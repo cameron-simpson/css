@@ -18,9 +18,12 @@ run_pull_mode=missing
 ff_postopts=
 
 cmd=$0
-usage="Usage: $cmd [--tm] [-U] ffmpeg-command-line-arguments...
+usage="Usage: $cmd [--tm] [-U] [ffmpeg-command-line-arguments...]
   Run ffmpeg via \"docker run ... $image ...\" as a method for
   running a modern ffmpeg on a stale system.
+
+  With no ffmpeg command line, recite the current image.
+  If -U is supplied, update the image.
 
   Leading options:
   -I image  Specify a different image name. Default from \$FFMPEG_DOCKER_IMAGE
@@ -51,9 +54,18 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+[ $# = 0 ] && {
+  docker images "$image"
+  case "$run_pull_mode" in
+    always)  $trace docker image pull "$image" ;;
+  esac
+  exit $?
+}
+
 # docker_name=$( echo "ffmpeg $inputbase $$" | tr -s "' .:+" "_____" )
 
 set -- \
+  env FFMPEG_DOCKER_IMAGE="$image" \
   python3 -c 'if 1:
                 from cs.ffmpegutils import main_ffmpeg_docker
                 main_ffmpeg_docker()
