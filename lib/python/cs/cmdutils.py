@@ -1270,7 +1270,7 @@ class BaseCommand:
         if not specs or not isinstance(specs[0], str):
           specs.insert(0, default_help_text)
         if needs_arg:
-          opt_spec = cls.OptionSpec.promote(specs)
+          opt_spec = OptionSpec.promote(specs)
           opt_spec_map[opt] = opt_spec
         opt_name_map[opt] = opt_name
     opts, post_argv = getopt(argv, shortopts, longopts)
