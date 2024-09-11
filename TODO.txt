@@ -1,3 +1,4 @@
+make stdin and stdout work correctly so that I can pipe ffmpeg commands
 script to run strace or truss or sudo dtruss -p PID etc depending on the OS
 cs.cmdutils OptSpec to be promotable, leverage in popopts
 fetch the dedrm package if not present, store where?
