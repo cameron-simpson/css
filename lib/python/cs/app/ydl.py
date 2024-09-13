@@ -40,12 +40,13 @@ import logging
 from os.path import splitext
 import sys
 from threading import RLock, Semaphore
+
 from youtube_dl import YoutubeDL
 from youtube_dl.utils import DownloadError
+
 from cs.cmdutils import BaseCommand
 from cs.excutils import logexc
 from cs.fstags import FSTags
-import cs.logutils
 from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
@@ -115,7 +116,7 @@ class YDLCommand(BaseCommand):
   class Options(BaseCommand.Options):
     parallel: int = DEFAULT_PARALLEL
     ydl_opts: dict = field(
-        default_factory=lambda: dict(logger=cs.logutils.loginfo.logger)
+        default_factory=lambda: dict(logger=logging.getLogger())
     )
 
   def apply_opts(self, opts):
@@ -137,7 +138,7 @@ class YDLCommand(BaseCommand):
               if options.parallel < 1:
                 raise GetoptError("must be >= 1")
         else:
-          raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+          raise NotImplementedError("unhandled option: %s=%s" % (opt, val))
 
   def main(self, argv):
     ''' Command line main programme.

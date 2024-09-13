@@ -7,25 +7,37 @@
 ''' Filesystem semantics for a Dir.
 '''
 
+from dataclasses import dataclass
 import errno
 from inspect import getmodule
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O_NOFOLLOW
+from os.path import (
+    basename,
+    isfile as isfilepath,
+    realpath,
+    splitext,
+)
 import shlex
+from threading import Thread
 from types import SimpleNamespace as NS
+from typing import Optional
 from uuid import UUID
 
-from cs.context import stackattrs
 from cs.excutils import logexc
+from cs.fs import shortpath
 from cs.later import Later
+from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import exception, error, warning, info, debug
 from cs.pfx import Pfx, pfx_method
 from cs.range import Range
 from cs.threads import locked, HasThreadState, State as ThreadState
 from cs.x import X
 
-from . import Lock, RLock, uses_Store
+from . import Lock, RLock, Store, uses_Store
+from .archive import Archive, FilePathArchive
 from .cache import BlockCache
+from .config import Config, uses_Config
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .meta import Meta
@@ -249,16 +261,13 @@ class Inodes:
   def load_fs_inode_dirents(self, D):
     ''' Load entries from an `fs_inode_dirents` Dir into the Inode table.
     '''
-    X("LOAD FS INODE DIRENTS:")
-    dump_Dirent(D)
+    ##dump_Dirent(D)
     for name, E in D.entries.items():
-      X("  name=%r, E=%r", name, E)
       with Pfx(name):
         # get the refcount from the :uuid:refcount" name
         _, refcount_s = name.split(':')[:2]
         I = self.add(E)
         I.refcount = int(refcount_s)
-        X("  I=%s", I)
 
   def get_fs_inode_dirents(self):
     ''' Create an `fs_inode_dirents` Dir containing Inodes which
@@ -270,8 +279,7 @@ class Inodes:
         D["%s:%d" % (uuid, I.refcount)] = I.E
       else:
         warning("refcount=%s, SKIP %s", I.refcount, I.E)
-    X("GET FS INODE DIRENTS:")
-    dump_Dirent(D)
+    ##dump_Dirent(D)
     return D
 
   def _new_inum(self):
@@ -347,6 +355,110 @@ class Inodes:
     except (KeyError, IndexError):
       return False
     return True
+
+@dataclass
+class MountSpec:
+  fsname: str
+  S: Store
+  D: Dir
+  basename: str
+  readonly: bool = True
+  archive: Optional[Archive] = None
+
+  # pylint: disable=too-many-branches
+  @classmethod
+  @pfx_method
+  @uses_Config
+  def from_str(
+      cls, special: str, *, readonly=True, config: Config
+  ) -> "MountSpec":
+    ''' Parse the mount command's special device from `special`.
+        Return the `MountSpec`.
+
+        Supported formats:
+        * `D{...}`: a raw `Dir` transcription.
+        * `[`*clause*`]`: a config clause name.
+        * `[`*clause*`]`*archive*: a config clause name
+        and a reference to a named archive associated with that clause.
+        * *archive_file*`.vt`: a path to a `.vt` archive file.
+    '''
+    fsname = special
+    specialD = None
+    special_store = None
+    archive = None
+    if special.startswith('D{') and special.endswith('}'):
+      # D{dir}
+      specialD, offset = Dir.parse(special)
+      if offset != len(special):
+        raise ValueError("unparsed text: %r" % (special[offset:],))
+      if not isinstance(specialD, Dir):
+        raise ValueError(
+            "does not seem to be a Dir transcription, looks like a %s" %
+            (type(specialD),)
+        )
+      special_basename = specialD.name
+      if not readonly:
+        warning("setting readonly")
+        readonly = True
+    elif special.startswith('['):
+      if special.endswith(']'):
+        # expect "[clause]"
+        clause_name, offset = get_ini_clausename(special)
+        archive_name = ''
+        special_basename = clause_name
+      else:
+        # expect "[clause]archive"
+        # TODO: just pass to Archive(special,config=config)?
+        # what about special_basename then?
+        clause_name, archive_name, offset = get_ini_clause_entryname(special)
+        special_basename = archive_name
+      if offset < len(special):
+        raise ValueError("unparsed text: %r" % (special[offset:],))
+      fsname = str(config) + special
+      try:
+        special_store = config[clause_name]
+      except KeyError:
+        # pylint: disable=raise-missing-from
+        raise ValueError("unknown config clause [%s]" % (clause_name,))
+      if archive_name is None or not archive_name:
+        special_basename = clause_name
+      else:
+        special_basename = archive_name
+      archive = special_store.get_Archive(archive_name)
+    else:
+      # pathname to archive file
+      arpath = special
+      if not isfilepath(arpath):
+        raise ValueError("not a file")
+      fsname = shortpath(realpath(arpath))
+      spfx, sext = splitext(basename(arpath))
+      if spfx and sext == '.vt':
+        special_basename = spfx
+      else:
+        special_basename = special
+      archive = FilePathArchive(arpath)
+    return cls(
+        fsname=fsname,
+        readonly=readonly,
+        S=special_store,
+        D=specialD,
+        basename=special_basename,
+        archive=archive,
+    )
+
+  def mount(self, mnt: str, **mount_kw) -> Thread:
+    from .fuse import mount
+    _mount_kw = dict(
+        S=self.S,
+        archive=self.archive,
+        readonly=self.readonly,
+    )
+    _mount_kw.update(mount_kw)
+    return mount(
+        mnt,
+        self.D,
+        **_mount_kw,
+    )
 
 class FileSystem(HasThreadState):
   ''' The core filesystem functionality supporting FUSE operations
@@ -435,14 +547,10 @@ class FileSystem(HasThreadState):
     try:
       with Pfx("fs_inode_dirents"):
         fs_inode_dirents = E.meta.get("fs_inode_dirents")
-        X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
         if fs_inode_dirents:
           inode_dir = _Dirent.from_str(fs_inode_dirents)
           dump_Dirent(inode_dir)
           inodes.load_fs_inode_dirents(inode_dir)
-        else:
-          X("NO INODE IMPORT")
-        X("FileSystem mntE:")
       with self.S:
         with self:
           dump_Dirent(mntE)

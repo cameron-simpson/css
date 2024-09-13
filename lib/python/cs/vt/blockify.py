@@ -11,11 +11,12 @@ import sys
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import fmtdoc, promote
+from cs.fs import shortpath
 from cs.logutils import warning
 from cs.pfx import pfx
 from cs.progress import progressbar
 from cs.queues import IterableQueue
-from cs.resources import uses_runstate
+from cs.resources import RunState, uses_runstate
 from cs.seq import tee
 from cs.threads import bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
@@ -99,37 +100,46 @@ def indirect_blocks(blocks):
       block = IndirectBlock.from_subblocks(subblocks)
     yield block
 
+@uses_runstate
 @promote
 def blockify(
     bfr: CornuCopyBuffer,
     *,
-    chunks_name=None,
+    name=None,
     scanner=None,
     min_block=None,
-    max_block=None
+    max_block=None,
+    runstate: RunState,
 ):
   ''' Wrapper for `blocked_chunks_of` which yields `Block`s
       from the data from `bfr`.
   '''
-  if chunks_name is None:
-    chunks_name = bfr.__class__.__name__
+  if name is None:
+    name = bfr.__class__.__name__
   for chunk in progressbar(
       blocked_chunks_of(bfr, scanner=scanner, min_block=min_block,
                         max_block=max_block),
-      label=f'blockify({chunks_name})',
+      label=f'blockify({name})',
       itemlenfunc=len,
       units_scale=BINARY_BYTES_SCALE,
+      total=bfr.final_offset,
   ):
-    yield Block.promote(chunk)
+    runstate.raiseif()
+    yield Block.from_bytes(chunk)
 
-@promote
-def block_for(bfr: CornuCopyBuffer, **kw):
-  ''' Return a top Block for the contents `bfr`, an iterable of `bytes`like objects
-      such as a `CornuCopyBuffer`.
+def block_for(src, *, name=None, **blockify_kw) -> Block:
+  ''' Return a top `Block` for the contents `bfr`, an iterable of
+      `bytes`like objects such as a `CornuCopyBuffer`.
+      This actually accepts any object suitable for `CornuCopyBuffer.promote`.
 
       Keyword arguments are passed to `blockify`.
   '''
-  return top_block_for(blockify(bfr, **kw))
+  if name is None:
+    if isinstance(src, int):
+      name = f'fd:{src}'
+    elif isinstance(src, str):
+      name = shortpath(src)
+  return top_block_for(blockify(src, name=name, **blockify_kw))
 
 def spliced_blocks(B, new_blocks):
   ''' Splice (note *insert*) the iterable `new_blocks` into the data of the `Block` `B`.

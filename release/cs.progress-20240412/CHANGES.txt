@@ -1,0 +1,17 @@
+lib/python/cs/progress.py: cs.progress: define a DEFAULT_UPDATE_PERIOD = 0.3 more as a suggestion
+lib/python/cs/progress.py: cs.progress: rename window to recent_window for clarity
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: fixes for the arrow_width computation
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: drop existing UpdProxy support, drop deferred, implement update_period using a ticker Thread
+lib/python/cs/progress.py: cs.progress: Progress.iterbar: drop preexisting UpdProxy support, update_frequency and update_min_size support; progressbar(): the same
+lib/python/cs/progress.py: cs.progress: update imports, make self tests easier to switch out, clean some lint
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: set update_period=DEFAULT_UPDATE_PERIOD by default
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: use a closure for the cancel flag instead of a RunState
+lib/python/cs/progress.py: cs.progress: BaseProgress.iterbar: also default update_period to DEFAULT_UPDATE_PERIOD
+lib/python/cs/progress.py: cs.progress: Progress: new advance_total(delta) method so that we have a callable for this
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: bugfix initial value of cancel_ticker
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: new optional poll parameter accepting a callable accepting a BaseProgress to update the state before updating the bar display
+lib/python/cs/progress.py: cs.progress: update imports
+lib/python/cs/progress.py: cs.progress: import transcribe as transcribe_units for clarity
+lib/python/cs/progress.py: cs.progress: new stalled='stalled' parameter to specify the term for no recent throughput, workers might prefer 'idle'
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: replace lambda with function to happy the linter
+lib/python/cs/progress.py: cs.progress: update DISTINFO

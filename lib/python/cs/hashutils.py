@@ -13,7 +13,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.lex import r
 
-__version__ = '20240316-post'
+__version__ = '20240412-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -24,6 +24,7 @@ DISTINFO = {
     'install_requires': [
         'cs.buffer',
         'cs.deco',
+        'cs.lex',
     ],
 }
 

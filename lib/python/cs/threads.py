@@ -20,7 +20,12 @@ from threading import (
     local as thread_local,
 )
 
-from cs.context import ContextManagerMixin, stackattrs, stackset
+from cs.context import (
+    ContextManagerMixin,
+    stackattrs,
+    stackset,
+    closeall,
+)
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
 from cs.gimmicks import error, warning
@@ -29,7 +34,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20240316-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'description':
@@ -46,6 +51,7 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.pfx',
         'cs.py.func',
+        'cs.py.stack',
         'cs.seq',
     ],
 }
@@ -120,7 +126,7 @@ class HasThreadState(ContextManagerMixin):
   THREAD_STATE_ATTR = 'perthread_state'
 
   @classmethod
-  def default(cls, factory=None, raise_on_None=False):
+  def default(cls, *, factory=None, raise_on_None=False):
     ''' The default instance of this class from `cls.perthread_state.current`.
 
         Parameters:
@@ -251,7 +257,11 @@ class HasThreadState(ContextManagerMixin):
     enter_it = iter(enter_tuples)
 
     def with_enter_objects():
-      ''' A recursive context manager to enter all the contexts implied by `enter_it`.
+      ''' A recursive context manager to enter all the contexts
+          implied by `enter_it`.
+          For each `(enter_obj,for_with)` in `enter_it`, if `for_with`
+          is true, enter the object using `with enter_obj:` otherwise
+          enter using: `with enter_object.per_thread_state(current=enter_obj)`.
       '''
       try:
         enter_obj, for_with = next(enter_it)
@@ -281,13 +291,13 @@ class HasThreadState(ContextManagerMixin):
     return builtin_Thread(name=name, target=target_wrapper, **Thread_kw)
 
   def bg(self, func, *, enter_objects=None, **bg_kw):
-    ''' Get a `Thread` using `type(elf).Thread` and start it.
+    ''' Get a `Thread` using `type(self).Thread` and start it.
         Return the `Thread`.
 
         The `HasThreadState.Thread` factory duplicates the current `Thread`'s
         `HasThreadState` current objects as current in the new `Thread`.
         Additionally it enters the contexts of various objects using
-        `with obj` accorind to the `enter_objects` parameter.
+        `with obj` according to the `enter_objects` parameter.
 
         The value of the optional parameter `enter_objects` governs
         which objects have their context entered using `with obj`
@@ -295,7 +305,8 @@ class HasThreadState(ContextManagerMixin):
         - `None`: the default, meaning `(self,)`
         - `False`: no object contexts are entered
         - `True`: all current `HasThreadState` object contexts will be entered
-        - an iterable of objects whose contexts will be entered
+        - an iterable of objects whose contexts will be entered;
+          pass `()` to enter no objects
     '''
     cls = type(self)
     if enter_objects is None:
@@ -318,6 +329,7 @@ def bg(
     args=None,
     kwargs=None,
     thread_factory=None,
+    pre_enter_objects=None,
     **tfkw,
 ):
   ''' Dispatch the callable `func` in its own `Thread`;
@@ -325,18 +337,23 @@ def bg(
 
       Parameters:
       * `func`: a callable for the `Thread` target.
+      * `args`, `kwargs`: passed to the `Thread` constructor
+      * `kwargs`, `kwargs`: passed to the `Thread` constructor
       * `daemon`: optional argument specifying the `.daemon` attribute.
       * `name`: optional argument specifying the `Thread` name,
         default: the name of `func`.
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
-      * `thread_factory`: the `Thread` factory, default `HasThreadState.Thread`,
-        which prepares a new `threading.Thread` with the default
-        `HasThreadState` contexts
-      * `thread_states`: passed to the  `thread_factory` factory;
-        default `True`
-      * `args`, `kwargs`: passed to the `Thread` constructor
+      * `pre_enter_objects`: an optional iterable of objects which
+        should be entered using `with`
+
+      If `pre_enter_objects` is supplied, these objects will be
+      entered before the `Thread` is started and exited when the
+      `Thread` target function ends.
+      If the `Thread` is _not_ started (`no_start=True`, very
+      unusual) then it will be the caller's responsibility to manage
+      to entered objects.
   '''
   if name is None:
     name = funcname(func)
@@ -346,15 +363,20 @@ def bg(
     kwargs = {}
   if thread_factory is None:
     thread_factory = HasThreadState.Thread
-
   ##thread_prefix = prefix() + ': ' + name
   thread_prefix = name
+  preopen_close = None
 
   def thread_body():
     ''' Establish a basic `Pfx` context for the target `func`.
     '''
-    with Pfx("Thread:%d:%s", current_thread().ident, thread_prefix):
-      return func(*args, **kwargs)
+    try:
+      with Pfx("Thread:%d:%s", current_thread().ident, thread_prefix):
+        return func(*args, **kwargs)
+    finally:
+      if preopen_close is not None:
+        # do the closes
+        preopen_close()
 
   T = thread_factory(
       name=thread_prefix,
@@ -365,6 +387,8 @@ def bg(
     func = logexc(func)
   if daemon is not None:
     T.daemon = daemon
+  if pre_enter_objects:
+    preopen_close = closeall(pre_enter_objects)
   if not no_start:
     T.start()
   return T
@@ -381,7 +405,7 @@ def joinif(T: builtin_Thread):
       the same thread as the "final close" shutdown phase, it is
       possible for example for a worker `Thread` to execute the
       shutdown phase and try to join itself. Using this function
-      allows that scenario.
+      supports that scenario.
   '''
   if T is not current_thread():
     T.join()
@@ -515,8 +539,8 @@ def locked_property(
 
   @transmute(exc_from=AttributeError)
   def locked_property_getprop(self):
-    ''' Attempt lockless fetch of property first.
-        Use lock if property is unset.
+    ''' Attempt lockless fetch of the property first.
+        Use lock if the property is unset.
     '''
     p = getattr(self, prop_name, unset_object)
     if p is unset_object:
@@ -556,21 +580,21 @@ class LockableMixin(object):
 
   @property
   def lock(self):
-    ''' Return the lock.
+    ''' The internal lock object.
     '''
     return self._lock
 
 def via(cmanager, func, *a, **kw):
   ''' Return a callable that calls the supplied `func` inside a
-      with statement using the context manager `cmanager`.
+      `with` statement using the context manager `cmanager`.
       This intended use case is aimed at deferred function calls.
   '''
 
-  def f():
+  def via_func_wrapper():
     with cmanager:
       return func(*a, **kw)
 
-  return f
+  return via_func_wrapper
 
 class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
                                      'name priority lock priority_lock')):
@@ -758,20 +782,22 @@ class NRLock:
   ''' A nonrecursive lock.
       Attempting to take this lock when it is already held by the current `Thread`
       will raise `DeadlockError`.
-      Otherwise this behaves likc `threading.Lock`.
+      Otherwise this behaves like `threading.Lock`.
   '''
 
-  __slots__ = ('_lock', '_lock_thread', '_locked_by')
+  __slots__ = ('_lock', '_lock_thread', '_locked_by', '_name')
 
-  def __init__(self):
+  def __init__(self, name=None):
     self._lock = Lock()
     self._lock_thread = None
     self._locked_by = None
+    self._name = name
 
   def __repr__(self):
     return (
-        f'{self.__class__.__name__}:{self._lock}:{self._lock_thread}:{self._locked_by}'
-        if self.locked() else f'{self.__class__.__name__}:{self._lock}'
+        f'{self.__class__.__name__}:{self._name!r}:{self._lock}:{self._lock_thread}:{self._locked_by}'
+        if self.locked() else
+        f'{self.__class__.__name__}:{self._name!r}:{self._lock}'
     )
 
   def locked(self):
@@ -785,7 +811,9 @@ class NRLock:
     '''
     lock = self._lock
     if lock.locked() and current_thread() is self._lock_thread:
-      raise DeadlockError('lock already held by current Thread')
+      raise DeadlockError(
+          f'lock already held by current Thread:{self._locked_by}'
+      )
     acquired = lock.acquire(*a, **kw)
     if acquired:
       if caller_frame is None:
@@ -795,6 +823,8 @@ class NRLock:
     return acquired
 
   def release(self):
+    ''' Release the lock as for `threading.Lock`.
+    '''
     self._lock.release()
     self._lock_thread = None
     self._locked_by = None

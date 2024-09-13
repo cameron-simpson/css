@@ -1,0 +1,4 @@
+lib/python/cs/fileutils.py: cs.fileutils: atomic_filename: slightly nicer temp file name
+lib/python/cs/fileutils.py: cs.fileutils: makelockfile: cap the retry poll interval at 37s, just issue a warning if the lock file is already gone on exit (eg manual removal)
+lib/python/cs/fileutils.py: cs.fileutils: makelockfile: fix call to min()
+lib/python/cs/fileutils.py: cs.fileutils: tee: refactor to use stackattrs

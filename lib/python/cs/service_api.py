@@ -19,16 +19,15 @@ from typing import Mapping, Set
 from icontract import require
 import requests
 
-from cs.context import stackattrs
 from cs.deco import promote
-from cs.fstags import FSTags
+from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.upd import uses_upd
 
-__version__ = '20230703-post'
+__version__ = '20240723-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -38,7 +37,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context',
         'cs.deco',
         'cs.fstags',
         'cs.logutils',
@@ -60,23 +58,20 @@ class ServiceAPI(MultiOpenMixin):
   API_RETRY_DELAY = 5  # interval between request retries
 
   @promote
-  def __init__(self, *, sqltags: SQLTags):
+  @uses_fstags
+  def __init__(self, *, fstags: FSTags, sqltags: SQLTags):
+    self.fstags = fstags
     self.sqltags = sqltags
-    self.fstags = None
     self._lock = RLock()
     self.login_state_mapping = None
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Start up: open and init the `SQLTags`, open the `FSTags`.
+    ''' Open/close the FSTags and SQLTags.
     '''
-    sqltags = self.sqltags
-    fstags = FSTags()
-    with sqltags:
-      sqltags.init()
-      with fstags:
-        with stackattrs(self, fstags=fstags):
-          yield
+    with self.sqltags:
+      with self.fstags:
+        yield
 
   def login(self) -> Mapping:
     ''' Do a login: authenticate to the service, return a mapping of related information.

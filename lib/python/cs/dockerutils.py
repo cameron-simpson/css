@@ -30,7 +30,7 @@ from cs.context import stackattrs
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.psutils import run
 
-__version__ = '20240305-post'
+__version__ = '20240519-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -248,7 +248,7 @@ class DockerRun:
   input_root: str = INPUTDIR_DEFAULT
   input_map: dict = field(default_factory=dict)
   output_root: str = OUTPUTDIR_DEFAULT
-  outputpath: str = '.'
+  output_hostdir: str = '.'
   output_map: dict = field(default_factory=dict)
   as_root: bool = False
   pull_mode: str = 'missing'
@@ -377,11 +377,11 @@ class DockerRun:
         raise ValueError('not an absolute path')
       if self.output_root != normpath(self.output_root):
         raise ValueError('not normalised')
-    with Pfx("outputpath:%r", self.outputpath):
+    with Pfx("output_hostdir:%r", self.output_hostdir):
       # output mount point
-      if not self.outputpath:
-        self.outputpath = '.'
-      if not isdirpath(self.outputpath):
+      if not self.output_hostdir:
+        self.output_hostdir = '.'
+      if not isdirpath(self.output_hostdir):
         raise ValueError('not a directory')
     docker_argv = [
         docker_exe,
@@ -413,7 +413,7 @@ class DockerRun:
             '--mount',
             mount_escape(
                 'type=bind',
-                f'source={abspath(self.outputpath)}',
+                f'source={abspath(self.output_hostdir)}',
                 f'destination={self.output_root}',
             ),
         ]

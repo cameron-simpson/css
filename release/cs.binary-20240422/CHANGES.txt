@@ -1,0 +1,2 @@
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan: drop Pfx context, ill behaved in a generator function
+lib/python/cs/binary.py: cs.binary: new _BinaryMultiValue_Base.for_json() method returning a dict containing the fields

@@ -84,7 +84,6 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     self._workQ = None
     self.cachefiles = []
     self._add_cachefile()
-    self.runstate.notify_cancel.add(lambda rs: self.close())
 
   @contextmanager
   def startup_shutdown(self):
@@ -139,6 +138,14 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     if backend:
       return h in backend
     return False
+
+  def __len__(self):
+    ''' Count the number of keys by iterating through them all.
+    '''
+    length = 0
+    for _ in self.keys():
+      length += 1
+    return length
 
   def keys(self):
     ''' Mapping method for .keys.

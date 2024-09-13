@@ -1,0 +1,19 @@
+lib/python/cs/cache.py: cs.cache,cs.mappings: move CachingMapping to cs.cache
+lib/python/cs/cache.py: cs.cache: CachingMapping: implement __str__ and __repr__
+lib/python/cs/cache.py: cs.cache: CachingMapping.startup_shutdown: use try/finally for the cleanup
+lib/python/cs/cache.py: cs.cache: CachingMapping: implement __len__
+lib/python/cs/cache.py: cs.cache: CachingMapping: not an ABC
+lib/python/cs/cache.py: cs.cache: CachingMapping: implement a flush() method
+lib/python/cs/cache.py: cs.cache: update imports
+lib/python/cs/cache.py: cs.cache: CachingMapping: wrap use of the backing mapping with withif()
+lib/python/cs/cache.py: cs.cache: CachingMapping: process data items in batches, hold a lock during processing
+lib/python/cs/cache.py: cs.cache: LRU_Cache: use the lock
+lib/python/cs/cache.py: cs.cache: rename maxsize to max_size
+lib/python/cs/cache.py: cs.cache: LRU_Cache: add keys() and items()
+lib/python/cs/cache.py: cs.cache: CachingMapping: use an LRU_Cache for the cache to cap its size, add delitem_bg and setitem_bg optional parameters for backends with workers, many other internal changes
+lib/python/cs/cache.py: cs.cache: uses type annotations etc, drop Python 2 support from DISTINFO
+lib/python/cs/cache.py: cs.cache: CachingMapping: new optional missing_fallthrough=False parameter, drops use of MISSING in favour of querying the backend
+lib/python/cs/cache.py: cs.cache: CachingMapping: worker: leave cached things in the cache
+lib/python/cs/cache.py: cs.cache: LRU_Cache: use an RLock, was deadlocking in cs.vt
+lib/python/cs/cache.py: cs.cache: update DISTINFO
+lib/python/cs/cache.py: cs.cache: update DISTINFO some more

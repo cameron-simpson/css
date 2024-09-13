@@ -144,8 +144,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         return id(tree), subdir_name
 
-      @typechecked
       @require(lambda subdir_name: os.sep not in subdir_name)
+      @typechecked
       def __init__(self, tree: KindleTree, subdir_name: str):
         ''' Initialise this book subdirectory reference.
 
@@ -636,10 +636,12 @@ class KindleCommand(BaseCommand):
   GETOPT_SPEC = 'C:K:'
 
   USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] [subcommand [...]]
-  -C calibre_library
-    Specify calibre library location.
-  -K kindle_library
-    Specify kindle library location.'''
+  Operate on a Kindle library.
+  Options:
+    -C calibre_library
+      Specify calibre library location.
+    -K kindle_library
+      Specify kindle library location.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 

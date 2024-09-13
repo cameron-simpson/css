@@ -1,0 +1,3 @@
+file_checksum: skip any nonregular file, only use run_task when checksumming more than 1MiB.
+HashIndexCommand.cmd_rearrange: run the refdir index in relative mode.
+Small fixes.

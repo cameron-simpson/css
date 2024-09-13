@@ -1,0 +1,1 @@
+hashindex: plumb hashname to file_checksum.
