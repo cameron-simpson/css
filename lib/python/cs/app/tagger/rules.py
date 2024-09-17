@@ -97,9 +97,23 @@ class RuleResult:
   # exceptions running the action
   failed: List[Exception] = field(default_factory=list)
 
-class _Token(Promotable, ABC):
+@dataclass
+class _Token(Promotable):
   ''' Base class for tokens.
   '''
+
+  source_text: str
+  offset: int
+  end_offset: int
+
+  def __str__(self):
+    return self.matched_text
+
+  @property
+  def matched_text(self):
+    ''' The text from `self.source_text` which matches this token.
+    '''
+    return self.source_text[self.offset:self.end_offset]
 
   @classmethod
   def token_subclasses(cls):
@@ -114,74 +128,74 @@ class _Token(Promotable, ABC):
       q.extend(subcls.__subclasses__())
     return token_classes
 
-  @abstractclassmethod
-  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    ''' Parse a token from `test` at `offset`.
-        Return a 3-tuple of `(token_s,token,end_offset)`:
-        * `token_s`: the source text of the token
-        * `token`: the parsed object which the token represents
-        * `end_offset`: the parse offset after the token
-        This skips any leading whitespace.
-        If there is no recognised token, return `(None,None,offset)`.
+  @pfx_method
+  def parse(cls, text: str, offset: int = 0) -> "_Token":
+    ''' Parse a token from `test` at `offset` (default `0`).
+        Return a `_Token` subclass instance.
+        Raise `SyntaxError` if no subclass parses it.
+
+        This base class method attempts the `.parse` method of all
+        the public subclasses.
     '''
-    raise NotImplementedError
+    token_classes = cls.token_subclasses()
+    if not token_classes:
+      raise RuntimeError("no public subclasses")
+    for subcls in token_classes:
+      print("parse: try", subcls, "parse", repr(text))
+      try:
+        return subcls.parse(text, offset=offset)
+      except SyntaxError as e:
+        warning("%s.parse: %s", subcls.__name__, e)
+    raise SyntaxError(
+        'no subclass.parse succeeded,'
+        f'tried {",".join(subcls.__name__ for subcls in token_classes)}'
+    )
+
+  @classmethod
+  def pop(cls, text: str, offset: int = 0) -> "_Token":
+    ''' Pop a token from `text` at `offset` (default `0`).
+        This method skips any leading whitespace on `text` at `offset`.
+    '''
+    start_offset = skipwhite(text, offset)
+    return cls.parse(text, start_offset)
 
   @classmethod
   @pfx_method
   @typechecked
   def from_str(cls, text: str) -> "_Token":
     ''' Parse `test` as a token of type `cls`, return the token.
+        Raises `SyntaxError` on a parse failure.
         This is a wrapper for the `parse` class method.
     '''
-    if not text or text[0].isspace():
-      raise ValueError("expected text to start with nonwhitespace")
-    token_classes = cls.token_subclasses()
-    for subcls in token_classes:
-      print("from_str: try", subcls, "parse", repr(text))
-      try:
-        token_s, token, end_offset = subcls.parse(text)
-      except (SyntaxError, ValueError) as e:
-        print("from_str: exception:", e)
-      else:
-        break
-    else:
-      raise ValueError(
-          f'no {cls.__name__} subclass matched'
-          f', tried: {", ".join(subcls.__name for subcls in token_classes)}'
+    token = cls.parse(text)
+    if token.end_offset != len(text):
+      raise SyntaxError(
+          f'unparsed text at offset {token.end_offset}:'
+          f' {text[token.end_offset:]!r}'
       )
-    if end_offset != len(text):
-      raise ValueError('whitespace after token {token.matched!r}')
     return token
 
-  @abstractmethod
-  def __str__(self):
-    ''' Return this `_Token`'s parsable form.
-    '''
-    raise NotImplementedError
 
+@dataclass
 class Identifier(_Token):
   ''' A dotted identifier.
   '''
 
-  @require(lambda name: is_identifier(name))
-  def __init__(self, name: str):
-    self.name = name
-
-  @ensure(lambda result: is_identifier(result))
-  def __str__(self):
-    return self.name
+  name: str
 
   @classmethod
   def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     ''' Parse a dotted identifier from `test`.
     '''
-    start_offset = skipwhite(text, offset)
-    name, end_offset = get_dotted_identifier(text, start_offset)
+    name, end_offset = get_dotted_identifier(text, offset)
     if not name:
       raise SyntaxError(
           f'{offset}: expected dotted identifier, found {text[offset:offset+3]!r}...'
       )
-    return text[start_offset:end_offset], cls(name), end_offset
+    return cls(
+        source_text=text, offset=offset, end_offset=end_offset, name=name
+    )
+
 
 class _LiteralValue(_Token):
   value: Any
@@ -211,7 +225,9 @@ class NumericValue(_LiteralValue):
       value = int(m.group())
     except ValueError:
       value = float(m.group())
-    return text[start_offset:m.end()], cls(value), m.end()
+    return cls(
+        source_text=text, offset=offset, end_offset=m.end(), value=value
+    )
 
 @dataclass
 class QuotedString(_LiteralValue):
@@ -225,38 +241,38 @@ class QuotedString(_LiteralValue):
     return slosh_quote(self.value, self.quote)
 
   @classmethod
-  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  def parse(cls, text: str, offset: int = 0) -> "_Token":
     ''' Parse a double quoted string from `text`.
     '''
-    start_offset = skipwhite(text, offset)
-    if not text.startswith('"', start_offset):
+    if not text.startswith('"', offset):
       raise SyntaxError(
-          f'{start_offset}: expected ", found {text[start_offset:start_offset+1]!r}'
+          f'{offset}: expected ", found {text[offset:offset+1]!r}'
       )
-    q = text[start_offset]
-    value, end_offset = get_qstr(text, start_offset)
-    return text[start_offset:end_offset], cls(value, q), end_offset
+    q = text[offset]
+    value, end_offset = get_qstr(text, offset)
+    return cls(
+        source_text=text,
+        offset=offset,
+        end_offset=end_offset,
+        value=value,
+        quote=q,
+    )
 
 @dataclass
 class TagAddRemove(_Token):
   tag: Tag
   add_remove: bool = True
 
-  def __str__(self):
-    if self.add_remove:
-      return str(self.tag)
-    return f'-{self.tag.name}'
-
   @classmethod
   def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    start_offset = skipwhite(text, offset)
-    with Pfx("%d:%r...", start_offset, text[start_offset:start_offset + 16]):
-      if text.startswith('-', start_offset):
+    offset0 = offset
+    with Pfx("%d:%r...", offset, text[offset:offset + 16]):
+      if text.startswith('-', offset):
         add_remove = False
-      elif text.startswith('+', start_offset):
+      elif text.startswith('+', offset):
         add_remove = True
       else:
-        raise ValueError(f'expected + or -, got: {text[offset:offset+1]!r}')
+        raise SyntaxError(f'expected + or -, got: {text[offset:offset+1]!r}')
     offset += 1
     with Pfx("%d:%r...", offset, text[offset:offset + 16]):
       name, offset = get_dotted_identifier(text, offset)
@@ -269,16 +285,21 @@ class TagAddRemove(_Token):
         raise ValueError(f'{offset}: unexpected assignment following -{name}')
       offset += 1
       with Pfx("%d:%r...", offset, text[offset:offset + 16]):
-        _, qs, end_offset = QuotedString.from_str(text, offset)
+        qs = QuotedString.from_str(text[offset:])
         if qs is None:
           raise ValueError(f'expected quoted string after {name}=')
       value = qs.value
+      end_offset = qs.end_offset
     else:
       value = None
       end_offset = offset
-    return text[start_offset:end_offset], cls(
-        tag=Tag(name, value), add_remove=add_remove
-    ), end_offset
+    return cls(
+        source_text=text,
+        offset=offset0,
+        end_offset=end_offset,
+        tag=Tag(name, value),
+        add_remove=add_remove,
+    )
 
 class _Comparison(_Token, ABC):
   ''' Abstract base class for comparisons.
@@ -288,62 +309,55 @@ class _Comparison(_Token, ABC):
   def __call__(self, value, tags):
     raise NotImplementedError
 
+@dataclass
 class EqualityComparison(_Comparison):
   ''' A comparison of some value for equality.
   '''
 
-  @typechecked
-  def __init__(self, compare_s: str):
-    self.compare_s = compare_s
+  reference_value: Any
 
-  def __str__(self):
-    q = '"'
-    return f'== {slosh_quote(self.compare_s,q)}'
+  OP_SYMBOL = '=='
 
   @classmethod
   @typechecked
-  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  def parse(cls, text: str, offset: int = 0) -> "_Token":
     ''' Match a string or numeric value in `text` at `offset`.
-        Return a 3-tuple of `(matched_text,_Token,end_offset)`
-        being the matching source text,
     '''
-    start_offset = skipwhite(text, offset)
-    if not text.startswith('==', start_offset):
+    if not text.startswith('==', offset):
       raise SyntaxError(
-          f'{offset}: expected "==", found {text[start_offset:start_offset+2]!r}'
+          f'{offset}: expected "==", found {text[offset:offset+2]!r}'
       )
-    offset = skipwhite(text, start_offset + 2)
-    _, qs, end_offset = QuotedString.from_str(text, offset)
-    return text[start_offset:end_offset], cls(qs.value), end_offset
+    qs = QuotedString.pop(text, offset + 2)
+    return cls(
+        source_text=text,
+        offset=offset,
+        end_offset=qs.end_offset,
+        reference_value=qs.value
+    )
 
   def __call__(self, value_s: str, tags: TagSet):
     return value_s == self.compare_s
 
+@dataclass
 class RegexpComparison(_Comparison):
   ''' A comparison of some string using a regular expression.
       Return is `None` on no omatch or the `Match.groupdict()` on a match.
   '''
 
+  regexp: re.Pattern
+  delim: str
+
   # supported delimiters for regular expressions
   REGEXP_DELIMS = '/:!|'
 
-  @require(lambda self, delim: delim in self.REGEXP_DELIMS)
-  @typechecked
-  def __init__(self, regexp: Pattern, delim: str):
-    self.regexp = regexp
-    self.delim = delim
-
-  def __str__(self):
-    return f'~ {self.delim}{self.regexp.pattern}{self.delim}'
-
   @classmethod
-  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    start_offset = skipwhite(text, offset)
-    if not text.startswith('~', start_offset):
+  def parse(cls, text: str, offset: int = 0) -> "_Token":
+    offset0 = offset
+    if not text.startswith('~', offset):
       raise SyntaxError(
-          f'{start_offset}: expected "~", found {text[start_offset:start_offset+1]!r}'
+          f'{offset}: expected "~", found {text[offset:offset+1]!r}'
       )
-    offset = skipwhite(text, start_offset + 1)
+    offset = skipwhite(text, offset + 1)
     if not text.startswith(tuple(cls.REGEXP_DELIMS), offset):
       raise SyntaxError(
           f'{offset}: expected regular expression delimited by one of {cls.REGEXP_DELIMS!r}'
@@ -358,15 +372,19 @@ class RegexpComparison(_Comparison):
     re_s = text[offset:endpos]
     end_offset = endpos + 1
     regexp = pfx_call(re.compile, re_s)
-    return text[start_offset:end_offset], cls(regexp, delim), end_offset
+    return cls(
+        source_text=text,
+        offset=offset0,
+        end_offset=end_offset,
+        regexp=regexp,
+        delim=delim
+    )
 
   def __call__(self, value: str, tags: TagSet):
     m = self.regexp.search(value)
     if not m:
       return None
     return m.groupdict()
-
-TokenRecord = namedtuple('TokenRecord', 'matched token end_offset')
 
 Action = Union[str, Tuple[bool, Tag]]
 
@@ -524,52 +542,34 @@ class Rule(Promotable):
   # TODO: should be class method of _Token
   @classmethod
   @typechecked
-  def get_token(cls, rule_s: str, offset: int = 0) -> Tuple[str, _Token, int]:
+  def get_token(cls, rule_s: str, offset: int = 0) -> _Token:
     ''' Parse a token from `rule_s` at `offset`.
-        Return a 3-tuple of `(token_s,token,offset)`:
-        * `token_s`: the source text of the token
-        * `token`: the parsed object which the token represents
-        * `offset`: the parse offset after the token
         This skips any leading whitespace.
-        If there is no recognised token, return `(None,None,offset)`.
+        Raise `EOFError` at the end of the string or at a comment.
+        Raise `SyntaxError` if no token is recognised.
     '''
     offset = skipwhite(rule_s, offset)
     if offset == len(rule_s) or rule_s.startswith(('#', '//'), offset):
       # end of string or comment -> end of tokens
       raise EOFError
-    for token_type in (
-        Identifier,
-        QuotedString,
-        EqualityComparison,
-        RegexpComparison,
-        TagAddRemove,
-    ):
+    for token_type in _Token.token_subclasses():
       try:
-        matched_s, token, end_offset = token_type.from_str(rule_s, offset)
-      except SyntaxError:  # as e:
-        ##warning("not %s: %s", token_type.__name__, e)
+        return token_type.parse(rule_s, offset)
+      except SyntaxError as e:
         continue
-      return matched_s, token, end_offset
-    raise SyntaxError(f'unrecognised token at: {rule_s[offset:]}')
+    raise SyntaxError(f'no token recognised at: {rule_s[offset:]!r}')
 
   @classmethod
   def tokenise(cls, rule_s: str, offset: int = 0):
-    ''' Generator yielding `(token_s,token,offset)` 3-tuples.
-        * `token_s`: the source text of the token
-        * `token`: the parsed object which the token represents
-        * `offset`: the parse offset after the token
+    ''' Generator yielding `_Token`s.
     '''
     while True:
       try:
-        token_s, token, offset = cls.get_token(rule_s, offset)
+        token = cls.get_token(rule_s, offset)
       except EOFError:
         return
-      assert rule_s[:offset].endswith(token_s), (
-          f'rule_s[:offset={offset}]'
-          f' should end with token_s:{token_s!r}'
-          f' but ends with {rule_s[:offset][-len(token_s):]!r}'
-      )
-      yield TokenRecord(matched=token_s, token=token, end_offset=offset)
+      offset = token.end_offset
+      yield token
 
   @classmethod
   def from_str(
@@ -633,7 +633,7 @@ class Rule(Promotable):
       f'action.modes not in RULE_MODES:f{RULE_MODES!r}'
   )
   @typechecked
-  def pop_action(tokens: List[TokenRecord]) -> Union[Callable, None]:
+  def pop_action(tokens: List[_Token]) -> Union[Callable, None]:
     ''' Pop an action from `tokens`.
     '''
     action_token = tokens.pop(0).token
@@ -691,7 +691,9 @@ class Rule(Promotable):
           while tokens:
             token = tokens.pop(0).token
             if not isinstance(token, TagAddRemove):
-              raise ValueError(f'expected TagAddRemove tokens, found: {token}')
+              raise SyntaxError(
+                  f'expected TagAddRemove tokens, found: {token}'
+              )
             tag_tokens.append(token)
 
           @typechecked
@@ -728,7 +730,7 @@ class Rule(Promotable):
 
   @staticmethod
   @pops_tokens
-  def pop_match_test(tokens: List[TokenRecord]) -> Tuple[Callable, str]:
+  def pop_match_test(tokens: List[_Token]) -> Tuple[Callable, str]:
     ''' Pop a match-test from `tokens`.
     '''
     # [match-name] match-op
@@ -752,18 +754,17 @@ class Rule(Promotable):
     raise ValueError("invalid match-test")
 
   @staticmethod
-  @pops_tokens
-  def pop_quick(tokens: List[TokenRecord]) -> bool:
+  def pop_quick(tokens: List[_Token]) -> bool:
     ''' Check if the next token is `Identifier(name="quick")`.
         If so, pop it and return `True`, otherwise `False`.
     '''
-    if tokens:
-      next_token = tokens[0].token
-      match next_token:
-        case Identifier(name="quick"):
-          tokens.pop(0)
-          return True
-    return False
+    if not tokens:
+      return False
+    next_token = tokens[0].token
+    if type(next_token) is not Identifier or next_token.name != 'quick':
+      return False
+    tokens.pop(0)
+    return True
 
   @classmethod
   def from_file(
