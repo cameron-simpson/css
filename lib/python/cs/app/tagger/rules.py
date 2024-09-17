@@ -414,7 +414,7 @@ class RegexpComparison(_Comparison):
         delim=delim
     )
 
-  def __call__(self, value: str, tags: TagSet):
+  def __call__(self, value: str, tags: TagSet) -> dict:
     m = self.regexp.search(value)
     if not m:
       return None
@@ -433,7 +433,7 @@ class Rule(Promotable):
       definition: str,
       match_attribute: str,
       match_test: Callable[[str, TagSet], dict],
-      action: Callable[..., Iterable[Action]],
+      action: Union[None, Callable[..., Iterable[Action]]],
       *,
       quick=False,
       filename=None,
@@ -546,7 +546,9 @@ class Rule(Promotable):
                 case TagChange() as tag_change:
                   result.tag_changes.append(tag_change)
                 case _:
-                  raise NotImplementedError(f'unsupported side effect {r(side_effect)}')
+                  raise NotImplementedError(
+                      f'unsupported side effect {r(side_effect)}'
+                  )
     return result
 
   @typechecked
@@ -718,6 +720,10 @@ class Rule(Promotable):
               )
               mv_action.modes = ('move',)
               return mv_action
+            case _:
+              raise SyntaxError(
+                  f'expected a quoted string after {action_token}'
+              )
         case Identifier(name="tag"):
           if not tokens:
             raise ValueError("missing tags")
@@ -807,7 +813,7 @@ class Rule(Promotable):
       *,
       filename: str = None,
       start_lineno: int = 1,
-  ):
+  ) -> List["Rule"]:
     ''' Read rules from `lines`.
         If `lines` is a string, treat it as a filename and open it for read.
     '''
@@ -821,7 +827,7 @@ class Rule(Promotable):
     rules = []
     for lineno, line in enumerate(lines, start_lineno):
       with Pfx(lineno):
-        R = cls.from_str(line, filename=filename, lineno=lineno)
+        R = cls.from_str(line.rstrip(), filename=filename, lineno=lineno)
         print(filename, lineno, R)
         if R is not None:
           rules.append(R)
