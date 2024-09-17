@@ -64,8 +64,8 @@ def pops_tokens(func):
   '''
 
   @typechecked
-  def pops_token_wrapper(tokens: List[TokenRecord]):
-    tokens0 = list(tokens)
+  def pops_token_wrapper(tokens: List["_Token"]):
+    tokens0 = tokens[:]
     try:
       return func(tokens)
     except:  # pylint: disable=
