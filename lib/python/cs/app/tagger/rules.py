@@ -335,8 +335,42 @@ class EqualityComparison(_Comparison):
         reference_value=qs.value
     )
 
-  def __call__(self, value_s: str, tags: TagSet):
-    return value_s == self.compare_s
+  @typechecked
+  def __call__(
+      self, comparison_value: Union[str, int, float], tags: TagSet
+  ) -> bool:
+    ''' Test `comparison_value` for equality `self.reference_value` value.
+
+        If the reference value is numeric we will promote a string
+        comparison to its numeric value via `int()` or `float()`;
+        invalid numeric strings issue a warning and return `False`.
+
+        If the reference value is a string, return `False` if the comparison
+        value is not a string.
+
+        Otherwise compare using `==`.
+    '''
+    with Pfx("%s(%s %s %s)", r(comparison_value), self.OP_SYMBOL,
+             r(self.reference_value)):
+      value = self.reference_value
+      # promote the comparison value to match the reference value
+      if isinstance(value, str):
+        if not isinstance(comparison_value, str):
+          warning("cannot compare nonstring to string")
+          return False
+      elif isinstance(value, (int, float)):
+        if isinstance(comparison_value, str):
+          try:
+            comparison_value = int(comparison_value)
+          except ValueError:
+            try:
+              comparison_value = float(comparison_value)
+            except ValueError:
+              warning("cannot convert %s to int or float", r(comparison_value))
+              return False
+      else:
+        raise RuntimeError(f'unhandled reference_value {r(value)}')
+      return comparison_value == value
 
 @dataclass
 class RegexpComparison(_Comparison):
