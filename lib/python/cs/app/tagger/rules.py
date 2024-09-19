@@ -630,7 +630,7 @@ class Rule(Promotable):
     if not tokens:
       # empty command
       return None
-    verb = tokens.pop(0).token
+    verb = tokens.pop(0)
     with Pfx(verb):
       quick = False
       match verb:
@@ -666,13 +666,13 @@ class Rule(Promotable):
   def pop_action(tokens: List[_Token]) -> Union[Callable, None]:
     ''' Pop an action from `tokens`.
     '''
-    action_token = tokens.pop(0).token
+    action_token = tokens.pop(0)
     with Pfx(action_token):
       match action_token:
         case Identifier(name="mv"):
           if not tokens:
             raise ValueError("missing mv target")
-          target_token = tokens.pop(0).token
+          target_token = tokens.pop(0)
           match target_token:
             case QuotedString():
               target_format = target_token.value
@@ -723,7 +723,7 @@ class Rule(Promotable):
             raise ValueError("missing tags")
           tag_tokens = []
           while tokens:
-            token = tokens.pop(0).token
+            token = tokens.pop(0)
             if not isinstance(token, TagAddRemove):
               raise SyntaxError(
                   f'expected TagAddRemove tokens, found: {token}'
@@ -770,7 +770,7 @@ class Rule(Promotable):
     # [match-name] match-op
     match_attribute = "basename"
     if tokens:
-      next_token = tokens[0].token
+      next_token = tokens[0]
       match next_token:
         case Identifier():
           tokens.pop(0)
@@ -778,7 +778,7 @@ class Rule(Promotable):
     if not tokens:
       raise ValueError("missing match-op")
     # make a match_test function
-    match_op = tokens.pop(0).token
+    match_op = tokens.pop(0)
     with Pfx(match_op):
       match match_op:
         case _Comparison():
@@ -794,7 +794,7 @@ class Rule(Promotable):
     '''
     if not tokens:
       return False
-    next_token = tokens[0].token
+    next_token = tokens[0]
     if type(next_token) is not Identifier or next_token.name != 'quick':
       return False
     tokens.pop(0)
