@@ -882,6 +882,19 @@ class RunState(FSM, HasThreadState):
       if inc_delay > 0:
         time.sleep(inc_delay)
 
+  def bg(self, func, **bg_kw):
+    ''' Override `HasThreadState.bg` to catch CancellationError
+        and just issue a warning.
+    '''
+
+    def _rs_func(*rs_a, **rs_kw):
+      try:
+        return pfx_call(func, *rs_a, **rs_kw)
+      except CancellationError as e:
+        warning("cancelled: %s", e)
+
+    return super().bg(_rs_func, **bg_kw)
+
 @decorator
 def uses_runstate(func, name=None):
   ''' A wrapper for `@default_params` which makes a new thread wide
