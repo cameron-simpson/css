@@ -877,7 +877,7 @@ class RunState(FSM, HasThreadState):
     if delay > 0:
       eta = time.time() + delay
       while (inc_delay := eta - time.time()) >= step:
-        time.sleep(inc_delay)
+        time.sleep(step)
         self.raiseif()
       if inc_delay > 0:
         time.sleep(inc_delay)
