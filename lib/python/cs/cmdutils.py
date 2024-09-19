@@ -46,7 +46,7 @@ from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
-from cs.upd import Upd, uses_upd, print
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20240709-post'
 
@@ -1320,12 +1320,12 @@ class BaseCommand:
     self._prerun_setup()
     options = self.options
     try:
-      with self.run_context(**kw_options):
-        try:
+      try:
+        with self.run_context(**kw_options):
           return self._run(self._argv)
-        except CancellationError:
-          error("cancelled")
-          return 1
+      except CancellationError:
+        error("cancelled")
+        return 1
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
