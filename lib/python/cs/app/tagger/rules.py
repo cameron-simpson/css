@@ -17,7 +17,6 @@ from os.path import (
     join as joinpath,
 )
 import re
-from re import Pattern
 from typing import (
     Any,
     Callable,
@@ -175,7 +174,6 @@ class _Token(Promotable):
       )
     return token
 
-
 @dataclass
 class Identifier(_Token):
   ''' A dotted identifier.
@@ -196,7 +194,6 @@ class Identifier(_Token):
         source_text=text, offset=offset, end_offset=end_offset, name=name
     )
 
-
 class _LiteralValue(_Token):
   value: Any
 
@@ -211,7 +208,6 @@ class NumericValue(_LiteralValue):
     return str(self.value)
 
   @classmethod
-  @trace
   def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     ''' Parse a Python style `int` or `float`.
     '''
@@ -266,28 +262,26 @@ class TagAddRemove(_Token):
   @classmethod
   def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
     offset0 = offset
-    with Pfx("%d:%r...", offset, text[offset:offset + 16]):
-      if text.startswith('-', offset):
-        add_remove = False
-      elif text.startswith('+', offset):
-        add_remove = True
-      else:
-        raise SyntaxError(f'expected + or -, got: {text[offset:offset+1]!r}')
+    # leading + or -
+    if text.startswith('-', offset):
+      add_remove = False
+    elif text.startswith('+', offset):
+      add_remove = True
+    else:
+      raise SyntaxError(f'expected + or -, got: {text[offset:offset+1]!r}')
     offset += 1
-    with Pfx("%d:%r...", offset, text[offset:offset + 16]):
-      name, offset = get_dotted_identifier(text, offset)
-      if not name:
-        raise SyntaxError(
-            f'expected dotted identifier, found {text[offset:offset+3]!r}...'
-        )
+    # tag name
+    name, offset = get_dotted_identifier(text, offset)
+    if not name:
+      raise SyntaxError(
+          f'expected dotted identifier, found {text[offset:offset+3]!r}...'
+      )
+    # tag value
     if text.startswith("=", offset):
       if not add_remove:
         raise ValueError(f'{offset}: unexpected assignment following -{name}')
       offset += 1
-      with Pfx("%d:%r...", offset, text[offset:offset + 16]):
-        qs = QuotedString.from_str(text[offset:])
-        if qs is None:
-          raise ValueError(f'expected quoted string after {name}=')
+      qs = QuotedString.parse(text, offset)
       value = qs.value
       end_offset = qs.end_offset
     else:
