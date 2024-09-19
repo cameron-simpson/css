@@ -178,6 +178,7 @@ class PlayOnCommand(BaseCommand):
     '''
     with super().run_context():
       options = self.options
+      runstate = options.runstate
       sqltags = PlayOnSQLTags()
       api = PlayOnAPI(options.user, options.password, sqltags)
       with sqltags:
@@ -189,6 +190,7 @@ class PlayOnCommand(BaseCommand):
             # if there are unexpired stale entries or no unexpired entries,
             # refresh them
             self._refresh_sqltags_data(api, sqltags)
+            runstate.raiseif()
             yield
 
   def cmd_account(self, argv):
