@@ -402,6 +402,150 @@ class RegexpComparison(_Comparison):
       return None
     return m.groupdict()
 
+class _Action:
+
+  @classmethod
+  @typechecked
+  def parse(cls, tokens: List[_Token]):
+    if not tokens:
+      raise SyntaxError('tokens is empty')
+    for subcls in public_subclasses(cls):
+      with Pfx(subcls.__name__):
+        try:
+          return pops_tokens(subcls.parse)(tokens)
+        except SyntaxError as e:
+          warning("skip: %s", e)
+          pass
+    raise SyntaxError(
+        f'no {cls.__name__} subclass matched, tried {",".join(subcls.__name__ for subcls in public_subclasses(cls))}'
+    )
+
+  @abstractmethod
+  @typechecked
+  def __call__(
+      self,
+      fspath: str,
+      tags: TagSet,
+      *,
+      hashname: str,
+      doit=False,
+      quiet=False,
+      fstags: FSTags,
+  ):
+    ''' Perform this action on `fspath` and `tags`.
+    '''
+    raise NotImplementedError
+
+@dataclass
+class MoveAction(_Action):
+  ''' An action to move a file.
+  '''
+
+  MODES = ('move',)
+
+  target_format: str
+
+  @classmethod
+  @typechecked
+  def parse(cls, tokens: List[_Token]) -> "MoveAction":
+    ''' Parse a `mv` action from a list of tokens.
+    '''
+    token0 = tokens.pop(0)
+    match token0:
+      case Identifier(name="mv"):
+        target_token = tokens.pop(0)
+        match target_token:
+          case QuotedString():
+            target_format = target_token.value
+            return cls(target_format=target_token.value)
+          case _:
+            raise SyntaxError(f'expected a quoted string after {action_token}')
+      case _:
+        raise SyntaxError(f'expected "mv", found {token0}')
+
+  @uses_fstags
+  def __call__(
+      self,
+      fspath: str,
+      tags: TagSet,
+      *,
+      hashname: str,
+      doit=False,
+      quiet=False,
+      fstags: FSTags,
+  ) -> Tuple[str, ...]:
+    ''' Move `fspath` to `self.target_format`, return the new fspath.
+    '''
+    target_fspath = expanduser(tags.format_as(self.target_format))
+    if not isabspath(target_fspath):
+      target_fspath = joinpath(dirname(fspath), target_fspath)
+    if target_fspath.endswith('/'):
+      target_fspath = joinpath(target_fspath, basename(fspath))
+    target_dirpath = dirname(target_fspath)
+    if doit and not isdirpath(target_dirpath):
+      needdir(target_dirpath, use_makedirs=False)
+    merge(
+        fspath,
+        target_fspath,
+        hashname=hashname,
+        move_mode=True,
+        symlink_mode=False,
+        doit=doit,
+        quiet=quiet,
+    )
+    return (target_fspath,)
+
+@dataclass
+class TagAction(_Action):
+  ''' An action to move a file.
+  '''
+
+  MODES = ('tag',)
+
+  tag_tokens: List[TagAddRemove]
+
+  @classmethod
+  @typechecked
+  def parse(cls, tokens: List[_Token]) -> "TagAction":
+    ''' Parse a `tag` action from a list of tokens.
+    '''
+    token0 = tokens.pop(0)
+    match token0:
+      case Identifier(name="tag"):
+        tag_tokens = []
+        while tokens and isinstance(tokens[0], TagAddRemove):
+          tag_tokens.append(tokens.pop(0))
+        if not tag_tokens:
+          raise SyntaxError(f'no tag changes after "{token0}"')
+        return cls(tag_tokens=tag_tokens)
+      case _:
+        raise SyntaxError(f'expected "tag", found {r(token0)} {token0}')
+
+  @uses_fstags
+  def __call__(
+      self,
+      fspath: str,
+      tags: TagSet,
+      *,
+      hashname: str,
+      doit=False,
+      quiet=False,
+      fstags: FSTags,
+  ) -> Tuple[TagChange, ...]:
+    ''' Apply `self.tag_tokens` to `tags`.
+        Return a tuple of the applied `TagChange`s.
+    '''
+    tag_changes = []
+    for tag_token in self.tag_tokens:
+      if tag_token.add_remove:
+        tags.add(tag_token.tag, verbose=not quiet)
+      else:
+        tags.discard(tag_token.tag.name, verbose=not quiet)
+      tag_changes.append(
+          TagChange(add_remove=tag_token.add_remove, tag=tag_token.tag)
+      )
+    return tuple(tag_changes)
+
 Action = Union[str, Tuple[bool, Tag]]
 
 class Rule(Promotable):
@@ -651,104 +795,10 @@ class Rule(Promotable):
       f'action.modes not in RULE_MODES:f{RULE_MODES!r}'
   )
   @typechecked
-  def pop_action(tokens: List[_Token]) -> Union[Callable, None]:
+  def pop_action(tokens: List[_Token]) -> _Action:
     ''' Pop an action from `tokens`.
     '''
-    action_token = tokens.pop(0)
-    with Pfx(action_token):
-      match action_token:
-        case Identifier(name="mv"):
-          if not tokens:
-            raise ValueError("missing mv target")
-          target_token = tokens.pop(0)
-          match target_token:
-            case QuotedString():
-              target_format = target_token.value
-
-              @uses_fstags
-              @typechecked
-              def mv_action(
-                  fspath: str,
-                  tags: TagSet,
-                  *,
-                  hashname: str,
-                  doit=False,
-                  quiet=False,
-                  fstags: FSTags,
-              ) -> Tuple[str, ...]:
-                ''' Move `fspath` to `target_format`, return the new fspath.
-                '''
-                target_fspath = expanduser(tags.format_as(target_format))
-                if not isabspath(target_fspath):
-                  target_fspath = joinpath(dirname(fspath), target_fspath)
-                if target_fspath.endswith('/'):
-                  target_fspath = joinpath(target_fspath, basename(fspath))
-                target_dirpath = dirname(target_fspath)
-                if doit and not isdirpath(target_dirpath):
-                  needdir(target_dirpath, use_makedirs=False)
-                merge(
-                    fspath,
-                    target_fspath,
-                    hashname=hashname,
-                    move_mode=True,
-                    symlink_mode=False,
-                    doit=doit,
-                    quiet=quiet,
-                )
-                return (target_fspath,)
-
-              mv_action.__doc__ = (
-                  f'Move `fspath` to {target_format!r}`.format_kwargs(**format_kwargs)`.'
-              )
-              mv_action.modes = ('move',)
-              return mv_action
-            case _:
-              raise SyntaxError(
-                  f'expected a quoted string after {action_token}'
-              )
-        case Identifier(name="tag"):
-          if not tokens:
-            raise ValueError("missing tags")
-          tag_tokens = []
-          while tokens:
-            token = tokens.pop(0)
-            if not isinstance(token, TagAddRemove):
-              raise SyntaxError(
-                  f'expected TagAddRemove tokens, found: {token}'
-              )
-            tag_tokens.append(token)
-
-          @typechecked
-          def tag_action(
-              fspath: str,
-              tags: TagSet,
-              *,
-              hashname: str,
-              doit=False,
-              quiet=False,
-          ) -> Iterable[TagChange]:
-            ''' Apply tag changes from this `Rule` to `tags`.
-            '''
-            tag_changes = []
-            for tag_token in tag_tokens:
-              if tag_token.add_remove:
-                tags.add(tag_token.tag, verbose=not quiet)
-              else:
-                tags.discard(tag_token.tag.name, verbose=not quiet)
-              tag_changes.append(
-                  TagChange(
-                      add_remove=tag_token.add_remove, tag=tag_token.tag
-                  )
-              )
-            return tuple(tag_changes)
-
-          tag_action.__doc__ = (
-              f'Tag `fspath` with {" ".join(map(str,tag_tokens))}.'
-          )
-          tag_action.modes = ('tag',)
-
-          return tag_action
-    raise ValueError("invalid action")
+    return _Action.parse(tokens)
 
   @staticmethod
   @pops_tokens
