@@ -42,6 +42,7 @@ from cs.lex import (
     skipwhite,
 )
 from cs.logutils import ifverbose, warning
+from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import ListQueue
 from cs.tagset import Tag, TagSet
@@ -114,19 +115,6 @@ class _Token(Promotable):
     '''
     return self.source_text[self.offset:self.end_offset]
 
-  @classmethod
-  def token_subclasses(cls):
-    token_classes = []
-    q = ListQueue(cls.__subclasses__())
-    for subcls in q:
-      if not issubclass(subcls, _Token):
-        continue
-      if not subcls.__name__.startswith('_'):
-        token_classes.append(subcls)
-        print(cls, "token_classes +", subcls)
-      q.extend(subcls.__subclasses__())
-    return token_classes
-
   @pfx_method
   def parse(cls, text: str, offset: int = 0) -> "_Token":
     ''' Parse a token from `test` at `offset` (default `0`).
@@ -136,7 +124,7 @@ class _Token(Promotable):
         This base class method attempts the `.parse` method of all
         the public subclasses.
     '''
-    token_classes = cls.token_subclasses()
+    token_classes = public_subclasses(cls)
     if not token_classes:
       raise RuntimeError("no public subclasses")
     for subcls in token_classes:
