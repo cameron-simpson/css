@@ -714,7 +714,7 @@ class Rule(Promotable):
     if offset == len(rule_s) or rule_s.startswith(('#', '//'), offset):
       # end of string or comment -> end of tokens
       raise EOFError
-    for token_type in _Token.token_subclasses():
+    for token_type in public_subclasses(_Token):
       try:
         return token_type.parse(rule_s, offset)
       except SyntaxError as e:
@@ -791,7 +791,7 @@ class Rule(Promotable):
   @pops_tokens
   @ensure(
       lambda result:
-      (result is None or all([mode in RULE_MODES for mode in result.modes])),
+      (result is None or all([mode in RULE_MODES for mode in result.MODES])),
       f'action.modes not in RULE_MODES:f{RULE_MODES!r}'
   )
   @typechecked
