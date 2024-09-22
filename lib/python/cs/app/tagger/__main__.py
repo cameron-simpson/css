@@ -283,8 +283,7 @@ class TaggerCommand(BaseCommand):
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
-          Derive an autofile mapping of tags to directory paths
-          from the directory paths suppplied.
+          Derive an autofile mapping of tags to directory paths.
     '''
     if not argv:
       raise GetoptError("missing dirpaths")
@@ -308,6 +307,7 @@ class TaggerCommand(BaseCommand):
 
   def cmd_ont(self, argv):
     ''' Usage: {cmd} type_name
+          Print ontology information about type_name.
     '''
     tagger = self.options.tagger
     if not argv:
