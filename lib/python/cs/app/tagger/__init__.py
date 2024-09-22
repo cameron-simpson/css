@@ -262,6 +262,8 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     ''' Return a list of alternative values for `tag_name`
         derived from the ontology `self.ont`.
     '''
+    if not self.ont:
+      return []
     return list(self.ont.type_values(tag_name))
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
