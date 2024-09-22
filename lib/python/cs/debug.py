@@ -14,6 +14,7 @@ anywhere in the code provided this module has been imported somewhere.
 
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
+* `abrk`: a decorator to call `breakpoint(0` in an `AssertionError`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`
@@ -615,6 +616,34 @@ def log_via_print(msg, *a, file=None):
   if file is None:
     file = sys.stdout
   print(msg, file=file, flush=True)
+
+@ALL
+@decorator
+def abrk(func, exceptions=(AssertionError, NameError, RuntimeError)):
+  ''' A decorator to intercept certain exceptions `AssertionError` or `RuntimeError` and call `breakpoint()`.
+      The breakpoint frame contains:
+      - `func`: the wrapper function
+      - `func_a`, `func_kw`: the function positional and keyword arguments
+      The default exceptions are `AssertionError`, `NameError` and `RuntimeError`;
+      These may be overriddenusing the `exceptions` decorator parameter.
+  '''
+
+  def cs_debug_abrk_wrapper(*func_a, **func_kw):
+    try:
+      return func(*func_a, **func_kw)
+    except exceptions as e:
+      warning(
+          "%s: %s\n  func = %s\n  func_a = %r\nfunc_kw = %r",
+          funccite(func),
+          e,
+          funccite(func),
+          func_a,
+          func_kw,
+      )
+      breakpoint()
+      raise
+
+  return cs_debug_abrk_wrapper
 
 @ALL
 @decorator
