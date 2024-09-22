@@ -1,3 +1,4 @@
+wait 0.5s before displaying the ticker? probably interacts badly with use of the ticker proxy
 ffmpeg-docker: make stdin and stdout work correctly so that I can pipe ffmpeg commands
 script to run strace or truss or sudo dtruss -p PID etc depending on the OS
 cs.cmdutils OptSpec to be promotable, leverage in popopts
