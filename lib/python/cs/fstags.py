@@ -207,7 +207,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   GETOPT_SPEC = 'o:P'
 
-
   USAGE_KEYWORDS = {
       'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
       'LS_OUTPUT_FORMAT_DEFAULT': LS_OUTPUT_FORMAT_DEFAULT,
@@ -636,7 +635,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           tags = fstags[fspath]
           if options.long_format:
             print(fspath)
-            for tag in tags.as_tags(all_tags=not options.use_direct_tags):
+            for tag in sorted(
+                tags.as_tags(all_tags=not options.use_direct_tags),
+                key=lambda tag: tag.name,
+            ):
               print(" ", tag)
           else:
             try:
