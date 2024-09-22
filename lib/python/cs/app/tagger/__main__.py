@@ -354,6 +354,20 @@ class TaggerCommand(BaseCommand):
             repr([shortpath(path) for path in paths])
         )
 
+  def cmd_show(self, argv):
+    ''' Usage: {cmd} rules
+          Show the filing rules.
+    '''
+    dirpath = '.'
+    if not argv:
+      argv = [
+          'rules',
+      ]
+    tagger = Tagger(dirpath)
+    print(shortpath(tagger.rcfile))
+    for n, rule in enumerate(tagger.rules, 1):
+      print(n, rule)
+
   @uses_fstags
   def cmd_test(self, argv, *, fstags: FSTags):
     ''' Usage: {cmd} path
