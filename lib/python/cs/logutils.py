@@ -320,12 +320,12 @@ class LoggingState(NS):
 
       signal.signal(signal.SIGHUP, handler)
 
-def setup_logging(cmd=None, **kw):
+def setup_logging(cmd_name=None, **kw):
   ''' Prepare a `LoggingState` and return it.
       It is also available as the global `cs.logutils.loginfo`.
   '''
   global loginfo
-  logstate = LoggingState(cmd=cmd, **kw)
+  logstate = LoggingState(cmd=cmd_name, **kw)
   logstate.apply()
   loginfo = logstate
   return loginfo
