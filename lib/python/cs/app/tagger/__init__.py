@@ -27,7 +27,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.deco import cachedmethod, default_params, fmtdoc, promote
-from cs.fs import FSPathBasedSingleton, shortpath
+from cs.fs import findup, FSPathBasedSingleton, shortpath
 from cs.fstags import FSTags, TaggedPath, uses_fstags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
@@ -124,11 +124,19 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     '''
     return fstags[self.fspath]
 
+  @property
+  def rcfile(self):
+    ''' The path to the `.taggerrc` file.
+    '''
+    return findup(self.fspath, self.TAGGERRC)
+
   @cached_property
   def rules(self):
     ''' The `Rule`s for this `Tagger` directory.
     '''
-    taggerrc = self.pathto(self.TAGGERRC)
+    taggerrc = self.rcfile
+    if taggerrc is None:
+      return ()
     with Pfx("%s.rules", self):
       try:
         with open(taggerrc) as f:
@@ -254,6 +262,8 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     ''' Return a list of alternative values for `tag_name`
         derived from the ontology `self.ont`.
     '''
+    if not self.ont:
+      return []
     return list(self.ont.type_values(tag_name))
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements

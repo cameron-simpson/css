@@ -14,7 +14,7 @@ anywhere in the code provided this module has been imported somewhere.
 
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
-* `breakpoint`: `cs.upd.breakpoint`
+* `abrk`: a decorator to call `breakpoint(0` in an `AssertionError`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`
@@ -59,7 +59,7 @@ from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.threads import ThreadState
-from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
+from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
 __version__ = '20240630-post'
@@ -87,10 +87,7 @@ DISTINFO = {
     ],
 }
 
-__all__ = [
-    'X', 'breakpoint', 'pformat', 'pprint', 'print', 'r', 'redirect_stdout',
-    's'
-]
+__all__ = ['X', 'pformat', 'pprint', 'print', 'r', 'redirect_stdout', 's']
 
 # environment variable specifying names to become built in
 CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
@@ -611,6 +608,43 @@ def debug_object_shell(o, prompt=None):
 
 _trace_state = ThreadState(indent='')
 
+def log_via_print(msg, *a, file=None):
+  ''' Logging style message using `cs.upd.print`.
+  '''
+  if a:
+    msg = msg % a
+  if file is None:
+    file = sys.stdout
+  print(msg, file=file, flush=True)
+
+@ALL
+@decorator
+def abrk(func, exceptions=(AssertionError, NameError, RuntimeError)):
+  ''' A decorator to intercept certain exceptions `AssertionError` or `RuntimeError` and call `breakpoint()`.
+      The breakpoint frame contains:
+      - `func`: the wrapper function
+      - `func_a`, `func_kw`: the function positional and keyword arguments
+      The default exceptions are `AssertionError`, `NameError` and `RuntimeError`;
+      These may be overriddenusing the `exceptions` decorator parameter.
+  '''
+
+  def cs_debug_abrk_wrapper(*func_a, **func_kw):
+    try:
+      return func(*func_a, **func_kw)
+    except exceptions as e:
+      warning(
+          "%s: %s\n  func = %s\n  func_a = %r\nfunc_kw = %r",
+          funccite(func),
+          e,
+          funccite(func),
+          func_a,
+          func_kw,
+      )
+      breakpoint()
+      raise
+
+  return cs_debug_abrk_wrapper
+
 @ALL
 @decorator
 # pylint: disable=too-many-arguments
@@ -622,6 +656,7 @@ def trace(
     use_pformat=False,
     with_caller=False,
     with_pfx=False,
+    xlog=None,
 ):
   ''' Decorator to report the call and return of a function.
 
@@ -835,14 +870,14 @@ if builtin_names_s:
                          builtin_names_s.split(',')):
       if not builtin_name:
         continue
-      if builtin_name in ('breakpoint',):
-        # breakpoint doesn't work right if wrapped, gets the wrong frame
-        continue
       if builtin_name not in __all__:
         warning(
             "$%s: ignoring %r, not in cs.debug.__all__:%r",
             CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
         )
+        continue
+      if builtin_name in ('breakpoint',):
+        # breakpoint doesn't work right if wrapped, gets the wrong frame
         continue
       if not is_identifier(builtin_name):
         warning(

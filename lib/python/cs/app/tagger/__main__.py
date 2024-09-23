@@ -283,8 +283,7 @@ class TaggerCommand(BaseCommand):
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
-          Derive an autofile mapping of tags to directory paths
-          from the directory paths suppplied.
+          Derive an autofile mapping of tags to directory paths.
     '''
     if not argv:
       raise GetoptError("missing dirpaths")
@@ -308,6 +307,7 @@ class TaggerCommand(BaseCommand):
 
   def cmd_ont(self, argv):
     ''' Usage: {cmd} type_name
+          Print ontology information about type_name.
     '''
     tagger = self.options.tagger
     if not argv:
@@ -353,6 +353,20 @@ class TaggerCommand(BaseCommand):
             Tag(tag_name, tag_value),
             repr([shortpath(path) for path in paths])
         )
+
+  def cmd_show(self, argv):
+    ''' Usage: {cmd} rules
+          Show the filing rules.
+    '''
+    dirpath = '.'
+    if not argv:
+      argv = [
+          'rules',
+      ]
+    tagger = Tagger(dirpath)
+    print(shortpath(tagger.rcfile))
+    for n, rule in enumerate(tagger.rules, 1):
+      print(n, rule)
 
   @uses_fstags
   def cmd_test(self, argv, *, fstags: FSTags):

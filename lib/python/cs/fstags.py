@@ -635,7 +635,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           tags = fstags[fspath]
           if options.long_format:
             print(fspath)
-            for tag in tags.as_tags(all_tags=not options.use_direct_tags):
+            for tag in sorted(
+                tags.as_tags(all_tags=not options.use_direct_tags),
+                key=lambda tag: tag.name,
+            ):
               print(" ", tag)
           else:
             try:
