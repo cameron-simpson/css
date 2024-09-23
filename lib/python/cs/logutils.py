@@ -325,7 +325,9 @@ def setup_logging(cmd_name=None, **kw):
       It is also available as the global `cs.logutils.loginfo`.
   '''
   global loginfo
-  logstate = LoggingState(cmd=cmd_name, **kw)
+  if cmd_name is not None:
+    kw['cmd'] = cmd_name
+  logstate = LoggingState(**kw)
   logstate.apply()
   loginfo = logstate
   return loginfo
