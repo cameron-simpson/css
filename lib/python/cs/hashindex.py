@@ -89,7 +89,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options
 from cs.context import contextif, reconfigure_file
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_quiet
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
@@ -899,6 +899,7 @@ def rearrange(
 
 @pfx
 @uses_fstags
+@uses_quiet
 @require(
     lambda move_mode, symlink_mode: not (move_mode and symlink_mode),
     'move_mode and symlink_mode may not both be true'
@@ -912,7 +913,7 @@ def merge(
     move_mode: bool = False,
     symlink_mode=False,
     doit=False,
-    quiet=False,
+    quiet,
     fstags: FSTags,
 ):
   ''' Merge `srcpath` to `dstpath`.
