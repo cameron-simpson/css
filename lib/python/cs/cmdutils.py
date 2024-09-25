@@ -30,7 +30,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, Promotable
+from cs.deco import decorator, default_params, fmtdoc, Promotable
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -472,6 +472,7 @@ class BaseCommandOptions(HasThreadState):
       opt_specs.setdefault(k, v)
     return BaseCommand.popopts(argv, self, **opt_specs)
 
+@decorator
 def uses_cmd_options(
     func, cls=BaseCommandOptions, options_param_name='options'
 ):
