@@ -1546,3 +1546,12 @@ class BaseCommandCmd(Cmd):
       if subcmd in ('EOF', 'exit', 'quit'):
         return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+
+@uses_cmd_options
+def vprint(*print_a, options, verbose=None, **print_kw):
+  ''' Call `print()` if `options.verbose`.
+  '''
+  if verbose is None:
+    verbose = options.verbose
+  if verbose:
+    print(*print_a, **print_kw)
