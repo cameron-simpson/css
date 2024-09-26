@@ -162,7 +162,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     '''
     fspath = self.pathto(filename)
     tagged = fstags[fspath]
-    # start with the format_tags of the file
+    # start the working TagSet with the format_tags of the file
     tags = tagged.format_tagset()
     matched_results = []
     printed_filename = False
