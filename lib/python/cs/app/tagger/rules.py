@@ -244,7 +244,8 @@ class QuotedString(_LiteralValue):
 
 @dataclass
 class TagAddRemove(_Token):
-  tag: Tag
+  tag_name: str
+  tag_expression: Union[QuotedString, Identifier, None]
   add_remove: bool = True
 
   @classmethod
@@ -269,17 +270,20 @@ class TagAddRemove(_Token):
       if not add_remove:
         raise ValueError(f'{offset}: unexpected assignment following -{name}')
       offset += 1
-      qs = QuotedString.parse(text, offset)
-      value = qs.value
-      end_offset = qs.end_offset
+      if text.startswith('"', offset):
+        expression = QuotedString.parse(text, offset)
+      else:
+        expression = Identifier.parse(text, offset)
+      end_offset = expression.end_offset
     else:
-      value = None
+      expression = None
       end_offset = offset
     return cls(
         source_text=text,
         offset=offset0,
         end_offset=end_offset,
-        tag=Tag(name, value),
+        tag_name=name,
+        tag_expression=expression,
         add_remove=add_remove,
     )
 
