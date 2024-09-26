@@ -26,7 +26,7 @@ from typing import List, Optional
 from icontract import require
 from typeguard import typechecked
 
-from cs.deco import cachedmethod, default_params, fmtdoc, promote
+from cs.deco import cachedmethod, default_params, fmtdoc, promote, uses_verbose
 from cs.fs import findup, FSPathBasedSingleton, shortpath
 from cs.fstags import FSTags, TaggedPath, uses_fstags
 from cs.lex import FormatAsError, r, get_dotted_identifier
@@ -145,6 +145,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
         return ()
 
   @uses_fstags
+  @uses_verbose
   @require(lambda filename: filename and '/' not in filename)
   @typechecked
   def process(
@@ -153,8 +154,8 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       *,
       fstags: FSTags,
       hashname: str,
+      verbose,
       doit=False,
-      verbose=False,
       modes=RULE_MODES,
   ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
