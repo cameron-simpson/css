@@ -367,6 +367,8 @@ class RegexpComparison(_Comparison):
   regexp: re.Pattern
   delim: str
 
+  OP_SYMBOL = '~'
+
   # supported delimiters for regular expressions
   REGEXP_DELIMS = '/:!|'
 
@@ -404,7 +406,11 @@ class RegexpComparison(_Comparison):
     m = self.regexp.search(value)
     if not m:
       return None
-    return m.groupdict()
+    matched = m.groupdict()
+    for k, v in list(matched.items()):
+      if (k_ := cutsuffix(k, "_n")) is not k and k_ not in matched:
+        matched[k_] = int(v)
+    return matched
 
 class _Action:
 
