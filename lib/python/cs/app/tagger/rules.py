@@ -484,7 +484,9 @@ class MoveAction(_Action):
   ) -> Tuple[str, ...]:
     ''' Move `fspath` to `self.target_format`, return the new fspath.
     '''
-    target_fspath = expanduser(tags.format_as(self.target_format))
+    format_tags = fstags[fspath].format_tagset()
+    format_tags.update(tags)
+    target_fspath = expanduser(format_tags.format_as(self.target_format))
     if not isabspath(target_fspath):
       target_fspath = joinpath(dirname(fspath), target_fspath)
     if target_fspath.endswith('/'):
