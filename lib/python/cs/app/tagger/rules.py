@@ -439,7 +439,6 @@ class _Action:
       *,
       hashname: str,
       doit=False,
-      quiet=False,
       fstags: FSTags,
   ):
     ''' Perform this action on `fspath` and `tags`.
@@ -481,7 +480,6 @@ class MoveAction(_Action):
       *,
       hashname: str,
       doit=False,
-      quiet=False,
       fstags: FSTags,
   ) -> Tuple[str, ...]:
     ''' Move `fspath` to `self.target_format`, return the new fspath.
@@ -501,7 +499,6 @@ class MoveAction(_Action):
         move_mode=True,
         symlink_mode=False,
         doit=doit,
-        quiet=quiet,
     )
     return (target_fspath,)
 
@@ -532,6 +529,7 @@ class TagAction(_Action):
         raise SyntaxError(f'expected "tag", found {r(token0)} {token0}')
 
   @uses_fstags
+  @uses_verbose
   def __call__(
       self,
       fspath: str,
@@ -539,7 +537,7 @@ class TagAction(_Action):
       *,
       hashname: str,
       doit=False,
-      quiet=False,
+      verbose: bool,
       fstags: FSTags,
   ) -> Tuple[TagChange, ...]:
     ''' Apply `self.tag_tokens` to `tags`.
@@ -621,7 +619,6 @@ class Rule(Promotable):
       *,
       hashname: str,
       doit: bool = False,
-      quiet: bool = False,
       modes=RULE_MODES,
       fstags: FSTags,
   ) -> RuleResult:
@@ -669,7 +666,6 @@ class Rule(Promotable):
                 tags,
                 hashname=hashname,
                 doit=doit,
-                quiet=quiet,
             )
           except Exception as e:
             warning("action failed: %s", e)
