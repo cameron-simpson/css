@@ -424,7 +424,7 @@ class _Action:
         try:
           return pops_tokens(subcls.parse)(tokens)
         except SyntaxError as e:
-          warning("skip: %s", e)
+          ##warning("SKIP: %s", e)
           pass
     raise SyntaxError(
         f'no {cls.__name__} subclass matched, tried {",".join(subcls.__name__ for subcls in public_subclasses(cls))}'
@@ -677,9 +677,9 @@ class Rule(Promotable):
           result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
     if self.action is not None:
       with Pfx(self.action.__doc__.strip().split()[0].strip()):
-        if not (set(self.action.modes) & set(modes)):
+        if not (set(self.action.MODES) & set(modes)):
           ##warning(
-          ##    "SKIP action with unwanted modes %r: %s", self.action.modes,
+          ##    "SKIP action with unwanted modes %r: %s", self.action.MODES,
           ##    self.action
           ##)
           pass
@@ -694,7 +694,7 @@ class Rule(Promotable):
                 doit=doit,
             )
           except Exception as e:
-            warning("action failed: %s", e)
+            warning("action failed: %s", s(e))
             result.failed.append(e)
           else:
             for side_effect in side_effects:
@@ -750,6 +750,7 @@ class Rule(Promotable):
       try:
         return token_type.parse(rule_s, offset)
       except SyntaxError as e:
+        ##warning("not %s: %s", token_type.__name__, e)
         continue
     raise SyntaxError(f'no token recognised at: {rule_s[offset:]!r}')
 
