@@ -542,18 +542,42 @@ class TagAction(_Action):
       verbose: bool,
       fstags: FSTags,
   ) -> Tuple[TagChange, ...]:
-    ''' Apply `self.tag_tokens` to `tags`.
+    ''' Apply `self.tag_tokens` to `tags` and `fstags[fspath]`.
         Return a tuple of the applied `TagChange`s.
     '''
+    tagged = fstags[fspath]
     tag_changes = []
     for tag_token in self.tag_tokens:
-      if tag_token.add_remove:
-        tags.add(tag_token.tag, verbose=not quiet)
-      else:
-        tags.discard(tag_token.tag.name, verbose=not quiet)
-      tag_changes.append(
-          TagChange(add_remove=tag_token.add_remove, tag=tag_token.tag)
-      )
+      with Pfx(tag_token):
+        tag_name = tag_token.tag_name
+        tag_value = None
+        if tag_token.add_remove:
+          match tag_token.tag_expression:
+            case Identifier():
+              try:
+                tag_value = tags[tag_token.tag_expression.name]
+              except KeyError:
+                warning(
+                    "no tags[%r], not setting tags.%s",
+                    tag_token.tag_expression.name, tag_name
+                )
+                continue
+            case QuotedString():
+              tag_value = tag_token.tag_expression.value
+            case _:
+              raise RuntimeError(f'unimplemented {s(self)}')
+          tags.add(tag_name, tag_value, verbose=verbose)
+          if doit:
+            tagged.add(tag_name, tag_value)
+        else:
+          tags.discard(tag_name, verbose=verbose)
+          if doit:
+            tagged.discard(tag_name)
+        tag_changes.append(
+            TagChange(
+                add_remove=tag_token.add_remove, tag=Tag(tag_name, tag_value)
+            )
+        )
     return tuple(tag_changes)
 
 Action = Union[str, Tuple[bool, Tag]]
