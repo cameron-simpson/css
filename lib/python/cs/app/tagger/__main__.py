@@ -23,8 +23,8 @@ from pprint import pprint
 from stat import S_ISDIR, S_ISREG
 import sys
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions
-from cs.context import stackattrs
+from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options
+from cs.context import contextif, stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fs import HasFSPath
@@ -179,11 +179,11 @@ class TaggerCommand(BaseCommand):
     xit = 0
     limit = 1 if once else None
     q = ListQueue(paths, unique=realpath)
-    with run_task('autofile') as proxy:
+    with contextif(verbose, run_task, 'autofile') as proxy:
       for path in q:
         runstate.raiseif()
         with Pfx(path):
-          proxy.text = shortpath(path)
+          if proxy: proxy.text = shortpath(path)
           if not existspath(path):
             continue
           if isdirpath(path) and not direct:
@@ -205,7 +205,6 @@ class TaggerCommand(BaseCommand):
                 hashname=hashname,
                 modes=modes,
                 doit=doit,
-                verbose=verbose,
             )
             if matches:
               for match in matches:
