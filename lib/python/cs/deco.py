@@ -866,6 +866,7 @@ def uses_cmd_option(func, _strict=False, **option_defaults):
 
   return verbose_wrapper
 
+uses_doit = uses_cmd_option(doit=True)
 uses_quiet = uses_cmd_option(quiet=False)
 uses_verbose = uses_cmd_option(verbose=False)
 
