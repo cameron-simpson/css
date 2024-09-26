@@ -53,8 +53,9 @@ pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
-def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
+def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None) -> bool:
   ''' Create the directory `dirpath` if missing.
+      Return `True` if the directory was made, `False` otherwise.
 
       Parameters:
       * `dirpath`: the required directory path
@@ -63,15 +64,17 @@ def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
       * `use_makedirs`: optional creation mode, default `False`;
         if true, use `os.makedirs`, otherwise `os.mkdir`
   '''
-  if not isdirpath(dirpath):
-    if use_makedirs:
-      if log is not None:
-        log("makedirs(%r,0o%3o)", dirpath, mode)
-      pfx_makedirs(dirpath, mode)
-    else:
-      if log is not None:
-        log("mkdir(%r,0o%3o)", dirpath, mode)
-      pfx_mkdir(dirpath, mode)
+  if isdirpath(dirpath):
+    return False
+  if use_makedirs:
+    if log is not None:
+      log("makedirs(%r,0o%3o)", dirpath, mode)
+    pfx_makedirs(dirpath, mode)
+  else:
+    if log is not None:
+      log("mkdir(%r,0o%3o)", dirpath, mode)
+    pfx_mkdir(dirpath, mode)
+  return True
 
 @decorator
 def atomic_directory(infill_func, make_placeholder=False):
