@@ -6,6 +6,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import partial
+import os
 from os.path import (
     abspath,
     basename,
@@ -13,6 +14,8 @@ from os.path import (
     expanduser,
     isabs as isabspath,
     isdir as isdirpath,
+    isfile as isfilepath,
+    islink as islinkpath,
     join as joinpath,
 )
 import re
@@ -500,11 +503,13 @@ class MoveAction(_Action):
       target_fspath = joinpath(dirname(fspath), target_fspath)
     if target_fspath.endswith('/'):
       target_fspath = joinpath(target_fspath, basename(fspath))
-    target_dirpath = dirname(target_fspath)
-    if doit and not isdirpath(target_dirpath):
-      needdir(target_dirpath, use_makedirs=False)
     if doit and not force and (islinkpath(fspath) or not isfilepath(fspath)):
       raise ValueError(f'not a regular file: {fspath!r}')
+    if not force and isfilepath(fspath) and os.stat(fspath).st_size == 0:
+      raise ValueError(f'zero length file (placeholder?): {fspath!r}')
+    target_dirpath = dirname(target_fspath)
+    if doit and not isdirpath(target_dirpath):
+      needdir(target_dirpath, use_makedirs=False, verbose=not quiet)
     merge(
         fspath,
         target_fspath,
