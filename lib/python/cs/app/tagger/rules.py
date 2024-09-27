@@ -473,6 +473,7 @@ class MoveAction(_Action):
         raise SyntaxError(f'expected "mv", found {token0}')
 
   @uses_fstags
+  @uses_quiet
   def __call__(
       self,
       fspath: str,
@@ -481,6 +482,7 @@ class MoveAction(_Action):
       hashname: str,
       doit=False,
       fstags: FSTags,
+      quiet: bool,
   ) -> Tuple[str, ...]:
     ''' Move `fspath` to `self.target_format`, return the new fspath.
     '''
@@ -501,6 +503,7 @@ class MoveAction(_Action):
         move_mode=True,
         symlink_mode=False,
         doit=doit,
+        verbose=not quiet,
     )
     return (target_fspath,)
 
