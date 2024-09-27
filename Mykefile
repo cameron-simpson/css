@@ -1,4 +1,3 @@
-# architecture eg apple.x86_64.darwin
 :import ARCH
 # full path to the base python executable from a venv
 :import PYTHON_EXE

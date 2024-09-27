@@ -1,0 +1,1 @@
+how fast can we make dlog when there is a dlog.pipe?

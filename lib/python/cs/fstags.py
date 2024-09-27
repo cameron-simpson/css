@@ -738,7 +738,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             print(srcpath, '->', dstpath)
     return xit
 
-  def cmd_ns(self, argv):
+  @uses_runstate
+  def cmd_ns(self, argv, runstate: RunState):
     ''' Usage: {cmd} [-d] [--direct] [paths...]
           Report on the available primary namespace fields for formatting.
           Note that because the namespace used for formatting has
@@ -766,6 +767,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       fullpath = realpath(path)
       for fspath in ((fullpath,) if directories_like_files else scandirpaths(
           fullpath, sort_names=True)):
+        runstate.raiseif()
         with Pfx(fspath):
           tags = fstags[fspath].format_tagset(direct=use_direct_tags)
           print(fspath)
@@ -1579,18 +1581,7 @@ class FSTags(MultiOpenMixin):
             )
         else:
           raise
-      old_modified = dst_taggedpath.modified
       dst_taggedpath.update(src_taggedpath)
-      if not self.is_open():
-        # we're not expecting save-on-final-close, so save now
-        try:
-          dst_taggedpath.save()
-        except OSError as e:
-          if e.errno == errno.EACCES:
-            warning("save tags: %s", e)
-            dst_taggedpath.modified = old_modified
-          else:
-            raise
       return result
 
   @require(lambda srcpath: existspath(srcpath), "srcpath does not exist")
@@ -1707,6 +1698,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   def discard(self, tag_name, value, *, verbose=None):
     assert tag_name != 'name'
     super().discard(tag_name, value, verbose=verbose)
+    self.save_if_closed()
 
   @tag_or_tag_value
   def set(self, tag_name, value, **kw):
@@ -1715,6 +1707,13 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
     assert tag_name != 'name'
     ##assert tag_name != 'fspath'
     super().set(tag_name, value, **kw)
+    self.save_if_closed()
+
+  def update(self, other=None, **update_kw):
+    ''' Call `TagSet.update` with the `FSTags` open.
+    '''
+    with self._fstags:
+      super().update(other, **update_kw)
 
   # pylint: disable=arguments-differ
   def as_tags(self, prefix=None, all_tags=False):
@@ -1821,6 +1820,22 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
     ''' Update the associated `FSTagsTagFile`.
     '''
     self.tagfile.save(prune=prune)
+
+  def save_if_closed(self, **save_kw):
+    ''' Save the tag file is `self._fstags` is closed (no autosave).
+    '''
+    if self._fstags.is_open():
+      return
+    # we're not expecting save-on-final-close, so save now
+    old_modified = self.modified
+    try:
+      self.save(**save_kw)
+    except OSError as e:
+      if e.errno == errno.EACCES:
+        warning("save tags: %s", e)
+        self.modified = old_modified
+      else:
+        raise
 
   def merged_tags(self):
     ''' Compute the cumulative tags for this path as a new `TagSet`

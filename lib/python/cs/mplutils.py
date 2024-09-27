@@ -171,6 +171,7 @@ def remove_decorations(figure_or_ax: Union[Figure, Axes]):
 @contextmanager
 def saved_figure(figure_or_ax, dir=None, ext=None):
   ''' Context manager to save a `Figure` to a file and yield the file path.
+      The file is removed on exit from the context.
 
       Parameters:
       * `figure_or_ax`: a `matplotlib.figure.Figure` or an object

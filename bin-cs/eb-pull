@@ -12,7 +12,12 @@ set -ue
   Expoects:
     $CALIBRE_LIBRARY      The path to the Calibre library.
     $DEDRM_PACKAGE_PATH   The path the plugin subdirectory of a DeDRM/noDRM checkout.
-    $KINDLE_LIBRARY_PULL  The path to the Kindle library from which to pull.'
+    $KINDLE_LIBRARY_PULL  The path to the Kindle library from which to pull.
+  Currently:' >&2
+  for envvar in CALIBRE_LIBRARY DEDRM_PACKAGE_PATH KINDLE_LIBRARY_PULL
+  do  eval "value=\$$envvar"
+      echo "    $envvar=$value" >&2
+  done
   exit 2
 }
 

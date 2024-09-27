@@ -6,14 +6,19 @@
 import abc
 import importlib
 from inspect import (
-    getcomments, getmodule, isclass, isdatadescriptor, isfunction, ismethod,
-    signature
+    getcomments,
+    getmodule,
+    isclass,
+    isdatadescriptor,
+    isfunction,
+    ismethod,
+    signature,
 )
 from itertools import chain
 
 from cs.fsm import FSM
-from cs.gvutils import gvdataurl, GVDATAURL
-from cs.lex import cutprefix, stripped_dedent
+from cs.gvutils import gvdataurl, GVDATAURL, gvsvg
+from cs.lex import cutprefix, stripped_dedent, indent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.py.modules import module_attributes
@@ -75,15 +80,20 @@ def module_doc(
       obj_doc = obj_docstring(obj) if obj_module else ''
       if not callable(obj):
         if obj_doc:
-          full_docs.append(f'\n\n## `{Mname} = {obj!r}`\n\n{obj_doc}')
+          full_docs.append(
+              f'\n\n## <a name="{Mname}"></a>`{Mname} = {obj!r}`\n\n{obj_doc}'
+          )
         continue
       if not obj_doc:
         continue
       if isfunction(obj):
         sig = signature(obj)
-        full_docs.append(f'\n\n## `{Mname}{sig}`\n\n{obj_doc}')
+        full_docs.append(
+            f'\n\n## <a name="{Mname}"></a>`{Mname}{sig}`\n\n{obj_doc}'
+        )
       elif isclass(obj):
         classname_etc = Mname
+        # compute the list of immediate superclass names
         mro_names = []
         mro_set = set(obj.__mro__)
         for superclass in obj.__mro__:
@@ -111,7 +121,9 @@ def module_doc(
                   dataurl_encoding='base64',
               ) + f' "{Mname} State Diagram")\n'
           )
-        full_docs.append(f'\n\n## Class `{classname_etc}`\n\n{obj_doc}')
+        full_docs.append(
+            f'\n\n## <a name="{Mname}"></a>Class `{classname_etc}`\n\n{obj_doc}'
+        )
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order

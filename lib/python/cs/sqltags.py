@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20240316-post'
+__version__ = '20240723-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -881,14 +881,18 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
-    self.define_schema()
+    self.__first_use = True
 
-  def define_schema(self):
-    ''' Instantiate the schema and define the root metanode.
-    '''
-    with self.sqla_state.auto_session() as session:
-      self.Base.metadata.create_all(bind=self.engine)
-      self.prepare_metanode(session=session)
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      # make sure the schema is up to date
+      # in particular, create the metanode 0 if missing
+      if self.__first_use:
+        with self.sqla_state.auto_session() as session:
+          self.prepare_metanode(session=session)
+        self.__first_use = False
+      yield
 
   def prepare_metanode(self, *, session):
     ''' Ensure row id 0, the metanode, exists.
@@ -1837,11 +1841,6 @@ class SQLTags(BaseTagSets, Promotable):
     if not db_url:
       db_url = expanduser(default_path)
     return db_url
-
-  def init(self):
-    ''' Initialise the database.
-    '''
-    self.orm.define_schema()
 
   def db_entity(self, index):
     ''' Return the `Entities` instance for `index` or `None`.

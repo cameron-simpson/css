@@ -70,7 +70,7 @@ import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 
-__version__ = '20240630-post'
+__version__ = '20240923-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -320,12 +320,14 @@ class LoggingState(NS):
 
       signal.signal(signal.SIGHUP, handler)
 
-def setup_logging(cmd=None, **kw):
+def setup_logging(cmd_name=None, **kw):
   ''' Prepare a `LoggingState` and return it.
       It is also available as the global `cs.logutils.loginfo`.
   '''
   global loginfo
-  logstate = LoggingState(cmd=cmd, **kw)
+  if cmd_name is not None:
+    kw['cmd'] = cmd_name
+  logstate = LoggingState(**kw)
   logstate.apply()
   loginfo = logstate
   return loginfo

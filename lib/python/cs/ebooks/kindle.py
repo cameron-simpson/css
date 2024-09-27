@@ -144,8 +144,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         return id(tree), subdir_name
 
-      @typechecked
       @require(lambda subdir_name: os.sep not in subdir_name)
+      @typechecked
       def __init__(self, tree: KindleTree, subdir_name: str):
         ''' Initialise this book subdirectory reference.
 
