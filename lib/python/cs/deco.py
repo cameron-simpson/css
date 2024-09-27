@@ -841,7 +841,6 @@ def uses_cmd_option(func, _strict=False, **option_defaults):
   from cs.debug import trace, X, r, s
 
   def verbose_wrapper(*func_a, **func_kw):
-    X("verbose_wrapper(%s)...", func)
     # fill in the func_kw from the defaults
     # and keep a record of the chosen values
     options_updates = {}
