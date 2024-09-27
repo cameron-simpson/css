@@ -123,6 +123,7 @@ class TaggerCommand(BaseCommand):
     '''
     options = self.options
     options.direct = False
+    options.force = False
     options.modes = ",".join(RULE_MODES)
     options.once = False
     options.recurse = False
@@ -130,6 +131,7 @@ class TaggerCommand(BaseCommand):
         argv,
         _1='once',
         d='direct',
+        f='force',
         h='hashname',
         n='dry_run',  # no action
         M_=('modes', str),
@@ -142,6 +144,7 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing paths")
     doit = options.doit
     direct = options.direct
+    force = options.force
     hashname = options.hashname
     modes = options.modes.split(',')
     if not all([mode in RULE_MODES for mode in modes]):
@@ -151,41 +154,15 @@ class TaggerCommand(BaseCommand):
     quiet = options.quiet
     taggers = set()
     ok = True
-    paths = []
-    for path in argv:
-      with Pfx(path):
-        try:
-          S = os.stat(path)
-        except OSError as e:
-          warning("cannot stat: %s", e)
-          ok = False
-          continue
-        if S_ISREG(S.st_mode):
-          paths.append(path)
-        elif S_ISDIR(S.st_mode):
-          if direct:
-            paths.append(path)
-          else:
-            paths.extend(
-                [
-                    joinpath(path, base)
-                    for base in sorted(pfx_call(os.listdir, path))
-                    if not base.startswith('.')
-                ]
-            )
-        else:
-          warning("unhandled file type ignored")
     xit = 0
     limit = 1 if once else None
-    q = ListQueue(paths, unique=realpath)
+    q = ListQueue(argv, unique=realpath)
     with contextif(not quiet, run_task, 'autofile') as proxy:
       for path in q:
         runstate.raiseif()
         with Pfx(path):
           if proxy: proxy.text = shortpath(path)
-          if not existspath(path):
-            continue
-          if isdirpath(path) and not direct:
+          if not direct and isdirpath(path):
             if recurse:
               # queue children
               q.extend(
@@ -195,33 +172,31 @@ class TaggerCommand(BaseCommand):
                       if not base.startswith('.')
                   ]
               )
+            # do not autofile directories
             continue
-          if isfilepath(path) or (direct and isdirpath(path)):
-            tagger = Tagger(dirname(path))
-            taggers.add(tagger)  # remember for reuse
-            matches = tagger.process(
-                basename(path),
-                hashname=hashname,
-                modes=modes,
-                doit=doit,
-            )
-            if matches:
-              for match in matches:
-                if match.filed_to:
-                  # process the filed paths ahead of the pending stuff
-                  # raise limit to process this file in the filed_to places
-                  q.prepend(match.filed_to)
-                  if limit is not None:
-                    limit += len(match.filed_to)
-              if limit is not None:
-                # now drop the limit by 1
-                limit -= 1
-                if limit < 1:
-                  # we're done
-                  break
-            continue
-          warning("not a regular file, skipping")
-          xit = 1
+          tagger = Tagger(dirname(path))
+          taggers.add(tagger)  # remember for reuse
+          matches = tagger.process(
+              basename(path),
+              hashname=hashname,
+              modes=modes,
+              doit=doit,
+              force=force,
+          )
+          if matches:
+            for match in matches:
+              if match.filed_to:
+                # process the filed paths ahead of the pending stuff
+                # raise limit to process this file in the filed_to places
+                q.prepend(match.filed_to)
+                if limit is not None:
+                  limit += len(match.filed_to)
+            if limit is not None:
+              # now drop the limit by 1
+              limit -= 1
+              if limit < 1:
+                # we're done
+                break
           continue
     return xit
 

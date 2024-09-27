@@ -155,6 +155,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       fstags: FSTags,
       hashname: str,
       doit=False,
+      force=False,
       modes=RULE_MODES,
   ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
@@ -174,6 +175,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
             hashname=hashname,
             modes=modes,
             doit=doit,
+            force=force,
         )
         if not applied.matched:
           continue
