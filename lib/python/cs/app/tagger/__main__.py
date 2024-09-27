@@ -150,6 +150,7 @@ class TaggerCommand(BaseCommand):
       raise GetoptError(f'invalid modes not in {RULE_MODES!r}: {modes!r}')
     once = options.once
     recurse = options.recurse
+    quiet = options.quiet
     verbose = options.verbose
     taggers = set()
     ok = True
