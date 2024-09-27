@@ -407,9 +407,13 @@ class RegexpComparison(_Comparison):
     )
 
   def __call__(self, value: str, tags: TagSet) -> dict:
+    vprint(self.__class__.__name__, self.regexp.pattern)
+    vprint("  value", repr(value))
     m = self.regexp.search(value)
     if not m:
+      vprint("  NO MATCH")
       return None
+    vprint("  =>", m.groupdict())
     matched = m.groupdict()
     for k, v in list(matched.items()):
       if (k_ := cutsuffix(k, "_n")) is not k and k_ not in matched:
