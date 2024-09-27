@@ -108,7 +108,7 @@ class TaggerCommand(BaseCommand):
   # pylint: disable=too-many-branches,too-many-locals
   @uses_runstate
   def cmd_autofile(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-dnrx] paths...
+    ''' Usage: {cmd} [-dnry] paths...
           Link paths to destinations based on their tags.
           -d    Treat directory paths like files - file the
                 directory, not its contents.
@@ -119,12 +119,12 @@ class TaggerCommand(BaseCommand):
                 Only apply actions in modes, a comma separated list of modes
                 from {RULE_MODES!r}.
           -n    No action (default). Just print filing actions.
+          -q    Quiet.
           -r    Recurse. Required to autofile a directory tree.
           -y    Link files to destinations.
     '''
     options = self.options
     options.direct = False
-    options.hashname = HASHNAME_DEFAULT
     options.modes = ",".join(RULE_MODES)
     options.once = False
     options.recurse = False
@@ -135,6 +135,7 @@ class TaggerCommand(BaseCommand):
         h='hashname',
         n='dry_run',  # no action
         M_=('modes', str),
+        q='quiet',
         r='recurse',
         y='doit',  # inverse of -n
         v='verbose',
@@ -179,7 +180,7 @@ class TaggerCommand(BaseCommand):
     xit = 0
     limit = 1 if once else None
     q = ListQueue(paths, unique=realpath)
-    with contextif(verbose, run_task, 'autofile') as proxy:
+    with contextif(not quiet, run_task, 'autofile') as proxy:
       for path in q:
         runstate.raiseif()
         with Pfx(path):
