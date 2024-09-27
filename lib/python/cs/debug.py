@@ -620,12 +620,12 @@ def log_via_print(msg, *a, file=None):
 @ALL
 @decorator
 def abrk(func, exceptions=(AssertionError, NameError, RuntimeError)):
-  ''' A decorator to intercept certain exceptions `AssertionError` or `RuntimeError` and call `breakpoint()`.
+  ''' A decorator to intercept certain exceptions
+      (by default `AssertionError`, `NameError`, `RuntimeError`)
+      and call `breakpoint()`.
       The breakpoint frame contains:
       - `func`: the wrapper function
       - `func_a`, `func_kw`: the function positional and keyword arguments
-      The default exceptions are `AssertionError`, `NameError` and `RuntimeError`;
-      These may be overriddenusing the `exceptions` decorator parameter.
   '''
 
   def cs_debug_abrk_wrapper(*func_a, **func_kw):

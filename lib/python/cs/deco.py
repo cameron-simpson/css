@@ -823,6 +823,52 @@ def default_params(func, _strict=False, **param_defaults):
   defaulted_func.__signature__ = sig
   return defaulted_func
 
+@decorator
+def uses_cmd_option(func, _strict=False, **option_defaults):
+  ''' A decorator to provide default keyword arguments
+      from the prevailing `cs.cmdutils.BaseCommandOptions`
+      if available, otherwise from `option_defaults`.
+
+      Example:
+
+          @uses_cmd_option(quiet=False)
+          def func(x, *, quiet, **kw):
+              if not quiet:
+                  print("something", x, kw)
+              ... etc ...
+  '''
+
+  from cs.debug import trace, X, r, s
+
+  def verbose_wrapper(*func_a, **func_kw):
+    # fill in the func_kw from the defaults
+    # and keep a record of the chosen values
+    options_updates = {}
+    for option_name, option_default in option_defaults.items():
+      if _strict:
+        func_kw.setdefault(option_name, option_default)
+      elif func_kw.get(option_name) is None:
+        func_kw[option_name] = option_default
+      options_updates[option_name] = func_kw[option_name]
+    try:
+      from cs.cmdutils import BaseCommand
+      from cs.context import stackattrs
+    except ImportError:
+      # missing cs.cmdutils or cs.context
+      return func(*func_a, **func_kw)
+    # run with the prevailing BaseCommand suitably updated
+    options_class = BaseCommand.Options
+    options = options_class.default() or options_class()
+    with stackattrs(options, **options_updates):
+      with options:
+        return func(*func_a, **func_kw)
+
+  return verbose_wrapper
+
+uses_doit = uses_cmd_option(doit=True)
+uses_quiet = uses_cmd_option(quiet=False)
+uses_verbose = uses_cmd_option(verbose=False)
+
 # pylint: disable=too-many-statements
 @decorator
 def promote(func, params=None, types=None):

@@ -13,7 +13,6 @@ from os.path import (
     basename,
     dirname,
     exists as existspath,
-    isabs as isabspath,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -23,8 +22,8 @@ from pprint import pprint
 from stat import S_ISDIR, S_ISREG
 import sys
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions
-from cs.context import stackattrs
+from cs.cmdutils import BaseCommand
+from cs.context import contextif, stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fs import HasFSPath
@@ -33,10 +32,9 @@ from cs.gui_tk import BaseTkCommand
 from cs.hashindex import HASHNAME_DEFAULT
 from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx, pfxprint, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
 from cs.resources import RunState, uses_runstate
-from cs.seq import unrepeated
 from cs.tagset import Tag
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
@@ -108,7 +106,7 @@ class TaggerCommand(BaseCommand):
   # pylint: disable=too-many-branches,too-many-locals
   @uses_runstate
   def cmd_autofile(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-dnrx] paths...
+    ''' Usage: {cmd} [-dnry] paths...
           Link paths to destinations based on their tags.
           -d    Treat directory paths like files - file the
                 directory, not its contents.
@@ -119,12 +117,12 @@ class TaggerCommand(BaseCommand):
                 Only apply actions in modes, a comma separated list of modes
                 from {RULE_MODES!r}.
           -n    No action (default). Just print filing actions.
+          -q    Quiet.
           -r    Recurse. Required to autofile a directory tree.
           -y    Link files to destinations.
     '''
     options = self.options
     options.direct = False
-    options.hashname = HASHNAME_DEFAULT
     options.modes = ",".join(RULE_MODES)
     options.once = False
     options.recurse = False
@@ -135,6 +133,7 @@ class TaggerCommand(BaseCommand):
         h='hashname',
         n='dry_run',  # no action
         M_=('modes', str),
+        q='quiet',
         r='recurse',
         y='doit',  # inverse of -n
         v='verbose',
@@ -149,7 +148,7 @@ class TaggerCommand(BaseCommand):
       raise GetoptError(f'invalid modes not in {RULE_MODES!r}: {modes!r}')
     once = options.once
     recurse = options.recurse
-    verbose = options.verbose
+    quiet = options.quiet
     taggers = set()
     ok = True
     paths = []
@@ -179,11 +178,11 @@ class TaggerCommand(BaseCommand):
     xit = 0
     limit = 1 if once else None
     q = ListQueue(paths, unique=realpath)
-    with run_task('autofile') as proxy:
+    with contextif(not quiet, run_task, 'autofile') as proxy:
       for path in q:
         runstate.raiseif()
         with Pfx(path):
-          proxy.text = shortpath(path)
+          if proxy: proxy.text = shortpath(path)
           if not existspath(path):
             continue
           if isdirpath(path) and not direct:
@@ -205,7 +204,6 @@ class TaggerCommand(BaseCommand):
                 hashname=hashname,
                 modes=modes,
                 doit=doit,
-                verbose=verbose,
             )
             if matches:
               for match in matches:

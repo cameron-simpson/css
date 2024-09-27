@@ -30,7 +30,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, Promotable
+from cs.deco import decorator, default_params, fmtdoc, Promotable
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -567,6 +567,7 @@ class BaseCommandOptions(HasThreadState):
       opt_specs.setdefault(k, v)
     return BaseCommand.popopts(argv, self, **opt_specs)
 
+@decorator
 def uses_cmd_options(
     func, cls=BaseCommandOptions, options_param_name='options'
 ):
@@ -1573,3 +1574,12 @@ class BaseCommandCmd(Cmd):
       if subcmd in ('EOF', 'exit', 'quit'):
         return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+
+@uses_cmd_options
+def vprint(*print_a, options, verbose=None, **print_kw):
+  ''' Call `print()` if `options.verbose`.
+  '''
+  if verbose is None:
+    verbose = options.verbose
+  if verbose:
+    print(*print_a, **print_kw)

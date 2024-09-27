@@ -1656,9 +1656,11 @@ class FormatableFormatter(Formatter):
     offset = 0
     while offset < len(format_spec):
       if format_spec.startswith(':', offset):
+        # an empty spec
         subspec = ''
         offset += 1
       else:
+        # match a FORMAT_RE_FIELD_EXPR
         m_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
         if m_subspec:
           subspec = m_subspec.group()
@@ -1686,8 +1688,7 @@ class FormatableFormatter(Formatter):
     '''
     # parse the format_spec into multiple subspecs
     format_subspecs = cls.get_format_subspecs(format_spec) or []
-    while format_subspecs:
-      format_subspec = format_subspecs.pop(0)
+    for format_subspec in format_subspecs:
       with Pfx("subspec %r", format_subspec):
         assert isinstance(format_subspec, str)
         assert len(format_subspec) > 0

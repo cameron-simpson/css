@@ -26,7 +26,8 @@ from typing import List, Optional
 from icontract import require
 from typeguard import typechecked
 
-from cs.deco import cachedmethod, default_params, fmtdoc, promote
+from cs.cmdutils import vprint
+from cs.deco import cachedmethod, default_params, fmtdoc, promote, uses_verbose
 from cs.fs import findup, FSPathBasedSingleton, shortpath
 from cs.fstags import FSTags, TaggedPath, uses_fstags
 from cs.lex import FormatAsError, r, get_dotted_identifier
@@ -154,7 +155,6 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       fstags: FSTags,
       hashname: str,
       doit=False,
-      verbose=False,
       modes=RULE_MODES,
   ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
@@ -162,7 +162,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     '''
     fspath = self.pathto(filename)
     tagged = fstags[fspath]
-    # start with the format_tags of the file
+    # start the working TagSet with the format_tags of the file
     tags = tagged.format_tagset()
     matched_results = []
     printed_filename = False
@@ -174,30 +174,25 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
             hashname=hashname,
             modes=modes,
             doit=doit,
-            quiet=True,
         )
         if not applied.matched:
           continue
         matched_results.append(applied)
-        if verbose:
-          if not printed_filename:
-            print(fspath)
-            printed_filename = True
+        if not printed_filename:
+          vprint(fspath)
+          printed_filename = True
         if applied.failed:
           warning("  failed:")
           for failure in applied.failed:
             warning("   %s", failure)
         for new_fspath in applied.filed_to:
-          if verbose:
-            print("  ->", shortpath(new_fspath))
+          vprint("  ->", shortpath(new_fspath))
         for tag_change in applied.tag_changes:
           match tag_change:
             case TagChange(add_remove=True) as change:
-              if verbose:
-                print("  +", change.tag)
+              vprint("  +", change.tag)
             case TagChange(add_remove=False) as change:
-              if verbose:
-                print("  -", change.tag)
+              vprint("  -", change.tag)
             case _:
               warning("ignoring unsupported action {r(action)}")
         if rule.quick:

@@ -3,8 +3,7 @@
 ''' Parser for tagger rules.
 '''
 
-from abc import ABC, abstractmethod, abstractclassmethod
-from collections import namedtuple
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import partial
 from os.path import (
@@ -23,7 +22,6 @@ from typing import (
     Iterable,
     List,
     Mapping,
-    Optional,
     Tuple,
     Union,
 )
@@ -31,31 +29,31 @@ from typing import (
 from icontract import ensure, require
 from typeguard import typechecked
 
-from cs.deco import decorator, promote, Promotable
+from cs.cmdutils import vprint
+from cs.deco import decorator, Promotable, uses_quiet, uses_verbose
 from cs.fs import needdir, shortpath
-from cs.fstags import FSTags, TaggedPath, uses_fstags
+from cs.fstags import FSTags, uses_fstags
 from cs.hashindex import merge
 from cs.lex import (
+    cutsuffix,
     get_dotted_identifier,
     get_qstr,
     is_identifier,
+    r,
+    s,
     skipwhite,
 )
-from cs.logutils import ifverbose, warning
+from cs.logutils import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
-from cs.queues import ListQueue
 from cs.tagset import Tag, TagSet
-from cs.upd import print
-
-from cs.debug import X, trace, r, s
 
 RULE_MODES = 'move', 'tag'
 
-def slosh_quote(s: str, q: str):
-  ''' Quote a string `s` with quote character `q`.
+def slosh_quote(raw_s: str, q: str):
+  ''' Quote a string `raw_s` with quote character `q`.
   '''
-  return q + s.replace('\\', '\\\\').replace(q, '\\' + q)
+  return q + raw_s.replace('\\', '\\\\').replace(q, '\\' + q)
 
 @decorator
 def pops_tokens(func):
@@ -68,7 +66,7 @@ def pops_tokens(func):
     tokens0 = tokens[:]
     try:
       return func(tokens)
-    except:  # pylint: disable=
+    except:  # noqa
       tokens[:] = tokens0
       raise
 
@@ -115,8 +113,9 @@ class _Token(Promotable):
     '''
     return self.source_text[self.offset:self.end_offset]
 
+  @classmethod
   @pfx_method
-  def parse(cls, text: str, offset: int = 0) -> "_Token":
+  def parse(cls, text: str, offset: int = 0) -> Tuple["_Token", int]:
     ''' Parse a token from `test` at `offset` (default `0`).
         Return a `_Token` subclass instance.
         Raise `SyntaxError` if no subclass parses it.
@@ -128,11 +127,10 @@ class _Token(Promotable):
     if not token_classes:
       raise RuntimeError("no public subclasses")
     for subcls in token_classes:
-      print("parse: try", subcls, "parse", repr(text))
       try:
         return subcls.parse(text, offset=offset)
-      except SyntaxError as e:
-        warning("%s.parse: %s", subcls.__name__, e)
+      except SyntaxError:
+        pass
     raise SyntaxError(
         'no subclass.parse succeeded,'
         f'tried {",".join(subcls.__name__ for subcls in token_classes)}'
@@ -187,6 +185,9 @@ class _LiteralValue(_Token):
 
 @dataclass
 class NumericValue(_LiteralValue):
+  ''' An `int` or `float` literal.
+  '''
+
   value: Union[int, float]
 
   # anything this matches should be a valid Python int/float
@@ -244,7 +245,11 @@ class QuotedString(_LiteralValue):
 
 @dataclass
 class TagAddRemove(_Token):
-  tag: Tag
+  ''' An action to add or remove a `Tag`.
+  '''
+
+  tag_name: str
+  tag_expression: Union[QuotedString, Identifier, None]
   add_remove: bool = True
 
   @classmethod
@@ -269,17 +274,20 @@ class TagAddRemove(_Token):
       if not add_remove:
         raise ValueError(f'{offset}: unexpected assignment following -{name}')
       offset += 1
-      qs = QuotedString.parse(text, offset)
-      value = qs.value
-      end_offset = qs.end_offset
+      if text.startswith('"', offset):
+        expression = QuotedString.parse(text, offset)
+      else:
+        expression = Identifier.parse(text, offset)
+      end_offset = expression.end_offset
     else:
-      value = None
+      expression = None
       end_offset = offset
     return cls(
         source_text=text,
         offset=offset0,
         end_offset=end_offset,
-        tag=Tag(name, value),
+        tag_name=name,
+        tag_expression=expression,
         add_remove=add_remove,
     )
 
@@ -363,6 +371,8 @@ class RegexpComparison(_Comparison):
   regexp: re.Pattern
   delim: str
 
+  OP_SYMBOL = '~'
+
   # supported delimiters for regular expressions
   REGEXP_DELIMS = '/:!|'
 
@@ -397,10 +407,18 @@ class RegexpComparison(_Comparison):
     )
 
   def __call__(self, value: str, tags: TagSet) -> dict:
+    vprint(self.__class__.__name__, self.regexp.pattern)
+    vprint("  value", repr(value))
     m = self.regexp.search(value)
     if not m:
+      vprint("  NO MATCH")
       return None
-    return m.groupdict()
+    vprint("  =>", m.groupdict())
+    matched = m.groupdict()
+    for k, v in list(matched.items()):
+      if (k_ := cutsuffix(k, "_n")) is not k and k_ not in matched:
+        matched[k_] = int(v)
+    return matched
 
 class _Action:
 
@@ -413,8 +431,7 @@ class _Action:
       with Pfx(subcls.__name__):
         try:
           return pops_tokens(subcls.parse)(tokens)
-        except SyntaxError as e:
-          warning("skip: %s", e)
+        except SyntaxError:
           pass
     raise SyntaxError(
         f'no {cls.__name__} subclass matched, tried {",".join(subcls.__name__ for subcls in public_subclasses(cls))}'
@@ -429,7 +446,6 @@ class _Action:
       *,
       hashname: str,
       doit=False,
-      quiet=False,
       fstags: FSTags,
   ):
     ''' Perform this action on `fspath` and `tags`.
@@ -456,14 +472,14 @@ class MoveAction(_Action):
         target_token = tokens.pop(0)
         match target_token:
           case QuotedString():
-            target_format = target_token.value
             return cls(target_format=target_token.value)
           case _:
-            raise SyntaxError(f'expected a quoted string after {action_token}')
+            raise SyntaxError(f'expected a quoted string after {token0}')
       case _:
         raise SyntaxError(f'expected "mv", found {token0}')
 
   @uses_fstags
+  @uses_quiet
   def __call__(
       self,
       fspath: str,
@@ -471,12 +487,14 @@ class MoveAction(_Action):
       *,
       hashname: str,
       doit=False,
-      quiet=False,
       fstags: FSTags,
+      quiet: bool,
   ) -> Tuple[str, ...]:
     ''' Move `fspath` to `self.target_format`, return the new fspath.
     '''
-    target_fspath = expanduser(tags.format_as(self.target_format))
+    format_tags = fstags[fspath].format_tagset()
+    format_tags.update(tags)
+    target_fspath = expanduser(format_tags.format_as(self.target_format))
     if not isabspath(target_fspath):
       target_fspath = joinpath(dirname(fspath), target_fspath)
     if target_fspath.endswith('/'):
@@ -491,7 +509,7 @@ class MoveAction(_Action):
         move_mode=True,
         symlink_mode=False,
         doit=doit,
-        quiet=quiet,
+        verbose=not quiet,
     )
     return (target_fspath,)
 
@@ -522,6 +540,7 @@ class TagAction(_Action):
         raise SyntaxError(f'expected "tag", found {r(token0)} {token0}')
 
   @uses_fstags
+  @uses_verbose
   def __call__(
       self,
       fspath: str,
@@ -529,21 +548,45 @@ class TagAction(_Action):
       *,
       hashname: str,
       doit=False,
-      quiet=False,
+      verbose: bool,
       fstags: FSTags,
   ) -> Tuple[TagChange, ...]:
-    ''' Apply `self.tag_tokens` to `tags`.
+    ''' Apply `self.tag_tokens` to `tags` and `fstags[fspath]`.
         Return a tuple of the applied `TagChange`s.
     '''
+    tagged = fstags[fspath]
     tag_changes = []
     for tag_token in self.tag_tokens:
-      if tag_token.add_remove:
-        tags.add(tag_token.tag, verbose=not quiet)
-      else:
-        tags.discard(tag_token.tag.name, verbose=not quiet)
-      tag_changes.append(
-          TagChange(add_remove=tag_token.add_remove, tag=tag_token.tag)
-      )
+      with Pfx(tag_token):
+        tag_name = tag_token.tag_name
+        tag_value = None
+        if tag_token.add_remove:
+          match tag_token.tag_expression:
+            case Identifier():
+              try:
+                tag_value = tags[tag_token.tag_expression.name]
+              except KeyError:
+                warning(
+                    "no tags[%r], not setting tags.%s",
+                    tag_token.tag_expression.name, tag_name
+                )
+                continue
+            case QuotedString():
+              tag_value = tag_token.tag_expression.value
+            case _:
+              raise RuntimeError(f'unimplemented {s(self)}')
+          tags.add(tag_name, tag_value, verbose=verbose)
+          if doit:
+            tagged.add(tag_name, tag_value)
+        else:
+          tags.discard(tag_name, verbose=verbose)
+          if doit:
+            tagged.discard(tag_name)
+        tag_changes.append(
+            TagChange(
+                add_remove=tag_token.add_remove, tag=Tag(tag_name, tag_value)
+            )
+        )
     return tuple(tag_changes)
 
 Action = Union[str, Tuple[bool, Tag]]
@@ -576,7 +619,6 @@ class Rule(Promotable):
   def __str__(self):
     return self.definition
 
-  # TODO: repr should do what str does now
   def __repr__(self):
     filename = self.filename
     lineno = self.lineno
@@ -611,7 +653,6 @@ class Rule(Promotable):
       *,
       hashname: str,
       doit: bool = False,
-      quiet: bool = False,
       modes=RULE_MODES,
       fstags: FSTags,
   ) -> RuleResult:
@@ -644,9 +685,9 @@ class Rule(Promotable):
           result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
     if self.action is not None:
       with Pfx(self.action.__doc__.strip().split()[0].strip()):
-        if not (set(self.action.modes) & set(modes)):
+        if not (set(self.action.MODES) & set(modes)):
           ##warning(
-          ##    "SKIP action with unwanted modes %r: %s", self.action.modes,
+          ##    "SKIP action with unwanted modes %r: %s", self.action.MODES,
           ##    self.action
           ##)
           pass
@@ -659,10 +700,9 @@ class Rule(Promotable):
                 tags,
                 hashname=hashname,
                 doit=doit,
-                quiet=quiet,
             )
           except Exception as e:
-            warning("action failed: %s", e)
+            warning("action failed: %s", s(e))
             result.failed.append(e)
           else:
             for side_effect in side_effects:
@@ -714,12 +754,10 @@ class Rule(Promotable):
     if offset == len(rule_s) or rule_s.startswith(('#', '//'), offset):
       # end of string or comment -> end of tokens
       raise EOFError
-    for token_type in public_subclasses(_Token):
-      try:
-        return token_type.parse(rule_s, offset)
-      except SyntaxError as e:
-        continue
-    raise SyntaxError(f'no token recognised at: {rule_s[offset:]!r}')
+    try:
+      return _Token.parse(rule_s, offset)
+    except SyntaxError as e:
+      raise SyntaxError(f'no token recognised at: {rule_s[offset:]!r}') from e
 
   @classmethod
   def tokenise(cls, rule_s: str, offset: int = 0):
@@ -781,6 +819,8 @@ class Rule(Promotable):
               match_attribute,
               match_test,
               action,
+              filename=filename,
+              lineno=lineno,
               quick=quick
           )
         case _:
@@ -833,10 +873,12 @@ class Rule(Promotable):
     if not tokens:
       return False
     next_token = tokens[0]
-    if type(next_token) is not Identifier or next_token.name != 'quick':
-      return False
-    tokens.pop(0)
-    return True
+    match next_token:
+      case Identifier(name="quick"):
+        tokens.pop(0)
+        return True
+      case _:
+        return False
 
   @classmethod
   def from_file(
@@ -852,15 +894,14 @@ class Rule(Promotable):
     if isinstance(lines, str):
       filename = lines
       with Pfx(filename):
-        with open(filename, encoding='utf-8') as lines:
+        with open(filename, encoding='utf-8') as lines2:
           return cls.from_file(
-              lines, filename=filename, start_lineno=start_lineno
+              lines2, filename=filename, start_lineno=start_lineno
           )
     rules = []
     for lineno, line in enumerate(lines, start_lineno):
       with Pfx(lineno):
         R = cls.from_str(line.rstrip(), filename=filename, lineno=lineno)
-        print(filename, lineno, R)
         if R is not None:
           rules.append(R)
     return rules
