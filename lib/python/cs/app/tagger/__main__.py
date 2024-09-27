@@ -13,7 +13,6 @@ from os.path import (
     basename,
     dirname,
     exists as existspath,
-    isabs as isabspath,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -23,7 +22,7 @@ from pprint import pprint
 from stat import S_ISDIR, S_ISREG
 import sys
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options
+from cs.cmdutils import BaseCommand
 from cs.context import contextif, stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
@@ -33,10 +32,9 @@ from cs.gui_tk import BaseTkCommand
 from cs.hashindex import HASHNAME_DEFAULT
 from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx, pfxprint, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
 from cs.resources import RunState, uses_runstate
-from cs.seq import unrepeated
 from cs.tagset import Tag
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
@@ -151,7 +149,6 @@ class TaggerCommand(BaseCommand):
     once = options.once
     recurse = options.recurse
     quiet = options.quiet
-    verbose = options.verbose
     taggers = set()
     ok = True
     paths = []
