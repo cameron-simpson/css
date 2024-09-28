@@ -6,6 +6,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import partial
+import os
 from os.path import (
     abspath,
     basename,
@@ -13,6 +14,8 @@ from os.path import (
     expanduser,
     isabs as isabspath,
     isdir as isdirpath,
+    isfile as isfilepath,
+    islink as islinkpath,
     join as joinpath,
 )
 import re
@@ -487,6 +490,7 @@ class MoveAction(_Action):
       *,
       hashname: str,
       doit=False,
+      force=False,
       fstags: FSTags,
       quiet: bool,
   ) -> Tuple[str, ...]:
@@ -499,9 +503,13 @@ class MoveAction(_Action):
       target_fspath = joinpath(dirname(fspath), target_fspath)
     if target_fspath.endswith('/'):
       target_fspath = joinpath(target_fspath, basename(fspath))
+    if doit and not force and (islinkpath(fspath) or not isfilepath(fspath)):
+      raise ValueError(f'not a regular file: {fspath!r}')
+    if not force and isfilepath(fspath) and os.stat(fspath).st_size == 0:
+      raise ValueError(f'zero length file (placeholder?): {fspath!r}')
     target_dirpath = dirname(target_fspath)
     if doit and not isdirpath(target_dirpath):
-      needdir(target_dirpath, use_makedirs=False)
+      needdir(target_dirpath, use_makedirs=False, verbose=not quiet)
     merge(
         fspath,
         target_fspath,
@@ -548,6 +556,7 @@ class TagAction(_Action):
       *,
       hashname: str,
       doit=False,
+      force=False,
       verbose: bool,
       fstags: FSTags,
   ) -> Tuple[TagChange, ...]:
@@ -595,6 +604,7 @@ class Rule(Promotable):
   ''' A tagger rule.
   '''
 
+  @pfx_method
   @require(lambda match_attribute: is_identifier(match_attribute))
   @typechecked
   def __init__(
@@ -653,6 +663,7 @@ class Rule(Promotable):
       *,
       hashname: str,
       doit: bool = False,
+      force=False,
       modes=RULE_MODES,
       fstags: FSTags,
   ) -> RuleResult:
@@ -683,38 +694,37 @@ class Rule(Promotable):
         tags.update(match_result)
         for k, v in match_result.items():
           result.tag_changes.append(TagChange(add_remove=True, tag=Tag(k, v)))
-    if self.action is not None:
-      with Pfx(self.action.__doc__.strip().split()[0].strip()):
-        if not (set(self.action.MODES) & set(modes)):
-          ##warning(
-          ##    "SKIP action with unwanted modes %r: %s", self.action.MODES,
-          ##    self.action
-          ##)
-          pass
+    for action in self.action, :
+      if self.action is None:
+        continue
+      with Pfx(action.__doc__.strip().split()[0].strip()):
+        if not (set(action.MODES) & set(modes)):
+          vprint("SKIP action modes", action.MODES, "not in", modes)
+          continue
+        # apply the current tags in case the file gets moved
+        fstags[fspath].update(tags)
+        try:
+          side_effects = action(
+              fspath,
+              tags,
+              hashname=hashname,
+              doit=doit,
+              force=force,
+          )
+        except Exception as e:
+          warning("action failed: %s", s(e))
+          result.failed.append(e)
         else:
-          # apply the current tags in case the file gets moved
-          fstags[fspath].update(tags)
-          try:
-            side_effects = self.action(
-                fspath,
-                tags,
-                hashname=hashname,
-                doit=doit,
-            )
-          except Exception as e:
-            warning("action failed: %s", s(e))
-            result.failed.append(e)
-          else:
-            for side_effect in side_effects:
-              match side_effect:
-                case str(new_fspath):
-                  result.filed_to.append(new_fspath)
-                case TagChange() as tag_change:
-                  result.tag_changes.append(tag_change)
-                case _:
-                  raise NotImplementedError(
-                      f'unsupported side effect {r(side_effect)}'
-                  )
+          for side_effect in side_effects:
+            match side_effect:
+              case str(new_fspath):
+                result.filed_to.append(new_fspath)
+              case TagChange() as tag_change:
+                result.tag_changes.append(tag_change)
+              case _:
+                raise NotImplementedError(
+                    f'unsupported side effect {r(side_effect)}'
+                )
     return result
 
   @typechecked
