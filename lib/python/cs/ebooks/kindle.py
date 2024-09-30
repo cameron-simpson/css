@@ -804,6 +804,13 @@ class KindleCommand(BaseCommand):
           raise
     return xit
 
+  def cmd_keys(self, argv):
+    ''' Usage: {cmd} [base|import|json|print]
+          Shortcut to \"dedrm kindlekeys\".
+    '''
+    from .dedrm import DeDRMCommand
+    return DeDRMCommand([self.options.cmd, 'kindlekeys', *argv]).run()
+
   @uses_runstate
   def cmd_import_tags(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-nqv] [ASINs...]
