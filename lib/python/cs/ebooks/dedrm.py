@@ -277,8 +277,10 @@ class DeDRMWrapper(Promotable):
       kindlekey = self.import_name('kindlekey')
       ##kindlekey = self.import_name('kindlekey', package=__package__)
       # monkey patch the kindlekey.kindlekeys function
-      self.base_kindlekeys = kindlekey.kindlekeys
-      kindlekey.kindlekeys = self.cached_kindlekeys
+      if not hasattr(self, 'base_kindlekeys'):
+        # we only do this once!
+        self.base_kindlekeys = kindlekey.kindlekeys
+        kindlekey.kindlekeys = self.cached_kindlekeys
       # monkey patch the kindlekey.CryptUnprotectData class
       BaseCryptUnprotectData = kindlekey.CryptUnprotectData
       LibCrypto = getLibCrypto()
