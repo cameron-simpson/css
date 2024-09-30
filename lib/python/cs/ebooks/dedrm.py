@@ -35,6 +35,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import pfx, Pfx, pfx_call, pfx_method
@@ -141,7 +142,7 @@ class DeDRMCommand(BaseCommand):
                       List the kindle keys derived from the current system.
             import    Read a JSON list of key dicts and update the cached keys.
             json      Write the cached list of keys as JSON.
-            print     Readable listing of the keys.
+            print     Readable listing of the cached keys.
           The default mode is 'json'.
           Examples:
             Import the base keys from this system into the local collection:
@@ -198,6 +199,8 @@ class DeDRMCommand(BaseCommand):
   def cmd_remove(self, argv):
     ''' Usage: {cmd} filenames...
           Remove DRM from the specified filenames.
+          Write the decrypted book at path/to/book
+          to the file decrypted-book in the current directory.
     '''
     dedrm = self.options.dedrm
     exists_ok = False
@@ -274,8 +277,10 @@ class DeDRMWrapper(Promotable):
       kindlekey = self.import_name('kindlekey')
       ##kindlekey = self.import_name('kindlekey', package=__package__)
       # monkey patch the kindlekey.kindlekeys function
-      self.base_kindlekeys = kindlekey.kindlekeys
-      kindlekey.kindlekeys = self.cached_kindlekeys
+      if not hasattr(self, 'base_kindlekeys'):
+        # we only do this once!
+        self.base_kindlekeys = kindlekey.kindlekeys
+        kindlekey.kindlekeys = self.cached_kindlekeys
       # monkey patch the kindlekey.CryptUnprotectData class
       BaseCryptUnprotectData = kindlekey.CryptUnprotectData
       LibCrypto = getLibCrypto()
@@ -396,12 +401,14 @@ class DeDRMWrapper(Promotable):
         return M
       return pfx_call(getattr, M, name)
 
+  @uses_fstags
   @pfx_method
   def remove(
       self,
       srcpath,
       dstpath,
       *,
+      fstags: FSTags,
       booktype=None,
       exists_ok=False,
       obok_lib=None,
@@ -462,7 +469,10 @@ class DeDRMWrapper(Promotable):
                   (srcpath, booktype)
               )
             if decrypted_ebook == srcpath:
-              pfx_call(copyfile, srcpath, T.name)
+              warning("srcpath is already decrypted")
+            pfx_call(copyfile, srcpath, T.name)
+    # copy tags from the srcpath to the dstpath
+    fstags[dstpath].update(fstags[srcpath])
 
   @contextmanager
   def removed(self, srcpath):

@@ -583,7 +583,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.db.shell()
 
-  @uses_upd
   def preload(self):
     ''' Scan all the books, preload their data.
     '''
