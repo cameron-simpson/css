@@ -35,6 +35,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import pfx, Pfx, pfx_call, pfx_method
@@ -398,12 +399,14 @@ class DeDRMWrapper(Promotable):
         return M
       return pfx_call(getattr, M, name)
 
+  @uses_fstags
   @pfx_method
   def remove(
       self,
       srcpath,
       dstpath,
       *,
+      fstags: FSTags,
       booktype=None,
       exists_ok=False,
       obok_lib=None,
@@ -464,7 +467,10 @@ class DeDRMWrapper(Promotable):
                   (srcpath, booktype)
               )
             if decrypted_ebook == srcpath:
-              pfx_call(copyfile, srcpath, T.name)
+              warning("srcpath is already decrypted")
+            pfx_call(copyfile, srcpath, T.name)
+    # copy tags from the srcpath to the dstpath
+    fstags[dstpath].update(fstags[srcpath])
 
   @contextmanager
   def removed(self, srcpath):
