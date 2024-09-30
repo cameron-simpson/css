@@ -94,7 +94,7 @@ class BWizCmd(BaseCommand):
           vcodec = arg0[3:]
         elif arg0 == '--rm':
           remove_source = True
-        if arg0 == '-d':
+        elif arg0 == '-d':
           outputdir = argv.pop(0)
         else:
           warning('unexpected option')

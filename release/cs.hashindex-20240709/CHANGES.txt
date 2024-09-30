@@ -1,0 +1,8 @@
+lib/python/cs/hashindex.py: cs.hashindex: file_checksum: refactor to use fs.fstags.TaggedPath.cached_value
+lib/python/cs/hashindex.py: cs.hashindex: fix cached hashcode tags prefix
+lib/python/cs/hashindex.py: cs.hashindex: file_checksum: hold the fstags open while we access/update the cache
+lib/python/cs/hashindex.py: cs.hashindex: file_checksum: include the hashname in the task label
+lib/python/cs/hashindex.py: cs.hashindex: require blake3 and use it as the default hash algorithm
+lib/python/cs/hashindex.py: cs.hashindex: update for new cs.upd.above context manager
+lib/python/cs/hashindex.py: merge default ==> vt
+lib/python/cs/hashindex.py: merge default -> vt

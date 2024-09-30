@@ -1,23 +1,42 @@
 #!/bin/sh
 #
-# Install local CSS to remote CSS.
-#	- Cameron Simpson <cs@cskk.id.au> 18jan2004
+# Install local /opt/css to remote /opt/css.
+# - Cameron Simpson <cs@cskk.id.au> 18jan2004
 #
 
 set -ue
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d dstdir] hostlists..."
+usage="Usage: $cmd [-d dstdir] [-q] hostlists..."
 
-: ${OPTCSS:=/opt/css}
+: "${OPTCSS:=/opt/css}"
 
 async=1
 srcdir=$OPTCSS
 dstdir=$OPTCSS
-[ $# -gt 0 ] && [ "x$1" = x-d ] && { dstdir=$2; shift; shift; }
-[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+rsiopt=-i
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) dstdir=$2; shift ;;
+    -q) rsiopt= ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing hostlists" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 for hostlist
 do
-  mrsync -iO -aH --delete --delete-excluded --exclude=/release '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
+  mrsync $rsiopt -O -aH --delete --delete-excluded --exclude=/release '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
 done

@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from getopt import GetoptError
 import platform
+from signal import SIGINT
 import sys
 import tkinter as tk
 
@@ -14,7 +15,7 @@ from icontract import require, ensure
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommandOptions
-from cs.context import stackattrs
+from cs.context import stackattrs, stack_signals
 from cs.fs import shortpath, HasFSPath
 from cs.gui_tk import (
     BaseTkCommand,
@@ -33,6 +34,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.resources import RunState, uses_runstate
 from cs.tagset import Tag, TagSet
+from cs.upd import run_task
 
 from . import Tagger, uses_tagger
 
@@ -43,6 +45,26 @@ def main(argv=None):
   '''
   return TaggerGUICommand(argv).run()
 
+@uses_runstate
+def run(tagger: Tagger, *, runstate: RunState, **widget_kw):
+  ''' Create a `TaggerWidget` for `tagger` and run the GUI until
+      the runstate is cancelled.
+    '''
+  root = trace(tk.Tk)()
+  widget = TaggerWidget(root, tagger=tagger, **widget_kw)
+  widget.grid()
+
+  def onsig(signum, frame):
+    root.after_idle(root.quit)
+
+  runstate.notify_cancel.add(lambda _: root.quit())
+  with stack_signals(SIGINT, onsig, additional=True):
+    with run_task(f'{widget} mainloop'):
+      with runstate:
+        trace(widget.lift)()
+        trace(widget.focus)()
+        trace(root.mainloop)()
+
 class TaggerGUICommand(BaseTkCommand):
 
   @dataclass
@@ -51,16 +73,18 @@ class TaggerGUICommand(BaseTkCommand):
 
   @contextmanager
   def run_context(self):
-    options = self.options
-    with Tagger(options.fspath) as tagger:
-      with stackattrs(options, tagger=tagger):
-        yield
+    with super().run_context():
+      options = self.options
+      with Tagger(options.fspath) as tagger:
+        with stackattrs(options, tagger=tagger):
+          yield
 
   def main(self, argv):
+    ''' Create a `TaggerWidget` and run the GUI.
+    '''
     tagger = self.options.tagger
-    root = tk.Tk()
-    gui = TaggerWidget(root, tagger=tagger, fspaths=argv)
-    gui.mainloop()
+    runstate = self.options.runstate
+    trace(run)(tagger, runstate=runstate, fspaths=argv)
 
 # pylint: disable=too-many-ancestors,too-many-instance-attributes
 class TaggerWidget(_Widget, tk.Frame, HasFSPath):
@@ -119,10 +143,6 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
     self.columnconfigure(2, weight=1)
     self.rowconfigure(0, weight=1)
 
-    # let the geometry settle
-    self.grid()
-    self.update_idletasks()
-
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
 
@@ -161,76 +181,6 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
     if self.thumbsview is not None:
       # scroll to new_fspath
       self.thumbsview.show_fspath(new_fspath)
-
-  @contextmanager
-  def startup_shutdown(self):
-    ''' Startup/shutdown context manager.
-    '''
-    root = tk.Tk()
-    app = Frame(root)
-    app.grid()
-
-    # Define the window's contents
-    def select_path(_, path):
-      self.fspath = path
-
-    pathlist = PathList_Listbox(
-        app,
-        self.fspaths,
-        command=select_path,
-    )
-    pathlist.grid(column=0, row=0, sticky=tk.N + tk.S, rowspan=2)
-    pathview = PathView(app, tagger=self.tagger)
-    pathview.grid(column=1, row=0, sticky=tk.N + tk.S)
-
-    thumbscanvas = Canvas(app)
-    thumbscanvas.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
-
-    thumbsscroll = Scrollbar(
-        app,
-        orient=tk.HORIZONTAL,
-        command=thumbscanvas.xview,
-    )
-    thumbsscroll.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
-    thumbscanvas['xscrollcommand'] = thumbsscroll.set
-
-    # let the geometry settle
-    app.update_idletasks()
-
-    thumbsview = ThumbNailScrubber(
-        thumbscanvas,
-        (),
-        command=select_path,
-    )
-    thumbscanvas.create_window(
-        thumbsscroll.winfo_width() / 2, 0, anchor=tk.N, window=thumbsview
-    )
-
-    # attach widget references
-    with stackattrs(
-        self,
-        app=app,
-        pathlist=pathlist,
-        pathview=pathview,
-        thumbscanvas=thumbscanvas,
-        thumbsview=thumbsview,
-    ):
-      # set fspaths with side effects to widgets
-      with stackattrs(self, fspaths=self.fspaths):
-        # set current display with side effects to widgets
-        with stackattrs(self,
-                        fspath=self.fspaths[0] if self.fspaths else None):
-          yield app
-
-  @uses_runstate
-  def run(self, runstate: RunState):
-    ''' Run the GUI.
-    '''
-    print("run...")
-    with runstate:
-      print("before mainloop")
-      self.app.mainloop()
-      print("after mainloop")
 
 class TagValueStringVar(tk.StringVar):
   ''' A `StringVar` which holds a `Tag` value transcription.
@@ -560,12 +510,13 @@ class PathView(LabelFrame):
     return suggestions
 
   @property
-  def tagged(self):
+  @uses_fstags
+  def tagged(self, *, fstags: FSTags):
     ''' The `TaggedFile` for the currently displayed path.
     '''
     if self._fspath is None:
       return None
-    return self.tagger.fstags[self._fspath]
+    return fstags[self._fspath]
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

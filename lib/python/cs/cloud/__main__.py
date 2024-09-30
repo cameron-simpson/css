@@ -61,7 +61,7 @@ class CloudCommand(BaseCommand):
     if opt == '-A':
       self.options.cloud_area_path = val
     else:
-      raise RuntimeError("unimplemented option")
+      raise NotImplementedError("unimplemented option")
 
   def cmd_stat(self, argv):
     ''' Usage: {cmd}

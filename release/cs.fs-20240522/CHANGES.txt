@@ -1,0 +1,4 @@
+lib/python/cs/fs.py: cs.fs: shortpath: rename DEFAULT_SHORTEN_PREFIXES to SHORTPATH_PREFIXES_DEFAULT, improve docstring
+lib/python/cs/fs.py: cs.fs: shortpath: rename path to fspath
+lib/python/cs/fs.py: cs.fs: shortpath: new collapseuser=False, foldsymlinks=False parameters
+lib/python/cs/fs.py: cs.fs: remove unused import

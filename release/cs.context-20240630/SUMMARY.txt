@@ -1,0 +1,3 @@
+New closeall(Iterable) wrapping withall() and returning the close step as a callable.
+contextif: document the lambda shuffle needed if cmgr is callable.
+New @with_self decorator for methods which should `with(self)` while the method runs (unused?)

@@ -1,0 +1,1 @@
+lib/python/cs/debug.py: cs.debug: trace_caller: access frame.name instead of frame.funcname

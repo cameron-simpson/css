@@ -1,0 +1,3 @@
+BaseCommandOptions.popopts: return the dict from BaseCommand.popopts().
+BaseCommand.apply_preargv: apply the default options supported by self.options.
+BaseCommandOptions.update(mapping) method, useful for dropping subcommand-specific defaults onto the options ahead of the local popopts() call.

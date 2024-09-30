@@ -11,4 +11,5 @@ word1=$1; shift
 if [ $# = 0 ]
 then  find "$HOME/dl/playon/" "$HOME/v/" "$HOME/vv/" -iname "*${word1}*"
 else  find "$HOME/dl/playon/" "$HOME/v/" "$HOME/vv/" -iname "*${word1}*" | grepall "$word1" "$@"
-fi
+fi \
+| sort

@@ -1,0 +1,2 @@
+lib/python/cs/service_api.py: cs.servbice_api: small formatting change, no semantic effect
+lib/python/cs/service_api.py: cs.service_api: ServiceAPI: acquire the fstags automatically at init

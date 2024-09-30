@@ -1,0 +1,5 @@
+lib/python/cs/tagset.py: cs.tagset: Tag.from_str2: make the ontology optional
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion: drop .promote, the default one from Promotable works fine
+lib/python/cs/tagset.py: cs.tagset: TagSetPrefixView: provide __len__() and update()
+lib/python/cs/tagset.py: cs.tagset: BaseTagSets: add another example to the docstring
+lib/python/cs/tagset.py: cs.tagset: update imports

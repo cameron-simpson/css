@@ -1,0 +1,6 @@
+lib/python/cs/sqltags.py: replace many raises of RuntimeError with NotImplementedError, suggestion by @dimaqq on disucss.python.org
+lib/python/cs/sqltags.py: cs.sqltags: move some constants from BaseSQLTagsCommand to SQLTagsCommandsMixin where they belong, add missing USAGE_KEYWORDS entry
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand.Options.db_url: fill in in run_context instead of using a field because of changes to cs.cmdutils which now makes an instance beofre its name is known
+lib/python/cs/sqltags.py: cs.sqltags: autoformat
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: do not define_schema() in init, instead let the ORM do that and we prepare the metanode on first use of the db - this makes it much cheaper to make an SQLTags and then not use it
+lib/python/cs/sqltags.py: cs.sqltags: drop SQLTags.init, now part of the first-use startup

@@ -1,0 +1,3 @@
+lib/python/cs/later.py: cs.later: Later.submit: new optional daemon:bool parameter and associated plumbing; submit the final finished-Event.set as a daemon Thread
+lib/python/cs/later.py: cs.later: Later.defer: a little internal refactoring
+lib/python/cs/later.py: Later.startup_shutdown: make the finished_event.set thread daemon mode

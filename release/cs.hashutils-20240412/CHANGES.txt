@@ -1,0 +1,5 @@
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode.hashclass(hashname): fall back to looking for blake3 from the blake3 module
+lib/python/cs/hashutils.py: cs.hashutils: docstring updates, remove some unused flexibility from the class constructor
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode: new get_hashfunc(hashname) static method; __init_subclass__: run the super().__init_subclass__ first, handle hashname is None and hashfunc is None to imply a superclass of another base class
+lib/python/cs/hashutils.py: cs.hashutils: remove debug
+lib/python/cs/hashutils.py: cs.hashutils: update DISTINFO

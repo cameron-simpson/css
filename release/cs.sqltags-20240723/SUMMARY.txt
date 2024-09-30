@@ -1,0 +1,3 @@
+Replace many raises of RuntimeError with NotImplementedError, suggestion by @dimaqq on discuss.python.org.
+Move some constants from BaseSQLTagsCommand to SQLTagsCommandsMixin where they belong, add missing USAGE_KEYWORDS entry.
+SQLTagsORM: do not define_schema() in init, instead let the ORM do that and we prepare the metanode on first use of the db - this makes it much cheaper to make an SQLTags and then not use it.

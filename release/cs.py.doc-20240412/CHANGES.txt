@@ -1,0 +1,3 @@
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: update docstring to describe the method_names parameter
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: classes: MRO: suppress classes which are not immediate superclasses
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: shuffle if-statement

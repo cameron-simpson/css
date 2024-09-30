@@ -1,0 +1,9 @@
+lib/python/cs/logutils.py: cs.logutils: infer_logging_level: ignore the module.name and module:function_name $DEBUG values, now done by importing cs.debug
+lib/python/cs/logutils.py: cs.logutils: infer_logging_level: simpler extraction of the flags
+lib/python/cs/logutils.py: cs.logutils: drop func_wrap and _ftrace, superceded by cs.debug.trace
+lib/python/cs/logutils.py: cs.logutils: new LoggingState class for the computed log state, subclassing the old NS; split out setup_logging() as a little stub; remove the last vestigates of the trace stuff now in cs.debug
+lib/python/cs/logutils.py: cs.logutils: clean some lint
+lib/python/cs/logutils.py: cs.logutils: LoggingState.apply: fix reference to self.format
+lib/python/cs/logutils.py: cs.logutils: setup_logging: set loginfo after the apply()
+lib/python/cs/logutils.py: cs.logutils: setup_logging: handle the common no-arguments mode
+lib/python/cs/logutils.py: cs.logutils: DISTINFO: comment for the cs.upd install_requires

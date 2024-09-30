@@ -39,4 +39,4 @@ exec 1>&2
 
 ##[ -s "$tags" ] || set --
 set -x
-exec lock -P "$tags" ctags -R -a -o "$tags" --tag-relative --links=no --extra=fq ${1+"$@"}
+exec lock -P "$tags" ctags -R -a -o "$tags" --tag-relative --links=no --extras=fq ${1+"$@"}

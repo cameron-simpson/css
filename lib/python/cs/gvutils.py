@@ -79,9 +79,7 @@ def gvprint(
   if file is None:
     file = sys.stdout
   if isinstance(file, str):
-    if existspath(file):
-      raise ValueError("file %r: already exists" % (file,))
-    with open(file, 'wb') as f:
+    with open(file, 'xb') as f:
       return gvprint(dot_s, file=f, fmt=fmt, layout=layout, **dot_kw)
   if file is GVDATAURL:
     if dataurl_encoding is None:
@@ -213,10 +211,10 @@ def gvdataurl(dot_s, **kw):
   '''
   return gvprint(dot_s, file=GVDATAURL, **kw)
 
-def gvsvg(dot_s, **kw):
+def gvsvg(dot_s, **gvdata_kw):
   ''' Convenience wrapper for `gvprint` which returns an SVG string.
   '''
-  svg = gvdata(dot_s, fmt='svg', **kw).decode('utf-8')
+  svg = gvdata(dot_s, fmt='svg', **gvdata_kw).decode('utf-8')
   svg = svg[svg.find('<svg'):].rstrip()  # trim header and tail
   return svg
 
@@ -280,13 +278,12 @@ class DOTNodeMixin:
     strs = []
     for attr, value in attrs.items():
       if isinstance(value, (int, float)):
-          value_s = str(value)
+        value_s = str(value)
       elif isinstance(value, str):
         value_s = quote(value)
       else:
         raise TypeError(
-            "attrs[%r]=%s: expected int,float,str"
-            % (attr, r(value))
+            "attrs[%r]=%s: expected int,float,str" % (attr, r(value))
         )
       strs.append(quote(attr) + '=' + value_s)
     attrs_s = ','.join(strs)

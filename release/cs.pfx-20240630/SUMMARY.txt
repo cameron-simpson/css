@@ -1,0 +1,1 @@
+@pfx_method: fix access to class name when the target is a class.

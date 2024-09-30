@@ -1,0 +1,28 @@
+lib/python/cs/iso14496.py: cs.iso14496: replace dropped UTF16NULField with BinaryUTF16NUL
+lib/python/cs/iso14496.py: cs.iso14496: comment out unused CO64BoxBody.chunk_offsets, uses dropped (and not replaced) deferred_field
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command: update usage messages
+lib/python/cs/iso14496.py: cs.iso14496: type annotations for the bfr parameter
+lib/python/cs/iso14496.py: cs.iso14496: docstring tweaks and another type annotation
+lib/python/cs/iso14496.py: cs.iso14496: replace add_body_class() with BoxBody.__init_subclass__
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_autotag: use cs.fs.scandirpaths
+lib/python/cs/iso14496.py: cs.iso14496.__getattr__: tweak .boxes lookup
+lib/python/cs/iso14496.py: cs.iso14496: drop FallbackBoxBody, we'll just use BoxBody when there's no box specific subclass
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody no longer overtly an ABC, we're using it instead of FallBackBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: replace pick_boxbody_class with BoxBody.for_box_type, rename boxbody_type_from_klass to boxbody_type_from_class, drop obsolete KNOWN_BOXBODY_CLASSES
+lib/python/cs/iso14496.py: cs.iso14496: update imports and DISTINFO, tweak docstring and format string
+lib/python/cs/iso14496.py: cs.iso14496: lint and idiom updates
+lib/python/cs/iso14496.py: cs.iso14496: add_generic_sample_boxbody: update _SpecificSampleBoxBody for new BoxBody setup
+lib/python/cs/iso14496.py: cs.iso14496: comment that I can't remember what this code was for
+lib/python/cs/iso14496.py: cs.iso14496: fix mapping of box types to BoxBody subclasses
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_info: print moov.udta.meta.ilst.cover in SIXEL format on a terminal
+lib/python/cs/iso14496.py: cs.iso14496: METABoxBody.__getattr__: refactor
+lib/python/cs/iso14496.py: cs.iso14496: update imports, minor tweaks
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_info: use cs.imageutils.sixel_from_image_bytes to simplify the display of the cover image
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_autotag: redo the option parse and main loop
+lib/python/cs/iso14496.py: cs.iso14496: rename parse_deref_path to get_deref_path like other lexical functions, update doctest
+lib/python/cs/iso14496.py: cs.iso14496: docstring, format and comment tweaks
+lib/python/cs/iso14496.py: cs.iso14496: walk: type annotation
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.__getattr__: fix lookup of long names
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_info: handle TypeError from str(tag), issue warning and use repr()
+lib/python/cs/iso14496.py: cs.imageutils,iso14496: the classifiers have changed :-(
+lib/python/cs/iso14496.py: cs.iso14496: update DISTINFO

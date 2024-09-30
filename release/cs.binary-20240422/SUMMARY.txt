@@ -1,0 +1,1 @@
+New _BinaryMultiValue_Base.for_json() method returning a dict containing the fields.

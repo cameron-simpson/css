@@ -17,7 +17,7 @@ from cs.result import bg
 from cs.threads import locked, LockableMixin
 
 from . import RLock, Store
-from .block import Block, IndirectBlock, RLEBlock
+from .block import Block, IndirectBlock, LiteralBlock, RLEBlock
 from .blockify import top_block_for, blockify
 
 # arbitrary threshold to generate blockmaps
@@ -80,7 +80,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     ''' Initialise RWBlockFile with optional backing Block `backing_block`.
     '''
     if backing_block is None:
-      backing_block = Block(data=b'')
+      backing_block = LiteralBlock(data=b'')
     self.filename = None
     self._syncer = None  # syncing Result, close waits for it
     self._sync_span = None
@@ -221,7 +221,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     if length < 0:
       raise ValueError("length must be >= 0, received %s" % (length,))
     if length == 0:
-      self._reset(Block(data=b''))
+      self._reset(LiteralBlock(data=b''))
     else:
       # let any syncers complete
       self.sync()

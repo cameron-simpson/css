@@ -1,0 +1,1 @@
+FSM: make fsm_transitions_as_dot a shim for new fsm_state_diagram_as_dot class method.

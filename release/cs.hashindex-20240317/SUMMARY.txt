@@ -1,0 +1,3 @@
+HashIndexCommand.cmd_ls: default to listing the current directory.
+HashIndexCommand: new -o output_format to allow outputting only hashcodes or fspaths.
+HashIndexCommand.cmd_comm: new -r (relative) option.

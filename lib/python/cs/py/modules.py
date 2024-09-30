@@ -15,7 +15,7 @@ from cs.context import stackattrs
 from cs.gimmicks import warning
 from cs.pfx import Pfx
 
-__version__ = '20220606-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -155,15 +155,15 @@ def direct_imports(src_filename, module_name=None):
                 subimport = module_name
               else:
                 # resolve relative import name
-                preparts = module_name.split('.')
                 subimport = subimport[1:]
+                module_parts = module_name.split('.')
                 while subimport.startswith('.'):
-                  preparts.pop(-1)
+                  module_parts.pop(-1)
                   subimport = subimport[1:]
-                if preparts:
+                if module_parts:
                   if subimport:
-                    preparts.append(subimport)
-                subimport = '.'.join(preparts)
+                    module_parts.append(subimport)
+                subimport = '.'.join(module_parts)
             subnames.add(subimport)
   return subnames
 

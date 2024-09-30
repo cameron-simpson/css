@@ -1,0 +1,2 @@
+TaggedPath.infer_tags: add _dt, _date, _f conversions, skip conversions which raise TypeError or ValueError.
+rpaths: fix to yield relative paths.

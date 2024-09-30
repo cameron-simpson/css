@@ -1,0 +1,2 @@
+lib/python/cs/app/osx/misc.py: cs.app.osx.misc: things which would be in __init__ if that were a thing, initially the tuple macos_version
+lib/python/cs/app/osx/misc.py: cs.app.osx.misc: DISTINFO

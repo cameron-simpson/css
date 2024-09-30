@@ -1,0 +1,2 @@
+Replace many raises of RuntimeError with NotImplementedError, suggestion by @dimaqq on discuss.python.org.
+This update tracks some bugfixes in some required modules.

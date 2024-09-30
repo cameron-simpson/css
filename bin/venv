@@ -6,7 +6,8 @@
 
 set -ue
 
-: ${VENV_DIR:=$HOME/var/venv}
+# the base location of the venvs
+: "${VENV_DIR:=$HOME/var/venv}"
 
 # this was inline, but vim's syntax highlighting broke
 pyver() {
@@ -14,8 +15,6 @@ pyver() {
   # http://bugs.python.org/issue18338
   "$1" --version 2>&1 | awk '{print$2}'
 }
-
-: ${VENV_DIR:=$HOME/var/venv}
 
 cmd=`basename "$0"`
 usage="Usage:

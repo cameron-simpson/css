@@ -1,0 +1,4 @@
+contextif: rework to be much easier to use, add new call modes.
+pushkeys, stackkeys: support update dicts whose keys are not identifier strings i.e. a non **kw call mode.
+New withif() function returning a context manager even for objects which do not provide one.
+New withall(iterable-of-context-managers) context manager.

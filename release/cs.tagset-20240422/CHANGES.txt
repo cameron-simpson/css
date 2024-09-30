@@ -1,0 +1,6 @@
+lib/python/cs/tagset.py: cs.tagset: new jsonable(obj) function to return a deep copy of `obj` which can be transcribed as JSON
+lib/python/cs/tagset.py: cs.tagset: jsonable: update docstring
+lib/python/cs/tagset.py: cs.tagset: Tag.transcribe_value: pass jsonable(value) to the JSON encoder, drop special checks not done by jsonable()
+lib/python/cs/tagset.py: cs.tagset: Tag.__str__: do not catch TypeError any more, was embedding Python repr()s in .fstags files - now Tag.transcribe_value() does the correct thing where that is possible
+lib/python/cs/tagset.py: cs.tagset: update to use MultiOpenMixin.startup_shutdown, greatly shorten the length of some exception and debug messages
+lib/python/cs/tagset.py: cs.tagset: clean some lint, update an idiom, drop some Pfx noise

@@ -6,9 +6,6 @@
 
 set -ue
 
-remote_revhost=127.0.0.1
-remote_revport=12345
-
 cmd=$( basename "$0" )
 usage="Usage: $cmd localdir:remote:remotedir[:remote-ssh-name]...
   For each argument back up localdir to a histbackup at remote:remotedir.
@@ -33,7 +30,7 @@ do
     IFS=:
     set -- $spec
     IFS=$oIFS
-    echo "$# $*"
+    ##echo "$# $*"
     case $# in
       3)  localdir=$1 remotes=$2 remotedir=$3 remotessh='$ssh_connection_srcip' ;;
       4)  localdir=$1 remotes=$2 remotedir=$3 remotessh=$( shqstr "$4" ) ;;
@@ -45,20 +42,22 @@ do
       /*)   ;;
       *)    localdir=$(pwd)/$localdir ;;
     esac
-    qlocaldir=$( shqstr "$localdir" )
-    qqlocaldir=$( shqstr "$qlocaldir" )
-    qremotedir=$( shqstr "$remotedir" )
     xit=0
     for remote in $( echo "$remotes" | tr , ' ' )
     do
-      set-x envssh -o controlpath=none -R "$remote_revport:127.0.0.1:22" "$remote" \
-        "set -ue
-         set -- \$SSH_CONNECTION; ssh_connection_srcip=\$1
-         cd $qremotedir
-         pwd
-         set -x
-         histbackup -i -x $remote_revhost:$qqlocaldir . --outbuf=line -e 'ssh -o port=$remote_revport'" \
-        || xit=1
+      echo "$localdir -> $remote:$remotedir"
+      revssh \
+        -E "remote_srcdir=$localdir" \
+        -E "remote_dstdir=$remotedir" \
+        "$remote" \
+        sh -c '
+          set -ue
+          histbackup \
+            -e "ssh -F $REVSSH_SSHCFG" \
+            "$REVSSH_SRCHOST:$remote_srcdir" \
+            "$remote_dstdir" \
+            --outbuf=line -i
+          ' || xit=1
     done
     exit $xit
   ) || xit=1

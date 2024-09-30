@@ -1,0 +1,2 @@
+The fallback StackSummary: add format_frame_summary(frame) static method.
+stack_dump: updates to avoid a name conflict, expect to work off a StackSummary or a list of frames.

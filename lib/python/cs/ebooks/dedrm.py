@@ -24,6 +24,7 @@ from os.path import (
     realpath,
     splitext,
 )
+from pprint import pprint
 from shutil import copyfile
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -34,6 +35,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
+from cs.fstags import FSTags, uses_fstags
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import pfx, Pfx, pfx_call, pfx_method
@@ -53,6 +55,7 @@ class DeDRMCommand(BaseCommand):
 
   GETOPT_SPEC = 'D:'
   USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
+    Operations using the DeDRM/NoDRM package.
     Options:
       -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
           For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
@@ -75,7 +78,7 @@ class DeDRMCommand(BaseCommand):
     if opt == '-D':
       self.options.dedrm_package_path = val
     else:
-      raise RuntimeError("unhandled option")
+      raise NotImplementedError("unhandled option")
     if badopt:
       raise GetoptError("bad option value")
 
@@ -132,34 +135,72 @@ class DeDRMCommand(BaseCommand):
     return xit
 
   def cmd_kindlekeys(self, argv):
-    ''' Usage: {cmd} [import]
-          Print or import the Kindle DRM keys.
+    ''' Usage: {cmd} [base|import|json|print]
+          Dump, print or import the Kindle DRM keys.
           Modes:
+            base [-json] [filepaths...]
+                      List the kindle keys derived from the current system.
             import    Read a JSON list of key dicts and update the cached keys.
-          Example:
-            Import the keys from one host into the local collection:
-              ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys \
+            json      Write the cached list of keys as JSON.
+            print     Readable listing of the cached keys.
+          The default mode is 'json'.
+          Examples:
+            Import the base keys from this system into the local collection:
+              python3 -m cs.ebooks.dedrm kindlekeys base \
+              | python3 -m cs.ebooks dedrm kindlekeys import
+            Import the keys from another host into the local collection:
+              ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys json \
               | python3 -m cs.ebooks dedrm kindlekeys import
     '''
     dedrm = self.options.dedrm
     if not argv:
-      with redirect_stdout(sys.stderr):
-        kks = dedrm.kindlekeys
-      print(json.dumps(kks))
-      return 0
+      argv = ['json']
     op = argv.pop(0)
-    if op != 'import':
-      raise GetoptError("expected 'import', got %r" % (op,))
     with Pfx(op):
-      if argv:
-        raise GetoptError("extra arguments: %r" % (argv,))
-      new_kks = json.loads(sys.stdin.read())
-      assert all(isinstance(kk, dict) for kk in new_kks)
-      dedrm.update_kindlekeys_from_keys(new_kks)
+      if op == 'base':
+        json_mode = not sys.stdout.isatty()
+        if argv and argv[0] == '-json':
+          json_mode = True
+          argv.pop(0)
+        # fetch the base system kindle keys
+        with redirect_stdout(sys.stderr):
+          new_kks = dedrm.base_kindlekeys(argv)
+        if json_mode:
+          print(json.dumps(new_kks, indent=2))
+        else:
+          for i, kk in enumerate(new_kks):
+            print(f'{i}:')
+            for k, v in sorted(kk.items()):
+              print(" ", k, v)
+      elif op == 'import':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        if sys.stdin.isatty():
+          print("Reading JSON keys from standard input.")
+        new_kks = json.loads(sys.stdin.read())
+        assert all(isinstance(kk, dict) for kk in new_kks)
+        dedrm.update_kindlekeys_from_keys(new_kks)
+      elif op == 'json':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        with redirect_stdout(sys.stderr):
+          kks = dedrm.kindlekeys
+        print(json.dumps(kks, indent=2))
+      elif op == 'print':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        with redirect_stdout(sys.stderr):
+          kks = dedrm.kindlekeys
+        for kk in kks:
+          pprint(kk)
+      else:
+        raise GetoptError("expected 'import' or 'print', got %r" % (op,))
 
   def cmd_remove(self, argv):
     ''' Usage: {cmd} filenames...
           Remove DRM from the specified filenames.
+          Write the decrypted book at path/to/book
+          to the file decrypted-book in the current directory.
     '''
     dedrm = self.options.dedrm
     exists_ok = False
@@ -236,8 +277,10 @@ class DeDRMWrapper(Promotable):
       kindlekey = self.import_name('kindlekey')
       ##kindlekey = self.import_name('kindlekey', package=__package__)
       # monkey patch the kindlekey.kindlekeys function
-      self.base_kindlekeys = kindlekey.kindlekeys
-      kindlekey.kindlekeys = self.cached_kindlekeys
+      if not hasattr(self, 'base_kindlekeys'):
+        # we only do this once!
+        self.base_kindlekeys = kindlekey.kindlekeys
+        kindlekey.kindlekeys = self.cached_kindlekeys
       # monkey patch the kindlekey.CryptUnprotectData class
       BaseCryptUnprotectData = kindlekey.CryptUnprotectData
       LibCrypto = getLibCrypto()
@@ -358,12 +401,14 @@ class DeDRMWrapper(Promotable):
         return M
       return pfx_call(getattr, M, name)
 
+  @uses_fstags
   @pfx_method
   def remove(
       self,
       srcpath,
       dstpath,
       *,
+      fstags: FSTags,
       booktype=None,
       exists_ok=False,
       obok_lib=None,
@@ -424,7 +469,10 @@ class DeDRMWrapper(Promotable):
                   (srcpath, booktype)
               )
             if decrypted_ebook == srcpath:
-              pfx_call(copyfile, srcpath, T.name)
+              warning("srcpath is already decrypted")
+            pfx_call(copyfile, srcpath, T.name)
+    # copy tags from the srcpath to the dstpath
+    fstags[dstpath].update(fstags[srcpath])
 
   @contextmanager
   def removed(self, srcpath):
@@ -514,6 +562,15 @@ def getLibCrypto():
     pass
 
   # interface to needed routines in openssl's libcrypto
+  #
+  # Note that this started crashing with:
+  #   WARNING: /Users/cameron/tmp/venv--css-ebooks--apple.x86_64.darwin/bin/python3 is loading libcrypto in an unsafe way
+  #   [1]    85172 abort      env-dev python3 -m cs.ebooks kindle
+  # resolved by:
+  #   CSS[~/hg/css-ebooks(hg:ebooks)]fleet2*> cd /usr/local/lib
+  #   [/usr/local/lib]fleet2*> ln -s ~/var/homebrew/lib/libcrypto.* .
+  #   + exec ln -s /Users/cameron/var/homebrew/lib/libcrypto.3.dylib /Users/cameron/var/homebrew/lib/libcrypto.a /Users/cameron/var/homebrew/lib/libcrypto.dylib .
+  #
   def _load_crypto_libcrypto():
     from ctypes import (
         CDLL, byref, POINTER, c_void_p, c_char_p, c_int, c_long, Structure,

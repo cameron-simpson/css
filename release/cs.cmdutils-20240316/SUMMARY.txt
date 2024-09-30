@@ -1,0 +1,2 @@
+New @uses_cmd_options decorator to provide an "options" parameter being the prevailing BaseCommandOptions instance.
+BaseCommandOptions.popopts: get common options from BaseCommandOptions.COMMON_OPT_SPECS.

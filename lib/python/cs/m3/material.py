@@ -385,7 +385,7 @@ class Material:
     elif slice_dim == 2:
       abc_fn = lambda a, b, c: (a, b, c)
     else:
-      raise RuntimeError("unhandled slice_dim %s" % (r(slice_dim),))
+      raise NotImplementedError("unhandled slice_dim %s" % (r(slice_dim),))
     c = slice_index
     surface = Surface(f'surface_{alabel}_{blabel}_{clabel}{c}')
     # enumerate all the polygons

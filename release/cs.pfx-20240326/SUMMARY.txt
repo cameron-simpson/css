@@ -1,0 +1,2 @@
+Pfx.prefixify_exception: sanity check the types of the prefixed attributes, aids debugging.
+Pfx.prefixify_exception: do not modify .message if it is not a string.

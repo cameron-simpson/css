@@ -1,3 +1,6 @@
+SEI.from_Recording: also parse leading sSSeEE - from the playon.Name field
+queue - what is the Status field? can I check for expired queue items
+"playon help" still logs in etc
 clean expired queued items somehow, same with pending
 incorporate the season/episode stripping functions, gather them into the format and tags if missing
 honour SIGINT during dl and during refresh, run_task during refresh

@@ -1,0 +1,1 @@
+FSM.__getattr__: return None for missing self.fsm_state, happens in too-early call to __str__.

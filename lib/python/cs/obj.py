@@ -529,6 +529,21 @@ class Sentinel:
   def __eq__(self, other):
     return self is other
 
+def public_subclasses(cls):
+  ''' Return a list of the subclasses of `cls` which has public names.
+  '''
+  classes = []
+  q = list(cls.__subclasses__())
+  while q:
+    subcls = q.pop(0)
+    if not issubclass(subcls, cls):
+      continue
+    if not subcls.__name__.startswith('_'):
+      classes.append(subcls)
+      ##print(cls, "classes +", subcls)
+    q.extend(subcls.__subclasses__())
+  return classes
+
 if __name__ == '__main__':
   import cs.obj_tests
   cs.obj_tests.selftest(sys.argv)

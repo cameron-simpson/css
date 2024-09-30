@@ -34,7 +34,7 @@ from cs.lex import s
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import progressbar
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 
 from .calibre import CalibreTree
 
@@ -388,7 +388,8 @@ class KoboCommand(BaseCommand):
       print(" ", shortpath(bookpath))
 
   # pylint: disable=too-many-locals
-  def cmd_export(self, argv):
+  @uses_runstate
+  def cmd_export(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-fnqv] [volumeids...]
           Export Kobo books to Calibre library.
           -f    Force: replace the EPUB format if already present.
@@ -403,7 +404,6 @@ class KoboCommand(BaseCommand):
     options = self.options
     calibre = options.calibre
     kobo = options.kobo
-    runstate = options.runstate
     self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
     doit = options.doit
     force = options.force
@@ -415,9 +415,7 @@ class KoboCommand(BaseCommand):
     for vid in progressbar(volumeids, f"export to {calibre}"):
       with Pfx(vid):
         book = kobo[vid]
-        if runstate.cancelled:
-          xit = 1
-          break
+        runstate.raiseif()
         try:
           book.export_to_calibre(
               calibre,

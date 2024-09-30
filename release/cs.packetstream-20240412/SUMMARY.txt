@@ -1,0 +1,3 @@
+PacketConnection: now subclasses MultiOpenMixin, big refactor.
+PacketConnection.__init__: use @promote to turn the recv parameter into a CornuCopyBuffer.
+Fix a deadlock.

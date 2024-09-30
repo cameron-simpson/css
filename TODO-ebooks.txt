@@ -1,3 +1,4 @@
+fetch the dedrm package if not present, store where?
 calibre popbooks: error on unknown dbids
 import dedrm and obok plugins from the calibre prefs plugins subdir by default
 command line option to specify kobo library path

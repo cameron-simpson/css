@@ -1,0 +1,6 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.popopts: return the dict from BaseCommand.popopts(); update docstrings and doctests for modern dataclass based options
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._OptSpec.parse_value: avoid doubling up the Pfx context
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.apply_preargv: apply the default options supports by self.options
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popopts: comment the opt spec parse, presaging docuemnting this in the docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init_subclass__: tweak the automatic usage in the docstring to survive the dedent stuff for MarkDown
+lib/python/cs/cmdutils.py: cs.cmdutils: new BaseCommandOptions.update(mapping) method, useful for dropping subcommand-specific defaults onto the options ahead of the local popopts() call

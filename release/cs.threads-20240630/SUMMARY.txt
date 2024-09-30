@@ -1,0 +1,2 @@
+bg: use closeall instead of twostep/withall.
+HasThreadState.bg: drop pre_enter_objects (unused), gets plumbed by the **bg_kw.

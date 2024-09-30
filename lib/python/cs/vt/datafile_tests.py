@@ -15,7 +15,7 @@ try:
 except ImportError:
   kyotocabinet = None
 
-from cs.binary_tests import TestBinaryClasses
+from cs.binary_tests import BaseTestBinaryClasses
 from cs.buffer import CornuCopyBuffer
 ##from cs.debug import thread_dump
 from cs.randutils import rand0, make_randblock
@@ -30,7 +30,7 @@ from .datafile import DataRecord, DataFilePushable
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
 
-class TestDataFileBinaryClasses(TestBinaryClasses, unittest.TestCase):
+class TestDataFileBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Test the `AbstractBinary` subclasses.
   '''
   test_module = datafile

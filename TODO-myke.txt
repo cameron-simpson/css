@@ -1,3 +1,4 @@
+Target: FSM: PREPARE, UNCONSIDERED, INCOMPLETE, FAILED, DONE
 Target: working dir for action commands
 Target should be a FSPathBasedSingleton, step towards one maker for an entire tree
 replace calls to .format with f-strings

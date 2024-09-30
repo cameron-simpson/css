@@ -1,3 +1,11 @@
+regexps do not update tags, tag actions update tags
+cs.gui_tk: imgof: does this code match what thumbnailcache does?
+cs.gui_tk: imgof and pngfor to use convof
+action call imported-name(...), autosupply: taggedpath, tags as keyword arguments
+from module import name,... to pull in callables
+tagger rule: tag !tagname expr to tag only if the tag is missing
+tagger autotag to run autofile with --no-mv or something like that
+comparison rules accepting int/float
 use Pattern.groupindex to inspect the regexp based rules for potential tag names
 rules: ~ prefix./regexp/ to prefix the matched names in the tags
 autotag to use the fstags autotag support, merge?

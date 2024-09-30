@@ -19,7 +19,7 @@ from cs.py.modules import module_attributes
 from . import binary as binary_module
 from .binary import AbstractBinary
 
-class TestBinaryClasses(object):
+class BaseTestBinaryClasses(object):
   ''' Unit tests for the cs.binary module.
   '''
 
@@ -104,8 +104,8 @@ class TestBinaryClasses(object):
             else:
               raise ValueError("unhandled test case: %r" % (test_case,))
 
-class TestCSBinaryClasses(TestBinaryClasses, unittest.TestCase):
-  ''' `unittest.TestCase` subclass of `TestBinaryClasses`.
+class TestCSBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
+  ''' `unittest.TestCase` subclass of `BaseTestBinaryClasses`.
   '''
   test_module = binary_module
 

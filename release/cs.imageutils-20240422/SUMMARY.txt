@@ -1,0 +1,1 @@
+Initial PyPI release with ThumbnailCache and SIXEL functions.
