@@ -141,7 +141,7 @@ class DeDRMCommand(BaseCommand):
                       List the kindle keys derived from the current system.
             import    Read a JSON list of key dicts and update the cached keys.
             json      Write the cached list of keys as JSON.
-            print     Readable listing of the keys.
+            print     Readable listing of the cached keys.
           The default mode is 'json'.
           Examples:
             Import the base keys from this system into the local collection:
@@ -198,6 +198,8 @@ class DeDRMCommand(BaseCommand):
   def cmd_remove(self, argv):
     ''' Usage: {cmd} filenames...
           Remove DRM from the specified filenames.
+          Write the decrypted book at path/to/book
+          to the file decrypted-book in the current directory.
     '''
     dedrm = self.options.dedrm
     exists_ok = False
