@@ -454,9 +454,7 @@ class DeDRMWrapper(Promotable):
             breakpoint()
             return T
 
-          with stackattrs(
-              dedrm,
-              temporary_file=dedrem_temporaryfile):  ##lambda ext: T.name):
+          with stackattrs(dedrm, temporary_file=dedrem_temporaryfile):
             with self.dedrm_imports():
               dedrm.starttime = time.time()
               if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3',
