@@ -446,31 +446,41 @@ class DeDRMWrapper(Promotable):
           obok_lib.close()
       else:
         dedrm = self.dedrm
-        # monkey patch temporary_file method to return tmpfilename
-        with stackattrs(dedrm, temporary_file=lambda ext: T):
-          with self.dedrm_imports():
-            dedrm.starttime = time.time()
-            if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3',
-                            'azw4', 'tpz', 'kfx-zip']:
-              # Kindle/Mobipocket
-              decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
-            elif booktype == 'pdb':
-              # eReader
-              decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
-            elif booktype == 'pdf':
-              # Adobe PDF (hopefully) or LCP PDF
-              decrypted_ebook = dedrm.PDFDecrypt(srcpath)
-            elif booktype == 'epub':
-              # Adobe Adept, PassHash (B&N) or LCP ePub
-              decrypted_ebook = dedrm.ePubDecrypt(srcpath)
-            else:
-              raise ValueError(
-                  "cannot decrypt %r, unhandled book type %r" %
-                  (srcpath, booktype)
-              )
-            if decrypted_ebook == srcpath:
-              warning("srcpath is already decrypted")
-            pfx_call(copyfile, srcpath, T.name)
+
+        # have T.close() just flush the file content to the filesystem
+        with stackattrs(T, close=lambda: T.flush()):
+          # monkey patch temporary_file method to return tmpfilename
+          def dedrem_temporaryfile(fext):
+            breakpoint()
+            return T
+
+          with stackattrs(
+              dedrm,
+              temporary_file=dedrem_temporaryfile):  ##lambda ext: T.name):
+            with self.dedrm_imports():
+              dedrm.starttime = time.time()
+              if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3',
+                              'azw4', 'tpz', 'kfx-zip']:
+                # Kindle/Mobipocket
+                decrypted_ebook = trace(retval=True)(dedrm.KindleMobiDecrypt)(
+                    srcpath
+                )
+              elif booktype == 'pdb':
+                # eReader
+                decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
+              elif booktype == 'pdf':
+                # Adobe PDF (hopefully) or LCP PDF
+                decrypted_ebook = dedrm.PDFDecrypt(srcpath)
+              elif booktype == 'epub':
+                # Adobe Adept, PassHash (B&N) or LCP ePub
+                decrypted_ebook = dedrm.ePubDecrypt(srcpath)
+              else:
+                raise ValueError(
+                    "cannot decrypt %r, unhandled book type %r" %
+                    (srcpath, booktype)
+                )
+              if decrypted_ebook == srcpath:
+                warning("srcpath is already decrypted")
     # copy tags from the srcpath to the dstpath
     fstags[dstpath].update(fstags[srcpath])
 
