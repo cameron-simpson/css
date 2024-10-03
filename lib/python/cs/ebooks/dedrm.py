@@ -31,7 +31,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 import time
 from typing import Iterable, List, Optional
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, vprint
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
@@ -247,22 +247,31 @@ class DeDRMWrapper(MultiOpenMixin, Promotable):
           under the `self.DEDRM_PACKAGE_NAME.` prefix;
           default from `SQLTags()`
     '''
+    if dedrm_package_path is None:
+      dedrm_package_path = self.get_package_path()
     with Pfx("dedrm_package_path %r", dedrm_package_path):
-      if dedrm_package_path is None:
-        dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
-        if dedrm_package_path is None:
-          raise ValueError(
-              f'no dedrm_package_path and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
-          )
-        with Pfx('$%s=%r', DEDRM_PACKAGE_PATH_ENVVAR, dedrm_package_path):
-          self.__init__(dedrm_package_path, sqltags=sqltags)
-          return
       if not isdirpath(dedrm_package_path):
         raise ValueError("not a directory")
       if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
         raise ValueError("no \"standalone\" subdirectory")
       self.dedrm_package_path = dedrm_package_path
-      self.sqltags = sqltags or SQLTags()
+    self.sqltags = sqltags or SQLTags()
+
+  @staticmethod
+  @fmtdoc
+  def get_package_path(dedrm_package_path: str = None):
+    ''' Return the filesystem path of the DeDRM/noDRM package to use.
+          If the supplied `dedrm_package_path` is `None`,
+          obtain the path from ${DEDRM_PACKAGE_PATH_ENVVAR}.
+      '''
+    if dedrm_package_path is None:
+      dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
+      if dedrm_package_path is None:
+        raise ValueError(
+            f'no dedrm_package_path and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
+        )
+      vprint(f'${DEDRM_PACKAGE_PATH_ENVVAR} -> {dedrm_package_path!r}')
+    return dedrm_package_path
 
   @contextmanager
   def startup_shutdown(self):
