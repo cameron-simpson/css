@@ -39,6 +39,7 @@ from cs.fstags import FSTags, uses_fstags
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import pfx, Pfx, pfx_call, pfx_method
+from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.upd import print  # pylint: disable=redefined-builtin
 
@@ -98,7 +99,8 @@ class DeDRMCommand(BaseCommand):
         except ValueError as e:
           raise GetoptError("bad dedrm_package_path: %s" % (e,))
         options.dedrm_package_path = options.dedrm.dedrm_package_path
-      yield
+        with options.dedrm:  # prepare the shim modules for the duration
+          yield
 
   def cmd_import(self, argv):
     ''' Usage: {cmd} module_name...
@@ -217,7 +219,7 @@ class DeDRMCommand(BaseCommand):
         )
         pfx_call(dedrm.remove, filename, output_filename, exists_ok=exists_ok)
 
-class DeDRMWrapper(Promotable):
+class DeDRMWrapper(MultiOpenMixin, Promotable):
   ''' Class embodying the DeDRM/noDRM package actions.
   '''
 
@@ -260,56 +262,69 @@ class DeDRMWrapper(Promotable):
       if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
         raise ValueError("no \"standalone\" subdirectory")
       self.dedrm_package_path = dedrm_package_path
-      dedrm_DeDRM = self.import_name(self.DEDRM_PACKAGE_NAME, 'DeDRM')
-      dedrm_DeDRMError = self.import_name(
-          self.DEDRM_PACKAGE_NAME, 'DeDRMError'
-      )
-
-      class CSEBookDeDRM(DeDRMOverride, dedrm_DeDRM):
-        ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
-            using overrides from `DeDRMOverride`.
-        '''
-        alfdir = dedrm_package_path
-
-      self.dedrm = CSEBookDeDRM()
-      self.DeDRMError = dedrm_DeDRMError
-    with self.dedrm_imports():
-      kindlekey = self.import_name('kindlekey')
-      ##kindlekey = self.import_name('kindlekey', package=__package__)
-      # monkey patch the kindlekey.kindlekeys function
-      if not hasattr(self, 'base_kindlekeys'):
-        # we only do this once!
-        self.base_kindlekeys = kindlekey.kindlekeys
-        kindlekey.kindlekeys = self.cached_kindlekeys
-      # monkey patch the kindlekey.CryptUnprotectData class
-      BaseCryptUnprotectData = kindlekey.CryptUnprotectData
-      LibCrypto = getLibCrypto()
-
-      class CryptUnprotectData(BaseCryptUnprotectData):
-
-        def __init__(self, *args):
-          self.crp = LibCrypto()
-          super().__init__(*args)
-
-      kindlekey.CryptUnprotectData = CryptUnprotectData
-    if sqltags is None:
-      sqltags = SQLTags()
-    self.tags = sqltags.subdomain(f'{self.DEDRM_PACKAGE_NAME}')
+      self.sqltags = sqltags or SQLTags()
 
   @contextmanager
-  def dedrm_imports(self):
-    ''' Context manager to run some code with `self.dedrm_package_path`
-        prepended to `sys.path` for import purposes.
+  def startup_shutdown(self):
+    # prepare the shim modules
+    with TemporaryDirectory(prefix='dedrm_shim_lib--') as shimlib_dirpath:
+      self.prepare_dedrm_shims(shimlib_dirpath)
+      with stackattrs(self, shimlib_dirpath=shimlib_dirpath):
+        dedrm_DeDRM = self.import_name(self.DEDRM_PACKAGE_NAME, 'DeDRM')
+        dedrm_DeDRMError = self.import_name(
+            self.DEDRM_PACKAGE_NAME, 'DeDRMError'
+        )
 
-        This also crafts some stub modules to convince the plugin
-        to run by providing some things normally provided by the
-        Calibre plugin environment.
+        class CSEBookDeDRM(DeDRMOverride, dedrm_DeDRM):
+          ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
+              using overrides from `DeDRMOverride`.
+          '''
+          alfdir = self.dedrm_package_path
+
+        with stackattrs(
+            self,
+            dedrm=CSEBookDeDRM(),
+            DeDRMError=dedrm_DeDRMError,
+        ):
+          with self.dedrm_imports():
+            kindlekey = self.import_name('kindlekey')
+            ##kindlekey = self.import_name('kindlekey', package=__package__)
+            # monkey patch the kindlekey.kindlekeys function
+            if not hasattr(self, 'base_kindlekeys'):
+              # we only do this once!
+              self.base_kindlekeys = kindlekey.kindlekeys
+              kindlekey.kindlekeys = self.cached_kindlekeys
+              # monkey patch the kindlekey.CryptUnprotectData class
+              BaseCryptUnprotectData = kindlekey.CryptUnprotectData
+              LibCrypto = getLibCrypto()
+
+              class CryptUnprotectData(BaseCryptUnprotectData):
+
+                def __init__(self, *args):
+                  self.crp = LibCrypto()
+                  super().__init__(*args)
+
+              kindlekey.CryptUnprotectData = CryptUnprotectData
+            with self.sqltags:
+              with stackattrs(
+                  self,
+                  tags=self.sqltags.subdomain(f'{self.DEDRM_PACKAGE_NAME}'),
+              ):
+                yield
+
+  def prepare_dedrm_shims(self, libdirpath):
+    ''' Create `__version` and `prefs` stub modules in `libdirpath`
+        to support the `import_name` method.
+
+        The stub modules to convince the plugin to run by providing
+        some things normally provided by the Calibre plugin
+        environment.
     '''
 
     def write_module(name, contents):
       ''' Write Python code `contents` to a top level module named `name`.
       '''
-      module_path = joinpath(tmpdirpath, f'{name}.py')
+      module_path = joinpath(libdirpath, f'{name}.py')
       with pfx_call(open, module_path, 'w') as pyf:
         print(
             stripped_dedent(
@@ -321,67 +336,76 @@ class DeDRMWrapper(Promotable):
                 #
                 '''
             ),
-            file=pyf
+            file=pyf,
         )
         print(stripped_dedent(contents), file=pyf)
       ##os.system(f'set -x; cat {module_path}')
 
-    with TemporaryDirectory(prefix='dedrm_lib') as tmpdirpath:
-      # present the dedrm package as DEDRM_PACKAGE_NAME ('dedrm')
-      os.symlink(
-          self.dedrm_package_path,
-          joinpath(tmpdirpath, self.DEDRM_PACKAGE_NAME)
-      )
-      # fake up __version.py
-      write_module(
-          '__version',
-          f'''
-          PLUGIN_NAME = {self.DEDRM_PLUGIN_NAME!r}
-          PLUGIN_VERSION = {self.DEDRM_PLUGIN_VERSION!r}
-          PLUGIN_VERSION_TUPLE = {tuple(map(int, self.DEDRM_PLUGIN_VERSION.split('.')))!r}
-        ''',
-      )
-      # fake up prefs.DeDRM_Prefs()
-      write_module(
-          'prefs',
-          f'''
-          import os
-          import {self.DEDRM_PACKAGE_NAME}.prefs
-          from {self.DEDRM_PACKAGE_NAME}.prefs import DeDRM_Prefs as BaseDeDRM_Prefs
-          from {self.DEDRM_PACKAGE_NAME}.standalone.jsonconfig import JSONConfig as BaseJSONConfig
-          from cs.ebooks.dedrm import DeDRM_PrefsOverride
-          from cs.gimmicks import warning
-          class DeDRM_Prefs(DeDRM_PrefsOverride, BaseDeDRM_Prefs):
-            def __init__(self, json_path=None):
-              if json_path is not None:
-                warning(
-                    "DeDRM_Prefs: ignoring json_path=%r, using %r", json_path,
-                    os.devnull
-                )
-              BaseDeDRM_Prefs.__init__(self, json_path=os.devnull)
-          class JSONConfig(BaseJSONConfig):
-            def __init__(self, rel_path_to_cf_file):
-              super().__init__(rel_path_to_cf_file)
+    # present the dedrm package as DEDRM_PACKAGE_NAME ('dedrm')
+    os.symlink(
+        self.dedrm_package_path, joinpath(libdirpath, self.DEDRM_PACKAGE_NAME)
+    )
+    # fake up __version.py
+    write_module(
+        '__version',
+        f'''
+        PLUGIN_NAME = {self.DEDRM_PLUGIN_NAME!r}
+        PLUGIN_VERSION = {self.DEDRM_PLUGIN_VERSION!r}
+        PLUGIN_VERSION_TUPLE = {tuple(map(int, self.DEDRM_PLUGIN_VERSION.split('.')))!r}
+      ''',
+    )
+    # fake up prefs.DeDRM_Prefs()
+    write_module(
+        'prefs',
+        f'''
+        import os
+        import {self.DEDRM_PACKAGE_NAME}.prefs
+        from {self.DEDRM_PACKAGE_NAME}.prefs import DeDRM_Prefs as BaseDeDRM_Prefs
+        from {self.DEDRM_PACKAGE_NAME}.standalone.jsonconfig import JSONConfig as BaseJSONConfig
+        from cs.ebooks.dedrm import DeDRM_PrefsOverride
+        from cs.gimmicks import warning
+        class DeDRM_Prefs(DeDRM_PrefsOverride, BaseDeDRM_Prefs):
+          def __init__(self, json_path=None):
+            if json_path is not None:
               warning(
-                  "JSONConfig: replacing file_path=%r with %r",
-                  self.file_path,
+                  "DeDRM_Prefs: ignoring json_path=%r, using %r", json_path,
                   os.devnull
               )
-              self.file_path = os.devnull
-          {self.DEDRM_PACKAGE_NAME}.prefs.JSONConfig = JSONConfig
-          ''',
-      )
-      with stackattrs(
-          sys,
-          path=[tmpdirpath, joinpath(tmpdirpath, self.DEDRM_PACKAGE_NAME)] +
-          sys.path):
-        # pylint: disable=import-outside-toplevel
-        import builtins
-        with stackattrs(builtins, print=print):
-          with redirect_stdout(sys.stderr):
-            # pylint: disable=import-outside-toplevel
-            import prefs  # imported for its side effect
-            yield
+            BaseDeDRM_Prefs.__init__(self, json_path=os.devnull)
+        class JSONConfig(BaseJSONConfig):
+          def __init__(self, rel_path_to_cf_file):
+            super().__init__(rel_path_to_cf_file)
+            warning(
+                "JSONConfig: replacing file_path=%r with %r",
+                self.file_path,
+                os.devnull
+            )
+            self.file_path = os.devnull
+        {self.DEDRM_PACKAGE_NAME}.prefs.JSONConfig = JSONConfig
+        ''',
+    )
+
+  @contextmanager
+  def dedrm_imports(self):
+    ''' Context manager to run some code with `self.dedrm_package_path`
+        prepended to `sys.path` for import purposes.
+    '''
+    with stackattrs(
+        sys,
+        path=([
+            self.shimlib_dirpath,
+            joinpath(self.shimlib_dirpath, self.DEDRM_PACKAGE_NAME),
+        ] + sys.path),
+    ):
+      # the DeDRM code is amazingly noisy to stdout
+      # so we intercept print and redirect stdout to stderr
+      # pylint: disable=import-outside-toplevel
+      import builtins
+      with stackattrs(builtins, print=print):
+        with redirect_stdout(sys.stderr):
+          # pylint: disable=import-outside-toplevel
+          import prefs  # imported for its side effect
+          yield
 
   def import_name(self, module_name, name=None, *, package=None):
     ''' Shim for `importlib.import_module` to import from the DeDRM/noDRM package.
@@ -395,11 +419,12 @@ class DeDRMWrapper(Promotable):
         If `name` is omitted, return the imported module.
         Otherwise return the value of `name` from the imported module.
     '''
-    with self.dedrm_imports():
-      M = pfx_call(importlib.import_module, module_name, package=package)
-      if name is None:
-        return M
-      return pfx_call(getattr, M, name)
+    with self:  # just in case the caller hasn't done this
+      with self.dedrm_imports():
+        M = pfx_call(importlib.import_module, module_name, package=package)
+        if name is None:
+          return M
+        return pfx_call(getattr, M, name)
 
   @uses_fstags
   @pfx_method
