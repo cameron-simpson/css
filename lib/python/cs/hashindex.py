@@ -87,9 +87,9 @@ from typing import Iterable, List, Mapping, Optional, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options
+from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options, vprint
 from cs.context import contextif, reconfigure_file
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_quiet, uses_verbose
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
@@ -476,7 +476,6 @@ class HashIndexCommand(BaseCommand):
               doit=doit,
               move_mode=move_mode,
               symlink_mode=symlink_mode,
-              quiet=quiet,
           )
       else:
         # prepare the remote input
@@ -826,7 +825,6 @@ def rearrange(
     move_mode: bool = False,
     symlink_mode=False,
     doit: bool,
-    quiet: bool = False,
     fstags: FSTags,
     runstate: RunState,
 ):
@@ -843,7 +841,6 @@ def rearrange(
       * `move_move`: move files instead of linking them
       * `symlink_mode`: symlink files instead of linking them
       * `doit`: if true do the link/move/symlink, otherwise just print
-      * `quiet`: default `False`; if true do not print
   '''
   with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
     if dstdirpath is None:
@@ -883,7 +880,6 @@ def rearrange(
                 symlink_mode=symlink_mode,
                 fstags=fstags,
                 doit=doit,
-                quiet=quiet,
             )
           except FileExistsError as e:
             warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
@@ -899,6 +895,7 @@ def rearrange(
 
 @pfx
 @uses_fstags
+@uses_verbose
 @require(
     lambda move_mode, symlink_mode: not (move_mode and symlink_mode),
     'move_mode and symlink_mode may not both be true'
@@ -912,8 +909,8 @@ def merge(
     move_mode: bool = False,
     symlink_mode=False,
     doit=False,
-    quiet=False,
     fstags: FSTags,
+    verbose: bool,
 ):
   ''' Merge `srcpath` to `dstpath`.
 
@@ -952,11 +949,13 @@ def merge(
       if doit:
         fstags[dstpath].update(fstags[srcpath])
       if move_mode and realpath(srcpath) != realpath(dstpath):
-        if not quiet:
-          print(
-              "remove", shortpath(srcpath), "# identical content at",
-              shortpath(dstpath)
-          )
+        vprint(
+            "remove",
+            shortpath(srcpath),
+            "# identical content at",
+            shortpath(dstpath),
+            verbose=verbose,
+        )
         if doit:
           pfx_call(os.remove, srcpath)
       return
@@ -964,8 +963,7 @@ def merge(
     raise FileExistsError(
         f'dstpath {dstpath!r} already exists with different hashcode'
     )
-  if not quiet:
-    print(opname, shortpath(srcpath), shortpath(dstpath))
+  vprint(opname, shortpath(srcpath), shortpath(dstpath), verbose=verbose)
   if doit:
     pfx_call(
         fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode

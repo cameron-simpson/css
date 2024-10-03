@@ -30,7 +30,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, Promotable
+from cs.deco import decorator, default_params, fmtdoc, Promotable
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -46,7 +46,7 @@ from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
-from cs.upd import Upd, uses_upd, print
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20240709-post'
 
@@ -117,6 +117,97 @@ def docmd(dofunc):
   docmd_wrapper.__name__ = '@docmd(%s)' % (funcname,)
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
+
+@dataclass
+class OptionSpec(Promotable):
+  ''' A class to support parsing an option value.
+  '''
+
+  UNVALIDATED_MESSAGE_DEFAULT = "invalid value"
+
+  help_text: str
+  parse: Optional[Callable[[str], Any]] = None
+  validate: Optional[Callable[[Any], bool]] = None
+  unvalidated_message: str = UNVALIDATED_MESSAGE_DEFAULT
+
+  def parse_value(self, value):
+    ''' Parse `value` according to the spec.
+        Raises `GetoptError` for invalid values.
+    '''
+    with Pfx("%s %r", self.help_text, value):
+      try:
+        value = pfx_call(self.parse, value)
+        if self.validate is not None:
+          if not pfx_call(self.validate, value):
+            raise ValueError(self.unvalidated_message)
+      except ValueError as e:
+        raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
+    return value
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Construct an `OptionSpec` from a list of positional parameters
+        as for `poparg()` or `popopts()`.
+
+        Examples:
+
+          >>> OptionSpec.promote( () ) #doctest: +ELLIPSIS
+          OptionSpec(help_text='string value', parse=<function ...>, validate=None, unvalidated_message='invalid value')
+    '''
+    if isinstance(obj, cls):
+      return obj
+    # reform obj as a list to convert into a specification
+    if isinstance(obj, str):
+      # just the help text
+      specs = (obj,)
+    elif callable(obj):
+      # just the value parser/factory
+      specs = (obj,)
+    else:
+      # some iterable
+      specs = tuple(obj)
+    parse = None
+    help_text = None
+    validate = None
+    unvalidated_message = None
+    for spec in specs:
+      with Pfx("%r", spec):
+        if isinstance(spec, str):
+          # help text or invlaid message
+          if help_text is None:
+            help_text = spec
+            continue
+          if unvalidated_message is None:
+            unvalidated_message = spec
+            continue
+        elif callable(spec):
+          # parser/factory or validator
+          if parse is None:
+            parse = spec
+            continue
+          if validate is None:
+            validate = spec
+            continue
+        raise TypeError(
+            "unexpected argument, expected help_text or parse,"
+            " then optional validate and optional invalid message,"
+            " received %s" % (r(spec),)
+        )
+    if help_text is None:
+      help_text = (
+          "string value" if parse is None else "value for %s" % (parse,)
+      )
+    if parse is None:
+      # pass option value through unchanged
+      parse = lambda val: val  # pylint: disable=unnecessary-lambda-assignment
+    if unvalidated_message is None:
+      unvalidated_message = cls.UNVALIDATED_MESSAGE_DEFAULT
+    return cls(
+        help_text=help_text,
+        parse=parse,
+        validate=validate,
+        unvalidated_message=unvalidated_message,
+    )
 
 def extract_usage_from_doc(doc: str | None,
                            usage_marker="Usage:") -> Tuple[str, str]:
@@ -349,7 +440,7 @@ class BaseCommandOptions(HasThreadState):
       * `.verbose=False`
       and a `.doit` property which is the inverse of `.dry_run`.
 
-      It is recommended that if ``BaseCommand` subclasses use a
+      It is recommended that if `BaseCommand` subclasses use a
       different type for their `Options` that it should be a
       subclass of `BaseCommandOptions`.
       Since `BaseCommandOptions` is a data class, this typically looks like:
@@ -362,13 +453,16 @@ class BaseCommandOptions(HasThreadState):
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
   COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
+  # the cmd prefix while a command runs
   cmd: Optional[str] = None
+  # dry run, no action
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
   runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   verbose: bool = False
+  opt_spec_class = OptionSpec
 
   perthread_state = ThreadState()
 
@@ -473,6 +567,7 @@ class BaseCommandOptions(HasThreadState):
       opt_specs.setdefault(k, v)
     return BaseCommand.popopts(argv, self, **opt_specs)
 
+@decorator
 def uses_cmd_options(
     func, cls=BaseCommandOptions, options_param_name='options'
 ):
@@ -612,6 +707,7 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = 'shell'
+
   Options = BaseCommandOptions
 
   def __init_subclass__(cls, **super_kw):
@@ -950,82 +1046,10 @@ class BaseCommand:
     self.options.popopts(argv)
     return argv
 
-  class _OptSpec(
-      namedtuple('_OptSpec',
-                 'help_text, parse, validate, unvalidated_message'),
-      Promotable,
-  ):
-    ''' A class to support parsing an option value.
-    '''
-
-    @classmethod
-    def promote(cls, obj):
-      ''' Construct an `_OptSpec` from a list of positional parameters
-          as for `poparg()`.
-      '''
-      if isinstance(obj, cls):
-        return obj
-      if isinstance(obj, str):
-        # the help text
-        specs = (obj,)
-      elif callable(obj):
-        # the factory
-        specs = (obj,)
-      else:
-        # some iterable
-        specs = obj
-      parse = None
-      help_text = None
-      validate = None
-      unvalidated_message = None
-      for spec in specs:
-        with Pfx("%r", spec):
-          if help_text is None and isinstance(spec, str):
-            help_text = spec
-          elif unvalidated_message is None and isinstance(spec, str):
-            unvalidated_message = spec
-          elif parse is None and callable(spec):
-            parse = spec
-          elif validate is None and callable(spec):
-            validate = spec
-          else:
-            raise TypeError(
-                "unexpected argument, expected help_text or parse,"
-                " then optional validate and optional invalid message,"
-                " received %s" % (r(spec),)
-            )
-      if help_text is None:
-        help_text = (
-            "string value" if parse is None else "value for %s" % (parse,)
-        )
-      if parse is None:
-        # pass option value through unchanged
-        parse = lambda val: val  # pylint: disable=unnecessary-lambda-assignment
-      if unvalidated_message is None:
-        unvalidated_message = "invalid value"
-      return cls(
-          help_text=help_text,
-          parse=parse,
-          validate=validate,
-          unvalidated_message=unvalidated_message,
-      )
-
-    def parse_value(self, value):
-      ''' Parse `value` according to the spec.
-          Raises a `GetoptError` for invalid values.
-      '''
-      try:
-        with Pfx("%s %r", self.help_text, value):
-          value = pfx_call(self.parse, value)
-          if self.validate is not None:
-            if not pfx_call(self.validate, value):
-              raise ValueError(self.unvalidated_message)
-      except ValueError as e:
-        raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
-      return value
-
   @classmethod
-  def poparg(cls, argv: List[str], *a, unpop_on_error=False):
+  def poparg(
+      cls, argv: List[str], *a, unpop_on_error=False, opt_spec_class=None
+  ):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
         Raises `getopt.GetoptError` on a missing or invalid argument.
@@ -1096,7 +1120,9 @@ class BaseCommand:
             >>> argv  # zz was pushed back
             ['zz']
     '''
-    opt_spec = cls._OptSpec.promote(a)
+    if opt_spec_class is None:
+      opt_spec_class = OptionSpec
+    opt_spec = opt_spec_class.promote(a)
     with Pfx(opt_spec.help_text):
       if not argv:
         raise GetoptError("missing argument")
@@ -1231,7 +1257,7 @@ class BaseCommand:
           # list or tuple: copyt to a list
           specs = list(opt_spec)
         else:
-          # promote scaler to single element list
+          # promote scalar to single element list
           specs = [opt_spec]
         if specs:
           # see if the leading spec is an option citation
@@ -1245,7 +1271,7 @@ class BaseCommand:
         if not specs or not isinstance(specs[0], str):
           specs.insert(0, default_help_text)
         if needs_arg:
-          opt_spec = cls._OptSpec.promote(specs)
+          opt_spec = OptionSpec.promote(specs)
           opt_spec_map[opt] = opt_spec
         opt_name_map[opt] = opt_name
     opts, post_argv = getopt(argv, shortopts, longopts)
@@ -1295,12 +1321,12 @@ class BaseCommand:
     self._prerun_setup()
     options = self.options
     try:
-      with self.run_context(**kw_options):
-        try:
+      try:
+        with self.run_context(**kw_options):
           return self._run(self._argv)
-        except CancellationError:
-          error("cancelled")
-          return 1
+      except CancellationError:
+        error("cancelled")
+        return 1
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
@@ -1548,3 +1574,12 @@ class BaseCommandCmd(Cmd):
       if subcmd in ('EOF', 'exit', 'quit'):
         return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+
+@uses_cmd_options
+def vprint(*print_a, options, verbose=None, **print_kw):
+  ''' Call `print()` if `options.verbose`.
+  '''
+  if verbose is None:
+    verbose = options.verbose
+  if verbose:
+    print(*print_a, **print_kw)

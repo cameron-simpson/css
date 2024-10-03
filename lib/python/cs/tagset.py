@@ -441,6 +441,11 @@ class _FormatStringTagProxy:
         type(self).__name__, type(self.__proxied).__name__, self.__proxied
     )
 
+  def __format__(self, format_spec):
+    ''' Formatting `self` formats `self.__proxied.value`.
+    '''
+    return format(self.__proxied.value, format_spec)
+
   def __getattr__(self, attr):
     return getattr(self.__proxied, attr)
 

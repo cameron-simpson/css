@@ -94,7 +94,7 @@ from os.path import (
     relpath,
     samefile,
 )
-from pathlib import PurePath
+from pathlib import Path
 import shutil
 import sys
 from threading import Lock, RLock
@@ -635,7 +635,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           tags = fstags[fspath]
           if options.long_format:
             print(fspath)
-            for tag in tags.as_tags(all_tags=not options.use_direct_tags):
+            for tag in sorted(
+                tags.as_tags(all_tags=not options.use_direct_tags),
+                key=lambda tag: tag.name,
+            ):
               print(" ", tag)
           else:
             try:
@@ -735,7 +738,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             print(srcpath, '->', dstpath)
     return xit
 
-  def cmd_ns(self, argv):
+  @uses_runstate
+  def cmd_ns(self, argv, runstate: RunState):
     ''' Usage: {cmd} [-d] [--direct] [paths...]
           Report on the available primary namespace fields for formatting.
           Note that because the namespace used for formatting has
@@ -763,6 +767,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       fullpath = realpath(path)
       for fspath in ((fullpath,) if directories_like_files else scandirpaths(
           fullpath, sort_names=True)):
+        runstate.raiseif()
         with Pfx(fspath):
           tags = fstags[fspath].format_tagset(direct=use_direct_tags)
           print(fspath)
@@ -1289,7 +1294,7 @@ class FSTags(MultiOpenMixin):
         in order from the root to `dirname(fspath)`.
     '''
     absfilepath = abspath(fspath)
-    root, *subparts = PurePath(absfilepath).parts
+    root, *subparts = Path(absfilepath).parts
     if not subparts:
       raise ValueError("root=%r and no subparts" % (root,))
     current = root
@@ -1775,7 +1780,11 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       if tag.name not in kwtags:
         kwtags.add(tag)
     # tags based on the fspath
-    kwtags['fspath'] = PurePath(self.fspath)
+    path = Path(self.fspath)
+    kwtags.update(
+        basename=path.name,
+        fspath=path,
+    )
     return kwtags
 
   def format_kwargs(self, *, direct=False):

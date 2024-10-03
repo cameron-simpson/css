@@ -273,7 +273,6 @@ class HasThreadState(ContextManagerMixin):
           yield from with_enter_objects()
         else:
           if for_with:
-            print("WITH enter_obj", enter_obj)
             with enter_obj:
               yield from with_enter_objects()
           else:

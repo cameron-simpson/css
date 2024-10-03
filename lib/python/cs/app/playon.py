@@ -178,6 +178,7 @@ class PlayOnCommand(BaseCommand):
     '''
     with super().run_context():
       options = self.options
+      runstate = options.runstate
       sqltags = PlayOnSQLTags()
       api = PlayOnAPI(options.user, options.password, sqltags)
       with sqltags:
@@ -189,6 +190,7 @@ class PlayOnCommand(BaseCommand):
             # if there are unexpired stale entries or no unexpired entries,
             # refresh them
             self._refresh_sqltags_data(api, sqltags)
+            runstate.raiseif()
             yield
 
   def cmd_account(self, argv):
@@ -368,7 +370,10 @@ class PlayOnCommand(BaseCommand):
 
     return xit
 
-  def _refresh_sqltags_data(self, api, sqltags, max_age=None):
+  @uses_runstate
+  def _refresh_sqltags_data(
+      self, api, sqltags, runstate: RunState, max_age=None
+  ):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
@@ -381,7 +386,7 @@ class PlayOnCommand(BaseCommand):
     )
     if need_refresh:
       with run_task("refresh queue and recordings"):
-        Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
+        Ts = [runstate.bg(api.queue), runstate.bg(api.recordings)]
         for T in Ts:
           T.join()
 

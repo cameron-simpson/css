@@ -57,7 +57,10 @@ case "$mode" in
     if [ -n "$category" ]
     then
         todo_path2=$( findup "TODO-$category.txt" || : )
-        [ -f "$todo_path2" ] && todo_path=$todo_path2
+        if [ -f "$todo_path2" ]
+        then  todo_path=$todo_path2
+        else  set -- "$category:" ${1+"$@"}
+        fi
     fi
 
     [ -f "$todo_path" ] || {

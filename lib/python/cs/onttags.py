@@ -90,9 +90,12 @@ class Ont(FSPathBasedSingleton, TagsOntology, Promotable):
   ''' A `TagsOntology` based on a persistent store.
   '''
 
+  FSPATH_ENVVAR = ONTTAGS_PATH_ENVVAR
+  FSPATH_DEFAULT = ONTTAGS_PATH_DEFAULT
+
   @typechecked
   def __init__(self, ont_path: str):
-    self.ont_path = ont_path
+    self.fspath = ont_path
     tagsets, ont_pfx_map = self.tagsetses_from_path(ont_path)
     super().__init__(tagsets)
     # apply any prefix TagSetses
@@ -101,15 +104,6 @@ class Ont(FSPathBasedSingleton, TagsOntology, Promotable):
       prefix_ = prefix + '.'
       X("add %r => %s", prefix_, subtagsets)
       self.add_tagsets(subtagsets, prefix_)
-
-  def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.ont_path)
-
-  @property
-  def fspath(self):
-    ''' The `.fspath` is `self.ont_path`.
-    '''
-    return self.ont_path
 
   @classmethod
   @typechecked
