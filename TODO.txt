@@ -1,6 +1,3 @@
-dedrm: only define the wrappers etc once, not per with-dedrm_imports call
-fetch the dedrm package if not present, store where?
-fetch the dedrm package if not present, store where?
 service_api: rate limiter? context manager to access it directly, implied if .API_RATE_LIMIT
 Upd: try the hide-the cursor stuff again, maybe in the update+clean method
 Upd: keep a set of dirty slots, update+clean method
