@@ -254,7 +254,7 @@ class DeDRMWrapper(MultiOpenMixin, Promotable):
         raise ValueError("not a directory")
       if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
         raise ValueError("no \"standalone\" subdirectory")
-      self.dedrm_package_path = dedrm_package_path
+    self.dedrm_package_path = dedrm_package_path
     self.sqltags = sqltags or SQLTags()
 
   @staticmethod
@@ -334,6 +334,7 @@ class DeDRMWrapper(MultiOpenMixin, Promotable):
       ''' Write Python code `contents` to a top level module named `name`.
       '''
       module_path = joinpath(libdirpath, f'{name}.py')
+      vprint("DeDRM: write module", module_path)
       with pfx_call(open, module_path, 'w') as pyf:
         print(
             stripped_dedent(
@@ -593,8 +594,8 @@ class DeDRM_PrefsOverride:
 
 def getLibCrypto():
   ''' The OSX `LibCrypto` implementation as an experiment,
-        copied from `Other_Tools/DRM_Key_Scripts/Kindle_for_Mac_and_PC/kindlekey.pyw`.
-    '''
+      copied from `Other_Tools/DRM_Key_Scripts/Kindle_for_Mac_and_PC/kindlekey.pyw`.
+  '''
 
   class DrmException(Exception):
     ''' Really DeDRM/noDRM needs this in `__init__`, but instead
