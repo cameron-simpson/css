@@ -63,6 +63,7 @@ def module_doc(
         the default is to document `__init__`, then CONSTANTS, the
         dunders, then other public names
   '''
+  from cs.cmdutils import BaseCommand
   if isinstance(module, str):
     module = pfx_call(importlib.import_module, module)
   full_docs = [obj_docstring(module)]
@@ -109,8 +110,8 @@ def module_doc(
             mro_set.difference_update(superclass.__mro__)
         if mro_names:
           classname_etc += '(' + ', '.join(mro_names) + ')'
-          ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
         if issubclass(obj, FSM) and hasattr(obj, 'FSM_TRANSITIONS'):
+          # append an FSM state diagram
           obj_doc += (
               f'\n\nState diagram:\n![{Mname} State Diagram](' + gvdataurl(
                   obj.fsm_state_diagram_as_dot(
@@ -121,6 +122,17 @@ def module_doc(
                   dataurl_encoding='base64',
               ) + f' "{Mname} State Diagram")\n'
           )
+        if issubclass(obj, BaseCommand):
+          # extract the Usage: paragraph if present, append a full usage
+          doc_without_usage, usage_text = obj.extract_usage()
+          obj_doc = ''.join(
+              (
+                  doc_without_usage,
+                  "\n\nUsage summary:\n\n",
+                  indent("Usage: " + usage_text, "    "),
+              )
+          )
+          breakpoint()
         full_docs.append(
             f'\n\n## <a name="{Mname}"></a>Class `{classname_etc}`\n\n{obj_doc}'
         )
