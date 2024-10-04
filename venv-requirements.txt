@@ -24,6 +24,7 @@ pycryptodome
 pyflakes
 pyicontract-lint
 pylint
+pylzma
 ##pyobjc[allbindings]  ## macos only
 pytest
 python-dateutil
