@@ -132,7 +132,6 @@ def module_doc(
                   indent("Usage: " + usage_text, "    "),
               )
           )
-          breakpoint()
         full_docs.append(
             f'\n\n## <a name="{Mname}"></a>Class `{classname_etc}`\n\n{obj_doc}'
         )
