@@ -212,10 +212,10 @@ class OptionSpec(Promotable):
 def extract_usage_from_doc(doc: str | None,
                            usage_marker="Usage:") -> Tuple[str, str]:
   ''' Extract a `"Usage:"`paragraph from a docstring
-          and return the unindented usage and the docstring with that paragraph elided.
+      and return the unindented usage and the docstring with that paragraph elided.
 
-          If the usage paragraph is not present, return `(None,doc)`.
-      '''
+      If the usage paragraph is not present, return `(None,doc)`.
+  '''
   if not doc:
     # no doc, return unchanged
     return None, doc
@@ -710,25 +710,6 @@ class BaseCommand:
 
   Options = BaseCommandOptions
 
-  def __init_subclass__(cls, **super_kw):
-    super().__init_subclass__(**super_kw)
-    instance = cls([cls.__name__])
-    usage_format, doc_without_usage = extract_usage_from_doc(
-        obj_docstring(cls)
-    )
-    # This little shuffle is so that instance.usage_text()
-    # does not process format strings twice.
-    cls.__doc__ = doc_without_usage
-    if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
-      cls.USAGE_FORMAT = usage_format
-    usage_text = instance.usage_text()
-    docv = [
-        doc_without_usage,
-        "\n\nUsage summary:\n\n",
-        indent("Usage: " + usage_text, "    "),
-    ]
-    cls.__doc__ = ''.join(docv)
-
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
     ''' Initialise the command line.
@@ -1004,6 +985,27 @@ class BaseCommand:
       mapping.update(cmd=subcmd)
       subusage = subusage_format.format_map(mapping)
     return subusage.replace('\n', '\n  ')
+
+  @classmethod
+  def extract_usage(cls, cmd=None):
+    ''' Extract the `Usage:` paragraph from `cls__doc__` if present.
+        Return a 2-tuple of `(doc_without_usage,usage_text)`
+        being the remaining docstring and a full usage message.
+    '''
+    if cmd is None:
+      # infer a cmd from the class name
+      cmd = cutsuffix(cls.__name__, 'Command').lower()
+    instance = cls([cmd])
+    usage_format, doc_without_usage = extract_usage_from_doc(
+        obj_docstring(cls)
+    )
+    ## # This little shuffle is so that instance.usage_text()
+    ## # does not process format strings twice.
+    ## cls.__doc__ = doc_without_usage
+    if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
+      cls.USAGE_FORMAT = usage_format
+    usage_text = instance.usage_text()
+    return doc_without_usage, usage_text
 
   @pfx_method
   # pylint: disable=no-self-use
