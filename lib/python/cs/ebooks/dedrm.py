@@ -72,10 +72,6 @@ class DeDRMCommand(BaseCommand):
     ''' Command line option state.
     '''
 
-    dedrm_package_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
-    )
-
   def apply_opt(self, opt, val):
     badopt = False
     if opt == '-D':
