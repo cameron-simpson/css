@@ -35,7 +35,7 @@ except ImportError:
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.deco import cachedmethod, fmtdoc
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton, HasFSPath
@@ -721,7 +721,8 @@ class KindleCommand(BaseCommand):
         with CalibreTree(options.calibre_path) as cal:
           with stackattrs(options, kindle=kt, calibre=cal, dedrm=dedrm):
             with fstags:
-              yield
+              with contextif(options.dedrm):
+                yield
 
   def cmd_app_path(self, argv):
     ''' Usage: {cmd} [content-path]
