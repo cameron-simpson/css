@@ -455,7 +455,7 @@ class KindleBookAssetDB(ORM):
     '''
     print("sqlite3", self.db_path)
     with Upd().above():
-      run(['sqlite3', self.db_path], check=True)
+      run(['sqlite3', self.db_path], stdin=0, check=True)
     return 0
 
   # lifted from SQLTags
