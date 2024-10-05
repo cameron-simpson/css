@@ -904,7 +904,8 @@ class KindleCommand(BaseCommand):
       title = kbook.tags.auto.calibre.title
       if title:
         line1.append(title)
-      authors = kbook.tags.auto.calibre.authors
+      calibre_tags = kbook.tags.auto.calibre
+      authors = calibre_tags.authors
       if authors:
         line1.extend(('-', ','.join(authors)))
       if kbook.sampling:
