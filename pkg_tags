@@ -51,7 +51,7 @@ cs.dedrm
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.distinfo
 cs.dockerutils ok_revision=f846ece6e9f9353b443df14f81512ae6438681e6 pypi.release="20240519" features={"20240305":["DockerRun__network"]}
-cs.ebooks ok_revision="1d881fca9f0c3997eef70e570a06a020efcc0b0f" pypi.release="20240316" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
+cs.ebooks ok_revision="1d881fca9f0c3997eef70e570a06a020efcc0b0f" pypi.release="20241005" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
 cs.env pypi.release="20230407" ok_revision=bd184cdf4bd71eaa2bb8f98b30a735ec582d9abc
 cs.excutils pypi.release="20240630" ok_revision="467f248b10aa6109713d48374153093ac3c743f1"
