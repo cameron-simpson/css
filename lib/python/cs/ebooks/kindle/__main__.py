@@ -116,7 +116,7 @@ class KindleCommand(BaseCommand):
   def run_context(self, fstags: FSTags):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
+    from ..calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     with super().run_context():
       options = self.options
       dedrm = (
@@ -217,7 +217,7 @@ class KindleCommand(BaseCommand):
     ''' Usage: {cmd} [base|import|json|print]
           Shortcut to \"dedrm kindlekeys\".
     '''
-    from .dedrm import DeDRMCommand
+    from ..dedrm import DeDRMCommand
     return DeDRMCommand([self.options.cmd, 'kindlekeys', *argv]).run()
 
   @uses_runstate
