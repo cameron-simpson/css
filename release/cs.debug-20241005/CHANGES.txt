@@ -1,0 +1,12 @@
+lib/python/cs/debug.py: cs.debug: trace_DEBUG: fix method spelling
+lib/python/cs/debug.py: merge default -> ebooks
+lib/python/cs/debug.py: merge default -> ebooks
+lib/python/cs/debug.py: c.debug: new log_via_print(msg, *args[, file=stdout]) function to use cs.upd.print as a logging call
+lib/python/cs/debug.py: cs.debug: @trace: honour new $CS_DEBUG_TRACE envvar which may be "print" or "warning", with fallback to the global _trace_xlog (default None) which falls back as before (basicly the X() function)
+lib/python/cs/debug.py: cs.debug: $CS_DEBUG_TRACE: may also be "X" to get the default X()-based behaviour
+lib/python/cs/debug.py: merge default ==> tagger
+lib/python/cs/debug.py: cs.debug: do not import/export cs.upd.breakpoint (doesn't work!)
+lib/python/cs/debug.py: cs.debug: new @abrk decorator to intercept AssertionError, NameError and RuntimeError and call breakpoint
+lib/python/cs/debug.py: merge tagger ==> default
+lib/python/cs/debug.py: cs.debug: @abrk: update the docstring
+lib/python/cs/debug.py: merge tagger ==> default
