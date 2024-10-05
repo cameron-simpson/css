@@ -853,7 +853,12 @@ class BaseCommand:
               f'unrecognised subcommand {bad_subcmd!r}, expected one of:'
               f' {", ".join(sorted(subcmds.keys()))}'
           )
-        self._run = subcommand
+
+        def _run(argv):
+          with Pfx(subcmd):
+            return subcommand(argv)
+
+        self._run = _run
     except GetoptError as e:
       if self.getopt_error_handler(
           options.cmd,
