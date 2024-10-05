@@ -783,6 +783,10 @@ class BaseCommand:
         cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
       else:
         cmd = basename(argv.pop(0))
+        if cmd.endswith('.py'):
+          # "python -m foo" sets argv[0] to "..../foo.py"
+          # fall back to the class name
+          cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
     options = self.Options(cmd=cmd)
     # override the default options
     for option, value in kw_options.items():
@@ -811,13 +815,11 @@ class BaseCommand:
         argv = ['help']
       else:
         # we do this regardless in order to honour '--'
-
         opts, argv = getopt(argv, getopt_spec, '')
         self.apply_opts(opts)
         # we do this regardless so that subclasses can do some presubcommand parsing
         # after any command line options
         argv = self._argv = self.apply_preargv(argv)
-
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
