@@ -56,7 +56,7 @@ from cs.sqlalchemy_utils import (
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from . import KINDLE_LIBRARY_ENVVAR
-from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
+from ..dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 
 KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.amazon.Kindle'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
