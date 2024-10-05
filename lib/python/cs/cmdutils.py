@@ -850,10 +850,8 @@ class BaseCommand:
           bad_subcmd = subcmd
           subcmd = None
           raise GetoptError(
-              "%s: unrecognised subcommand, expected one of: %s" % (
-                  bad_subcmd,
-                  ', '.join(sorted(subcmds.keys())),
-              )
+              f'unrecognised subcommand {bad_subcmd!r}, expected one of:'
+              f' {", ".join(sorted(subcmds.keys()))}'
           )
         self._run = subcommand
     except GetoptError as e:
