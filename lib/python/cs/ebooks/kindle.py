@@ -339,7 +339,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Context manager to obtain and release resources.
     '''
     with fstags:
-      yield
+      with self.db:
+        yield
 
   @property
   @cachedmethod
