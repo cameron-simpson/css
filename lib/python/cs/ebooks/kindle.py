@@ -906,7 +906,9 @@ class KindleCommand(BaseCommand):
         line1.append(title)
       authors = kbook.tags.auto.calibre.authors
       if authors:
-        line1.append(','.join(authors))
+        line1.extend(('-', ','.join(authors)))
+      if kbook.sampling:
+        line1.append(f'({kbook.sampling})')
       print(*line1)
       if longmode:
         if kbook.type != 'kindle.ebook':
