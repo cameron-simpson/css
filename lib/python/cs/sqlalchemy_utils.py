@@ -810,9 +810,12 @@ def RelationProxy(
         except KeyError:
           pass
       with using_session(orm=orm) as session:
-        db_row = relation.by_id(
-            self.id, session=session, id_column=self.id_column
-        )
+        try:
+          db_row = relation.by_id(
+              self.id, session=session, id_column=self.id_column
+          )
+        except IndexError as e:
+          raise KeyError(r(field)) from e
         self.refresh_from_db(db_row)
       return self.__fields[field]
 
@@ -829,7 +832,10 @@ def RelationProxy(
           return self[attr]
         except KeyError as e:
           with using_session(orm=orm) as session:
-            db_row = relation.by_id(self.id, session=session)
+            try:
+              db_row = relation.by_id(self.id, session=session)
+            except IndexError as e:
+              raise AttributeError(f'{self.__class__.__name__}.{attr}') from e
             self.__fields[attr] = getattr(db_row, attr)
           raise AttributeError(
               "%s: no cached field .%s" % (type(self).__name__, attr)
