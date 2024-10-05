@@ -43,6 +43,8 @@ from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.upd import print  # pylint: disable=redefined-builtin
 
+from .common import EBooksCommonOptions
+
 DEDRM_PACKAGE_PATH_ENVVAR = 'DEDRM_PACKAGE_PATH'
 
 def main(argv=None):
@@ -66,7 +68,7 @@ class DeDRMCommand(BaseCommand):
   '''
 
   @dataclass
-  class Options(BaseCommand.Options):
+  class Options(EBooksCommonOptions):
     ''' Command line option state.
     '''
 
