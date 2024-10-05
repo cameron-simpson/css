@@ -896,8 +896,10 @@ class KindleCommand(BaseCommand):
     longmode = options.longmode
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    runstate = options.runstate
     print(kindle.fspath)
     for subdir_name, kbook in kindle.items():
+      runstate.raiseif()
       line1 = [subdir_name]
       title = kbook.tags.auto.calibre.title
       if title:
