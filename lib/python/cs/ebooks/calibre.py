@@ -742,7 +742,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       # try to remove DRM from the book file
       # and add the cleared temporary copy
       if doit:
-        with dedrm.removed(bookpath) as clearpath:
+        with dedrm.decrypted(bookpath) as clearpath:
           return self.add(clearpath, doit=doit, quiet=quiet, **subp_options)
     cp = self.calibredb(
         'add',

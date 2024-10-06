@@ -184,25 +184,38 @@ class DeDRMCommand(EBooksCommonBaseCommand):
         raise GetoptError("expected 'import' or 'print', got %r" % (op,))
 
   def cmd_remove(self, argv):
-    ''' Usage: {cmd} filenames...
+    ''' Usage: {cmd} [--inplace] filenames...
           Remove DRM from the specified filenames.
-          Write the decrypted book at path/to/book
-          to the file decrypted-book in the current directory.
+          Write the decrypted contents of path/to/book.ext
+          to the file book-decrypted.ext.
+          Options:
+            --inplace   Replace the original with the decrypted version.
     '''
     dedrm = self.options.dedrm
-    exists_ok = False
-    output_dirpath = '.'
-    # TODO: -f exists_ok -O output_dirpath
+    options = self.options
+    options.update(output_dirpath='.', inplace=False)
+    options.popopts(
+        argv,
+        O_='output_dirpath',
+        inplace=bool,
+    )
     if not argv:
       raise GetoptError("missing filenames")
     for filename in argv:
       with Pfx(filename):
-        output_filename = normpath(
-            joinpath(
-                realpath(output_dirpath), 'decrypted-' + basename(filename)
-            )
-        )
-        pfx_call(dedrm.remove, filename, output_filename, exists_ok=exists_ok)
+        if options.inplace:
+          output_filename = filename
+          exists_ok = True
+        else:
+          base, base_ext = splitext(basename(filename))
+          output_filename = normpath(
+              joinpath(
+                  realpath(options.output_dirpath),
+                  f'{base}-decrypted{base_ext}'
+              )
+          )
+          exists_ok = False
+        pfx_call(dedrm.decrypt, filename, output_filename, exists_ok=exists_ok)
 
 class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
   ''' Class embodying the DeDRM/noDRM package actions.
@@ -437,7 +450,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
 
   @uses_fstags
   @pfx_method
-  def remove(
+  def decrypt(
       self,
       srcpath,
       dstpath,
@@ -485,7 +498,6 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
         with stackattrs(T, close=lambda: T.flush()):
           # monkey patch temporary_file method to return tmpfilename
           def dedrem_temporaryfile(fext):
-            breakpoint()
             return T
 
           with stackattrs(dedrm, temporary_file=dedrem_temporaryfile):
@@ -494,9 +506,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
               if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3',
                               'azw4', 'tpz', 'kfx-zip']:
                 # Kindle/Mobipocket
-                decrypted_ebook = trace(retval=True)(dedrm.KindleMobiDecrypt)(
-                    srcpath
-                )
+                decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
               elif booktype == 'pdb':
                 # eReader
                 decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
@@ -517,8 +527,8 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
     fstags[dstpath].update(fstags[srcpath])
 
   @contextmanager
-  def removed(self, srcpath):
-    ''' Context manager to produce a deDRMed copy of `srcpath`,
+  def decrypted(self, srcpath):
+    ''' A context manager to produce a deDRMed copy of `srcpath`,
         yielding the temporary file containing the copy.
     '''
     srcext = splitext(basename(srcpath))[1]
@@ -526,7 +536,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
         prefix=f'.{self.__class__.__name__}-',
         suffix=srcext,
     ) as T:
-      self.remove(srcpath, T.name, exists_ok=True)
+      self.decrypt(srcpath, T.name, exists_ok=True)
       yield T.name
 
   @property
