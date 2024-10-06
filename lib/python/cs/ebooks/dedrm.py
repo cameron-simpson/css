@@ -17,6 +17,7 @@ import os
 from os.path import (
     basename,
     dirname,
+    exists as existspath,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -35,6 +36,7 @@ from cs.cmdutils import BaseCommand, vprint
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
+from cs.fs import FSPathBasedSingleton
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
@@ -202,7 +204,7 @@ class DeDRMCommand(EBooksCommonBaseCommand):
         )
         pfx_call(dedrm.remove, filename, output_filename, exists_ok=exists_ok)
 
-class DeDRMWrapper(MultiOpenMixin, Promotable):
+class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
   ''' Class embodying the DeDRM/noDRM package actions.
   '''
 
@@ -212,6 +214,15 @@ class DeDRMWrapper(MultiOpenMixin, Promotable):
   DEDRM_PACKAGE_NAME = 'dedrm'
   DEDRM_PLUGIN_NAME = 'DeDRM'
   DEDRM_PLUGIN_VERSION = '7.2.1'
+
+  @classmethod
+  @fmtdoc
+  def FSPATH_DEFAULT(cls):
+    ''' Called for the default `DeDRMWrapper` filesystem path
+        if unspecified and no `${DEDRM_PACKAGE_PATH_ENVVAR}` environment
+        variable.
+    '''
+    return cls.get_package_path()
 
   @pfx_method
   @fmtdoc
@@ -237,12 +248,12 @@ class DeDRMWrapper(MultiOpenMixin, Promotable):
         raise ValueError("not a directory")
       if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
         raise ValueError("no \"standalone\" subdirectory")
-    self.dedrm_package_path = dedrm_package_path
+    self.fspath = dedrm_package_path
     self.sqltags = sqltags or SQLTags()
 
   @staticmethod
   @fmtdoc
-  def get_package_path(dedrm_package_path: str = None):
+  def get_package_path(dedrm_package_path: str = None) -> str:
     ''' Return the filesystem path of the DeDRM/noDRM package to use.
           If the supplied `dedrm_package_path` is `None`,
           obtain the path from ${DEDRM_PACKAGE_PATH_ENVVAR}.
@@ -254,6 +265,10 @@ class DeDRMWrapper(MultiOpenMixin, Promotable):
             f'no dedrm_package_path and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
         )
       vprint(f'${DEDRM_PACKAGE_PATH_ENVVAR} -> {dedrm_package_path!r}')
+    if not existspath(dedrm_package_path):
+      raise ValueError(
+          f'dedrm_package_path:{dedrm_package_path!r} does not exist'
+      )
     return dedrm_package_path
 
   @contextmanager
@@ -271,7 +286,7 @@ class DeDRMWrapper(MultiOpenMixin, Promotable):
           ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
               using overrides from `DeDRMOverride`.
           '''
-          alfdir = self.dedrm_package_path
+          alfdir = self.fspath
 
         with stackattrs(
             self,
@@ -335,9 +350,7 @@ class DeDRMWrapper(MultiOpenMixin, Promotable):
       ##os.system(f'set -x; cat {module_path}')
 
     # present the dedrm package as DEDRM_PACKAGE_NAME ('dedrm')
-    os.symlink(
-        self.dedrm_package_path, joinpath(libdirpath, self.DEDRM_PACKAGE_NAME)
-    )
+    os.symlink(self.fspath, joinpath(libdirpath, self.DEDRM_PACKAGE_NAME))
     # fake up __version.py
     write_module(
         '__version',
