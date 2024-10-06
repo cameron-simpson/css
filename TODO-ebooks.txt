@@ -1,3 +1,4 @@
+in-calibre decryption in place
 recognise AZWs containing comics - keywords and images?
 -A/apple_books_path common option
 cs.ebooks should run if there is no calibre or kindle install
