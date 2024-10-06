@@ -74,6 +74,7 @@ from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import UpdProxy, uses_upd, print, run_task  # pylint: disable=redefined-builtin
 
+from .common import EBooksCommonBaseCommand
 from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 from .mobi import Mobi  # pylint: disable=import-outside-toplevel
 from .pdf import PDFDocument
@@ -1082,7 +1083,7 @@ class CalibreMetadataDB(ORM):
     self.tags = Tags
     Tags.orm = self
 
-class CalibreCommand(BaseCommand):
+class CalibreCommand(EBooksCommonBaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
   '''
 
@@ -1130,71 +1131,22 @@ class CalibreCommand(BaseCommand):
   }
 
   @dataclass
-  class Options(BaseCommand.Options):
+  class Options(EBooksCommonBaseCommand.Options):
     ''' Special class for `self.options` with various properties.
     '''
 
-    calibre_path: str = field(
-        default_factory=lambda: os.environ.get(CalibreTree.FSPATH_ENVVAR)
-    )
     calibre_path_other: Optional[str] = None
-    dedrm_package_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR),
-    )
-
-    def _default_kindle_path():
-      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-      return (
-          KindleTree._resolve_fspath(None)
-          if KindleTree.FSPATH_ENVVAR in os.environ else None
-      )
-
-    kindle_path: Optional[str] = field(default_factory=_default_kindle_path)
     linkto_dirpath: Optional[str] = None
     # used by "calibre add [--cbz]"
     make_cbz: bool = False
 
-    COMMON_OPT_SPECS = dict(
-        C_='calibre_path',
-        K_='kindle_path',
-        **BaseCommand.Options.COMMON_OPT_SPECS,
-    )
-
-    @property
-    def calibre(self):
-      ''' The `CalibreTree` from `self.calibre_path`.
-      '''
-      return CalibreTree(self.calibre_path)
-
-    @property
+    @cached_property
     def calibre_other(self):
       ''' The alternate `CalibreTree` from `self.calibre_path_other`.
       '''
       if self.calibre_path_other is None:
         raise AttributeError(".calibre_other: no .calibre_path_other")
       return CalibreTree(self.calibre_path_other)
-
-    @property
-    def kindle(self):
-      ''' The `KindleTree` from `self.kindle_path`.
-      '''
-      if self.kindle_path is None:
-        raise AttributeError(".kindle: no .kindle_path")
-      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-      return KindleTree(self.kindle_path)
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
-    options = self.options
-    if opt == '-C':
-      options.calibre_path = val
-    elif opt == '-K':
-      options.kindle_path = val
-    elif opt == '-O':
-      options.calibre_path_other = val
-    else:
-      super().apply_opt(opt, val)
 
   @contextmanager
   def run_context(self):
