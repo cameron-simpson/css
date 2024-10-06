@@ -4,45 +4,50 @@
 '''
 
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Optional
 
 from cs.cmdutils import BaseCommand
+from cs.logutils import warning
 
 @dataclass
 class EBooksCommonOptions(BaseCommand.Options):
   ''' Set up the default values in `options`.
     '''
 
-  # pylint: disable=no-method-argument
-  def _kindle_path():
+  kindle_path: Optional[str] = None
+
+  @cached_property
+  def kindle(self):
     from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-    try:
-      # pylint: disable=protected-access
-      kindle_path = KindleTree._resolve_fspath(None)
-    except ValueError:
-      kindle_path = None
-    return kindle_path
+    kindle = KindleTree(self.kindle_path)
+    self.kindle_path = kindle.fspath
+    return kindle
 
-  kindle_path: Optional[str] = field(default_factory=_kindle_path)
+  calibre_path: Optional[str] = None
 
-  # pylint: disable=no-method-argument
-  def _calibre_path():
+  @cached_property
+  def calibre(self):
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
-    try:
-      # pylint: disable=protected-access
-      calibre_path = CalibreTree._resolve_fspath(None)
-    except ValueError:
-      calibre_path = None
-    return calibre_path
+    calibre = CalibreTree(self.calibre_path)
+    self.calibre_path = calibre.fspath
+    return calibre
 
-  calibre_path: Optional[str] = field(default_factory=_calibre_path)
+  dedrm_package_path: Optional[str] = None
 
-  # pylint: disable=no-method-argument
-  def _dedrm_path():
+  @cached_property
+  def dedrm(self):
     from .dedrm import DeDRMWrapper  # pylint: disable=import-outside-toplevel
-    return DeDRMWrapper.get_package_path()
-
-  dedrm_package_path: Optional[str] = field(default_factory=_dedrm_path)
+    try:
+      dedrm_package_path = DeDRMWrapper.get_package_path(
+          self.dedrm_package_path
+      )
+    except ValueError as e:
+      warning("could not obtain the DeDRM package: %s", e)
+      return None
+    dedrm = trace(DeDRMWrapper)(dedrm_package_path)
+    self.dedrm_package_path = dedrm.fspath
+    return dedrm
 
   COMMON_OPT_SPECS = dict(
       C_='calibre_path',
