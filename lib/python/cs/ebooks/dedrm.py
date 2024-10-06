@@ -43,7 +43,7 @@ from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-from .common import EBooksCommonOptions
+from .common import EBooksCommonBaseCommand
 
 DEDRM_PACKAGE_PATH_ENVVAR = 'DEDRM_PACKAGE_PATH'
 
@@ -52,7 +52,7 @@ def main(argv=None):
   '''
   return DeDRMCommand(argv).run()
 
-class DeDRMCommand(BaseCommand):
+class DeDRMCommand(EBooksCommonBaseCommand):
   ''' cs.dedrm command line implementation.
   '''
 
@@ -67,11 +67,6 @@ class DeDRMCommand(BaseCommand):
           or place that value in the $DEDRM_PACKAGE_PATH environment variable.
   '''
 
-  @dataclass
-  class Options(EBooksCommonOptions):
-    ''' Command line option state.
-    '''
-
   def apply_opt(self, opt, val):
     badopt = False
     if opt == '-D':
@@ -84,21 +79,11 @@ class DeDRMCommand(BaseCommand):
   @contextmanager
   def run_context(self):
     with super().run_context():
-      options = self.options
-      with Pfx("dedrm_package_path"):
-        dedrm_package_path = options.dedrm_package_path
-        if dedrm_package_path is None:
-          if not os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR):
-            raise GetoptError(
-                f'no ${DEDRM_PACKAGE_PATH_ENVVAR} and no -D option'
-            )
-        try:
-          options.dedrm = pfx_call(DeDRMWrapper, dedrm_package_path)
-        except ValueError as e:
-          raise GetoptError("bad dedrm_package_path: %s" % (e,))
-        options.dedrm_package_path = options.dedrm.dedrm_package_path
-        with options.dedrm:  # prepare the shim modules for the duration
-          yield
+      dedrm = self.options.dedrm
+      if dedrm is None:
+        raise GetoptError(f'could not obtain the DeDRM package')
+      with dedrm:  # prepare the shim modules for the duration
+        yield
 
   def cmd_import(self, argv):
     ''' Usage: {cmd} module_name...
