@@ -55,3 +55,9 @@ class EBooksCommonOptions(BaseCommand.Options):
       K_='kindle_path',
       **BaseCommand.Options.COMMON_OPT_SPECS,
   )
+
+class EBooksCommonBaseCommand(BaseCommand):
+  ''' A common `BaseCommand` subclass for the ebooks commands.
+  '''
+
+  Options = EBooksCommonOptions
