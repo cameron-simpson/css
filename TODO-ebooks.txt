@@ -1,3 +1,4 @@
+should a kindletree hook into dedrm? much bikesheeding here
 split dedrm into a package with kobo and kindle dedrm parts
 test if an AZW is encrypted
 in-calibre decryption in place
