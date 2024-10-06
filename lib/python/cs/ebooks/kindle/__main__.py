@@ -268,28 +268,29 @@ class KindleCommand(EBooksCommonBaseCommand):
     runstate = options.runstate
     print(kindle.fspath)
     for subdir_name, kbook in kindle.items():
-      runstate.raiseif()
-      line1 = [subdir_name]
-      title = kbook.tags.auto.calibre.title
-      if title:
-        line1.append(title)
-      calibre_tags = kbook.tags.auto.calibre
-      authors = calibre_tags.authors
-      if authors:
-        line1.extend(('-', ','.join(authors)))
-      if kbook.sampling:
-        line1.append(f'({kbook.sampling})')
-      print(*line1)
-      if longmode:
-        if kbook.type != 'kindle.ebook':
-          print("  type =", kbook.type)
-        if kbook.revision is not None:
-          print("  revision =", kbook.revision)
+      with Pfx(kbook):
+        runstate.raiseif()
+        line1 = [subdir_name]
+        title = kbook.tags.auto.calibre.title
+        if title:
+          line1.append(title)
+        calibre_tags = kbook.tags.auto.calibre
+        authors = calibre_tags.authors
+        if authors:
+          line1.extend(('-', ','.join(authors)))
         if kbook.sampling:
-          print("  sampling =", kbook.sampling)
-        for tag in sorted(kbook.tags.as_tags()):
-          if tag.name not in ('calibre.title', 'calibre.authors'):
-            print(" ", tag)
+          line1.append(f'({kbook.sampling})')
+        print(*line1)
+        if longmode:
+          if kbook.type != 'kindle.ebook':
+            print("  type =", kbook.type)
+          if kbook.revision is not None:
+            print("  revision =", kbook.revision)
+          if kbook.sampling:
+            print("  sampling =", kbook.sampling)
+          for tag in sorted(kbook.tags.as_tags()):
+            if tag.name not in ('calibre.title', 'calibre.authors'):
+              print(" ", tag)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
