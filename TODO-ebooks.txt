@@ -1,3 +1,4 @@
+split dedrm into a package with kobo and kindle dedrm parts
 test if an AZW is encrypted
 in-calibre decryption in place
 recognise AZWs containing comics - keywords and images?
