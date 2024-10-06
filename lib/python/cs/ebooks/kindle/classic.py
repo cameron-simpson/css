@@ -58,6 +58,8 @@ from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 from . import KINDLE_LIBRARY_ENVVAR
 from ..dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 
+from cs.debug import trace, X, r, s, abrk
+
 KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.amazon.Kindle'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
@@ -162,7 +164,9 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
           super().__init__(self.asin)
 
       def __str__(self):
-        return "%s[%s]:%s" % (self.tree, self.subdir_name, self.tags)
+        return "%s[%s]:%s" % (
+            self.tree, self.asin, ",".join(map(str, self.tags))
+        )
 
       def __repr__(self):
         return "%s(%r,%r)" % (type(self).__name__, self.tree, self.subdir_name)
