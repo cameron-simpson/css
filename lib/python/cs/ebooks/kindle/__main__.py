@@ -25,6 +25,7 @@ from cs.pfx import Pfx
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
 
+from ..common import EBooksCommonBaseCommand
 from .classic import (
     KindleBookAssetDB,
     KindleTree,
@@ -32,14 +33,13 @@ from .classic import (
     KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING,
     kindle_content_path,
 )
-from ..dedrm import DeDRMWrapper
 
 def main(argv=None):
   ''' Kindle command line mode.
   '''
   return KindleCommand(argv).run()
 
-class KindleCommand(BaseCommand):
+class KindleCommand(EBooksCommonBaseCommand):
   ''' Command line for interacting with a Kindle filesystem tree.
   '''
 
@@ -54,39 +54,6 @@ class KindleCommand(BaseCommand):
       Specify kindle library location.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
-
-  @dataclass
-  class Options(BaseCommand.Options):
-    ''' Set up the default values in `options`.
-    '''
-
-    def _kindle_path():
-      try:
-        # pylint: disable=protected-access
-        kindle_path = KindleTree._resolve_fspath(None)
-      except ValueError:
-        kindle_path = None
-      return kindle_path
-
-    kindle_path: Optional[str] = field(default_factory=_kindle_path)
-
-    def _calibre_path():
-      from ..calibre import CalibreTree  # pylint: disable=import-outside-toplevel
-      try:
-        # pylint: disable=protected-access
-        calibre_path = CalibreTree._resolve_fspath(None)
-      except ValueError:
-        calibre_path = None
-      return calibre_path
-
-    calibre_path: Optional[str] = field(default_factory=_calibre_path)
-    dedrm_package_path: Optional[str] = None
-
-    COMMON_OPT_SPECS = dict(
-        C_='calibre_path',
-        K_='kindle_path',
-        **BaseCommand.Options.COMMON_OPT_SPECS,
-    )
 
   def apply_opt(self, opt, val):
     ''' Apply a command line option.
@@ -119,17 +86,11 @@ class KindleCommand(BaseCommand):
     from ..calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     with super().run_context():
       options = self.options
-      dedrm = (
-          DeDRMWrapper(options.dedrm_package_path)
-          if options.dedrm_package_path else None
-      )
-
-      with KindleTree(options.kindle_path) as kt:
-        with CalibreTree(options.calibre_path) as cal:
-          with stackattrs(options, kindle=kt, calibre=cal, dedrm=dedrm):
+      with options.kindle as kindle:
+        with contextif(options.calibre):
+          with contextif(options.dedrm):
             with fstags:
-              with contextif(options.dedrm):
-                yield
+              yield
 
   def cmd_app_path(self, argv):
     ''' Usage: {cmd} [content-path]
