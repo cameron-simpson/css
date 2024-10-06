@@ -329,17 +329,20 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
 
         On the first call:
         - set `.fspath` to `self._resolve_fspath(fspath)`
-        - set `._lock` to `lock` (or `threading.Lock()` if not specified)
-        - return `True`
-        On subsequent calls return `False`.
-
+        - set `._lock` to `lock` (or `cs.threads.NRLock()` if not specified)
     '''
     if '_lock' in self.__dict__:
       return
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
     if lock is None:
-      lock = Lock()
+      try:
+        from cs.threads import NRLock
+      except ImportError:
+        from threading import Lock
+        lock = Lock()
+      else:
+        lock = NRLock()
     self._lock = lock
 
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
