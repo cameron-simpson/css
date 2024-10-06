@@ -1,3 +1,4 @@
+test if an AZW is encrypted
 in-calibre decryption in place
 recognise AZWs containing comics - keywords and images?
 -A/apple_books_path common option
