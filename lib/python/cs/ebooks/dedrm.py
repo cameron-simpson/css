@@ -393,8 +393,11 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
 
   @contextmanager
   def dedrm_imports(self):
-    ''' Context manager to run some code with `self.dedrm_package_path`
+    ''' A context manager to run some code with `self.shimlib_dirpath`
+        and {self.shimlib_dirpath}/{self.DEDRM_PACKAGE_NAME}
         prepended to `sys.path` for import purposes.
+
+        This lets us import our generated stub modules and the DeDRM packages.
     '''
     with stackattrs(
         sys,
