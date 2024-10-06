@@ -1,3 +1,4 @@
+cs.ebooks should run if there is no calibre or kindle install
 cs.ebooks.cbz: ABCF metadata? https://acbf.fandom.com/wiki/ACBF_Specifications
 cs.ebooks.dedrm: option to use the plugin.zip directly instead of an unpacked source tree?
 fetch the dedrm package if not present, store where?
