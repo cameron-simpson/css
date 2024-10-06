@@ -87,6 +87,40 @@ class DeDRMCommand(EBooksCommonBaseCommand):
       with dedrm:  # prepare the shim modules for the duration
         yield
 
+  def cmd_decrypt(self, argv):
+    ''' Usage: {cmd} [--inplace] filenames...
+          Remove DRM from the specified filenames.
+          Write the decrypted contents of path/to/book.ext
+          to the file book-decrypted.ext.
+          Options:
+            --inplace   Replace the original with the decrypted version.
+    '''
+    dedrm = self.options.dedrm
+    options = self.options
+    options.update(output_dirpath='.', inplace=False)
+    options.popopts(
+        argv,
+        O_='output_dirpath',
+        inplace=bool,
+    )
+    if not argv:
+      raise GetoptError("missing filenames")
+    for filename in argv:
+      with Pfx(filename):
+        if options.inplace:
+          output_filename = filename
+          exists_ok = True
+        else:
+          base, base_ext = splitext(basename(filename))
+          output_filename = normpath(
+              joinpath(
+                  realpath(options.output_dirpath),
+                  f'{base}-decrypted{base_ext}'
+              )
+          )
+          exists_ok = False
+        pfx_call(dedrm.decrypt, filename, output_filename, exists_ok=exists_ok)
+
   def cmd_import(self, argv):
     ''' Usage: {cmd} module_name...
           Exercise the DeDRM python import mechanism for each module_name.
@@ -182,40 +216,6 @@ class DeDRMCommand(EBooksCommonBaseCommand):
           pprint(kk)
       else:
         raise GetoptError("expected 'import' or 'print', got %r" % (op,))
-
-  def cmd_remove(self, argv):
-    ''' Usage: {cmd} [--inplace] filenames...
-          Remove DRM from the specified filenames.
-          Write the decrypted contents of path/to/book.ext
-          to the file book-decrypted.ext.
-          Options:
-            --inplace   Replace the original with the decrypted version.
-    '''
-    dedrm = self.options.dedrm
-    options = self.options
-    options.update(output_dirpath='.', inplace=False)
-    options.popopts(
-        argv,
-        O_='output_dirpath',
-        inplace=bool,
-    )
-    if not argv:
-      raise GetoptError("missing filenames")
-    for filename in argv:
-      with Pfx(filename):
-        if options.inplace:
-          output_filename = filename
-          exists_ok = True
-        else:
-          base, base_ext = splitext(basename(filename))
-          output_filename = normpath(
-              joinpath(
-                  realpath(options.output_dirpath),
-                  f'{base}-decrypted{base_ext}'
-              )
-          )
-          exists_ok = False
-        pfx_call(dedrm.decrypt, filename, output_filename, exists_ok=exists_ok)
 
 class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
   ''' Class embodying the DeDRM/noDRM package actions.
