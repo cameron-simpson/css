@@ -122,12 +122,21 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     self._bookrefs = {}
 
     # define the proxy classes
-    class KindleBook(SingletonMixin, RelationProxy(self.db.books, [
-        'asin',
-        'type',
-        'revision',
-        'sampling',
-    ], id_column='asin'), HasFSPath):
+    class KindleBook(
+        SingletonMixin,
+        RelationProxy(
+            self.db.books,
+            [
+                'asin',
+                'type',
+                'revision',
+                'sampling',
+            ],
+            id_column='asin',
+            missing=lambda relp, field: None,
+        ),
+        HasFSPath,
+    ):
       ''' A reference to a Kindle library book subdirectory.
       '''
 
