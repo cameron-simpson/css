@@ -62,6 +62,7 @@ class KindleCommand(EBooksCommonBaseCommand):
     if opt == '-C':
       options.calibre_path = val
     elif opt == '-K':
+      # TODO: WTF? to go into the KindleTree factory function
       db_subpaths = (
           KindleBookAssetDB.DB_FILENAME,
           joinpath(KindleTree.CONTENT_DIRNAME, KindleBookAssetDB.DB_FILENAME),
@@ -290,4 +291,5 @@ class KindleCommand(EBooksCommonBaseCommand):
           if tag.name not in ('calibre.title', 'calibre.authors'):
             print(" ", tag)
 
-sys.exit(main(sys.argv))
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
