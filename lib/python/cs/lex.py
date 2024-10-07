@@ -408,7 +408,7 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
-def stripped_dedent(s):
+def stripped_dedent(s, post_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
@@ -439,9 +439,9 @@ def stripped_dedent(s):
     return ''
   line1 = lines.pop(0)
   if not lines:
-    return line1
+    return indent(line1, post_indent)
   adjusted = dedent('\n'.join(lines))
-  return line1 + '\n' + adjusted
+  return indent(line1 + '\n' + adjusted, post_indent)
 
 @require(lambda offset: offset >= 0)
 def get_prefix_n(s, prefix, n=None, *, offset=0):
