@@ -210,7 +210,7 @@
 
 '''
 
-__version__ = '20241007'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python3"],
