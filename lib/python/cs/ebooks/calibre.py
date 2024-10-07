@@ -66,6 +66,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.seq import unrepeated
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
@@ -1377,6 +1378,41 @@ class CalibreCommand(EBooksCommonBaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     return self.options.calibre.dbshell()
+
+  def cmd_decrypt(self, argv):
+    ''' Usage: {cmd} [dbids...]
+          Remove DRM from the specified books.
+    '''
+    options = self.options
+    calibre = options.calibre
+    dedrm = options.dedrm
+    if not self.options.dedrm:
+      warning("no DeDRM available")
+      return 1
+    if not argv:
+      argv = ['AZW', 'AZW3']
+    try:
+      cbooks = self.popbooks(argv)
+    except ValueError as e:
+      raise GetoptError("invalid book specifiers: %s") from e
+    runstate = self.options.runstate
+    xit = 0
+    with run_task("decrypt") as proxy:
+      for cbook in progressbar(list(unrepeated(cbooks)), "decrypt"):
+        runstate.raiseif()
+        proxy.text = str(cbook)
+        with Pfx(cbook):
+          for fmtk in 'AZW', 'AZW3':
+            proxy.text = f'{cbook} {fmtk}'
+            try:
+              if cbook.decrypt(fmtk):
+                print("decrypted", fmtk, "of", cbook)
+            except KeyError:
+              continue
+            except dedrm.DeDRMError as e:
+              warning("count not decrypt: %s", e)
+              xit = 1
+    return xit
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
