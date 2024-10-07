@@ -743,6 +743,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       # and add the cleared temporary copy
       if doit:
         with dedrm.decrypted(bookpath) as clearpath:
+          # bookpath is not encrypted, use as is
+          if clearpath is None:
+            clearpath = bookpath
           return self.add(clearpath, doit=doit, quiet=quiet, **subp_options)
     cp = self.calibredb(
         'add',
