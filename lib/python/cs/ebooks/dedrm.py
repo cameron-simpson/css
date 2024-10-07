@@ -119,7 +119,14 @@ class DeDRMCommand(EBooksCommonBaseCommand):
               )
           )
           exists_ok = False
-        pfx_call(dedrm.decrypt, filename, output_filename, exists_ok=exists_ok)
+        if not pfx_call(dedrm.decrypt, filename, output_filename,
+                        exists_ok=exists_ok):
+          # not encrypted, copy to source file
+          if not inplace:
+            if existspath(output_filename):
+              warning("decrypted filename already exists: %r", output_filename)
+            else:
+              copyfile(filename, output_filename)
 
   def cmd_import(self, argv):
     ''' Usage: {cmd} module_name...
@@ -461,6 +468,8 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
       obok_lib=None,
   ):
     ''' Remove the DRM from `srcpath`, writing the resulting file to `dstpath`.
+        Return `True` if `srcpath` was decrypted into `dstpath`.
+        Return `False` if `srcpath` was not encrypted; `dstpath` will not be created.
 
         Parameters:
         * `exists_ok`: if true then `dstpath` may already exist; default `False`
@@ -523,21 +532,27 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
                 )
               if decrypted_ebook == srcpath:
                 warning("srcpath is already decrypted")
+                pfx_call(os.remove, T.name)
+                return False
     # copy tags from the srcpath to the dstpath
     fstags[dstpath].update(fstags[srcpath])
+    return True
 
   @contextmanager
   def decrypted(self, srcpath):
     ''' A context manager to produce a deDRMed copy of `srcpath`,
-        yielding the temporary file containing the copy.
+        yielding the temporary file containing the copy;
+        if `srcpath` is not decrypted this context manager yields `None`.
     '''
     srcext = splitext(basename(srcpath))[1]
     with NamedTemporaryFile(
         prefix=f'.{self.__class__.__name__}-',
         suffix=srcext,
     ) as T:
-      self.decrypt(srcpath, T.name, exists_ok=True)
-      yield T.name
+      yield (
+          T.name if
+          self.decrypt(srcpath, T.name, exists_ok=True, **decrypt_kw) else None
+      )
 
   @property
   def kindlekeys(self) -> List[dict]:
