@@ -122,7 +122,7 @@ cs.splink ok_revision=d931f30ab0db0d1e1aef4df8295a1b20e364a4be pypi.release="202
 cs.sqla
 cs.sqlalchemy_utils ok_revision="3e56c158c54e7f3e818bc7f7024135e64f76ba76" pypi.release="20241005" features={"20230612":["orchestrated_session"]}
 cs.sqltags ok_revision="977113cd5173742347762aea02a88b7773f64d01" pypi.release="20240723"
-cs.tagset ok_revision="18f454a7788fe35e0c4b4e7026b72065cc545355" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"],"20240422":["fix_Tag__str__bad_TypeError","jsonable"],"20240422.2":["jsonable__for_json"]} pypi.release="20241005"
+cs.tagset ok_revision=d1c626adb493fdabb0c3eb03b85f2d774a24740c features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"],"20240422":["fix_Tag__str__bad_TypeError","jsonable"],"20240422.2":["jsonable__for_json"]} pypi.release="20241005"
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
 cs.taskqueue ok_revision="09c3371a64b2e881d2a681ed752dc2894d47e41e" features={"20221207":["BaseTask"]} pypi.release="20240423"
 cs.testutils ok_revision=d477dd0df1371183722d5184b19d56731fad911a features={"20230109":["SetupTeardownMixin","product_test"],"20240623":["assertSingleThread"]} pypi.release="20240623"
