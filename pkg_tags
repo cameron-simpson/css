@@ -59,7 +59,7 @@ cs.excutils pypi.release="20240630" ok_revision="467f248b10aa6109713d48374153093
 cs.export
 cs.ffmpegutils ok_revision="9dbd656200e52f7a9bbd101154dd5c54ce5d507c" pypi.release="20240519"
 cs.filestate pypi.release=20181107
-cs.fileutils pypi.release="20240723" ok_revision=f8bb42cbae809482792904b6a51d1227dc67146a features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
+cs.fileutils pypi.release="20240723" ok_revision=f791c23967d1c1e3ca30161d8859c8b888de278b features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fs ok_revision="656ca7884da13564670a77554bd3888ff3f5522b" pypi.release="20241005" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"],"20240422":["scandirpaths","scandirtree"]}
 cs.fsm ok_revision="5e52de3116a9ca6d83e2ee7942a0e6484159cf0f" pypi.release="20240721.1" features={"20231018":["fsm_transitions_as_dot__history_style"],"20240630":["CancellationError"],"20240721":["FSM__fsm_print_state_diagram"]}
 cs.fsrelease
