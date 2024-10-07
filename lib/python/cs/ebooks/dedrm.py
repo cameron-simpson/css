@@ -535,6 +535,10 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
                 warning("srcpath is already decrypted")
                 pfx_call(os.remove, T.name)
                 return False
+              if file_checksum(srcpath) == file_checksum(decrypted_ebook):
+                warning("srcpath content is unchanged by decryption")
+                pfx_call(trace(os.remove), T.name)
+                return False
     # copy tags from the srcpath to the dstpath
     fstags[dstpath].update(fstags[srcpath])
     return True
