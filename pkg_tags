@@ -46,7 +46,7 @@ cs.csvdb
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20240630" ok_revision=b066cb840c2f38629043516d239ce6ed2adf0e46 features={"20230613":["patch_builtins"]}
-cs.deco pypi.release="20241003" ok_revision=dd68577034be30ced0331d2671a192cd8b0c23e5 features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"]}
+cs.deco pypi.release="20241003" ok_revision="59ddd45fdbcb07da0ee66f9d554f03a73258dd6c" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"]}
 cs.dedrm
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.distinfo
