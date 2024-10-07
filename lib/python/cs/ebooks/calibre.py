@@ -50,7 +50,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import contextif
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_cmd_option
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
@@ -105,12 +105,14 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     return expanduser(CALIBRE_FSPATH)
 
   # pylint: disable=too-many-statements
+  @uses_cmd_option(dedrm=None)
   @typechecked
   def __init__(
       self,
       calibrepath: Optional[str] = None,
       bin_dirpath: Optional[str] = None,
       prefs_dirpath: Optional[str] = None,
+      dedrm: Optional[DeDRMWrapper] = None,
   ):
     ''' Initialise the `CalibreTree`.
 
@@ -121,6 +123,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     super().__init__(calibrepath)
     if not isdirpath(self.fspath):
       raise ValueError(f'no directory at {self.fspath!r}')
+    self.dedrm = dedrm
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
     self.prefs_dirpath = (
         prefs_dirpath or os.environ.get('CALIBRE_CONFIG_DIRECTORY')
@@ -286,6 +289,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         except KeyError:
           return None
         return self.pathto(fmtsubpath)
+
+      @property
+      def dedrm(self):
+        ''' The available `DeDRMWrapper` is any, or `None`.
+        '''
+        return self.tree.dedrm
 
       @pfx_method
       @typechecked
