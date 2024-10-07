@@ -45,7 +45,7 @@ class EBooksCommonOptions(BaseCommand.Options):
     except ValueError as e:
       warning("could not obtain the DeDRM package: %s", e)
       return None
-    dedrm = trace(DeDRMWrapper)(dedrm_package_path)
+    dedrm = DeDRMWrapper(dedrm_package_path)
     self.dedrm_package_path = dedrm.fspath
     return dedrm
 
