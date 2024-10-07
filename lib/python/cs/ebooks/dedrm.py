@@ -539,10 +539,11 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
     return True
 
   @contextmanager
-  def decrypted(self, srcpath):
+  def decrypted(self, srcpath, **decrypt_kw):
     ''' A context manager to produce a deDRMed copy of `srcpath`,
         yielding the temporary file containing the copy;
         if `srcpath` is not decrypted this context manager yields `None`.
+        Keyword arguments are passed through to `DeDRMWrapper.decrypt`.
     '''
     srcext = splitext(basename(srcpath))[1]
     with NamedTemporaryFile(
