@@ -38,6 +38,7 @@ from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
 from cs.fs import FSPathBasedSingleton
 from cs.fstags import FSTags, uses_fstags
+from cs.hashindex import file_checksum
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import pfx, Pfx, pfx_call, pfx_method
@@ -537,7 +538,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
                 return False
               if file_checksum(srcpath) == file_checksum(decrypted_ebook):
                 warning("srcpath content is unchanged by decryption")
-                pfx_call(trace(os.remove), T.name)
+                pfx_call(os.remove, T.name)
                 return False
     # copy tags from the srcpath to the dstpath
     fstags[dstpath].update(fstags[srcpath])
