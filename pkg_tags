@@ -21,7 +21,7 @@ cs.app.osx.spaces ok_revision=b88bef0ca653008cad8b0a2f3836629d49259674 features=
 cs.app.osx.spaces.misc
 cs.app.osx.spaces.objc
 cs.app.parse
-cs.app.playon ok_revision="6d46bd98f407fc8ff2326ce12af36517bd7a8483" pypi.release="20240723" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
+cs.app.playon ok_revision="6d46bd98f407fc8ff2326ce12af36517bd7a8483" pypi.release="20241007" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
 cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
