@@ -418,6 +418,9 @@ def stripped_dedent(s, post_indent=''):
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
 
+      The optional `post_indent` parameter may be used to indent
+      the dedented text before return.
+
       Example:
 
           >>> def func(s):
