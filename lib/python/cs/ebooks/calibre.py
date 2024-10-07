@@ -55,7 +55,9 @@ from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
     get_dotted_identifier,
+    indent,
     lc_,
+    stripped_dedent,
     FormatableMixin,
     FormatAsError,
 )
@@ -1190,16 +1192,25 @@ class CalibreCommand(EBooksCommonBaseCommand):
 
   GETOPT_SPEC = 'C:K:O:'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]
-  Operate on a Calibre library.
-  Options:
-    -C calibre_library
-      Specify calibre library location.
-    -K kindle_library
-      Specify kindle library location.
-    -O other_calibre_library
-      Specify alternate calibre library location, the default library
-      for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.'''
+  USAGE_FORMAT = '\n'.join(
+      (
+          'Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]',
+          stripped_dedent(
+              ''' Operate on a Calibre library.
+                  Options:
+                    -C calibre_library
+                      Specify calibre library location.
+                    -K kindle_library
+                      Specify kindle library location.
+                    -O other_calibre_library
+                      Specify alternate calibre library location, the default library
+                      for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.
+              ''', "  "
+          ),
+          # by_spec docs
+          stripped_dedent(CalibreTree.by_spec.__doc__.split("\n\n")[1], "  ")
+      ),
+  )
 
   # envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
   OTHER_LIBRARY_PATH_ENVVAR = CalibreTree.FSPATH_ENVVAR + '_OTHER'
