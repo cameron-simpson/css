@@ -472,6 +472,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
         Return `False` if `srcpath` was not encrypted; `dstpath` will not be created.
 
         Parameters:
+        * `booktype`: specify the book type of `srcpath`
         * `exists_ok`: if true then `dstpath` may already exist; default `False`
     '''
     if booktype is None:
