@@ -122,7 +122,7 @@ class DeDRMCommand(EBooksCommonBaseCommand):
         if not pfx_call(dedrm.decrypt, filename, output_filename,
                         exists_ok=exists_ok):
           # not encrypted, copy to source file
-          if not inplace:
+          if not options.inplace:
             if existspath(output_filename):
               warning("decrypted filename already exists: %r", output_filename)
             else:
