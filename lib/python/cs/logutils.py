@@ -155,7 +155,6 @@ class LoggingState(NS):
 
         Parameters:
         * `cmd`: program name, default from `basename(sys.argv[0])`.
-          Side-effect: sets `cs.pfx.cmd` to this value.
         * `main_log`: default logging system.
           If `None`, the main log will go to `sys.stderr`;
           if `main_log` is a string, is it used as a filename to
@@ -208,7 +207,6 @@ class LoggingState(NS):
 
     if cmd is None:
       cmd = os.path.basename(sys.argv[0])
-    cs.pfx.cmd = cmd
 
     if main_log is None:
       main_log = sys.stderr
@@ -323,13 +321,19 @@ class LoggingState(NS):
 def setup_logging(cmd_name=None, **kw):
   ''' Prepare a `LoggingState` and return it.
       It is also available as the global `cs.logutils.loginfo`.
+      Side-effect: sets `cs.pfx.cmd` to this value.
   '''
   global loginfo
-  if cmd_name is not None:
-    kw['cmd'] = cmd_name
-  logstate = LoggingState(**kw)
-  logstate.apply()
-  loginfo = logstate
+  if loginfo is None:
+    if cmd_name is not None:
+      kw.setdefault('cmd', cmd_name)
+    logstate = LoggingState(**kw)
+    logstate.apply()
+    loginfo = logstate
+    cs.pfx.cmd = kw['cmd']
+  else:
+    # just amend the current LoggingState
+    loginfo.__dict__.update(**kw)
   return loginfo
 
 class PfxFormatter(Formatter):
