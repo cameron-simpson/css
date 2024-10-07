@@ -48,7 +48,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, vprint
 from cs.context import contextif
 from cs.deco import fmtdoc, uses_cmd_option
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
@@ -295,6 +295,26 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         ''' The available `DeDRMWrapper` is any, or `None`.
         '''
         return self.tree.dedrm
+
+      @pfx_method
+      def decrypt(self, fmtk='AZW'):
+        ''' Decrypt the book file in format `fmtk`.
+        '''
+        bookpath = self.formatpath(fmtk)
+        if bookpath is None:
+          raise KeyError(fmtk)
+        dedrm = self.dedrm
+        if dedrm is None:
+          raise NotImplementedError('no DeDRMWrapper available')
+        with dedrm:
+          decrypted = pfx_call(
+              dedrm.decrypt, bookpath, bookpath, exists_ok=True
+          )
+          if decrypted:
+            vprint("decrypted:", shortpath(bookpath))
+          else:
+            vprint("already decrypted:", shortpath(bookpath))
+        return decrypted
 
       @pfx_method
       @typechecked
