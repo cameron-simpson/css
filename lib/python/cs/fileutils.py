@@ -1738,7 +1738,7 @@ def atomic_filename(
         raise FileExistsError(
             errno.EEXIST, os.strerror(errno.EEXIST), filename
         )
-      pfx_call(trace(rename_func), T.name, filename)
+      pfx_call(rename_func, T.name, filename)
     # recreate the temp file so that it can be cleaned up by NamedTemporaryFile
     with pfx_call(open, T.name, 'xb'):
       pass
@@ -1845,11 +1845,11 @@ def gzifopen(path, mode='r', *a, **kw):
     path1, path2 = path0, gzpath
   # if exactly one of the files exists, try only that file
   if existspath(path1) and not existspath(path2):
-    paths = path1,
+    paths = (path1,)
   elif existspath(path2) and not existspath(path1):
-    paths = path2,
+    paths = (path2,)
   else:
-    paths = path1, path2
+    paths = (path1, path2)
   for openpath in paths:
     try:
       with (gzip.open(openpath,
