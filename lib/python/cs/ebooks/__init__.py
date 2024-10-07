@@ -6,14 +6,18 @@
 
     The command `python -m cs.ebooks help -l` gives the basic usage information:
 
-        help:
-          apple subcommand [...]
+        Usage: ebooks subcommand [options...]
+          Ebooks utility command.
+          Subcommands:
+            apple subcommand [options...]
+              Command line access to Apple Books.
               Subcommands:
                 dbshell
                   Start an interactive database shell.
                 help [-l] [subcommand-names...]
-                  Print the full help for the named subcommands,
-                  or for all subcommands if no names are specified.
+                  Print help for subcommands.
+                  This outputs the full help for the named subcommands,
+                  or the short help for all subcommands if no names are specified.
                   -l  Long help even if no subcommand-names provided.
                 ls
                   List books in the library.
@@ -21,14 +25,16 @@
                   List metadata.
                 shell
                   Run a command prompt via cmd.Cmd using this command's subcommands.
-          calibre [-C calibre_library] [-K kindle-library-path] subcommand [...]
-              -C calibre_library
-                Specify calibre library location.
-              -K kindle_library
-                Specify kindle library location.
-              -O other_calibre_library
-                Specify alternate calibre library location, the default library
-                for pull etc. The default comes from $CALIBRE_LIBRARY_OTHER.
+            calibre [-C calibre_library] [-K kindle-library-path] subcommand [...]
+              Operate on a Calibre library.
+              Options:
+                -C calibre_library
+                  Specify calibre library location.
+                -K kindle_library
+                  Specify kindle library location.
+                -O other_calibre_library
+                  Specify alternate calibre library location, the default library
+                  for pull etc. The default comes from $CALIBRE_LIBRARY_OTHER.
               Subcommands:
                 add [-nqv] bookpaths...
                   Add the specified ebook bookpaths to the library.
@@ -44,9 +50,12 @@
                   -v    Verbose: report all actions and decisions.
                 dbshell
                   Start an interactive database prompt.
+                decrypt [dbids...]
+                  Remove DRM from the specified books.
                 help [-l] [subcommand-names...]
-                  Print the full help for the named subcommands,
-                  or for all subcommands if no names are specified.
+                  Print help for subcommands.
+                  This outputs the full help for the named subcommands,
+                  or the short help for all subcommands if no names are specified.
                   -l  Long help even if no subcommand-names provided.
                 info
                   Report basic information.
@@ -86,38 +95,65 @@
                     If no identifiers are provided, all books which have
                     the specified identifier will be pulled.
                 shell
+                  Run a command prompt via cmd.Cmd using calibre's subcommands.
                   Run an interactive Python prompt with some predefined names:
-                  calibre: the CalibreTree
-                  options: self.options
+                    calibre: the CalibreTree
+                    options: self.options
                 tag [-n] [--] [-]tag[,tag...] book_specs...
-          dedrm [-D dedrm_package_path] subcommand [args...]
-                -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
-                    For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
-                    at /path/to/DeDRM_tools--noDRM you could supply:
-                    -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
-                    or place that value in the $DEDRM_PACKAGE_PATH environment variable.
+                  Modify the tags of the specified books.
+            dedrm [-D dedrm_package_path] subcommand [args...]
+                Operations using the DeDRM/NoDRM package.
+                Options:
+                  -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
+                      For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
+                      at /path/to/DeDRM_tools--noDRM you could supply:
+                      -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
+                      or place that value in the $DEDRM_PACKAGE_PATH environment variable.
+              
               Subcommands:
+                decrypt [--inplace] filenames...
+                  Remove DRM from the specified filenames.
+                  Write the decrypted contents of path/to/book.ext
+                  to the file book-decrypted.ext.
+                  Options:
+                    --inplace   Replace the original with the decrypted version.
                 help [-l] [subcommand-names...]
-                  Print the full help for the named subcommands,
-                  or for all subcommands if no names are specified.
+                  Print help for subcommands.
+                  This outputs the full help for the named subcommands,
+                  or the short help for all subcommands if no names are specified.
                   -l  Long help even if no subcommand-names provided.
                 import module_name...
                   Exercise the DeDRM python import mechanism for each module_name.
-                kindlekeys [import]
-                  import    Read a JSON list of key dicts and update the cached keys.
-                remove filenames...
-                  Remove DRM from the specified filenames.
+                kindlekeys [base|import|json|print]
+                  Dump, print or import the Kindle DRM keys.
+                  Modes:
+                    base [-json] [filepaths...]
+                              List the kindle keys derived from the current system.
+                    import    Read a JSON list of key dicts and update the cached keys.
+                    json      Write the cached list of keys as JSON.
+                    print     Readable listing of the cached keys.
+                  The default mode is 'json'.
+                  Examples:
+                    Import the base keys from this system into the local collection:
+                      python3 -m cs.ebooks.dedrm kindlekeys base \
+                      | python3 -m cs.ebooks dedrm kindlekeys import
+                    Import the keys from another host into the local collection:
+                      ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys json \
+                      | python3 -m cs.ebooks dedrm kindlekeys import
                 shell
                   Run a command prompt via cmd.Cmd using this command's subcommands.
-          help [-l] [subcommand-names...]
-            Print the full help for the named subcommands,
-            or for all subcommands if no names are specified.
-            -l  Long help even if no subcommand-names provided.
-          kindle [-C calibre_library] [-K kindle-library-path] [subcommand [...]]
-              -C calibre_library
-                Specify calibre library location.
-              -K kindle_library
-                Specify kindle library location.
+            help [-l] [subcommand-names...]
+              Print help for subcommands.
+              This outputs the full help for the named subcommands,
+              or the short help for all subcommands if no names are specified.
+              -l  Long help even if no subcommand-names provided.
+            kindle [-C calibre_library] [-K kindle-library-path] [subcommand [...]]
+              Operate on a Kindle library.
+              Options:
+                -C calibre_library
+                  Specify calibre library location.
+                -K kindle_library
+                  Specify kindle library location.
               Subcommands:
                 app_path [content-path]
                   Report or set the content path for the Kindle application.
@@ -132,8 +168,9 @@
                   ASINs Optional ASIN identifiers to export.
                         The default is to export all books with no "calibre.dbid" fstag.
                 help [-l] [subcommand-names...]
-                  Print the full help for the named subcommands,
-                  or for all subcommands if no names are specified.
+                  Print help for subcommands.
+                  This outputs the full help for the named subcommands,
+                  or the short help for all subcommands if no names are specified.
                   -l  Long help even if no subcommand-names provided.
                 import_tags [-nqv] [ASINs...]
                   Import Calibre book information into the fstags for a Kindle book.
@@ -142,12 +179,15 @@
                   metadata db.
                 info
                   Report basic information.
+                keys [base|import|json|print]
+                  Shortcut to "dedrm kindlekeys".
                 ls [-l]
                   List the contents of the library.
                   -l  Long mode.
                 shell
                   Run a command prompt via cmd.Cmd using this command's subcommands.
-          kobo subcommand [...]
+            kobo subcommand [options...]
+              Command line for interacting with a Kobo Desktop filesystem tree.
               Subcommands:
                 export [-fnqv] [volumeids...]
                   Export Kobo books to Calibre library.
@@ -160,8 +200,9 @@
                         The default is to export all books.
                         (TODO: just those with no "calibre.dbid" fstag.)
                 help [-l] [subcommand-names...]
-                  Print the full help for the named subcommands,
-                  or for all subcommands if no names are specified.
+                  Print help for subcommands.
+                  This outputs the full help for the named subcommands,
+                  or the short help for all subcommands if no names are specified.
                   -l  Long help even if no subcommand-names provided.
                 info
                   Report basic information.
@@ -172,15 +213,17 @@
                         Optional Kobo volumeid identifiers to list.
                 shell
                   Run a command prompt via cmd.Cmd using this command's subcommands.
-          mobi subcommand [...]
+            mobi subcommand [options...]
+              Command line implementation for `mobi2cbz`.
               Subcommands:
                 extract mobipath [outdir]
-                  Extract the contents of the MOBI file mobipath
-                  into the directory outdir, default based on the mobipath basename.
+                  Extract the contents of the MOBI file mobipath.
+                  Unpack into the directory outdir, default based on the mobipath basename.
                   Prints the outdir and the name of the top file.
                 help [-l] [subcommand-names...]
-                  Print the full help for the named subcommands,
-                  or for all subcommands if no names are specified.
+                  Print help for subcommands.
+                  This outputs the full help for the named subcommands,
+                  or the short help for all subcommands if no names are specified.
                   -l  Long help even if no subcommand-names provided.
                 make_cbz mobipath [cbzpath]
                   Unpack a MOBI file and construct a CBZ file.
@@ -189,24 +232,29 @@
                   basename of mobipath with its extension removed.
                 shell
                   Run a command prompt via cmd.Cmd using this command's subcommands.
-          pdf subcommand [...]
+                toc mobipath
+                  List the contents of the MOBI file mobipath.
+            pdf subcommand [options...]
+              Command line tool for doing things with PDF files.
               Subcommands:
                 extract_images pdf-files...
                   Extract the images from the named page files.
                 help [-l] [subcommand-names...]
-                  Print the full help for the named subcommands,
-                  or for all subcommands if no names are specified.
+                  Print help for subcommands.
+                  This outputs the full help for the named subcommands,
+                  or the short help for all subcommands if no names are specified.
                   -l  Long help even if no subcommand-names provided.
                 make_cbz pdf-files...
                   Extract the images from the named page files.
+                mmap [options...]
                 scan pdf-files...
                   Scan the PDF-data in pdf-files and report.
                 shell
                   Run a command prompt via cmd.Cmd using this command's subcommands.
                 xi pdf-files...
                   Extract the images from the named page files.
-          shell
-            Run a command prompt via cmd.Cmd using this command's subcommands.
+            shell
+              Run a command prompt via cmd.Cmd using this command's subcommands.
 
 '''
 
