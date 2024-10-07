@@ -1261,7 +1261,7 @@ class BaseCommand:
           # default opt_spec: opt citation and type str
           specs = [opt_name, str]
         elif isinstance(opt_spec, (list, tuple)):
-          # list or tuple: copyt to a list
+          # list or tuple: copy it to a list
           specs = list(opt_spec)
         else:
           # promote scalar to single element list
