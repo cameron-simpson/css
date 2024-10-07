@@ -27,7 +27,7 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.upd import uses_upd
 
-__version__ = '20241007'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python3"],
