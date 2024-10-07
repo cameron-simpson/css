@@ -1195,20 +1195,22 @@ class CalibreCommand(EBooksCommonBaseCommand):
   USAGE_FORMAT = '\n'.join(
       (
           'Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]',
-          stripped_dedent(
-              ''' Operate on a Calibre library.
-                  Options:
-                    -C calibre_library
-                      Specify calibre library location.
-                    -K kindle_library
-                      Specify kindle library location.
-                    -O other_calibre_library
-                      Specify alternate calibre library location, the default library
-                      for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.
-              ''', "  "
-          ),
-          # by_spec docs
-          stripped_dedent(CalibreTree.by_spec.__doc__.split("\n\n")[1], "  ")
+          *(
+              stripped_dedent(paragraph, "  ") for paragraph in (
+                  ''' Operate on a Calibre library.
+                      Options:
+                      -C calibre_library
+                        Specify calibre library location.
+                      -K kindle_library
+                        Specify kindle library location.
+                      -O other_calibre_library
+                        Specify alternate calibre library location, the default library
+                        for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.
+                  ''',
+                  # by_spec docs
+                  CalibreTree.by_spec.__doc__.split("\n\n")[1],
+              )
+          )
       ),
   )
 
