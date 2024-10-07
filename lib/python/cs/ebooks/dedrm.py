@@ -390,7 +390,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
         from {self.DEDRM_PACKAGE_NAME}.prefs import DeDRM_Prefs as BaseDeDRM_Prefs
         from {self.DEDRM_PACKAGE_NAME}.standalone.jsonconfig import JSONConfig as BaseJSONConfig
         from cs.ebooks.dedrm import DeDRM_PrefsOverride
-        from cs.gimmicks import warning
+        from cs.gimmicks import debug
         class DeDRM_Prefs(DeDRM_PrefsOverride, BaseDeDRM_Prefs):
           def __init__(self, json_path=None):
             if json_path is not None:
@@ -402,7 +402,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
         class JSONConfig(BaseJSONConfig):
           def __init__(self, rel_path_to_cf_file):
             super().__init__(rel_path_to_cf_file)
-            warning(
+            debug(
                 "JSONConfig: replacing file_path=%r with %r",
                 self.file_path,
                 os.devnull
@@ -431,7 +431,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
       # so we intercept print and redirect stdout to stderr
       # pylint: disable=import-outside-toplevel
       import builtins
-      with stackattrs(builtins, print=print):
+      with stackattrs(builtins, print=vprint):
         with redirect_stdout(sys.stderr):
           # pylint: disable=import-outside-toplevel
           import prefs  # imported for its side effect
@@ -471,6 +471,9 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
     ''' Remove the DRM from `srcpath`, writing the resulting file to `dstpath`.
         Return `True` if `srcpath` was decrypted into `dstpath`.
         Return `False` if `srcpath` was not encrypted; `dstpath` will not be created.
+
+        A file may be decrypted in place by supplying the same path
+        for `srcpath` and `dstpath` and `exists_ok=True`.
 
         Parameters:
         * `booktype`: specify the book type of `srcpath`
@@ -533,11 +536,11 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
                     (srcpath, booktype)
                 )
               if decrypted_ebook == srcpath:
-                warning("srcpath is already decrypted")
+                vprint("srcpath is already decrypted")
                 pfx_call(os.remove, T.name)
                 return False
               if file_checksum(srcpath) == file_checksum(decrypted_ebook):
-                warning("srcpath content is unchanged by decryption")
+                vprint("srcpath content is unchanged by decryption")
                 pfx_call(os.remove, T.name)
                 return False
     # copy tags from the srcpath to the dstpath
