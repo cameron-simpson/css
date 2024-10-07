@@ -32,7 +32,7 @@ from cs.deco import decorator, fmtdoc
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20241005-post'
+__version__ = '20241007'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
