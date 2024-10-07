@@ -1532,6 +1532,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
             print(output)
           if longmode:
             print(" ", cbook.path)
+            print(" ", shortpath(cbook.shortpath))
             tags = cbook.tags
             if tags:
               print("   ", ", ".join(sorted(tags)))
