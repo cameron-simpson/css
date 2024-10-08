@@ -128,10 +128,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       raise ValueError(f'no directory at {self.fspath!r}')
     self.dedrm = dedrm
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
-    self.prefs_dirpath = (
-        prefs_dirpath or os.environ.get('CALIBRE_CONFIG_DIRECTORY')
-        or expanduser(CALIBRE_PREFSDIR_DEFAULT)
-    )
+    self.prefs_dirpath = prefs_dirpath or self.get_default_prefs_dirpath()
 
     # define the proxy classes
     class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
@@ -581,6 +578,13 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
   def __str__(self):
     return "%s:%s" % (type(self).__name__, self.shortpath)
+
+  @staticmethod
+  def get_default_prefs_dirpath():
+    return (
+        os.environ.get('CALIBRE_CONFIG_DIRECTORY')
+        or expanduser(CALIBRE_PREFSDIR_DEFAULT)
+    )
 
   @contextmanager
   def startup_shutdown(self):
