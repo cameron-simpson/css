@@ -1,3 +1,4 @@
+test update of dedrm from 7.2.1 to 10., see if we can support both
 should a kindletree hook into dedrm? much bikesheeding here
 split dedrm into a package with kobo and kindle dedrm parts
 test if an AZW is encrypted
