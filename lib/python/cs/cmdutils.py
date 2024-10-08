@@ -390,7 +390,7 @@ class SubCommand:
       mapping.update(usage_mapping)
     if self.usage_mapping:
       mapping.update(self.usage_mapping)
-    mapping.update(cmd=self.get_cmd())
+    mapping.update(cmd=self.get_cmd().replace('_', '-'))
     with Pfx("format %r using %r", usage_format, mapping):
       usage = usage_format.format_map(mapping)
     if recurse or show_subcmds:
