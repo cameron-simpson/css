@@ -48,9 +48,9 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, vprint
 from cs.context import contextif
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_cmd_option
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
@@ -66,6 +66,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.seq import unrepeated
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
@@ -74,6 +75,7 @@ from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import UpdProxy, uses_upd, print, run_task  # pylint: disable=redefined-builtin
 
+from .common import EBooksCommonBaseCommand
 from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 from .mobi import Mobi  # pylint: disable=import-outside-toplevel
 from .pdf import PDFDocument
@@ -104,12 +106,14 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     return expanduser(CALIBRE_FSPATH)
 
   # pylint: disable=too-many-statements
+  @uses_cmd_option(dedrm=None)
   @typechecked
   def __init__(
       self,
       calibrepath: Optional[str] = None,
       bin_dirpath: Optional[str] = None,
       prefs_dirpath: Optional[str] = None,
+      dedrm: Optional[DeDRMWrapper] = None,
   ):
     ''' Initialise the `CalibreTree`.
 
@@ -120,6 +124,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     super().__init__(calibrepath)
     if not isdirpath(self.fspath):
       raise ValueError(f'no directory at {self.fspath!r}')
+    self.dedrm = dedrm
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
     self.prefs_dirpath = (
         prefs_dirpath or os.environ.get('CALIBRE_CONFIG_DIRECTORY')
@@ -285,6 +290,32 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         except KeyError:
           return None
         return self.pathto(fmtsubpath)
+
+      @property
+      def dedrm(self):
+        ''' The available `DeDRMWrapper` is any, or `None`.
+        '''
+        return self.tree.dedrm
+
+      @pfx_method
+      def decrypt(self, fmtk='AZW'):
+        ''' Decrypt the book file in format `fmtk`.
+        '''
+        bookpath = self.formatpath(fmtk)
+        if bookpath is None:
+          raise KeyError(fmtk)
+        dedrm = self.dedrm
+        if dedrm is None:
+          raise NotImplementedError('no DeDRMWrapper available')
+        with dedrm:
+          decrypted = pfx_call(
+              dedrm.decrypt, bookpath, bookpath, exists_ok=True
+          )
+          if decrypted:
+            vprint("decrypted:", shortpath(bookpath))
+          else:
+            vprint("already decrypted:", shortpath(bookpath))
+        return decrypted
 
       @pfx_method
       @typechecked
@@ -583,7 +614,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.db.shell()
 
-  @uses_upd
   def preload(self):
     ''' Scan all the books, preload their data.
     '''
@@ -742,7 +772,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       # try to remove DRM from the book file
       # and add the cleared temporary copy
       if doit:
-        with dedrm.removed(bookpath) as clearpath:
+        with dedrm.decrypted(bookpath) as clearpath:
+          # bookpath is not encrypted, use as is
+          if clearpath is None:
+            clearpath = bookpath
           return self.add(clearpath, doit=doit, quiet=quiet, **subp_options)
     cp = self.calibredb(
         'add',
@@ -1083,7 +1116,7 @@ class CalibreMetadataDB(ORM):
     self.tags = Tags
     Tags.orm = self
 
-class CalibreCommand(BaseCommand):
+class CalibreCommand(EBooksCommonBaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
   '''
 
@@ -1131,71 +1164,22 @@ class CalibreCommand(BaseCommand):
   }
 
   @dataclass
-  class Options(BaseCommand.Options):
+  class Options(EBooksCommonBaseCommand.Options):
     ''' Special class for `self.options` with various properties.
     '''
 
-    calibre_path: str = field(
-        default_factory=lambda: os.environ.get(CalibreTree.FSPATH_ENVVAR)
-    )
     calibre_path_other: Optional[str] = None
-    dedrm_package_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR),
-    )
-
-    def _default_kindle_path():
-      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-      return (
-          KindleTree._resolve_fspath(None)
-          if KindleTree.FSPATH_ENVVAR in os.environ else None
-      )
-
-    kindle_path: Optional[str] = field(default_factory=_default_kindle_path)
     linkto_dirpath: Optional[str] = None
     # used by "calibre add [--cbz]"
     make_cbz: bool = False
 
-    COMMON_OPT_SPECS = dict(
-        C_='calibre_path',
-        K_='kindle_path',
-        **BaseCommand.Options.COMMON_OPT_SPECS,
-    )
-
-    @property
-    def calibre(self):
-      ''' The `CalibreTree` from `self.calibre_path`.
-      '''
-      return CalibreTree(self.calibre_path)
-
-    @property
+    @cached_property
     def calibre_other(self):
       ''' The alternate `CalibreTree` from `self.calibre_path_other`.
       '''
       if self.calibre_path_other is None:
         raise AttributeError(".calibre_other: no .calibre_path_other")
       return CalibreTree(self.calibre_path_other)
-
-    @property
-    def kindle(self):
-      ''' The `KindleTree` from `self.kindle_path`.
-      '''
-      if self.kindle_path is None:
-        raise AttributeError(".kindle: no .kindle_path")
-      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-      return KindleTree(self.kindle_path)
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
-    options = self.options
-    if opt == '-C':
-      options.calibre_path = val
-    elif opt == '-K':
-      options.kindle_path = val
-    elif opt == '-O':
-      options.calibre_path_other = val
-    else:
-      super().apply_opt(opt, val)
 
   @contextmanager
   def run_context(self):
@@ -1395,6 +1379,41 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     return self.options.calibre.dbshell()
 
+  def cmd_decrypt(self, argv):
+    ''' Usage: {cmd} [dbids...]
+          Remove DRM from the specified books.
+    '''
+    options = self.options
+    calibre = options.calibre
+    dedrm = options.dedrm
+    if not self.options.dedrm:
+      warning("no DeDRM available")
+      return 1
+    if not argv:
+      argv = ['AZW', 'AZW3']
+    try:
+      cbooks = self.popbooks(argv)
+    except ValueError as e:
+      raise GetoptError("invalid book specifiers: %s") from e
+    runstate = self.options.runstate
+    xit = 0
+    with run_task("decrypt") as proxy:
+      for cbook in progressbar(list(unrepeated(cbooks)), "decrypt"):
+        runstate.raiseif()
+        proxy.text = str(cbook)
+        with Pfx(cbook):
+          for fmtk in 'AZW', 'AZW3':
+            proxy.text = f'{cbook} {fmtk}'
+            try:
+              if cbook.decrypt(fmtk):
+                print("decrypted", fmtk, "of", cbook)
+            except KeyError:
+              continue
+            except dedrm.DeDRMError as e:
+              warning("count not decrypt: %s", e)
+              xit = 1
+    return xit
+
   def cmd_info(self, argv):
     ''' Usage: {cmd}
           Report basic information.
@@ -1578,6 +1597,7 @@ class CalibreCommand(BaseCommand):
             print(output)
           if longmode:
             print(" ", cbook.path)
+            print(" ", shortpath(cbook.shortpath))
             tags = cbook.tags
             if tags:
               print("   ", ", ".join(sorted(tags)))

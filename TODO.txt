@@ -1,3 +1,5 @@
+default: replace underscores with dashes in subcommand names in cs.cmdutils
+@promote: update signature by inspecting the signatures of the promotion functions?
 fs.fatsg: "fstags help ls" has bogus output
 cs.upd.run_task: wait 0.5s before displaying the ticker? probably interacts badly with use of the ticker proxy
 wait 0.5s before displaying the ticker? probably interacts badly with use of the ticker proxy

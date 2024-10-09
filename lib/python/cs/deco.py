@@ -18,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240709-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -840,30 +840,40 @@ def uses_cmd_option(func, _strict=False, **option_defaults):
 
   from cs.debug import trace, X, r, s
 
-  def verbose_wrapper(*func_a, **func_kw):
+  def uses_cmd_wrapper(*func_a, **func_kw):
     # fill in the func_kw from the defaults
     # and keep a record of the chosen values
-    options_updates = {}
-    for option_name, option_default in option_defaults.items():
-      if _strict:
-        func_kw.setdefault(option_name, option_default)
-      elif func_kw.get(option_name) is None:
-        func_kw[option_name] = option_default
-      options_updates[option_name] = func_kw[option_name]
+    # run with the prevailing BaseCommand suitably updated
     try:
       from cs.cmdutils import BaseCommand
       from cs.context import stackattrs
     except ImportError:
-      # missing cs.cmdutils or cs.context
-      return func(*func_a, **func_kw)
-    # run with the prevailing BaseCommand suitably updated
-    options_class = BaseCommand.Options
-    options = options_class.default() or options_class()
-    with stackattrs(options, **options_updates):
+      # missing cs.cmdutils or cs.context,
+      # make an options with no attributes
+      options = object()
+    else:
+      options_class = BaseCommand.Options
+      options = options_class.default() or options_class()
+    option_updates = {}
+    for option_name, option_default in option_defaults.items():
+      if _strict:
+        # skip if the option is not provided by the caller
+        if option_name in func_kw:
+          continue
+      elif func_kw.get(option_name) is not None:
+        # skip if the option is not provided by the caller
+        # or is provided as None
+        continue
+      option_value = getattr(options, option_name, None)
+      if option_value is None:
+        option_value = option_default
+      option_updates[option_name] = option_value
+    func_kw.update(option_updates)
+    with stackattrs(options, **option_updates):
       with options:
         return func(*func_a, **func_kw)
 
-  return verbose_wrapper
+  return uses_cmd_wrapper
 
 uses_doit = uses_cmd_option(doit=True)
 uses_quiet = uses_cmd_option(quiet=False)

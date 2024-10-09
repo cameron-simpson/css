@@ -48,7 +48,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20240709-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -212,10 +212,10 @@ class OptionSpec(Promotable):
 def extract_usage_from_doc(doc: str | None,
                            usage_marker="Usage:") -> Tuple[str, str]:
   ''' Extract a `"Usage:"`paragraph from a docstring
-          and return the unindented usage and the docstring with that paragraph elided.
+      and return the unindented usage and the docstring with that paragraph elided.
 
-          If the usage paragraph is not present, return `(None,doc)`.
-      '''
+      If the usage paragraph is not present, return `(None,doc)`.
+  '''
   if not doc:
     # no doc, return unchanged
     return None, doc
@@ -710,25 +710,6 @@ class BaseCommand:
 
   Options = BaseCommandOptions
 
-  def __init_subclass__(cls, **super_kw):
-    super().__init_subclass__(**super_kw)
-    instance = cls([cls.__name__])
-    usage_format, doc_without_usage = extract_usage_from_doc(
-        obj_docstring(cls)
-    )
-    # This little shuffle is so that instance.usage_text()
-    # does not process format strings twice.
-    cls.__doc__ = doc_without_usage
-    if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
-      cls.USAGE_FORMAT = usage_format
-    usage_text = instance.usage_text()
-    docv = [
-        doc_without_usage,
-        "\n\nUsage summary:\n\n",
-        indent("Usage: " + usage_text, "    "),
-    ]
-    cls.__doc__ = ''.join(docv)
-
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
     ''' Initialise the command line.
@@ -802,6 +783,10 @@ class BaseCommand:
         cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
       else:
         cmd = basename(argv.pop(0))
+        if cmd.endswith('.py'):
+          # "python -m foo" sets argv[0] to "..../foo.py"
+          # fall back to the class name
+          cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
     options = self.Options(cmd=cmd)
     # override the default options
     for option, value in kw_options.items():
@@ -830,13 +815,11 @@ class BaseCommand:
         argv = ['help']
       else:
         # we do this regardless in order to honour '--'
-
         opts, argv = getopt(argv, getopt_spec, '')
         self.apply_opts(opts)
         # we do this regardless so that subclasses can do some presubcommand parsing
         # after any command line options
         argv = self._argv = self.apply_preargv(argv)
-
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
@@ -867,12 +850,15 @@ class BaseCommand:
           bad_subcmd = subcmd
           subcmd = None
           raise GetoptError(
-              "%s: unrecognised subcommand, expected one of: %s" % (
-                  bad_subcmd,
-                  ', '.join(sorted(subcmds.keys())),
-              )
+              f'unrecognised subcommand {bad_subcmd!r}, expected one of:'
+              f' {", ".join(sorted(subcmds.keys()))}'
           )
-        self._run = subcommand
+
+        def _run(argv):
+          with Pfx(subcmd):
+            return subcommand(argv)
+
+        self._run = _run
     except GetoptError as e:
       if self.getopt_error_handler(
           options.cmd,
@@ -1004,6 +990,27 @@ class BaseCommand:
       mapping.update(cmd=subcmd)
       subusage = subusage_format.format_map(mapping)
     return subusage.replace('\n', '\n  ')
+
+  @classmethod
+  def extract_usage(cls, cmd=None):
+    ''' Extract the `Usage:` paragraph from `cls__doc__` if present.
+        Return a 2-tuple of `(doc_without_usage,usage_text)`
+        being the remaining docstring and a full usage message.
+    '''
+    if cmd is None:
+      # infer a cmd from the class name
+      cmd = cutsuffix(cls.__name__, 'Command').lower()
+    instance = cls([cmd])
+    usage_format, doc_without_usage = extract_usage_from_doc(
+        obj_docstring(cls)
+    )
+    ## # This little shuffle is so that instance.usage_text()
+    ## # does not process format strings twice.
+    ## cls.__doc__ = doc_without_usage
+    if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
+      cls.USAGE_FORMAT = usage_format
+    usage_text = instance.usage_text()
+    return doc_without_usage, usage_text
 
   @pfx_method
   # pylint: disable=no-self-use
@@ -1254,7 +1261,7 @@ class BaseCommand:
           # default opt_spec: opt citation and type str
           specs = [opt_name, str]
         elif isinstance(opt_spec, (list, tuple)):
-          # list or tuple: copyt to a list
+          # list or tuple: copy it to a list
           specs = list(opt_spec)
         else:
           # promote scalar to single element list

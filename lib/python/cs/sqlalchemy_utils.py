@@ -42,7 +42,7 @@ from cs.threads import ThreadState
 ##  from cs.py.stack import caller
 ##  X("CHECK from %r", caller())
 
-__version__ = '20240723-post'
+__version__ = '20241005-post'
 
 DISTINFO = {
     'description':
@@ -714,6 +714,7 @@ def RelationProxy(
     *,
     id_column: Optional[str] = None,
     orm=None,
+    missing=None,
 ):
   ''' Construct a proxy for a row from a relation.
 
@@ -724,6 +725,10 @@ def RelationProxy(
       * `id_column`: options primary key column name,
         default from `BasicTableMixin.DEFAULT_ID_COLUMN`: `'id'`
       * `orm`: the ORM, default from `relation.orm`
+      * `missing`: an optional function to produce a default value
+        for a field if there is no matching record in the relation;
+        if `None` (the default) access to a field raises `KeyError`
+        or `AttributeError` as appropriate
 
       This is something of a workaround for applications which dip
       briefly into the database to obtain information instead of
@@ -777,6 +782,7 @@ def RelationProxy(
       self.id_column = id_column
       self.relation = relation
       self.orm = orm
+      self.missing = missing
       self.__fields = {}
       if db_row is not None:
         self.refresh_from_db(db_row)
@@ -810,9 +816,14 @@ def RelationProxy(
         except KeyError:
           pass
       with using_session(orm=orm) as session:
-        db_row = relation.by_id(
-            self.id, session=session, id_column=self.id_column
-        )
+        try:
+          db_row = relation.by_id(
+              self.id, session=session, id_column=self.id_column
+          )
+        except IndexError as e:
+          if missing is not None:
+            return missing(self, field)
+          raise KeyError(r(field)) from e
         self.refresh_from_db(db_row)
       return self.__fields[field]
 
@@ -829,7 +840,10 @@ def RelationProxy(
           return self[attr]
         except KeyError as e:
           with using_session(orm=orm) as session:
-            db_row = relation.by_id(self.id, session=session)
+            try:
+              db_row = relation.by_id(self.id, session=session)
+            except IndexError as e:
+              raise AttributeError(f'{self.__class__.__name__}.{attr}') from e
             self.__fields[attr] = getattr(db_row, attr)
           raise AttributeError(
               "%s: no cached field .%s" % (type(self).__name__, attr)
