@@ -540,8 +540,13 @@ def public_subclasses(cls):
       continue
     if not subcls.__name__.startswith('_'):
       classes.append(subcls)
-      ##print(cls, "classes +", subcls)
-    q.extend(subcls.__subclasses__())
+    try:
+      subclasses = subcls.__subclasses__()
+    except TypeError:
+      # type is a subclass of object, but its __subclasses__ is just a function
+      pass
+    else:
+      q.extend(subcls.__subclasses__())
   return classes
 
 if __name__ == '__main__':
