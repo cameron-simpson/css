@@ -324,8 +324,7 @@ def setup_logging(cmd_name=None, **kw):
   '''
   global loginfo
   if loginfo is None:
-    if cmd_name is not None:
-      kw.setdefault('cmd', cmd_name)
+    kw.setdefault('cmd', cmd_name or kw.get('cmd'))
     logstate = LoggingState(**kw)
     logstate.apply()
     loginfo = logstate
