@@ -38,19 +38,14 @@ def import_module_name(module_name, name, sys_path=None, lock=None):
       * `lock`: a lock to hold during the import (recommended).
   '''
   with contextif(lock):
-    osyspath = sys.path
-    if sys_path:
-      sys.path = sys_path
-    try:
-      M = importlib.import_module(module_name)
-    except ImportError as e:
-      # pylint: disable=raise-missing-from
-      raise ImportError(
-          "no module named %r: %s: %s" % (module_name, type(e), e)
-      )
-    finally:
-      if sys_path:
-        sys.path = osyspath
+    with contextif(sys_path is not None, stackattrs, sys, path=sys_path):
+      try:
+        M = importlib.import_module(module_name)
+      except ImportError as e:
+        # pylint: disable=raise-missing-from
+        raise ImportError(
+            "no module named %r: %s: %s" % (module_name, type(e), e)
+        )
     if M is not None:
       if name is None:
         return M
