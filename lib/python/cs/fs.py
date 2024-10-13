@@ -28,7 +28,7 @@ from tempfile import TemporaryDirectory
 from threading import Lock
 from typing import Any, Callable, Optional, Union
 
-from cs.deco import decorator, fmtdoc
+from cs.deco import decorator, fmtdoc, Promotable
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
@@ -257,7 +257,7 @@ class HasFSPath:
     ''' Return `os.listdir(self.fspath)`. '''
     return os.listdir(self.fspath)
 
-class FSPathBasedSingleton(SingletonMixin, HasFSPath):
+class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
   '''
 
@@ -344,6 +344,17 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
       else:
         lock = NRLock()
     self._lock = lock
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `None` or `str` to a `CalibreTree`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    # TODO: or Pathlike?
+    if obj is None or isinstance(obj, str):
+      return cls(obj)
+    raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
 
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
