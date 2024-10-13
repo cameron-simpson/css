@@ -288,9 +288,13 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
     self.fspath = dedrm_package_path
     self.sqltags = sqltags or SQLTags()
 
-  @staticmethod
+  @classmethod
   @fmtdoc
-  def get_package_path(dedrm_package_path: str = None) -> str:
+  def get_package_path(
+      cls,
+      dedrm_package_path: str = None,
+      calibre: Optional[Union[str, "CalibreTree"]] = None,
+  ) -> str:
     ''' Return the filesystem path of the DeDRM/noDRM package to use.
         If the supplied `dedrm_package_path` is `None`,
         obtain the path from ${DEDRM_PACKAGE_PATH_ENVVAR}.
@@ -298,10 +302,19 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
     if dedrm_package_path is None:
       dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
       if dedrm_package_path is None:
-        raise ValueError(
-            f'no dedrm_package_path and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
+        calibre = Calibretree.promote(calibre)
+        dedrm_package_path = joinpath(
+            calibre.plugins_dirpath, cls.DEDRM_PLUGIN_ZIPFILE_NAME
         )
+        if not isfilepath(dedrm_package_path):
+          raise ValueError(
+              'no dedrm_package_path'
+              f' and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
+              f' and no {shortpath(dedrm_package_path)!r}'
+          )
       vprint(f'${DEDRM_PACKAGE_PATH_ENVVAR} -> {dedrm_package_path!r}')
+    else:
+      dedrm_package_path = abspath(dedrm_package_path)
     if not existspath(dedrm_package_path):
       raise ValueError(
           f'dedrm_package_path:{dedrm_package_path!r} does not exist'
