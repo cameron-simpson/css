@@ -63,11 +63,12 @@ class DeDRMCommand(EBooksCommonBaseCommand):
   USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
     Operations using the DeDRM/NoDRM package.
     Options:
-      -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
-          For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
-          at /path/to/DeDRM_tools--noDRM you could supply:
-          -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
-          or place that value in the $DEDRM_PACKAGE_PATH environment variable.
+      -D  Specify the filesystem path to the DeDRM/noDRM plugin.
+          This can be a checkout of the git@github.com:noDRM/DeDRM_tools.git
+          repository or the path to the DeDRM_plugin.zip as would
+          be installed in a Calibre plugin directory.
+          The default comes from the ${DEDRM_PACKAGE_PATH} environment variable
+          or the plugin zip file in the local Calibre plugins directory.
   '''
 
   def apply_opt(self, opt, val):
@@ -227,6 +228,16 @@ class DeDRMCommand(EBooksCommonBaseCommand):
 
 class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
   ''' Class embodying the DeDRM/noDRM package actions.
+
+      This accepts the path to a checkout of the
+      git@github.com:noDRM/DeDRM_tools.git source repositiory or
+      the path to a DeDRM plugins zipfile as would be installed in
+      a Calibre plugin directory.
+
+      If not specified, the environment variable
+      `${DEDRM_PACKAGE_PATH_ENVVAR}` is consulted.
+      If absent, this looks for the plugin zipfile in the local
+      Calibre install.
   '''
 
   # The package name to use for the DeDRM/noDRM package.
@@ -277,9 +288,9 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
   @fmtdoc
   def get_package_path(dedrm_package_path: str = None) -> str:
     ''' Return the filesystem path of the DeDRM/noDRM package to use.
-          If the supplied `dedrm_package_path` is `None`,
-          obtain the path from ${DEDRM_PACKAGE_PATH_ENVVAR}.
-      '''
+        If the supplied `dedrm_package_path` is `None`,
+        obtain the path from ${DEDRM_PACKAGE_PATH_ENVVAR}.
+    '''
     if dedrm_package_path is None:
       dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
       if dedrm_package_path is None:
