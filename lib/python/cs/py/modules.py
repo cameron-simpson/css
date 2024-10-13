@@ -11,7 +11,7 @@ from inspect import getmodule
 import os.path
 import sys
 
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.gimmicks import warning
 from cs.pfx import Pfx
 
@@ -37,31 +37,31 @@ def import_module_name(module_name, name, path=None, lock=None):
       * `path`: an array of paths to use as sys.path during the import.
       * `lock`: a lock to hold during the import (recommended).
   '''
-  if lock:
-    with lock:
-      return import_module_name(module_name, name, path)
-  osyspath = sys.path
-  if path:
-    sys.path = path
-  try:
-    M = importlib.import_module(module_name)
-  except ImportError as e:
-    # pylint: disable=raise-missing-from
-    raise ImportError("no module named %r: %s: %s" % (module_name, type(e), e))
-  finally:
+  with contextif(lock):
+    osyspath = sys.path
     if path:
-      sys.path = osyspath
-  if M is not None:
-    if name is None:
-      return M
+      sys.path = path
     try:
-      return getattr(M, name)
-    except AttributeError as e:
+      M = importlib.import_module(module_name)
+    except ImportError as e:
       # pylint: disable=raise-missing-from
       raise ImportError(
-          "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
+          "no module named %r: %s: %s" % (module_name, type(e), e)
       )
-  return None
+    finally:
+      if path:
+        sys.path = osyspath
+    if M is not None:
+      if name is None:
+        return M
+      try:
+        return getattr(M, name)
+      except AttributeError as e:
+        # pylint: disable=raise-missing-from
+        raise ImportError(
+            "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
+        )
+    return None
 
 def import_module_from_file(module_name, source_file, sys_path=None):
   ''' Import a specific file as a module instance,
