@@ -11,7 +11,7 @@
 
 from cmd import Cmd
 from code import interact
-from collections import namedtuple
+from collections import ChainMap, namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache
@@ -374,7 +374,6 @@ class SubCommand:
         show_subcmds = []
     elif isinstance(show_subcmds, str):
       show_subcmds = [show_subcmds]
-    usage_mapping = usage_mapping or {}
     usage_format = self.get_usage_format()  # pylint: disable=no-member
     if short:
       # just the summary line and opening sentence of the description
@@ -385,12 +384,23 @@ class SubCommand:
       if lines and lines[0].endswith('.'):
         usage_lines.append(lines.pop(0))
       usage_format = '\n'.join(usage_lines)
-    mapping = self.get_usage_keywords()
-    if usage_mapping:
-      mapping.update(usage_mapping)
-    if self.usage_mapping:
-      mapping.update(self.usage_mapping)
-    mapping.update(cmd=self.get_cmd().replace('_', '-'))
+    # elaborate search path for symbols in the usage format string
+    mapping = ChainMap(
+        # normalised cmd name
+        {'cmd': self.get_cmd().replace('_', '-')},
+        # supplied usage_mapping, if any
+        usage_mapping or {},
+        # direct .usage_mapping attribute
+        self.usage_mapping or {},
+        # usage mapping via the method
+        self.get_usage_keywords(),
+        # the names in the command
+        self.command.__dict__,
+        # ... and its class
+        self.command.__class__.__dict__,
+        # ... and its module's top level
+        sys.modules[self.command.__module__].__dict__,
+    )
     with Pfx("format %r using %r", usage_format, mapping):
       usage = usage_format.format_map(mapping)
     if recurse or show_subcmds:
