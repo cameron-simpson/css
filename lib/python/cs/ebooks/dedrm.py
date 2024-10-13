@@ -369,6 +369,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
               ):
                 yield
 
+  @pfx_method
   def prepare_dedrm_shims(self, libdirpath):
     ''' Create `__version` and `prefs` stub modules in `libdirpath`
         to support the `import_name` method.
@@ -400,7 +401,26 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
       ##os.system(f'set -x; cat {module_path}')
 
     # present the dedrm package as DEDRM_PACKAGE_NAME ('dedrm')
-    os.symlink(self.fspath, joinpath(libdirpath, self.DEDRM_PACKAGE_NAME))
+    dedrm_pkg_path = joinpath(libdirpath, self.DEDRM_PACKAGE_NAME)
+    if isdirpath(self.fspath):
+      # symlink to the source tree
+      pfx_call(os.symlink, self.fspath, dedrm_pkg_path)
+    else:
+      # unpack the plugin zip file
+      vprint("unpack", self.fspath)
+      pfx_call(os.mkdir, dedrm_pkg_path)
+      with Pfx("unzip %r", self.fspath):
+        with ZipFile(self.fspath) as zipf:
+          for member in zipf.namelist():
+            if member.endswith('/'):
+              vprint("skip", member)
+              continue
+            with Pfx(member):
+              validate_rpath(member)
+              path = joinpath(dedrm_pkg_path, member)
+              pathdir = dirname(path)
+              needdir(pathdir)
+              pfx_call(zipf.extract, member, dedrm_pkg_path)
     # fake up __version.py
     write_module(
         '__version',
