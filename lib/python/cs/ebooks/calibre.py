@@ -60,6 +60,7 @@ from cs.lex import (
     stripped_dedent,
     FormatableMixin,
     FormatAsError,
+    r,
 )
 from cs.logutils import warning, error
 from cs.numeric import intif
@@ -108,14 +109,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     return expanduser(CALIBRE_FSPATH)
 
   # pylint: disable=too-many-statements
-  @uses_cmd_option(dedrm=None)
   @typechecked
   def __init__(
       self,
       calibrepath: Optional[str] = None,
       bin_dirpath: Optional[str] = None,
       prefs_dirpath: Optional[str] = None,
-      dedrm: Optional[DeDRMWrapper] = None,
   ):
     ''' Initialise the `CalibreTree`.
 
@@ -126,7 +125,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     super().__init__(calibrepath)
     if not isdirpath(self.fspath):
       raise ValueError(f'no directory at {self.fspath!r}')
-    self.dedrm = dedrm
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
     self.prefs_dirpath = prefs_dirpath or self.get_default_prefs_dirpath()
 
@@ -296,14 +294,14 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         return self.tree.dedrm
 
+      @uses_cmd_option(dedrm=None)
       @pfx_method
-      def decrypt(self, fmtk='AZW'):
+      def decrypt(self, dedrm: "DeDRMWrapper", fmtk='AZW'):
         ''' Decrypt the book file in format `fmtk`.
         '''
         bookpath = self.formatpath(fmtk)
         if bookpath is None:
           raise KeyError(fmtk)
-        dedrm = self.dedrm
         if dedrm is None:
           raise NotImplementedError('no DeDRMWrapper available')
         with dedrm:
@@ -822,6 +820,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ]
     return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
+  @uses_cmd_option(dedrm=None)
   @pfx_method
   def add(
       self,
@@ -1330,10 +1329,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
           -v    Verbose: report all actions and decisions.
     '''
     options = self.options
-    dedrm = (
-        DeDRMWrapper(options.dedrm_package_path)
-        if options.dedrm_package_path else None
-    )
     options.popopts(
         argv,
         cbz='make_cbz',
@@ -1345,7 +1340,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
       with Pfx(bookpath):
         dbid = calibre.add(
             bookpath,
-            dedrm=dedrm,
             doit=options.doit,
             quiet=options.quiet,
         )
