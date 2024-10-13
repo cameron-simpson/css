@@ -15,6 +15,7 @@ import importlib
 import json
 import os
 from os.path import (
+    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -30,13 +31,16 @@ from shutil import copyfile
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import time
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Union
+from zipfile import ZipFile
+
+from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, vprint
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import atomic_filename
-from cs.fs import FSPathBasedSingleton
+from cs.fs import FSPathBasedSingleton, needdir, shortpath, validate_rpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashindex import file_checksum
 from cs.lex import r, stripped_dedent
