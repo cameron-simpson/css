@@ -247,10 +247,11 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
 
   @pfx_method
   @fmtdoc
+  @typechecked
   def __init__(
       self,
-      dedrm_package_path: Optional[str] = None,
-      sqltags: Optional[SQLTags] = None
+      dedrm_package_path: str,
+      sqltags: Optional[SQLTags] = None,
   ):
     ''' Initialise the DeDRM package.
 
@@ -262,13 +263,13 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
           under the `self.DEDRM_PACKAGE_NAME.` prefix;
           default from `SQLTags()`
     '''
-    if dedrm_package_path is None:
-      dedrm_package_path = self.get_package_path()
-    with Pfx("dedrm_package_path %r", dedrm_package_path):
-      if not isdirpath(dedrm_package_path):
-        raise ValueError("not a directory")
-      if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
-        raise ValueError("no \"standalone\" subdirectory")
+    if hasattr(self, 'fspath'):
+      # we're already set up
+      return
+    if not existspath(dedrm_package_path):
+      raise ValueError(
+          f'dedrm_package_path does not exist: {dedrm_package_path!r}'
+      )
     self.fspath = dedrm_package_path
     self.sqltags = sqltags or SQLTags()
 
