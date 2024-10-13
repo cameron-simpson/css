@@ -7,7 +7,7 @@
 
 from code import interact
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import filecmp
 from functools import cached_property, total_ordering
@@ -48,19 +48,17 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, vprint
+from cs.cmdutils import vprint
 from cs.context import contextif
 from cs.deco import fmtdoc, uses_cmd_option
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
     get_dotted_identifier,
-    indent,
     lc_,
     stripped_dedent,
     FormatableMixin,
     FormatAsError,
-    r,
 )
 from cs.logutils import warning, error
 from cs.numeric import intif
@@ -76,10 +74,10 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import UpdProxy, uses_upd, print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, print, run_task  # pylint: disable=redefined-builtin
 
 from .common import EBooksCommonBaseCommand
-from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
+from .dedrm import DeDRMWrapper
 from .mobi import Mobi  # pylint: disable=import-outside-toplevel
 from .pdf import PDFDocument
 
@@ -1845,7 +1843,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
                     verbose or warning(
                         "  \n".join(
                             [
-                                "multiple \"local\" books with this identifier:",
+                                'multiple "local" books with this identifier:',
                                 *map(str, cbooks)
                             ]
                         )

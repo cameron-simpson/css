@@ -8,7 +8,6 @@
 '''
 
 from contextlib import contextmanager, redirect_stdout
-from dataclasses import dataclass, field
 from datetime import datetime
 from getopt import GetoptError
 import importlib
@@ -36,16 +35,16 @@ from zipfile import ZipFile
 
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, vprint
+from cs.cmdutils import vprint
 from cs.context import stackattrs
-from cs.deco import fmtdoc, Promotable
+from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
 from cs.fs import FSPathBasedSingleton, needdir, shortpath, validate_rpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashindex import file_checksum
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
-from cs.pfx import pfx, Pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -89,7 +88,7 @@ class DeDRMCommand(EBooksCommonBaseCommand):
     with super().run_context():
       dedrm = self.options.dedrm
       if dedrm is None:
-        raise GetoptError(f'could not obtain the DeDRM package')
+        raise GetoptError('could not obtain the DeDRM package')
       with dedrm:  # prepare the shim modules for the duration
         yield
 
@@ -497,7 +496,6 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
       with stackattrs(builtins, print=vprint):
         with redirect_stdout(sys.stderr):
           # pylint: disable=import-outside-toplevel
-          import prefs  # imported for its side effect
           yield
 
   def import_name(self, module_name, name=None, *, package=None):
@@ -701,8 +699,8 @@ def getLibCrypto():
   #
   def _load_crypto_libcrypto():
     from ctypes import (
-        CDLL, byref, POINTER, c_void_p, c_char_p, c_int, c_long, Structure,
-        c_ulong, create_string_buffer, addressof, string_at, cast
+        CDLL, POINTER, c_char_p, c_int, c_long, Structure,
+        c_ulong, create_string_buffer
     )
     from ctypes.util import find_library
 
