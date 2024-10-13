@@ -226,7 +226,8 @@ class DeDRMCommand(EBooksCommonBaseCommand):
       else:
         raise GetoptError("expected 'import' or 'print', got %r" % (op,))
 
-class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
+@fmtdoc
+class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
   ''' Class embodying the DeDRM/noDRM package actions.
 
       This accepts the path to a checkout of the
@@ -246,6 +247,9 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
   DEDRM_PACKAGE_NAME = 'dedrm'
   DEDRM_PLUGIN_NAME = 'DeDRM'
   DEDRM_PLUGIN_VERSION = '7.2.1'
+
+  # used to locate the plugin zip fil inside a CalibreTree
+  DEDRM_PLUGIN_ZIPFILE_NAME = 'DeDRM_plugin.zip'
 
   @classmethod
   @fmtdoc
