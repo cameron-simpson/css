@@ -27,15 +27,15 @@ DISTINFO = {
     'install_requires': ['cs.context', 'cs.gimmicks', 'cs.pfx'],
 }
 
-def import_module_name(module_name, name, sys_path=None, lock=None):
+def import_module_name(module_name, name=None, sys_path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
 
       Parameters:
       * `module_name`: the module name to import.
-      * `name`: the name within the module whose value is returned;
+      * `name`: optional name within the module whose value is returned;
         if `name` is `None`, return the module itself.
-      * `sys_path`: an array of paths to use as sys.path during the import.
-      * `lock`: a lock to hold during the import (recommended).
+      * `sys_path`optional list array of paths to use as `sys.path` during the import.
+      * `lock`: an optional lock to hold during the import (recommended).
   '''
   with contextif(lock):
     if sys_path is None:
