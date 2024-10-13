@@ -27,20 +27,20 @@ DISTINFO = {
     'install_requires': ['cs.context', 'cs.gimmicks', 'cs.pfx'],
 }
 
-def import_module_name(module_name, name, path=None, lock=None):
+def import_module_name(module_name, name, sys_path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
 
       Parameters:
       * `module_name`: the module name to import.
       * `name`: the name within the module whose value is returned;
         if `name` is `None`, return the module itself.
-      * `path`: an array of paths to use as sys.path during the import.
+      * `sys_path`: an array of paths to use as sys.path during the import.
       * `lock`: a lock to hold during the import (recommended).
   '''
   with contextif(lock):
     osyspath = sys.path
-    if path:
-      sys.path = path
+    if sys_path:
+      sys.path = sys_path
     try:
       M = importlib.import_module(module_name)
     except ImportError as e:
@@ -49,7 +49,7 @@ def import_module_name(module_name, name, path=None, lock=None):
           "no module named %r: %s: %s" % (module_name, type(e), e)
       )
     finally:
-      if path:
+      if sys_path:
         sys.path = osyspath
     if M is not None:
       if name is None:
