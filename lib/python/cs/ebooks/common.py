@@ -3,7 +3,7 @@
 ''' Common utilities for cs.ebooks.
 '''
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
 
@@ -40,7 +40,8 @@ class EBooksCommonOptions(BaseCommand.Options):
     from .dedrm import DeDRMWrapper  # pylint: disable=import-outside-toplevel
     try:
       dedrm_package_path = DeDRMWrapper.get_package_path(
-          self.dedrm_package_path
+          self.dedrm_package_path,
+          calibre=self.calibre,
       )
     except ValueError as e:
       warning("could not obtain the DeDRM package: %s", e)

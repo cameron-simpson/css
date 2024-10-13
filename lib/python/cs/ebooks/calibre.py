@@ -7,7 +7,7 @@
 
 from code import interact
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import filecmp
 from functools import cached_property, total_ordering
@@ -31,7 +31,7 @@ import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
-from typing import Optional, Union
+from typing import Iterable, Optional, Union
 from uuid import UUID
 
 from icontract import require
@@ -48,7 +48,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, vprint
+from cs.cmdutils import vprint
 from cs.context import contextif
 from cs.deco import fmtdoc, uses_cmd_option
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
@@ -56,6 +56,7 @@ from cs.lex import (
     cutprefix,
     get_dotted_identifier,
     lc_,
+    stripped_dedent,
     FormatableMixin,
     FormatAsError,
 )
@@ -73,10 +74,10 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import UpdProxy, uses_upd, print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, print, run_task  # pylint: disable=redefined-builtin
 
 from .common import EBooksCommonBaseCommand
-from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
+from .dedrm import DeDRMWrapper
 from .mobi import Mobi  # pylint: disable=import-outside-toplevel
 from .pdf import PDFDocument
 
@@ -106,14 +107,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     return expanduser(CALIBRE_FSPATH)
 
   # pylint: disable=too-many-statements
-  @uses_cmd_option(dedrm=None)
   @typechecked
   def __init__(
       self,
       calibrepath: Optional[str] = None,
       bin_dirpath: Optional[str] = None,
       prefs_dirpath: Optional[str] = None,
-      dedrm: Optional[DeDRMWrapper] = None,
   ):
     ''' Initialise the `CalibreTree`.
 
@@ -124,12 +123,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     super().__init__(calibrepath)
     if not isdirpath(self.fspath):
       raise ValueError(f'no directory at {self.fspath!r}')
-    self.dedrm = dedrm
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
-    self.prefs_dirpath = (
-        prefs_dirpath or os.environ.get('CALIBRE_CONFIG_DIRECTORY')
-        or expanduser(CALIBRE_PREFSDIR_DEFAULT)
-    )
+    self.prefs_dirpath = prefs_dirpath or self.get_default_prefs_dirpath()
 
     # define the proxy classes
     class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
@@ -297,14 +292,14 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         '''
         return self.tree.dedrm
 
+      @uses_cmd_option(dedrm=None)
       @pfx_method
-      def decrypt(self, fmtk='AZW'):
+      def decrypt(self, dedrm: "DeDRMWrapper", fmtk='AZW'):
         ''' Decrypt the book file in format `fmtk`.
         '''
         bookpath = self.formatpath(fmtk)
         if bookpath is None:
           raise KeyError(fmtk)
-        dedrm = self.dedrm
         if dedrm is None:
           raise NotImplementedError('no DeDRMWrapper available')
         with dedrm:
@@ -580,6 +575,13 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def __str__(self):
     return "%s:%s" % (type(self).__name__, self.shortpath)
 
+  @staticmethod
+  def get_default_prefs_dirpath():
+    return (
+        os.environ.get('CALIBRE_CONFIG_DIRECTORY')
+        or expanduser(CALIBRE_PREFSDIR_DEFAULT)
+    )
+
   @contextmanager
   def startup_shutdown(self):
     ''' Stub startup/shutdown.
@@ -712,6 +714,74 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
     return cp
 
+  def by_spec(self, book_spec):
+    ''' A generator yielding `CalibreBook` instances from `book_spec`.
+
+        Book specifications:
+        - dbid: an integer Calibre book id
+        - FORMAT: an upper case format name, eg EPUB
+        - /regexp: a case insensitive regular expression matching book
+          authors, titles series names or tags
+        - [identfier,...=]value,...: values to match against a Calibre
+          identifier such as asin
+    '''
+    # raw dbid
+    try:
+      dbid = int(book_spec)
+    except ValueError:
+      # FORMAT
+      if book_spec.isupper():
+        # TODO: fast search of book formats? like identifiers
+        match_fn = lambda book: book_spec in book.formats
+      # /regexp
+      elif book_spec.startswith('/'):
+        re_s = book_spec[1:]
+        if not re_s:
+          raise ValueError("empty regexp")  # pylint: disable=raise-missing-from
+        regexp = re.compile(re_s, re.I)
+        match_fn = lambda book: (
+            regexp.search(book.title) or any(
+                map(regexp.search, book.author_names)
+            ) or regexp.search(book.series_name or "") or
+            any(map(regexp.search, book.tags))
+        )
+      else:
+        # [identifier=]id-value,...
+        try:
+          identifiers_s, values_s = book_spec.split('=', 1)
+        except ValueError:
+          # id-value,...
+          identifiers = None
+          values_s = book_spec
+        else:
+          identifiers = identifiers_s.split(',')
+        values = list(map(str.lower, values_s.split(',')))
+        if identifiers:
+          # fast search by identifier fields
+          yield from unrepeated(
+              chain(
+                  *(
+                      self.by_identifier(identifier, value)
+                      for identifier in identifiers
+                      for value in values
+                  )
+              )
+          )
+          return
+        match_fn = lambda book: any(
+            (
+                (identifiers is None or idk in identifiers) and idv.lower() in
+                values
+            ) for idk, idv in book.identifiers.items()
+        )
+      # slow search by arbitrary match_fn
+      for book in self:
+        if match_fn(book):
+          yield book
+    else:
+      # integer dbid
+      yield self[dbid]
+
   def calibredb(self, dbcmd, *argv, doit=True, quiet=False, **subp_options):
     ''' Run `dbcmd` via the `calibredb` command.
         Return a `CompletedProcess` or `None` if `doit` is false.
@@ -748,6 +818,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ]
     return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
+  @uses_cmd_option(dedrm=None)
   @pfx_method
   def add(
       self,
@@ -1122,16 +1193,27 @@ class CalibreCommand(EBooksCommonBaseCommand):
 
   GETOPT_SPEC = 'C:K:O:'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]
-  Operate on a Calibre library.
-  Options:
-    -C calibre_library
-      Specify calibre library location.
-    -K kindle_library
-      Specify kindle library location.
-    -O other_calibre_library
-      Specify alternate calibre library location, the default library
-      for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.'''
+  USAGE_FORMAT = '\n'.join(
+      (
+          'Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]',
+          *(
+              stripped_dedent(paragraph, "  ") for paragraph in (
+                  ''' Operate on a Calibre library.
+                      Options:
+                      -C calibre_library
+                        Specify calibre library location.
+                      -K kindle_library
+                        Specify kindle library location.
+                      -O other_calibre_library
+                        Specify alternate calibre library location, the default library
+                        for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.
+                  ''',
+                  # by_spec docs
+                  CalibreTree.by_spec.__doc__.split("\n\n")[1],
+              )
+          )
+      ),
+  )
 
   # envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
   OTHER_LIBRARY_PATH_ENVVAR = CalibreTree.FSPATH_ENVVAR + '_OTHER'
@@ -1198,51 +1280,10 @@ class CalibreCommand(EBooksCommonBaseCommand):
       with options.calibre:
         yield
 
-  @staticmethod
-  def books_from_spec(calibre, book_spec):
-    ''' Generator yielding `CalibreBook` instances from `book_spec`.
+  def books_from_spec(self, book_spec) -> Iterable["CalibreBook"]:
+    ''' A generator yielding `CalibreBook` instances from `book_spec`.
     '''
-    # raw dbid
-    try:
-      dbid = int(book_spec)
-    except ValueError:
-      # FORMAT
-      if book_spec.isupper():
-        match_fn = lambda book: book_spec in book.formats
-      # /regexp
-      elif book_spec.startswith('/'):
-        re_s = book_spec[1:]
-        if not re_s:
-          raise ValueError("empty regexp")  # pylint: disable=raise-missing-from
-        regexp = re.compile(re_s, re.I)
-        match_fn = lambda book: (
-            regexp.search(book.title) or any(
-                map(regexp.search, book.author_names)
-            ) or regexp.search(book.series_name or "") or
-            any(map(regexp.search, book.tags))
-        )
-      else:
-        # [identifier=]id-value,...
-        try:
-          identifiers_s, values_s = book_spec.split('=', 1)
-        except ValueError:
-          # id-value,...
-          identifiers = None
-          values_s = book_spec
-        else:
-          identifiers = identifiers_s.split(',')
-        values = list(map(str.lower, values_s.split(',')))
-        match_fn = lambda book: any(
-            (
-                (identifiers is None or idk in identifiers) and idv.lower() in
-                values
-            ) for idk, idv in book.identifiers.items()
-        )
-      for book in calibre:
-        if match_fn(book):
-          yield book
-    else:
-      yield calibre[dbid]
+    return self.options.calibre.by_spec(book_spec)
 
   @staticmethod
   def cbook_default_sortkey(cbook):
@@ -1268,7 +1309,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
     cbooks = []
     while argv:
       book_spec = self.poparg(argv, "book_spec")
-      cbooks.extend(self.books_from_spec(calibre, book_spec))
+      cbooks.extend(self.books_from_spec(book_spec))
       if once:
         break
     if sortkey is not None and sortkey is not False:
@@ -1286,10 +1327,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
           -v    Verbose: report all actions and decisions.
     '''
     options = self.options
-    dedrm = (
-        DeDRMWrapper(options.dedrm_package_path)
-        if options.dedrm_package_path else None
-    )
     options.popopts(
         argv,
         cbz='make_cbz',
@@ -1301,7 +1338,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
       with Pfx(bookpath):
         dbid = calibre.add(
             bookpath,
-            dedrm=dedrm,
             doit=options.doit,
             quiet=options.quiet,
         )
@@ -1807,7 +1843,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
                     verbose or warning(
                         "  \n".join(
                             [
-                                "multiple \"local\" books with this identifier:",
+                                'multiple "local" books with this identifier:',
                                 *map(str, cbooks)
                             ]
                         )
