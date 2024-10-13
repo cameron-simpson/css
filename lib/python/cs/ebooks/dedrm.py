@@ -471,10 +471,20 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
     '''
     with stackattrs(
         sys,
-        path=([
+        path=[
+            # shims first
             self.shimlib_dirpath,
+            # then the dedrm package itself, since it directly imports
+            # with absolute names like "kindlekeys"
             joinpath(self.shimlib_dirpath, self.DEDRM_PACKAGE_NAME),
-        ] + sys.path),
+        ] + sys.path + [
+            # dedrm/standalone/__init__.py self inserts its directory
+            # at the start of the path if it isn't already somewhere
+            # in sys.path (this is bad)
+            # https://github.com/noDRM/DeDRM_tools/issues/653
+            joinpath(self.shimlib_dirpath, self.DEDRM_PACKAGE_NAME,
+                     'standalone'),
+        ],
     ):
       # the DeDRM code is amazingly noisy to stdout
       # so we intercept print and redirect stdout to stderr
