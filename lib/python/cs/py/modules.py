@@ -38,7 +38,9 @@ def import_module_name(module_name, name, sys_path=None, lock=None):
       * `lock`: a lock to hold during the import (recommended).
   '''
   with contextif(lock):
-    with contextif(sys_path is not None, stackattrs, sys, path=sys_path):
+    if sys_path is None:
+      sys_path = sys.path
+    with stackattrs(sys, path=sys_path):
       try:
         M = importlib.import_module(module_name)
       except ImportError as e:
