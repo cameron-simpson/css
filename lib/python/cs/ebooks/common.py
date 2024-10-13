@@ -3,7 +3,7 @@
 ''' Common utilities for cs.ebooks.
 '''
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
 

@@ -9,7 +9,7 @@
 import binascii
 from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import cache, cached_property, partial
+from functools import cached_property, partial
 from getopt import GetoptError
 from io import BytesIO
 from itertools import chain
@@ -17,15 +17,13 @@ from math import floor
 from mmap import mmap, MAP_PRIVATE, PROT_READ
 import os
 from os.path import (
-    basename, exists as existspath, join as joinpath, splitext
+    basename, splitext
 )
-from pathlib import Path
 from pprint import pprint
 import re
 import sys
 from tempfile import NamedTemporaryFile
 from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
-from zipfile import ZipFile, ZIP_STORED
 import zlib
 
 from icontract import ensure, require
@@ -37,7 +35,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.deco import promote
 from cs.lex import r
-from cs.logutils import debug, error, warning
+from cs.logutils import debug, warning
 from cs.pfx import pfx, Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
@@ -45,8 +43,7 @@ from cs.threads import bg
 
 from .cbz import make_cbz
 
-from pprint import pformat
-from cs.debug import trace, s
+from cs.debug import s
 from cs.x import X
 
 pfx_open = partial(pfx_call, open)
