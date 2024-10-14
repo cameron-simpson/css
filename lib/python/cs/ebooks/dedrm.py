@@ -154,6 +154,15 @@ class DeDRMCommand(EBooksCommonBaseCommand):
             print("  .%r => %s" % (name, r(value)))
     return xit
 
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          List dedrm infomation.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    print('dedrm_package_path:', self.options.dedrm_package_path)
+    # TODO: recite the actual DeDRM version
+
   def cmd_kindlekeys(self, argv):
     ''' Usage: {cmd} [base|import|json|print]
           Dump, print or import the Kindle DRM keys.
