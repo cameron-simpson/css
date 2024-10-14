@@ -814,7 +814,7 @@ class BaseCommand:
 
   def _prerun_setup(self):
     argv = self._argv
-    options = self.options
+    options = self.options.copy()
     subcmds = self.subcommands()
     has_subcmds = self.has_subcommands()
     log_level = getattr(options, 'log_level', None)
@@ -831,9 +831,13 @@ class BaseCommand:
           and argv[0] in ('-h', '-help', '--help')):
         argv = ['help']
       else:
-        # we do this regardless in order to honour '--'
-        opts, argv = getopt(argv, getopt_spec, '')
-        self.apply_opts(opts)
+        if getopt_spec:
+          # we do this regardless in order to honour '--'
+          opts, argv = getopt(argv, getopt_spec, '')
+          self.apply_opts(opts)
+        else:
+          # use the options.COMMON_OPT_SPECS
+          options.popopts(argv)
         # we do this regardless so that subclasses can do some presubcommand parsing
         # after any command line options
         argv = self._argv = self.apply_preargv(argv)
