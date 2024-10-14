@@ -1427,6 +1427,9 @@ class BaseCommand:
   @uses_upd
   def run_context(self, *, runstate: RunState, upd: Upd, **options_kw):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
+        Normally this will have a bare `yield`, but you can yield
+        a not `None` value to exit before the command, for example
+        if the run setup fails.
 
         This default does several things, and subclasses should
         override it like this:
@@ -1439,6 +1442,16 @@ class BaseCommand:
                     yield
                 finally:
                   ... any unconditional cleanup ...
+
+        This base implementation does the following things:
+        - provides a `self.options` which is a copy of the original
+          `self.options` so that it may freely be modified during the
+          command
+        - provides a prevailing `RunState` as `self.options.runstate`
+          if one is not already present
+        - provides a `cs.upd.Upd` context for status lines
+        - catches `self.options.runstate_signals` and handles them
+          with `self.handle_signal`
     '''
     # prefer the runstate from the options if specified
     runstate = self.options.runstate or runstate
