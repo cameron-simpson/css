@@ -9,7 +9,7 @@ set -ue
 cmd=$0
 usage="Usage: $cmd -m message options...."
 
-if [ $# -lt 2 ] || [ "x$1" != 'x-m ]
+if [ $# -lt 2 ] || [ "x$1" != x-m ]
 then
   echo "$cmd: missing -m message option" >&2
   echo "$usage" >&2
