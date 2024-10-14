@@ -565,17 +565,24 @@ class BaseCommandOptions(HasThreadState):
         A subclass with more common options might extend this like so,
         from `cs.hashindex`:
 
-            COMMON_OPT_SPECS = dict(
-                e='ssh_exe',
-                h_='hashname',
-                H_='hashindex_exe',
-                **BaseCommand.Options.COMMON_OPT_SPECS,
+            COMMON_OPT_SPECS = ChainMap(
+                dict(
+                  e='ssh_exe',
+                  h_='hashname',
+                  H_='hashindex_exe',
+                ),
+                BaseCommand.Options.COMMON_OPT_SPECS,
             )
 
     '''
-    for k, v in self.COMMON_OPT_SPECS.items():
-      opt_specs.setdefault(k, v)
-    return BaseCommand.popopts(argv, self, **opt_specs)
+    return BaseCommand.popopts(
+        argv,
+        self,
+        **ChainMap(
+            opt_specs,
+            self.COMMON_OPT_SPECS,
+        ),
+    )
 
 @decorator
 def uses_cmd_options(
