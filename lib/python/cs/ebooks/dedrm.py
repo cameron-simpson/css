@@ -73,15 +73,6 @@ class DeDRMCommand(EBooksCommonBaseCommand):
           or the plugin zip file in the local Calibre plugins directory.
   '''
 
-  def apply_opt(self, opt, val):
-    badopt = False
-    if opt == '-D':
-      self.options.dedrm_package_path = val
-    else:
-      raise NotImplementedError("unhandled option")
-    if badopt:
-      raise GetoptError("bad option value")
-
   @contextmanager
   def run_context(self):
     with super().run_context():
