@@ -696,8 +696,8 @@ def getLibCrypto():
   #
   def _load_crypto_libcrypto():
     from ctypes import (
-        CDLL, POINTER, c_char_p, c_int, c_long, Structure,
-        c_ulong, create_string_buffer
+        CDLL, POINTER, c_char_p, c_int, c_long, Structure, c_ulong,
+        create_string_buffer
     )
     from ctypes.util import find_library
 
