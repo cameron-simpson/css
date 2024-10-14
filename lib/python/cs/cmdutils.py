@@ -1350,7 +1350,10 @@ class BaseCommand:
     options = self.options
     try:
       try:
-        with self.run_context(**kw_options):
+        with self.run_context(**kw_options) as xit:
+          if xit is not None:
+            error("exit status from rnu_context: %s", xit)
+            return xit
           return self._run(self._argv)
       except CancellationError:
         error("cancelled")
