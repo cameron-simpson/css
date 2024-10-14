@@ -43,9 +43,7 @@ class KindleCommand(EBooksCommonBaseCommand):
   ''' Command line for interacting with a Kindle filesystem tree.
   '''
 
-  GETOPT_SPEC = 'C:K:'
-
-  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] [subcommand [...]]
+  USAGE_FORMAT = '''Usage: {cmd} [options...] [subcommand [...]]
   Operate on a Kindle library.
   Options:
     -C calibre_library
