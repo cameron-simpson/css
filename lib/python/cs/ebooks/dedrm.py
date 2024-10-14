@@ -36,7 +36,7 @@ from zipfile import ZipFile
 from typeguard import typechecked
 
 from cs.cmdutils import vprint
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
 from cs.fs import FSPathBasedSingleton, needdir, shortpath, validate_rpath
@@ -76,10 +76,7 @@ class DeDRMCommand(EBooksCommonBaseCommand):
   @contextmanager
   def run_context(self):
     with super().run_context():
-      dedrm = self.options.dedrm
-      if dedrm is None:
-        raise GetoptError('could not obtain the DeDRM package')
-      with dedrm:  # prepare the shim modules for the duration
+      with contextif(self.options.dedrm):
         yield
 
   def cmd_decrypt(self, argv):
