@@ -301,7 +301,8 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
     if dedrm_package_path is None:
       dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
       if dedrm_package_path is None:
-        calibre = Calibretree.promote(calibre)
+        from .calibre import CalibreTree
+        calibre = CalibreTree.promote(calibre)
         dedrm_package_path = joinpath(
             calibre.plugins_dirpath, cls.DEDRM_PLUGIN_ZIPFILE_NAME
         )
