@@ -62,15 +62,14 @@ class DeDRMCommand(EBooksCommonBaseCommand):
   ''' cs.dedrm command line implementation.
   '''
 
-  GETOPT_SPEC = 'D:'
-  USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
+  USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand [args...]
     Operations using the DeDRM/NoDRM package.
     Options:
       -D  Specify the filesystem path to the DeDRM/noDRM plugin.
           This can be a checkout of the git@github.com:noDRM/DeDRM_tools.git
-          repository or the path to the DeDRM_plugin.zip as would
-          be installed in a Calibre plugin directory.
-          The default comes from the ${DEDRM_PACKAGE_PATH} environment variable
+          repository or the path to the {DeDRMWrapper.DEDRM_PLUGIN_ZIPFILE_NAME} file
+          as would be installed in a Calibre plugin directory.
+          The default comes from the ${DEDRM_PACKAGE_PATH_ENVVAR} environment variable
           or the plugin zip file in the local Calibre plugins directory.
   '''
 
