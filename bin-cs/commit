@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Tack a ticket number into the commit message if missing.
+# - Cameron Simpson <cs@cskk.id.au> 14oc2024
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd -m message options...."
+
+if [ $# -lt 2 ] || [ "x$1" != 'x-m ]
+then
+  echo "$cmd: missing -m message option" >&2
+  echo "$usage" >&2
+  exit 2
+fi
+
+message=$2
+shift; shift
+
+branch=$( vcs branch ) || {
+  echo "$cmd: cannot determine VCS branch" >&2
+  exit 1
+}
+
+case "$branch" in
+  [1-9]*)
+    issue=$( expr "x$branch" : 'x\([1-9][0-9]*\).*' )
+    case "$message" in
+      *\#$issue*) ;;
+      *)  message="$message #$issue" ;;
+    esac
+    ;;
+esac
+
+vcs_type=$( vcs type )
+case "$vcs_type" in
+  hg | git )
+    set -x
+    exec "$vcs_type" commit -m "$message" ${1+"$@"}
+    ;;
+  *)echo "$cmd: unhandled VCS type \"$vcs_type\"" >&2
+    exit 2
+    ;;
+esac
