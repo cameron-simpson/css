@@ -51,8 +51,6 @@ from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from . import KINDLE_LIBRARY_ENVVAR
 
-from cs.debug import trace, X, r, s, abrk
-
 KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.amazon.Kindle'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
