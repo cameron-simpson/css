@@ -29,6 +29,7 @@ from threading import Lock
 from typing import Any, Callable, Optional, Union
 
 from cs.deco import decorator, fmtdoc, Promotable
+from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
@@ -98,9 +99,8 @@ def atomic_directory(infill_func, make_placeholder=False):
       # prevent other users from using this directory
       pfx_mkdir(dirpath, 0o000)
       remove_placeholder = True
-    else:
-      if existspath(dirpath):
-        raise ValueError("directory already exists: %r" % (dirpath,))
+    elif existspath(dirpath):
+      raise ValueError("directory already exists: %r" % (dirpath,))
     work_dirpath = dirname(dirpath)
     try:
       with TemporaryDirectory(
@@ -338,9 +338,8 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
     HasFSPath.__init__(self, fspath)
     if lock is None:
       try:
-        from cs.threads import NRLock
+        from cs.threads import NRLock  # pylint: disable=import-outside-toplevel
       except ImportError:
-        from threading import Lock
         lock = Lock()
       else:
         lock = NRLock()
