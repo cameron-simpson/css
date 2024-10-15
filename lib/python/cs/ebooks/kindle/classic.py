@@ -117,6 +117,26 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
 
+  @classmethod
+  def fspath_normalised(cls, fspath: str):
+    ''' Normalise `fspath` by locating the book database file.
+      '''
+    db_subpaths = (
+        KindleBookAssetDB.DB_FILENAME,
+        joinpath(cls.CONTENT_DIRNAME, KindleBookAssetDB.DB_FILENAME),
+    )
+    for db_subpath in db_subpaths:
+      db_fspath = joinpath(fspath, db_subpath)
+      if existspath(db_fspath):
+        break
+    else:
+      raise ValueError(
+          f'{cls.__name__}: nomralise {fspath!r}'
+          f': cannot find db at any of {" or ".join(map(repr, db_subpaths))}'
+      )
+    # resolve the directory containing the book database
+    return super().fspath_normalised(dirname(db_fspath))
+
   def __init__(self, fspath=None):
     if hasattr(self, '_bookrefs'):
       return
