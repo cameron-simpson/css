@@ -4,9 +4,7 @@
 '''
 
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 import filecmp
-from getopt import GetoptError
 import os
 from os.path import (
     dirname,
@@ -17,7 +15,6 @@ from os.path import (
     join as joinpath,
 )
 import sys
-from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -34,19 +31,16 @@ except ImportError:
   import xml.etree.ElementTree as etree
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
-from cs.cmdutils import BaseCommand
-from cs.context import contextif, stackattrs
 from cs.deco import cachedmethod, fmtdoc
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton, HasFSPath
 from cs.fstags import FSTags, uses_fstags
-from cs.lex import cutsuffix, s
-from cs.logutils import warning, error
+from cs.lex import cutsuffix
+from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
-from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
@@ -56,7 +50,6 @@ from cs.sqlalchemy_utils import (
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from . import KINDLE_LIBRARY_ENVVAR
-from ..dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
 
 from cs.debug import trace, X, r, s, abrk
 
@@ -131,7 +124,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
         break
     else:
       raise ValueError(
-          f'{cls.__name__}: nomralise {fspath!r}'
+          f'{cls.__name__}: normalise {fspath!r}'
           f': cannot find db at any of {" or ".join(map(repr, db_subpaths))}'
       )
     # resolve the directory containing the book database
