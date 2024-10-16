@@ -6,6 +6,7 @@
 '''
 
 from code import interact
+from collections import ChainMap
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -1191,19 +1192,13 @@ class CalibreCommand(EBooksCommonBaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
   '''
 
-  GETOPT_SPEC = 'C:K:O:'
-
   USAGE_FORMAT = '\n'.join(
       (
-          'Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]',
+          'Usage: {cmd} subcommand [...]',
           *(
               stripped_dedent(paragraph, "  ") for paragraph in (
                   ''' Operate on a Calibre library.
                       Options:
-                      -C calibre_library
-                        Specify calibre library location.
-                      -K kindle_library
-                        Specify kindle library location.
                       -O other_calibre_library
                         Specify alternate calibre library location, the default library
                         for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.
@@ -1262,6 +1257,19 @@ class CalibreCommand(EBooksCommonBaseCommand):
       if self.calibre_path_other is None:
         raise AttributeError(".calibre_other: no .calibre_path_other")
       return CalibreTree(self.calibre_path_other)
+
+    COMMON_OPT_SPECS = ChainMap(
+        dict(
+            O_=(
+                'calibre_path_other',
+                'path to secondary Calibre library',
+                str,
+                isdirpath,
+                'not a directory',
+            ),
+        ),
+        EBooksCommonBaseCommand.Options.COMMON_OPT_SPECS,
+    )
 
   @contextmanager
   def run_context(self):
@@ -1464,7 +1472,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
 
   @uses_runstate
   def cmd_linkto(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-1fnqv] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
+    ''' Usage: {cmd} [-1f] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
           Export books to linkto-dir by hard linking.
           -1              Link only the first format found.
           -d linkto-dir   Specify the target directory, default from ${DEFAULT_LINKTO_DIRPATH_ENVVAR}
