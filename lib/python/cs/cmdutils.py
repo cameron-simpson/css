@@ -125,10 +125,30 @@ class OptionSpec(Promotable):
 
   UNVALIDATED_MESSAGE_DEFAULT = "invalid value"
 
-  help_text: str
+  # the option, eg '-n' or '--dry-run'
+  opt_name: str
+  # whether an argument is expected
+  # the argument usage name or None
+  # eg "username"
+  arg_name: Optional[str] = None
+  # value to use if treated as a Boolean (not self.needs_arg)
+  arg_bool: Optional[bool] = True
+  # the name of the options field/attribute
+  field_name: Optional[str] = None
+  # the help text
+  help_text: Optional[str] = None
+  # optional callable to convert the argument to the value
   parse: Optional[Callable[[str], Any]] = None
+  # optional callable to validate the value
   validate: Optional[Callable[[Any], bool]] = None
+  # optional message for invalid values
   unvalidated_message: str = UNVALIDATED_MESSAGE_DEFAULT
+
+  def __post_init__(self):
+    ''' Infer `field_name` and `help_text` if unspecified.
+    '''
+    if self.field_name is None:
+      self.field_name = self.opt_name.replace('-', '_')
 
   def parse_value(self, value):
     ''' Parse `value` according to the spec.
@@ -145,68 +165,94 @@ class OptionSpec(Promotable):
     return value
 
   @classmethod
-  def promote(cls, obj):
-    ''' Construct an `OptionSpec` from a list of positional parameters
-        as for `poparg()` or `popopts()`.
+  @pfx_method
+  def from_opt_kw(cls, opt_k: str, specs: Union[str, List, Tuple]):
+    ''' Factory to produce an `OptionSpec` from a `(key,specs)` 2-tuple
+        as from the `items()` from a `popopts()` call.
 
-        Examples:
+        The `specs` is normally a list or tuple, but a bare string
+        will be promoted to a 1-element list containing the string.
 
-          >>> OptionSpec.promote( () ) #doctest: +ELLIPSIS
-          OptionSpec(help_text='string value', parse=<function ...>, validate=None, unvalidated_message='invalid value')
+        The elements of `specs` are considered in order for:
+        - an identifier specifying the `arg_name`,
+          optionally prepended with a dash to indicate an inverted option
+        - a help text about the option
+        - a callable to parse the option string value to obtain the actual value
+        - a callable to validate the option value
+        - a message for use when validation fails
     '''
-    if isinstance(obj, cls):
-      return obj
-    # reform obj as a list to convert into a specification
-    if isinstance(obj, str):
-      # just the help text
-      specs = (obj,)
-    elif callable(obj):
-      # just the value parser/factory
-      specs = (obj,)
+    # produce needs_arg and cleaned up opt_name from the opt_k
+    needs_arg = False
+    # leading underscore for numeric options like -1
+    if opt_k.startswith('_'):
+      opt_k = opt_k[1:]
+      if is_identifier(opt_k):
+        warning("unnecessary leading underscore on valid identifier option")
+    # trailing underscore indicates that the option expected an argument
+    if opt_k.endswith('_'):
+      needs_arg = True
+      opt_k = opt_k[:-1]
+    self = cls(opt_name=opt_k, arg_name=(opt_k if needs_arg else None))
+    # apply the provided specifications
+    if isinstance(specs, str):
+      specs = [specs]
+    elif isinstance(specs, (list, tuple)):
+      specs = list(specs)
     else:
-      # some iterable
-      specs = tuple(obj)
-    parse = None
-    help_text = None
-    validate = None
-    unvalidated_message = None
-    for spec in specs:
-      with Pfx("%r", spec):
-        if isinstance(spec, str):
-          # help text or invlaid message
-          if help_text is None:
-            help_text = spec
-            continue
-          if unvalidated_message is None:
-            unvalidated_message = spec
-            continue
-        elif callable(spec):
-          # parser/factory or validator
-          if parse is None:
-            parse = spec
-            continue
-          if validate is None:
-            validate = spec
-            continue
-        raise TypeError(
-            "unexpected argument, expected help_text or parse,"
-            " then optional validate and optional invalid message,"
-            " received %s" % (r(spec),)
-        )
-    if help_text is None:
-      help_text = (
-          "string value" if parse is None else "value for %s" % (parse,)
+      raise TypeError(
+          f'expected str or list or tuple for specs, got {r(specs)}'
       )
-    if parse is None:
-      # pass option value through unchanged
-      parse = lambda val: val  # pylint: disable=unnecessary-lambda-assignment
-    if unvalidated_message is None:
-      unvalidated_message = cls.UNVALIDATED_MESSAGE_DEFAULT
-    return cls(
-        help_text=help_text,
-        parse=parse,
-        validate=validate,
-        unvalidated_message=unvalidated_message,
+    spec0 = specs.pop(0) if specs else None
+    # arg_name, an identifier
+    if isinstance(spec0, str) and is_identifier(spec0):
+      self.field_name = spec0
+      self.arg_name = self.field_name.replace('_', '-')
+      spec0 = specs.pop(0) if specs else None
+    elif isinstance(spec0, str) and spec0.startwith('-') and is_identifier(
+        spec0[1:]):
+      self.field_name = spec0
+      self.field_bool = False  # default is True
+      self.arg_name = self.field_name.replace('_', '-')
+      spec0 = specs.pop(0) if specs else None
+    # help text
+    if isinstance(spec0, str) and not is_identifier(spec0):
+      self.help_text = spec0
+      spec0 = specs.pop(0) if specs else None
+    # parse
+    if callable(spec0):
+      self.parse = spec0
+      spec0 = specs.pop(0) if specs else None
+    # validate
+    if callable(spec0):
+      self.validate = spec0
+      spec0 = specs.pop(0) if specs else None
+    # unvalidated_message
+    if isinstance(spec0, str):
+      if not self.validate:
+        raise ValueError(
+            f'unexpected unvalidated_message {spec0!r} when there is no validate callable'
+        )
+      self.unvalidated_message = spec0
+      spec0 = specs.pop(0) if specs else None
+    if spec0 is not None:
+      raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
+    if self.help_text is None:
+      self.help_text = self.help_text_from_field_name(self.field_name)
+    return self
+
+  @property
+  def needs_arg(self):
+    ''' Whether we expect an argument: we have a `self.arg_name`.
+    '''
+    return bool(self.arg_name)
+
+  @property
+  def getopt_opt(self):
+    ''' The `opt` we expect from `opt,val=getopt(argv,...)`.
+    '''
+    return (
+        f'-{self.opt_name}'
+        if len(self.opt_name) == 1 else f'--{self.opt_name}'
     )
 
 def extract_usage_from_doc(doc: str | None,
