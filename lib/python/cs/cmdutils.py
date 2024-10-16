@@ -662,14 +662,50 @@ class BaseCommandOptions(HasThreadState):
     '''
     self.dry_run = not new_doit
 
-  @fmtdoc
-  def popopts(self, argv, **opt_specs):
-    ''' Convenience method to appply `BaseCommand.popopts` to the options (`self`).
+  @classmethod
+  def getopt_spec_map(cls, opt_specs_kw: Mapping):
+    ''' Return a 3-tuple of (shortopts,longopts,getopt_spec_map)` being:
+       - `shortopts`: the `getopt()` short options specification string
+       - `longopts`: the `getopts()` long option specification list
+       - `getopt_spec_map`: a mapping of `opt`->`OptionSpec`
+         where `opt` is as from `opt,val` from `getopt()`
+         and `opt_spec` is the associated `OptionSpec` instance
+    '''
+    opt_spec_cls = cls.opt_spec_class
+    shortopts = ''
+    longopts = []
+    getopt_spec_map = {}
+    # gather up the option specifications and make getopt arguments
+    for opt_k, opt_specs in ChainMap(
+        opt_specs_kw,
+        cls.COMMON_OPT_SPECS,
+    ).items():
+      with Pfx("opt_spec[%r]=%r", opt_k, opt_specs):
+        opt_spec = opt_spec_cls.from_opt_kw(opt_k, opt_specs)
+        if opt_spec.getopt_opt in getopt_spec_map:
+          raise ValueError(f'repeated spec for {opt_spec.option_short()}')
+        getopt_spec_map[opt_spec.getopt_opt] = opt_spec
+        # update the arguments for getopt()
+        shortopts += opt_spec.getopt_short
+        getopt_long = opt_spec.getopt_long
+        if getopt_long is not None:
+          longopts.append(getopt_long)
+    return shortopts, longopts, getopt_spec_map
 
-        Example for a `BaseCommand` `cmd_foo` method:
+  def popopts(
+      self,
+      argv,
+      **opt_specs_kw,
+  ):
+    ''' Parse option switches from `argv`, a list of command line strings
+        with leading option switches and apply them to `self`.
+        Modify `argv` in place.
+
+        Example use in a `BaseCommand` `cmd_foo` method:
 
             def cmd_foo(self, argv):
-                self.options.popopts(
+                options = self.options
+                options.popopts(
                     c_='config',
                     l='long',
                     x='trace',
@@ -677,31 +713,78 @@ class BaseCommandOptions(HasThreadState):
                 if self.options.dry_run:
                     print("dry run!")
 
-        The class attribute `COMMON_OPT_SPECS` is a mapping of
-        options which are always supported. `BaseCommandOptions`
-        has: `COMMON_OPT_SPECS={_COMMON_OPT_SPECS!r}`.
+        The expected options are specified by the keyword parameters
+        in `opt_specs`.
+        Each keyword name has the following semantics:
+        * options not starting with a letter may be preceeded by an underscore
+          to allow use in the parameter list, for example `_1='once'`
+          for a `-1` option setting the `once` option name
+        * a single letter name specifies a short option
+          and a multiletter name specifies a long option
+        * options requiring an argument have a trailing underscore
+        * options not requiring an argument normally imply a value
+          of `True`; if their synonym commences with a dash they will
+          imply a value of `False`, for example `n='dry_run',y='-dry_run'`.
 
-        A subclass with more common options might extend this like so,
-        from `cs.hashindex`:
+        The `BaseCommand` class provides a `popopts` method
+        which is a shim for this method applied to its `.options`.
+        So common use in a command method usually looks like this:
 
-            COMMON_OPT_SPECS = ChainMap(
-                dict(
-                  e='ssh_exe',
-                  h_='hashname',
-                  H_='hashindex_exe',
-                ),
-                BaseCommand.Options.COMMON_OPT_SPECS,
-            )
+            class SomeCommand(BaseCommand):
 
+                def cmd_foo(self, argv):
+                    # accept a -j or --jobs options
+                    self.popopts(argv, jobs=1, j='jobs')
+                    print("jobs =", self.options.jobs)
+
+        The `self.options` object is preprovided as an instance of
+        the `self.Options` class, which is `BaseCommandOptions` by
+        default. There is presupplies support for some basic options
+        like `-v` for "verbose" and so forth, and a subcommand
+        need not describe these in a call to `self.options.popopts()`.
+
+        Example:
+
+            >>> import os.path
+            >>> from typing import Optional
+            >>> @dataclass
+            ... class DemoOptions(BaseCommandOptions):
+            ...   all: bool = False
+            ...   jobs: int = 1
+            ...   number: int = 0
+            ...   once: bool = False
+            ...   path: Optional[str] = None
+            ...   trace_exec: bool = False
+            ...
+            >>> options = DemoOptions()
+            >>> argv = ['-1', '-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
+            >>> opt_dict = options.popopts(
+            ...   argv,
+            ...   _1='once',
+            ...   a='all',
+            ...   j_=('jobs',int),
+            ...   x='-trace_exec',
+            ...   y='-dry_run',
+            ...   dry_run=None,
+            ...   path_=(str, os.path.isabs, 'not an absolute path'),
+            ...   verbose=None,
+            ... )
+            >>> opt_dict
+            {'once': True, 'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
+            >>> options # doctest: +ELLIPSIS
+            DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
     '''
-    return BaseCommand.popopts(
-        argv,
-        self,
-        **ChainMap(
-            opt_specs,
-            self.COMMON_OPT_SPECS,
-        ),
-    )
+    shortopts, longopts, getopt_spec_map = self.getopt_spec_map(opt_specs_kw)
+    opts, argv[:] = getopt(argv, shortopts, longopts)
+    for opt, val in opts:
+      with Pfx(opt):
+        opt_spec = getopt_spec_map[opt]
+        if opt_spec.needs_arg:
+          with Pfx("%r", val):
+            value = opt_spec.parse_value(val)
+        else:
+          value = opt_spec.arg_bool
+        setattr(self, opt_spec.field_name, value)
 
 @decorator
 def uses_cmd_options(
@@ -1283,167 +1366,10 @@ class BaseCommand:
         argv.insert(0, arg0)
       raise
 
-  @classmethod
-  def popopts(
-      cls,
-      argv,
-      attrfor=None,
-      **opt_specs,
-  ):
-    ''' Parse option switches from `argv`, a list of command line strings
-        with leading option switches.
-        Modify `argv` in place and return a dict mapping switch names to values.
-
-        The optional positional argument `attrfor`
-        may supply an object whose attributes may be set by the options,
-        for example:
-
-            def cmd_foo(self, argv):
-                self.popopts(argv, self.options, a='all', j_=('jobs', int))
-                ... use self.options.jobs etc ...
-
-        The expected options are specified by the keyword parameters
-        in `opt_specs`:
-        * options not starting with a letter may be preceeded by an underscore
-          to allow use in the parameter list, for example `_1='once'`
-          for a `-1` option setting the `once` option name
-        * a single letter name specifies a short option
-          and a multiletter name specifies a long option
-        * options requiring an argument have a trailing underscore
-        * options not requiring an argument normally imply a value
-          of `True`; if their synonym commences with a dash they will
-          imply a value of `False`, for example `n='dry_run',y='-dry_run'`
-
-        The `BaseCommandOptions` class provides a `popopts` method
-        which is a shim for this method with `attrfor=self` i.e.
-        the options object.
-        So common use in a command method usually looks like this:
-
-            class SomeCommand(BaseCommand):
-
-                def cmd_foo(self, argv):
-                    options = self.options
-                    # accept a -j or --jobs options
-                    options.popopts(argv, jobs=1, j='jobs')
-                    print("jobs =", options.jobs)
-
-        The `self.options` object is preprovided as an instance of
-        the `self.Options` class, which is `BaseCommandOptions` by
-        default. This presupplies support for some basic options
-        like `-v` for "verbose" and so forth, and a subcommand
-        need not describe these in a call to `self.options.popopts()`.
-
-        Example:
-
-            >>> import os.path
-            >>> from typing import Optional
-            >>> @dataclass
-            ... class DemoOptions(BaseCommandOptions):
-            ...   all: bool = False
-            ...   jobs: int = 1
-            ...   number: int = 0
-            ...   once: bool = False
-            ...   path: Optional[str] = None
-            ...   trace_exec: bool = False
-            ...
-            >>> options = DemoOptions()
-            >>> argv = ['-1', '-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
-            >>> opt_dict = options.popopts(
-            ...   argv,
-            ...   _1='once',
-            ...   a='all',
-            ...   j_=('jobs',int),
-            ...   x='-trace_exec',
-            ...   y='-dry_run',
-            ...   dry_run=None,
-            ...   path_=(str, os.path.isabs, 'not an absolute path'),
-            ...   verbose=None,
-            ... )
-            >>> opt_dict
-            {'once': True, 'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
-            >>> options # doctest: +ELLIPSIS
-            DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
+  def popopts(self, argv, **opt_specs):
+    ''' A convenience shim which returns `self.options.popopts(argv,**opt_specs)`.
     '''
-    keyfor = {}
-    shortopts = ''
-    longopts = []
-    opt_spec_map = {}
-    opt_name_map = {}
-    for opt_name, opt_spec in opt_specs.items():
-      with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
-        needs_arg = False
-        # leading underscore for numeric options like -1
-        if opt_name.startswith('_'):
-          opt_name = opt_name[1:]
-          if is_identifier(opt_name):
-            warning(
-                "unnecessary leading underscore on valid identifier option"
-            )
-        # trailing underscore indicates that the option expected an argument
-        if opt_name.endswith('_'):
-          needs_arg = True
-          opt_name = opt_name[:-1]
-        # single character option -x
-        if len(opt_name) == 1:
-          opt = '-' + opt_name
-          shortopts += opt_name
-          if needs_arg:
-            shortopts += ':'
-        # long option
-        elif len(opt_name) > 1:
-          opt_dashed = opt_name.replace('_', '-')
-          opt = '--' + opt_dashed
-          longopts.append(opt_dashed + '=' if needs_arg else opt_dashed)
-          default_help_text = opt
-        else:
-          raise ValueError("unexpected opt_name %s" % (r(opt_name),))
-        # construct an option specification list containing:
-        #   [opt_name:str] [help_text:str] [parse:Callable [validate:Callable [invalid_msg:str]]]
-        if opt_spec is None:
-          # default opt_spec: opt citation and type str
-          specs = [opt_name, str]
-        elif isinstance(opt_spec, (list, tuple)):
-          # list or tuple: copy it to a list
-          specs = list(opt_spec)
-        else:
-          # promote scalar to single element list
-          specs = [opt_spec]
-        if specs:
-          # see if the leading spec is an option citation
-          spec0 = specs[0]
-          if isinstance(spec0, str) and (is_identifier(spec0) or
-                                         (spec0.startswith('-')
-                                          and is_identifier(spec0[1:]))):
-            opt_name = specs[0]
-            if len(specs) > 1 and isinstance(specs[1], str):
-              specs.pop(0)
-        if not specs or not isinstance(specs[0], str):
-          specs.insert(0, default_help_text)
-        if needs_arg:
-          opt_spec = OptionSpec.promote(specs)
-          opt_spec_map[opt] = opt_spec
-        opt_name_map[opt] = opt_name
-    opts, post_argv = getopt(argv, shortopts, longopts)
-    argv[:] = post_argv
-    for opt, val in opts:
-      with Pfx(opt):
-        opt_name = opt_name_map[opt]
-        try:
-          opt_spec = opt_spec_map[opt]
-        except KeyError:
-          # option expected no arguments
-          assert val == ''
-          if opt_name.startswith('-'):
-            value = False
-            opt_name = opt_name[1:]
-          else:
-            value = True
-        else:
-          value = opt_spec.parse_value(val)
-        keyfor[opt_name] = value
-        if attrfor is not None:
-          setattr(attrfor, opt_name, value)
-    return keyfor
+    return self.options.popopts(argv, **opt_specs)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
