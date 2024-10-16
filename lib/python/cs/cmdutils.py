@@ -388,7 +388,7 @@ class SubCommand:
         if has_subcommands_test() else '{cmd} [options...]'
     )
 
-  def get_usage_format(self) -> str:
+  def get_usage_format(self, show_common=False) -> str:
     ''' Return the usage format string for this subcommand.
         *Note*: no leading "Usage:" prefix.
 
@@ -419,7 +419,29 @@ class SubCommand:
           usage_format += "\n" + indent(paragraph1)
     # The existing USAGE_FORMAT based usages have the word "Usage:"
     # at the front but this is supplied at print time now.
-    return cutprefix(usage_format, 'Usage:').lstrip()
+    usage_format = cutprefix(usage_format, 'Usage:').lstrip()
+    command_options = self.command.options
+    if show_common:
+      common_opts = command_options.COMMON_OPT_SPECS
+      if common_opts:
+        opt_spec_class = command_options.opt_spec_class
+        opt_usages = []
+        _, _, getopt_spec_map = self.command.Options.getopt_spec_map(
+            common_opts
+        )
+        usage_format += "\n" + indent(
+            "Common options:\n" + indent(
+                "\n".join(
+                    tabulate(
+                        *(
+                            (opt_spec.option_terse(), opt_spec.help_text)
+                            for _, opt_spec in sorted(getopt_spec_map.items())
+                        )
+                    )
+                )
+            )
+        )
+    return usage_format
 
   def get_usage_keywords(self):
     ''' Return a mapping to be used when formatting the usage format string.
