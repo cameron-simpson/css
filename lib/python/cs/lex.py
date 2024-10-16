@@ -1713,7 +1713,7 @@ class FormatableFormatter(Formatter):
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
-              value.convert_via_method_or_attr
+              value.convert_via_method_or_attr  # noqa
             except AttributeError:
               # promote to something with convert_via_method_or_attr
               if isinstance(value, str):
