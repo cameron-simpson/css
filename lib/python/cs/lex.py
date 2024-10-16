@@ -16,6 +16,7 @@ raising `ValueError` on failed tokenisation.
 
 import binascii
 from functools import partial
+from itertools import zip_longest
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -1350,6 +1351,19 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
       ssh_target = prefix
       remotepath = suffix
   return ssh_target, remotepath
+
+def tabulate(*rows):
+  ''' A generator yielding lines of values from columns.
+  '''
+  col_widths = [
+      max(map(len, (row[c]
+                    for row in rows)))
+      for c in range(max(map(len, rows)))
+  ]
+  for row in rows:
+    yield ' '.join(
+        f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
+    ).rstrip()
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):
