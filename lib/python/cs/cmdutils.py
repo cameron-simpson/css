@@ -13,7 +13,7 @@ from cmd import Cmd
 from code import interact
 from collections import ChainMap
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from functools import cache
 from getopt import getopt, GetoptError
 from inspect import isclass
@@ -1559,6 +1559,20 @@ class BaseCommand:
             short=short, show_common=True, show_subcmds=show_subcmds or None
         )
     )
+
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Recite general information.
+
+        This default ,ethod recites the values from `self.options`.
+    '''
+    self.popopts(argv)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    for line in tabulate(
+        *((f'{field}:', str(value))
+          for field, value in sorted(self.options.as_dict().items()))):
+      print(line)
 
   @uses_upd
   def cmd_shell(self, argv, *, upd: Upd):
