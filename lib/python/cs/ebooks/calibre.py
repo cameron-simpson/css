@@ -1444,18 +1444,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
               xit = 1
     return xit
 
-  def cmd_info(self, argv):
-    ''' Usage: {cmd}
-          Report basic information.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    print("calibre", self.options.calibre.shortpath)
-    if self.options.calibre_path_other:
-      print("calibre_other", shortpath(self.options.calibre_path_other))
-    if self.options.kindle_path:
-      print("kindle", shortpath(self.options.kindle_path))
-
   @uses_runstate
   def cmd_linkto(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-1f] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
