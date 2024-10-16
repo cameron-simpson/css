@@ -591,6 +591,7 @@ class BaseCommandOptions(HasThreadState):
   runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   verbose: bool = False
+
   opt_spec_class = OptionSpec
 
   perthread_state = ThreadState()
@@ -651,8 +652,7 @@ class BaseCommandOptions(HasThreadState):
 
   @property
   def doit(self):
-    ''' I usually use a `doit` flag,
-        the inverse of `dry_run`.
+    ''' I usually use a `doit` flag, the inverse of `dry_run`.
     '''
     return not self.dry_run
 
@@ -1040,8 +1040,8 @@ class BaseCommand:
         else:
           # use the options.COMMON_OPT_SPECS
           options.popopts(argv)
-        # we do this regardless so that subclasses can do some presubcommand parsing
-        # after any command line options
+        # We do this regardless so that subclasses can do some presubcommand parsing
+        # _after_ any command line options.
         argv = self._argv = self.apply_preargv(argv)
       # now prepare self._run, a callable
       if not has_subcmds:
@@ -1275,7 +1275,6 @@ class BaseCommand:
         supported by `self.options` (an instance of `self.Options`
         class).
     '''
-    self.options.popopts(argv)
     return argv
 
   @classmethod
@@ -1339,7 +1338,7 @@ class BaseCommand:
               ...
             getopt.GetoptError: length: missing argument
             >>> argv = ['-5', 'zz']
-            >>> BaseCommand.poparg(argv, float, "size", lambda f: f>0, "size should be >0")
+            >>> BaseCommand.poparg(argv, float, "size", lambda size: size > 0, "size should be >0")
             Traceback (most recent call last):
               ...
             getopt.GetoptError: size '-5': size should be >0
@@ -1650,7 +1649,7 @@ class BaseCommandCmd(Cmd):
     cmdcls = type(command)
     subcmd = cutprefix(attr, 'do_')
     if subcmd is not attr:
-      method_name = command.SUBCOMMAND_METHOD_PREFIX + subcmd
+      method_name = cmdcls.SUBCOMMAND_METHOD_PREFIX + subcmd
       try:
         method = getattr(command, method_name)
       except AttributeError:
