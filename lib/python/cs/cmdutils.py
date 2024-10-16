@@ -11,13 +11,14 @@
 
 from cmd import Cmd
 from code import interact
-from collections import ChainMap, namedtuple
+from collections import ChainMap
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache
 from getopt import getopt, GetoptError
 from inspect import isclass
 from os.path import basename
+# this enables readline support in the docmd stuff
 try:
   import readline  # pylint: disable=unused-import
 except ImportError:
@@ -30,7 +31,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import decorator, default_params, fmtdoc, Promotable
+from cs.deco import decorator, default_params
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -214,8 +215,8 @@ class OptionSpec:
     elif isinstance(spec0, str) and spec0.startwith('-') and is_identifier(
         spec0[1:]):
       self.field_name = spec0
-      self.field_bool = False  # default is True
       self.arg_name = self.field_name.replace('_', '-')
+      self.arg_bool = False  # default is True
       spec0 = specs.pop(0) if specs else None
     # help text
     if isinstance(spec0, str) and not is_identifier(spec0):
@@ -351,6 +352,10 @@ class SubCommand:
     return self.method(...) if isclass(self.method) else self.method.__self__
 
   def get_cmd(self) -> str:
+    ''' Return the `cmd` string for this `SubCommand`,
+        derived from the subcommand's method name or class name
+        if `self.cmd` is not set.
+    '''
     if self.cmd is None:
       method = self.method
       if isclass(method):
@@ -404,13 +409,11 @@ class SubCommand:
         to its first parapgraph.
     '''
     method = self.method
-    method_name = method.__name__
-    subcmd = self.command.method_cmdname(method_name)
     try:
       usage_format = method.USAGE_FORMAT
     except AttributeError:
       # derive from the docstring or from self.default_usage()
-      doc = obj_docstring(self.method)
+      doc = obj_docstring(method)
       usage_format, doc = extract_usage_from_doc(doc)
       if not usage_format:
         # No "Usage:" paragraph - use default usage line and first paragraph.
@@ -425,8 +428,6 @@ class SubCommand:
     if show_common:
       common_opts = command_options.COMMON_OPT_SPECS
       if common_opts:
-        opt_spec_class = command_options.opt_spec_class
-        opt_usages = []
         _, _, getopt_spec_map = self.command.Options.getopt_spec_map(
             common_opts
         )
@@ -472,6 +473,7 @@ class SubCommand:
   def usage_text(
       self,
       *,
+      cmd=None,
       short: bool,
       recurse: bool = False,
       show_common: bool = False,
@@ -501,7 +503,7 @@ class SubCommand:
       usage_format = '\n'.join(usage_lines)
     # elaborate search path for symbols in the usage format string
     # TODO: should this _be_ get_usage_keywords? pretty verbose
-    format_cmd = self.get_cmd().replace('_', '-')
+    format_cmd = cmd or self.get_cmd().replace('_', '-')
     if self.command.options.COMMON_OPT_SPECS:
       format_cmd += ' [common-options...]'
     mapping = ChainMap(
@@ -683,7 +685,7 @@ class BaseCommandOptions(HasThreadState):
       with Pfx("opt_spec[%r]=%r", opt_k, opt_specs):
         opt_spec = opt_spec_cls.from_opt_kw(opt_k, opt_specs)
         if opt_spec.getopt_opt in getopt_spec_map:
-          raise ValueError(f'repeated spec for {opt_spec.option_short()}')
+          raise ValueError(f'repeated spec for {opt_spec.getopt_opt}')
         getopt_spec_map[opt_spec.getopt_opt] = opt_spec
         # update the arguments for getopt()
         shortopts += opt_spec.getopt_short
@@ -1134,6 +1136,8 @@ class BaseCommand:
 
   @cache
   def subcommand(self, subcmd: str):
+    ''' Return the `SubCommand` associated with `subcmd`.
+    '''
     subcmd_ = subcmd.replace('-', '_').replace('.', '_')
     subcommands = self.subcommands()
     return subcommands[subcmd_]
@@ -1142,7 +1146,6 @@ class BaseCommand:
       self,
       *,
       cmd=None,
-      format_mapping=None,
       short=False,
       show_common=False,
       show_subcmds=None,
@@ -1152,9 +1155,7 @@ class BaseCommand:
         and the `'Usage:'`-containing docstrings of its `cmd_*` methods.
 
         Parameters:
-        * `cmd`: optional command name, default derived from the class name
-        * `format_mapping`: an optional format mapping for filling
-          in format strings in the usage text
+        * `cmd`: optional command name, default derived from the subcommand
         * `short`: default `False`; if true then just provide the opening sentence
         * `show_common`: show the `COMMON_OPT_SPECS` usage, default `False`
         * `show_subcmds`: constrain the usage to particular subcommands
@@ -1164,7 +1165,10 @@ class BaseCommand:
     return SubCommand(
         self, method=type(self)
     ).usage_text(
-        short=short, show_common=show_common, show_subcmds=show_subcmds
+        cmd=cmd,
+        short=short,
+        show_common=show_common,
+        show_subcmds=show_subcmds
     )
 
   def subcommand_usage_text(
