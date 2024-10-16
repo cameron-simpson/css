@@ -44,38 +44,9 @@ class KindleCommand(EBooksCommonBaseCommand):
   '''
 
   USAGE_FORMAT = '''Usage: {cmd} [options...] [subcommand [...]]
-  Operate on a Kindle library.
-  Options:
-    -C calibre_library
-      Specify calibre library location.
-    -K kindle_library
-      Specify kindle library location.'''
+  Operate on a Kindle library.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
-    options = self.options
-    if opt == '-C':
-      options.calibre_path = val
-    elif opt == '-K':
-      # TODO: WTF? to go into the KindleTree factory function
-      db_subpaths = (
-          KindleBookAssetDB.DB_FILENAME,
-          joinpath(KindleTree.CONTENT_DIRNAME, KindleBookAssetDB.DB_FILENAME),
-      )
-      for db_subpath in db_subpaths:
-        db_fspath = joinpath(val, db_subpath)
-        if existspath(db_fspath):
-          break
-      else:
-        raise GetoptError(
-            "cannot find db at %s" % (" or ".join(map(repr, db_subpaths)),)
-        )
-      options.kindle_path = dirname(db_fspath)
-    else:
-      super().apply_opt(opt, val)
 
   @contextmanager
   @uses_fstags
@@ -130,17 +101,14 @@ class KindleCommand(EBooksCommonBaseCommand):
   # pylint: disable=too-many-locals
   @uses_runstate
   def cmd_export(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] [ASINs...]
+    ''' Usage: {cmd} [-f] [ASINs...]
           Export AZW files to Calibre library.
           -f    Force: replace the AZW3 format if already present.
-          -n    No action, recite planned actions.
-          -q    Quiet: report only warnings.
-          -v    Verbose: report more information about actions and inaction.
           ASINs Optional ASIN identifiers to export.
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
+    self.popopts(argv, f='force')
     options = self.options
-    options.popopts(argv, f='force')
     kindle = options.kindle
     calibre = options.calibre
     dedrm = options.dedrm
@@ -182,7 +150,7 @@ class KindleCommand(EBooksCommonBaseCommand):
 
   @uses_runstate
   def cmd_import_tags(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-nqv] [ASINs...]
+    ''' Usage: {cmd} [ASINs...]
           Import Calibre book information into the fstags for a Kindle book.
           This will support doing searches based on stuff like
           titles which are, naturally, not presented in the Kindle
