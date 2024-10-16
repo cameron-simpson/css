@@ -257,6 +257,48 @@ class OptionSpec:
         if len(self.opt_name) == 1 else f'--{self.opt_name}'
     )
 
+  @property
+  def getopt_short(self):
+    ''' The option specification for a getopt short option.
+        Return `''` if `self.opt_name` is longer than 1 character.
+    '''
+    if len(self.opt_name) > 1:
+      return ''
+    opt_char = self.opt_name[0]
+    return f'{opt_char}:' if self.needs_arg else opt_char
+
+  @property
+  def getopt_long(self):
+    ''' The option specification for a getopt long option.
+        Return `None` if `self.opt_name` is only 1 character.
+    '''
+    if len(self.opt_name) < 2:
+      return None
+    return f'--{self.opt_name}=' if self.needs_arg else f'--{self.opt_name}'
+
+  def option_terse(self):
+    ''' Return the `"-x"` or `"--name"` option string (with the arg name if expected).
+    '''
+    return f'{self.getopt_opt} {self.arg_name}' if self.needs_arg else self.getopt_opt
+
+  @staticmethod
+  def help_text_from_field_name(field_name):
+    ''' Compute an inferred `help_text` from an option `field_name`.
+    '''
+    help_text = field_name.replace('_', ' ')
+    return help_text[0].upper() + help_text[1:] + '.'
+
+  def option_usage(self):
+    ''' A 2 line usage entry for this option.
+        Example:
+
+            -j jobs
+              Job limit.
+    '''
+    line1 = self.option_terse()
+    # TODO: allow multiline help_text, indent it here
+    return f'{line1}\n  {self.help_text}'
+
 def extract_usage_from_doc(doc: str | None,
                            usage_marker="Usage:") -> Tuple[str, str]:
   ''' Extract a `"Usage:"`paragraph from a docstring
