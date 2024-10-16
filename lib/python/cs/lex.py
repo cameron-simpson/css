@@ -16,7 +16,6 @@ raising `ValueError` on failed tokenisation.
 
 import binascii
 from functools import partial
-from itertools import zip_longest
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -216,14 +215,14 @@ def htmlquote(s):
   ''' Quote a string for use in HTML.
   '''
   s = htmlify(s)
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def jsquote(s):
   ''' Quote a string for use in JavaScript.
   '''
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def phpquote(s):
   ''' Quote a string for use in PHP code.
@@ -304,12 +303,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
           chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
         offset0 = offset
-    else:
-      if b in whitelist:
-        inwhite = True
-        chunk = hexify(bs[offset0:offset])
-        chunks.append(chunk)
-        offset0 = offset
+    elif b in whitelist:
+      inwhite = True
+      chunk = hexify(bs[offset0:offset])
+      chunks.append(chunk)
+      offset0 = offset
     offset += 1
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
