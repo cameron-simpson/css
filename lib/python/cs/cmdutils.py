@@ -119,7 +119,7 @@ def docmd(dofunc):
   return docmd_wrapper
 
 @dataclass
-class OptionSpec(Promotable):
+class OptionSpec:
   ''' A class to support parsing an option value.
   '''
 
@@ -154,12 +154,14 @@ class OptionSpec(Promotable):
     ''' Parse `value` according to the spec.
         Raises `GetoptError` for invalid values.
     '''
+    if self.parse is None:
+      return value
     with Pfx("%s %r", self.help_text, value):
       try:
         value = pfx_call(self.parse, value)
         if self.validate is not None:
           if not pfx_call(self.validate, value):
-            raise ValueError(self.unvalidated_message)
+            raise GetoptError(self.unvalidated_message)
       except ValueError as e:
         raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
     return value
