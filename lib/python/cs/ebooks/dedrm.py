@@ -158,9 +158,7 @@ class DeDRMCommand(EBooksCommonBaseCommand):
     ''' Usage: {cmd}
           List dedrm infomation.
     '''
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    print('dedrm_package_path:', self.options.dedrm_package_path)
+    super().cmd_info(argv)
     # TODO: recite the actual DeDRM version
 
   def cmd_kindlekeys(self, argv):
