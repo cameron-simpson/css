@@ -16,9 +16,7 @@ from itertools import chain
 from math import floor
 from mmap import mmap, MAP_PRIVATE, PROT_READ
 import os
-from os.path import (
-    basename, splitext
-)
+from os.path import (basename, splitext)
 from pprint import pprint
 import re
 import sys
@@ -99,6 +97,9 @@ class PDFCommand(BaseCommand):
         pdf.make_cbz(cbzpath)
 
   def cmd_mmap(self, argv):
+    ''' Usage: {cmd} pad-path
+          Decode a PDF document using mmap_pdf.
+    '''
     pdfpath, = argv
     pdfdoc = pfx_call(mmap_pdf, pdfpath)
     print(pdfdoc)
