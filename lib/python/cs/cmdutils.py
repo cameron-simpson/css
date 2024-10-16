@@ -38,6 +38,7 @@ from cs.lex import (
     is_identifier,
     r,
     stripped_dedent,
+    tabulate,
 )
 from cs.logutils import setup_logging, warning, error, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -446,6 +447,7 @@ class SubCommand:
   def get_usage_keywords(self):
     ''' Return a mapping to be used when formatting the usage format string.
     '''
+    # TODO maybe this should return the ChainMap used in usage_text
     usage_mapping = dict(getattr(self.method, 'USAGE_KEYWORDS', {}))
     return usage_mapping
 
@@ -472,6 +474,7 @@ class SubCommand:
       *,
       short: bool,
       recurse: bool = False,
+      show_common: bool = False,
       show_subcmds: Optional[Union[bool, str, List[str]]] = None,
       usage_mapping: Optional[Mapping] = None,
   ) -> str:
@@ -486,7 +489,7 @@ class SubCommand:
         show_subcmds = []
     elif isinstance(show_subcmds, str):
       show_subcmds = [show_subcmds]
-    usage_format = self.get_usage_format()  # pylint: disable=no-member
+    usage_format = self.get_usage_format(show_common=show_common)  # pylint: disable=no-member
     if short:
       # just the summary line and opening sentence of the description
       lines = usage_format.split('\n')
@@ -497,9 +500,13 @@ class SubCommand:
         usage_lines.append(lines.pop(0))
       usage_format = '\n'.join(usage_lines)
     # elaborate search path for symbols in the usage format string
+    # TODO: should this _be_ get_usage_keywords? pretty verbose
+    format_cmd = self.get_cmd().replace('_', '-')
+    if self.command.options.COMMON_OPT_SPECS:
+      format_cmd += ' [common-options...]'
     mapping = ChainMap(
         # normalised cmd name
-        {'cmd': self.get_cmd().replace('_', '-')},
+        {'cmd': format_cmd},
         # supplied usage_mapping, if any
         usage_mapping or {},
         # direct .usage_mapping attribute
@@ -1054,6 +1061,7 @@ class BaseCommand:
       cmd=None,
       format_mapping=None,
       short=False,
+      show_common=False,
       show_subcmds=None,
   ):
     ''' Compute the "Usage:" message for this class
@@ -1065,6 +1073,7 @@ class BaseCommand:
         * `format_mapping`: an optional format mapping for filling
           in format strings in the usage text
         * `short`: default `False`; if true then just provide the opening sentence
+        * `show_common`: show the `COMMON_OPT_SPECS` usage, default `False`
         * `show_subcmds`: constrain the usage to particular subcommands
           named in `show_subcmds`; this is used to produce a shorter
           usage for subcommand usage failures
@@ -1072,7 +1081,7 @@ class BaseCommand:
     return SubCommand(
         self, method=type(self)
     ).usage_text(
-        short=short, show_subcmds=show_subcmds
+        short=short, show_common=show_common, show_subcmds=show_subcmds
     )
 
   def subcommand_usage_text(
@@ -1617,7 +1626,9 @@ class BaseCommand:
       print("Longer help with the -l option.")
     print(
         "Usage:",
-        self.usage_text(short=short, show_subcmds=show_subcmds or None)
+        self.usage_text(
+            short=short, show_common=True, show_subcmds=show_subcmds or None
+        )
     )
 
   @uses_upd
