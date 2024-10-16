@@ -84,6 +84,8 @@ from .pdf import PDFDocument
 
 CALIBRE_FSPATH = '~/Calibre Library'
 CALIBRE_FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
+# envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
+OTHER_LIBRARY_PATH_ENVVAR = CALIBRE_FSPATH_ENVVAR + '_OTHER'
 CALIBRE_BINDIR_DEFAULT = '/usr/bin'
 CALIBRE_PREFSDIR_DEFAULT = expanduser('~/.config/calibre')
 if sys.platform == 'darwin':
@@ -1198,10 +1200,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
           *(
               stripped_dedent(paragraph, "  ") for paragraph in (
                   ''' Operate on a Calibre library.
-                      Options:
-                      -O other_calibre_library
-                        Specify alternate calibre library location, the default library
-                        for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.
                   ''',
                   # by_spec docs
                   CalibreTree.by_spec.__doc__.split("\n\n")[1],
@@ -1209,9 +1207,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
           )
       ),
   )
-
-  # envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
-  OTHER_LIBRARY_PATH_ENVVAR = CalibreTree.FSPATH_ENVVAR + '_OTHER'
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
@@ -1223,17 +1218,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
   DEFAULT_LINKTO_SELECTORS = ['CBZ', 'EPUB']
   DEFAULT_LINKTO_SERIES_FORMAT = '{series.name:lc}--{series.index}--{title:lc}'
   DEFAULT_LINKTO_NOSERIES_FORMAT = '{title:lc}'
-
-  USAGE_KEYWORDS = {
-      'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
-      'OTHER_LIBRARY_PATH_ENVVAR': OTHER_LIBRARY_PATH_ENVVAR,
-      'DEFAULT_LINKTO_DIRPATH': DEFAULT_LINKTO_DIRPATH,
-      'DEFAULT_LINKTO_DIRPATH_ENVVAR': DEFAULT_LINKTO_DIRPATH_ENVVAR,
-      'DEFAULT_LINKTO_FORMATS': DEFAULT_LINKTO_FORMATS,
-      'DEFAULT_LINKTO_SELECTORS': DEFAULT_LINKTO_SELECTORS,
-      'DEFAULT_LINKTO_SERIES_FORMAT': DEFAULT_LINKTO_SERIES_FORMAT,
-      'DEFAULT_LINKTO_NOSERIES_FORMAT': DEFAULT_LINKTO_NOSERIES_FORMAT,
-  }
 
   # mapping of target format key to source format and extra options
   CONVERT_MAP = {
@@ -1255,14 +1239,18 @@ class CalibreCommand(EBooksCommonBaseCommand):
       ''' The alternate `CalibreTree` from `self.calibre_path_other`.
       '''
       if self.calibre_path_other is None:
-        raise AttributeError(".calibre_other: no .calibre_path_other")
+        self.calibre_path_other = os.environ.get(OTHER_LIBRARY_PATH_ENVVAR)
+        if self.calibre_path_other is None:
+          raise AttributeError(
+              f'.calibre_other: no .calibre_path_other and no ${OTHER_LIBRARY_PATH_ENVVAR}'
+          )
       return CalibreTree(self.calibre_path_other)
 
     COMMON_OPT_SPECS = ChainMap(
         dict(
             O_=(
                 'calibre_path_other',
-                'path to secondary Calibre library',
+                f'Path to secondary Calibre library, default from ${OTHER_LIBRARY_PATH_ENVVAR}.',
                 str,
                 isdirpath,
                 'not a directory',
@@ -1278,9 +1266,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
     with super().run_context():
       options = self.options
       if options.calibre_path_other is None:
-        options.calibre_path_other = os.environ.get(
-            CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR
-        )
+        options.calibre_path_other = os.environ.get(OTHER_LIBRARY_PATH_ENVVAR)
       if options.linkto_dirpath is None:
         options.linkto_dirpath = os.environ.get(
             CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
