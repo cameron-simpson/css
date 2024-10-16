@@ -1560,7 +1560,7 @@ class BaseCommand:
         )
     )
 
-  def cmd_info(self, argv):
+  def cmd_info(self, argv, *, field_names=None):
     ''' Usage: {cmd}
           Recite general information.
 
@@ -1569,9 +1569,11 @@ class BaseCommand:
     self.popopts(argv)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    for line in tabulate(
-        *((f'{field}:', str(value))
-          for field, value in sorted(self.options.as_dict().items()))):
+    options = self.options
+    if field_names is None:
+      field_names = sorted(options.as_dict().keys())
+    for line in tabulate(*((f'{field}:', str(getattr(options, field)))
+                           for field in field_names)):
       print(line)
 
   @uses_upd
