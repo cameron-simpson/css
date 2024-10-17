@@ -210,15 +210,6 @@ class KindleCommand(EBooksCommonBaseCommand):
                 ctags[tag_name] = tag_value
     return xit
 
-  def cmd_info(self, argv):
-    ''' Usage: {cmd}
-          Report basic information.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    print("kindle", self.options.kindle.shortpath)
-    print("calibre", self.options.calibre.shortpath)
-
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l]
           List the contents of the library.
