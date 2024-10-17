@@ -13,7 +13,7 @@ from cmd import Cmd
 from code import interact
 from collections import ChainMap
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from functools import cache
 from getopt import getopt, GetoptError
 from inspect import isclass
@@ -1560,20 +1560,41 @@ class BaseCommand:
         )
     )
 
-  def cmd_info(self, argv, *, field_names=None):
-    ''' Usage: {cmd}
+  def cmd_info(self, argv, *, field_names=None, skip_names=None):
+    ''' Usage: {cmd} [field-names...]
           Recite general information.
+          Explicit field names may be provided to override the default listing.
 
-        This default ,ethod recites the values from `self.options`.
+        This default method recites the values from `self.options`,
+        excluding the basic fields from `BaseCommandOptions` other
+        than `cmd` and `dry_run`.
+
+        This base method provides two optional parameters to allow
+        subclasses to tune its behaviour:
+        - `field_namees`: an explicit list of options attributes to print
+        - `skip_names`: a list of option attributes to not print
+          if `field_names` is not specified; the default is the
+          field names of `BaseCommandOptions` excepting `cmd` and
+          `dry_run`
     '''
+    if skip_names is None:
+      skip_names = tuple(
+          F.name
+          for F in fields(BaseCommandOptions)
+          if F.name not in ('cmd', 'dry_run')
+      )
     self.popopts(argv)
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
-    if field_names is None:
-      field_names = sorted(options.as_dict().keys())
-    for line in tabulate(*((f'{field}:', str(getattr(options, field)))
-                           for field in field_names)):
+    if argv:
+      field_names = argv
+    elif field_names is None:
+      field_names = sorted(
+          field_name for field_name in options.as_dict().keys()
+          if field_name not in skip_names
+      )
+    for line in tabulate(*((f'{field_name}:',
+                            str(getattr(options, field_name)))
+                           for field_name in field_names)):
       print(line)
 
   @uses_upd
