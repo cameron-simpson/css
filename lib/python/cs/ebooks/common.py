@@ -50,10 +50,22 @@ class EBooksCommonOptions(BaseCommand.Options):
     self.dedrm_package_path = dedrm.fspath
     return dedrm
 
+  kobo_path: Optional[str] = None
+
+  @cached_property
+  def kobo(self):
+    from .kobo import Kobotree  # pylint: disable=import-outside-toplevel
+    kobo = KoboTree(self.kobo_path)
+    self.kobo_path = kobo.fspath
+
   COMMON_OPT_SPECS = dict(
       C_='calibre_path',
+      calibre_='calibre_path',
       D_='dedrm_package_path',
+      dedrm_='dedrm_package_path',
       K_='kindle_path',
+      kindle_='kindle_path',
+      kobo_='kobo_path',
       **BaseCommand.Options.COMMON_OPT_SPECS,
   )
 
