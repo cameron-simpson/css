@@ -451,8 +451,12 @@ class SubCommand:
                     tabulate(
                         *(
                             (opt_spec.option_terse(), opt_spec.help_text)
-                            for _, opt_spec in sorted(getopt_spec_map.items())
-                        )
+                            for _, opt_spec in sorted(
+                                getopt_spec_map.items(),
+                                key=lambda kv: kv[0].lstrip('-').lower()
+                            )
+                        ),
+                        sep='  ',
                     )
                 )
             )
