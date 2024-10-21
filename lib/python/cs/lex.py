@@ -1350,8 +1350,8 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
       remotepath = suffix
   return ssh_target, remotepath
 
-def tabulate(*rows):
-  ''' A generator yielding lines of values from columns.
+def tabulate(*rows, sep=' '):
+  ''' A generator yielding lines of values from `rows` aligned in columns.
   '''
   col_widths = [
       max(map(len, (row[c]
@@ -1359,7 +1359,7 @@ def tabulate(*rows):
       for c in range(max(map(len, rows)))
   ]
   for row in rows:
-    yield ' '.join(
+    yield sep.join(
         f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
     ).rstrip()
 
