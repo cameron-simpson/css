@@ -127,7 +127,7 @@ class OptionSpec:
 
   UNVALIDATED_MESSAGE_DEFAULT = "invalid value"
 
-  # the option, eg '-n' or '--dry-run'
+  # the option name, eg 'n' for -n or 'dry-run' for --dry-run
   opt_name: str
   # whether an argument is expected
   # the argument usage name or None
@@ -151,6 +151,8 @@ class OptionSpec:
     '''
     if self.field_name is None:
       self.field_name = self.opt_name.replace('-', '_')
+    if self.help_text is None:
+      self.help_text = self.help_text_from_field_name(self.field_name)
 
   def parse_value(self, value):
     ''' Parse `value` according to the spec.
@@ -196,7 +198,12 @@ class OptionSpec:
     if opt_k.endswith('_'):
       needs_arg = True
       opt_k = opt_k[:-1]
-    self = cls(opt_name=opt_k, arg_name=(opt_k if needs_arg else None))
+    opt_name = opt_k.replace('_', '-')
+    field_name = opt_k.replace('-', '_')
+    help_text = None
+    parse = None
+    validate = None
+    unvalidated_message = None
     # apply the provided specifications
     if isinstance(specs, str):
       specs = [specs]
@@ -207,30 +214,30 @@ class OptionSpec:
           f'expected str or list or tuple for specs, got {r(specs)}'
       )
     spec0 = specs.pop(0) if specs else None
-    # arg_name, an identifier
+    # first: optional field_name
+    # field_name, an identifier
     if isinstance(spec0, str) and is_identifier(spec0):
-      self.field_name = spec0
-      self.arg_name = self.field_name.replace('_', '-')
+      field_name = spec0
       spec0 = specs.pop(0) if specs else None
-    elif isinstance(spec0, str) and spec0.startwith('-') and is_identifier(
-        spec0[1:]):
-      self.field_name = spec0
-      self.arg_name = self.field_name.replace('_', '-')
+    # -field_name, a dash followed by an identifier
+    elif (isinstance(spec0, str) and spec0.startwith('-')
+          and is_identifier(spec0[1:])):
+      field_name = spec0[1:]
       self.arg_bool = False  # default is True
       spec0 = specs.pop(0) if specs else None
-    # help text
-    if isinstance(spec0, str) and not is_identifier(spec0):
+    # optional help text
+    if isinstance(spec0, str):
       self.help_text = spec0
       spec0 = specs.pop(0) if specs else None
-    # parse
+    # optional parse callable
     if callable(spec0):
       self.parse = spec0
       spec0 = specs.pop(0) if specs else None
-    # validate
+    # optional validate callable
     if callable(spec0):
       self.validate = spec0
       spec0 = specs.pop(0) if specs else None
-    # unvalidated_message
+    # optional unvalidated_message
     if isinstance(spec0, str):
       if not self.validate:
         raise ValueError(
@@ -240,8 +247,15 @@ class OptionSpec:
       spec0 = specs.pop(0) if specs else None
     if spec0 is not None:
       raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
-    if self.help_text is None:
-      self.help_text = self.help_text_from_field_name(self.field_name)
+    self = cls(
+        opt_name=opt_name,
+        arg_name=(field_name.replace('_', '-') if needs_arg else None),
+        field_name=field_name,
+        help_text=help_text,
+        parse=parse,
+        validate=validate,
+        unvalidated_message=unvalidated_message,
+    )
     return self
 
   @property
