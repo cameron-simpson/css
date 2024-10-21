@@ -1036,7 +1036,7 @@ class BaseCommand:
 
   def _prerun_setup(self):
     argv = self._argv
-    options = self.options.copy()
+    options = self.options
     subcmds = self.subcommands()
     has_subcmds = self.has_subcommands()
     log_level = getattr(options, 'log_level', None)
