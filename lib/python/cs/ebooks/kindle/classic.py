@@ -58,9 +58,11 @@ KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
     'Application Support/Kindle/My Kindle Content'
 )
 
-# The default location of the Kindle content.
+# The default location of the Kindle content
+# if there is no enviroment variable
+# and, on MacOS/darwin, no defaults setting.
 # On MacOS ("darwin") this is KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH.
-# Otherwise use the made up path ~/media/kindle/My Kindle Content,
+# Otherwise use the made up path ~/media/kindle/My Kindle Content
 # which is where I'm putting my personal Kindle stuff.
 KINDLE_CONTENT_DEFAULT_PATH = {
     'darwin': KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH,
@@ -83,16 +85,6 @@ def kindle_content_path():
       return path
   return expanduser(KINDLE_CONTENT_DEFAULT_PATH)
 
-@fmtdoc
-def default_kindle_library():
-  ''' Return the default kindle library content path from `${KINDLE_LIBRARY_ENVVAR}`
-      otherwise fall back to `kindle_content_path()`.
-    '''
-  path = os.environ.get(KINDLE_LIBRARY_ENVVAR, None)
-  if path is not None:
-    return path
-  return kindle_content_path()
-
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
 
@@ -102,9 +94,28 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CONTENT_DIRNAME = 'My Kindle Content'
 
-  FSPATH_FACTORY = default_kindle_library
   FSPATH_DEFAULT = KINDLE_CONTENT_DEFAULT_PATH
   FSPATH_ENVVAR = KINDLE_LIBRARY_ENVVAR
+
+  @classmethod
+  @fmtdoc
+  def FSPATH_DEFAULT(cls):
+    ''' Return the default Kindle content path.
+        On MacOS this will look up
+        `{KINDLE_APP_OSX_DEFAULTS_DOMAIN}[{KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING}]`
+        if present.
+        Otherwise it returns `KINDLE_CONTENT_DEFAULT_PATH`
+        (`{KINDLE_CONTENT_DEFAULT_PATH!r}`).
+    '''
+    if sys.platform == 'darwin':
+      # use the app settings if provided
+      defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+      path = defaults.get(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING)
+      if path is None:
+        path = expanduser(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH)
+    else:
+      path = expanduser(KINDLE_CONTENT_DEFAULT_PATH)
+    return path
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
 
