@@ -37,6 +37,7 @@ from cs.progress import progressbar
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 
 from .calibre import CalibreTree
+from .common import EBooksCommonBaseCommand
 
 pfx_listdir = partial(pfx_call, os.listdir)
 
@@ -338,29 +339,11 @@ class KoboBook(HasFSPath):
             )
     return cbook, added
 
-class KoboCommand(BaseCommand):
+class KoboCommand(EBooksCommonBaseCommand):
   ''' Command line for interacting with a Kobo Desktop filesystem tree.
   '''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
-
-  @dataclass
-  class Options(BaseCommand.Options):
-    ''' Set up the default values in `options`.
-    '''
-
-    def _calibre_path():
-      try:
-        # pylint: disable=protected-access
-        calibre_path = CalibreTree._resolve_fspath(None)
-      except ValueError:
-        calibre_path = None
-      return calibre_path
-
-    calibre_path: Optional[str] = field(default_factory=_calibre_path)
-    calibre: Optional[CalibreTree] = None
-    kobo_path: Optional[str] = None
-    kobo: Optional[KoboTree] = None
 
   @contextmanager
   @uses_fstags
@@ -375,17 +358,6 @@ class KoboCommand(BaseCommand):
           with stackattrs(options, kobo=kobo, calibre=cal):
             with fstags:
               yield
-
-  def cmd_info(self, argv):
-    ''' Usage: {cmd}
-          Report basic information.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    kobo = self.options.kobo
-    print("kobo", kobo)
-    for bookpath in kobo.bookpaths():
-      print(" ", shortpath(bookpath))
 
   # pylint: disable=too-many-locals
   @uses_runstate
