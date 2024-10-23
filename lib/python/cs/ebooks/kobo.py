@@ -377,7 +377,7 @@ class KoboCommand(EBooksCommonBaseCommand):
                 (TODO: just those with no "calibre.dbid" fstag.)
     '''
     options = self.options
-    options.popopts(argv, f='force', n='-doit', q='quiet', v='verbose')
+    options.popopts(argv, f='force')
     doit = options.doit
     force = options.force
     quiet = options.quiet
