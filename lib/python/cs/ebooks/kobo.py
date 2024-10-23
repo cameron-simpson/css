@@ -355,9 +355,8 @@ class KoboCommand(EBooksCommonBaseCommand):
     with super().run_context():
       options = self.options
       kobo_path = options.kobo_path
-      if kobo_path is None:
-        kobo_path = default_kobo_library()
       with KoboTree(kobo_path) as kobo:
+        options.kobo_path = kobo.fspath
         with CalibreTree(options.calibre_path) as cal:
           with stackattrs(options, kobo=kobo, calibre=cal):
             with fstags:
@@ -378,13 +377,13 @@ class KoboCommand(EBooksCommonBaseCommand):
                 (TODO: just those with no "calibre.dbid" fstag.)
     '''
     options = self.options
-    calibre = options.calibre
-    kobo = options.kobo
-    self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
+    options.popopts(argv, f='force', n='-doit', q='quiet', v='verbose')
     doit = options.doit
     force = options.force
     quiet = options.quiet
     verbose = options.verbose
+    calibre = options.calibre
+    kobo = options.kobo
     volumeids = argv or sorted(str(vid) for vid in kobo.volumeids)
     xit = 0
     quiet or print("export", kobo.shortpath, "=>", calibre.shortpath)
