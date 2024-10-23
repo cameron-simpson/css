@@ -54,7 +54,7 @@ class EBooksCommonOptions(BaseCommand.Options):
 
   @cached_property
   def kobo(self):
-    from .kobo import Kobotree  # pylint: disable=import-outside-toplevel
+    from .kobo import KoboTree  # pylint: disable=import-outside-toplevel
     kobo = KoboTree(self.kobo_path)
     self.kobo_path = kobo.fspath
 
