@@ -200,6 +200,7 @@ class OptionSpec:
       opt_k = opt_k[:-1]
     opt_name = opt_k.replace('_', '-')
     field_name = opt_k.replace('-', '_')
+    arg_bool = True
     help_text = None
     parse = None
     validate = None
@@ -220,36 +221,37 @@ class OptionSpec:
       field_name = spec0
       spec0 = specs.pop(0) if specs else None
     # -field_name, a dash followed by an identifier
-    elif (isinstance(spec0, str) and spec0.startwith('-')
+    elif (isinstance(spec0, str) and spec0.startswith('-')
           and is_identifier(spec0[1:])):
       field_name = spec0[1:]
-      self.arg_bool = False  # default is True
+      arg_bool = False  # default is True
       spec0 = specs.pop(0) if specs else None
     # optional help text
     if isinstance(spec0, str):
-      self.help_text = spec0
+      help_text = spec0
       spec0 = specs.pop(0) if specs else None
     # optional parse callable
     if callable(spec0):
-      self.parse = spec0
+      parse = spec0
       spec0 = specs.pop(0) if specs else None
     # optional validate callable
     if callable(spec0):
-      self.validate = spec0
+      validate = spec0
       spec0 = specs.pop(0) if specs else None
     # optional unvalidated_message
     if isinstance(spec0, str):
-      if not self.validate:
+      if not validate:
         raise ValueError(
             f'unexpected unvalidated_message {spec0!r} when there is no validate callable'
         )
-      self.unvalidated_message = spec0
+      unvalidated_message = spec0
       spec0 = specs.pop(0) if specs else None
     if spec0 is not None:
       raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
     self = cls(
         opt_name=opt_name,
         arg_name=(field_name.replace('_', '-') if needs_arg else None),
+        arg_bool=arg_bool,
         field_name=field_name,
         help_text=help_text,
         parse=parse,
