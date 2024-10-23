@@ -54,52 +54,6 @@ KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.kobo.Kobo Desktop Edition'
 OBOK_PACKAGE_PATH_ENVVAR = 'OBOK_PACKAGE_PATH'
 OBOK_PACKAGE_ZIPFILE = 'Obok DeDRM.zip'
 
-@pfx
-def decrypt_obok(obok_lib, obok_book, dstpath: str, exists_ok=False):
-  ''' Decrypt the encrypted kepub file of `obok_book` and save the
-      decrypted form at `dstpath`.
-
-      This is closely based on the `decrypt_book()` function from
-      `obok.obok` in the DeDRM Obok_plugin.
-  '''
-  userkeys = obok_lib.userkeys
-  with pfx_call(ZipFile, obok_book.filename, "r") as zin:
-    with open(os.devnull, 'w') as devnull:
-      with stackattrs(sys, stdout=devnull):
-        with atomic_filename(
-            dstpath,
-            exists_ok=exists_ok,
-            suffix=f'--{basename(obok_book.filename)}.zip',
-        ) as f:
-          with ZipFile(f.name, 'w', ZIP_DEFLATED) as zout:
-            for filename in zin.namelist():
-              with Pfx(filename):
-                contents = zin.read(filename)
-                try:
-                  file = obok_book.encryptedfiles[filename]
-                except KeyError:
-                  plain_contents = contents
-                else:
-                  for userkey in userkeys:
-                    with Pfx("userkey %s", userkey):
-                      try:
-                        plain_contents = file.decrypt(userkey, contents)
-                      except ValueError as e:
-                        warning("%s", e)
-                        continue
-                      try:
-                        file.check(plain_contents)
-                      except (IndexError, ValueError) as e:
-                        # Parse failures mean the key is probably wrong.
-                        ##warning("file.check fails: %s", e)
-                        continue
-                      break
-                  else:
-                    raise ValueError(
-                        f'could not decrypt using any keys from userkeys:{userkeys!r}'
-                    )
-                zout.writestr(filename, plain_contents)
-
 class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kobo ebook tree.
 
@@ -246,16 +200,56 @@ class KoboBook(HasFSPath):
     return fstags[self.fspath]
 
   @pfx
-  def decrypt(self, dstpath, exists_ok=False):
-    ''' Decrypt the encrypted kepub file of `book` and save the
+  def decrypt(self, dstpath: str, *, exists_ok=False):
+    ''' Decrypt the encrypted kepub file of `self` and save the
         decrypted form at `dstpath`.
 
         This is closely based on the `decrypt_book()` function from
         `obok.obok` in the DeDRM Obok_plugin.
+
+        Parameters:
+        * `dstpath`: the filesystem path for the decrypted copy
+        * `exists_ok`: optional flag, default `False`;
+          if true then it is not an error is `dstpath` already exists
     '''
-    return decrypt_obok(
-        self.kobo_tree.lib, self.kobo_book, dstpath, exists_ok=exists_ok
-    )
+    obok_book = self.kobo_book
+    userkeys = self.kobo_tree.lib.userkeys
+    with pfx_call(ZipFile, obok_book.filename, "r") as zin:
+      with open(os.devnull, 'w') as devnull:
+        with stackattrs(sys, stdout=devnull):
+          with atomic_filename(
+              dstpath,
+              exists_ok=exists_ok,
+              suffix=f'--{basename(obok_book.filename)}.zip',
+          ) as f:
+            with ZipFile(f.name, 'w', ZIP_DEFLATED) as zout:
+              for filename in zin.namelist():
+                with Pfx(filename):
+                  contents = zin.read(filename)
+                  try:
+                    file = obok_book.encryptedfiles[filename]
+                  except KeyError:
+                    plain_contents = contents
+                  else:
+                    for userkey in userkeys:
+                      with Pfx("userkey %s", userkey):
+                        try:
+                          plain_contents = file.decrypt(userkey, contents)
+                        except ValueError as e:
+                          warning("%s", e)
+                          continue
+                        try:
+                          file.check(plain_contents)
+                        except (IndexError, ValueError):
+                          # Parse failures mean the key is probably wrong.
+                          ##warning("file.check fails: %s", e)
+                          continue
+                        break
+                    else:
+                      raise ValueError(
+                          f'could not decrypt using any keys from userkeys:{userkeys!r}'
+                      )
+                  zout.writestr(filename, plain_contents)
 
   @contextmanager
   def decrypted(self):
