@@ -129,17 +129,16 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Open/closethe obok library. '''
     obok = self.import_obok(self.fspath)
     assert self.lib is None
-    self.lib = obok.KoboLibrary(desktopkobodir=self.fspath)
-    try:
-      yield
-    finally:
-      # close the library
+    with stackattrs(self, lib=obok.KoboLibrary(desktopkobodir=self.fspath)):
       try:
-        del self.books
-      except AttributeError:
-        pass
-      self.lib.close()
-      self.lib = None
+        yield
+      finally:
+        # close the library
+        try:
+          del self.books
+        except AttributeError:
+          pass
+        self.lib.close()
 
   @cached_property
   def books(self):
