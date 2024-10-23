@@ -55,39 +55,6 @@ OBOK_PACKAGE_PATH_ENVVAR = 'OBOK_PACKAGE_PATH'
 OBOK_PACKAGE_ZIPFILE = 'Obok DeDRM.zip'
 
 @pfx
-@fmtdoc
-def import_obok(obok_package_path=None):
-  ''' Import the `obok.py` module.
-
-      This looks in `obok_package_path`, which defaults to
-      `${OBOK_PACKAGE_PATH_ENVVAR}` if defined,
-      otherwise {OBOK_PACKAGE_ZIPFILE!r} in the default `CalibreTree`
-      plugins directory.
-  '''
-  if obok_package_path is None:
-    obok_package_path = pfx_call(os.environ.get, OBOK_PACKAGE_PATH_ENVVAR)
-    if obok_package_path is None:
-      from .calibre import CalibreTree
-      obok_package_path = joinpath(
-          CalibreTree().plugins_dirpath, OBOK_PACKAGE_ZIPFILE
-      )
-  if not existspath(obok_package_path):
-    raise ValueError(
-        f'obok_package_path does not exist: {obok_package_path!r}'
-    )
-  if isfilepath(obok_package_path):
-    with stackattrs(sys, path=[obok_package_path] + sys.path):
-      obok = pfx_call(importlib.import_module, '.obok', package='obok')
-  else:
-    with TemporaryDirectory() as tmpdirpath:
-      pfx_call(os.symlink, obok_package_path, joinpath(tmpdirpath, 'obok'))
-      with stackattrs(sys, path=[tmpdirpath] + sys.path):
-        obok = pfx_call(importlib.import_module, '.obok', package='obok')
-  return obok
-
-obok = import_obok()
-
-@pfx
 def decrypt_obok(obok_lib, obok_book, dstpath: str, exists_ok=False):
   ''' Decrypt the encrypted kepub file of `obok_book` and save the
       decrypted form at `dstpath`.
@@ -170,9 +137,43 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
         (sys.platform,)
     )
 
+  @classmethod
+  @fmtdoc
+  def import_obok(cls, obok_package_path=None):
+    ''' Import the `obok.py` module from the `obok` package.
+
+        This looks in `obok_package_path`, which defaults to
+        `${OBOK_PACKAGE_PATH_ENVVAR}` if defined,
+        otherwise {OBOK_PACKAGE_ZIPFILE!r} in the default `CalibreTree`
+        plugins directory.
+    '''
+    if obok_package_path is None:
+      obok_package_path = pfx_call(os.environ.get, OBOK_PACKAGE_PATH_ENVVAR)
+      if obok_package_path is None:
+        from .calibre import CalibreTree
+        obok_package_path = joinpath(
+            CalibreTree().plugins_dirpath, OBOK_PACKAGE_ZIPFILE
+        )
+    if not existspath(obok_package_path):
+      raise ValueError(
+          f'obok_package_path does not exist: {obok_package_path!r}'
+      )
+    if isdirpath(obok_package_path):
+      # assume a directory with an obok.py inside it
+      with TemporaryDirectory() as tmpdirpath:
+        pfx_call(os.symlink, obok_package_path, joinpath(tmpdirpath, 'obok'))
+        with stackattrs(sys, path=[tmpdirpath] + sys.path):
+          obok = pfx_call(importlib.import_module, '.obok', package='obok')
+    else:
+      # assume it is a zip file with an obok/obok.py inside it
+      with stackattrs(sys, path=[obok_package_path] + sys.path):
+        obok = pfx_call(importlib.import_module, '.obok', package='obok')
+    return obok
+
   @contextmanager
   def startup_shutdown(self):
     ''' Open/closethe obok library. '''
+    obok = self.import_obok(self.fspath)
     assert self.lib is None
     self.lib = obok.KoboLibrary(desktopkobodir=self.fspath)
     try:
