@@ -14,7 +14,7 @@ from os.path import (
     basename,
     exists as existspath,
     expanduser,
-    isfile as isfilepath,
+    isdir as isdirpath,
     join as joinpath,
 )
 import sys
@@ -56,9 +56,6 @@ OBOK_PACKAGE_ZIPFILE = 'Obok DeDRM.zip'
 
 class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kobo ebook tree.
-
-      This actually knows very little about Kobo ebooks or its database.
-      This is mostly to aid keeping track of state using `cs.fstags`.
   '''
 
   CONTENT_DIRNAME = 'kepub'
