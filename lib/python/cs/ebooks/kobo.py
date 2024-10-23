@@ -141,12 +141,17 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
         self.lib.close()
 
   @cached_property
+  def kobo_lib_books(self):
+    ''' A mapping of Kobo library books by their volumeids. '''
+    return {UUID(book.volumeid): book for book in self.lib.books}
+
+  @cached_property
   def books(self):
-    ''' A mapping of book volumeids (`UUID`s) to Kobo books. '''
+    ''' A mapping of book volumeids (`UUID`s) to `KoboBook` instance. '''
     return {
         UUID(book.volumeid):
-        KoboBook(kobo_tree=self, uuid=UUID(book.volumeid), kobo_book=book)
-        for book in self.lib.books
+        KoboBook(kobo_tree=self, uuid=UUID(book.volumeid))
+        for book in self.kobo_lib_books.values()
     }
 
   @cached_property
@@ -171,9 +176,9 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
 
 @dataclass
 class KoboBook(HasFSPath):
+  # the book UUID
   uuid: UUID
   kobo_tree: KoboTree
-  kobo_book: obok.KoboBook
 
   def __str__(self):
     return f'{self.kobo_tree}[{self.uuid}]'
@@ -185,6 +190,11 @@ class KoboBook(HasFSPath):
   def fspath(self):
     ''' The filesystem path of the KEPub file. '''
     return self.filename
+
+  @property
+  def kobo_book(self):
+    ''' The KoboBook instance from the obok module. '''
+    return self.kobo_tree.kobo_lib_books[self.uuid]
 
   @property
   def volumeid(self):
