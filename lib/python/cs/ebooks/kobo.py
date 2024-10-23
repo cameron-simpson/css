@@ -54,24 +54,6 @@ KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.kobo.Kobo Desktop Edition'
 OBOK_PACKAGE_PATH_ENVVAR = 'OBOK_PACKAGE_PATH'
 OBOK_PACKAGE_ZIPFILE = 'Obok DeDRM.zip'
 
-@fmtdoc
-def default_kobo_library():
-  ''' Return the default Kobo library content path
-      from ${KOBO_LIBRARY_ENVVAR}.
-      On Darwin, fall back to KOBO_LIBRARY_DEFAULT_OSX,
-      {KOBO_LIBRARY_DEFAULT_OSX!r}.
-      Raises `RuntimeError` if there is no default.
-    '''
-  path = os.environ.get(KOBO_LIBRARY_ENVVAR, None)
-  if path is not None:
-    return path
-  if sys.platform == 'darwin':
-    return expanduser(KOBO_LIBRARY_DEFAULT_OSX)
-  raise RuntimeError(
-      "I do not know the default Kobo content path on platform %r" %
-      (sys.platform,)
-  )
-
 @pfx
 @fmtdoc
 def import_obok(obok_package_path=None):
@@ -160,7 +142,6 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CONTENT_DIRNAME = 'kepub'
 
-  FSPATH_DEFAULT = default_kobo_library
   FSPATH_ENVVAR = KOBO_LIBRARY_ENVVAR
 
   def __init__(self, fspath=None):
@@ -169,6 +150,25 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
     super().__init__(fspath=fspath)
     self._lock = RLock()
     self.lib = None
+
+  @classmethod
+  @fmtdoc
+  def FSPATH_DEFAULT(cls):
+    ''' Return the default Kobo library content path
+        from ${KOBO_LIBRARY_ENVVAR}.
+        On Darwin, fall back to `KOBO_LIBRARY_DEFAULT_OSX`,
+        {KOBO_LIBRARY_DEFAULT_OSX!r}.
+        Raises `RuntimeError` if there is no default.
+      '''
+    path = os.environ.get(KOBO_LIBRARY_ENVVAR, None)
+    if path is not None:
+      return path
+    if sys.platform == 'darwin':
+      return expanduser(KOBO_LIBRARY_DEFAULT_OSX)
+    raise RuntimeError(
+        "I do not know the default Kobo content path on platform %r" %
+        (sys.platform,)
+    )
 
   @contextmanager
   def startup_shutdown(self):
