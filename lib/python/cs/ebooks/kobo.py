@@ -408,6 +408,7 @@ class KoboCommand(EBooksCommonBaseCommand):
           volumeids
                 Optional Kobo volumeid identifiers to list.
     '''
+    self.options.popopts(argv)
     kobo = self.options.kobo
     volumeids = argv or sorted(map(str, kobo.keys()))
     for vid in volumeids:
