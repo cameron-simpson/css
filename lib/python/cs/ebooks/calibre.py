@@ -77,7 +77,7 @@ from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import UpdProxy, print, run_task  # pylint: disable=redefined-builtin
 
-from .common import EBooksCommonBaseCommand
+from .common import AbstractEbooksTree, EBooksCommonBaseCommand
 from .dedrm import DeDRMWrapper
 from .mobi import Mobi  # pylint: disable=import-outside-toplevel
 from .pdf import PDFDocument
@@ -93,7 +93,7 @@ if sys.platform == 'darwin':
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
   CALIBRE_PREFSDIR_DEFAULT = expanduser('~/Library/Preferences/calibre')
 
-class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
+class CalibreTree(AbstractEbooksTree):
   ''' Work with a Calibre ebook tree.
   '''
 
@@ -128,6 +128,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       raise ValueError(f'no directory at {self.fspath!r}')
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
     self.prefs_dirpath = prefs_dirpath or self.get_default_prefs_dirpath()
+    self.books_by_dbib = {}
 
     # define the proxy classes
     class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
@@ -575,9 +576,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
     self.CalibreBook = CalibreBook
 
-  def __str__(self):
-    return "%s:%s" % (type(self).__name__, self.shortpath)
-
   @staticmethod
   def get_default_prefs_dirpath():
     return (
@@ -622,45 +620,23 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def preload(self):
     ''' Scan all the books, preload their data.
     '''
-    with run_task(f'preload {self}'):
+    with run_task(f'preload {self}', report_print=True):
       db = self.db
       with db.session() as session:
         for db_book in self.db.books.lookup(session=session):
-          self.book_by_dbid(db_book.id, db_book=db_book)
+          dbid = db_book.id
+          book = self.books_by_dbib.get(dbid)
+          if book is None:
+            self.books_by_dbib[dbid] = self.CalibreBook(
+                self, dbid, db_book=db_book
+            )
+          else:
+            book.refresh_from_db_row(db_book)
 
-  @typechecked
-  def __getitem__(self, dbid: int):
-    return self.book_by_dbid(dbid)
-
-  def __contains__(self, dbid: int):
-    db = self.db
-    try:
-      with db.session() as session:
-        db.books.by_id(dbid, session=session)
-    except IndexError:
-      return False
-    return True
-
-  @require(lambda dbid: dbid > 0)
-  @typechecked
-  def book_by_dbid(self, dbid: int, *, db_book=None):
-    ''' Return a cached `CalibreBook` for `dbid`.
-    '''
-    return self.CalibreBook(self, dbid, db_book=db_book)
-
-  def __iter__(self):
-    ''' Generator yielding `CalibreBook`s.
-    '''
-    db = self.db
-    seen_dbids = set()
-    with db.session() as session:
-      for author in sorted(db.authors.lookup(session=session)):
-        with Pfx("%d:%s", author.id, author.name):
-          for book in sorted(author.books):
-            if book.id in seen_dbids:
-              continue
-            yield self.book_by_dbid(book.id, db_book=book)
-            seen_dbids.add(book.id)
+  def get_library_books_mapping(self, preload=False):
+    if preload or not self.books_by_dbib:
+      self.preload()
+    return self.books_by_dbib
 
   def identifier_names(self):
     ''' Return an iterable of the identifiers in use in the library.
@@ -1584,7 +1560,9 @@ class CalibreCommand(EBooksCommonBaseCommand):
       else:
         with contextif(verbose, run_task, "sort calibre contents"):
           cbooks = sorted(
-              calibre, key=cbook_sort_key, reverse=options.sort_reverse
+              calibre.books(),
+              key=cbook_sort_key,
+              reverse=options.sort_reverse
           )
       for cbook in cbooks:
         runstate.raiseif()
