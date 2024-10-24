@@ -369,7 +369,7 @@ class KoboCommand(EBooksCommonBaseCommand):
     verbose = options.verbose
     calibre = options.calibre
     kobo = options.kobo
-    volumeids = argv or sorted(str(vid) for vid in kobo.volumeids)
+    volumeids = argv or sorted(map(str, self.keys()))
     xit = 0
     quiet or print("export", kobo.shortpath, "=>", calibre.shortpath)
     for vid in progressbar(volumeids, f"export to {calibre}"):
@@ -393,6 +393,14 @@ class KoboCommand(EBooksCommonBaseCommand):
           raise
     return xit
 
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report basic information.
+    '''
+    super().cmd_info(argv)
+    for book in self.options.kobo.books():
+      print(" ", book.shortpath)
+
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [volumeids...]
           List the contents of the library.
@@ -401,7 +409,7 @@ class KoboCommand(EBooksCommonBaseCommand):
                 Optional Kobo volumeid identifiers to list.
     '''
     kobo = self.options.kobo
-    volumeids = argv or sorted(str(vid) for vid in kobo.volumeids)
+    volumeids = argv or sorted(map(str, kobo.keys()))
     for vid in volumeids:
       book = kobo[vid]
       print(book.uuid, book)
