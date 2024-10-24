@@ -1738,7 +1738,7 @@ def atomic_filename(
         raise FileExistsError(
             errno.EEXIST, os.strerror(errno.EEXIST), filename
         )
-      pfx_call(trace(rename_func), T.name, filename)
+      pfx_call(rename_func, T.name, filename)
     # recreate the temp file so that it can be cleaned up by NamedTemporaryFile
     with pfx_call(open, T.name, 'xb'):
       pass
