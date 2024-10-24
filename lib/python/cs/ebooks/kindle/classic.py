@@ -15,6 +15,7 @@ from os.path import (
     join as joinpath,
 )
 import sys
+from typing import Mapping
 
 from icontract import require
 from sqlalchemy import (
@@ -50,6 +51,7 @@ from cs.sqlalchemy_utils import (
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 from . import KINDLE_LIBRARY_ENVVAR
+from ..common import AbstractEbooksTree
 
 KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.amazon.Kindle'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
@@ -85,7 +87,7 @@ def kindle_content_path():
       return path
   return expanduser(KINDLE_CONTENT_DEFAULT_PATH)
 
-class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
+class KindleTree(AbstractEbooksTree):
   ''' Work with a Kindle ebook tree.
 
       This actually knows very little about Kindle ebooks or its rather opaque database.
@@ -356,12 +358,6 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
     self.KindleBook = KindleBook
 
-  def __str__(self):
-    return "%s:%s" % (type(self).__name__, shortpath(self.fspath))
-
-  def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, self.fspath)
-
   @contextmanager
   @uses_fstags
   def startup_shutdown(self, fstags: FSTags):
@@ -383,6 +379,37 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Interactive db shell.
     '''
     return self.db.shell()
+
+  def subdir_for_asin(self, asin: str) -> str:
+    ''' Return the subdirectory name for `asin`,
+        or `asin.upper()+self.SUBDIR_SUFFIXES[0]` if nothing is found.
+    '''
+    ASIN = asin.upper()
+    # convert ASIN_EBOK to ASIN, handy for copy/paste of subdir name from listing
+    for suffix in self.SUBDIR_SUFFIXES:
+      subdir_name = cutsuffix(ASIN, suffix)
+      if subdir_name is not ASIN:
+        ASIN = subdir_name
+        break
+    for suffix in self.SUBDIR_SUFFIXES:
+      subdir_name = ASIN + suffix
+      if isdirpath(self.pathto(subdir_name)):
+        return subdir_name
+    return ASIN + self.SUBDIR_SUFFIXES[0]
+
+  def get_library_books_mapping(self) -> Mapping:
+    ''' Return a mapping of library primary keys to library book instances.
+    '''
+    book_map = {}
+    for asin in self.asins():
+      try:
+        book = self._bookrefs[asin]
+      except KeyError:
+        book = self._bookrefs[asin] = self.KindleBook(
+            self, self.subdir_for_asin(asin)
+        )
+      book_map[asin] = book
+    return book_map
 
   def is_book_subdir(self, subdir_name):
     ''' Test whether `subdir_name` is a Kindle ebook subdirectory basename.
@@ -420,40 +447,6 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       if isdirpath(self.pathto(subdir_name)):
         return self[subdir_name]
     return self[ASIN + self.SUBDIR_SUFFIXES[0]]
-
-  def keys(self):
-    ''' The keys of a `KindleTree` are its book subdirectory names.
-    '''
-    return self.book_subdir_names()
-
-  def __getitem__(self, subdir_name):
-    ''' Return the `KindleBook` for the ebook subdirectory named `subdir_name`.
-    '''
-    if not self.is_book_subdir(subdir_name):
-      raise ValueError(
-          "not a Kindle ebook subdirectory name: %r" % (subdir_name,)
-      )
-    try:
-      book = self._bookrefs[subdir_name]
-    except KeyError:
-      book = self._bookrefs[subdir_name] = self.KindleBook(self, subdir_name)
-    return book
-
-  def __iter__(self):
-    ''' Mapping iteration method.
-    '''
-    return iter(self.keys())
-
-  def values(self):
-    ''' Mapping method yielding `KindleBook` instances.
-    '''
-    yield from map(self.__getitem__, self)
-
-  def items(self):
-    ''' Mapping method yielding `(subdir_name,KindleBook)` pairs.
-    '''
-    for k in self:
-      yield k, self[k]
 
 # pylint: disable=too-many-instance-attributes
 class KindleBookAssetDB(ORM):
