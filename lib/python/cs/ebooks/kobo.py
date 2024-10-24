@@ -37,7 +37,7 @@ from cs.progress import progressbar
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 
 from .calibre import CalibreTree
-from .common import EBooksCommonBaseCommand
+from .common import AbstractEbooksTree, EBooksCommonBaseCommand
 
 pfx_listdir = partial(pfx_call, os.listdir)
 
@@ -54,7 +54,7 @@ KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.kobo.Kobo Desktop Edition'
 OBOK_PACKAGE_PATH_ENVVAR = 'OBOK_PACKAGE_PATH'
 OBOK_PACKAGE_ZIPFILE = 'Obok DeDRM.zip'
 
-class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
+class KoboTree(AbstractEbooksTree):
   ''' Work with a Kobo ebook tree.
   '''
 
@@ -142,19 +142,13 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' A mapping of Kobo library books by their volumeids. '''
     return {UUID(book.volumeid): book for book in self.lib.books}
 
-  @cached_property
-  def books(self):
+  def get_library_books_mapping(self):
     ''' A mapping of book volumeids (`UUID`s) to `KoboBook` instance. '''
     return {
         UUID(book.volumeid):
         KoboBook(kobo_tree=self, uuid=UUID(book.volumeid))
         for book in self.kobo_lib_books.values()
     }
-
-  @cached_property
-  def volumeids(self):
-    ''' `self.books.keys()`, a collection of `UUID`s. '''
-    return self.books.keys()
 
   def bookpaths(self):
     ''' Return a list of the filesystem paths in `self.CONTENT_DIRNAME`. '''
@@ -163,13 +157,10 @@ class KoboTree(FSPathBasedSingleton, MultiOpenMixin):
         for name in pfx_listdir(self.pathto(self.CONTENT_DIRNAME))
     ]
 
-  def __iter__(self):
-    return iter(sorted(self.books.values(), key=lambda book: book.uuid))
-
   def __getitem__(self, book_uuid: Union[UUID, str]):
     if isinstance(book_uuid, str):
       book_uuid = UUID(book_uuid)
-    return self.books[book_uuid]
+    return super().__getitem__(book_uuid)
 
 @dataclass
 class KoboBook(HasFSPath):
