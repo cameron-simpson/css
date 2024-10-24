@@ -649,8 +649,11 @@ class CalibreTree(AbstractEbooksTree):
     '''
     db = self.db
     with db.session() as session:
-      for identifier in db.identifiers.lookup(session=session, type=type_,
-                                              val=value):
+      for identifier in db.identifiers.lookup(
+          session=session,
+          type=type_,
+          val=value,
+      ):
         yield self[identifier.book_id]
 
   def by_asin(self, asin):
