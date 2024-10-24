@@ -3,12 +3,16 @@
 ''' Common utilities for cs.ebooks.
 '''
 
+from abc import abstractmethod
+from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
+from typing import Iterable, Mapping, Optional
 
 from cs.cmdutils import BaseCommand
+from cs.fs import FSPathBasedSingleton
 from cs.logutils import warning
+from cs.resources import MultiOpenMixin
 
 @dataclass
 class EBooksCommonOptions(BaseCommand.Options):
@@ -74,3 +78,35 @@ class EBooksCommonBaseCommand(BaseCommand):
   '''
 
   Options = EBooksCommonOptions
+
+class AbstractEbooksTree(FSPathBasedSingleton, MultiOpenMixin, MappingABC):
+  ''' A common base class for the `*Tree` classes accessing some
+      ebook reader's library.
+  '''
+
+  @abstractmethod
+  def get_library_books_mapping(self) -> Mapping:
+    ''' Return a mapping of library primary keys to library book instances.
+    '''
+    raise NotImplemenetedError
+
+  def __iter__(self) -> Iterable:
+    ''' Yield primary keys from the library.
+        This might yield ASINs for a Kindle library, VolumeIDs for a Kobo library, etc.
+    '''
+    return iter(self.get_library_books_mapping())
+
+  def __getitem__(self, key):
+    ''' Return the library book instance for the primary `key`.
+    '''
+    return self.get_library_books_mapping()[key]
+
+  def __len__(self):
+    ''' Return the number of library book instances.
+    '''
+    return len(self.get_library_books_mapping())
+
+  def books(self):
+    ''' Return the book instances for this library.
+    '''
+    return self.get_library_books_mapping().values()
