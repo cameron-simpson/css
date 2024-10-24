@@ -84,6 +84,12 @@ class AbstractEbooksTree(FSPathBasedSingleton, MultiOpenMixin, MappingABC):
       ebook reader's library.
   '''
 
+  def __str__(self):
+    return "%s:%s" % (self.__class__.__name__, self.shortpath)
+
+  def __repr__(self):
+    return "%s(%r)" % (self.__class__.__name__, self.fspath)
+
   @abstractmethod
   def get_library_books_mapping(self) -> Mapping:
     ''' Return a mapping of library primary keys to library book instances.
