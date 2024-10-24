@@ -218,7 +218,7 @@ class KindleCommand(EBooksCommonBaseCommand):
     options = self.options
     kindle = options.kindle
     options.longmode = False
-    self.popopts(argv, options, l='longmode')
+    options.popopts(argv, l='longmode')
     longmode = options.longmode
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
