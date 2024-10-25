@@ -40,6 +40,7 @@ from cs.resources import RunState, uses_runstate
 from cs.threads import bg
 
 from .cbz import make_cbz
+from .common import EBooksCommonBaseCommand
 
 from cs.debug import s
 from cs.x import X
@@ -51,7 +52,7 @@ DEFAULT_IMAGE_FILENAME_FORMAT = '{n:03d}.png'
 def main(argv=None):
   return PDFCommand(argv).run()
 
-class PDFCommand(BaseCommand):
+class PDFCommand(EBooksCommonBaseCommand):
   ''' Command line tool for doing things with PDF files.
   '''
 
