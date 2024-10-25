@@ -652,6 +652,15 @@ class CalibreTree(AbstractEbooksTree):
       self.preload()
     return self.books_by_dbib
 
+  def __getitem__(self, dbid: int):
+    mapping = self.get_library_books_mapping()
+    try:
+      cbook = mapping[dbid]
+    except KeyError:
+      self.refresh_dbid(dbid)
+      cbook = mapping[dbid]
+    return cbook
+
   def identifier_names(self):
     ''' Return an iterable of the identifiers in use in the library.
     '''
