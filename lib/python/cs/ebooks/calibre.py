@@ -885,6 +885,7 @@ class CalibreTree(AbstractEbooksTree):
       )
       return None
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
+    self.refresh_dbid(dbid)
     return dbid
 
 # pylint: disable=too-many-instance-attributes
