@@ -617,6 +617,20 @@ class CalibreTree(AbstractEbooksTree):
     '''
     return self.db.shell()
 
+  def refresh_dbid(self, dbid, session=None):
+    db = self.db
+    with db.session() as session:
+      db_book = self.db.books.lookup1(id=dbid, session=session)
+      if db_book is None:
+        raise ValueError(f'unknown database book id {dbid!r}')
+      book = self.books_by_dbib.get(dbid)
+      if book is None:
+        self.books_by_dbib[dbid] = self.CalibreBook(
+            self, dbid, db_book=db_book
+        )
+      else:
+        book.refresh_from_db(db_book)
+
   def preload(self):
     ''' Scan all the books, preload their data.
     '''
