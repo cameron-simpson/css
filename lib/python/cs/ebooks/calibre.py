@@ -714,7 +714,7 @@ class CalibreTree(AbstractEbooksTree):
     if not isabspath(calcmd):
       calcmd = joinpath(self.bin_dirpath, calcmd)
     calargv = [calcmd, *calargv]
-    cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
+    cp = run(calargv, doit=doit, quiet=quiet, print=print, **subp_options)
     if cp is not None and cp.stdout and not quiet:
       print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
     return cp
