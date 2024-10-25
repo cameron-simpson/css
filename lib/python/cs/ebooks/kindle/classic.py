@@ -322,6 +322,7 @@ class KindleTree(AbstractEbooksTree):
             cbook = None
           else:
             added = True
+            calibre.refresh_dbid(dbid)
             cbook = calibre[dbid]
             quiet or print(" ", cbook)
         else:
