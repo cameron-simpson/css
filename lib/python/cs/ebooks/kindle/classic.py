@@ -433,7 +433,7 @@ class KindleTree(AbstractEbooksTree):
     with db.session() as session:
       return set(asin for asin, in session.query(books.asin))
 
-  def by_asin(self, asin):
+  def __getitem__(self, asin: str):
     ''' Return a `KindleBook` for the supplied `asin`.
     '''
     ASIN = asin.upper()
@@ -443,11 +443,7 @@ class KindleTree(AbstractEbooksTree):
       if subdir_name is not ASIN:
         ASIN = subdir_name
         break
-    for suffix in self.SUBDIR_SUFFIXES:
-      subdir_name = ASIN + suffix
-      if isdirpath(self.pathto(subdir_name)):
-        return self[subdir_name]
-    return self[ASIN + self.SUBDIR_SUFFIXES[0]]
+    return super().__getitem__(ASIN)
 
 # pylint: disable=too-many-instance-attributes
 class KindleBookAssetDB(ORM):
