@@ -138,7 +138,10 @@ class KindleCommand(EBooksCommonBaseCommand):
               quiet=quiet,
               verbose=verbose,
           )
-        except (dedrm.DeDRMError, ValueError) as e:
+        except ValueError as e:
+          warning("export failed: %s", e)
+          xit = 1
+        except dedrm.DeDRMError as e:
           warning("export failed: %s", e)
           xit = 1
         except Exception as e:
