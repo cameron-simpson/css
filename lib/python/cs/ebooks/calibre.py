@@ -645,7 +645,7 @@ class CalibreTree(AbstractEbooksTree):
                 self, dbid, db_book=db_book
             )
           else:
-            book.refresh_from_db_row(db_book)
+            book.refresh_from_db(db_book)
 
   def get_library_books_mapping(self, preload=False):
     if preload or not self.books_by_dbib:
