@@ -19,7 +19,7 @@ from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
 from cs.cmdutils import BaseCommand
 from cs.context import contextif, stackattrs
 from cs.fstags import uses_fstags, FSTags
-from cs.lex import s
+from cs.lex import r, s
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.progress import progressbar
@@ -122,7 +122,12 @@ class KindleCommand(EBooksCommonBaseCommand):
     for asin in progressbar(asins, f"export to {calibre}"):
       runstate.raiseif()
       with Pfx(asin):
-        kbook = kindle.by_asin(asin)
+        try:
+          kbook = kindle[asin]
+        except KeyError as e:
+          warning("no Kindle book for ASIN %s: %s", r(asin), e)
+          xit = 1
+          continue
         try:
           kbook.export_to_calibre(
               calibre,
