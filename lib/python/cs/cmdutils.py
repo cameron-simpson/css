@@ -1303,7 +1303,7 @@ class BaseCommand:
 
   @classmethod
   def poparg(
-      cls, argv: List[str], *a, unpop_on_error=False, opt_spec_class=None
+      cls, argv: List[str], *specs, unpop_on_error=False, opt_spec_class=None
   ):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
@@ -1377,7 +1377,7 @@ class BaseCommand:
     '''
     if opt_spec_class is None:
       opt_spec_class = OptionSpec
-    opt_spec = opt_spec_class.promote(a)
+    opt_spec = opt_spec_class.from_opt_kw('_', specs)
     with Pfx(opt_spec.help_text):
       if not argv:
         raise GetoptError("missing argument")
