@@ -62,6 +62,7 @@ class EBooksCommonOptions(BaseCommand.Options):
     from .kobo import KoboTree  # pylint: disable=import-outside-toplevel
     kobo = KoboTree(self.kobo_path)
     self.kobo_path = kobo.fspath
+    return kobo
 
   COMMON_OPT_SPECS = dict(
       C_='calibre_path',
