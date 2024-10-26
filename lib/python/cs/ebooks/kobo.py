@@ -342,14 +342,9 @@ class KoboCommand(EBooksCommonBaseCommand):
   @uses_fstags
   def run_context(self, fstags: FSTags):
     with super().run_context():
-      options = self.options
-      kobo_path = options.kobo_path
-      with KoboTree(kobo_path) as kobo:
-        options.kobo_path = kobo.fspath
-        with CalibreTree(options.calibre_path) as cal:
-          with stackattrs(options, kobo=kobo, calibre=cal):
-            with fstags:
-              yield
+      with self.options.kobo:
+        with fstags:
+          yield
 
   # pylint: disable=too-many-locals
   @uses_runstate
@@ -373,26 +368,27 @@ class KoboCommand(EBooksCommonBaseCommand):
     volumeids = argv or sorted(map(str, self.keys()))
     xit = 0
     quiet or print("export", kobo.shortpath, "=>", calibre.shortpath)
-    for vid in progressbar(volumeids, f"export to {calibre}"):
-      with Pfx(vid):
-        book = kobo[vid]
-        runstate.raiseif()
-        try:
-          book.export_to_calibre(
-              calibre,
-              doit=doit,
-              force=force,
-              replace_format=force,
-              quiet=quiet,
-              verbose=verbose,
-          )
-        except ValueError as e:
-          warning("export failed: %s", e)
-          xit = 1
-        except Exception as e:
-          warning("kobo book.export_to_calibre: e=%s", s(e))
-          raise
-    return xit
+    with calibre:
+      for vid in progressbar(volumeids, f"export to {calibre}"):
+        with Pfx(vid):
+          book = kobo[vid]
+          runstate.raiseif()
+          try:
+            book.export_to_calibre(
+                calibre,
+                doit=doit,
+                force=force,
+                replace_format=force,
+                quiet=quiet,
+                verbose=verbose,
+            )
+          except ValueError as e:
+            warning("export failed: %s", e)
+            xit = 1
+          except Exception as e:
+            warning("kobo book.export_to_calibre: e=%s", s(e))
+            raise
+      return xit
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
