@@ -838,8 +838,6 @@ def uses_cmd_option(func, _strict=False, **option_defaults):
               ... etc ...
   '''
 
-  from cs.debug import trace, X, r, s
-
   def uses_cmd_wrapper(*func_a, **func_kw):
     # fill in the func_kw from the defaults
     # and keep a record of the chosen values
@@ -876,6 +874,7 @@ def uses_cmd_option(func, _strict=False, **option_defaults):
   return uses_cmd_wrapper
 
 uses_doit = uses_cmd_option(doit=True)
+uses_force = uses_cmd_option(force=False)
 uses_quiet = uses_cmd_option(quiet=False)
 uses_verbose = uses_cmd_option(verbose=False)
 
