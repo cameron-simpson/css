@@ -6,20 +6,25 @@
 
 set -ue
 
-[ $# = 0 ] || {
-  echo "Usage: $0"'
-  Export from Kindle library to Calibre.
-  Expoects:
-    $CALIBRE_LIBRARY      The path to the Calibre library.
-    $DEDRM_PACKAGE_PATH   The path the plugin subdirectory of a DeDRM/noDRM checkout.
-    $KINDLE_LIBRARY_PULL  The path to the Kindle library from which to pull.
-  Currently:' >&2
-  for envvar in CALIBRE_LIBRARY DEDRM_PACKAGE_PATH KINDLE_LIBRARY_PULL
-  do  eval "value=\$$envvar"
-      echo "    $envvar=$value" >&2
-  done
-  exit 2
-}
+if [ $# = 1 ]
+then
+  case "$1" in
+    -h | help | -help | --help | "-?" )
+      echo "Usage: $0"'
+      Export from Kindle library to Calibre.
+      Expoects:
+        $CALIBRE_LIBRARY      The path to the Calibre library.
+        $DEDRM_PACKAGE_PATH   The path the plugin subdirectory of a DeDRM/noDRM checkout.
+        $KINDLE_LIBRARY_PULL  The path to the Kindle library from which to pull.
+      Currently:' >&2
+      for envvar in CALIBRE_LIBRARY DEDRM_PACKAGE_PATH KINDLE_LIBRARY_PULL
+      do  eval "value=\$$envvar"
+          echo "    $envvar=$value" >&2
+      done
+      exit 0
+      ;;
+  esac
+fi
 
 # make sure we have this
 : "$DEDRM_PACKAGE_PATH"
