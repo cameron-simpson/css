@@ -620,6 +620,9 @@ class CalibreTree(AbstractEbooksTree):
     return self.db.shell()
 
   def refresh_dbid(self, dbid, session=None):
+    ''' Refresh our knowledge of `dbid` from the database,
+        which may be a new `dbid` not previously known.
+    '''
     db = self.db
     with db.session() as session:
       db_book = self.db.books.lookup1(id=dbid, session=session)
@@ -1304,7 +1307,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
         If `sortkey` is not `None`, sort the returned books by this function.
     '''
     options = self.options
-    calibre = options.calibre
     cbooks = []
     while argv:
       book_spec = self.poparg(argv, "book_spec")
