@@ -117,7 +117,7 @@ class AbstractEbooksTree(FSPathBasedSingleton, MultiOpenMixin, MappingABC):
   def get_library_books_mapping(self) -> Mapping:
     ''' Return a mapping of library primary keys to library book instances.
     '''
-    raise NotImplemenetedError
+    raise NotImplementedError
 
   def __iter__(self) -> Iterable:
     ''' Yield primary keys from the library.
