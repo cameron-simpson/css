@@ -11,6 +11,7 @@ from typing import Iterable, Mapping, Optional
 
 from cs.cmdutils import BaseCommand
 from cs.fs import FSPathBasedSingleton
+from cs.lex import tabulate
 from cs.logutils import warning
 from cs.resources import MultiOpenMixin
 
@@ -78,6 +79,27 @@ class EBooksCommonBaseCommand(BaseCommand):
   '''
 
   Options = EBooksCommonOptions
+
+  def cmd_info(self, argv):
+    super().cmd_info(argv)
+    options = self.options
+    rows = []
+
+    def library_row(title, library):
+      ''' Return a row to tabulate for a `library`.
+      '''
+      return (
+          f'{title}:',
+          '-' if library is None else f'{len(library)} ebooks',
+          str(library) if library is None else library.shortpath,
+      )
+
+    for line in tabulate(
+        library_row('Calibre', options.calibre),
+        library_row('Kindle', options.kindle),
+        library_row('Kobo', options.kobo),
+    ):
+      print(line)
 
 class AbstractEbooksTree(FSPathBasedSingleton, MultiOpenMixin, MappingABC):
   ''' A common base class for the `*Tree` classes accessing some
