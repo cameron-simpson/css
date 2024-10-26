@@ -13,7 +13,7 @@ from cmd import Cmd
 from code import interact
 from collections import ChainMap
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import dataclass, field, fields
 from functools import cache
 from getopt import getopt, GetoptError
 from inspect import isclass
@@ -376,7 +376,7 @@ class SubCommand:
       method = self.method
       if isclass(method):
         return cutsuffix(method.__name__, 'Command').lower()
-      return cutprefix(method.__name__, self.SUBCOMMAND_METHOD_PREFIX)
+      return cutprefix(method.__name__, self.command.SUBCOMMAND_METHOD_PREFIX)
     return self.cmd
 
   @typechecked
