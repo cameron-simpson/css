@@ -636,10 +636,17 @@ class CalibreTree(AbstractEbooksTree):
       else:
         book.refresh_from_db(db_book)
 
-  def preload(self):
+  @uses_quiet
+  @uses_verbose
+  def preload(self, *, quiet, verbose):
     ''' Scan all the books, preload their data.
     '''
-    with run_task(f'preload {self}', report_print=True):
+    with contextif(
+        not quiet,
+        run_task,
+        f'preload {self}',
+        report_print=verbose,
+    ):
       db = self.db
       with db.session() as session:
         for db_book in self.db.books.lookup(session=session):
