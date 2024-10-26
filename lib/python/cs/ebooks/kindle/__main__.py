@@ -53,7 +53,6 @@ class KindleCommand(EBooksCommonBaseCommand):
   def run_context(self, fstags: FSTags):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    from ..calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     with super().run_context():
       with self.options.kindle:
         with fstags:
@@ -108,11 +107,8 @@ class KindleCommand(EBooksCommonBaseCommand):
     options = self.options
     calibre = options.calibre
     dedrm = options.dedrm
-    doit = options.doit
     kindle = options.kindle
     force = options.force
-    quiet = options.quiet
-    verbose = options.verbose
     asins = argv or sorted(kindle.asins())
     xit = 0
     qvprint("export", kindle.shortpath, "=>", calibre.shortpath)
@@ -129,7 +125,7 @@ class KindleCommand(EBooksCommonBaseCommand):
               continue
             try:
               kbook.export_to_calibre(
-                  calibre,
+                  calibre=calibre,
                   dedrm=dedrm,
                   replace_format=force,
               )
@@ -160,12 +156,10 @@ class KindleCommand(EBooksCommonBaseCommand):
           metadata db.
     '''
     options = self.options
-    kindle = options.kindle
-    calibre = options.calibre
-    self.popopts(argv, options, n='-doit', q='quiet', v='verbose')
+    options.popopts(argv)
     doit = options.doit
-    quiet = options.quiet
-    verbose = options.verbose
+    calibre = options.calibre
+    kindle = options.kindle
     asins = argv or sorted(kindle.asins())
     xit = 0
     for asin in progressbar(asins, f"import metadata from {calibre}"):
@@ -199,16 +193,15 @@ class KindleCommand(EBooksCommonBaseCommand):
           with Pfx("%s=%r", tag_name, tag_value):
             old_value = ctags.get(tag_name)
             if old_value != tag_value:
-              if not quiet:
-                if first_update:
-                  print(f"{asin}: update from {cbook}")
-                  first_update = False
-                if old_value:
-                  print(
-                      f"  calibre.{tag_name}={tag_value!r}, was {old_value!r}"
-                  )
-                else:
-                  print(f"  calibre.{tag_name}={tag_value!r}")
+              if first_update:
+                qvprint(f"{asin}: update from {cbook}")
+                first_update = False
+              if old_value:
+                qvprint(
+                    f"  calibre.{tag_name}={tag_value!r}, was {old_value!r}"
+                )
+              else:
+                qvprint(f"  calibre.{tag_name}={tag_value!r}")
               if doit:
                 ctags[tag_name] = tag_value
     return xit
