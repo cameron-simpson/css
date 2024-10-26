@@ -35,7 +35,7 @@ from zipfile import ZipFile
 
 from typeguard import typechecked
 
-from cs.cmdutils import vprint
+from cs.cmdutils import qvprint
 from cs.context import contextif, stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
@@ -310,7 +310,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
               f' and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
               f' and no {shortpath(dedrm_package_path)!r}'
           )
-      vprint(f'${DEDRM_PACKAGE_PATH_ENVVAR} -> {dedrm_package_path!r}')
+      qvprint(f'${DEDRM_PACKAGE_PATH_ENVVAR} -> {dedrm_package_path!r}')
     else:
       dedrm_package_path = abspath(dedrm_package_path)
     if not existspath(dedrm_package_path):
@@ -381,7 +381,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
       ''' Write Python code `contents` to a top level module named `name`.
       '''
       module_path = joinpath(libdirpath, f'{name}.py')
-      vprint("DeDRM: write module", module_path)
+      qvprint("DeDRM: write module", module_path)
       with pfx_call(open, module_path, 'w') as pyf:
         print(
             stripped_dedent(
@@ -405,13 +405,13 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
       pfx_call(os.symlink, self.fspath, dedrm_pkg_path)
     else:
       # unpack the plugin zip file
-      vprint("unpack", self.fspath)
+      qvprint("unpack", self.fspath)
       pfx_call(os.mkdir, dedrm_pkg_path)
       with Pfx("unzip %r", self.fspath):
         with ZipFile(self.fspath) as zipf:
           for member in zipf.namelist():
             if member.endswith('/'):
-              vprint("skip", member)
+              qvprint("skip", member)
               continue
             with Pfx(member):
               validate_rpath(member)
@@ -488,7 +488,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
       # so we intercept print and redirect stdout to stderr
       # pylint: disable=import-outside-toplevel
       import builtins
-      with stackattrs(builtins, print=vprint):
+      with stackattrs(builtins, print=qvprint):
         with redirect_stdout(sys.stderr):
           # pylint: disable=import-outside-toplevel
           yield
@@ -592,11 +592,11 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
                     (srcpath, booktype)
                 )
               if decrypted_ebook == srcpath:
-                vprint("srcpath is already decrypted")
+                qvprint("srcpath is already decrypted")
                 pfx_call(os.remove, T.name)
                 return False
               if file_checksum(srcpath) == file_checksum(decrypted_ebook):
-                vprint("srcpath content is unchanged by decryption")
+                qvprint("srcpath content is unchanged by decryption")
                 pfx_call(os.remove, T.name)
                 return False
     # copy tags from the srcpath to the dstpath

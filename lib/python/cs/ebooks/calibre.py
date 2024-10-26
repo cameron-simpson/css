@@ -48,7 +48,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
-from cs.cmdutils import vprint
+from cs.cmdutils import qvprint
 from cs.context import contextif
 from cs.deco import fmtdoc, uses_cmd_option
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
@@ -313,9 +313,9 @@ class CalibreTree(AbstractEbooksTree):
               dedrm.decrypt, bookpath, bookpath, exists_ok=True
           )
           if decrypted:
-            vprint("decrypted:", shortpath(bookpath))
+            qvprint("decrypted:", shortpath(bookpath))
           else:
-            vprint("already decrypted:", shortpath(bookpath))
+            qvprint("already decrypted:", shortpath(bookpath))
         return decrypted
 
       @pfx_method

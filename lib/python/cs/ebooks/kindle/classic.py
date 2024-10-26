@@ -33,6 +33,7 @@ except ImportError:
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
 from cs.deco import cachedmethod, fmtdoc
+from cs.cmdutils import qvprint
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton, HasFSPath
 from cs.fstags import FSTags, uses_fstags
@@ -343,7 +344,7 @@ class KindleTree(AbstractEbooksTree):
               if fmtpath and existspath(fmtpath):
                 if filecmp.cmp(fmtpath, azwpath):
                   # pylint: disable=expression-not-assigned
-                  verbose and print(
+                  qvprint(
                       cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
                   )
                   return cbook, False
