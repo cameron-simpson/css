@@ -56,11 +56,9 @@ class KindleCommand(EBooksCommonBaseCommand):
     from ..calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     with super().run_context():
       options = self.options
-      with options.kindle as kindle:
-        with contextif(options.calibre):
-          with contextif(options.dedrm):
-            with fstags:
-              yield
+      with options.kindle:
+        with fstags:
+          yield
 
   def cmd_app_path(self, argv):
     ''' Usage: {cmd} [content-path]
@@ -109,44 +107,42 @@ class KindleCommand(EBooksCommonBaseCommand):
     '''
     self.popopts(argv, f='force')
     options = self.options
-    kindle = options.kindle
     calibre = options.calibre
     dedrm = options.dedrm
     doit = options.doit
+    kindle = options.kindle
     force = options.force
     quiet = options.quiet
     verbose = options.verbose
     asins = argv or sorted(kindle.asins())
     xit = 0
     quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
-    for asin in progressbar(asins, f"export to {calibre}"):
-      runstate.raiseif()
-      with Pfx(asin):
-        try:
-          kbook = kindle[asin]
-        except KeyError as e:
-          warning("no Kindle book for ASIN %s: %s", r(asin), e)
-          xit = 1
-          continue
-        try:
-          kbook.export_to_calibre(
-              calibre,
-              dedrm=dedrm,
-              doit=doit,
-              force=force,
-              replace_format=force,
-              quiet=quiet,
-              verbose=verbose,
-          )
-        except ValueError as e:
-          warning("export failed: %s", e)
-          xit = 1
-        except dedrm.DeDRMError as e:
-          warning("export failed: %s", e)
-          xit = 1
-        except Exception as e:
-          warning("kbook.export_to_calibre: e=%s", s(e))
-          raise
+    with calibre:
+      with dedrm:
+        for asin in progressbar(asins, f"export to {calibre}"):
+          runstate.raiseif()
+          with Pfx(asin):
+            try:
+              kbook = kindle[asin]
+            except KeyError as e:
+              warning("no Kindle book for ASIN %s: %s", r(asin), e)
+              xit = 1
+              continue
+            try:
+              kbook.export_to_calibre(
+                  calibre,
+                  dedrm=dedrm,
+                  replace_format=force,
+              )
+            except ValueError as e:
+              warning("export failed: %s", e)
+              xit = 1
+            except dedrm.DeDRMError as e:
+              warning("export failed: %s", e)
+              xit = 1
+            except Exception as e:
+              warning("kbook.export_to_calibre: e=%s", s(e))
+              raise
     return xit
 
   def cmd_keys(self, argv):
