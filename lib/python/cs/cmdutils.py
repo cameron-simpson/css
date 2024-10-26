@@ -31,7 +31,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import decorator, default_params
+from cs.deco import decorator, default_params, uses_cmd_option
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -1728,11 +1728,15 @@ class BaseCommandCmd(Cmd):
         return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
-@uses_cmd_options
-def vprint(*print_a, options, verbose=None, **print_kw):
-  ''' Call `print()` if `options.verbose`.
+@uses_cmd_option(quiet=False, verbose=False)
+def qvprint(*print_a, quiet, verbose, **print_kw):
+  ''' Call `print()` if `options.verbose` and not `options.quiet`.
   '''
-  if verbose is None:
-    verbose = options.verbose
-  if verbose:
+  if verbose and not quiet:
     print(*print_a, **print_kw)
+
+def vprint(*print_a, **qvprint_kw):
+  ''' Call `print()` if `options.verbose`.
+      This is a compatibility shim for `qvprint()` with `quiet=False`.
+  '''
+  return qvprint(*print_a, quiet=False, **qvprint_kw)
