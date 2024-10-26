@@ -365,7 +365,7 @@ class KoboCommand(EBooksCommonBaseCommand):
     verbose = options.verbose
     calibre = options.calibre
     kobo = options.kobo
-    volumeids = argv or sorted(map(str, self.keys()))
+    volumeids = argv or sorted(map(str, kobo.keys()))
     xit = 0
     qvprint("export", kobo.shortpath, "=>", calibre.shortpath)
     with calibre:
