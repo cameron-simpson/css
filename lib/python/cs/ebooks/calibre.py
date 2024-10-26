@@ -557,9 +557,7 @@ class CalibreTree(AbstractEbooksTree):
           if fmtpath is not None and not force:
             if filecmp.cmp(fmtpath, ofmtpath):
               # pylint: disable=expression-not-assigned
-              verbose and print(
-                  self, fmtk, "identical to", shortpath(ofmtpath)
-              )
+              qvprint(self, fmtk, "identical to", shortpath(ofmtpath))
             else:
               # pylint: disable=expression-not-assigned
               verbose and warning(
@@ -571,7 +569,7 @@ class CalibreTree(AbstractEbooksTree):
               )
             return
         # pylint: disable=expression-not-assigned
-        quiet or print(
+        qvprint(
             self, self.formats, '+', fmtk, '<=', shortpath(ofmtpath)
         )
         self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
@@ -1394,7 +1392,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
             verbose and warning("replacing format %r")
           else:
             # pylint: disable=expression-not-assigned
-            verbose and print(f"{cbook}: format {dstfmtk!r} already present")
+            qvprint(f"{cbook}: format {dstfmtk!r} already present")
             continue
         for srcfmtk in srcfmtks:
           if srcfmtk in cbook.formats:
@@ -1498,7 +1496,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
     linkto_dirpath = options.linkto_dirpath
     quiet = options.quiet
     verbose = options.verbose
-    quiet or print(
+    qvprint(
         "linkto", calibre.shortpath, "=>", shortpath(options.linkto_dirpath)
     )
     cbooks = sorted(
@@ -1544,7 +1542,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
                 continue
             dstdir = dirname(dstpath)
             if not isdirpath(dstdir) and doit:
-              verbose and print("mkdir", shortpath(dstdir))
+              qvprint("mkdir", shortpath(dstdir))
               pfx_call(os.mkdir, dstdir)
             (quiet and doit
              ) or print("link", shortpath(srcpath), '=>', shortpath(dstpath))
@@ -1743,8 +1741,8 @@ class CalibreCommand(EBooksCommonBaseCommand):
     quiet = options.quiet
     verbose = options.verbose
     other_library = options.calibre_other
-    quiet or print("pull", other_library.shortpath, "=>", calibre.shortpath)
     with run_task("pull " + shlex.join(argv)) as proxy:
+    qvprint("pull", other_library.shortpath, "=>", calibre.shortpath)
       with Pfx(other_library.shortpath):
         with other_library:
           if other_library is calibre:
@@ -1808,7 +1806,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
                     "%s=%s: %s" % (identifier_name, identifier_value, obook)):
                   if not obook.formats:
                     # pylint: disable=expression-not-assigned
-                    verbose and print("no formats to pull")
+                    qvprint("no formats to pull")
                     continue
                   cbooks = list(
                       calibre.by_identifier(identifier_name, identifier_value)
@@ -1835,7 +1833,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
                     else:
                       cbook = calibre[dbid]
                       # pylint: disable=expression-not-assigned
-                      quiet or print('new', cbook, '<=', obook)
+                      qvprint('new', cbook, '<=', obook)
                   elif len(cbooks) > 1:
                     # pylint: disable=expression-not-assigned
                     verbose or warning(

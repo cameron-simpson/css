@@ -16,7 +16,7 @@ import sys
 from typing import Optional
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, qvprint
 from cs.context import contextif, stackattrs
 from cs.fstags import uses_fstags, FSTags
 from cs.lex import r, s
@@ -115,7 +115,7 @@ class KindleCommand(EBooksCommonBaseCommand):
     verbose = options.verbose
     asins = argv or sorted(kindle.asins())
     xit = 0
-    quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
+    qvprint("export", kindle.shortpath, "=>", calibre.shortpath)
     with calibre:
       with dedrm:
         for asin in progressbar(asins, f"export to {calibre}"):
@@ -175,12 +175,12 @@ class KindleCommand(EBooksCommonBaseCommand):
         cbooks = list(calibre.by_asin(asin))
         if not cbooks:
           # pylint: disable=expression-not-assigned
-          verbose and print("asin %s: no Calibre books" % (asin,))
+          qvprint("asin %s: no Calibre books" % (asin,))
           continue
         cbook = cbooks[0]
         if len(cbooks) > 1:
           # pylint: disable=expression-not-assigned
-          quiet or print(
+          qvprint(
               f'asin {asin}: multiple Calibre books,',
               f'dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}'
           )

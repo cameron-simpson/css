@@ -24,7 +24,7 @@ from typing import Optional, Union
 from uuid import UUID
 from zipfile import ZipFile, ZIP_DEFLATED
 
-from cs.cmdutils import BaseCommand, vprint
+from cs.cmdutils import BaseCommand, qvprint
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
@@ -293,7 +293,7 @@ class KoboBook(HasFSPath):
       if not cbooks:
         # new book
         # pylint: disable=expression-not-assigned
-        quiet or print("new book <=", self.shortpath)
+        qvprint("new book <=", self.shortpath)
         dbid = calibre.add(
             bookpath,
             doit=doit,
@@ -306,7 +306,7 @@ class KoboBook(HasFSPath):
         else:
           added = True
           cbook = calibre[dbid]
-          quiet or print(" ", cbook)
+          qvprint(" ", cbook)
       else:
         # book already present in calibre
         cbook = cbooks[0]
@@ -322,7 +322,7 @@ class KoboBook(HasFSPath):
             if fmtpath and existspath(fmtpath):
               if filecmp.cmp(fmtpath, bookpath):
                 # pylint: disable=expression-not-assigned
-                verbose and print(
+                qvprint(
                     cbook, fmtk, shortpath(fmtpath), '=', shortpath(bookpath)
                 )
                 return cbook, False
@@ -367,7 +367,7 @@ class KoboCommand(EBooksCommonBaseCommand):
     kobo = options.kobo
     volumeids = argv or sorted(map(str, self.keys()))
     xit = 0
-    quiet or print("export", kobo.shortpath, "=>", calibre.shortpath)
+    qvprint("export", kobo.shortpath, "=>", calibre.shortpath)
     with calibre:
       for vid in progressbar(volumeids, f"export to {calibre}"):
         with Pfx(vid):

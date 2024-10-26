@@ -316,7 +316,7 @@ class KindleTree(AbstractEbooksTree):
         if not cbooks:
           # new book
           # pylint: disable=expression-not-assigned
-          quiet or print("new book <=", shortpath(bookpath))
+          qvprint("new book <=", shortpath(bookpath))
           dbid = calibre.add(bookpath, dedrm=dedrm, doit=doit, quiet=quiet)
           if dbid is None:
             added = not doit
@@ -325,7 +325,7 @@ class KindleTree(AbstractEbooksTree):
             added = True
             calibre.refresh_dbid(dbid)
             cbook = calibre[dbid]
-            quiet or print(" ", cbook)
+            qvprint(" ", cbook)
         else:
           # book already present in calibre
           cbook = cbooks[0]
