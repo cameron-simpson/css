@@ -35,7 +35,6 @@ from tempfile import TemporaryDirectory
 from typing import Iterable, Optional, Union
 from uuid import UUID
 
-from icontract import require
 from sqlalchemy import (
     Boolean,
     Column,
@@ -67,7 +66,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.resources import RunState, uses_runstate
 from cs.seq import unrepeated
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
@@ -199,9 +198,12 @@ class CalibreTree(AbstractEbooksTree):
         return tags
 
       def format_kwargs(self):
+        ''' Return the `CalibreTree` format `TagSet` as a mapping.
+        '''
         return self.format_tagset()
 
-      def get_arg_name(self, field_name):
+      @staticmethod
+      def get_arg_name(field_name):
         ''' Override for `FormattableMixin.get_arg_name`:
             return the leading dotted identifier,
             which represents a tag or tag prefix.
