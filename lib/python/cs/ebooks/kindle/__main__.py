@@ -4,20 +4,13 @@
 '''
 
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from getopt import GetoptError
-from os.path import (
-    dirname,
-    exists as existspath,
-    isdir as isdirpath,
-    join as joinpath,
-)
+from os.path import isdir as isdirpath
 import sys
-from typing import Optional
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
-from cs.cmdutils import BaseCommand, qvprint
-from cs.context import contextif, stackattrs
+from cs.cmdutils import qvprint
+from cs.context import contextif
 from cs.fstags import uses_fstags, FSTags
 from cs.lex import r, s
 from cs.logutils import warning, error
@@ -27,8 +20,6 @@ from cs.resources import RunState, uses_runstate
 
 from ..common import EBooksCommonBaseCommand
 from .classic import (
-    KindleBookAssetDB,
-    KindleTree,
     KINDLE_APP_OSX_DEFAULTS_DOMAIN,
     KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING,
     kindle_content_path,
@@ -113,6 +104,8 @@ class KindleCommand(EBooksCommonBaseCommand):
     xit = 0
     qvprint("export", kindle.shortpath, "=>", calibre.shortpath)
     with calibre:
+      if not dedrm:
+        warning("no DeDRM, exports of DRMed ebooks will probably fail")
       with contextif(dedrm):
         for asin in progressbar(asins, f"export to {calibre}"):
           runstate.raiseif()
