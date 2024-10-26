@@ -12,7 +12,7 @@ then
     -h | help | -help | --help | "-?" )
       echo "Usage: $0"'
       Export from Kindle library to Calibre.
-      Expoects:
+      Expects:
         $CALIBRE_LIBRARY      The path to the Calibre library.
         $DEDRM_PACKAGE_PATH   The path the plugin subdirectory of a DeDRM/noDRM checkout.
         $KINDLE_LIBRARY_PULL  The path to the Kindle library from which to pull.
@@ -30,7 +30,7 @@ fi
 : "$DEDRM_PACKAGE_PATH"
 
 set -x
-exec ebooks kindle -K "${KINDLE_LIBRARY_PULL:-${KINDLE_LIBRARY:-''}}" export
+exec ebooks kindle -K "${KINDLE_LIBRARY_PULL:-${KINDLE_LIBRARY:-''}}" export "$@"
 
 ##  cmd=$( basename "$0" )
 ##  usage="Usage: $cmd
