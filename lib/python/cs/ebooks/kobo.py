@@ -144,11 +144,12 @@ class KoboTree(AbstractEbooksTree):
 
   def get_library_books_mapping(self):
     ''' A mapping of book volumeids (`UUID`s) to `KoboBook` instance. '''
-    return {
-        UUID(book.volumeid):
-        KoboBook(kobo_tree=self, uuid=UUID(book.volumeid))
-        for book in self.kobo_lib_books.values()
-    }
+    with self:
+      return {
+          UUID(book.volumeid):
+          KoboBook(kobo_tree=self, uuid=UUID(book.volumeid))
+          for book in self.kobo_lib_books.values()
+      }
 
   def bookpaths(self):
     ''' Return a list of the filesystem paths in `self.CONTENT_DIRNAME`. '''
