@@ -1,3 +1,4 @@
+cs.cmdutils: shell: subcommand with no args - enter the subcommand mode even if there is a default subcommand, display usage on entry
 default: replace underscores with dashes in subcommand names in cs.cmdutils
 @promote: update signature by inspecting the signatures of the promotion functions?
 fs.fatsg: "fstags help ls" has bogus output
