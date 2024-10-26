@@ -24,9 +24,9 @@ from typing import Optional, Union
 from uuid import UUID
 from zipfile import ZipFile, ZIP_DEFLATED
 
-from cs.cmdutils import BaseCommand, qvprint
+from cs.cmdutils import BaseCommand, qvprint, uses_cmd_options
 from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_cmd_option
 from cs.fileutils import atomic_filename
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.fstags import FSTags, uses_fstags
@@ -36,7 +36,6 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 
-from .calibre import CalibreTree
 from .common import AbstractEbooksTree, EBooksCommonBaseCommand
 
 pfx_listdir = partial(pfx_call, os.listdir)
@@ -90,7 +89,8 @@ class KoboTree(AbstractEbooksTree):
 
   @classmethod
   @fmtdoc
-  def import_obok(cls, obok_package_path=None):
+  @uses_cmd_options
+  def import_obok(cls, obok_package_path=None, *, options):
     ''' Import the `obok.py` module from the `obok` package.
 
         This looks in `obok_package_path`, which defaults to
@@ -101,9 +101,8 @@ class KoboTree(AbstractEbooksTree):
     if obok_package_path is None:
       obok_package_path = pfx_call(os.environ.get, OBOK_PACKAGE_PATH_ENVVAR)
       if obok_package_path is None:
-        from .calibre import CalibreTree
         obok_package_path = joinpath(
-            CalibreTree().plugins_dirpath, OBOK_PACKAGE_ZIPFILE
+            options.calibre.plugins_dirpath, OBOK_PACKAGE_ZIPFILE
         )
     if not existspath(obok_package_path):
       raise ValueError(
@@ -261,10 +260,11 @@ class KoboBook(HasFSPath):
       yield f.name
 
   # pylint: disable=too-many-branches
+  @uses_cmd_option(calibre=None)
   def export_to_calibre(
       self,
-      calibre,
       *,
+      calibre=None,
       doit=True,
       replace_format=False,
       force=False,
@@ -277,7 +277,7 @@ class KoboBook(HasFSPath):
         (books are not added if the format is already present).
 
         Parameters:
-        * `calibre`: the `CalibreTree`
+        * `calibre`: optional `CalibreTree`, default from the command line options
         * `doit`: optional flag, default `True`;
           if false just recite planned actions
         * `force`: optional flag, default `False`;
@@ -375,7 +375,7 @@ class KoboCommand(EBooksCommonBaseCommand):
           runstate.raiseif()
           try:
             book.export_to_calibre(
-                calibre,
+                calibre=calibre,
                 doit=doit,
                 force=force,
                 replace_format=force,
