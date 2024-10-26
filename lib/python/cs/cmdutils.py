@@ -388,7 +388,7 @@ class SubCommand:
     '''
     method = self.method
     if isclass(method):
-      # plumb the options through to the subcommand
+      # plumb self.command.options through to the subcommand
       updates = self.command.options.as_dict()
       updates.update(cmd=self.get_cmd())
       return pfx_call(method, argv, **updates).run()
