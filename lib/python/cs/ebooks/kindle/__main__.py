@@ -55,8 +55,7 @@ class KindleCommand(EBooksCommonBaseCommand):
     '''
     from ..calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     with super().run_context():
-      options = self.options
-      with options.kindle:
+      with self.options.kindle:
         with fstags:
           yield
 
