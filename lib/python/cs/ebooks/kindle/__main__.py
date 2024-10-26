@@ -113,7 +113,7 @@ class KindleCommand(EBooksCommonBaseCommand):
     xit = 0
     qvprint("export", kindle.shortpath, "=>", calibre.shortpath)
     with calibre:
-      with dedrm:
+      with contextif(dedrm):
         for asin in progressbar(asins, f"export to {calibre}"):
           runstate.raiseif()
           with Pfx(asin):
