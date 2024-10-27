@@ -24,9 +24,9 @@ from typing import Optional, Union
 from uuid import UUID
 from zipfile import ZipFile, ZIP_DEFLATED
 
-from cs.cmdutils import BaseCommand, qvprint, uses_cmd_options
+from cs.cmdutils import BaseCommand, qvprint
 from cs.context import stackattrs
-from cs.deco import fmtdoc, uses_cmd_option
+from cs.deco import fmtdoc, uses_cmd_options
 from cs.fileutils import atomic_filename
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.fstags import FSTags, uses_fstags
@@ -260,7 +260,7 @@ class KoboBook(HasFSPath):
       yield f.name
 
   # pylint: disable=too-many-branches
-  @uses_cmd_option(calibre=None)
+  @uses_cmd_options(calibre=None)
   def export_to_calibre(
       self,
       *,

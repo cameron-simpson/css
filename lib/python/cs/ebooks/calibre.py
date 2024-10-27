@@ -50,8 +50,15 @@ from typeguard import typechecked
 
 from cs.cmdutils import qvprint
 from cs.context import contextif
-from cs.deco import fmtdoc, uses_cmd_option
-from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
+from cs.deco import (
+    fmtdoc,
+    uses_cmd_options,
+    uses_doit,
+    uses_force,
+    uses_quiet,
+    uses_verbose,
+)
+from cs.fs import HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
     get_dotted_identifier,
@@ -298,7 +305,7 @@ class CalibreTree(AbstractEbooksTree):
         '''
         return self.tree.dedrm
 
-      @uses_cmd_option(dedrm=None)
+      @uses_cmd_options(dedrm=None)
       @pfx_method
       def decrypt(self, dedrm: "DeDRMWrapper", fmtk='AZW'):
         ''' Decrypt the book file in format `fmtk`.
@@ -513,15 +520,19 @@ class CalibreTree(AbstractEbooksTree):
                   verbose=verbose
               )
 
+      @uses_doit
+      @uses_force
+      @uses_quiet
+      @uses_verbose
       def pull_format(
           self,
           ofmtpath,
           *,
           fmtk=None,
-          doit=True,
-          force=False,
-          quiet=False,
-          verbose=False,
+          doit,
+          force,
+          quiet,
+          verbose,
       ):
         ''' Pull a format file, typically from another `CalibreBook`.
 
@@ -569,9 +580,7 @@ class CalibreTree(AbstractEbooksTree):
               )
             return
         # pylint: disable=expression-not-assigned
-        qvprint(
-            self, self.formats, '+', fmtk, '<=', shortpath(ofmtpath)
-        )
+        qvprint(self, self.formats, '+', fmtk, '<=', shortpath(ofmtpath))
         self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
 
     self.CalibreBook = CalibreBook
@@ -833,15 +842,15 @@ class CalibreTree(AbstractEbooksTree):
     ]
     return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
-  @uses_cmd_option(dedrm=None)
+  @uses_cmd_options(dedrm=None, doit=True, quiet=False)
   @pfx_method
   def add(
       self,
       bookpath,
       *,
-      dedrm=None,
-      doit=True,
-      quiet=False,
+      dedrm,
+      doit,
+      quiet,
       add_args=(),
       **subp_options,
   ):

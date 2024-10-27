@@ -32,8 +32,16 @@ except ImportError:
   import xml.etree.ElementTree as etree
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
-from cs.deco import cachedmethod, fmtdoc
 from cs.cmdutils import qvprint
+from cs.deco import (
+    cachedmethod,
+    fmtdoc,
+    uses_cmd_options,
+    uses_doit,
+    uses_force,
+    uses_quiet,
+    uses_verbose,
+)
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton, HasFSPath
 from cs.fstags import FSTags, uses_fstags
@@ -275,16 +283,24 @@ class KindleTree(AbstractEbooksTree):
           return pfx_call(etree.fromstring, xml_bs)
 
       # pylint: disable=too-many-branches
-      def export_to_calibre(
-          self,
-          calibre,
-          *,
+      @uses_cmd_options(
+          calibre=None,
           dedrm=None,
           doit=True,
-          replace_format=False,
           force=False,
           quiet=False,
           verbose=False,
+      )
+      def export_to_calibre(
+          self,
+          *,
+          calibre,
+          dedrm,
+          replace_format=False,
+          doit,
+          force,
+          quiet,
+          verbose,
       ):
         ''' Export this Kindle book to a Calibre instance,
             return `(cbook,added)`
@@ -292,8 +308,8 @@ class KindleTree(AbstractEbooksTree):
             (books are not added if the format is already present).
 
             Parameters:
-            * `calibre`: the `CalibreTree`
-            * `dedrm`: optional `DeDRMWrapper` instance
+            * `calibre`: optional `CalibreTree`, default from the command line options
+            * `dedrm`: optional `DeDRMWrapper`, default from the command line options
             * `doit`: optional flag, default `True`;
               if false just recite planned actions
             * `force`: optional flag, default `False`;
