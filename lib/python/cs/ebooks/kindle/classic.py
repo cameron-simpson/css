@@ -37,20 +37,15 @@ from cs.deco import (
     cachedmethod,
     fmtdoc,
     uses_cmd_options,
-    uses_doit,
-    uses_force,
-    uses_quiet,
-    uses_verbose,
 )
 from cs.fileutils import shortpath
-from cs.fs import FSPathBasedSingleton, HasFSPath
+from cs.fs import HasFSPath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutsuffix
 from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
