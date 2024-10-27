@@ -824,17 +824,46 @@ def default_params(func, _strict=False, **param_defaults):
   return defaulted_func
 
 @decorator
-def uses_cmd_option(func, _strict=False, **option_defaults):
+def uses_cmd_options(
+    func, _strict=False, _options_param_name='options', **option_defaults
+):
   ''' A decorator to provide default keyword arguments
       from the prevailing `cs.cmdutils.BaseCommandOptions`
       if available, otherwise from `option_defaults`.
 
-      Example:
+      This exists to provide plumbing free access to options set
+      up by a command line invocation using `cs.cmdutils.BaseCommand`.
 
-          @uses_cmd_option(quiet=False)
-          def func(x, *, quiet, **kw):
+      If no `option_defaults` are provided, a single `options`
+      keyword argument is provided which is the prevailing
+      `BaseCommand.Options` instance.
+
+      The decorator accepts two optional "private" keyword arguments
+      commencing with underscores:
+      * `_strict`: default `False`; if true then an `option_defaults`
+        will only be applied if the argument is _missing_ from the
+        function arguments, otherwise it will be applied if the
+        argument is missing or `None`
+      * `_options_param_name`: default `'options'`; this is the
+        name of the single `options` keyword argument which will be
+        supplied if there are no `option_defaults`
+
+      Examples:
+
+          @uses_cmd_options(doit=True, quiet=False)
+          def func(x, *, doit, quiet, **kw):
               if not quiet:
                   print("something", x, kw)
+              if doit:
+                 ... do the thing ...
+              ... etc ...
+
+          @uses_cmd_options()
+          def func(x, *, options, **kw):
+              if not options.quiet:
+                  print("something", x, kw)
+              if options.doit:
+                 ... do the thing ...
               ... etc ...
   '''
 
@@ -853,6 +882,8 @@ def uses_cmd_option(func, _strict=False, **option_defaults):
       options_class = BaseCommand.Options
       options = options_class.default() or options_class()
     option_updates = {}
+    if not option_defaults:
+      option_defaults[_options_param_name] = options
     for option_name, option_default in option_defaults.items():
       if _strict:
         # skip if the option is not provided by the caller
@@ -873,10 +904,10 @@ def uses_cmd_option(func, _strict=False, **option_defaults):
 
   return uses_cmd_wrapper
 
-uses_doit = uses_cmd_option(doit=True)
-uses_force = uses_cmd_option(force=False)
-uses_quiet = uses_cmd_option(quiet=False)
-uses_verbose = uses_cmd_option(verbose=False)
+uses_doit = uses_cmd_options(doit=True)
+uses_force = uses_cmd_options(force=False)
+uses_quiet = uses_cmd_options(quiet=False)
+uses_verbose = uses_cmd_options(verbose=False)
 
 # pylint: disable=too-many-statements
 @decorator

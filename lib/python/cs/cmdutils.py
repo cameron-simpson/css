@@ -31,7 +31,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import decorator, default_params, uses_cmd_option
+from cs.deco import decorator, default_params, uses_cmd_options
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -807,48 +807,6 @@ class BaseCommandOptions(HasThreadState):
         else:
           value = opt_spec.arg_bool
         setattr(self, opt_spec.field_name, value)
-
-@decorator
-def uses_cmd_options(
-    func, cls=BaseCommandOptions, options_param_name='options'
-):
-  ''' A decorator to provide a default parameter containing the
-      prevailing `BaseCommandOptions` instance as the `options` keyword
-      argument, using the `cs.deco.default_params` decorator factory.
-
-      This allows functions to utilitse global options set by a
-      command such as `options.dry_run` or `options.verbose` without
-      the tedious plumbing through the entire call stack.
-
-      Parameters:
-      * `cls`: the `BaseCommandOptions` or `BaseCommand` class,
-        default `BaseCommandOptions`. If a `BaseCommand` subclass is
-        provided its `cls.Options` class is used.
-      * `options_param_name`: the parameter name to provide, default `options`
-
-      Examples:
-
-          @uses_cmd_options
-          def f(x,*,options):
-              """ Run directly from the prevailing options. """
-              if options.verbose:
-                  print("doing f with x =", x)
-              ....
-
-          @uses_cmd_options
-          def f(x,*,verbose=None,options):
-              """ Get defaults from the prevailing options. """
-              if verbose is None:
-                  verbose = options.verbose
-              if verbose:
-                  print("doing f with x =", x)
-              ....
-  '''
-  if issubclass(cls, BaseCommand):
-    cls = cls.Options
-  return default_params(
-      func, **{options_param_name: lambda: cls.default() or cls()}
-  )
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
@@ -1728,7 +1686,7 @@ class BaseCommandCmd(Cmd):
         return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
-@uses_cmd_option(quiet=False, verbose=False)
+@uses_cmd_options(quiet=False, verbose=False)
 def qvprint(*print_a, quiet, verbose, **print_kw):
   ''' Call `print()` if `options.verbose` and not `options.quiet`.
   '''
