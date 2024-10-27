@@ -1750,8 +1750,13 @@ class CalibreCommand(EBooksCommonBaseCommand):
     quiet = options.quiet
     verbose = options.verbose
     other_library = options.calibre_other
-    with run_task("pull " + shlex.join(argv)) as proxy:
     qvprint("pull", other_library.shortpath, "=>", calibre.shortpath)
+    with contextif(
+        not quiet,
+        run_task,
+        "pull " + shlex.join(argv),
+        report_print=verbose,
+    ):
       with Pfx(other_library.shortpath):
         with other_library:
           if other_library is calibre:
@@ -1770,7 +1775,12 @@ class CalibreCommand(EBooksCommonBaseCommand):
             for identifier_name in sorted(other_library.identifier_names()):
               print(" ", identifier_name)
             return 0
-          with run_task(f'scan identifiers from {other_library}...'):
+          with contextif(
+              not quiet,
+              run_task,
+              f'scan identifiers from {other_library}...',
+              report_print=verbose,
+          ):
             obooks_map = {
                 idv: obook
                 for idv, obook in (
