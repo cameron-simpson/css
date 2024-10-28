@@ -215,14 +215,14 @@ def htmlquote(s):
   ''' Quote a string for use in HTML.
   '''
   s = htmlify(s)
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def jsquote(s):
   ''' Quote a string for use in JavaScript.
   '''
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def phpquote(s):
   ''' Quote a string for use in PHP code.
@@ -303,12 +303,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
           chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
         offset0 = offset
-    else:
-      if b in whitelist:
-        inwhite = True
-        chunk = hexify(bs[offset0:offset])
-        chunks.append(chunk)
-        offset0 = offset
+    elif b in whitelist:
+      inwhite = True
+      chunk = hexify(bs[offset0:offset])
+      chunks.append(chunk)
+      offset0 = offset
     offset += 1
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
@@ -1351,6 +1350,19 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
       remotepath = suffix
   return ssh_target, remotepath
 
+def tabulate(*rows, sep=' '):
+  ''' A generator yielding lines of values from `rows` aligned in columns.
+  '''
+  col_widths = [
+      max(map(len, (row[c]
+                    for row in rows)))
+      for c in range(max(map(len, rows)))
+  ]
+  for row in rows:
+    yield sep.join(
+        f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
+    ).rstrip()
+
 # pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
@@ -1701,7 +1713,7 @@ class FormatableFormatter(Formatter):
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
-              value.convert_via_method_or_attr
+              value.convert_via_method_or_attr  # noqa
             except AttributeError:
               # promote to something with convert_via_method_or_attr
               if isinstance(value, str):

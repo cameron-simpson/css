@@ -87,9 +87,9 @@ from typing import Iterable, List, Mapping, Optional, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options, vprint
+from cs.cmdutils import BaseCommand, BaseCommandOptions, vprint
 from cs.context import contextif, reconfigure_file
-from cs.deco import fmtdoc, uses_quiet, uses_verbose
+from cs.deco import fmtdoc, uses_quiet, uses_verbose, uses_cmd_options
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
@@ -712,7 +712,7 @@ def read_remote_hashindex(
       raise CalledProcessError(remote.returncode, remote_argv)
 
 @fmtdoc
-@uses_cmd_options
+@uses_cmd_options(doit=True, quiet=False)
 def run_remote_hashindex(
     rhost: str,
     argv,
@@ -720,9 +720,8 @@ def run_remote_hashindex(
     ssh_exe=None,
     hashindex_exe=None,
     check: bool = True,
-    doit: bool = None,
-    quiet: Optional[bool] = None,
-    options: BaseCommandOptions,
+    doit: bool,
+    quiet: bool,
     **subp_options,
 ):
   ''' Run a remote `hashindex` command.
@@ -747,10 +746,6 @@ def run_remote_hashindex(
     ssh_exe = options.ssh_exe
   if hashindex_exe is None:
     hashindex_exe = options.hashindex_exe
-  if doit is None:
-    doit = options.doit
-  if quiet is None:
-    quiet = True
   hashindex_cmd = shlex.join(prep_argv(
       hashindex_exe,
       *argv,

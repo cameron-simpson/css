@@ -4,22 +4,15 @@
 '''
 
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from getopt import GetoptError
-from os.path import (
-    dirname,
-    exists as existspath,
-    isdir as isdirpath,
-    join as joinpath,
-)
+from os.path import isdir as isdirpath
 import sys
-from typing import Optional
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
-from cs.cmdutils import BaseCommand
-from cs.context import contextif, stackattrs
+from cs.cmdutils import qvprint
+from cs.context import contextif
 from cs.fstags import uses_fstags, FSTags
-from cs.lex import s
+from cs.lex import r, s
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.progress import progressbar
@@ -27,8 +20,6 @@ from cs.resources import RunState, uses_runstate
 
 from ..common import EBooksCommonBaseCommand
 from .classic import (
-    KindleBookAssetDB,
-    KindleTree,
     KINDLE_APP_OSX_DEFAULTS_DOMAIN,
     KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING,
     kindle_content_path,
@@ -43,55 +34,20 @@ class KindleCommand(EBooksCommonBaseCommand):
   ''' Command line for interacting with a Kindle filesystem tree.
   '''
 
-  GETOPT_SPEC = 'C:K:'
-
-  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] [subcommand [...]]
-  Operate on a Kindle library.
-  Options:
-    -C calibre_library
-      Specify calibre library location.
-    -K kindle_library
-      Specify kindle library location.'''
+  USAGE_FORMAT = '''Usage: {cmd} [options...] [subcommand [...]]
+  Operate on a Kindle library.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
-    options = self.options
-    if opt == '-C':
-      options.calibre_path = val
-    elif opt == '-K':
-      # TODO: WTF? to go into the KindleTree factory function
-      db_subpaths = (
-          KindleBookAssetDB.DB_FILENAME,
-          joinpath(KindleTree.CONTENT_DIRNAME, KindleBookAssetDB.DB_FILENAME),
-      )
-      for db_subpath in db_subpaths:
-        db_fspath = joinpath(val, db_subpath)
-        if existspath(db_fspath):
-          break
-      else:
-        raise GetoptError(
-            "cannot find db at %s" % (" or ".join(map(repr, db_subpaths)),)
-        )
-      options.kindle_path = dirname(db_fspath)
-    else:
-      super().apply_opt(opt, val)
 
   @contextmanager
   @uses_fstags
   def run_context(self, fstags: FSTags):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    from ..calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     with super().run_context():
-      options = self.options
-      with options.kindle as kindle:
-        with contextif(options.calibre):
-          with contextif(options.dedrm):
-            with fstags:
-              yield
+      with self.options.kindle:
+        with fstags:
+          yield
 
   def cmd_app_path(self, argv):
     ''' Usage: {cmd} [content-path]
@@ -132,47 +88,49 @@ class KindleCommand(EBooksCommonBaseCommand):
   # pylint: disable=too-many-locals
   @uses_runstate
   def cmd_export(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] [ASINs...]
+    ''' Usage: {cmd} [-f] [ASINs...]
           Export AZW files to Calibre library.
           -f    Force: replace the AZW3 format if already present.
-          -n    No action, recite planned actions.
-          -q    Quiet: report only warnings.
-          -v    Verbose: report more information about actions and inaction.
           ASINs Optional ASIN identifiers to export.
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
+    self.popopts(argv, f='force')
     options = self.options
-    options.popopts(argv, f='force')
-    kindle = options.kindle
     calibre = options.calibre
     dedrm = options.dedrm
-    doit = options.doit
+    kindle = options.kindle
     force = options.force
-    quiet = options.quiet
-    verbose = options.verbose
     asins = argv or sorted(kindle.asins())
     xit = 0
-    quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
-    for asin in progressbar(asins, f"export to {calibre}"):
-      runstate.raiseif()
-      with Pfx(asin):
-        kbook = kindle.by_asin(asin)
-        try:
-          kbook.export_to_calibre(
-              calibre,
-              dedrm=dedrm,
-              doit=doit,
-              force=force,
-              replace_format=force,
-              quiet=quiet,
-              verbose=verbose,
-          )
-        except (dedrm.DeDRMError, ValueError) as e:
-          warning("export failed: %s", e)
-          xit = 1
-        except Exception as e:
-          warning("kbook.export_to_calibre: e=%s", s(e))
-          raise
+    qvprint("export", kindle.shortpath, "=>", calibre.shortpath)
+    with calibre:
+      if not dedrm:
+        warning("no DeDRM, exports of DRMed ebooks will probably fail")
+      with contextif(dedrm):
+        for asin in progressbar(asins, f"export to {calibre}"):
+          runstate.raiseif()
+          with Pfx(asin):
+            try:
+              kbook = kindle[asin]
+            except KeyError as e:
+              warning("no Kindle book for ASIN %s: %s", r(asin), e)
+              xit = 1
+              continue
+            try:
+              kbook.export_to_calibre(
+                  calibre=calibre,
+                  dedrm=dedrm,
+                  replace_format=force,
+              )
+            except ValueError as e:
+              warning("export failed: %s", e)
+              xit = 1
+            except dedrm.DeDRMError as e:
+              warning("export failed: %s", e)
+              xit = 1
+            except Exception as e:
+              warning("kbook.export_to_calibre: e=%s", s(e))
+              raise
     return xit
 
   def cmd_keys(self, argv):
@@ -184,19 +142,17 @@ class KindleCommand(EBooksCommonBaseCommand):
 
   @uses_runstate
   def cmd_import_tags(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-nqv] [ASINs...]
+    ''' Usage: {cmd} [ASINs...]
           Import Calibre book information into the fstags for a Kindle book.
           This will support doing searches based on stuff like
           titles which are, naturally, not presented in the Kindle
           metadata db.
     '''
     options = self.options
-    kindle = options.kindle
-    calibre = options.calibre
-    self.popopts(argv, options, n='-doit', q='quiet', v='verbose')
+    options.popopts(argv)
     doit = options.doit
-    quiet = options.quiet
-    verbose = options.verbose
+    calibre = options.calibre
+    kindle = options.kindle
     asins = argv or sorted(kindle.asins())
     xit = 0
     for asin in progressbar(asins, f"import metadata from {calibre}"):
@@ -206,12 +162,12 @@ class KindleCommand(EBooksCommonBaseCommand):
         cbooks = list(calibre.by_asin(asin))
         if not cbooks:
           # pylint: disable=expression-not-assigned
-          verbose and print("asin %s: no Calibre books" % (asin,))
+          qvprint("asin %s: no Calibre books" % (asin,))
           continue
         cbook = cbooks[0]
         if len(cbooks) > 1:
           # pylint: disable=expression-not-assigned
-          quiet or print(
+          qvprint(
               f'asin {asin}: multiple Calibre books,',
               f'dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}'
           )
@@ -230,28 +186,18 @@ class KindleCommand(EBooksCommonBaseCommand):
           with Pfx("%s=%r", tag_name, tag_value):
             old_value = ctags.get(tag_name)
             if old_value != tag_value:
-              if not quiet:
-                if first_update:
-                  print(f"{asin}: update from {cbook}")
-                  first_update = False
-                if old_value:
-                  print(
-                      f"  calibre.{tag_name}={tag_value!r}, was {old_value!r}"
-                  )
-                else:
-                  print(f"  calibre.{tag_name}={tag_value!r}")
+              if first_update:
+                qvprint(f"{asin}: update from {cbook}")
+                first_update = False
+              if old_value:
+                qvprint(
+                    f"  calibre.{tag_name}={tag_value!r}, was {old_value!r}"
+                )
+              else:
+                qvprint(f"  calibre.{tag_name}={tag_value!r}")
               if doit:
                 ctags[tag_name] = tag_value
     return xit
-
-  def cmd_info(self, argv):
-    ''' Usage: {cmd}
-          Report basic information.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    print("kindle", self.options.kindle.shortpath)
-    print("calibre", self.options.calibre.shortpath)
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l]
@@ -261,7 +207,7 @@ class KindleCommand(EBooksCommonBaseCommand):
     options = self.options
     kindle = options.kindle
     options.longmode = False
-    self.popopts(argv, options, l='longmode')
+    options.popopts(argv, l='longmode')
     longmode = options.longmode
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))

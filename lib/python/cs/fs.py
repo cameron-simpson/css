@@ -29,6 +29,7 @@ from threading import Lock
 from typing import Any, Callable, Optional, Union
 
 from cs.deco import decorator, fmtdoc, Promotable
+from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
@@ -98,9 +99,8 @@ def atomic_directory(infill_func, make_placeholder=False):
       # prevent other users from using this directory
       pfx_mkdir(dirpath, 0o000)
       remove_placeholder = True
-    else:
-      if existspath(dirpath):
-        raise ValueError("directory already exists: %r" % (dirpath,))
+    elif existspath(dirpath):
+      raise ValueError("directory already exists: %r" % (dirpath,))
     work_dirpath = dirname(dirpath)
     try:
       with TemporaryDirectory(
@@ -269,6 +269,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
       default_attr: str = 'FSPATH_DEFAULT'
   ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
+        This key is used to identify instances in the singleton registry.
 
         Parameters:
         * `fspath`: the filesystem path to resolve;
@@ -295,7 +296,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
       if envvar is not None:
         fspath = os.environ.get(envvar)
         if fspath is not None:
-          return realpath(fspath)
+          return cls.fspath_normalised(fspath)
       default = getattr(cls, default_attr, None)
       if default is not None:
         if callable(default):
@@ -303,7 +304,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
         else:
           fspath = expanduser(default)
         if fspath is not None:
-          return realpath(fspath)
+          return cls.fspath_normalised(fspath)
       raise ValueError(
           "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
               (
@@ -314,7 +315,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
               default_attr,
           )
       )
-    return realpath(fspath)
+    return cls.fspath_normalised(fspath)
 
   @classmethod
   def _singleton_key(cls, fspath=None, **_):
@@ -337,13 +338,25 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
     HasFSPath.__init__(self, fspath)
     if lock is None:
       try:
-        from cs.threads import NRLock
+        from cs.threads import NRLock  # pylint: disable=import-outside-toplevel
       except ImportError:
-        from threading import Lock
         lock = Lock()
       else:
         lock = NRLock()
     self._lock = lock
+
+  @classmethod
+  def fspath_normalised(cls, fspath: str):
+    ''' Return the normalised form of the filesystem path `fspath`,
+        used as the key for the singleton registry.
+
+        This default returns `realpath(fspath)`.
+
+        As a contracting example, the `cs.ebooks.kindle.classic.KindleTree`
+        class tries to locate the directory containing the book
+        database, and returns its realpath, allowing some imprecision.
+    '''
+    return realpath(fspath)
 
   @classmethod
   def promote(cls, obj):

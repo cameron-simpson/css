@@ -16,9 +16,7 @@ from itertools import chain
 from math import floor
 from mmap import mmap, MAP_PRIVATE, PROT_READ
 import os
-from os.path import (
-    basename, splitext
-)
+from os.path import (basename, splitext)
 from pprint import pprint
 import re
 import sys
@@ -42,6 +40,7 @@ from cs.resources import RunState, uses_runstate
 from cs.threads import bg
 
 from .cbz import make_cbz
+from .common import EBooksCommonBaseCommand
 
 from cs.debug import s
 from cs.x import X
@@ -53,7 +52,7 @@ DEFAULT_IMAGE_FILENAME_FORMAT = '{n:03d}.png'
 def main(argv=None):
   return PDFCommand(argv).run()
 
-class PDFCommand(BaseCommand):
+class PDFCommand(EBooksCommonBaseCommand):
   ''' Command line tool for doing things with PDF files.
   '''
 
@@ -99,6 +98,9 @@ class PDFCommand(BaseCommand):
         pdf.make_cbz(cbzpath)
 
   def cmd_mmap(self, argv):
+    ''' Usage: {cmd} pad-path
+          Decode a PDF document using mmap_pdf.
+    '''
     pdfpath, = argv
     pdfdoc = pfx_call(mmap_pdf, pdfpath)
     print(pdfdoc)
