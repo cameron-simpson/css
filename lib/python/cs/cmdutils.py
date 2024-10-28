@@ -4,7 +4,7 @@
 #
 # pylint: disable=too-many-lines
 
-''' Convenience functions for working with the Cmd module,
+''' Convenience functions for working with the cmd stdlib module,
     the BaseCommand class for constructing command line programmes,
     and other command line related stuff.
 '''
