@@ -1843,7 +1843,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
                       qvprint('new', cbook, '<=', obook)
                   elif len(cbooks) > 1:
                     # pylint: disable=expression-not-assigned
-                    verbose or warning(
+                    verbose and warning(
                         "  \n".join(
                             [
                                 'multiple "local" books with this identifier:',
