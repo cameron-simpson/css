@@ -1337,9 +1337,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
     ''' Usage: {cmd} [-nqv] bookpaths...
           Add the specified ebook bookpaths to the library.
           --cbz Also make a CBZ.
-          -n    No action: recite planned actions.
-          -q    Quiet: only emit warnings.
-          -v    Verbose: report all actions and decisions.
     '''
     options = self.options
     options.popopts(
@@ -1366,9 +1363,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
     ''' Usage: {cmd} [-fnqv] formatkey dbids...
           Convert books to the format `formatkey`.
           -f    Force: convert even if the format is already present.
-          -n    No action: recite planned actions.
-          -q    Quiet: only emit warnings.
-          -v    Verbose: report all actions and decisions.
     '''
     options = self.options
     options.popopts(
@@ -1474,10 +1468,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
                           or {DEFAULT_LINKTO_DIRPATH}.
           -F fmt,...      Source formats, default: {DEFAULT_LINKTO_FORMATS}
           -f              Force. Replace existing links.
-          -n              No action. Report planned actions.
           -o link-format  Link name format.
-          -q              Quiet.
-          -v              Verbose.
     '''
     ##Default with series: {DEFAULT_LINKTO_SERIES_FORMAT}
     ##Default without series: {DEFAULT_LINKTO_NOSERIES_FORMAT}
@@ -1725,9 +1716,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
     ''' Usage: {cmd} [-fnqv] [/path/to/other-library] [identifiers...]
           Import formats from another Calibre library.
           -f    Force. Overwrite existing formats with formats from other-library.
-          -n    No action: recite planned actions.
-          -q    Quiet. Only issue warnings and errors.
-          -v    Verbose. Print more information.
           /path/to/other-library: optional path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
@@ -1894,13 +1882,12 @@ class CalibreCommand(EBooksCommonBaseCommand):
     )
 
   def cmd_tag(self, argv):
-    ''' Usage: {cmd} [-n] [--] [-]tag[,tag...] book_specs...
+    ''' Usage: {cmd} [--] [-]tag[,tag...] book_specs...
           Modify the tags of the specified books.
+          Note the required -- separator if you are removing a tag with "-tag".
     '''
     options = self.options
-    if argv and argv[0] == '-n':
-      argv.pop(0)
-      options.doit = False
+    options.popopts(argv)
     doit = options.doit
     tags = self.poparg(argv, "tags")
     add_mode = True
