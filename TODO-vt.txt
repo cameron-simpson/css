@@ -1,3 +1,4 @@
+replace run_modes with @uses_verbose etc
 Dir and File objects to subclass importlib.resources.abc.Traversable
 rename Store.connected to Store.active
 StreamStore,TCPStore etc: use the new "on demand" PacketConnection mode
