@@ -190,26 +190,29 @@ class DataDirCommand(BaseCommand):
     '''
     datadirpath: Optional[str] = None
 
-  @contextmanager
-  def run_context(self):
-    options = self.options
-    datadirpath = options.datadirpath
-    if datadirpath is None:
-      from .store import DataDirStore  # pylint: disable=import-outside-toplevel
-      S = pfx_call(Store.promote, options.store_spec, options.config)
-      if not isinstance(S, DataDirStore):
-        raise GetoptError("default Store is not a DataDirStore: %s" % (s(S),))
-      datadir = S._datadir
-      datadirpath = datadir.fspath
-    else:
-      datadir = DataDir(datadirpath)
-    with super().run_context():
-      with stackattrs(
-          options,
-          datadir=datadir,
-          datadirpath=datadirpath,
-      ):
-        yield
+    @cached_property
+    def datadir(self):
+      ''' The `DataDir`, inferred from the default `Store`
+          if `datadirpath` is not specified.
+      '''
+      datadirpath = self.datadirpath
+      if datadirpath is None:
+        S = self.store
+        if not isinstance(S, DataDirStore):
+          raise GetoptError(
+              "default Store is not a DataDirStore: %s" % (s(S),)
+          )
+        datadir = S._datadir
+        self.datadirpath = datadir.fspath
+      else:
+        datadir = DataDir(datadirpath)
+      return datadir
+
+    COMMON_OPT_SPECS = dict(
+        **VTCmdOptions.COMMON_OPT_SPECS,
+        d_=('datadirpath', 'DataDir directory path.'),
+        datadir_=('datadirpath', 'DataDir directory path.'),
+    )
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
