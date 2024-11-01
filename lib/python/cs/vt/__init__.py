@@ -52,7 +52,7 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, promote
+from cs.deco import default_params, fmtdoc, promote, Promotable
 from cs.later import Later
 from cs.lex import r
 from cs.logutils import warning
@@ -194,7 +194,7 @@ PATHSEP = '/'
 run_modes = NS(show_progress=True,)
 
 class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
-            RunStateMixin, ABC):
+            RunStateMixin, Promotable, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but StoreSyncBase
@@ -786,6 +786,15 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       return block_for(src, name=name)
 
   @classmethod
+  def from_str(cls, store_spec: str, config=None):
+    ''' Return the `Store` for the specification `store_spec`.
+    '''
+    if config is None:
+      from .config import Config  # pylint:disable=import-outside-toplevel
+      config = Config.default(factory=True)
+    return config.Store_from_spec(store_spec)
+
+  @classmethod
   @fmtdoc
   def promote(cls, obj, config=None):
     ''' Promote `obj` to a `Store` instance.
@@ -796,16 +805,9 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         variable ${VT_STORE_ENVVAR} or {VT_STORE_DEFAULT!r}
         and then promoted from `str`.
     '''
-    if isinstance(obj, cls):
-      return obj
     if obj is None:
       obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
-    if isinstance(obj, str):
-      if config is None:
-        from .config import Config  # pylint:disable=import-outside-toplevel
-        config = Config.default(factory=True)
-      return config.Store_from_spec(obj)
-    raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
+    return super().promote(obj, config=config)
 
 class StoreSyncBase(Store):
   ''' Subclass of Store expecting synchronous operations
