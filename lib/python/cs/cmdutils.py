@@ -1108,7 +1108,9 @@ class BaseCommand:
     ''' Test whether the class defines additional subcommands.
     '''
     subcmds = set(self.subcommands())
+    # ignore the subcommands we presupply
     subcmds.discard('help')
+    subcmds.discard('info')
     subcmds.discard('shell')
     return bool(subcmds)
 
