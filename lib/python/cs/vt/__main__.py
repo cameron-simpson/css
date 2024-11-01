@@ -176,8 +176,6 @@ class DataDirCommand(BaseCommand):
   ''' Command line implementation for `DataDir`s.
   '''
 
-  GETOPT_SPEC = 'd:'
-
   USAGE_FORMAT = '''Usage: {cmd} [-d datadir] subcommand [...]
       Perform various tasks with DataDirs.
       -d datadir    Specify the filesystem path of the DataDir.
@@ -191,23 +189,6 @@ class DataDirCommand(BaseCommand):
     ''' Special class for `self.options` with various properties.
     '''
     datadirpath: Optional[str] = None
-    datadir: Optional["DataDir"] = None
-
-    @property
-    def config(self):
-      ''' The configuration.
-      '''
-      from .config import Config
-      return Config(self.config_map)
-
-  def apply_opt(self, opt, val):
-    ''' Apply the command line option `opt` with value `val`.
-    '''
-    options = self.options
-    if opt == '-d':
-      options.datadirpath = val
-    else:
-      raise GetoptError(f'unhandled option: {opt!r}={val!r}')
 
   @contextmanager
   def run_context(self):
