@@ -619,9 +619,16 @@ class BaseCommandOptions(HasThreadState):
   perthread_state = ThreadState()
 
   def as_dict(self):
-    ''' Return the optionas as a `dict`.
+    ''' Return the options as a `dict`.
+        This contains all the public attributes of `self`.
     '''
     return {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
+
+  def fields_as_dict(self):
+    ''' Return the options' fields as a `dict`.
+        This contains all the field values of `self`.
+    '''
+    return {f.name: getattr(self, f.name) for f in fields(self)}
 
   def copy(self, **updates):
     ''' Return a new instance of `BaseCommandOptions` (well, `type(self)`)
@@ -629,7 +636,12 @@ class BaseCommandOptions(HasThreadState):
 
         Any keyword arguments are applied as attribute updates to the copy.
     '''
-    copied = pfx_call(type(self), **self.as_dict())
+    # instantiate copied with the fields
+    copied = pfx_call(type(self), **self.fields_as_dict())
+    # infill any attributes which were not fields
+    for k, v in self.as_dict().items():
+      setattr(copied, k, v)
+    # apply the supplied updates
     for k, v in updates.items():
       setattr(copied, k, v)
     return copied
