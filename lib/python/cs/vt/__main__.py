@@ -134,10 +134,26 @@ class VTCmdOptions(BaseCommand.Options):
   )
   show_progress: bool = field(default_factory=lambda: run_modes.show_progress)
 
-  @property
+  @cached_property
+  def config(self):
+    ''' A `Config` derived from `self.config_map`, cached.
+    '''
+    return Config(self.config_map)
+
+  @cached_property
+  def store(self):
+    ''' The `Store`.
+    '''
+    return Store.default(
+        config_spec=self.config_map,
+        store_spec=self.store_spec,
+        cache_spec=self.cache_store_spec,
+    )
+
+  @cached_property
   def hashclass(self):
     ''' The `HashCode` subclass for `self.hashname`.
-      '''
+    '''
     try:
       return HashCode.by_hashname[self.hashname]
     except KeyError as e:
