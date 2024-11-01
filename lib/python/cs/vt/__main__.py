@@ -325,28 +325,32 @@ class VTCmd(BaseCommand):
       options = self.options
       config = options.config
       show_progress = options.show_progress
-      with config:
-        with stackattrs(run_modes, config=config):
-          # redo these because defaults is already initialised
-          with stackattrs(run_modes, show_progress=show_progress):
-            with fstags:
-              if cmd in ("config", "datadir", "dump", "help", "init",
-                         "profile", "scan"):
-                yield
-              else:
-                # open the default Store
-                if options.store_spec is None:
-                  if cmd == "serve":
-                    options.store_spec = options.store_spec
-                S = Store.default(
-                    config_spec=options.config_map,
-                    store_spec=options.store_spec,
-                    cache_spec=options.cache_store_spec,
-                )
-                with S:
-                  with stackattrs(options, S=S):
-                    with S.connected():
-                      yield
+      if options.dflt_log is not None:
+        logTo(options.dflt_log, delay=True)
+      with contextif(
+          options.verbose,
+          stackattrs,
+          self.loginfo,
+          level=logging.INFO,
+      ):
+        with config:
+          with stackattrs(run_modes, config=config):
+            # redo these because defaults is already initialised
+            with stackattrs(run_modes, show_progress=show_progress):
+              with fstags:
+                if cmd in ("config", "datadir", "dump", "help", "init",
+                           "profile", "scan"):
+                  yield
+                else:
+                  # open the default Store
+                  if options.store_spec is None:
+                    if cmd == "serve":
+                      options.store_spec = '[server]'
+                  S = options.store
+                  with S:
+                    with stackattrs(options, S=S):
+                      with S.connected():
+                        yield
       if ifdebug():
         dump_debug_threads()
 
