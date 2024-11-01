@@ -269,8 +269,6 @@ class VTCmd(BaseCommand):
 
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
 
-  GETOPT_SPEC = 'C:S:f:h:Pqv'
-
   USAGE_KEYWORDS = {
       'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
       'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
@@ -295,45 +293,14 @@ class VTCmd(BaseCommand):
               Default from ${VT_STORE_ENVVAR}, or {VT_STORE_DEFAULT!r},
               except for the "serve" subcommand which defaults to
               "[server]" and ignores ${VT_STORE_ENVVAR}.
-    -f config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
+    -c config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
               otherwise {DEFAULT_CONFIG_PATH}
     -h hashclass Hashclass for Stores. Default from ${HASHNAME_ENVVAR},
               otherwise `{HASHNAME_DEFAULT!r}`.
     -P        Progress: show a progress bar of top level Store activity.
-    -q        Quiet; not verbose. Default if stderr is not a tty.
-    -v        Verbose; not quiet. Default if stderr is a tty.
 '''
 
   Options = VTCmdOptions
-
-  def apply_opts(self, opts):
-    ''' Apply the command line options mapping `opts` to `options`.
-    '''
-    options = self.options
-    for opt, val in opts:
-      if opt == '-C':
-        options.cache_store_spec = val
-      elif opt == '-S':
-        # specify Store
-        options.store_spec = val
-      elif opt == '-f':
-        options.config_map = val
-      elif opt == '-h':
-        options.hashname = val
-      elif opt == '-P':
-        options.show_progress = True
-      elif opt == '-q':
-        # quiet: not verbose
-        options.verbose = False
-      elif opt == '-v':
-        # verbose: not quiet
-        options.verbose = True
-      else:
-        raise NotImplementedError("unhandled option: %s" % (opt,))
-    if options.verbose:
-      self.loginfo.level = logging.INFO
-    if options.dflt_log is not None:
-      logTo(options.dflt_log, delay=True)
 
   def handle_signal(self, sig, frame):
     ''' Override `BaseCommand.handle_signal`:
