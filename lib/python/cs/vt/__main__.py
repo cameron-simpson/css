@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 import errno
+from functools import cached_property
 from getopt import GetoptError
 import logging
 import os
@@ -31,7 +32,7 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data, shortpath
 from cs.fstags import FSTags, uses_fstags
