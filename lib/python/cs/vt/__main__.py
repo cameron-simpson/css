@@ -1397,9 +1397,7 @@ def lsDirent(fp, E, name):
   '''
   B = E.block
   st = E.stat()
-  st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
-      st_atime, st_mtime, st_ctime = st
-  t = datetime.fromtimestamp(int(st_mtime))
+  t = datetime.fromtimestamp(int(st.st_mtime))
   try:
     h = B.hashcode
   except AttributeError:
@@ -1408,7 +1406,7 @@ def lsDirent(fp, E, name):
     detail = hexify(h)
   fp.write(
       "%c %-41s %s %6d %s\n" %
-      (('d' if E.isdir else 'f'), detail, t, st_size, name)
+      (('d' if E.isdir else 'f'), detail, t, st.st_size, name)
   )
 
 @typechecked
