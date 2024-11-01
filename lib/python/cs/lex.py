@@ -215,14 +215,14 @@ def htmlquote(s):
   ''' Quote a string for use in HTML.
   '''
   s = htmlify(s)
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def jsquote(s):
   ''' Quote a string for use in JavaScript.
   '''
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def phpquote(s):
   ''' Quote a string for use in PHP code.
@@ -303,12 +303,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
           chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
         offset0 = offset
-    else:
-      if b in whitelist:
-        inwhite = True
-        chunk = hexify(bs[offset0:offset])
-        chunks.append(chunk)
-        offset0 = offset
+    elif b in whitelist:
+      inwhite = True
+      chunk = hexify(bs[offset0:offset])
+      chunks.append(chunk)
+      offset0 = offset
     offset += 1
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
@@ -402,13 +401,13 @@ def skipwhite(s, offset=0):
   return offset
 
 def indent(paragraph, line_indent="  "):
-  ''' Return the `paragraph` indents by `line_indent` (default `"  "`).
+  ''' Return the `paragraph` indented by `line_indent` (default `"  "`).
   '''
   return "\n".join(
       line and line_indent + line for line in paragraph.split("\n")
   )
 
-def stripped_dedent(s):
+def stripped_dedent(s, post_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
@@ -417,6 +416,9 @@ def stripped_dedent(s):
 
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
+
+      The optional `post_indent` parameter may be used to indent
+      the dedented text before return.
 
       Example:
 
@@ -439,9 +441,9 @@ def stripped_dedent(s):
     return ''
   line1 = lines.pop(0)
   if not lines:
-    return line1
+    return indent(line1, post_indent)
   adjusted = dedent('\n'.join(lines))
-  return line1 + '\n' + adjusted
+  return indent(line1 + '\n' + adjusted, post_indent)
 
 @require(lambda offset: offset >= 0)
 def get_prefix_n(s, prefix, n=None, *, offset=0):
@@ -1348,6 +1350,19 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
       remotepath = suffix
   return ssh_target, remotepath
 
+def tabulate(*rows, sep=' '):
+  ''' A generator yielding lines of values from `rows` aligned in columns.
+  '''
+  col_widths = [
+      max(map(len, (row[c]
+                    for row in rows)))
+      for c in range(max(map(len, rows)))
+  ]
+  for row in rows:
+    yield sep.join(
+        f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
+    ).rstrip()
+
 # pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
@@ -1656,9 +1671,11 @@ class FormatableFormatter(Formatter):
     offset = 0
     while offset < len(format_spec):
       if format_spec.startswith(':', offset):
+        # an empty spec
         subspec = ''
         offset += 1
       else:
+        # match a FORMAT_RE_FIELD_EXPR
         m_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
         if m_subspec:
           subspec = m_subspec.group()
@@ -1686,8 +1703,7 @@ class FormatableFormatter(Formatter):
     '''
     # parse the format_spec into multiple subspecs
     format_subspecs = cls.get_format_subspecs(format_spec) or []
-    while format_subspecs:
-      format_subspec = format_subspecs.pop(0)
+    for format_subspec in format_subspecs:
       with Pfx("subspec %r", format_subspec):
         assert isinstance(format_subspec, str)
         assert len(format_subspec) > 0
@@ -1697,7 +1713,7 @@ class FormatableFormatter(Formatter):
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
-              value.convert_via_method_or_attr
+              value.convert_via_method_or_attr  # noqa
             except AttributeError:
               # promote to something with convert_via_method_or_attr
               if isinstance(value, str):

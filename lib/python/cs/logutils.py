@@ -70,7 +70,7 @@ import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 
-__version__ = '20240630-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -86,7 +86,6 @@ DISTINFO = {
         'cs.lex',
         'cs.pfx',
         'cs.py.func',
-        'cs.upd',  # done as a late import
     ],
 }
 
@@ -155,7 +154,6 @@ class LoggingState(NS):
 
         Parameters:
         * `cmd`: program name, default from `basename(sys.argv[0])`.
-          Side-effect: sets `cs.pfx.cmd` to this value.
         * `main_log`: default logging system.
           If `None`, the main log will go to `sys.stderr`;
           if `main_log` is a string, is it used as a filename to
@@ -208,7 +206,6 @@ class LoggingState(NS):
 
     if cmd is None:
       cmd = os.path.basename(sys.argv[0])
-    cs.pfx.cmd = cmd
 
     if main_log is None:
       main_log = sys.stderr
@@ -320,14 +317,21 @@ class LoggingState(NS):
 
       signal.signal(signal.SIGHUP, handler)
 
-def setup_logging(cmd=None, **kw):
+def setup_logging(cmd_name=None, **kw):
   ''' Prepare a `LoggingState` and return it.
       It is also available as the global `cs.logutils.loginfo`.
+      Side-effect: sets `cs.pfx.cmd` to this value.
   '''
   global loginfo
-  logstate = LoggingState(cmd=cmd, **kw)
-  logstate.apply()
-  loginfo = logstate
+  if loginfo is None:
+    kw.setdefault('cmd', cmd_name or kw.get('cmd'))
+    logstate = LoggingState(**kw)
+    logstate.apply()
+    loginfo = logstate
+    cs.pfx.cmd = kw['cmd']
+  else:
+    # just amend the current LoggingState
+    loginfo.__dict__.update(**kw)
   return loginfo
 
 class PfxFormatter(Formatter):

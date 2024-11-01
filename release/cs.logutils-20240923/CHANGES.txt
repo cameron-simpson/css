@@ -1,0 +1,2 @@
+lib/python/cs/logutils.py: cs.cmdutils: setup_logging: accept leading `cmd_name` for backwards compatibility, reported by Lance Cohen
+lib/python/cs/logutils.py: cs.logutils: fix the fix

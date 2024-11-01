@@ -94,7 +94,7 @@ from os.path import (
     relpath,
     samefile,
 )
-from pathlib import PurePath
+from pathlib import Path
 import shutil
 import sys
 from threading import Lock, RLock
@@ -131,7 +131,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20240422-post'
+__version__ = '20241005-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -198,14 +198,14 @@ def verbose(msg, *a):
 # pylint: disable=too-many-public-methods
 class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
+
+      Usage: {cmd} [-o ontology] [-P] subcommand [...]
+        -o ontology   Specify the path to an ontology file.
+        -P            Physical. Resolve pathnames through symlinks.
+                      Default ~/.fstagsrc[general]physical or False.
   '''
 
   GETOPT_SPEC = 'o:P'
-
-  USAGE_FORMAT = '''Usage: {cmd} [-o ontology] [-P] subcommand [...]
-  -o ontology   Specify the path to an ontology file.
-  -P            Physical. Resolve pathnames through symlinks.
-                Default ~/.fstagsrc[general]physical or False.'''
 
   USAGE_KEYWORDS = {
       'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
@@ -635,7 +635,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           tags = fstags[fspath]
           if options.long_format:
             print(fspath)
-            for tag in tags.as_tags(all_tags=not options.use_direct_tags):
+            for tag in sorted(
+                tags.as_tags(all_tags=not options.use_direct_tags),
+                key=lambda tag: tag.name,
+            ):
               print(" ", tag)
           else:
             try:
@@ -735,7 +738,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             print(srcpath, '->', dstpath)
     return xit
 
-  def cmd_ns(self, argv):
+  @uses_runstate
+  def cmd_ns(self, argv, runstate: RunState):
     ''' Usage: {cmd} [-d] [--direct] [paths...]
           Report on the available primary namespace fields for formatting.
           Note that because the namespace used for formatting has
@@ -763,6 +767,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       fullpath = realpath(path)
       for fspath in ((fullpath,) if directories_like_files else scandirpaths(
           fullpath, sort_names=True)):
+        runstate.raiseif()
         with Pfx(fspath):
           tags = fstags[fspath].format_tagset(direct=use_direct_tags)
           print(fspath)
@@ -1289,7 +1294,7 @@ class FSTags(MultiOpenMixin):
         in order from the root to `dirname(fspath)`.
     '''
     absfilepath = abspath(fspath)
-    root, *subparts = PurePath(absfilepath).parts
+    root, *subparts = Path(absfilepath).parts
     if not subparts:
       raise ValueError("root=%r and no subparts" % (root,))
     current = root
@@ -1576,18 +1581,7 @@ class FSTags(MultiOpenMixin):
             )
         else:
           raise
-      old_modified = dst_taggedpath.modified
       dst_taggedpath.update(src_taggedpath)
-      if not self.is_open():
-        # we're not expecting save-on-final-close, so save now
-        try:
-          dst_taggedpath.save()
-        except OSError as e:
-          if e.errno == errno.EACCES:
-            warning("save tags: %s", e)
-            dst_taggedpath.modified = old_modified
-          else:
-            raise
       return result
 
   @require(lambda srcpath: existspath(srcpath), "srcpath does not exist")
@@ -1704,6 +1698,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   def discard(self, tag_name, value, *, verbose=None):
     assert tag_name != 'name'
     super().discard(tag_name, value, verbose=verbose)
+    self.save_if_closed()
 
   @tag_or_tag_value
   def set(self, tag_name, value, **kw):
@@ -1712,6 +1707,13 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
     assert tag_name != 'name'
     ##assert tag_name != 'fspath'
     super().set(tag_name, value, **kw)
+    self.save_if_closed()
+
+  def update(self, other=None, **update_kw):
+    ''' Call `TagSet.update` with the `FSTags` open.
+    '''
+    with self._fstags:
+      super().update(other, **update_kw)
 
   # pylint: disable=arguments-differ
   def as_tags(self, prefix=None, all_tags=False):
@@ -1778,7 +1780,11 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       if tag.name not in kwtags:
         kwtags.add(tag)
     # tags based on the fspath
-    kwtags['fspath'] = PurePath(self.fspath)
+    path = Path(self.fspath)
+    kwtags.update(
+        basename=path.name,
+        fspath=path,
+    )
     return kwtags
 
   def format_kwargs(self, *, direct=False):
@@ -1814,6 +1820,22 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
     ''' Update the associated `FSTagsTagFile`.
     '''
     self.tagfile.save(prune=prune)
+
+  def save_if_closed(self, **save_kw):
+    ''' Save the tag file is `self._fstags` is closed (no autosave).
+    '''
+    if self._fstags.is_open():
+      return
+    # we're not expecting save-on-final-close, so save now
+    old_modified = self.modified
+    try:
+      self.save(**save_kw)
+    except OSError as e:
+      if e.errno == errno.EACCES:
+        warning("save tags: %s", e)
+        self.modified = old_modified
+      else:
+        raise
 
   def merged_tags(self):
     ''' Compute the cumulative tags for this path as a new `TagSet`

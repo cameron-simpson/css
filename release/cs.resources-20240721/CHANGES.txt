@@ -1,0 +1,1 @@
+lib/python/cs/resources.py: cs.resouces: mark the MutliOpen wrapper class as obsolete, various doc updates

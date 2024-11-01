@@ -104,6 +104,10 @@ class SvcDCommand(BaseCommand):
   ''' Implementation of `SvcD` command line mode.
   '''
 
+  USAGE_KEYWORDS = {
+      'VARRUN': VARRUN,
+  }
+
   def disable(self, argv):
     ''' {cmd} disable names...
           For each name set the flag {{NAME}}_DISABLE, causing the matching

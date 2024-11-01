@@ -78,7 +78,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20240316-post'
+__version__ = '20240723-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -881,14 +881,18 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
-    self.define_schema()
+    self.__first_use = True
 
-  def define_schema(self):
-    ''' Instantiate the schema and define the root metanode.
-    '''
-    with self.sqla_state.auto_session() as session:
-      self.Base.metadata.create_all(bind=self.engine)
-      self.prepare_metanode(session=session)
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      # make sure the schema is up to date
+      # in particular, create the metanode 0 if missing
+      if self.__first_use:
+        with self.sqla_state.auto_session() as session:
+          self.prepare_metanode(session=session)
+        self.__first_use = False
+      yield
 
   def prepare_metanode(self, *, session):
     ''' Ensure row id 0, the metanode, exists.
@@ -1838,11 +1842,6 @@ class SQLTags(BaseTagSets, Promotable):
       db_url = expanduser(default_path)
     return db_url
 
-  def init(self):
-    ''' Initialise the database.
-    '''
-    self.orm.define_schema()
-
   def db_entity(self, index):
     ''' Return the `Entities` instance for `index` or `None`.
     '''
@@ -1994,6 +1993,14 @@ class SQLTags(BaseTagSets, Promotable):
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
+  TAGSETS_CLASS = SQLTags
+
+  TAGSET_CRITERION_CLASS = SQTCriterion
+
+  TAG_BASED_TEST_CLASS = SQLTagBasedTest
+
+  GETOPT_SPEC = 'f:'
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database shell.
@@ -2080,7 +2087,9 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
             )
         )
     else:
-      raise NotImplementedError("unimplemented export format %r" % (export_format,))
+      raise NotImplementedError(
+          "unimplemented export format %r" % (export_format,)
+      )
 
   # pylint: disable=too-many-locals
   def cmd_find(self, argv):
@@ -2372,14 +2381,6 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   ''' Common features for commands oriented around an `SQLTags` database.
   '''
 
-  TAGSETS_CLASS = SQLTags
-
-  TAGSET_CRITERION_CLASS = SQTCriterion
-
-  TAG_BASED_TEST_CLASS = SQLTagBasedTest
-
-  GETOPT_SPEC = 'f:'
-
   # TODO:
   # export_csv [criteria...] >csv_data
   #   Export selected items to CSV data.
@@ -2395,13 +2396,12 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   USAGE_KEYWORDS = {
       'DBURL_DEFAULT': DBURL_DEFAULT,
       'DBURL_ENVVAR': DBURL_ENVVAR,
+      'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
   }
 
   @dataclass
   class Options(BaseCommand.Options):
-    db_url: str = field(
-        default_factory=lambda: BaseSQLTagsCommand.TAGSETS_CLASS.infer_db_url()
-    )
+    db_url: str = None
     sqltags: Optional[SQLTags] = None
 
   def apply_opt(self, opt, val):
@@ -2420,6 +2420,8 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
     with super().run_context():
       options = self.options
       db_url = options.db_url
+      if db_url is None:
+        db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
       sqltags = self.TAGSETS_CLASS(db_url)
       with sqltags:
         with stackattrs(options, sqltags=sqltags, verbose=True):

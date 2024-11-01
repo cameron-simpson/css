@@ -11,7 +11,7 @@ from inspect import getmodule
 import os.path
 import sys
 
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.gimmicks import warning
 from cs.pfx import Pfx
 
@@ -27,41 +27,38 @@ DISTINFO = {
     'install_requires': ['cs.context', 'cs.gimmicks', 'cs.pfx'],
 }
 
-def import_module_name(module_name, name, path=None, lock=None):
+def import_module_name(module_name, name=None, sys_path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
 
       Parameters:
       * `module_name`: the module name to import.
-      * `name`: the name within the module whose value is returned;
+      * `name`: optional name within the module whose value is returned;
         if `name` is `None`, return the module itself.
-      * `path`: an array of paths to use as sys.path during the import.
-      * `lock`: a lock to hold during the import (recommended).
+      * `sys_path`optional list array of paths to use as `sys.path` during the import.
+      * `lock`: an optional lock to hold during the import (recommended).
   '''
-  if lock:
-    with lock:
-      return import_module_name(module_name, name, path)
-  osyspath = sys.path
-  if path:
-    sys.path = path
-  try:
-    M = importlib.import_module(module_name)
-  except ImportError as e:
-    # pylint: disable=raise-missing-from
-    raise ImportError("no module named %r: %s: %s" % (module_name, type(e), e))
-  finally:
-    if path:
-      sys.path = osyspath
-  if M is not None:
-    if name is None:
-      return M
-    try:
-      return getattr(M, name)
-    except AttributeError as e:
-      # pylint: disable=raise-missing-from
-      raise ImportError(
-          "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
-      )
-  return None
+  with contextif(lock):
+    if sys_path is None:
+      sys_path = sys.path
+    with stackattrs(sys, path=sys_path):
+      try:
+        M = importlib.import_module(module_name)
+      except ImportError as e:
+        # pylint: disable=raise-missing-from
+        raise ImportError(
+            "no module named %r: %s: %s" % (module_name, type(e), e)
+        )
+    if M is not None:
+      if name is None:
+        return M
+      try:
+        return getattr(M, name)
+      except AttributeError as e:
+        # pylint: disable=raise-missing-from
+        raise ImportError(
+            "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
+        )
+    return None
 
 def import_module_from_file(module_name, source_file, sys_path=None):
   ''' Import a specific file as a module instance,

@@ -13,7 +13,6 @@ from os.path import (
     basename,
     dirname,
     exists as existspath,
-    isabs as isabspath,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -23,8 +22,8 @@ from pprint import pprint
 from stat import S_ISDIR, S_ISREG
 import sys
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions
-from cs.context import stackattrs
+from cs.cmdutils import BaseCommand
+from cs.context import contextif, stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fs import HasFSPath
@@ -33,10 +32,9 @@ from cs.gui_tk import BaseTkCommand
 from cs.hashindex import HASHNAME_DEFAULT
 from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx, pfxprint, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
 from cs.resources import RunState, uses_runstate
-from cs.seq import unrepeated
 from cs.tagset import Tag
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
@@ -108,7 +106,7 @@ class TaggerCommand(BaseCommand):
   # pylint: disable=too-many-branches,too-many-locals
   @uses_runstate
   def cmd_autofile(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-dnrx] paths...
+    ''' Usage: {cmd} [-dnry] paths...
           Link paths to destinations based on their tags.
           -d    Treat directory paths like files - file the
                 directory, not its contents.
@@ -119,12 +117,13 @@ class TaggerCommand(BaseCommand):
                 Only apply actions in modes, a comma separated list of modes
                 from {RULE_MODES!r}.
           -n    No action (default). Just print filing actions.
+          -q    Quiet.
           -r    Recurse. Required to autofile a directory tree.
           -y    Link files to destinations.
     '''
     options = self.options
     options.direct = False
-    options.hashname = HASHNAME_DEFAULT
+    options.force = False
     options.modes = ",".join(RULE_MODES)
     options.once = False
     options.recurse = False
@@ -132,9 +131,11 @@ class TaggerCommand(BaseCommand):
         argv,
         _1='once',
         d='direct',
+        f='force',
         h='hashname',
         n='dry_run',  # no action
         M_=('modes', str),
+        q='quiet',
         r='recurse',
         y='doit',  # inverse of -n
         v='verbose',
@@ -143,50 +144,25 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing paths")
     doit = options.doit
     direct = options.direct
+    force = options.force
     hashname = options.hashname
     modes = options.modes.split(',')
     if not all([mode in RULE_MODES for mode in modes]):
       raise GetoptError(f'invalid modes not in {RULE_MODES!r}: {modes!r}')
     once = options.once
     recurse = options.recurse
-    verbose = options.verbose
+    quiet = options.quiet
     taggers = set()
     ok = True
-    paths = []
-    for path in argv:
-      with Pfx(path):
-        try:
-          S = os.stat(path)
-        except OSError as e:
-          warning("cannot stat: %s", e)
-          ok = False
-          continue
-        if S_ISREG(S.st_mode):
-          paths.append(path)
-        elif S_ISDIR(S.st_mode):
-          if direct:
-            paths.append(path)
-          else:
-            paths.extend(
-                [
-                    joinpath(path, base)
-                    for base in sorted(pfx_call(os.listdir, path))
-                    if not base.startswith('.')
-                ]
-            )
-        else:
-          warning("unhandled file type ignored")
     xit = 0
     limit = 1 if once else None
-    q = ListQueue(paths, unique=realpath)
-    with run_task('autofile') as proxy:
+    q = ListQueue(argv, unique=realpath)
+    with contextif(not quiet, run_task, 'autofile') as proxy:
       for path in q:
         runstate.raiseif()
         with Pfx(path):
-          proxy.text = shortpath(path)
-          if not existspath(path):
-            continue
-          if isdirpath(path) and not direct:
+          if proxy: proxy.text = shortpath(path)
+          if not direct and isdirpath(path):
             if recurse:
               # queue children
               q.extend(
@@ -196,34 +172,31 @@ class TaggerCommand(BaseCommand):
                       if not base.startswith('.')
                   ]
               )
+            # do not autofile directories
             continue
-          if isfilepath(path) or (direct and isdirpath(path)):
-            tagger = Tagger(dirname(path))
-            taggers.add(tagger)  # remember for reuse
-            matches = tagger.process(
-                basename(path),
-                hashname=hashname,
-                modes=modes,
-                doit=doit,
-                verbose=verbose,
-            )
-            if matches:
-              for match in matches:
-                if match.filed_to:
-                  # process the filed paths ahead of the pending stuff
-                  # raise limit to process this file in the filed_to places
-                  q.prepend(match.filed_to)
-                  if limit is not None:
-                    limit += len(match.filed_to)
-              if limit is not None:
-                # now drop the limit by 1
-                limit -= 1
-                if limit < 1:
-                  # we're done
-                  break
-            continue
-          warning("not a regular file, skipping")
-          xit = 1
+          tagger = Tagger(dirname(path))
+          taggers.add(tagger)  # remember for reuse
+          matches = tagger.process(
+              basename(path),
+              hashname=hashname,
+              modes=modes,
+              doit=doit,
+              force=force,
+          )
+          if matches:
+            for match in matches:
+              if match.filed_to:
+                # process the filed paths ahead of the pending stuff
+                # raise limit to process this file in the filed_to places
+                q.prepend(match.filed_to)
+                if limit is not None:
+                  limit += len(match.filed_to)
+            if limit is not None:
+              # now drop the limit by 1
+              limit -= 1
+              if limit < 1:
+                # we're done
+                break
           continue
     return xit
 
@@ -283,8 +256,7 @@ class TaggerCommand(BaseCommand):
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
-          Derive an autofile mapping of tags to directory paths
-          from the directory paths suppplied.
+          Derive an autofile mapping of tags to directory paths.
     '''
     if not argv:
       raise GetoptError("missing dirpaths")
@@ -308,6 +280,7 @@ class TaggerCommand(BaseCommand):
 
   def cmd_ont(self, argv):
     ''' Usage: {cmd} type_name
+          Print ontology information about type_name.
     '''
     tagger = self.options.tagger
     if not argv:
@@ -353,6 +326,20 @@ class TaggerCommand(BaseCommand):
             Tag(tag_name, tag_value),
             repr([shortpath(path) for path in paths])
         )
+
+  def cmd_show(self, argv):
+    ''' Usage: {cmd} rules
+          Show the filing rules.
+    '''
+    dirpath = '.'
+    if not argv:
+      argv = [
+          'rules',
+      ]
+    tagger = Tagger(dirpath)
+    print(shortpath(tagger.rcfile))
+    for n, rule in enumerate(tagger.rules, 1):
+      print(n, rule)
 
   @uses_fstags
   def cmd_test(self, argv, *, fstags: FSTags):

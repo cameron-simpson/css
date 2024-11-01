@@ -18,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240630-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -499,7 +499,7 @@ def cachedmethod(
 
 @decorator
 def OBSOLETE(func, suggestion=None):
-  ''' Decorator for obsolete functions.
+  ''' A decorator for obsolete functions or classes.
 
       Use:
 
@@ -517,7 +517,7 @@ def OBSOLETE(func, suggestion=None):
 
   callers = set()
 
-  def wrapped(*args, **kwargs):
+  def OBSOLETE_func_wrapper(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
     frame = traceback.extract_stack(None, 2)[0]
@@ -538,12 +538,12 @@ def OBSOLETE(func, suggestion=None):
 
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
-  doc = "OBSOLETE FUNCTION " + funcname
+  doc = "OBSOLETE " + funcname
+  func.__doc__ = doc + '\n\n' + funcdoc
   if suggestion:
     doc += ' suggestion: ' + suggestion
-  wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  wrapped.__doc__ = doc + '\n\n' + funcdoc
-  return wrapped
+  OBSOLETE_func_wrapper.__name__ = '@OBSOLETE(%s)' % (funcname,)
+  return OBSOLETE_func_wrapper
 
 @OBSOLETE(suggestion='cachedmethod')
 def cached(*a, **kw):
@@ -804,9 +804,9 @@ def default_params(func, _strict=False, **param_defaults):
   )
   sig0 = signature(func)
   sig = sig0
-  new_params = []
   modified_params = []
   for param in sig0.parameters.values():
+    modified_param = None
     try:
       param_default = param_defaults[param.name]
     except KeyError:
@@ -816,9 +816,98 @@ def default_params(func, _strict=False, **param_defaults):
           annotation=typing.Optional[param.annotation],
           default=None if param_default is param.empty else param_default,
       )
-      sig = sig.replace(parameters=[modified_param])
+    if modified_param is None:
+      modified_param = param.replace()
+    modified_params.append(modified_param)
+  sig = sig.replace(parameters=modified_params)
   defaulted_func.__signature__ = sig
   return defaulted_func
+
+@decorator
+def uses_cmd_options(
+    func, _strict=False, _options_param_name='options', **option_defaults
+):
+  ''' A decorator to provide default keyword arguments
+      from the prevailing `cs.cmdutils.BaseCommandOptions`
+      if available, otherwise from `option_defaults`.
+
+      This exists to provide plumbing free access to options set
+      up by a command line invocation using `cs.cmdutils.BaseCommand`.
+
+      If no `option_defaults` are provided, a single `options`
+      keyword argument is provided which is the prevailing
+      `BaseCommand.Options` instance.
+
+      The decorator accepts two optional "private" keyword arguments
+      commencing with underscores:
+      * `_strict`: default `False`; if true then an `option_defaults`
+        will only be applied if the argument is _missing_ from the
+        function arguments, otherwise it will be applied if the
+        argument is missing or `None`
+      * `_options_param_name`: default `'options'`; this is the
+        name of the single `options` keyword argument which will be
+        supplied if there are no `option_defaults`
+
+      Examples:
+
+          @uses_cmd_options(doit=True, quiet=False)
+          def func(x, *, doit, quiet, **kw):
+              if not quiet:
+                  print("something", x, kw)
+              if doit:
+                 ... do the thing ...
+              ... etc ...
+
+          @uses_cmd_options()
+          def func(x, *, options, **kw):
+              if not options.quiet:
+                  print("something", x, kw)
+              if options.doit:
+                 ... do the thing ...
+              ... etc ...
+  '''
+
+  def uses_cmd_wrapper(*func_a, **func_kw):
+    # fill in the func_kw from the defaults
+    # and keep a record of the chosen values
+    # run with the prevailing BaseCommand suitably updated
+    try:
+      from cs.cmdutils import BaseCommand
+      from cs.context import stackattrs
+    except ImportError:
+      # missing cs.cmdutils or cs.context,
+      # make an options with no attributes
+      options = object()
+    else:
+      options_class = BaseCommand.Options
+      options = options_class.default() or options_class()
+    option_updates = {}
+    if not option_defaults:
+      option_defaults[_options_param_name] = options
+    for option_name, option_default in option_defaults.items():
+      if _strict:
+        # skip if the option is not provided by the caller
+        if option_name in func_kw:
+          continue
+      elif func_kw.get(option_name) is not None:
+        # skip if the option is not provided by the caller
+        # or is provided as None
+        continue
+      option_value = getattr(options, option_name, None)
+      if option_value is None:
+        option_value = option_default
+      option_updates[option_name] = option_value
+    func_kw.update(option_updates)
+    with stackattrs(options, **option_updates):
+      with options:
+        return func(*func_a, **func_kw)
+
+  return uses_cmd_wrapper
+
+uses_doit = uses_cmd_options(doit=True)
+uses_force = uses_cmd_options(force=False)
+uses_quiet = uses_cmd_options(quiet=False)
+uses_verbose = uses_cmd_options(verbose=False)
 
 # pylint: disable=too-many-statements
 @decorator

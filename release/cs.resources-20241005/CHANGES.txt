@@ -1,0 +1,4 @@
+lib/python/cs/resources.py: cs.resources: tweak docstring
+lib/python/cs/resources.py: new RunState.sleep(delay[,step]) function to do an interruptable sleep
+lib/python/cs/resources.py: cs.resources: RunState.sleep: bugfix: sleep in step increments, not the entire delay
+lib/python/cs/resources.py: cs.resources: RunState.bg: override HasThreadState.bg to catch CancellationError and just issue a warning

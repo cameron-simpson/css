@@ -194,7 +194,7 @@ from contextlib import contextmanager
 from datetime import date, datetime
 import errno
 from fnmatch import (fnmatch, fnmatchcase, translate as fn_translate)
-from functools import partial
+from functools import cached_property, partial
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
@@ -235,7 +235,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20240422.2-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -440,6 +440,11 @@ class _FormatStringTagProxy:
     return "%s(%s:%s)" % (
         type(self).__name__, type(self.__proxied).__name__, self.__proxied
     )
+
+  def __format__(self, format_spec):
+    ''' Formatting `self` formats `self.__proxied.value`.
+    '''
+    return format(self.__proxied.value, format_spec)
 
   def __getattr__(self, attr):
     return getattr(self.__proxied, attr)
@@ -1041,6 +1046,17 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       self._tagset = tagset
       self._prefix = prefix
 
+    def __fullattr(self, attr):
+      ''' The absolute tag name associated with `attr`.
+      '''
+      return attr if self._prefix is None else f'{self._prefix}.{attr}'
+
+    @cached_property
+    def __prefixed_view(self):
+      ''' A `TagSetPrefixView` at this prefix.
+        '''
+      return TagSetPrefixView(self._tagset, self._prefix)
+
     def __bool__(self):
       ''' We return `False` so that an unresolved attribute,
           which returns a deeper `_Auto` instance,
@@ -1048,17 +1064,22 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
               title = tags.auto.title or "default title"
       '''
-      return False
+      return bool(self.__prefixed_view)
 
     def __getattr__(self, attr):
-      fullattr = (
-          attr if self._prefix is None else '.'.join((self._prefix, attr))
-      )
+      fullattr = self.__fullattr(attr)
       try:
         return self._tagset.auto_infer(fullattr)
       except ValueError:
         # auto view of deeper attributes
+        if attr in ('items', 'keys', 'values'):
+          return self.__prefixed_view.items
         return self._tagset._Auto(self._tagset, fullattr)
+
+    def __iter__(self):
+      ''' Iterate over the keys of the prefix view.
+      '''
+      return iter(self.__prefixed_view)
 
   @property
   def auto(self):
@@ -2120,7 +2141,11 @@ class TagSetPrefixView(FormatableMixin):
   @require(lambda prefix: len(prefix) > 0)
   @typechecked
   def __init__(self, tags, prefix: str):
-    self.__dict__.update(_tags=tags, _prefix=prefix, _prefix_=prefix + '.')
+    self.__dict__.update(
+        _tags=tags,
+        _prefix=prefix,
+        _prefix_=prefix + '.',
+    )
 
   def __str__(self):
     tag = self.tag
