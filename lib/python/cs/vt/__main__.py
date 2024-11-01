@@ -218,9 +218,10 @@ class DataDirCommand(BaseCommand):
     ''' Usage: {cmd}
           Print information about the DataDir.
     '''
+    options = self.options
+    options.popopts(argv)
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    options = self.options
     datadir = options.datadir
     verbose = options.verbose
     print(datadir)
