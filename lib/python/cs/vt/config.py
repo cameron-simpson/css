@@ -243,7 +243,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
         using `MountSpec.from_str`, return the resulting `MountSpec`.
     '''
     from .fs import MountSpec
-    return MountSPec.from_str(special, config=self, readonly=readonly)
+    return MountSpec.from_str(special, config=self, readonly=readonly)
 
   @pfx
   @uses_runstate
