@@ -173,7 +173,7 @@ class OptionSpec:
 
   @classmethod
   @pfx_method
-  def from_opt_kw(cls, opt_k: str, specs: Union[str, List, Tuple]):
+  def from_opt_kw(cls, opt_k: str, specs: Union[str, List, Tuple, None]):
     ''' Factory to produce an `OptionSpec` from a `(key,specs)` 2-tuple
         as from the `items()` from a `popopts()` call.
 
@@ -207,7 +207,9 @@ class OptionSpec:
     validate = None
     unvalidated_message = None
     # apply the provided specifications
-    if isinstance(specs, str):
+    if specs is None:
+      specs = [field_name]
+    elif isinstance(specs, str):
       specs = [specs]
     elif isinstance(specs, (list, tuple)):
       specs = list(specs)
