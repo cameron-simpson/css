@@ -811,7 +811,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     if fetch_source is not None:
       options.fetch_source = fetch_source
     options.expunge = False if expunge is None else expunge
-    self.popopts(argv, options, F_='fetch_source', n='dry_run', x='expunge')
+    options.popopts(argv, F_='fetch_source', n='dry_run', x='expunge')
     doit = options.doit
     expunge = options.expunge
     fetch_source = options.fetch_source
@@ -1051,10 +1051,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     options.imgpath = None
     options.stacked = False
     options.event_labels = None
-    self.popopts(
+    options.popopts(
         argv,
-        options,
-        bare='bare',
+        bare=None,
         e_='event_labels',
         f='force',
         o_='imgpath',
@@ -1275,9 +1274,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     options = self.options
     options.datasets = self.ALL_DATASETS
     options.expunge = False
-    self.popopts(
+    options.popopts(
         argv,
-        options,
         d_=('datasets', lambda opt: opt.split(',')),
         F_='fetch_source',
         n='dry_run',
