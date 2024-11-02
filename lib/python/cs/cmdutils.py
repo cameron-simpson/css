@@ -248,9 +248,9 @@ class OptionSpec:
       spec0 = specs.pop(0) if specs else None
     # optional unvalidated_message
     if isinstance(spec0, str):
-      if not validate:
+      if not parse and not validate:
         raise ValueError(
-            f'unexpected unvalidated_message {spec0!r} when there is no validate callable'
+            f'unexpected unvalidated_message {spec0!r} when there is no parse or validate callable'
         )
       unvalidated_message = spec0
       spec0 = specs.pop(0) if specs else None
