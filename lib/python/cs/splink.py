@@ -811,7 +811,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     if fetch_source is not None:
       options.fetch_source = fetch_source
     options.expunge = False if expunge is None else expunge
-    options.popopts(argv, F_='fetch_source', n='dry_run', x='expunge')
+    options.popopts(argv, F_='fetch_source', x='expunge')
     doit = options.doit
     expunge = options.expunge
     fetch_source = options.fetch_source
