@@ -31,13 +31,14 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import decorator, default_params, uses_cmd_options
+from cs.deco import OBSOLETE, decorator, default_params, uses_cmd_options
 from cs.lex import (
     cutprefix,
     cutsuffix,
     indent,
     is_identifier,
     r,
+    s,
     stripped_dedent,
     tabulate,
 )
@@ -1349,10 +1350,16 @@ class BaseCommand:
         argv.insert(0, arg0)
       raise
 
-  def popopts(self, argv, **opt_specs):
+  @OBSOLETE
+  def popopts(self, argv, options, **opt_specs):
     ''' A convenience shim which returns `self.options.popopts(argv,**opt_specs)`.
     '''
-    return self.options.popopts(argv, **opt_specs)
+    if options is not self.options:
+      warning(
+          "obsolete use of %s.popopts\n    with options %s\n    is not self.options %s",
+          self.__class__.__name__, r(options), r(self.options)
+      )
+    return options.popopts(argv, **opt_specs)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
