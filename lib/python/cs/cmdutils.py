@@ -165,8 +165,13 @@ class OptionSpec:
       try:
         value = pfx_call(self.parse, value)
         if self.validate is not None:
-          if not pfx_call(self.validate, value):
-            raise GetoptError(self.unvalidated_message)
+          try:
+            if not pfx_call(self.validate, value):
+              raise GetoptError(self.unvalidated_message)
+          except valueError as e:
+            raise GetoptError(
+                f'{self.unvalidated_message}: {e.__class__.__name__}:{e}'
+            ) from e
       except ValueError as e:
         raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
     return value
