@@ -477,15 +477,15 @@ class BaseProgress(object):
       cancel_ticker = True
       if update_period == 0:
         self.notify_update.remove(update)
-    if report_print:
-      if isinstance(report_print, bool):
-        report_print = print
-      report_print(
-          label + ':', self.format_counter(self.position - start_pos), 'in',
-          transcribe_units(
-              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
-          )
-      )
+      if report_print:
+        if isinstance(report_print, bool):
+          report_print = print
+        report_print(
+            label + ':', self.format_counter(self.position - start_pos), 'in',
+            transcribe_units(
+                self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+            )
+        )
 
   # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
   def iterbar(
