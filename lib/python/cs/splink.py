@@ -43,7 +43,7 @@ from typeguard import typechecked
 from cs.context import stackattrs
 from cs.csvutils import csv_import
 from cs.deco import cachedmethod
-from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
+from cs.fs import FSPathBasedSingleton, HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import s
 from cs.logutils import warning, error
@@ -357,7 +357,7 @@ SPLinkDataFileInfo = namedtuple(
     'SPLinkDataFileInfo', 'fspath sitename dataset unixtime dotext'
 )
 
-class SPLinkData(HasFSPath, MultiOpenMixin):
+class SPLinkData(FSPathBasedSingleton, MultiOpenMixin):
   ''' A directory containing SP-LInk data.
 
       This contains:
@@ -369,6 +369,11 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       - `DetailedData`: an `SPLinkDataDir` containing accrued data
         from the `DetailedData` CSV files
   '''
+
+  # default location for the link data: the current directory
+  FSPATH_DEFAULT = '.'
+  # environment variable for the default
+  FSPATH_ENVVAR = 'SPLINK_DATADIR'
 
   # where the PerformanceData downloads reside
   DOWNLOADS = 'downloads'
@@ -388,9 +393,10 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       self,
       dirpath,
   ):
-    if not isdirpath(dirpath):
-      pfx_call(needdir, dirpath)
+    if hasattr(self, '_to_close'):
+      return
     super().__init__(dirpath)
+    pfx_call(needdir, self.fspath)
     self._to_close = []
 
   def __str__(self):
