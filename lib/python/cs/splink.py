@@ -811,7 +811,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           f"no fetch source: no ${self.DEFAULT_FETCH_SOURCE_ENVVAR} and no -F option"
       )
     spd = options.spd
-    return trace(run)(
+    return run(
         [
             'rsync',
             dry_run and '-n',
@@ -1223,7 +1223,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         label=label,
     )
     if len(graphs) == 1:
-      axes = axes,
+      axes = (axes,)
     for ax, (gkey, gplots) in zip(axes, graphs.items()):
       gtitle = gkey
       for gplot in gplots:
