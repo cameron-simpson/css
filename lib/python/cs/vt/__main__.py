@@ -407,7 +407,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           sizes.append(len(chunk))
@@ -421,7 +420,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           last_offset = offset
@@ -435,7 +433,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           hash_value, chunk_scan_offsets = py_scanbuf2(
@@ -450,7 +447,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
       elif mode == 'scan_offsets':
@@ -467,7 +463,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=itemlenfunc,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           sizes.append(offset - last_offset)
@@ -481,7 +476,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           sizes.append(len(chunk))
@@ -495,7 +489,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           hash_value, chunk_scan_offsets = scanbuf2(
