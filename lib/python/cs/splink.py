@@ -14,7 +14,7 @@ from contextlib import contextmanager
 import csv
 from dataclasses import dataclass
 from datetime import datetime
-from functools import partial
+from functools import cached_property, partial
 from getopt import GetoptError
 from itertools import chain, cycle
 import os
@@ -680,12 +680,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   ''' Command line to work with SP-Link data downloads.
   '''
 
-  GETOPT_SPEC = 'd:n'
-  USAGE_FORMAT = r'''Usage: {cmd} [-d spdpath] [-n] subcommand...
+  USAGE_FORMAT = r'''Usage: {cmd} subcommand...
     -d spdpath  Specify the directory containing the SP-Link downloads
                 and time series. Default from ${DEFAULT_SPDPATH_ENVVAR},
-                or {DEFAULT_SPDPATH!r}.
-    -n          No action; recite planned actions.'''
+                or {DEFAULT_SPDPATH!r}.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
@@ -706,18 +704,16 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     fetch_source: Optional[str] = None
     spdpath: Optional[str] = None
 
-  def apply_opt(self, opt, val):
-    ''' Handle an individual global command line option.
-    '''
-    options = self.options
-    if opt == '-d':
-      if not isdirpath(val):
-        raise GetoptError("not a directory: %r" % (val,))
-      options.spdpath = val
-    elif opt == '-n':
-      options.doit = False
-    else:
-      raise NotImplementedError("unhandled pre-option")
+    @cached_property
+    def spd(self):
+      spd = SPLinkData(self.spdpath)
+      self.spdpath = spd.fspath
+      return spd
+
+    COMMON_OPT_SPECS = dict(
+        d_=('spdpath', 'SP-Link data directory.'),
+        **TimeSeriesBaseCommand.Options.COMMON_OPT_SPECS,
+    )
 
   def print_known_datasets(self, file=None):
     ''' Print the known datasets and their fields to `file`.
@@ -764,22 +760,13 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           options.fetch_source
           or os.environ.get(self.DEFAULT_FETCH_SOURCE_ENVVAR)
       )
-      spdpath = (
-          options.spdpath or os.environ.get(
-              self.DEFAULT_SPDPATH_ENVVAR,
-              self.DEFAULT_SPDPATH,
-          )
-      )
-      spd = SPLinkData(spdpath)
       with fstags:
         with stackattrs(
             options,
             fetch_source=fetch_source,
-            spd=spd,
-            spdpath=spdpath,
             tz=tzlocal(),
         ):
-          with spd:
+          with options.spd:
             yield
 
   def cmd_export(self, argv):
