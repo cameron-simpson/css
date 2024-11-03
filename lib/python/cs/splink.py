@@ -803,7 +803,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       options.fetch_source = fetch_source
     options.expunge = False if expunge is None else expunge
     options.popopts(argv, F_='fetch_source', x='expunge')
-    doit = options.doit
+    dry_run = options.dry_run
     expunge = options.expunge
     fetch_source = options.fetch_source
     if not fetch_source:
@@ -811,22 +811,19 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           f"no fetch source: no ${self.DEFAULT_FETCH_SOURCE_ENVVAR} and no -F option"
       )
     spd = options.spd
-    rsopts = ['-iaO']
-    rsargv = ['set-x', 'rsync']
-    if not doit:
-      rsargv.append('-n')
-    rsargv.extend(rsopts)
-    if expunge:
-      rsargv.append('--delete-source')
-    rsargv.extend(argv)
-    rsargv.extend(
+    return trace(run)(
         [
-            '--', fetch_source + '/' + spd.PERFORMANCEDATA_GLOB,
-            spd.downloadspath + '/'
-        ]
-    )
-    print('+', shlex.join(argv))
-    return run(rsargv).returncode
+            'rsync',
+            dry_run and '-n',
+            '-iaO',
+            expunge and '--delete-source',
+            argv,
+            '--',
+            fetch_source + '/' + spd.PERFORMANCEDATA_GLOB,
+            spd.downloadspath + '/',
+        ],
+        doit=True,
+    ).returncode
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   @uses_fstags
