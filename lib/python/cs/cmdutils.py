@@ -1035,7 +1035,7 @@ class BaseCommand:
       # catch bare -h or --help if no 'h' in the getopt_spec
       if ('h' not in getopt_spec and len(argv) == 1
           and argv[0] in ('-h', '-help', '--help')):
-        argv = ['help']
+        argv = self._argv = ['help']
       else:
         if getopt_spec:
           # we do this regardless in order to honour '--'
