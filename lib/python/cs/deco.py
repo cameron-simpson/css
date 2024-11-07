@@ -1129,12 +1129,13 @@ class Promotable:
   '''
 
   @classmethod
-  def promote(cls, obj):
+  def promote(cls, obj, **from_t_kw):
     ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
         This method supports the `@promote` decorator.
 
-        This base method will call the `from_`*typename*`(obj)` class factory
-        method if present, where *typename* is `obj.__class__.__name__`.
+        This base method will call the `from_`*typename*`(obj,**from_t_kw)`
+        class factory method if present, where *typename* is
+        `obj.__class__.__name__`.
 
         Subclasses may override this method to promote other types,
         typically:
@@ -1147,6 +1148,30 @@ class Promotable:
                 ... not done via a from_typename factory method
                 # fall back to Promotable.promote
                 return super().promote(obj)
+
+        An typical `from_`*typename*` factory method:
+
+            class Foo(Promotable):
+
+                def __init__(self, dbkey, dbrow):
+                    self.key = dbkey
+                    self.row_data = row
+
+                @classmethod
+                def from_str(cls, s : str):
+                    """Accept a database key string, return a `Foo` instance."""
+                    row = db_lookup(s)
+                    return cls(s, row)
+
+        This supports using `@promote` on functions with `Foo` instances:
+
+            @promote
+            def do_it(foo : Foo):
+                ... work with foo ...
+
+        but calling it as:
+
+            do_it("foo_key_value")
     '''
     if isinstance(obj, cls):
       return obj
@@ -1155,7 +1180,7 @@ class Promotable:
     except AttributeError:
       pass
     else:
-      return from_type(obj)
+      return from_type(obj, **from_t_kw)
     raise TypeError(
         f'{cls.__name__}.promote: cannot promote {obj.__class__.__name__}:{obj!r}'
     )

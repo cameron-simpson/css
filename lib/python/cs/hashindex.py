@@ -795,7 +795,7 @@ def dir_remap(
     hashname: str,
 ):
   ''' Generator yielding `(srcpath,[remapped_paths])` 2-tuples
-      based on the hashcodes keying `rfspaths_by_hashcode`.
+      based on the hashcodes keying `fspaths_by_hashcode`.
   '''
   yield from paths_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname

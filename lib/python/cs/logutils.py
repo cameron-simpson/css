@@ -120,7 +120,7 @@ def ifdebug():
   global loginfo  # pylint: disable=global-statement
   if loginfo is None:
     loginfo = setup_logging()
-  return loginfo.level <= logging.DEBUG
+  return loginfo.level is not None and loginfo.level <= logging.DEBUG
 
 class LoggingState(NS):
   ''' A logging setup arranged for conventional UNIX command line use.
