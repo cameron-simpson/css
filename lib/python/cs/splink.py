@@ -678,14 +678,14 @@ class SPLinkData(FSPathBasedSingleton, MultiOpenMixin):
 
 class SPLinkCommand(TimeSeriesBaseCommand):
   ''' Command line to work with SP-Link data downloads.
-  '''
 
-  USAGE_FORMAT = r'''Usage: {cmd} subcommand...
-    Manage a collection of SP-Link CSV data.
-    Options:
-      -d spdpath  Specify the directory containing the SP-Link downloads
-                  and time series. Default from ${DEFAULT_SPDPATH_ENVVAR},
-                  or {DEFAULT_SPDPATH!r}.'''
+      Usage: {cmd} subcommand...
+        Manage a collection of SP-Link CSV data.
+        Options:
+          -d spdpath  Specify the directory containing the SP-Link downloads
+                      and time series. Default from ${DEFAULT_SPDPATH_ENVVAR},
+                      or {DEFAULT_SPDPATH!r}.
+  '''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
