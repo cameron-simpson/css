@@ -434,8 +434,10 @@ class SubCommand:
     '''
     method = self.method
     try:
+      # the old way
       usage_format = method.USAGE_FORMAT
     except AttributeError:
+      # the preferred way
       # derive from the docstring or from self.default_usage()
       doc = obj_docstring(method)
       usage_format, doc = extract_usage_from_doc(doc)
@@ -445,6 +447,8 @@ class SubCommand:
         paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
         if paragraph1:
           usage_format += "\n" + indent(paragraph1)
+    else:
+      usage_format = indent(stripped_dedent(usage_format))
     # The existing USAGE_FORMAT based usages have the word "Usage:"
     # at the front but this is supplied at print time now.
     usage_format = cutprefix(usage_format, 'Usage:').lstrip()
