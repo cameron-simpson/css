@@ -524,7 +524,7 @@ class SubCommand:
     elif isinstance(show_subcmds, str):
       show_subcmds = [show_subcmds]
     usage_format = self.get_usage_format(show_common=show_common)  # pylint: disable=no-member
-    if short:
+    if short and not show_common:
       # just the summary line and opening sentence of the description
       lines = usage_format.split('\n')
       usage_lines = [lines.pop(0)]
