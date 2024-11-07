@@ -713,8 +713,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       return spd
 
     COMMON_OPT_SPECS = dict(
-        d_=('spdpath', 'SP-Link data directory.'),
         **TimeSeriesBaseCommand.Options.COMMON_OPT_SPECS,
+        d_=('spdpath', 'SP-Link data directory.'),
     )
 
   def print_known_datasets(self, file=None):
