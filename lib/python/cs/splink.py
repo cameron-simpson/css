@@ -681,9 +681,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   '''
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand...
-    -d spdpath  Specify the directory containing the SP-Link downloads
-                and time series. Default from ${DEFAULT_SPDPATH_ENVVAR},
-                or {DEFAULT_SPDPATH!r}.'''
+    Manage a collection of SP-Link CSV data.
+    Options:
+      -d spdpath  Specify the directory containing the SP-Link downloads
+                  and time series. Default from ${DEFAULT_SPDPATH_ENVVAR},
+                  or {DEFAULT_SPDPATH!r}.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
