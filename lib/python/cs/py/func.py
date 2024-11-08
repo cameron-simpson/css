@@ -110,8 +110,7 @@ def callif(doit, func, *a, **kw):
   modes.setdefault('print', print)
   if doit:
     return func(*a, **kw)
-  fmt, av = func_a_kw_fmt(func, *a, **kw)
-  modes['print'](fmt % tuple(av))
+  modes['print'](func_a_kw(func, *a, **kw))
   return None
 
 def callmethod_if(o, method, default=None, a=None, kw=None):
