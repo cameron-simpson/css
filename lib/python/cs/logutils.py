@@ -70,7 +70,7 @@ import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 
-__version__ = '20240923-post'
+__version__ = '20241109-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -86,7 +86,6 @@ DISTINFO = {
         'cs.lex',
         'cs.pfx',
         'cs.py.func',
-        'cs.upd',  # done as a late import
     ],
 }
 
@@ -121,7 +120,7 @@ def ifdebug():
   global loginfo  # pylint: disable=global-statement
   if loginfo is None:
     loginfo = setup_logging()
-  return loginfo.level <= logging.DEBUG
+  return loginfo.level is not None and loginfo.level <= logging.DEBUG
 
 class LoggingState(NS):
   ''' A logging setup arranged for conventional UNIX command line use.
@@ -325,8 +324,7 @@ def setup_logging(cmd_name=None, **kw):
   '''
   global loginfo
   if loginfo is None:
-    if cmd_name is not None:
-      kw.setdefault('cmd', cmd_name)
+    kw.setdefault('cmd', cmd_name or kw.get('cmd'))
     logstate = LoggingState(**kw)
     logstate.apply()
     loginfo = logstate

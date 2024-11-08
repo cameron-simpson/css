@@ -21,7 +21,7 @@ from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subpro
 import sys
 import time
 
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_doit, uses_quiet
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
@@ -198,12 +198,14 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
+@uses_doit
+@uses_quiet
 def run(
     argv,
     *,
-    doit=True,
+    doit: bool,
     logger=None,
-    quiet=True,
+    quiet: bool,
     input=None,
     stdin=None,
     print=None,
@@ -263,7 +265,8 @@ def run(
     )
   return cp
 
-def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
+@uses_quiet
+def pipefrom(argv, *, quiet: bool, text=True, stdin=DEVNULL, **popen_kw):
   ''' Pipe text (usually) from a command using `subprocess.Popen`.
       Return the `Popen` object with `.stdout` as a pipe.
 
@@ -284,7 +287,8 @@ def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
     print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
-def pipeto(argv, *, quiet=False, **kw):
+@uses_quiet
+def pipeto(argv, *, quiet: bool, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.

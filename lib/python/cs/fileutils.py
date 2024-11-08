@@ -53,7 +53,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20240723-post'
+__version__ = '20241007.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1845,11 +1845,11 @@ def gzifopen(path, mode='r', *a, **kw):
     path1, path2 = path0, gzpath
   # if exactly one of the files exists, try only that file
   if existspath(path1) and not existspath(path2):
-    paths = path1,
+    paths = (path1,)
   elif existspath(path2) and not existspath(path1):
-    paths = path2,
+    paths = (path2,)
   else:
-    paths = path1, path2
+    paths = (path1, path2)
   for openpath in paths:
     try:
       with (gzip.open(openpath,

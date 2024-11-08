@@ -100,7 +100,7 @@ from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
 from cs.upd import above as above_upd, print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20240709-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -795,7 +795,7 @@ def dir_remap(
     hashname: str,
 ):
   ''' Generator yielding `(srcpath,[remapped_paths])` 2-tuples
-      based on the hashcodes keying `rfspaths_by_hashcode`.
+      based on the hashcodes keying `fspaths_by_hashcode`.
   '''
   yield from paths_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname

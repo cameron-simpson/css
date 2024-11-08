@@ -1,0 +1,8 @@
+lib/python/cs/lex.py: cs.lex: fix docstring typo
+lib/python/cs/lex.py: cs.lex: FormatableFormatter: clean up a loop
+lib/python/cs/lex.py: cs.lex: stripped_dedent: new optional post_indent parameter to indent the dedented text
+lib/python/cs/lex.py: cs.lex: stripped_dedent: update docstring
+lib/python/cs/lex.py: cs.lex: new tabulate(*rows) generator function yielding lines of padded columns
+lib/python/cs/lex.py: cs.lex: ruff check --fix
+lib/python/cs/lex.py: cs.lex: brush off a little ruff lint
+lib/python/cs/lex.py: cs.lex: tabulate: new optional sep=" " separator parameter

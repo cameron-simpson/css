@@ -1,0 +1,1 @@
+lib/python/cs/tagset.py: cs.tagset: _FormatStringTagProxy: give it a __format__ method which formats the proxied tag's value

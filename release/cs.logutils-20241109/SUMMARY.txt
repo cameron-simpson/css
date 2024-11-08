@@ -1,0 +1,2 @@
+setup_logging: make it work with no arguments.
+ifdebug: handle loginfo.level=None.

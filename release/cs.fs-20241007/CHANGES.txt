@@ -1,0 +1,2 @@
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton.__init__: use an NRLock for the default lock, using a late import with fallback to Lock
+lib/python/cs/fs.py: merge ebooks ==> default

@@ -142,17 +142,17 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     '''
     return cls(config_spec=spec)
 
-  def as_text(self) -> str:
-    ''' Return a text transcription of the config.
-    '''
-    with StringIO() as S:
-      self.map.write(S)
-      return S.getvalue()
-
   def write(self, f):
     ''' Write the config to a file.
     '''
     self.map.write(f)
+
+  def as_text(self) -> str:
+    ''' Return a text transcription of the config.
+    '''
+    with StringIO() as f:
+      self.write(f)
+      return f.getvalue()
 
   def __getitem__(self, clause_name: str) -> Store:
     ''' Return the `Store` defined by the named clause.
@@ -243,7 +243,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
         using `MountSpec.from_str`, return the resulting `MountSpec`.
     '''
     from .fs import MountSpec
-    return MountSPec.from_str(special, config=self, readonly=readonly)
+    return MountSpec.from_str(special, config=self, readonly=readonly)
 
   @pfx
   @uses_runstate
@@ -319,12 +319,12 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
     # blockmapdir: location to store persistent blockmaps
     blockmapdir = params.pop('blockmapdir', None)
     if store_name is None:
-      store_name = str(self) + '[' + clause_name + ']'
-    constructor_name = store_type + '_Store'
+      store_name = f'{self}[{clause_name}]'
+    constructor_name = f'{store_type}_Store'
     constructor = getattr(self, constructor_name, None)
     if not constructor:
       raise ValueError(
-          "unsupported Store type (no .%s method)" % (constructor_name,)
+          f'unsupported Store type (no .{constructor_name} method)'
       )
     S = constructor(store_name, clause_name, **params)
     if S.config is None:

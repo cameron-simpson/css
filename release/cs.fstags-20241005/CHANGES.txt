@@ -1,0 +1,6 @@
+lib/python/cs/fstags.py: cs.fstags: FSTags.attach,TaggedPath: move the save-to-the-tagfile logic to TaggedPath.save_if_closed, needs refinement
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ns: support interrupting the listing
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ls: sort the tag listing
+lib/python/cs/fstags.py: merge tagger ==> default
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.format_tagset: include a basename tag, use Path instead of PurePath
+lib/python/cs/fstags.py: merge tagger ==> default
