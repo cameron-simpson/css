@@ -47,7 +47,7 @@ cs.csvdb
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20241005" ok_revision=fb49ab3bf51884d4c570c46375fe17fba3a742e9 features={"20230613":["patch_builtins"],"20241005":["CS_DEBUG_TRACE","abrk","log_via_print"]}
-cs.deco pypi.release="20241007" ok_revision="32a5b3aa0b42d90cf4a3bf279e34dc784a30b4d0" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"],"20241109":["uses_doit","uses_force","uses_quiet"]}
+cs.deco pypi.release="20241007" ok_revision="32a5b3aa0b42d90cf4a3bf279e34dc784a30b4d0" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"],"20241109":["uses_doit","uses_force","uses_quiet","uses_verbose"]}
 cs.dedrm
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.distinfo
