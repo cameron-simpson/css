@@ -14,7 +14,7 @@ from contextlib import contextmanager
 import csv
 from dataclasses import dataclass
 from datetime import datetime
-from functools import partial
+from functools import cached_property, partial
 from getopt import GetoptError
 from itertools import chain, cycle
 import os
@@ -43,7 +43,7 @@ from typeguard import typechecked
 from cs.context import stackattrs
 from cs.csvutils import csv_import
 from cs.deco import cachedmethod
-from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
+from cs.fs import FSPathBasedSingleton, HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import s
 from cs.logutils import warning, error
@@ -357,7 +357,7 @@ SPLinkDataFileInfo = namedtuple(
     'SPLinkDataFileInfo', 'fspath sitename dataset unixtime dotext'
 )
 
-class SPLinkData(HasFSPath, MultiOpenMixin):
+class SPLinkData(FSPathBasedSingleton, MultiOpenMixin):
   ''' A directory containing SP-LInk data.
 
       This contains:
@@ -369,6 +369,11 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       - `DetailedData`: an `SPLinkDataDir` containing accrued data
         from the `DetailedData` CSV files
   '''
+
+  # default location for the link data: the current directory
+  FSPATH_DEFAULT = '.'
+  # environment variable for the default
+  FSPATH_ENVVAR = 'SPLINK_DATADIR'
 
   # where the PerformanceData downloads reside
   DOWNLOADS = 'downloads'
@@ -388,9 +393,10 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
       self,
       dirpath,
   ):
-    if not isdirpath(dirpath):
-      pfx_call(needdir, dirpath)
+    if hasattr(self, '_to_close'):
+      return
     super().__init__(dirpath)
+    pfx_call(needdir, self.fspath)
     self._to_close = []
 
   def __str__(self):
@@ -672,19 +678,17 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
 
 class SPLinkCommand(TimeSeriesBaseCommand):
   ''' Command line to work with SP-Link data downloads.
-  '''
 
-  GETOPT_SPEC = 'd:n'
-  USAGE_FORMAT = r'''Usage: {cmd} [-d spdpath] [-n] subcommand...
-    -d spdpath  Specify the directory containing the SP-Link downloads
-                and time series. Default from ${DEFAULT_SPDPATH_ENVVAR},
-                or {DEFAULT_SPDPATH!r}.
-    -n          No action; recite planned actions.'''
+      Usage: {cmd} subcommand...
+        Manage a collection of SP-Link CSV data.
+        Options:
+          -d spdpath  Specify the directory containing the SP-Link downloads
+                      and time series. Default from ${DEFAULT_SPDPATH_ENVVAR},
+                      or {DEFAULT_SPDPATH!r}.
+  '''
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
-  DEFAULT_SPDPATH = '.'
-  DEFAULT_SPDPATH_ENVVAR = 'SPLINK_DATADIR'
   DEFAULT_FETCH_SOURCE_ENVVAR = 'SPLINK_FETCH_SOURCE'
 
   ALL_DATASETS = SPLinkData.EVENTS_DATASETS + SPLinkData.TIMESERIES_DATASETS
@@ -692,8 +696,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   USAGE_KEYWORDS = {
       'ALL_DATASETS': ' '.join(sorted(ALL_DATASETS)),
       'TIMESERIES_DATASETS': ' '.join(sorted(SPLinkData.TIMESERIES_DATASETS)),
-      'DEFAULT_SPDPATH': DEFAULT_SPDPATH,
-      'DEFAULT_SPDPATH_ENVVAR': DEFAULT_SPDPATH_ENVVAR,
+      'DEFAULT_SPDPATH': SPLinkData.FSPATH_DEFAULT,
+      'DEFAULT_SPDPATH_ENVVAR': SPLinkData.FSPATH_ENVVAR,
       'DEFAULT_FETCH_SOURCE_ENVVAR': DEFAULT_FETCH_SOURCE_ENVVAR,
   }
 
@@ -702,18 +706,16 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     fetch_source: Optional[str] = None
     spdpath: Optional[str] = None
 
-  def apply_opt(self, opt, val):
-    ''' Handle an individual global command line option.
-    '''
-    options = self.options
-    if opt == '-d':
-      if not isdirpath(val):
-        raise GetoptError("not a directory: %r" % (val,))
-      options.spdpath = val
-    elif opt == '-n':
-      options.doit = False
-    else:
-      raise NotImplementedError("unhandled pre-option")
+    @cached_property
+    def spd(self):
+      spd = SPLinkData(self.spdpath)
+      self.spdpath = spd.fspath
+      return spd
+
+    COMMON_OPT_SPECS = dict(
+        **TimeSeriesBaseCommand.Options.COMMON_OPT_SPECS,
+        d_=('spdpath', 'SP-Link data directory.'),
+    )
 
   def print_known_datasets(self, file=None):
     ''' Print the known datasets and their fields to `file`.
@@ -760,22 +762,13 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           options.fetch_source
           or os.environ.get(self.DEFAULT_FETCH_SOURCE_ENVVAR)
       )
-      spdpath = (
-          options.spdpath or os.environ.get(
-              self.DEFAULT_SPDPATH_ENVVAR,
-              self.DEFAULT_SPDPATH,
-          )
-      )
-      spd = SPLinkData(spdpath)
       with fstags:
         with stackattrs(
             options,
             fetch_source=fetch_source,
-            spd=spd,
-            spdpath=spdpath,
             tz=tzlocal(),
         ):
-          with spd:
+          with options.spd:
             yield
 
   def cmd_export(self, argv):
@@ -811,8 +804,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     if fetch_source is not None:
       options.fetch_source = fetch_source
     options.expunge = False if expunge is None else expunge
-    self.popopts(argv, options, F_='fetch_source', n='dry_run', x='expunge')
-    doit = options.doit
+    options.popopts(argv, F_='fetch_source', x='expunge')
+    dry_run = options.dry_run
     expunge = options.expunge
     fetch_source = options.fetch_source
     if not fetch_source:
@@ -820,22 +813,19 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           f"no fetch source: no ${self.DEFAULT_FETCH_SOURCE_ENVVAR} and no -F option"
       )
     spd = options.spd
-    rsopts = ['-iaO']
-    rsargv = ['set-x', 'rsync']
-    if not doit:
-      rsargv.append('-n')
-    rsargv.extend(rsopts)
-    if expunge:
-      rsargv.append('--delete-source')
-    rsargv.extend(argv)
-    rsargv.extend(
+    return run(
         [
-            '--', fetch_source + '/' + spd.PERFORMANCEDATA_GLOB,
-            spd.downloadspath + '/'
-        ]
-    )
-    print('+', shlex.join(argv))
-    return run(rsargv).returncode
+            'rsync',
+            dry_run and '-n',
+            '-iaO',
+            expunge and '--delete-source',
+            argv,
+            '--',
+            fetch_source + '/' + spd.PERFORMANCEDATA_GLOB,
+            spd.downloadspath + '/',
+        ],
+        doit=True,
+    ).returncode
 
   # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   @uses_fstags
@@ -1051,10 +1041,9 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     options.imgpath = None
     options.stacked = False
     options.event_labels = None
-    self.popopts(
+    options.popopts(
         argv,
-        options,
-        bare='bare',
+        bare=None,
         e_='event_labels',
         f='force',
         o_='imgpath',
@@ -1236,7 +1225,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         label=label,
     )
     if len(graphs) == 1:
-      axes = axes,
+      axes = (axes,)
     for ax, (gkey, gplots) in zip(axes, graphs.items()):
       gtitle = gkey
       for gplot in gplots:
@@ -1275,9 +1264,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     options = self.options
     options.datasets = self.ALL_DATASETS
     options.expunge = False
-    self.popopts(
+    options.popopts(
         argv,
-        options,
         d_=('datasets', lambda opt: opt.split(',')),
         F_='fetch_source',
         n='dry_run',

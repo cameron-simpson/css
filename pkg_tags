@@ -47,7 +47,7 @@ cs.csvdb
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20241005" ok_revision=fb49ab3bf51884d4c570c46375fe17fba3a742e9 features={"20230613":["patch_builtins"],"20241005":["CS_DEBUG_TRACE","abrk","log_via_print"]}
-cs.deco pypi.release="20241007" ok_revision="59ddd45fdbcb07da0ee66f9d554f03a73258dd6c" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"]}
+cs.deco pypi.release="20241109" ok_revision="32a5b3aa0b42d90cf4a3bf279e34dc784a30b4d0" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"],"20241109":["uses_doit","uses_force","uses_quiet","uses_verbose"]}
 cs.dedrm
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.distinfo
@@ -79,8 +79,8 @@ cs.iso14496 pypi.release="20240422" ok_revision="47a80858a023fb3be3c72a4eeed2dac
 cs.kindle
 cs.kobo
 cs.later pypi.release="20240630" ok_revision="819a6782e492719c8ec508be77bebd84117e8cfc" features={"20240305":["Later__thread_states"]}
-cs.lex pypi.release="20240630" ok_revision="1f6a9327f5613f7b9fc09477cc8728a9ac74feb5" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"]}
-cs.logutils pypi.release="20241007" ok_revision="95b5b0ac45be5c9944ecd7a187339d4cc9219ed4" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"],"20240630":["LoggingState"]}
+cs.lex pypi.release="20241109" ok_revision=b3dd4fb4234de2ae68a61d1ceb3929911cc6049d features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"],"20241109":["tabulate"]}
+cs.logutils pypi.release="20241109" ok_revision="53988cea8841d820cb179d2d88ba2490e8e030c2" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"],"20240630":["LoggingState"]}
 cs.mailfiler
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappingdb
@@ -103,7 +103,7 @@ cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550c
 cs.progress pypi.release="20240412" ok_revision="31f182d4407ab9837008018fbaee6d3b21cdd4e7" features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"]}
 cs.psutils pypi.release="20240316" ok_revision="8291b0f87bdef1ec55c6c8464cdc394d52208f03" features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"]}
 cs.py.doc pypi.release="20241007" ok_revision=a639a998cb404958be0e1e6860d39dc1a3dc616c
-cs.py.func pypi.release="20240630" ok_revision=cf485b64ecefefa602f31aa90ab2524e43517057 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
+cs.py.func pypi.release="20240630" ok_revision="0dd7f10b229df7807892a255ae6983d2136b819e" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
 cs.py.modules pypi.release="20240630" ok_revision="3ba357635de7e8c2931ffa68e60408a9b9af34ed" features={"20220606":["import_extra"]}
 cs.py.stack pypi.release="20240630" ok_revision="3f7db25a6e686983598ec71936a9c1e8995ba543" features={"20240412":["stack_dump__select"]}
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"

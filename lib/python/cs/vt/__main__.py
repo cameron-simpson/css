@@ -299,8 +299,7 @@ class VTCmd(BaseCommand):
               otherwise {DEFAULT_CONFIG_PATH}
     -h hashclass Hashclass for Stores. Default from ${HASHNAME_ENVVAR},
               otherwise `{HASHNAME_DEFAULT!r}`.
-    -P        Progress: show a progress bar of top level Store activity.
-'''
+  '''
 
   Options = VTCmdOptions
 

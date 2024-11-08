@@ -31,13 +31,14 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import decorator, default_params, uses_cmd_options
+from cs.deco import OBSOLETE, decorator, default_params, uses_cmd_options
 from cs.lex import (
     cutprefix,
     cutsuffix,
     indent,
     is_identifier,
     r,
+    s,
     stripped_dedent,
     tabulate,
 )
@@ -164,15 +165,20 @@ class OptionSpec:
       try:
         value = pfx_call(self.parse, value)
         if self.validate is not None:
-          if not pfx_call(self.validate, value):
-            raise GetoptError(self.unvalidated_message)
+          try:
+            if not pfx_call(self.validate, value):
+              raise GetoptError(self.unvalidated_message)
+          except valueError as e:
+            raise GetoptError(
+                f'{self.unvalidated_message}: {e.__class__.__name__}:{e}'
+            ) from e
       except ValueError as e:
         raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
     return value
 
   @classmethod
   @pfx_method
-  def from_opt_kw(cls, opt_k: str, specs: Union[str, List, Tuple]):
+  def from_opt_kw(cls, opt_k: str, specs: Union[str, List, Tuple, None]):
     ''' Factory to produce an `OptionSpec` from a `(key,specs)` 2-tuple
         as from the `items()` from a `popopts()` call.
 
@@ -206,7 +212,9 @@ class OptionSpec:
     validate = None
     unvalidated_message = None
     # apply the provided specifications
-    if isinstance(specs, str):
+    if specs is None:
+      specs = [field_name]
+    elif isinstance(specs, str):
       specs = [specs]
     elif isinstance(specs, (list, tuple)):
       specs = list(specs)
@@ -240,9 +248,9 @@ class OptionSpec:
       spec0 = specs.pop(0) if specs else None
     # optional unvalidated_message
     if isinstance(spec0, str):
-      if not validate:
+      if not parse and not validate:
         raise ValueError(
-            f'unexpected unvalidated_message {spec0!r} when there is no validate callable'
+            f'unexpected unvalidated_message {spec0!r} when there is no parse or validate callable'
         )
       unvalidated_message = spec0
       spec0 = specs.pop(0) if specs else None
@@ -426,8 +434,10 @@ class SubCommand:
     '''
     method = self.method
     try:
+      # the old way
       usage_format = method.USAGE_FORMAT
     except AttributeError:
+      # the preferred way
       # derive from the docstring or from self.default_usage()
       doc = obj_docstring(method)
       usage_format, doc = extract_usage_from_doc(doc)
@@ -437,6 +447,8 @@ class SubCommand:
         paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
         if paragraph1:
           usage_format += "\n" + indent(paragraph1)
+    else:
+      usage_format = indent(stripped_dedent(usage_format))
     # The existing USAGE_FORMAT based usages have the word "Usage:"
     # at the front but this is supplied at print time now.
     usage_format = cutprefix(usage_format, 'Usage:').lstrip()
@@ -512,7 +524,7 @@ class SubCommand:
     elif isinstance(show_subcmds, str):
       show_subcmds = [show_subcmds]
     usage_format = self.get_usage_format(show_common=show_common)  # pylint: disable=no-member
-    if short:
+    if short and not show_common:
       # just the summary line and opening sentence of the description
       lines = usage_format.split('\n')
       usage_lines = [lines.pop(0)]
@@ -1023,7 +1035,7 @@ class BaseCommand:
       # catch bare -h or --help if no 'h' in the getopt_spec
       if ('h' not in getopt_spec and len(argv) == 1
           and argv[0] in ('-h', '-help', '--help')):
-        argv = ['help']
+        argv = self._argv = ['help']
       else:
         if getopt_spec:
           # we do this regardless in order to honour '--'
@@ -1120,7 +1132,9 @@ class BaseCommand:
     ''' Test whether the class defines additional subcommands.
     '''
     subcmds = set(self.subcommands())
+    # ignore the subcommands we presupply
     subcmds.discard('help')
+    subcmds.discard('info')
     subcmds.discard('shell')
     return bool(subcmds)
 
@@ -1359,10 +1373,16 @@ class BaseCommand:
         argv.insert(0, arg0)
       raise
 
-  def popopts(self, argv, **opt_specs):
+  @OBSOLETE
+  def popopts(self, argv, options, **opt_specs):
     ''' A convenience shim which returns `self.options.popopts(argv,**opt_specs)`.
     '''
-    return self.options.popopts(argv, **opt_specs)
+    if options is not self.options:
+      warning(
+          "obsolete use of %s.popopts\n    with options %s\n    is not self.options %s",
+          self.__class__.__name__, r(options), r(self.options)
+      )
+    return options.popopts(argv, **opt_specs)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
