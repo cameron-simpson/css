@@ -65,6 +65,7 @@ class EBooksCommonOptions(BaseCommand.Options):
     return kobo
 
   COMMON_OPT_SPECS = dict(
+      **BaseCommand.Options.COMMON_OPT_SPECS,
       C_='calibre_path',
       calibre_='calibre_path',
       D_='dedrm_package_path',
@@ -72,7 +73,6 @@ class EBooksCommonOptions(BaseCommand.Options):
       K_='kindle_path',
       kindle_='kindle_path',
       kobo_='kobo_path',
-      **BaseCommand.Options.COMMON_OPT_SPECS,
   )
 
 class EBooksCommonBaseCommand(BaseCommand):
