@@ -938,7 +938,7 @@ class BaseCommand:
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
-  SUBCOMMAND_ARGV_DEFAULT = 'shell'
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
 
   Options = BaseCommandOptions
 
