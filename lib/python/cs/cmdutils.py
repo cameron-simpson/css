@@ -20,6 +20,7 @@ except ImportError:
   from functools import lru_cache
 
   def cache(func):
+    '''Replacement `@cache` decorator.'''
     return lru_cache(maxsize=None)(func)
 
 from getopt import getopt, GetoptError
@@ -45,7 +46,6 @@ from cs.lex import (
     indent,
     is_identifier,
     r,
-    s,
     stripped_dedent,
     tabulate,
 )
