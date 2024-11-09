@@ -38,7 +38,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import OBSOLETE, decorator, default_params, uses_cmd_options
+from cs.deco import OBSOLETE, uses_cmd_options
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -175,7 +175,7 @@ class OptionSpec:
           try:
             if not pfx_call(self.validate, value):
               raise GetoptError(self.unvalidated_message)
-          except valueError as e:
+          except ValueError as e:
             raise GetoptError(
                 f'{self.unvalidated_message}: {e.__class__.__name__}:{e}'
             ) from e
