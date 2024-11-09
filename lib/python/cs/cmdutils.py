@@ -342,13 +342,13 @@ class OptionSpec:
         `Options` instance to provide a default value.
     '''
     parser.add_argument(
-        self.opt_spec.getopt_opt,
-        action=('store' if opt_spec.arg_name else 'store_true'),
-        dest=opt_spec.field_name,
-        help=opt_spec.help_text,
+        self.getopt_opt,
+        action=('store' if self.arg_name else 'store_true'),
+        dest=self.field_name,
+        help=self.help_text,
         default=(
-            None if options is None else
-            getattr(options, opt_spec.field_name, None)
+            (None if self.arg_name else False)
+            if options is None else getattr(options, self.field_name, None)
         ),
     )
 
