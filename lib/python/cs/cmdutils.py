@@ -15,11 +15,13 @@ from collections import ChainMap
 from contextlib import contextmanager
 from dataclasses import dataclass, field, fields
 try:
-  from functools import cache # 3.9 onward
+  from functools import cache  # 3.9 onward
 except ImportError:
   from functools import lru_cache
+
   def cache(func):
     return lru_cache(maxsize=None)(func)
+
 from getopt import getopt, GetoptError
 from inspect import isclass
 from os.path import basename
@@ -226,7 +228,7 @@ class OptionSpec:
       specs = list(specs)
     elif callable(specs):
       # bare conversion function (or a type eg int)
-      specs=[specs]
+      specs = [specs]
     else:
       raise TypeError(
           f'expected str or list or tuple for specs, got {r(specs)}'
@@ -334,8 +336,10 @@ class OptionSpec:
     # TODO: allow multiline help_text, indent it here
     return f'{line1}\n  {self.help_text}'
 
-def extract_usage_from_doc(doc: Union[str, None],
-                           usage_marker="Usage:") -> Tuple[Union[str, None], str]:
+def extract_usage_from_doc(
+    doc: Union[str, None],
+    usage_marker="Usage:"
+) -> Tuple[Union[str, None], str]:
   ''' Extract a `"Usage:"`paragraph from a docstring
       and return the unindented usage and the docstring with that paragraph elided.
 
@@ -1021,7 +1025,7 @@ class BaseCommand:
           cmd = (
               cutsuffix(self.__class__.__name__, 'Command').lower()
               or self.__class__.__module__
-              )
+          )
     options = self.__class__.Options(cmd=cmd)
     # override the default options
     for option, value in kw_options.items():
