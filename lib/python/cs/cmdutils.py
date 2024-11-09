@@ -334,8 +334,8 @@ class OptionSpec:
     # TODO: allow multiline help_text, indent it here
     return f'{line1}\n  {self.help_text}'
 
-def extract_usage_from_doc(doc: str | None,
-                           usage_marker="Usage:") -> Tuple[str, str]:
+def extract_usage_from_doc(doc: Union[str, None],
+                           usage_marker="Usage:") -> Tuple[Union[str, None], str]:
   ''' Extract a `"Usage:"`paragraph from a docstring
       and return the unindented usage and the docstring with that paragraph elided.
 
