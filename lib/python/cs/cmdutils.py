@@ -1605,7 +1605,7 @@ class BaseCommand:
           for F in fields(BaseCommandOptions)
           if F.name not in ('cmd', 'dry_run')
       )
-    self.popopts(argv)
+    self.options.popopts(argv)
     options = self.options
     if argv:
       field_names = argv
