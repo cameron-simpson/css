@@ -1018,8 +1018,11 @@ class BaseCommand:
         if cmd.endswith('.py'):
           # "python -m foo" sets argv[0] to "..../foo.py"
           # fall back to the class name
-          cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
-    options = self.Options(cmd=cmd)
+          cmd = (
+              cutsuffix(self.__class__.__name__, 'Command').lower()
+              or self.__class__.__module__
+              )
+    options = self.__class__.Options(cmd=cmd)
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
