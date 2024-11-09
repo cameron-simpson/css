@@ -14,7 +14,12 @@ from code import interact
 from collections import ChainMap
 from contextlib import contextmanager
 from dataclasses import dataclass, field, fields
-from functools import cache
+try:
+  from functools import cache # 3.9 onward
+except ImportError:
+  from functools import lru_cache
+  def cache(func):
+    return lru_cache(maxsize=None)(func)
 from getopt import getopt, GetoptError
 from inspect import isclass
 from os.path import basename
