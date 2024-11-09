@@ -220,9 +220,13 @@ class OptionSpec:
     if specs is None:
       specs = [field_name]
     elif isinstance(specs, str):
+      # bare field name or help text
       specs = [specs]
     elif isinstance(specs, (list, tuple)):
       specs = list(specs)
+    elif callable(specs):
+      # bare conversion function (or a type eg int)
+      specs=[specs]
     else:
       raise TypeError(
           f'expected str or list or tuple for specs, got {r(specs)}'
