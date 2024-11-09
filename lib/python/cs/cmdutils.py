@@ -336,6 +336,22 @@ class OptionSpec:
     # TODO: allow multiline help_text, indent it here
     return f'{line1}\n  {self.help_text}'
 
+  def add_argument(self, parser, options=None):
+    ''' Add this option to an `argparser`-style option parser.
+        The optional `options` parameter may be used to supply an
+        `Options` instance to provide a default value.
+    '''
+    parser.add_argument(
+        self.opt_spec.getopt_opt,
+        action=('store' if opt_spec.arg_name else 'store_true'),
+        dest=opt_spec.field_name,
+        help=opt_spec.help_text,
+        default=(
+            None if options is None else
+            getattr(options, opt_spec.field_name, None)
+        ),
+    )
+
 def extract_usage_from_doc(
     doc: Union[str, None],
     usage_marker="Usage:"
