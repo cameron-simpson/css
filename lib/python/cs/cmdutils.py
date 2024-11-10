@@ -14,7 +14,15 @@ from code import interact
 from collections import ChainMap
 from contextlib import contextmanager
 from dataclasses import dataclass, field, fields
-from functools import cache
+try:
+  from functools import cache  # 3.9 onward
+except ImportError:
+  from functools import lru_cache
+
+  def cache(func):
+    '''Replacement `@cache` decorator.'''
+    return lru_cache(maxsize=None)(func)
+
 from getopt import getopt, GetoptError
 from inspect import isclass
 from os.path import basename
@@ -31,14 +39,13 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import OBSOLETE, decorator, default_params, uses_cmd_options
+from cs.deco import OBSOLETE, uses_cmd_options
 from cs.lex import (
     cutprefix,
     cutsuffix,
     indent,
     is_identifier,
     r,
-    s,
     stripped_dedent,
     tabulate,
 )
@@ -168,7 +175,7 @@ class OptionSpec:
           try:
             if not pfx_call(self.validate, value):
               raise GetoptError(self.unvalidated_message)
-          except valueError as e:
+          except ValueError as e:
             raise GetoptError(
                 f'{self.unvalidated_message}: {e.__class__.__name__}:{e}'
             ) from e
@@ -215,9 +222,13 @@ class OptionSpec:
     if specs is None:
       specs = [field_name]
     elif isinstance(specs, str):
+      # bare field name or help text
       specs = [specs]
     elif isinstance(specs, (list, tuple)):
       specs = list(specs)
+    elif callable(specs):
+      # bare conversion function (or a type eg int)
+      specs = [specs]
     else:
       raise TypeError(
           f'expected str or list or tuple for specs, got {r(specs)}'
@@ -325,8 +336,26 @@ class OptionSpec:
     # TODO: allow multiline help_text, indent it here
     return f'{line1}\n  {self.help_text}'
 
-def extract_usage_from_doc(doc: str | None,
-                           usage_marker="Usage:") -> Tuple[str, str]:
+  def add_argument(self, parser, options=None):
+    ''' Add this option to an `argparser`-style option parser.
+        The optional `options` parameter may be used to supply an
+        `Options` instance to provide a default value.
+    '''
+    parser.add_argument(
+        self.getopt_opt,
+        action=('store' if self.arg_name else 'store_true'),
+        dest=self.field_name,
+        help=self.help_text,
+        default=(
+            (None if self.arg_name else False)
+            if options is None else getattr(options, self.field_name, None)
+        ),
+    )
+
+def extract_usage_from_doc(
+    doc: Union[str, None],
+    usage_marker="Usage:"
+) -> Tuple[Union[str, None], str]:
   ''' Extract a `"Usage:"`paragraph from a docstring
       and return the unindented usage and the docstring with that paragraph elided.
 
@@ -822,6 +851,11 @@ class BaseCommandOptions(HasThreadState):
             DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
     '''
     shortopts, longopts, getopt_spec_map = self.getopt_spec_map(opt_specs_kw)
+    # infill default None for new fields
+    for opt_spec in getopt_spec_map.values():
+      field_name = opt_spec.field_name
+      if not hasattr(self, field_name):
+        setattr(self, field_name, None)
     opts, argv[:] = getopt(argv, shortopts, longopts)
     for opt, val in opts:
       with Pfx(opt):
@@ -930,7 +964,7 @@ class BaseCommand:
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
-  SUBCOMMAND_ARGV_DEFAULT = 'shell'
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
 
   Options = BaseCommandOptions
 
@@ -1010,8 +1044,11 @@ class BaseCommand:
         if cmd.endswith('.py'):
           # "python -m foo" sets argv[0] to "..../foo.py"
           # fall back to the class name
-          cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
-    options = self.Options(cmd=cmd)
+          cmd = (
+              cutsuffix(self.__class__.__name__, 'Command').lower()
+              or self.__class__.__module__
+          )
+    options = self.__class__.Options(cmd=cmd)
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
@@ -1129,15 +1166,18 @@ class BaseCommand:
         )
     return mapping
 
-  def has_subcommands(self):
+  @classmethod
+  def has_subcommands(cls):
     ''' Test whether the class defines additional subcommands.
     '''
-    subcmds = set(self.subcommands())
-    # ignore the subcommands we presupply
-    subcmds.discard('help')
-    subcmds.discard('info')
-    subcmds.discard('shell')
-    return bool(subcmds)
+    prefix = cls.SUBCOMMAND_METHOD_PREFIX
+    for method_name in dir(cls):
+      if not method_name.startswith(prefix):
+        continue
+      if getattr(cls, method_name) is getattr(BaseCommand, method_name, None):
+        continue
+      return True
+    return False
 
   @cache
   def subcommand(self, subcmd: str):
@@ -1594,11 +1634,18 @@ class BaseCommand:
           for F in fields(BaseCommandOptions)
           if F.name not in ('cmd', 'dry_run')
       )
-    self.popopts(argv)
+    self.options.popopts(argv)
+    xit = 0
     options = self.options
     if argv:
-      field_names = argv
-    elif field_names is None:
+      field_names = []
+      for field_name in argv:
+        if not hasattr(options, field_name):
+          warning("no options.%s attribute", field_name)
+          xit = 1
+        else:
+          field_names.append(field_name)
+    if not field_names:
       field_names = sorted(
           field_name for field_name in options.as_dict().keys()
           if field_name not in skip_names
@@ -1607,6 +1654,7 @@ class BaseCommand:
                             str(getattr(options, field_name)))
                            for field_name in field_names)):
       print(line)
+    return xit
 
   @uses_upd
   def cmd_shell(self, argv, *, upd: Upd):
