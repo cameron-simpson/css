@@ -1630,10 +1630,17 @@ class BaseCommand:
           if F.name not in ('cmd', 'dry_run')
       )
     self.options.popopts(argv)
+    xit=0
     options = self.options
     if argv:
-      field_names = argv
-    elif field_names is None:
+      field_names = []
+      for field_name in argv:
+        if not hasattr(options,field_name):
+          warning("no options.%s attribute", field_name)
+          xit=1
+        else:
+          field_names.append(field_name)
+    if not field_names:
       field_names = sorted(
           field_name for field_name in options.as_dict().keys()
           if field_name not in skip_names
@@ -1642,6 +1649,7 @@ class BaseCommand:
                             str(getattr(options, field_name)))
                            for field_name in field_names)):
       print(line)
+    return xit
 
   @uses_upd
   def cmd_shell(self, argv, *, upd: Upd):
