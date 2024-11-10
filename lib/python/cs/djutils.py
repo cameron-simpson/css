@@ -12,6 +12,18 @@ from django.core.management.base import (
 
 from cs.cmdutils import BaseCommand
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.cmdutils',
+        'django',
+    ],
+}
+
 class DjangoBaseCommand(BaseCommand, BaseDjangoBaseCommand):
   ''' A drop in class for `django.core.management.base.BaseCommand`
       which subclasses `cs.cmdutils.BaseCommand`.
