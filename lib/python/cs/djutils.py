@@ -6,11 +6,11 @@
 import sys
 
 from django.core.management.base import (
-    BaseCommand as BaseDjangoBaseCommand,
+    BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand as CSBaseCommand
 
 __version__ = '20241110-post'
 
@@ -26,7 +26,7 @@ DISTINFO = {
     ],
 }
 
-class DjangoBaseCommand(BaseCommand, BaseDjangoBaseCommand):
+class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   ''' A drop in class for `django.core.management.base.BaseCommand`
       which subclasses `cs.cmdutils.BaseCommand`.
 
