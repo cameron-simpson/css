@@ -1161,15 +1161,18 @@ class BaseCommand:
         )
     return mapping
 
-  def has_subcommands(self):
+  @classmethod
+  def has_subcommands(cls):
     ''' Test whether the class defines additional subcommands.
     '''
-    subcmds = set(self.subcommands())
-    # ignore the subcommands we presupply
-    subcmds.discard('help')
-    subcmds.discard('info')
-    subcmds.discard('shell')
-    return bool(subcmds)
+    prefix = cls.SUBCOMMAND_METHOD_PREFIX
+    for method_name in dir(cls):
+      if not method_name.startswith(prefix):
+        continue
+      if getattr(cls,method_name) is getattr(BaseCommand,method_name,None):
+        continue
+      return True
+    return False
 
   @cache
   def subcommand(self, subcmd: str):
