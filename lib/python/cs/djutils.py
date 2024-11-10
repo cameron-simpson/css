@@ -37,7 +37,7 @@ class DjangoBaseCommand(BaseCommand, BaseDjangoBaseCommand):
   @classmethod
   def run_from_argv(cls, argv):
     ''' Intercept `django.core.management.base.BaseCommand.run_from_argv`.
-        Construct an instance of cs.djutils.DjangoBaseCommand` and run it.
+        Construct an instance of `cs.djutils.DjangoBaseCommand` and run it.
     '''
     _, djcmdname, *argv = argv
     command = cls(argv, cmd=djcmdname)
