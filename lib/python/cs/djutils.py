@@ -12,6 +12,8 @@ from django.core.management.base import (
 
 from cs.cmdutils import BaseCommand
 
+__version__ = '20241110'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
