@@ -87,9 +87,9 @@ from typing import Iterable, List, Mapping, Optional, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_cmd_options
+from cs.cmdutils import BaseCommand, BaseCommandOptions, vprint
 from cs.context import contextif, reconfigure_file
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_quiet, uses_verbose, uses_cmd_options
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
@@ -100,7 +100,7 @@ from cs.psutils import prep_argv, pipefrom, run
 from cs.resources import RunState, uses_runstate
 from cs.upd import above as above_upd, print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20240709-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -476,7 +476,6 @@ class HashIndexCommand(BaseCommand):
               doit=doit,
               move_mode=move_mode,
               symlink_mode=symlink_mode,
-              quiet=quiet,
           )
       else:
         # prepare the remote input
@@ -713,7 +712,7 @@ def read_remote_hashindex(
       raise CalledProcessError(remote.returncode, remote_argv)
 
 @fmtdoc
-@uses_cmd_options
+@uses_cmd_options(doit=True, quiet=False)
 def run_remote_hashindex(
     rhost: str,
     argv,
@@ -721,9 +720,8 @@ def run_remote_hashindex(
     ssh_exe=None,
     hashindex_exe=None,
     check: bool = True,
-    doit: bool = None,
-    quiet: Optional[bool] = None,
-    options: BaseCommandOptions,
+    doit: bool,
+    quiet: bool,
     **subp_options,
 ):
   ''' Run a remote `hashindex` command.
@@ -748,10 +746,6 @@ def run_remote_hashindex(
     ssh_exe = options.ssh_exe
   if hashindex_exe is None:
     hashindex_exe = options.hashindex_exe
-  if doit is None:
-    doit = options.doit
-  if quiet is None:
-    quiet = True
   hashindex_cmd = shlex.join(prep_argv(
       hashindex_exe,
       *argv,
@@ -801,7 +795,7 @@ def dir_remap(
     hashname: str,
 ):
   ''' Generator yielding `(srcpath,[remapped_paths])` 2-tuples
-      based on the hashcodes keying `rfspaths_by_hashcode`.
+      based on the hashcodes keying `fspaths_by_hashcode`.
   '''
   yield from paths_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
@@ -826,7 +820,6 @@ def rearrange(
     move_mode: bool = False,
     symlink_mode=False,
     doit: bool,
-    quiet: bool = False,
     fstags: FSTags,
     runstate: RunState,
 ):
@@ -843,7 +836,6 @@ def rearrange(
       * `move_move`: move files instead of linking them
       * `symlink_mode`: symlink files instead of linking them
       * `doit`: if true do the link/move/symlink, otherwise just print
-      * `quiet`: default `False`; if true do not print
   '''
   with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
     if dstdirpath is None:
@@ -883,7 +875,6 @@ def rearrange(
                 symlink_mode=symlink_mode,
                 fstags=fstags,
                 doit=doit,
-                quiet=quiet,
             )
           except FileExistsError as e:
             warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
@@ -899,6 +890,7 @@ def rearrange(
 
 @pfx
 @uses_fstags
+@uses_verbose
 @require(
     lambda move_mode, symlink_mode: not (move_mode and symlink_mode),
     'move_mode and symlink_mode may not both be true'
@@ -912,8 +904,8 @@ def merge(
     move_mode: bool = False,
     symlink_mode=False,
     doit=False,
-    quiet=False,
     fstags: FSTags,
+    verbose: bool,
 ):
   ''' Merge `srcpath` to `dstpath`.
 
@@ -952,11 +944,13 @@ def merge(
       if doit:
         fstags[dstpath].update(fstags[srcpath])
       if move_mode and realpath(srcpath) != realpath(dstpath):
-        if not quiet:
-          print(
-              "remove", shortpath(srcpath), "# identical content at",
-              shortpath(dstpath)
-          )
+        vprint(
+            "remove",
+            shortpath(srcpath),
+            "# identical content at",
+            shortpath(dstpath),
+            verbose=verbose,
+        )
         if doit:
           pfx_call(os.remove, srcpath)
       return
@@ -964,8 +958,7 @@ def merge(
     raise FileExistsError(
         f'dstpath {dstpath!r} already exists with different hashcode'
     )
-  if not quiet:
-    print(opname, shortpath(srcpath), shortpath(dstpath))
+  vprint(opname, shortpath(srcpath), shortpath(dstpath), verbose=verbose)
   if doit:
     pfx_call(
         fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode

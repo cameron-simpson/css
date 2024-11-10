@@ -1,7 +1,26 @@
-calibre popbooks: error on unknown dbids
+obok prints to be monkeypatchs with qvprint as with dedrm
+common EBookLibrarytree abstract class presenting a mapping of book key to Book, asin for kindle, volumeid for kobo etc
+modern kindle db support
+test update of dedrm from 7.2.1 to 10., see if we can support both
+should a kindletree hook into dedrm? much bikesheeding here
+split dedrm into a package with kobo and kindle dedrm parts
+test if an AZW is encrypted
+in-calibre decryption in place
+recognise AZWs containing comics - keywords and images?
+-A/apple_books_path common option
+cs.ebooks should run if there is no calibre or kindle install
+cs.ebooks.cbz: ABCF metadata? https://acbf.fandom.com/wiki/ACBF_Specifications
+cs.ebooks.dedrm: option to use the plugin.zip directly instead of an unpacked source tree?
+fetch the dedrm package if not present, store where?
+dedrm: only define the wrappers etc once, not per with-dedrm_imports call
+use the dedrm plugin from calibre as a fallback
 import dedrm and obok plugins from the calibre prefs plugins subdir by default
+decrm: remove --inplace mode
+calibre dedrm: autodedrm specified books
+calibre popbooks: error on unknown dbids
 command line option to specify kobo library path
 kobo: do not require dedrm and the associated envvar, only need decrypt if there are encrypted zip members
+kobo: get the obok stuff from the calibre obok plugin as a fallback
 export_to_calibre: try to decrypt azw files
 kindle export: recite src and dst libs
 calibre lint command

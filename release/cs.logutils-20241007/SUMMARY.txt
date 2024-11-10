@@ -1,0 +1,2 @@
+setup_logging: just amend the existing loginfo if already set up.
+Remove the cs.pfx.cmd side effect from LogState.__init__, now in setup_logging.

@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 import errno
+from functools import cached_property
 from getopt import GetoptError
 import logging
 import os
@@ -31,7 +32,7 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data, shortpath
 from cs.fstags import FSTags, uses_fstags
@@ -134,10 +135,26 @@ class VTCmdOptions(BaseCommand.Options):
   )
   show_progress: bool = field(default_factory=lambda: run_modes.show_progress)
 
-  @property
+  @cached_property
+  def config(self):
+    ''' A `Config` derived from `self.config_map`, cached.
+    '''
+    return Config(self.config_map)
+
+  @cached_property
+  def store(self):
+    ''' The `Store`.
+    '''
+    return Store.default(
+        config_spec=self.config_map,
+        store_spec=self.store_spec,
+        cache_spec=self.cache_store_spec,
+    )
+
+  @cached_property
   def hashclass(self):
     ''' The `HashCode` subclass for `self.hashname`.
-      '''
+    '''
     try:
       return HashCode.by_hashname[self.hashname]
     except KeyError as e:
@@ -145,17 +162,20 @@ class VTCmdOptions(BaseCommand.Options):
           f'{self.__class__.__name__}.hashclass: unknown hashclass name {self.hashname!r} (I know {sorted(HashCode.by_hashname.keys())})'
       ) from e
 
-  @property
-  def config(self):
-    ''' A `Config` derived from `self.config_map`.
-      '''
-    return Config(self.config_map)
+  COMMON_OPT_SPECS = dict(
+      **BaseCommand.Options.COMMON_OPT_SPECS,
+      c_=('config_map', 'Configuration filename.'),
+      C_=(
+          'cache_store_spec', 'Cache store specification, "NONE" for no cache.'
+      ),
+      S_=('store_spec', 'Store specification.'),
+      h_=('hashname', 'Hash function name.'),
+      P='show_progress',
+  )
 
 class DataDirCommand(BaseCommand):
   ''' Command line implementation for `DataDir`s.
   '''
-
-  GETOPT_SPEC = 'd:'
 
   USAGE_FORMAT = '''Usage: {cmd} [-d datadir] subcommand [...]
       Perform various tasks with DataDirs.
@@ -170,52 +190,39 @@ class DataDirCommand(BaseCommand):
     ''' Special class for `self.options` with various properties.
     '''
     datadirpath: Optional[str] = None
-    datadir: Optional["DataDir"] = None
 
-    @property
-    def config(self):
-      ''' The configuration.
+    @cached_property
+    def datadir(self):
+      ''' The `DataDir`, inferred from the default `Store`
+          if `datadirpath` is not specified.
       '''
-      from .config import Config
-      return Config(self.config_map)
+      datadirpath = self.datadirpath
+      if datadirpath is None:
+        S = self.store
+        if not isinstance(S, DataDirStore):
+          raise GetoptError(
+              "default Store is not a DataDirStore: %s" % (s(S),)
+          )
+        datadir = S._datadir
+        self.datadirpath = datadir.fspath
+      else:
+        datadir = DataDir(datadirpath)
+      return datadir
 
-  def apply_opt(self, opt, val):
-    ''' Apply the command line option `opt` with value `val`.
-    '''
-    options = self.options
-    if opt == '-d':
-      options.datadirpath = val
-    else:
-      raise GetoptError(f'unhandled option: {opt!r}={val!r}')
-
-  @contextmanager
-  def run_context(self):
-    options = self.options
-    datadirpath = options.datadirpath
-    if datadirpath is None:
-      from .store import DataDirStore  # pylint: disable=import-outside-toplevel
-      S = pfx_call(Store.promote, options.store_spec, options.config)
-      if not isinstance(S, DataDirStore):
-        raise GetoptError("default Store is not a DataDirStore: %s" % (s(S),))
-      datadir = S._datadir
-      datadirpath = datadir.fspath
-    else:
-      datadir = DataDir(datadirpath)
-    with super().run_context():
-      with stackattrs(
-          options,
-          datadir=datadir,
-          datadirpath=datadirpath,
-      ):
-        yield
+    COMMON_OPT_SPECS = dict(
+        **VTCmdOptions.COMMON_OPT_SPECS,
+        d_=('datadirpath', 'DataDir directory path.'),
+        datadir_=('datadirpath', 'DataDir directory path.'),
+    )
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
           Print information about the DataDir.
     '''
+    options = self.options
+    options.popopts(argv)
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    options = self.options
     datadir = options.datadir
     verbose = options.verbose
     print(datadir)
@@ -264,8 +271,6 @@ class VTCmd(BaseCommand):
 
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
 
-  GETOPT_SPEC = 'C:S:f:h:Pqv'
-
   USAGE_KEYWORDS = {
       'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
       'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
@@ -290,45 +295,13 @@ class VTCmd(BaseCommand):
               Default from ${VT_STORE_ENVVAR}, or {VT_STORE_DEFAULT!r},
               except for the "serve" subcommand which defaults to
               "[server]" and ignores ${VT_STORE_ENVVAR}.
-    -f config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
+    -c config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
               otherwise {DEFAULT_CONFIG_PATH}
     -h hashclass Hashclass for Stores. Default from ${HASHNAME_ENVVAR},
               otherwise `{HASHNAME_DEFAULT!r}`.
-    -P        Progress: show a progress bar of top level Store activity.
-    -q        Quiet; not verbose. Default if stderr is not a tty.
-    -v        Verbose; not quiet. Default if stderr is a tty.
-'''
+  '''
 
   Options = VTCmdOptions
-
-  def apply_opts(self, opts):
-    ''' Apply the command line options mapping `opts` to `options`.
-    '''
-    options = self.options
-    for opt, val in opts:
-      if opt == '-C':
-        options.cache_store_spec = val
-      elif opt == '-S':
-        # specify Store
-        options.store_spec = val
-      elif opt == '-f':
-        options.config_map = val
-      elif opt == '-h':
-        options.hashname = val
-      elif opt == '-P':
-        options.show_progress = True
-      elif opt == '-q':
-        # quiet: not verbose
-        options.verbose = False
-      elif opt == '-v':
-        # verbose: not quiet
-        options.verbose = True
-      else:
-        raise NotImplementedError("unhandled option: %s" % (opt,))
-    if options.verbose:
-      self.loginfo.level = logging.INFO
-    if options.dflt_log is not None:
-      logTo(options.dflt_log, delay=True)
 
   def handle_signal(self, sig, frame):
     ''' Override `BaseCommand.handle_signal`:
@@ -353,28 +326,32 @@ class VTCmd(BaseCommand):
       options = self.options
       config = options.config
       show_progress = options.show_progress
-      with config:
-        with stackattrs(run_modes, config=config):
-          # redo these because defaults is already initialised
-          with stackattrs(run_modes, show_progress=show_progress):
-            with fstags:
-              if cmd in ("config", "datadir", "dump", "help", "init",
-                         "profile", "scan"):
-                yield
-              else:
-                # open the default Store
-                if options.store_spec is None:
-                  if cmd == "serve":
-                    options.store_spec = options.store_spec
-                S = Store.default(
-                    config_spec=options.config_map,
-                    store_spec=options.store_spec,
-                    cache_spec=options.cache_store_spec,
-                )
-                with S:
-                  with stackattrs(options, S=S):
-                    with S.connected():
-                      yield
+      if options.dflt_log is not None:
+        logTo(options.dflt_log, delay=True)
+      with contextif(
+          options.verbose,
+          stackattrs,
+          self.loginfo,
+          level=logging.INFO,
+      ):
+        with config:
+          with stackattrs(run_modes, config=config):
+            # redo these because defaults is already initialised
+            with stackattrs(run_modes, show_progress=show_progress):
+              with fstags:
+                if cmd in ("config", "datadir", "dump", "help", "init",
+                           "profile", "scan"):
+                  yield
+                else:
+                  # open the default Store
+                  if options.store_spec is None:
+                    if cmd == "serve":
+                      options.store_spec = '[server]'
+                  S = options.store
+                  with S:
+                    with stackattrs(options, S=S):
+                      with S.connected():
+                        yield
       if ifdebug():
         dump_debug_threads()
 
@@ -429,7 +406,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           sizes.append(len(chunk))
@@ -443,7 +419,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           last_offset = offset
@@ -457,7 +432,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           hash_value, chunk_scan_offsets = py_scanbuf2(
@@ -472,7 +446,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
       elif mode == 'scan_offsets':
@@ -489,7 +462,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=itemlenfunc,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           sizes.append(offset - last_offset)
@@ -503,7 +475,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           sizes.append(len(chunk))
@@ -517,7 +488,6 @@ class VTCmd(BaseCommand):
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
-            report_print=True,
         ):
           runstate.raiseif()
           hash_value, chunk_scan_offsets = scanbuf2(
@@ -1420,9 +1390,7 @@ def lsDirent(fp, E, name):
   '''
   B = E.block
   st = E.stat()
-  st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
-      st_atime, st_mtime, st_ctime = st
-  t = datetime.fromtimestamp(int(st_mtime))
+  t = datetime.fromtimestamp(int(st.st_mtime))
   try:
     h = B.hashcode
   except AttributeError:
@@ -1431,7 +1399,7 @@ def lsDirent(fp, E, name):
     detail = hexify(h)
   fp.write(
       "%c %-41s %s %6d %s\n" %
-      (('d' if E.isdir else 'f'), detail, t, st_size, name)
+      (('d' if E.isdir else 'f'), detail, t, st.st_size, name)
   )
 
 @typechecked

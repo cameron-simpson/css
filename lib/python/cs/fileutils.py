@@ -53,7 +53,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20240723-post'
+__version__ = '20241007.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1653,8 +1653,11 @@ def atomic_filename(
     **tempfile_kw
 ):
   ''' A context manager to create `filename` atomicly on completion.
-      This returns a `NamedTemporaryFile` to use to create the file contents.
+      This yields a `NamedTemporaryFile` to use to create the file contents.
       On completion the temporary file is renamed to the target name `filename`.
+
+      If the caller decides to _not_ create the target they may remove the
+      temporary file. This is not considered an error.
 
       Parameters:
       * `filename`: the file name to create
@@ -1711,24 +1714,32 @@ def atomic_filename(
       with open(filename, 'ab' if exists_ok else 'xb'):
         pass
     yield T
-    mtime = pfx_call(os.stat, T.name).st_mtime
-    try:
-      pfx_call(shutil.copystat, filename, T.name)
-    except FileNotFoundError:
-      pass
-    except OSError as e:
-      warning(
-          "defaut modes not copied from from placeholder %r: %s", filename, e
-      )
-    else:
-      # we made the attributes like the original, now bump the mtime
+    # if the caller removed the temp file
+    # do not create/replace the target
+    if existspath(T.name):
+      mtime = pfx_call(os.stat, T.name).st_mtime
       try:
-        atime = pfx_call(os.stat, filename).st_atime
+        pfx_call(shutil.copystat, filename, T.name)
       except FileNotFoundError:
-        atime = mtime
-      pfx_call(os.utime, T.name, (atime, mtime))
-    pfx_call(rename_func, T.name, filename)
-    # recreate the temp file so that it can be cleaned up
+        pass
+      except OSError as e:
+        warning(
+            "defaut modes not copied from from placeholder %r: %s", filename, e
+        )
+      else:
+        # we make the attribute like the original, now bump the mtime
+        try:
+          atime = pfx_call(os.stat, filename).st_atime
+        except FileNotFoundError:
+          atime = mtime
+        pfx_call(os.utime, T.name, (atime, mtime))
+      # just in case something made the file
+      if not placeholder and not exists_ok and existspath(filename):
+        raise FileExistsError(
+            errno.EEXIST, os.strerror(errno.EEXIST), filename
+        )
+      pfx_call(rename_func, T.name, filename)
+    # recreate the temp file so that it can be cleaned up by NamedTemporaryFile
     with pfx_call(open, T.name, 'xb'):
       pass
 
@@ -1848,11 +1859,11 @@ def gzifopen(path, mode='r', *a, **kw):
     path1, path2 = path0, gzpath
   # if exactly one of the files exists, try only that file
   if existspath(path1) and not existspath(path2):
-    paths = path1,
+    paths = (path1,)
   elif existspath(path2) and not existspath(path1):
-    paths = path2,
+    paths = (path2,)
   else:
-    paths = path1, path2
+    paths = (path1, path2)
   for openpath in paths:
     try:
       with (gzip.open(openpath,

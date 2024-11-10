@@ -637,7 +637,7 @@ class OnDemandResult(Result):
           "%s.__call__: no parameters expected, received: *%r, **%r" %
           (self, a, kw)
       )
-    with self._lock:
+    with self._Result__lock:
       if self.is_pending:
         self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()

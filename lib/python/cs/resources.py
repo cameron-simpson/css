@@ -16,6 +16,7 @@ from threading import Lock, RLock, current_thread, main_thread
 import time
 from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
+from icontract import require
 from typeguard import typechecked
 
 from cs.context import contextif, stackattrs, setup_cmgr, ContextManagerMixin
@@ -30,7 +31,7 @@ from cs.py.stack import caller, frames as stack_frames, StackSummary
 from cs.result import CancellationError
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20240723-post'
+__version__ = '20241005-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -867,12 +868,39 @@ class RunState(FSM, HasThreadState):
       warning("%s: received signal %s, cancelling", self, sig)
     self.cancel()
 
+  @require(lambda delay: delay >= 0)
+  @require(lambda step: step > 0)
+  def sleep(self, delay, step=1.0):
+    ''' Sleep for `delay` seconds in increments of `step` (default `1.0`).
+        `self.raiseif()` is polled between steps.
+    '''
+    if delay > 0:
+      eta = time.time() + delay
+      while (inc_delay := eta - time.time()) >= step:
+        time.sleep(step)
+        self.raiseif()
+      if inc_delay > 0:
+        time.sleep(inc_delay)
+
+  def bg(self, func, **bg_kw):
+    ''' Override `HasThreadState.bg` to catch CancellationError
+        and just issue a warning.
+    '''
+
+    def _rs_func(*rs_a, **rs_kw):
+      try:
+        return pfx_call(func, *rs_a, **rs_kw)
+      except CancellationError as e:
+        warning("cancelled: %s", e)
+
+    return super().bg(_rs_func, **bg_kw)
+
 @decorator
 def uses_runstate(func, name=None):
   ''' A wrapper for `@default_params` which makes a new thread wide
       `RunState` parameter `runstate` if missing.
       The optional decorator parameter `name` may be used to specify
-      a name for the new `RunState` if one is made. The default
+      a name for the new `RunState` if one is made. The default name
       comes from the wrapped function's name.
 
       Example:

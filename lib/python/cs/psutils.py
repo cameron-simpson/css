@@ -8,6 +8,7 @@ Not to be confused with the excellent
 (psutil)[https://pypi.org/project/psutil/] package.
 '''
 
+import builtins
 from contextlib import contextmanager
 import errno
 import io
@@ -20,7 +21,7 @@ from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subpro
 import sys
 import time
 
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_doit, uses_quiet
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
@@ -197,14 +198,17 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
+@uses_doit
+@uses_quiet
 def run(
     argv,
     *,
-    doit=True,
+    doit: bool,
     logger=None,
-    quiet=True,
+    quiet: bool,
     input=None,
     stdin=None,
+    print=None,
     **subp_options,
 ):
   ''' Run a command via `subprocess.run`.
@@ -243,7 +247,7 @@ def run(
     if logger:
       trace("+ %s", shlex.join(argv))
     else:
-      print_argv(*argv, indent="+ ", file=sys.stderr)
+      print_argv(*argv, indent="+ ", file=sys.stderr, print=print)
   if input is None:
     if stdin is None:
       stdin = subprocess_DEVNULL
@@ -261,7 +265,8 @@ def run(
     )
   return cp
 
-def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
+@uses_quiet
+def pipefrom(argv, *, quiet: bool, text=True, stdin=DEVNULL, **popen_kw):
   ''' Pipe text (usually) from a command using `subprocess.Popen`.
       Return the `Popen` object with `.stdout` as a pipe.
 
@@ -282,7 +287,8 @@ def pipefrom(argv, *, quiet=False, text=True, stdin=DEVNULL, **popen_kw):
     print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
-def pipeto(argv, *, quiet=False, **kw):
+@uses_quiet
+def pipeto(argv, *, quiet: bool, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.
@@ -408,35 +414,44 @@ def prep_argv(*argv):
   )
 
 def print_argv(
-    *argv, indent="", subindent="  ", end="\n", file=None, fold=False
+    *argv,
+    indent="",
+    subindent="  ",
+    end="\n",
+    file=None,
+    fold=False,
+    print=None,
 ):
   ''' Print an indented possibly folded command line.
   '''
   if file is None:
     file = sys.stdout
+  if print is None:
+    print = builtins.print
+  print_argv = []
   was_opt = False
   for i, arg in enumerate(argv):
     if i == 0:
-      file.write(indent)
+      print_argv.append(indent)
       was_opt = False
     elif len(arg) >= 2 and arg.startswith('-'):
       if fold:
         # options get a new line
-        file.write(" \\\n" + indent + subindent)
+        print_argv.append(" \\\n" + indent + subindent)
       else:
-        file.write(" ")
+        print_argv.append(" ")
       was_opt = True
     else:
       if was_opt:
-        file.write(" ")
+        print_argv.append(" ")
       elif fold:
         # nonoptions get a new line
-        file.write(" \\\n" + indent + subindent)
+        print_argv.append(" \\\n" + indent + subindent)
       else:
-        file.write(" ")
+        print_argv.append(" ")
       was_opt = False
-    file.write(shlex.quote(arg))
-  file.write(end)
+    print_argv.append(shlex.quote(arg))
+  print(*print_argv, sep='', end=end, file=file)
 
 if __name__ == '__main__':
   for test_max_argv in 64, 20, 16, 8:

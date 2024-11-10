@@ -52,14 +52,13 @@ class Defaults:
   def __init__(self, host=None):
     self.host = host
 
-  def run(self, argv, doit=True, quiet=False) -> str:
+  def run(self, argv, doit=True) -> str:
     ''' Run a `defaults` subcommand, return the output decoded from UTF-8.
     '''
     return defaults(
         argv,
         host=self.host,
         doit=doit,
-        quiet=quiet,
         stdout=PIPE,
         encoding='utf-8',
     ).stdout

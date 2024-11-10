@@ -1,4 +1,3 @@
-# architecture eg apple.x86_64.darwin
 :import ARCH
 # full path to the base python executable from a venv
 :import PYTHON_EXE
@@ -9,7 +8,7 @@ weblocal        = $(HOME)/@/ezos/html/cs/css
 hg_repos        = sr.ht-css $${CSS_HG_REPOS}
 git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
-www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
+www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits
 www_github      = https://github.com/cameron-simpson/css
 title           = Cameron Simpson's Scripts
 

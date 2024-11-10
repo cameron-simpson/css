@@ -1,0 +1,2 @@
+stripped_dedent: new optional post_indent parameter to indent the dedented text.
+New tabulate(*rows) generator function yielding lines of padded columns.

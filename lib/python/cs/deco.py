@@ -18,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240709-post'
+__version__ = '20241109-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -823,6 +823,92 @@ def default_params(func, _strict=False, **param_defaults):
   defaulted_func.__signature__ = sig
   return defaulted_func
 
+@decorator
+def uses_cmd_options(
+    func, _strict=False, _options_param_name='options', **option_defaults
+):
+  ''' A decorator to provide default keyword arguments
+      from the prevailing `cs.cmdutils.BaseCommandOptions`
+      if available, otherwise from `option_defaults`.
+
+      This exists to provide plumbing free access to options set
+      up by a command line invocation using `cs.cmdutils.BaseCommand`.
+
+      If no `option_defaults` are provided, a single `options`
+      keyword argument is provided which is the prevailing
+      `BaseCommand.Options` instance.
+
+      The decorator accepts two optional "private" keyword arguments
+      commencing with underscores:
+      * `_strict`: default `False`; if true then an `option_defaults`
+        will only be applied if the argument is _missing_ from the
+        function arguments, otherwise it will be applied if the
+        argument is missing or `None`
+      * `_options_param_name`: default `'options'`; this is the
+        name of the single `options` keyword argument which will be
+        supplied if there are no `option_defaults`
+
+      Examples:
+
+          @uses_cmd_options(doit=True, quiet=False)
+          def func(x, *, doit, quiet, **kw):
+              if not quiet:
+                  print("something", x, kw)
+              if doit:
+                 ... do the thing ...
+              ... etc ...
+
+          @uses_cmd_options()
+          def func(x, *, options, **kw):
+              if not options.quiet:
+                  print("something", x, kw)
+              if options.doit:
+                 ... do the thing ...
+              ... etc ...
+  '''
+
+  def uses_cmd_wrapper(*func_a, **func_kw):
+    # fill in the func_kw from the defaults
+    # and keep a record of the chosen values
+    # run with the prevailing BaseCommand suitably updated
+    try:
+      from cs.cmdutils import BaseCommand
+      from cs.context import stackattrs
+    except ImportError:
+      # missing cs.cmdutils or cs.context,
+      # make an options with no attributes
+      options = object()
+    else:
+      options_class = BaseCommand.Options
+      options = options_class.default() or options_class()
+    option_updates = {}
+    if not option_defaults:
+      option_defaults[_options_param_name] = options
+    for option_name, option_default in option_defaults.items():
+      if _strict:
+        # skip if the option is not provided by the caller
+        if option_name in func_kw:
+          continue
+      elif func_kw.get(option_name) is not None:
+        # skip if the option is not provided by the caller
+        # or is provided as None
+        continue
+      option_value = getattr(options, option_name, None)
+      if option_value is None:
+        option_value = option_default
+      option_updates[option_name] = option_value
+    func_kw.update(option_updates)
+    with stackattrs(options, **option_updates):
+      with options:
+        return func(*func_a, **func_kw)
+
+  return uses_cmd_wrapper
+
+uses_doit = uses_cmd_options(doit=True)
+uses_force = uses_cmd_options(force=False)
+uses_quiet = uses_cmd_options(quiet=False)
+uses_verbose = uses_cmd_options(verbose=False)
+
 # pylint: disable=too-many-statements
 @decorator
 def promote(func, params=None, types=None):
@@ -1043,12 +1129,13 @@ class Promotable:
   '''
 
   @classmethod
-  def promote(cls, obj):
+  def promote(cls, obj, **from_t_kw):
     ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
         This method supports the `@promote` decorator.
 
-        This base method will call the `from_`*typename*`(obj)` class factory
-        method if present, where *typename* is `obj.__class__.__name__`.
+        This base method will call the `from_`*typename*`(obj,**from_t_kw)`
+        class factory method if present, where *typename* is
+        `obj.__class__.__name__`.
 
         Subclasses may override this method to promote other types,
         typically:
@@ -1061,6 +1148,30 @@ class Promotable:
                 ... not done via a from_typename factory method
                 # fall back to Promotable.promote
                 return super().promote(obj)
+
+        An typical `from_`*typename*` factory method:
+
+            class Foo(Promotable):
+
+                def __init__(self, dbkey, dbrow):
+                    self.key = dbkey
+                    self.row_data = row
+
+                @classmethod
+                def from_str(cls, s : str):
+                    """Accept a database key string, return a `Foo` instance."""
+                    row = db_lookup(s)
+                    return cls(s, row)
+
+        This supports using `@promote` on functions with `Foo` instances:
+
+            @promote
+            def do_it(foo : Foo):
+                ... work with foo ...
+
+        but calling it as:
+
+            do_it("foo_key_value")
     '''
     if isinstance(obj, cls):
       return obj
@@ -1069,7 +1180,7 @@ class Promotable:
     except AttributeError:
       pass
     else:
-      return from_type(obj)
+      return from_type(obj, **from_t_kw)
     raise TypeError(
         f'{cls.__name__}.promote: cannot promote {obj.__class__.__name__}:{obj!r}'
     )
