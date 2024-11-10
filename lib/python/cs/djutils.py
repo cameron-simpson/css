@@ -46,6 +46,7 @@ class DjangoBaseCommand(BaseCommand, BaseDjangoBaseCommand):
 
   def add_arguments(self, parser):
     ''' Add the `Options.COMMON_OPT_SPECS` to the `argparse` parser.
+        This is basicly to support the Django `call_command` function.
     '''
     if self.has_subcommands():
       parser.add_argument('subcmd', nargs='?')
