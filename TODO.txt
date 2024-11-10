@@ -1,13 +1,13 @@
 default: use cs.psutils.prep_argv throughout cs.cmdutils d
 cs.cmdutils: shell: subcommand with no args - enter the subcommand mode even if there is a default subcommand, display usage on entry
-default: replace underscores with dashes in subcommand names in cs.cmdutils
+√ default: replace underscores with dashes in subcommand names in cs.cmdutils
 @promote: update signature by inspecting the signatures of the promotion functions?
-fs.fatsg: "fstags help ls" has bogus output
+√ fs.ftags: "fstags help ls" has bogus output
 cs.upd.run_task: wait 0.5s before displaying the ticker? probably interacts badly with use of the ticker proxy
 wait 0.5s before displaying the ticker? probably interacts badly with use of the ticker proxy
 ffmpeg-docker: make stdin and stdout work correctly so that I can pipe ffmpeg commands
 script to run strace or truss or sudo dtruss -p PID etc depending on the OS
-cs.cmdutils OptSpec to be promotable, leverage in popopts
+√ cs.cmdutils OptSpec to be promotable, leverage in popopts
 fetch the dedrm package if not present, store where?
 service_api: rate limiter? context manager to access it directly, implied if .API_RATE_LIMIT
 Upd: try the hide-the cursor stuff again, maybe in the update+clean method
