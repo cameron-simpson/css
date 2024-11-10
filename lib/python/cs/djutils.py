@@ -12,7 +12,7 @@ from django.core.management.base import (
 
 from cs.cmdutils import BaseCommand as CSBaseCommand
 
-__version__ = '20241110-post'
+__version__ = '20241111'
 
 DISTINFO = {
     'keywords': ["python3"],
