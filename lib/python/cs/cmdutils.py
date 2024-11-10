@@ -448,10 +448,11 @@ class SubCommand:
         if paragraph1:
           usage_format += "\n" + indent(paragraph1)
     else:
-      usage_format = indent(stripped_dedent(usage_format))
-    # The existing USAGE_FORMAT based usages have the word "Usage:"
-    # at the front but this is supplied at print time now.
-    usage_format = cutprefix(usage_format, 'Usage:').lstrip()
+      # The existing USAGE_FORMAT based usages have the word "Usage:"
+      # at the front but this is supplied at print time now.
+      usage_format = indent(
+          stripped_dedent(cutprefix(usage_format.lstrip(), 'Usage:'))
+      ).lstrip()
     command_options = self.command.options
     if show_common:
       common_opts = command_options.COMMON_OPT_SPECS
