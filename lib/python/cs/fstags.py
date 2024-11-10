@@ -197,36 +197,21 @@ def verbose(msg, *a):
 
 # pylint: disable=too-many-public-methods
 class FSTagsCommand(BaseCommand, TagsCommandMixin):
-  ''' `fstags` main command line utility.
-
-      Usage: {cmd} [-o ontology] [-P] subcommand [...]
-        -o ontology   Specify the path to an ontology file.
-        -P            Physical. Resolve pathnames through symlinks.
-                      Default ~/.fstagsrc[general]physical or False.
+  ''' Usage: {cmd} [-o ontology] [-P] subcommand [...]
+        Work with fstags.
   '''
-
-  GETOPT_SPEC = 'o:P'
-
-  USAGE_KEYWORDS = {
-      'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
-      'LS_OUTPUT_FORMAT_DEFAULT': LS_OUTPUT_FORMAT_DEFAULT,
-  }
 
   @dataclass
   class Options(BaseCommand.Options):
     ontology_path: Optional[str] = os.environ.get('FSTAGS_ONTOLOGY')
+    # Default ~/.fstagsrc[general]physical or False.
     physical: Optional[bool] = None
 
-  def apply_opt(self, opt, val):
-    ''' Apply command line option.
-    '''
-    options = self.options
-    if opt == '-o':
-      options.ontology_path = val
-    elif opt == '-P':
-      options.physical = True
-    else:
-      raise NotImplementedError("unhandled option")
+    COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+        O_='ontology_path',
+        P=('physical', 'Physical. Resolve pathnames through symlinks.'),
+    )
 
   @contextmanager
   def run_context(self):
