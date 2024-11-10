@@ -611,7 +611,8 @@ class SubCommand:
 
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
-    n='dry_run',
+    dry_run='dry_run',
+    n=('dry_run', 'No action, aka dry run.'),
     q='quiet',
     v='verbose',
 )
