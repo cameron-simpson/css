@@ -1174,7 +1174,7 @@ class BaseCommand:
     for method_name in dir(cls):
       if not method_name.startswith(prefix):
         continue
-      if getattr(cls,method_name) is getattr(BaseCommand,method_name,None):
+      if getattr(cls, method_name) is getattr(BaseCommand, method_name, None):
         continue
       return True
     return False
@@ -1635,14 +1635,14 @@ class BaseCommand:
           if F.name not in ('cmd', 'dry_run')
       )
     self.options.popopts(argv)
-    xit=0
+    xit = 0
     options = self.options
     if argv:
       field_names = []
       for field_name in argv:
-        if not hasattr(options,field_name):
+        if not hasattr(options, field_name):
           warning("no options.%s attribute", field_name)
-          xit=1
+          xit = 1
         else:
           field_names.append(field_name)
     if not field_names:
