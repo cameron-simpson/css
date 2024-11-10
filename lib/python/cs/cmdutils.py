@@ -851,6 +851,11 @@ class BaseCommandOptions(HasThreadState):
             DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
     '''
     shortopts, longopts, getopt_spec_map = self.getopt_spec_map(opt_specs_kw)
+    # infill default None for new fields
+    for opt_spec in getopt_spec_map.values():
+      field_name = opt_spec.field_name
+      if not hasattr(self, field_name):
+        setattr(self, field_name, None)
     opts, argv[:] = getopt(argv, shortopts, longopts)
     for opt, val in opts:
       with Pfx(opt):
