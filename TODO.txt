@@ -1,3 +1,4 @@
+default: buglog in Python?
 default: use cs.psutils.prep_argv throughout cs.cmdutils d
 cs.cmdutils: shell: subcommand with no args - enter the subcommand mode even if there is a default subcommand, display usage on entry
 √ default: replace underscores with dashes in subcommand names in cs.cmdutils
