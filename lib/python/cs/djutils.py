@@ -6,13 +6,27 @@
 import sys
 
 from django.core.management.base import (
-    BaseCommand as BaseDjangoBaseCommand,
+    BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand as CSBaseCommand
 
-class DjangoBaseCommand(BaseCommand, BaseDjangoBaseCommand):
+__version__ = '20241111-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.cmdutils',
+        'django',
+    ],
+}
+
+class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   ''' A drop in class for `django.core.management.base.BaseCommand`
       which subclasses `cs.cmdutils.BaseCommand`.
 
@@ -91,7 +105,7 @@ class DjangoBaseCommand(BaseCommand, BaseDjangoBaseCommand):
   @classmethod
   def run_from_argv(cls, argv):
     ''' Intercept `django.core.management.base.BaseCommand.run_from_argv`.
-        Construct an instance of cs.djutils.DjangoBaseCommand` and run it.
+        Construct an instance of `cs.djutils.DjangoBaseCommand` and run it.
     '''
     _, djcmdname, *argv = argv
     command = cls(argv, cmd=djcmdname)

@@ -58,7 +58,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20241007-post'
+__version__ = '20241110-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -611,7 +611,8 @@ class SubCommand:
 
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
-    n='dry_run',
+    dry_run='dry_run',
+    n=('dry_run', 'No action, aka dry run.'),
     q='quiet',
     v='verbose',
 )

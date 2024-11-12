@@ -38,7 +38,7 @@ cs.calibre
 cs.cbz
 cs.cdutils
 cs.clockutils pypi.release=20190101
-cs.cmdutils pypi.release="20241007" ok_revision="15cceb145163699206502dffb10664eade1c45e7" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"],"20240630":["BaseCommandOptions__as_dict"],"20241005":["vprint"]}
+cs.cmdutils pypi.release="20241110" ok_revision="63cb33b19053b6d1c74bd6b03fef2932bb663e05" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"],"20240630":["BaseCommandOptions__as_dict"],"20241005":["vprint"],"20241110":["vqprint"]}
 cs.common
 cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18806fb0ded874" features={"20220430":["HasConfigIni"],"20220606":["info_dict"]}
 cs.context pypi.release="20240630" ok_revision="365a81af90e11f74111f9cf63a365c5c65389274" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"],"20230109":["contextif"],"20230125":["ContextManagerMixin_as_contextmanager"],"20230212":["stackset"],"20240212":["reconfigure_file"],"20240412":["withall","withif"],"20240630":["closeall","with_self"]}
@@ -51,6 +51,7 @@ cs.deco pypi.release="20241109" ok_revision="32a5b3aa0b42d90cf4a3bf279e34dc784a3
 cs.dedrm
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.distinfo
+cs.djutils ok_revision=bca75d436a4cb8ff63617df15bceb1731ec7e118 features={"20241110":["DjangoBaseCommand"]} pypi.release="20241111"
 cs.dockerutils ok_revision=f846ece6e9f9353b443df14f81512ae6438681e6 pypi.release="20240519" features={"20240305":["DockerRun__network"]}
 cs.ebooks ok_revision="3379fcbf1eb008df3cd38e9afd40f1d0db9afbd4" pypi.release="20241007" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -137,6 +138,7 @@ cs.upd ok_revision="08f7d62b98d3c1b2532c4b8c9199a0c756914c6c" pypi.release="2024
 cs.urlutils ok_revision="7eeaa1d7ef5d4e82b88e9d614e8646d80a5344e7" pypi.release="20231129"
 cs.x ok_revision="68e0c6027afe808d188c53ab5ef6c9285f29067b" pypi.release="20240630" features={"20231129":["via_logger"]}
 cs.xml ok_revision=ab95976b267e5d8e4561d4603499c8530de51249
+django
 "ffmpeg-python"
 icontract
 matplotlib
