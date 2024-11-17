@@ -1,4 +1,4 @@
-cs.cmdutils: cmd_foo=None to remove am inherited subcommand
+√ cs.cmdutils: cmd_foo=None to remove am inherited subcommand
 cs.cmdutils: help: suppress command subcommands?
 default: buglog in Python?
 default: use cs.psutils.prep_argv throughout cs.cmdutils d
