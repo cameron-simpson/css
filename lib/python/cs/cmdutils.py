@@ -1345,8 +1345,13 @@ class BaseCommand:
     return argv
 
   @classmethod
+  @typechecked
   def poparg(
-      cls, argv: List[str], *specs, unpop_on_error=False, opt_spec_class=None
+      cls,
+      argv: List[str],
+      *specs,
+      unpop_on_error: bool = False,
+      opt_spec_class=None
   ):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
