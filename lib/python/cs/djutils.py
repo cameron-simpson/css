@@ -14,6 +14,7 @@ from django.core.management.base import (
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand as CSBaseCommand
+from cs.lex import cutprefix, stripped_dedent
 
 __version__ = '20241111-post'
 
@@ -30,19 +31,43 @@ DISTINFO = {
 }
 
 class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
-  '''
-  A subclass of `cs.cmdutils.SubCOmmand` with additional support
-  for Django's `BaseCommand`.
+  ''' A subclass of `cs.cmdutils.SubCOmmand` with additional support
+      for Django's `BaseCommand`.
   '''
 
+  @property
+  def is_pure_django_command(self):
+    ''' Whether this subcommand is a pure Django `BaseCommand`. '''
+    method = self.method
+    return (
+        isclass(method) and issubclass(method, DjangoBaseCommand)
+        and not issubclass(method, CSBaseCommand)
+    )
+
+  @trace
   @typechecked
   def __call__(self, argv: List[str]):
+    ''' Run this `SubCommand` with `argv`.
+        This calls Django's `BaseCommand.run_from_argv` for pure Django commands.
+    '''
+    if not self.is_pure_django_command:
+      return super().__call__(argv)
     method = self.method
-    if (isclass(method) and issubclass(method, DjangoBaseCommand)
-        and not issubclass(method, CSBaseCommand)):
-      instance = method()
-      return instance.run_from_argv([method.__module__, self.cmd] + argv)
-    return super().__call__(argv)
+    instance = method()
+    return instance.run_from_argv([method.__module__, self.cmd] + argv)
+
+  def usage_text(self, *, cmd=None, **kw):
+    ''' Return the usage text for this subcommand.
+    '''
+    if not self.is_pure_django_command:
+      return super().usage_text(cmd=cmd, **kw)
+    method = self.method
+    help_text = stripped_dedent(method.help, sub_indent='  ')
+    instance = method()
+    parser = instance.create_parser("", self.cmd)  ##, usage=help_text)
+    usage = parser.usage or help_text
+    usage = cutprefix(cutprefix(usage, 'usage:'), 'Usage:').lstrip()
+    return usage
 
 class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   ''' A drop in class for `django.core.management.base.BaseCommand`
