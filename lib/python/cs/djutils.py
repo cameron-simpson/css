@@ -40,8 +40,8 @@ class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
     method = self.method
     if (isclass(method) and issubclass(method, DjangoBaseCommand)
         and not issubclass(method, CSBaseCommand)):
-      instance = trace(method())
-      return trace(instance)(argv)
+      instance = method()
+      return instance.run_from_argv([method.__module__, self.cmd] + argv)
     return super().__call__(argv)
 
 class BaseCommand(CSBaseCommand, DjangoBaseCommand):
