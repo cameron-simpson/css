@@ -1,1 +1,2 @@
+a function to prep the imports so that you can import Django modules directly, somehow hooking up whatever voodoo manage.py does
 DjangoSubCommand: work with pure Django BaseCommand classes
