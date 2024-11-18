@@ -601,10 +601,8 @@ class SubCommand:
               short=short,
               recurse=recurse,
               seen_subcommands=sub_seen_subcommands,
-          ) for subcmd, subcommand in sorted(subcommands.items()) if (
-              subcmd not in common_subcmds and
-              (show_subcmds is None or subcmd in show_subcmds)
-          )
+          ) for subcmd, subcommand in sorted(subcommands.items())
+          if subcmd in additional_subcommands
       ]
       if subusages or common_subcmds:
         subusage_listing = []
