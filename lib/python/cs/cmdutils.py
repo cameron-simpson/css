@@ -596,14 +596,17 @@ class SubCommand:
       sub_seen_subcommands.update(subcommands)
       common_subcmds = seen_subcommands.keys() & subcommands.keys()
       additional_subcommands = subcommands.keys() - common_subcmds
-      subusages = [
-          subcommand.usage_text(
-              short=short,
-              recurse=recurse,
-              seen_subcommands=sub_seen_subcommands,
-          ) for subcmd, subcommand in sorted(subcommands.items())
-          if subcmd in additional_subcommands
-      ]
+      subusages = []
+      for subcmd in sorted(show_subcmds):
+        if subcmd in additional_subcommands:
+          subcommand = subcommands[subcmd]
+          subusages.append(
+              subcommand.usage_text(
+                  short=short,
+                  recurse=recurse,
+                  seen_subcommands=sub_seen_subcommands,
+              )
+          )
       if subusages or common_subcmds:
         subusage_listing = []
         if common_subcmds:
