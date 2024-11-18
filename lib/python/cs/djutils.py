@@ -44,7 +44,6 @@ class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
         and not issubclass(method, CSBaseCommand)
     )
 
-  @trace
   @typechecked
   def __call__(self, argv: List[str]):
     ''' Run this `SubCommand` with `argv`.
@@ -64,7 +63,7 @@ class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
     method = self.method
     help_text = stripped_dedent(method.help, sub_indent='  ')
     instance = method()
-    parser = instance.create_parser("", self.cmd)  ##, usage=help_text)
+    parser = instance.create_parser("", self.cmd)
     usage = parser.usage or help_text
     usage = cutprefix(cutprefix(usage, 'usage:'), 'Usage:').lstrip()
     return usage
