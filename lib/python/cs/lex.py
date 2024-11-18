@@ -407,7 +407,7 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
-def stripped_dedent(s, post_indent=''):
+def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
@@ -420,7 +420,10 @@ def stripped_dedent(s, post_indent=''):
       The optional `post_indent` parameter may be used to indent
       the dedented text before return.
 
-      Example:
+      The optional `sub_indent` parameter may be used to indent
+      the second and following lines if the dedented text before return.
+
+      Examples:
 
           >>> def func(s):
           ...   """ Slightly smarter dedent which ignores a string's opening indent.
@@ -434,6 +437,18 @@ def stripped_dedent(s, post_indent=''):
           Slightly smarter dedent which ignores a string's opening indent.
           Strip the supplied string `s`. Pull off the leading line.
           Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, sub_indent='  '))
+          Slightly smarter dedent which ignores a string's opening indent.
+            Strip the supplied string `s`. Pull off the leading line.
+            Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, post_indent='  '))
+            Slightly smarter dedent which ignores a string's opening indent.
+            Strip the supplied string `s`. Pull off the leading line.
+            Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, post_indent='  ', sub_indent='| '))
+            Slightly smarter dedent which ignores a string's opening indent.
+            | Strip the supplied string `s`. Pull off the leading line.
+            | Dedent the rest. Put back the leading line.
   '''
   s = s.strip()
   lines = s.split('\n')
@@ -442,7 +457,7 @@ def stripped_dedent(s, post_indent=''):
   line1 = lines.pop(0)
   if not lines:
     return indent(line1, post_indent)
-  adjusted = dedent('\n'.join(lines))
+  adjusted = indent(dedent('\n'.join(lines)), sub_indent)
   return indent(line1 + '\n' + adjusted, post_indent)
 
 @require(lambda offset: offset >= 0)
