@@ -3,12 +3,15 @@
 ''' My collection of things for working with Django.
 '''
 
+from inspect import isclass
 import sys
+from typing import List
 
 from django.core.management.base import (
     BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
+from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand as CSBaseCommand
 
@@ -25,6 +28,21 @@ DISTINFO = {
         'django',
     ],
 }
+
+class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
+  '''
+  A subclass of `cs.cmdutils.SubCOmmand` with additional support
+  for Django's `BaseCommand`.
+  '''
+
+  @typechecked
+  def __call__(self, argv: List[str]):
+    method = self.method
+    if (isclass(method) and issubclass(method, DjangoBaseCommand)
+        and not issubclass(method, CSBaseCommand)):
+      instance = trace(method())
+      return trace(instance)(argv)
+    return super().__call__(argv)
 
 class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   ''' A drop in class for `django.core.management.base.BaseCommand`
@@ -104,6 +122,9 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
                   ... now consult options.x or whatever
                   ... argv is now the remaining arguments after the options
   '''
+
+  # use our Django specific subclass of CSBaseCommand.SubCommandClass
+  SubCommandClass = DjangoSpecificSubCommand
 
   @classmethod
   def run_from_argv(cls, argv):
