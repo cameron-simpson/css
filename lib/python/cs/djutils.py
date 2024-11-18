@@ -81,9 +81,9 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
               def cmd_that(self, argv):
                   ... do the "that" subcommand ...
 
-      If want some kind of app/client specific "overcommand" and
-      you have other management commands also based on this you can
-      import them and make them subcommands of the overcommand:
+      If want some kind of app/client specific "overcommand" composed
+      from other management commands you can import them and make
+      them subcommands of the overcommand:
 
           from .other_command import Command as OtherCommand
 
