@@ -9,7 +9,9 @@
 # leading step does work.
 #
 
-for ts in 2*.ts
+[ $# -gt 0 ] || set -- *.ts
+
+for ts
 do
   date
   ls -ld "$ts"

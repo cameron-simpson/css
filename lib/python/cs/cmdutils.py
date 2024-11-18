@@ -58,7 +58,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20241110-post'
+__version__ = '20241117-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -541,6 +541,7 @@ class SubCommand:
       show_common: bool = False,
       show_subcmds: Optional[Union[bool, str, List[str]]] = None,
       usage_mapping: Optional[Mapping] = None,
+      seen_subcommands: Optional[Mapping] = None,
   ) -> str:
     ''' Return the filled out usage text for this subcommand.
     '''
@@ -553,6 +554,8 @@ class SubCommand:
         show_subcmds = []
     elif isinstance(show_subcmds, str):
       show_subcmds = [show_subcmds]
+    if seen_subcommands is None:
+      seen_subcommands = {}
     usage_format = self.get_usage_format(show_common=show_common)  # pylint: disable=no-member
     if short and not show_common:
       # just the summary line and opening sentence of the description
@@ -588,25 +591,39 @@ class SubCommand:
       usage = usage_format.format_map(mapping)
     if recurse or show_subcmds:
       # include the (or some) subcmds
+      subcommands = self.get_subcommands()
+      sub_seen_subcommands = dict(seen_subcommands)
+      sub_seen_subcommands.update(subcommands)
+      common_subcmds = seen_subcommands.keys() & subcommands.keys()
+      additional_subcommands = subcommands.keys() - common_subcmds
       subusages = [
           subcommand.usage_text(
               short=short,
               recurse=recurse,
+              seen_subcommands=sub_seen_subcommands,
+          ) for subcmd, subcommand in sorted(subcommands.items()) if (
+              subcmd not in common_subcmds and
+              (show_subcmds is None or subcmd in show_subcmds)
           )
-          for subcmd, subcommand in sorted(self.get_subcommands().items())
-          if show_subcmds is None or subcmd in show_subcmds
       ]
-      if subusages:
-        subcmds_header = (
-            'Subcommands'
-            if show_subcmds is None or len(show_subcmds) > 1 else 'Subcommand'
-        )
-        if short:
-          subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
-        subusage_listing = "\n".join(
-            [f'{subcmds_header}:', *map(indent, subusages)]
-        )
-        usage = f'{usage}\n{indent(subusage_listing)}'
+      if subusages or common_subcmds:
+        subusage_listing = []
+        if common_subcmds:
+          subusage_listing.append(
+              f'Common subcommands: {", ".join(sorted(common_subcmds))}'
+          )
+        if subusages:
+          subcmds_header = (
+              'Subcommands' if show_subcmds is None or len(show_subcmds) > 1
+              else 'Subcommand'
+          )
+          if short:
+            subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
+          subusage_listing.extend(
+              [f'{subcmds_header}:', *map(indent, subusages)]
+          )
+        subusage = "\n".join(subusage_listing)
+        usage = f'{usage}\n{indent(subusage)}'
     return usage
 
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
@@ -1328,8 +1345,13 @@ class BaseCommand:
     return argv
 
   @classmethod
+  @typechecked
   def poparg(
-      cls, argv: List[str], *specs, unpop_on_error=False, opt_spec_class=None
+      cls,
+      argv: List[str],
+      *specs,
+      unpop_on_error: bool = False,
+      opt_spec_class=None
   ):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.

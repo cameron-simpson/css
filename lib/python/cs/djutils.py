@@ -76,7 +76,7 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
 
       Option parsing is inline in the command. `self` comes
       presupplied with a `.options` attribute which is an instance
-      of `cs.cmdutils.BaseCommand` (or some subclass).
+      of `cs.cmdutils.BaseCommandOptions` (or some subclass).
 
       Parsing options is simple:
 
@@ -84,18 +84,21 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
 
               def cmd_this(self, argv):
                   options = self.options
+                  # parsing options:
+                  #
+                  # boolean -x option, makes options.x
+                  #
+                  # --thing-limit n option taking an int
+                  # makes options.thing_limit
+                  # help text is "Thing limit."
+                  #
+                  # a --mode foo option taking a string
+                  # makes options.mode
+                  # help text is "The run mode."
                   options.popopts(
                       argv,
-                      # boolean -x option
-                      # makes options.x
                       x=None,
-                      # --thing-limit n option taking an int
-                      # makes options.thing_limit
-                      # help text is "Thing limit."
                       thing_limit_=int,
-                      # a --mode foo option taking a string
-                      # makes options.mode
-                      # help text is "The run mode"
                       mode_='The run mode.',
                   )
                   ... now consult options.x or whatever

@@ -1,4 +1,6 @@
 cs.cmdutils: generate zsh and bash autocompletion rules
+√ cs.cmdutils: cmd_foo=None to remove am inherited subcommand
+cs.cmdutils: help: suppress command subcommands?
 default: buglog in Python?
 default: use cs.psutils.prep_argv throughout cs.cmdutils d
 cs.cmdutils: shell: subcommand with no args - enter the subcommand mode even if there is a default subcommand, display usage on entry
