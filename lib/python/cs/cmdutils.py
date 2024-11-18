@@ -986,6 +986,7 @@ class BaseCommand:
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
   Options = BaseCommandOptions
+  SubCommandClass = SubCommand
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
@@ -1112,7 +1113,7 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = SubCommand(self, main)
+        self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
         if not argv:
@@ -1177,7 +1178,7 @@ class BaseCommand:
         method_keywords = getattr(method, 'USAGE_KEYWORDS', {})
         subusage_mapping.update(method_keywords)
         subusage_mapping.update(cmd=subcmd)
-        mapping[subcmd] = SubCommand(
+        mapping[subcmd] = self.SubCommandClass(
             self,
             method,
             cmd=subcmd,
@@ -1226,7 +1227,7 @@ class BaseCommand:
           named in `show_subcmds`; this is used to produce a shorter
           usage for subcommand usage failures
     '''
-    return SubCommand(
+    return self.SubCommandClass(
         self, method=type(self)
     ).usage_text(
         cmd=cmd,
