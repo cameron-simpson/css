@@ -1,3 +1,4 @@
+cs.cmdutils: usage_text: in short mode list just subcmd and the usage 1-liner tabulated d
 √ cs.cmdutils: cmd_foo=None to remove am inherited subcommand
 cs.cmdutils: help: suppress command subcommands?
 default: buglog in Python?
