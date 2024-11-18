@@ -596,16 +596,17 @@ class SubCommand:
       sub_seen_subcommands.update(subcommands)
       common_subcmds = seen_subcommands.keys() & subcommands.keys()
       additional_subcommands = subcommands.keys() - common_subcmds
-      subusages = [
-          subcommand.usage_text(
-              short=short,
-              recurse=recurse,
-              seen_subcommands=sub_seen_subcommands,
-          ) for subcmd, subcommand in sorted(subcommands.items()) if (
-              subcmd not in common_subcmds and
-              (show_subcmds is None or subcmd in show_subcmds)
+      subusages = []
+      for subcmd in sorted(show_subcmds):
+        if subcmd in additional_subcommands:
+          subcommand = subcommands[subcmd]
+          subusages.append(
+              subcommand.usage_text(
+                  short=short,
+                  recurse=recurse,
+                  seen_subcommands=sub_seen_subcommands,
+              )
           )
-      ]
       if subusages or common_subcmds:
         subusage_listing = []
         if common_subcmds:
@@ -981,9 +982,10 @@ class BaseCommand:
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
-  GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = 'info'
+  SubCommandClass = SubCommand
 
+  GETOPT_SPEC = ''
   Options = BaseCommandOptions
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
@@ -1111,7 +1113,7 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = SubCommand(self, main)
+        self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
         if not argv:
@@ -1176,7 +1178,7 @@ class BaseCommand:
         method_keywords = getattr(method, 'USAGE_KEYWORDS', {})
         subusage_mapping.update(method_keywords)
         subusage_mapping.update(cmd=subcmd)
-        mapping[subcmd] = SubCommand(
+        mapping[subcmd] = self.SubCommandClass(
             self,
             method,
             cmd=subcmd,
@@ -1225,7 +1227,7 @@ class BaseCommand:
           named in `show_subcmds`; this is used to produce a shorter
           usage for subcommand usage failures
     '''
-    return SubCommand(
+    return self.SubCommandClass(
         self, method=type(self)
     ).usage_text(
         cmd=cmd,
