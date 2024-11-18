@@ -982,11 +982,11 @@ class BaseCommand:
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
-  GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = 'info'
-
-  Options = BaseCommandOptions
   SubCommandClass = SubCommand
+
+  GETOPT_SPEC = ''
+  Options = BaseCommandOptions
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
