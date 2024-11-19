@@ -18,10 +18,11 @@ try:
   from functools import cache  # 3.9 onward
 except ImportError:
   from functools import lru_cache
-
-  def cache(func):
-    '''Replacement `@cache` decorator.'''
-    return lru_cache(maxsize=None)(func)
+  cache = lru_cache(maxsize=None)
+try:
+  from functools import cached_property  # 3.8 onward
+except ImportError:
+  cached_property = lambda func: property(cache(func))
 
 from getopt import getopt, GetoptError
 from inspect import isclass
@@ -141,7 +142,7 @@ class OptionSpec:
   # the argument usage name or None
   # eg "username"
   arg_name: Optional[str] = None
-  # value to use if treated as a Boolean (not self.needs_arg)
+  # value to use if treated as a Boolean (== not self.needs_arg)
   arg_bool: Optional[bool] = True
   # the name of the options field/attribute
   field_name: Optional[str] = None
@@ -431,8 +432,10 @@ class SubCommand:
       return pfx_call(method, argv, **updates).run()
     return method(argv)
 
-  def default_usage(self):
-    ''' Return `'{cmd} [options...]'` or `'{cmd} subcommand [options...]'`.
+  @cached_property
+  def usage_default(self):
+    ''' The fallback usage line if nothing specified:
+        `'{cmd} [options...]'` or `'{cmd} subcommand [options...]'`.
     '''
     if isclass(self.method):
       has_subcommands_test = getattr(
@@ -447,15 +450,37 @@ class SubCommand:
         if has_subcommands_test() else '{cmd} [options...]'
     )
 
-  def get_usage_format(self, show_common=False) -> str:
-    ''' Return the usage format string for this subcommand.
+  @cached_property
+  def usage_commonopts_format(self):
+    ''' The `Common options:` format string paragraph
+        or `None` if there are no common options.
+    '''
+    common_opts = self.command.options.COMMON_OPT_SPECS
+    if not common_opts:
+      return None
+    _, _, getopt_spec_map = self.command.Options.getopt_spec_map(common_opts)
+    return "Common options:\n" + indent(
+        "\n".join(
+            tabulate(
+                *(
+                    (opt_spec.option_terse(), opt_spec.help_text)
+                    for _, opt_spec in sorted(
+                        getopt_spec_map.items(),
+                        key=lambda kv: kv[0].lstrip('-').lower()
+                    )
+                ),
+                sep='  ',
+            )
+        )
+    )
+
+  @cached_property
+  def usage_format(self) -> str:
+    ''' The usage format string for this subcommand.
         *Note*: no leading "Usage:" prefix.
 
-        This first tries `self.method.USAGE_FORMAT`, falling back
-        to deriving it from `obj_docstring(self.method)`.
-        Usually a subcommand which is another `BaseCommand` instance
-        will have a `.USAGE_FORMAT` attribute and a subcommand which
-        is a method will derive the usage from its docstring.
+        This first tries the legacy `self.method.USAGE_FORMAT`,
+        falling back to deriving it from `obj_docstring(self.method)`.
 
         When deriving from the docstring we look for a paragraph
         commencing with the string `Usage:` and otherwise fall back
@@ -467,12 +492,12 @@ class SubCommand:
       usage_format = method.USAGE_FORMAT
     except AttributeError:
       # the preferred way
-      # derive from the docstring or from self.default_usage()
+      # derive from the docstring or from self.usage_default
       doc = obj_docstring(method)
       usage_format, doc = extract_usage_from_doc(doc)
       if not usage_format:
         # No "Usage:" paragraph - use default usage line and first paragraph.
-        usage_format = self.default_usage()
+        usage_format = self.usage_default
         paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
         if paragraph1:
           usage_format += "\n" + indent(paragraph1)
@@ -482,29 +507,18 @@ class SubCommand:
       usage_format = indent(
           stripped_dedent(cutprefix(usage_format.lstrip(), 'Usage:'))
       ).lstrip()
-    command_options = self.command.options
+    return usage_format
+
+  def get_usage_format(self, show_common=False) -> str:
+    ''' Return the usage format string for this subcommand.
+        *Note*: no leading "Usage:" prefix.
+        If `show_common` is true, include the `Common options:` paragraph.
+    '''
+    usage_format = self.usage_format
     if show_common:
-      common_opts = command_options.COMMON_OPT_SPECS
-      if common_opts:
-        _, _, getopt_spec_map = self.command.Options.getopt_spec_map(
-            common_opts
-        )
-        usage_format += "\n" + indent(
-            "Common options:\n" + indent(
-                "\n".join(
-                    tabulate(
-                        *(
-                            (opt_spec.option_terse(), opt_spec.help_text)
-                            for _, opt_spec in sorted(
-                                getopt_spec_map.items(),
-                                key=lambda kv: kv[0].lstrip('-').lower()
-                            )
-                        ),
-                        sep='  ',
-                    )
-                )
-            )
-        )
+      copts_format = self.usage_commonopts_format
+      if copts_format:
+        usage_format += "\n" + indent(copts_format)
     return usage_format
 
   def get_usage_keywords(self):
