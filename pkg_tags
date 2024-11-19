@@ -51,7 +51,7 @@ cs.deco pypi.release="20241109" ok_revision="32a5b3aa0b42d90cf4a3bf279e34dc784a3
 cs.dedrm
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.distinfo
-cs.djutils ok_revision="1a4d40164e2a6fe60f2e91f01463dee4f9581eac" features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"]} pypi.release="20241111"
+cs.djutils ok_revision="1a4d40164e2a6fe60f2e91f01463dee4f9581eac" features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"]} pypi.release="20241119"
 cs.dockerutils ok_revision=f846ece6e9f9353b443df14f81512ae6438681e6 pypi.release="20240519" features={"20240305":["DockerRun__network"]}
 cs.ebooks ok_revision="3379fcbf1eb008df3cd38e9afd40f1d0db9afbd4" pypi.release="20241007" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
