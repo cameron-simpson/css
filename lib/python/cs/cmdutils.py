@@ -35,6 +35,7 @@ except ImportError:
 import shlex
 from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 import sys
+from textwrap import dedent
 from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 
 from typeguard import typechecked
@@ -508,6 +509,31 @@ class SubCommand:
           stripped_dedent(cutprefix(usage_format.lstrip(), 'Usage:'))
       ).lstrip()
     return usage_format
+
+  @cached_property
+  def usage_format_parts(
+      self
+  ) -> Tuple[str, Union[str | None], Union[str | None]]:
+    ''' The usage description format string brokoen into:
+        - the usage line (or lines if slosh extended)
+        - the first line of the description, or `None`
+        - the trailing lines of the description, or `None`
+    '''
+    lines = self.usage_format.split('\n')
+    usage_lines = [lines.pop(0)]
+    while usage_lines[-1].endswith('\\'):
+      usage_lines.append(lines.pop(0))
+    return (
+        "\n".join(usage_lines),
+        lines.pop(0).lstrip() if lines and lines[0].endswith('.') else None,
+        dedent("\n".join(lines)) if lines else None,
+    )
+
+  @cached_property
+  def usage_format_usage(self) -> str:
+    ''' The usage line(s) part of the format string.
+    '''
+    return self.usage_format_parts[0]
 
   def get_usage_format(self, show_common=False) -> str:
     ''' Return the usage format string for this subcommand.
