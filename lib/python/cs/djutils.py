@@ -26,7 +26,9 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils',
+        'cs.lex',
         'django',
+        'typeguard',
     ],
 }
 
