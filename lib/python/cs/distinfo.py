@@ -834,7 +834,7 @@ class Module:
       # we will be consuming the dict so make a copy of the presupplied mapping
       dinfo = dict(dinfo)
     projspec = dict(
-        name=dinfo.pop('name'),
+        name=dinfo.pop('name').replace('.', '-'),
         description=dinfo.pop('description'),
         authors=[
             dict(name=dinfo.pop('author'), email=dinfo.pop('author_email'))
@@ -1343,7 +1343,9 @@ class Module:
           if true, do not prepare the package metadata files and
           the distribution files
     '''
-    release_dirpath = vcs_revision + '--' + datetime.now().isoformat()
+    path_name, path_version = vcs_revision.split('-')
+    path_name = path_name.replace('.', '_')
+    release_dirpath = f'{path_name}-{path_version}--{datetime.now().isoformat()}'
     try:
       dist_rpaths = self.prepare_release_dir(
           release_dirpath, self, vcs, vcs_revision, bare=bare
@@ -1441,8 +1443,10 @@ class Module:
   def prepare_dist(self, pkg_dir, vcs_version):
     ''' Run "python3 -m build ." inside `pkg_dir`, making files in `dist/`.
     '''
-    sdist_rpath = f'dist/{vcs_version}.tar.gz'
-    wheel_rpath = f'dist/{vcs_version}-py3-none-any.whl'
+    path_name, path_version = vcs_version.split('-')
+    path_name = path_name.replace('.', '_')
+    sdist_rpath = f'dist/{path_name}-{path_version}.tar.gz'
+    wheel_rpath = f'dist/{path_name}-{path_version}-py3-none-any.whl'
     cd_run(
         pkg_dir,
         ('python3', '-m', 'build'),
