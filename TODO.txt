@@ -1,3 +1,4 @@
+cs.cmdutils: support opt=!field' for an inverted boolean option
 cs.cmdutils: usage_text: in short mode list just subcmd and the usage 1-liner tabulated d
 cs.cmdutils: generate zsh and bash autocompletion rules
 √ cs.cmdutils: cmd_foo=None to remove am inherited subcommand
