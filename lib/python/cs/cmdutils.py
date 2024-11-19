@@ -629,37 +629,19 @@ class SubCommand:
       show_subcmds = [show_subcmds]
     if seen_subcommands is None:
       seen_subcommands = {}
-    usage_format = self.get_usage_format(show_common=show_common)  # pylint: disable=no-member
-    if short and not show_common:
-      # just the summary line and opening sentence of the description
-      lines = usage_format.split('\n')
-      usage_lines = [lines.pop(0)]
-      while usage_lines[-1].endswith('\\'):
-        usage_lines.append(lines.pop(0))
-      if lines and lines[0].endswith('.'):
-        usage_lines.append(lines.pop(0))
-      usage_format = '\n'.join(usage_lines)
-    # elaborate search path for symbols in the usage format string
-    # TODO: should this _be_ get_usage_keywords? pretty verbose
-    format_cmd = cmd or self.get_cmd().replace('_', '-')
-    if self.command.options.COMMON_OPT_SPECS:
-      format_cmd += ' [common-options...]'
-    mapping = ChainMap(
-        # normalised cmd name
-        {'cmd': format_cmd},
-        # supplied usage_mapping, if any
-        usage_mapping or {},
-        # direct .usage_mapping attribute
-        self.usage_mapping or {},
-        # usage mapping via the method
-        self.get_usage_keywords(),
-        # the names in the command
-        self.command.__dict__,
-        # ... and its class
-        self.command.__class__.__dict__,
-        # ... and its module's top level
-        sys.modules[self.command.__module__].__dict__,
-    )
+    if short:
+      usage_line, desc1, _ = self.usage_format_parts
+      usage_format = usage_line
+      if desc1:
+        usage_format += '\n' + indent(desc1)
+    else:
+      usage_format = self.usage_format
+    if show_common:
+      copts_format = self.usage_commonopts_format
+      if copts_format:
+        usage_format += "\n" + indent(copts_format)
+    # the elaborate search path for symbols in the usage format string
+    mapping = self.get_usage_keywords(cmd=cmd, usage_mapping=usage_mapping)
     with Pfx("format %r using %r", usage_format, mapping):
       usage = usage_format.format_map(mapping)
     if recurse or show_subcmds:
@@ -683,9 +665,7 @@ class SubCommand:
       if subusages or common_subcmds:
         subusage_listing = []
         if common_subcmds:
-          subusage_listing.append(
-              f'Common subcommands: {", ".join(sorted(common_subcmds))}'
-          )
+          common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
         if subusages:
           subcmds_header = (
               'Subcommands' if show_subcmds is None or len(show_subcmds) > 1
@@ -693,9 +673,13 @@ class SubCommand:
           )
           if short:
             subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
-          subusage_listing.extend(
-              [f'{subcmds_header}:', *map(indent, subusages)]
-          )
+          subusage_listing.append(f'{subcmds_header}:')
+          if common_subcmds:
+            subusage_listing.append(indent(common_subcmds_line))
+          subusage_listing.extend(map(indent, subusages))
+        else:
+          if common_subcmds:
+            subusage_listing.append(common_subcmds_line)
         subusage = "\n".join(subusage_listing)
         usage = f'{usage}\n{indent(subusage)}'
     return usage
