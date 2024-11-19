@@ -547,12 +547,45 @@ class SubCommand:
         usage_format += "\n" + indent(copts_format)
     return usage_format
 
-  def get_usage_keywords(self):
+  def get_usage_keywords(
+      self,
+      *,
+      cmd: Optional[str] = None,
+      usage_mapping: Optional[Mapping] = None,
+  ) -> str:
     ''' Return a mapping to be used when formatting the usage format string.
+
+        This is an elaborate `ChainMap` of:
+        - the optional `cmd` or `self.get_cmd()`
+        - the optional `usage_mapping`
+        - `self.usage_mapping`
+        - `self.method.USAGE_KEYWORDS` if present
+        - the attributes of `self.command`
+        - the attributes of `type(self.command)`
+        - the attributes of the module for `type(self.command)`
     '''
     # TODO maybe this should return the ChainMap used in usage_text
-    usage_mapping = dict(getattr(self.method, 'USAGE_KEYWORDS', {}))
-    return usage_mapping
+    # elaborate search path for symbols in the usage format string
+    # TODO: should this _be_ get_usage_keywords? pretty verbose
+    format_cmd = cmd or self.get_cmd().replace('_', '-')
+    if self.command.options.COMMON_OPT_SPECS:
+      format_cmd += ' [common-options...]'
+    return ChainMap(
+        # normalised cmd name
+        {'cmd': format_cmd},
+        # supplied usage_mapping, if any
+        usage_mapping or {},
+        # direct .usage_mapping attribute
+        self.usage_mapping or {},
+        # usage mapping via the method
+        dict(getattr(self.method, 'USAGE_KEYWORDS', {})),
+        # the names in the command
+        self.command.__dict__,
+        # ... and its class
+        self.command.__class__.__dict__,
+        # ... and its module's top level
+        sys.modules[self.command.__module__].__dict__,
+    )
 
   def get_subcommands(self):
     ''' Return `self.method`'s mapping of subcommand name to `SubCommand`.
