@@ -16,7 +16,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand as CSBaseCommand
 from cs.lex import cutprefix, stripped_dedent
 
-__version__ = '20241119'
+__version__ = '20241119-post'
 
 DISTINFO = {
     'keywords': ["python3"],
