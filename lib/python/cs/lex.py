@@ -51,6 +51,7 @@ DISTINFO = {
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
+        "Topic :: Text Processing",
     ],
     'install_requires': [
         'cs.dateutils',
