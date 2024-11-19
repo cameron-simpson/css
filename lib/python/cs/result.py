@@ -67,7 +67,7 @@ from cs.py.func import funcname, func_a_kw_fmt
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20240630-post'
+__version__ = '20241119'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
