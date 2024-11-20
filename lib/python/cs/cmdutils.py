@@ -703,8 +703,6 @@ class SubCommand:
               'Subcommands' if show_subcmds is None or len(show_subcmds) > 1
               else 'Subcommand'
           )
-          if short:
-            subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
           subusage_listing.append(f'{subcmds_header}:')
           if common_subcmds:
             subusage_listing.append(indent(common_subcmds_line))
