@@ -1689,37 +1689,43 @@ class BaseCommand:
       pass
 
   def cmd_help(self, argv):
-    ''' Usage: {cmd} [-l] [subcommand-names...]
+    ''' Usage: {cmd} [-l] [-s] [subcommand-names...]
           Print help for subcommands.
           This outputs the full help for the named subcommands,
           or the short help for all subcommands if no names are specified.
-          -l  Long help even if no subcommand-names provided.
+          -l  Long help.
+          -s  Short help.
     '''
-    if argv and argv[0] == '-l':
-      argv.pop(0)
-      short = False
-    elif argv:
-      short = False
+    options = self.options
+    if argv and argv[0].startswith('-'):
+      options.popopts(
+          argv,
+          l=('-short', 'Long listing.'),
+          s=('short', 'Short listing.'),
+      )
+      short = options.short
     else:
-      short = True
-    subcmds = self.subcommands()
-    argv = argv or sorted(subcmds)
+      short = not argv
+    all_subcmds = self.subcommands()
+    subcmds = argv or sorted(all_subcmds)
     unknown = False
     show_subcmds = []
-    for subcmd in argv:
+    for subcmd in subcmds:
       if subcmd in subcmds:
         show_subcmds.append(subcmd)
       else:
         warning("unknown subcommand %r", subcmd)
         unknown = True
     if unknown:
-      warning("I know: %s", ', '.join(sorted(subcmds.keys())))
+      warning("I know: %s", ', '.join(sorted(all_subcmds)))
     if short:
       print("Longer help with the -l option.")
     print(
         "Usage:",
         self.usage_text(
-            short=short, show_common=True, show_subcmds=show_subcmds or None
+            short=short,
+            show_common=not short,
+            show_subcmds=show_subcmds or None
         )
     )
 
