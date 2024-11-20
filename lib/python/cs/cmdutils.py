@@ -672,17 +672,28 @@ class SubCommand:
       sub_seen_subcommands.update(subcommands)
       common_subcmds = seen_subcommands.keys() & subcommands.keys()
       additional_subcommands = subcommands.keys() - common_subcmds
-      subusages = []
-      for subcmd in sorted(show_subcmds):
-        if subcmd in additional_subcommands:
-          subcommand = subcommands[subcmd]
-          subusages.append(
-              subcommand.usage_text(
-                  short=short,
-                  recurse=recurse,
-                  seen_subcommands=sub_seen_subcommands,
-              )
-          )
+      if short and not recurse:
+        rows = [
+            [
+                subcmd, subcommand.usage_format_desc1
+                or f'{subcmd.title()} subcommand.'
+            ]
+            for subcmd, subcommand in sorted(subcommands.items())
+            if subcmd in show_subcmds
+        ]
+        subusages = list(tabulate(*rows))
+      else:
+        subusages = []
+        for subcmd in sorted(show_subcmds):
+          if subcmd in additional_subcommands:
+            subcommand = subcommands[subcmd]
+            subusages.append(
+                subcommand.usage_text(
+                    short=short,
+                    recurse=recurse,
+                    seen_subcommands=sub_seen_subcommands,
+                )
+            )
       if subusages or common_subcmds:
         subusage_listing = []
         if common_subcmds:
