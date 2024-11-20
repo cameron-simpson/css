@@ -550,6 +550,12 @@ class SubCommand:
     '''
     return self.usage_format_parts[0]
 
+  @cached_property
+  def usage_format_desc1(self) -> str:
+    ''' The usage line(s) part of the format string.
+    '''
+    return self.usage_format_parts[1]
+
   def get_usage_format(self, show_common=False) -> str:
     ''' Return the usage format string for this subcommand.
         *Note*: no leading "Usage:" prefix.
