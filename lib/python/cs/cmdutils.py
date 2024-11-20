@@ -1069,7 +1069,7 @@ class BaseCommand:
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
-  SUBCOMMAND_ARGV_DEFAULT = 'info'
+  SUBCOMMAND_ARGV_DEFAULT = None
   SubCommandClass = SubCommand
 
   GETOPT_SPEC = ''
@@ -1206,10 +1206,11 @@ class BaseCommand:
         if not argv:
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
-            raise GetoptError(
-                "missing subcommand, expected one of: %s" %
-                (', '.join(sorted(subcmds.keys())),)
+            warning(
+                "missing subcommand, expected one of: %s",
+                ', '.join(sorted(subcmds.keys()))
             )
+            default_argv = ['help', '-s']
           argv = (
               [default_argv]
               if isinstance(default_argv, str) else list(default_argv)
