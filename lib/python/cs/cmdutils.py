@@ -143,10 +143,10 @@ class OptionSpec:
   # the argument usage name or None
   # eg "username"
   arg_name: Optional[str] = None
-  # value to use if treated as a Boolean (== not self.needs_arg)
-  arg_bool: Optional[bool] = True
   # the name of the options field/attribute
   field_name: Optional[str] = None
+  # the initial value of the option
+  field_default: Optional[Any] = None
   # the help text
   help_text: Optional[str] = None
   # optional callable to convert the argument to the value
@@ -215,7 +215,7 @@ class OptionSpec:
       opt_k = opt_k[:-1]
     opt_name = opt_k.replace('_', '-')
     field_name = opt_k.replace('-', '_')
-    arg_bool = True
+    field_default = None
     help_text = None
     parse = None
     validate = None
@@ -245,7 +245,12 @@ class OptionSpec:
     elif (isinstance(spec0, str) and spec0.startswith('-')
           and is_identifier(spec0[1:])):
       field_name = spec0[1:]
-      arg_bool = False  # default is True
+      if needs_arg:
+        raise ValueError(
+            f'field name {field_name!r} expects an aegument'
+            ': inverted options only make sense for Boolean options'
+        )
+      field_default = True
       spec0 = specs.pop(0) if specs else None
     # optional help text
     if isinstance(spec0, str):
@@ -269,11 +274,21 @@ class OptionSpec:
       spec0 = specs.pop(0) if specs else None
     if spec0 is not None:
       raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
+    if not needs_arg:
+      # sanity check Boolean option
+      if field_default is None:
+        field_default = False
+      elif not isinstance(field_default, bool):
+        raise ValueError(
+            f'non-Booolean specified for the field default: {r(field_default)}'
+        )
+    if field_default is None and not needs_arg:
+      field_default = False
     self = cls(
         opt_name=opt_name,
         arg_name=(field_name.replace('_', '-') if needs_arg else None),
-        arg_bool=arg_bool,
         field_name=field_name,
+        field_default=field_default,
         help_text=help_text,
         parse=parse,
         validate=validate,
@@ -931,7 +946,7 @@ class BaseCommandOptions(HasThreadState):
     for opt_spec in getopt_spec_map.values():
       field_name = opt_spec.field_name
       if not hasattr(self, field_name):
-        setattr(self, field_name, False if opt_spec.arg_bool else None)
+        setattr(self, field_name, opt_spec.field_default)
     opts, argv[:] = getopt(argv, shortopts, longopts)
     for opt, val in opts:
       with Pfx(opt):
@@ -940,7 +955,7 @@ class BaseCommandOptions(HasThreadState):
           with Pfx("%r", val):
             value = opt_spec.parse_value(val)
         else:
-          value = opt_spec.arg_bool
+          value = not opt_spec.field_default
         setattr(self, opt_spec.field_name, value)
 
 class BaseCommand:
