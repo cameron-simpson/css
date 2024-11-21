@@ -619,6 +619,12 @@ class SubCommand:
       return {}
     return get_subcommands()
 
+  @property
+  def has_subcommands(self):
+    ''' Whether this `SubCommand`'s `.method` has subcommands.
+    '''
+    return bool(self.get_subcommands())
+
   def get_subcmds(self):
     ''' Return the names of `self.method`'s subcommands in lexical order.
     '''
