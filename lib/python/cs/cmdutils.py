@@ -1321,42 +1321,19 @@ class BaseCommand:
 
   def usage_text(
       self,
-      *,
-      cmd=None,
-      short=False,
-      show_common=False,
-      show_subcmds=None,
+      **subcommand_kw,
   ):
-    ''' Compute the "Usage:" message for this class
-        from the top level `USAGE_FORMAT`
-        and the `'Usage:'`-containing docstrings of its `cmd_*` methods.
-
-        Parameters:
-        * `cmd`: optional command name, default derived from the subcommand
-        * `short`: default `False`; if true then just provide the opening sentence
-        * `show_common`: show the `COMMON_OPT_SPECS` usage, default `False`
-        * `show_subcmds`: constrain the usage to particular subcommands
-          named in `show_subcmds`; this is used to produce a shorter
-          usage for subcommand usage failures
+    ''' Compute the "Usage:" message for this class.
+        Parameters are as for `SubCommand.usage_text`.
     '''
     return self.SubCommandClass(
         self, method=type(self)
-    ).usage_text(
-        cmd=cmd,
-        short=short,
-        show_common=show_common,
-        show_subcmds=show_subcmds
-    )
+    ).usage_text(**subcommand_kw)
 
   def subcommand_usage_text(
       self, subcmd, usage_format_mapping=None, short=False
   ):
     ''' Return the usage text for a subcommand.
-
-        Parameters:
-        * `subcmd`: the subcommand name
-        * `short`: just include the first line of the usage message,
-          intented for when there are many subcommands
     '''
     method = self.subcommands()[subcmd].method
     subusage = None
