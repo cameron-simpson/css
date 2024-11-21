@@ -485,7 +485,6 @@ class SubCommand:
                         key=lambda kv: kv[0].lstrip('-').lower()
                     )
                 ),
-                sep='  ',
             )
         )
     )
