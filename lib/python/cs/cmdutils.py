@@ -1703,11 +1703,14 @@ class BaseCommand:
       options.popopts(
           argv,
           l=('-short', 'Long listing.'),
+          r=('recurse', 'Recurse into subcommands.'),
           s=('short', 'Short listing.'),
       )
+      recurse = options.recurse
       short = options.short
     else:
       short = not argv
+      recurse = False
     all_subcmds = self.subcommands()
     subcmds = argv or sorted(all_subcmds)
     unknown = False
@@ -1726,6 +1729,7 @@ class BaseCommand:
         "Usage:",
         self.usage_text(
             short=short,
+            recurse=recurse,
             show_common=not short,
             show_subcmds=show_subcmds or None
         )
