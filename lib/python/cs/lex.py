@@ -1366,7 +1366,7 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
       remotepath = suffix
   return ssh_target, remotepath
 
-def tabulate(*rows, sep=' '):
+def tabulate(*rows, sep='  '):
   ''' A generator yielding lines of values from `rows` aligned in columns.
   '''
   col_widths = [
