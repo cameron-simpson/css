@@ -1707,6 +1707,7 @@ class BaseCommand:
           This outputs the full help for the named subcommands,
           or the short help for all subcommands if no names are specified.
           -l  Long help.
+          -r  Recurse into subcommands.
           -s  Short help.
     '''
     options = self.options
@@ -1736,6 +1737,8 @@ class BaseCommand:
       warning("I know: %s", ', '.join(sorted(all_subcmds)))
     if short:
       print("Longer help with the -l option.")
+    if not recurse:
+      print("Recursive help with the -r option.")
     print(
         "Usage:",
         self.usage_text(
