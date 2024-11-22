@@ -105,7 +105,7 @@ cs.progress pypi.release="20241122" ok_revision="8e98a9a461a915cb3c1478ba94254bc
 cs.psutils pypi.release="20241122" ok_revision="49d7aa9d23656f8d7a17b07600549a6009e13ba1" features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"]}
 cs.py.doc pypi.release="20241007" ok_revision=a639a998cb404958be0e1e6860d39dc1a3dc616c
 cs.py.func pypi.release="20240630" ok_revision="0dd7f10b229df7807892a255ae6983d2136b819e" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
-cs.py.modules pypi.release="20240630" ok_revision="3ba357635de7e8c2931ffa68e60408a9b9af34ed" features={"20220606":["import_extra"]}
+cs.py.modules pypi.release="20240630" ok_revision="494204872267e1baa6abbc034af40932ae28a095" features={"20220606":["import_extra"]}
 cs.py.stack pypi.release="20240630" ok_revision="3f7db25a6e686983598ec71936a9c1e8995ba543" features={"20240412":["stack_dump__select"]}
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
 cs.pystack
