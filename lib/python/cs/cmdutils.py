@@ -636,7 +636,7 @@ class SubCommand:
     subcommands = self.get_subcommands()
     rows = [
         [
-            subcmd,
+            subcmd.replace('_', '-'),
             (
                 subcommands[subcmd].usage_format_desc1
                 or f'{subcmd.title()} subcommand.'
