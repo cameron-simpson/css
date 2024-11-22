@@ -1589,7 +1589,7 @@ class BaseCommand:
           self.cmd,
           options,
           e,
-          self.usage_text(cmd=self.cmd),
+          self.usage_text(cmd=self.cmd, short=False),
       ):
         return 2
       raise
