@@ -630,6 +630,21 @@ class SubCommand:
     '''
     return sorted(self.get_subcommands().keys())
 
+  def short_subusages(self, subcmds: List[str]):
+    ''' Return a list of tabulated one line subcommand summaries.
+    '''
+    subcommands = self.get_subcommands()
+    rows = [
+        [
+            subcmd,
+            (
+                subcommands[subcmd].usage_format_desc1
+                or f'{subcmd.title()} subcommand.'
+            )
+        ] for subcmd in subcmds
+    ]
+    return list(tabulate(*rows))
+
   @typechecked
   def usage_text(
       self,
