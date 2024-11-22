@@ -58,7 +58,7 @@ cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0
 cs.env pypi.release="20230407" ok_revision=bd184cdf4bd71eaa2bb8f98b30a735ec582d9abc
 cs.excutils pypi.release="20240630" ok_revision="467f248b10aa6109713d48374153093ac3c743f1"
 cs.export
-cs.ffmpegutils ok_revision="67dd2032154d8a0aeb4d80e51edecf6198ecc95d" pypi.release="20240519"
+cs.ffmpegutils ok_revision="67dd2032154d8a0aeb4d80e51edecf6198ecc95d" pypi.release="20240519" features={"20241122":["FFMPEG_DOCKER_IMAGE"]}
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20241122" ok_revision=ea280db018c8a06481cab25bd1939c9d3b36e716 features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"],"20241122":["atomic_copy2"]}
 cs.fs ok_revision="222f108051ad1872174253eee1148b62bf59fd6a" pypi.release="20241122" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"],"20240422":["scandirpaths","scandirtree"]}
