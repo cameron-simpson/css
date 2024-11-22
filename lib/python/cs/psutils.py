@@ -25,7 +25,7 @@ from cs.deco import fmtdoc, uses_doit, uses_quiet
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
-__version__ = '20240316-post'
+__version__ = '20241122'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
