@@ -661,15 +661,24 @@ class SubCommand:
     '''
     if show_subcmds is None:
       show_subcmds = True
-    if isinstance(show_subcmds, bool):
-      if show_subcmds:
-        show_subcmds = self.get_subcmds()
-      else:
-        show_subcmds = []
-    elif isinstance(show_subcmds, str):
-      show_subcmds = [show_subcmds]
     if seen_subcommands is None:
       seen_subcommands = {}
+    subcommands = self.get_subcommands()
+    if show_subcmds:
+      # compute those already seen and those new
+      common_subcmds = subcommands.keys() & seen_subcommands.keys()
+      additional_subcommands = subcommands.keys() - common_subcmds
+      # turn show_subcmds into the list of subcommand names to show in the usage
+      if isinstance(show_subcmds, bool):
+        # all the subcommands winnowed by the sub_seen_subcommands
+        assert show_subcmds is True
+        show_subcmds = sorted(additional_subcommands)
+      elif isinstance(show_subcmds, str):
+        # show a single subcommand
+        show_subcmds = [show_subcmds]
+      # the seen_subcommands for our subcommands
+      sub_seen_subcommands = dict(seen_subcommands)
+      sub_seen_subcommands.update(subcommands)
     if short:
       usage_line, desc1, _ = self.usage_format_parts
       usage_format = usage_line
@@ -685,72 +694,59 @@ class SubCommand:
     mapping = self.get_usage_keywords(cmd=cmd, usage_mapping=usage_mapping)
     with Pfx("format %r using %r", usage_format, mapping):
       usage = usage_format.format_map(mapping)
-    if recurse or show_subcmds:
-      # include the (or some) subcmds
-      subcommands = self.get_subcommands()
-      sub_seen_subcommands = dict(seen_subcommands)
-      sub_seen_subcommands.update(subcommands)
-      common_subcmds = seen_subcommands.keys() & subcommands.keys()
-      additional_subcommands = subcommands.keys() - common_subcmds
-      if short:
-        sorted_subitems = sorted(
-            (subcmd, subcommand)
-            for subcmd, subcommand in subcommands.items()
-            if subcmd in show_subcmds and subcmd in additional_subcommands
-        )
-        rows = [
-            [
-                subcmd, subcommand.usage_format_desc1
-                or f'{subcmd.title()} subcommand.'
-            ] for subcmd, subcommand in sorted_subitems
-        ]
-        subusages = list(tabulate(*rows))
-        if recurse:
-          rsubusages = []
-          for (subcmd, subcommand), subusage in zip(sorted_subitems,
-                                                    subusages):
-            rsubusages.append(subusage)
-            print(subusage)
-            print(s(subcommand))
-            if subcommand.has_subcommands:
-              subusage_detail = subcommand.usage_text(
-                  short=short,
+    if short:
+      # the terse one subcommand-per-line listing
+      subusages = self.short_subusages(show_subcmds)
+      if recurse:
+        rsubusages = []
+        for subcmd, subusage in zip(show_subcmds, subusages):
+          rsubusages.append(subusage)
+          subcommand = subcommands[subcmd]
+          if subcommand.has_subcommands:
+            subusage_detail = "\n".join(
+                subcommand.short_subusages(
+                    sorted(
+                        subcommand.get_subcommands().keys() -
+                        sub_seen_subcommands.keys()
+                    )
+                )
+            )
+            rsubusages.extend(indent(subusage_detail).split("\n"))
+        subusages = rsubusages
+    else:
+      # the longer descriptions
+      subusages = []
+      for subcmd in show_subcmds:
+        subcommand = subcommands[subcmd]
+        if True:  ##recurse:
+          # recursive long listing
+          subusages.append(
+              subcommand.usage_text(
+                  short=not recurse,
                   recurse=recurse,
                   seen_subcommands=sub_seen_subcommands,
               )
-              print(subusage_detail)
-              rsubusages.extend(indent(subusage_detail).split("\n"))
-          subusages = rsubusages
-      else:
-        subusages = []
-        for subcmd in sorted(show_subcmds):
-          if subcmd in additional_subcommands:
-            subcommand = subcommands[subcmd]
-            subusages.append(
-                subcommand.usage_text(
-                    short=short,
-                    recurse=recurse,
-                    seen_subcommands=sub_seen_subcommands,
-                )
-            )
-      if subusages or common_subcmds:
-        subusage_listing = []
-        if common_subcmds:
-          common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
-        if subusages:
-          subcmds_header = (
-              'Subcommands' if show_subcmds is None or len(show_subcmds) > 1
-              else 'Subcommand'
           )
-          subusage_listing.append(f'{subcmds_header}:')
-          if common_subcmds:
-            subusage_listing.append(indent(common_subcmds_line))
-          subusage_listing.extend(map(indent, subusages))
         else:
-          if common_subcmds:
-            subusage_listing.append(common_subcmds_line)
-        subusage = "\n".join(subusage_listing)
-        usage = f'{usage}\n{indent(subusage)}'
+          subusages.extend(self.short_subusages(show_subcmds))
+    subusage_listing = []
+    if common_subcmds:
+      common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
+    if subusages:
+      subcmds_header = (
+          'Subcommands'
+          if show_subcmds is None or len(show_subcmds) > 1 else 'Subcommand'
+      )
+      subusage_listing.append(f'{subcmds_header}:')
+      if common_subcmds:
+        subusage_listing.append(indent(common_subcmds_line))
+      subusage_listing.extend(map(indent, subusages))
+    else:
+      if common_subcmds:
+        subusage_listing.append(common_subcmds_line)
+    if subusage_listing:
+      subusage = "\n".join(subusage_listing)
+      usage = f'{usage}\n{indent(subusage)}'
     return usage
 
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
