@@ -1369,6 +1369,8 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
 def tabulate(*rows, sep='  '):
   ''' A generator yielding lines of values from `rows` aligned in columns.
   '''
+  if not rows:
+    return
   col_widths = [
       max(map(len, (row[c]
                     for row in rows)))
