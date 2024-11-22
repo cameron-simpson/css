@@ -527,7 +527,7 @@ class SubCommand:
   @cached_property
   def usage_format_parts(
       self
-  ) -> Tuple[str, Union[str | None], Union[str | None]]:
+  ) -> Tuple[str, Union[str, None], Union[str, None]]:
     ''' The usage description format string brokoen into:
         - the usage line (or lines if slosh extended)
         - the first line of the description, or `None`
@@ -1403,7 +1403,7 @@ class BaseCommand:
     ## cls.__doc__ = doc_without_usage
     if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
       cls.USAGE_FORMAT = usage_format
-    usage_text = instance.usage_text()
+    usage_text = instance.usage_text(recurse=True, short=False)
     return doc_without_usage, usage_text
 
   @pfx_method
