@@ -12,7 +12,7 @@ cs.app.make
 cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447af3df5566ae33"
 cs.app.mklinks pypi.release="20221228" ok_revision="25db918d3d95925205dd361638d2ddb9f279f52c"
 cs.app.myke ok_revision="1027faacf36b6c49eaa58dae48345ddf7db6558a" pypi.release="20240316.1"
-cs.app.osx.defaults ok_revision=bbf58073621cf9e5d5160db008e30e598550f2f7 pypi.release="20240316"
+cs.app.osx.defaults ok_revision="48674c05ea4a392976201049a5d279c24d5f0e04" pypi.release="20240316"
 cs.app.osx.defaults.plist
 cs.app.osx.misc ok_revision=a8db5e27f6d608f7bad1854b0c06aa31338fa544 features={"20240622":["macos_version"]} pypi.release="20240622.1"
 cs.app.osx.objc ok_revision=bafa7354f7242e42dd089064362915d523d762da pypi.release="20240622"
