@@ -27,7 +27,7 @@ from cs.env import getenv
 from cs.lex import r
 from cs.pfx import pfx_call
 
-__version__ = '20241122'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python3"],
