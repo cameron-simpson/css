@@ -1,3 +1,4 @@
+@promote: params to also accept a mapping of param_name to promotion_func
 default: media info: support "http://www.omdbapi.com/?apikey={OMDB_API_KEY}&type=movie&s=&genre={genre}&y={year}" ?
 √ cs.cmdutils: support opt=-field' for an inverted boolean option
 cs.cmdutils: usage_text: in short mode list just subcmd and the usage 1-liner tabulated d
