@@ -15,7 +15,7 @@ from cs.context import contextif, stackattrs
 from cs.gimmicks import warning
 from cs.pfx import Pfx
 
-__version__ = '20241122'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
