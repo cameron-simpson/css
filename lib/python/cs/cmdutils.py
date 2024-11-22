@@ -328,7 +328,7 @@ class OptionSpec:
     '''
     if len(self.opt_name) < 2:
       return None
-    return f'--{self.opt_name}=' if self.needs_arg else f'--{self.opt_name}'
+    return f'{self.opt_name}=' if self.needs_arg else f'{self.opt_name}'
 
   def option_terse(self):
     ''' Return the `"-x"` or `"--name"` option string (with the arg name if expected).
