@@ -76,7 +76,7 @@ cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.imageutils ok_revision="1f307905c3dd39927aebaa421d0100ba88edd6d8" features={"20240422":["ThumbnailCache","sixel"]} pypi.release="20240422.1"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
-cs.iso14496 pypi.release="20240422" ok_revision="47a80858a023fb3be3c72a4eeed2dac19d22455c"
+cs.iso14496 pypi.release="20240422" ok_revision=d119731d38eed9058fcf6dd4e344b78244965f1f
 cs.kindle
 cs.kobo
 cs.later pypi.release="20240630" ok_revision="819a6782e492719c8ec508be77bebd84117e8cfc" features={"20240305":["Later__thread_states"]}
