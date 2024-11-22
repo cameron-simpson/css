@@ -121,7 +121,7 @@ cs.sh ok_revision="3af3cf2c5da8cc18eafa8a65437eaf1e7b7f1db3"
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.splink ok_revision=d931f30ab0db0d1e1aef4df8295a1b20e364a4be pypi.release="20240316"
 cs.sqla
-cs.sqlalchemy_utils ok_revision="3e56c158c54e7f3e818bc7f7024135e64f76ba76" pypi.release="20241005" features={"20230612":["orchestrated_session"]}
+cs.sqlalchemy_utils ok_revision="295d8d19971adb20df350997864bd29c6bd44eca" pypi.release="20241005" features={"20230612":["orchestrated_session"]}
 cs.sqltags ok_revision="977113cd5173742347762aea02a88b7773f64d01" pypi.release="20240723"
 cs.tagset ok_revision=d1c626adb493fdabb0c3eb03b85f2d774a24740c features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"],"20240422":["fix_Tag__str__bad_TypeError","jsonable"],"20240422.2":["jsonable__for_json"]} pypi.release="20241007"
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
