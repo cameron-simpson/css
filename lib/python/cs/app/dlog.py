@@ -29,7 +29,8 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from getopt import getopt, GetoptError
+from functools import partial
+from getopt import GetoptError
 import os
 from os.path import expanduser
 from queue import Queue
@@ -39,16 +40,15 @@ from stat import S_ISFIFO
 import sys
 from threading import Thread
 import time
-from typing import Optional, Iterable, List, Union
+from typing import Optional, Iterable, Set, Union
 
 from arrow import Arrow
 from icontract import require
 from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, vprint
 from cs.context import stack_signals
-from cs.dateutils import datetime2unixtime
 from cs.deco import fmtdoc, promote
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import skipwhite
@@ -407,8 +407,9 @@ class DLogCommand(BaseCommand):
           -t tags         Tags.
     '''
     options = self.options
-    options.categories = set()
-    options.tags = TagSet()
+    options.categories = set()  # pylint: disable=attribute-defined-outside-init
+    options.tags = TagSet()  # pylint: disable=attribute-defined-outside-init
+    options.tags.when = None  # pylint: disable=attribute-defined-outside-init
     options.popopts(
         argv,
         c_=('categories', 'Alternate categories specification.'),
@@ -428,7 +429,7 @@ class DLogCommand(BaseCommand):
       )
       options.categories.update(auto_categories)
 
-    def dlog(headline):
+    def log_headline(headline):
       when = options.when
       if when is None:
         when = time.time()
@@ -449,9 +450,9 @@ class DLogCommand(BaseCommand):
       else:
         readline = sys.stdin.readline
       while line := readline():
-        dlog(line.rstrip())
+        log_headline(line.rstrip())
     else:
-      dlog(" ".join(argv))
+      log_headline(" ".join(argv))
 
   @uses_runstate
   def cmd_scan(self, argv, *, runstate: RunState):
