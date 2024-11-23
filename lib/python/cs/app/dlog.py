@@ -399,7 +399,7 @@ class DLogCommand(BaseCommand):
   # pylint: disable=too-many-branches,too-many-locals
   @uses_fstags
   def cmd_log(self, argv, fstags: FSTags):
-    ''' Usage: {cmd} [{{CATEGORIES:|tag=value}}...] headline
+    ''' Usage: {cmd} [{{CATEGORIES:|tag=value}}...] {{-|headline}}
           Log headline to the dlog.
           Options:
           -c categories   Alternate categories specification.
