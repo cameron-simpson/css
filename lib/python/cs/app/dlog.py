@@ -328,6 +328,7 @@ class DLog:
             lines = get_batch(q)
           if not lines:
             break
+          vprint("daemon:", len(lines), "gathered")
           sqltags = SQLTags.promote(sqltags)
           # open the db once around the whole batch
           with sqltags:
