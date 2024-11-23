@@ -117,7 +117,7 @@ class DLog:
   ''' A log entry.
   '''
   headline: str
-  categories: List[str] = field(default_factory=set)
+  categories: Set[str] = field(default_factory=set)
   tags: TagSet = field(default_factory=TagSet)
   when: float = field(default_factory=time.time)
 
