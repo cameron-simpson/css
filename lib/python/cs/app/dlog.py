@@ -408,7 +408,6 @@ class DLogCommand(BaseCommand):
     options = self.options
     options.categories = set()
     options.tags = TagSet()
-    options.when = time.time()
     options.popopts(
         argv,
         c_=('categories', 'Alternate categories specification.'),
@@ -421,24 +420,37 @@ class DLogCommand(BaseCommand):
     )
     if not argv:
       raise GetoptError("missing headline")
-    headline = " ".join(argv)
-    dl = DLog(
-        headline=headline,
-        categories=options.categories,
-        tags=options.tags,
-        when=options.when,
-    )
-    if not dl.categories:
+    if not options.categories:
       # infer categories from the working directory
       auto_categories = self.cats_from_str(
           fstags['.'].all_tags.get('cs.dlog', '')
       )
-      dl.categories.update(auto_categories)
-    dl.log(
-        logpath=options.logpath,
-        pipepath=options.pipepath,
-        sqltags=options.dbpath,
-    )
+      options.categories.update(auto_categories)
+
+    def dlog(headline):
+      when = options.when
+      if when is None:
+        when = time.time()
+      DLog(
+          headline=headline,
+          categories=options.categories,
+          tags=options.tags,
+          when=when,
+      ).log(
+          logpath=options.logpath,
+          pipepath=options.pipepath,
+          sqltags=options.dbpath,
+      )
+
+    if argv == ['-']:
+      if sys.stdin.isatty():
+        readline = partial(input, f'{self.cmd}> ')
+      else:
+        readline = sys.stdin.readline
+      while line := readline():
+        dlog(line.rstrip())
+    else:
+      dlog(" ".join(argv))
 
   @uses_runstate
   def cmd_scan(self, argv, *, runstate: RunState):
