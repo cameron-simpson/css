@@ -243,7 +243,7 @@ class DLog:
         S = pfx_call(os.stat, pipepath)
       except FileNotFoundError:
         # no server pipe
-        pass
+        warning("no pipepath %r", pipepath)
       except Exception as e:  # pylint: disable=broad-exception-caught
         warning(
             "cannot stat pipepath:%r: %s, falling back to direct log",
@@ -251,6 +251,7 @@ class DLog:
         )
       else:
         if S_ISFIFO(S.st_mode):
+          vprint("append to pipe", pipepath, self.headline)
           try:
             with pfx_call(open, pipepath, 'a') as pipef:
               builtin_print(self, file=pipef)
