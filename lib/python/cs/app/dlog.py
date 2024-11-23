@@ -412,7 +412,11 @@ class DLogCommand(BaseCommand):
     options.tags.when = None  # pylint: disable=attribute-defined-outside-init
     options.popopts(
         argv,
-        c_=('categories', 'Alternate categories specification.'),
+        c_=(
+            'categories',
+            'Alternate categories specification.',
+            lambda arg: DLogCommand.cats_from_str(arg),
+        ),
         d_=(
             'when',
             'ISO8601 timestamp for the log entry instead of "now".',
