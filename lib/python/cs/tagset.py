@@ -405,11 +405,11 @@ def jsonable(obj, converted: dict):
     try:
       it = iter(obj)
     except TypeError:
-      raise TypeError(f'jsoanble({t.__name__}): cannot convert for JSON')
+      raise TypeError(f'jsoanble({r(obj)}): cannot convert for JSON')
     else:
       if it is obj:
         raise TypeError(
-            f'jsoanble(t.__name__): refusing to convert an iterator for JSON because it would consume it'
+            f'jsoanble({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
         )
       # convert to list
       converted[id(obj)] = convobj = []
