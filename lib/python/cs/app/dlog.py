@@ -353,7 +353,6 @@ class DLogCommand(BaseCommand):
   class Options(BaseCommand.Options):
     ''' Options for `DLogCommand`.
     '''
-    categories: set = field(default_factory=set)
     dbpath: str = field(
         default_factory=lambda:
         (os.environ.get('DLOG_DBPATH') or expanduser(DEFAULT_DBPATH))
@@ -366,8 +365,6 @@ class DLogCommand(BaseCommand):
         default_factory=lambda:
         (os.environ.get('DLOG_PIPEPATH') or expanduser(DEFAULT_PIPEPATH))
     )
-    tags: TagSet = field(default_factory=TagSet)
-    when: float = field(default_factory=time.time)
 
   @staticmethod
   def cats_from_str(cats_s):
