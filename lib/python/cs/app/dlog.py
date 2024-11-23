@@ -383,19 +383,17 @@ class DLogCommand(BaseCommand):
     )
 
   def cmd_daemon(self, argv):
-    ''' Usage: {cmd} [pipepath]
+    ''' Usage: {cmd}
           Listen on pipepath for new dlog messages.
           This serialises contention for the database.
     '''
     options = self.options
-    dbpath = options.dbpath
-    logpath = options.logpath
-    pipepath = options.pipepath
-    if argv:
-      pipepath = argv.pop(0)
+    options.popopts(argv)
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    DLog.daemon(pipepath, logpath=logpath, sqltags=dbpath)
+    DLog.daemon(
+        options.pipepath, logpath=options.logpath, sqltags=options.dbpath
+    )
 
   # pylint: disable=too-many-branches,too-many-locals
   @uses_fstags
