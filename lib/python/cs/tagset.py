@@ -63,7 +63,7 @@
         a=1 b=3 c=[1,2,3] d=dee
         >>> # since you can print a TagSet to a file as a line of text
         >>> # you can get it back from a line of text
-        >>> TagSet.from_line('a=1 b=3 c=[1,2,3] d=dee')
+        >>> TagSet.from_str('a=1 b=3 c=[1,2,3] d=dee')
         TagSet:{'a': 1, 'b': 3, 'c': [1, 2, 3], 'd': 'dee'}
         >>> # because TagSets are dicts you can format strings with them
         >>> print('topic:{topic} subtopic:{subtopic}'.format_map(tags))
