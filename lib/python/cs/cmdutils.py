@@ -1213,15 +1213,18 @@ class BaseCommand:
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
       # catch bare -h or --help if no 'h' in the getopt_spec
-      if ('h' not in getopt_spec and len(argv) == 1
-          and argv[0] in ('-h', '-help', '--help')):
-        argv = self._argv = ['help']
+      if (len(argv) == 1
+          and (argv[0] in ('-help', '--help') or
+               ('h' not in getopt_spec and argv[0] in ('-h',)))):
+        argv = self._argv = ['help', '-l']
       else:
         if getopt_spec:
+          # legacy GETOPT_SPEC mode
           # we do this regardless in order to honour '--'
           opts, argv = getopt(argv, getopt_spec, '')
           self.apply_opts(opts)
         else:
+          # modern mode
           # use the options.COMMON_OPT_SPECS
           options.popopts(argv)
         # We do this regardless so that subclasses can do some presubcommand parsing
