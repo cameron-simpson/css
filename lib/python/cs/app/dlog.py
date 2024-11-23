@@ -366,6 +366,13 @@ class DLogCommand(BaseCommand):
         (os.environ.get('DLOG_PIPEPATH') or expanduser(DEFAULT_PIPEPATH))
     )
 
+    COMMON_OPT_SPECS = dict(
+        db=('dbpath', 'SQLTags database path.'),
+        log=('logpath', 'Flat log file path.'),
+        pipe=('pipepath', 'Logging named pipe path.'),
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
+
   @staticmethod
   def cats_from_str(cats_s):
     ''' Return an iterable of lowercase category names from a comma
@@ -396,37 +403,30 @@ class DLogCommand(BaseCommand):
           Options:
           -c categories   Alternate categories specification.
           -d datetime     Timestamp for the log entry instead of "now".
+          -t tags         Tags.
     '''
     options = self.options
-    badopts = False
-    dt = None
-    opts, argv = getopt(argv, 'c:d:')
-    for opt, val in opts:
-      with Pfx(opt if val is None else "%s %r" % (opt, val)):
-        if opt == '-c':
-          options.categories.update(self.cats_from_str(val))
-        elif opt == '-d':
-          try:
-            dt = pfx_call(datetime.fromisoformat, val)
-          except ValueError as e:
-            # pylint: disable=raise-missing-from
-            raise GetoptError("unparsed date: %s" % (e,))
-          options.when = datetime2unixtime(dt)
-        else:
-          raise NotImplementedError("unimplemented option")
-    if dt is None:
-      dt = datetime.fromtimestamp(options.when)
-    if badopts:
-      raise GetoptError("invalid preargv")
+    options.categories = set()
+    options.tags = TagSet()
+    options.when = time.time()
+    options.popopts(
+        argv,
+        c_=('categories', 'Alternate categories specification.'),
+        d_=(
+            'when',
+            'ISO8601 timestamp for the log entry instead of "now".',
+            datetime.fromisoformat,
+        ),
+        t_=('tags', TagSet.from_str),
+    )
     if not argv:
-      raise GetoptError("no headline")
-    categories = options.categories
-    pipepath = options.pipepath
-    logpath = options.logpath
-    dbpath = options.dbpath
-    dl = DLog.from_str(
-        f'{dt.isoformat(sep=" ",timespec="seconds")} {" ".join(argv)}',
-        categories=categories,
+      raise GetoptError("missing headline")
+    headline = " ".join(argv)
+    dl = DLog(
+        headline=headline,
+        categories=options.categories,
+        tags=options.tags,
+        when=options.when,
     )
     if not dl.categories:
       # infer categories from the working directory
@@ -434,7 +434,11 @@ class DLogCommand(BaseCommand):
           fstags['.'].all_tags.get('cs.dlog', '')
       )
       dl.categories.update(auto_categories)
-    dl.log(logpath=logpath, pipepath=pipepath, sqltags=dbpath)
+    dl.log(
+        logpath=options.logpath,
+        pipepath=options.pipepath,
+        sqltags=options.dbpath,
+    )
 
   @uses_runstate
   def cmd_scan(self, argv, *, runstate: RunState):
