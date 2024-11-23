@@ -374,11 +374,13 @@ class DLogCommand(BaseCommand):
     )
 
   @staticmethod
-  def cats_from_str(cats_s):
-    ''' Return an iterable of lowercase category names from a comma
-        or space separated string.
+  def cats_from_str(cats_s) -> set:
+    ''' Return a set of lowercase category names from a comma
+        or whitespace separated string.
     '''
-    return (category for category in cats_s.replace(',', ' ').lower().split())
+    return set(
+        category for category in cats_s.replace(',', ' ').lower().split()
+    )
 
   def cmd_daemon(self, argv):
     ''' Usage: {cmd} [pipepath]
