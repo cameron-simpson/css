@@ -32,6 +32,10 @@ import csv
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from fnmatch import fnmatchcase
+try:
+  from functools import cached_property  # 3.8 onward
+except ImportError:
+  cached_property = lambda func: property(cache(func))
 from getopt import getopt, GetoptError
 import operator
 import os
@@ -2389,29 +2393,28 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   # init
   #   Initialise the database.
 
-  USAGE_FORMAT = '''Usage: {cmd} [-f db_url] subcommand [...]
-  -f db_url SQLAlchemy database URL or filename.
-            Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').'''
-
-  USAGE_KEYWORDS = {
-      'DBURL_DEFAULT': DBURL_DEFAULT,
-      'DBURL_ENVVAR': DBURL_ENVVAR,
-      'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
-  }
+  USAGE_FORMAT = '''
+    Usage: {cmd} [-f db_url] subcommand [...]
+      --db db_url SQLAlchemy database URL or filename.
+                  Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').
+  '''
 
   @dataclass
   class Options(BaseCommand.Options):
     db_url: str = None
-    sqltags: Optional[SQLTags] = None
 
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
+    COMMON_OPT_SPECS = dict(
+        db=('db_url', 'SQLTags database URL.'),
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
+
+  @cached_property
+  def sqltags(self):
     options = self.options
-    if opt == '-f':
-      options.db_url = val
-    else:
-      super().apply_opt(opt, val)
+    db_url = options.db_url
+    if db_url is None:
+      db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
+    return self.TAGSETS_CLASS(db_url)
 
   @contextmanager
   def run_context(self):
@@ -2419,12 +2422,8 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
     '''
     with super().run_context():
       options = self.options
-      db_url = options.db_url
-      if db_url is None:
-        db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
-      sqltags = self.TAGSETS_CLASS(db_url)
-      with sqltags:
-        with stackattrs(options, sqltags=sqltags, verbose=True):
+      with stackattrs(options, verbose=True):
+        with self.sqltags:
           yield
 
   @classmethod
