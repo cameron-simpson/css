@@ -113,6 +113,7 @@ def module_names(M):
   '''
   return [attr for attr, value in module_attributes(M)]
 
+# TODO: use the AST module to do a real parse?
 # pylint: disable=too-many-branches
 def direct_imports(src_filename, module_name=None):
   ''' Crudely parse `src_filename` for `import` statements.
@@ -129,8 +130,8 @@ def direct_imports(src_filename, module_name=None):
     with open(src_filename, encoding='utf-8') as codefp:
       for lineno, line in enumerate(codefp, 1):
         with Pfx(lineno):
+          line = line.strip()
           if line.startswith('import ') or line.startswith('from '):
-            line = line.strip()
             # quick hack to strip trailing "; second-statement"
             try:
               line, _ = line.split(';', 1)
@@ -147,20 +148,21 @@ def direct_imports(src_filename, module_name=None):
             if word0 == 'from' and (len(words) < 4 or words[2] != 'import'):
               continue
             subimport = words[1]
-            if module_name and subimport.startswith('.'):
-              if subimport == '.':
-                subimport = module_name
-              else:
-                # resolve relative import name
+            if subimport.startswith('.'):
+              # relative import, must be in a package
+              if not module_name:
+                # can't be in a package, just ignore it
+                continue
+              module_parts = module_name.split('.')
+              while subimport.startswith('.'):
+                module_parts = module_parts[:-1]
                 subimport = subimport[1:]
-                module_parts = module_name.split('.')
-                while subimport.startswith('.'):
-                  module_parts.pop(-1)
-                  subimport = subimport[1:]
-                if module_parts:
-                  if subimport:
-                    module_parts.append(subimport)
-                subimport = '.'.join(module_parts)
+              if not module_parts:
+                # walked off the top of the path
+                continue
+              if subimport:
+                module_parts.append(subimport)
+              subimport = '.'.join(module_parts)
             subnames.add(subimport)
   return subnames
 
