@@ -163,6 +163,9 @@ def direct_imports(src_filename, module_name=None):
               if subimport:
                 module_parts.append(subimport)
               subimport = '.'.join(module_parts)
+            if subimport == module_name:
+              # HACK: simplistic parse finding ourself in a docstring
+              continue
             subnames.add(subimport)
   return subnames
 
