@@ -530,7 +530,7 @@ class Sentinel:
     return self is other
 
 def public_subclasses(cls):
-  ''' Return a list of the subclasses of `cls` which has public names.
+  ''' Return a list of the subclasses of `cls` which have public names.
   '''
   classes = []
   q = list(cls.__subclasses__())
