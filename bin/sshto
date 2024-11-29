@@ -10,10 +10,10 @@ set -ue
 
 : "${OPTCSS:=/opt/css}"
 : "${SSHTO_OPTCSS:=$OPTCSS}"
-: "${SSHTO_OPTS:=''}"
+: "${SSHTO_OPTS:=}"
 : "${SSHTO_CONFIG:=$HOME/.sshtorc}"
-: "${SSHTO_PREFIX:=''}"
-: "${SSHTO_RUSER:=''}"
+: "${SSHTO_PREFIX:=}"
+: "${SSHTO_RUSER:=}"
 
 oldstyle=
 cf=$SSHTO_CONFIG
