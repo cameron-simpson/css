@@ -1,3 +1,4 @@
+calibre and dedrm, display calibre plugins paths in usage
 obok prints to be monkeypatchs with qvprint as with dedrm
 common EBookLibrarytree abstract class presenting a mapping of book key to Book, asin for kindle, volumeid for kobo etc
 modern kindle db support
