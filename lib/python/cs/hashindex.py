@@ -176,10 +176,13 @@ class HashIndexCommand(BaseCommand):
 
     # pylint: disable=use-dict-literal
     COMMON_OPT_SPECS = dict(
-        e_='ssh_exe',
-        h_='hashname',
-        H_='hashindex_exe',
-        o_='output_format',
+        e_=('ssh_exe', 'The ssh executable.'),
+        h_=('hashname', 'The file content hash algorithm name.'),
+        H_=('hashindex_exe', 'The remote hashindex executable.'),
+        o_=(
+            'output_format',
+            'Output format, default: {OUTPUT_FORMAT_DEFAULT!r}'
+        ),
         **BaseCommand.Options.COMMON_OPT_SPECS,
     )
 
@@ -199,11 +202,6 @@ class HashIndexCommand(BaseCommand):
           -1            List hashes and paths only present in path1.
           -2            List hashes and paths only present in path2.
           -3            List hashes and paths present in path1 and path2.
-          -e ssh_exe    Specify the ssh executable.
-          -h hashname   Specify the file content hash algorithm name.
-          -H hashindex_exe
-                        Specify the remote hashindex executable.
-          -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
           -r            Emit relative paths in the listing.
     '''
     badopts = False
@@ -324,11 +322,6 @@ class HashIndexCommand(BaseCommand):
           Walk filesystem paths and emit a listing.
           The default path is the current directory.
           Options:
-          -e ssh_exe    Specify the ssh executable.
-          -h hashname   Specify the file content hash algorithm name.
-          -H hashindex_exe
-                        Specify the remote hashindex executable.
-          -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
           -r            Emit relative paths in the listing.
                         This requires each path to be a directory.
     '''
@@ -372,13 +365,7 @@ class HashIndexCommand(BaseCommand):
     ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir [dstdir]
           Rearrange files from targetdir into dstdir based on their positions in refdir.
           Options:
-            -e ssh_exe  Specify the ssh executable.
-            -h hashname Specify the file content hash algorithm name.
-            -H hashindex_exe
-                        Specify the remote hashindex executable.
             --mv        Move mode.
-            -n          No action, dry run.
-            -o output_format Default: {OUTPUT_FORMAT_DEFAULT!r}.
             -s          Symlink mode.
           Other arguments:
             refdir      The reference directory, which may be local or remote
