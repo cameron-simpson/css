@@ -96,8 +96,8 @@ else
                   sed "s/^/  /" "$REVSSH_SSHCFG"
                   echo "Forwarded agent:"
                   ssh-add -l | sed "s/^/  /"
-                  echo "Environment:"
-                  env | sort | sed "s/^/  /"
+                  ##echo "Environment:"
+                  ##env | sort | sed "s/^/  /"
                  '
 fi
 
