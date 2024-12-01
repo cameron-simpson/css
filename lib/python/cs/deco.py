@@ -877,7 +877,10 @@ def uses_cmd_options(
     except ImportError:
       # missing cs.cmdutils or cs.context,
       # make an options with no attributes
-      options = object()
+      class Options:
+        '''Dummy options object for accruing attributes.'''
+
+      options = Options()
     else:
       options_class = BaseCommand.Options
       options = options_class.default() or options_class()
