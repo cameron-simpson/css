@@ -246,7 +246,7 @@ _publish_git:
         for repo in $(git_repos) \
         do  pfx "$$repo" hg-gitup -a -f -x "$$repo" \
         done
-        @echo 'changes visible at $(www_bitbucket)/rbanches/'"$$(vcs branch))"
+        @echo 'changes visible at $(www_bitbucket)/rbanches/'"$$(vcs branch)"
         @echo 'code visible at $(www_github)'
 
 _publish_hg:
