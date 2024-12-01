@@ -242,7 +242,7 @@ def run(
       which to run `argv`. This is done via the `ssh_exe` argument,
       which defaults to the string `'ssh'`. The value of `ssh_exe`
       is a command string parsed with `shlex.split`. A new `argv`
-      computed as:
+      is computed as:
 
           [
               *shlex.split(ssh_exe),
