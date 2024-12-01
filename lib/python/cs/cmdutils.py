@@ -752,6 +752,7 @@ class SubCommand:
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
     dry_run='dry_run',
+    e_=('ssh_exe', 'An ssh-like command to use for remote command execution.'),
     n=('dry_run', 'No action, aka dry run.'),
     q='quiet',
     v='verbose',
@@ -795,6 +796,7 @@ class BaseCommandOptions(HasThreadState):
   quiet: bool = False
   runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
+  ssh_exe: str = 'ssh'
   verbose: bool = False
 
   opt_spec_class = OptionSpec
