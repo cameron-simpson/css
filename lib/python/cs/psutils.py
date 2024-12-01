@@ -454,30 +454,30 @@ def print_argv(
     file = sys.stdout
   if print is None:
     print = builtins.print
-  print_argv = []
+  pr_argv = []
   was_opt = False
   for i, arg in enumerate(argv):
     if i == 0:
-      print_argv.append(indent)
+      pr_argv.append(indent)
       was_opt = False
     elif len(arg) >= 2 and arg.startswith('-'):
       if fold:
         # options get a new line
-        print_argv.append(" \\\n" + indent + subindent)
+        pr_argv.append(" \\\n" + indent + subindent)
       else:
-        print_argv.append(" ")
+        pr_argv.append(" ")
       was_opt = True
     else:
       if was_opt:
-        print_argv.append(" ")
+        pr_argv.append(" ")
       elif fold:
         # nonoptions get a new line
-        print_argv.append(" \\\n" + indent + subindent)
+        pr_argv.append(" \\\n" + indent + subindent)
       else:
-        print_argv.append(" ")
+        pr_argv.append(" ")
       was_opt = False
-    print_argv.append(shlex.quote(arg))
-  print(*print_argv, sep='', end=end, file=file)
+    pr_argv.append(shlex.quote(arg))
+  print(*pr_argv, sep='', end=end, file=file)
 
 if __name__ == '__main__':
   for test_max_argv in 64, 20, 16, 8:
