@@ -21,7 +21,7 @@ from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subpro
 import sys
 import time
 
-from cs.deco import fmtdoc, uses_doit, uses_quiet
+from cs.deco import fmtdoc, uses_cmd_options, uses_quiet
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
@@ -198,42 +198,67 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
-@uses_doit
-@uses_quiet
+@uses_cmd_options(doit=True, quiet=False, ssh_exe='ssh')
 def run(
     argv,
     *,
     doit: bool,
-    logger=None,
-    quiet: bool,
     input=None,
-    stdin=None,
+    logger=None,
     print=None,
+    quiet: bool,
+    remote=None,
+    ssh_exe: str,
+    stdin=None,
     **subp_options,
 ):
   ''' Run a command via `subprocess.run`.
       Return the `CompletedProcess` result or `None` if `doit` is false.
 
-      Parameters:
+      Positional parameter:
       * `argv`: the command line to run
-      * `doit`: optional flag, default `True`;
-        if false do not run the command and return `None`
-      * `logger`: optional logger, default `None`;
-        if `True`, use `logging.getLogger()`;
-        if not `None` or `False` trace using `print_argv`
-      * `quiet`: default `True`; if false, print the command and its output
-      * `input`: default `None`: alternative to `stdin`;
-        passed to `subprocess.run`
-      * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
-        passed to `subprocess.run`
-      * `subp_options`: optional mapping of keyword arguments
-        to pass to `subprocess.run`
 
       Note that `argv` is passed through `prep_argv` before use,
       allowing direct invocation with conditional parts.
       See the `prep_argv` function for details.
+
+      Keyword parameters:
+      * `doit`: optional flag, default `True`;
+        if false do not run the command and return `None`
+      * `input`: default `None`: alternative to `stdin`;
+        passed to `subprocess.run`
+      * `logger`: optional logger, default `None`;
+        if `True`, use `logging.getLogger()`;
+        if not `None` or `False` trace using `print_argv`
+      * `quiet`: default `True`; if false, print the command and its output
+      * `remote`: optional remote target on which to run `argv`
+      * `ssh_exe`: remote execution command used if `remote` is not `None`
+      * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
+        passed to `subprocess.run`
+
+      Other keyword parameters are passed to `subprocess.run`.
+
+      If `remote` is not `None` it is taken to be a remote host on
+      which to run `argv`. This is done via the `ssh_exe` argument,
+      which defaults to the string `'ssh'`. The value of `ssh_exe`
+      is a command string parsed with `shlex.split`. A new `argv`
+      computed as:
+
+          [
+              *shlex.split(ssh_exe),
+              remote,
+              '--',
+              shlex.join(argv),
+          ]
   '''
   argv = prep_argv(*argv)
+  if remote is not None:
+    argv = [
+        *shlex.split(ssh_exe),
+        remote,
+        '--',
+        shlex.join(argv),
+    ]
   if logger is True:
     logger = logging.getLogger()
   if not doit:
@@ -255,6 +280,7 @@ def run(
     raise ValueError("you may not specify both input and stdin")
   cp = pfx_call(subprocess_run, argv, input=input, stdin=stdin, **subp_options)
   if cp.stderr:
+    # TODO: is this a good thing? I have my doubts
     print(" stderr:")
     print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
   if cp.returncode != 0:
