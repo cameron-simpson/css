@@ -176,7 +176,6 @@ class HashIndexCommand(BaseCommand):
 
     # pylint: disable=use-dict-literal
     COMMON_OPT_SPECS = dict(
-        e_=('ssh_exe', 'The ssh executable.'),
         h_=('hashname', 'The file content hash algorithm name.'),
         H_=('hashindex_exe', 'The remote hashindex executable.'),
         o_=(
