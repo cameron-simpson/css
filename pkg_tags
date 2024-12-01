@@ -29,7 +29,6 @@ cs.app.tvwiz
 cs.app.wizpnp
 cs.app.ydl pypi.release="20220318" ok_revision="6c4e9e800dde94ed935a1b31a532f68cbe63adb8"
 cs.apple
-cs.asynchron pypi.release=20160828
 cs.backend
 cs.binary pypi.release="20240630" ok_revision="66f18265a8db3bc69e7eb97716af302983f117ca" features={"20230212":["BinaryMixin_load","BinaryMixin_save"],"20240630":["AbstractBinary__write","BinarySingleValue__value_from_bytes"]}
 cs.buffer pypi.release="20240630" ok_revision=d96fe57b31e11584e172240a8f1c8d574a29c3ad features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"],"20240630":["CornuCopyBuffer__final_offset"]}
@@ -102,6 +101,7 @@ cs.pipeline pypi.release="20191007.1" ok_revision="2a26b6f06610394b6c7e6fb6f9a52
 cs.pop3 ok_revision="64592a92c8db0e90cf818f6ccf415f6cfb53c90d" pypi.release="20240316"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.progress pypi.release="20241122" ok_revision="8e98a9a461a915cb3c1478ba94254bc6aa174a1b" features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"]}
+cs.psutil
 cs.psutils pypi.release="20241122" ok_revision="49d7aa9d23656f8d7a17b07600549a6009e13ba1" features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"]}
 cs.py.doc pypi.release="20241007" ok_revision=a639a998cb404958be0e1e6860d39dc1a3dc616c
 cs.py.func pypi.release="20240630" ok_revision="0dd7f10b229df7807892a255ae6983d2136b819e" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
