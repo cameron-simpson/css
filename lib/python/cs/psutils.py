@@ -21,7 +21,7 @@ from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subpro
 import sys
 import time
 
-from cs.deco import fmtdoc, uses_cmd_options, uses_quiet
+from cs.deco import fmtdoc, uses_cmd_options
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
@@ -198,7 +198,7 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
-@uses_cmd_options(doit=True, quiet=False, ssh_exe='ssh')
+@uses_cmd_options(doit=True, quiet=False)
 def run(
     argv,
     *,
@@ -209,7 +209,7 @@ def run(
     print=None,
     quiet: bool,
     remote=None,
-    ssh_exe: str,
+    ssh_exe=None,
     stdin=None,
     **subp_options,
 ):
@@ -219,8 +219,8 @@ def run(
       Positional parameter:
       * `argv`: the command line to run
 
-      Note that `argv` is passed through `prep_argv` before use,
-      allowing direct invocation with conditional parts.
+      Note that `argv` is passed through `prep_argv(argv,remote=remote,ssh_exe=ssh_exe)`
+      before use, allowing direct invocation with conditional parts.
       See the `prep_argv` function for details.
 
       Keyword parameters:
@@ -233,35 +233,17 @@ def run(
       * `logger`: optional logger, default `None`;
         if `True`, use `logging.getLogger()`;
         if not `None` or `False` trace using `print_argv`
-      * `quiet`: default `True`; if false, print the command and its output
+      * `quiet`: default `False`; if false, print the command and its output
       * `remote`: optional remote target on which to run `argv`
-      * `ssh_exe`: remote execution command used if `remote` is not `None`
+      * `ssh_exe`: optional command string for the remote shell
       * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
         passed to `subprocess.run`
 
       Other keyword parameters are passed to `subprocess.run`.
-
-      If `remote` is not `None` it is taken to be a remote host on
-      which to run `argv`. This is done via the `ssh_exe` argument,
-      which defaults to the string `'ssh'`. The value of `ssh_exe`
-      is a command string parsed with `shlex.split`. A new `argv`
-      is computed as:
-
-          [
-              *shlex.split(ssh_exe),
-              remote,
-              '--',
-              shlex.join(argv),
-          ]
   '''
-  argv = prep_argv(*argv)
-  if remote is not None:
-    argv = [
-        *shlex.split(ssh_exe),
-        remote,
-        '--',
-        shlex.join(argv),
-    ]
+  from cs.debug import X
+  X("run quiet=%r argv=%r", quiet, argv)
+  argv = prep_argv(*argv, remote=remote, ssh_exe=ssh_exe)
   if logger is True:
     logger = logging.getLogger()
   if not doit:
@@ -301,8 +283,17 @@ def run(
     )
   return cp
 
-@uses_quiet
-def pipefrom(argv, *, quiet: bool, text=True, stdin=DEVNULL, **popen_kw):
+@uses_cmd_options(quiet=False, ssh_exe='ssh')
+def pipefrom(
+    argv,
+    *,
+    quiet: bool,
+    remote=None,
+    ssh_exe,
+    text=True,
+    stdin=DEVNULL,
+    **popen_kw
+):
   ''' Pipe text (usually) from a command using `subprocess.Popen`.
       Return the `Popen` object with `.stdout` as a pipe.
 
@@ -318,13 +309,14 @@ def pipefrom(argv, *, quiet: bool, text=True, stdin=DEVNULL, **popen_kw):
       allowing direct invocation with conditional parts.
       See the `prep_argv` function for details.
   '''
-  argv = prep_argv(*argv)
+  argv = prep_argv(*argv, remote=remote, ssh_exe=ssh_exe)
   if not quiet:
     print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
-@uses_quiet
-def pipeto(argv, *, quiet: bool, **kw):
+# TODO: text= parameter?
+@uses_cmd_options(quiet=False, ssh_exe='ssh')
+def pipeto(argv, *, quiet: bool, remote=None, ssh_exe, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.
@@ -415,7 +407,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
     argvs.append(pre_argv + per + post_argv)
   return argvs
 
-def prep_argv(*argv):
+@uses_cmd_options(ssh_exe='ssh')
+def prep_argv(*argv, ssh_exe, remote=None):
   ''' A trite list comprehension to reduce an argument list `*argv`
       to the entries which are not `None` or `False`
       and to flatten other entries which are not strings.
@@ -438,8 +431,21 @@ def prep_argv(*argv):
       where `verbose` is a `bool` governing the `-v` option
       and `hashname` is either `str` to be passed with `-h hashname`
       or `None` to omit the option.
+
+      If `remote` is not `None` it is taken to be a remote host on
+      which to run `argv`. This is done via the `ssh_exe` argument,
+      which defaults to the string `'ssh'`. The value of `ssh_exe`
+      is a command string parsed with `shlex.split`. A new `argv`
+      is computed as:
+
+          [
+              *shlex.split(ssh_exe),
+              remote,
+              '--',
+              shlex.join(argv),
+          ]
   '''
-  return list(
+  argv = list(
       chain(
           *[
               ((arg,) if isinstance(arg, str) else arg)
@@ -448,6 +454,14 @@ def prep_argv(*argv):
           ]
       )
   )
+  if remote is not None:
+    argv = [
+        *shlex.split(ssh_exe),
+        remote,
+        '--',
+        shlex.join(argv),
+    ]
+  return argv
 
 def print_argv(
     *argv,
