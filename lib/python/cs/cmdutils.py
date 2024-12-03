@@ -26,6 +26,7 @@ except ImportError:
 
 from getopt import getopt, GetoptError
 from inspect import isclass
+import os
 from os.path import basename
 # this enables readline support in the docmd stuff
 try:
@@ -749,6 +750,10 @@ class SubCommand:
       usage = f'{usage}\n{indent(subusage)}'
     return usage
 
+# exposed outside the class for @fmtdoc
+SSH_EXE_DEFAULT = 'ssh'
+SSH_EXE_ENVVAR = 'SSH_EXE'
+
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
     dry_run='dry_run',
@@ -772,6 +777,7 @@ class BaseCommandOptions(HasThreadState):
       * `.dry_run=False`
       * `.force=False`
       * `.quiet=False`
+      * `.ssh_exe='ssh'`
       * `.verbose=False`
       and a `.doit` property which is the inverse of `.dry_run`.
 
@@ -796,7 +802,12 @@ class BaseCommandOptions(HasThreadState):
   quiet: bool = False
   runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
-  ssh_exe: str = 'ssh'
+  ssh_exe: str = field(
+      default_factory=lambda: (
+          os.environ.get(SSH_EXE_ENVVAR, os.environ.get('RSYNC_RSH', '')) or
+          SSH_EXE_DEFAULT
+      )
+  )
   verbose: bool = False
 
   opt_spec_class = OptionSpec
@@ -1583,7 +1594,7 @@ class BaseCommand:
       try:
         with self.run_context(**kw_options) as xit:
           if xit is not None:
-            error("exit status from rnu_context: %s", xit)
+            error("exit status from run_context: %s", xit)
             return xit
           return self._run(self._argv)
       except CancellationError:
