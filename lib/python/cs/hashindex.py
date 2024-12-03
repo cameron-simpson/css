@@ -134,8 +134,6 @@ DISTINFO = {
 
 HASHNAME_DEFAULT = 'blake3'
 HASHINDEX_EXE_DEFAULT = 'hashindex'
-SSH_EXE_DEFAULT = 'ssh'
-SSH_EXE_ENVVAR = 'HASHINDEX_SSH'
 OUTPUT_FORMAT_DEFAULT = '{hashcode} {fspath}'
 
 def main(argv=None):
@@ -163,12 +161,6 @@ class HashIndexCommand(BaseCommand):
     '''
     hashname: str = HASHNAME_DEFAULT
     move_mode: bool = False
-    ssh_exe: str = field(
-        default_factory=lambda: (
-            os.environ.get(SSH_EXE_ENVVAR, os.environ.get('RSYNC_RSH', '')) or
-            SSH_EXE_DEFAULT
-        )
-    )
     hashindex_exe: str = HASHINDEX_EXE_DEFAULT
     symlink_mode: bool = False
     relative: Optional[bool] = None
@@ -227,7 +219,6 @@ class HashIndexCommand(BaseCommand):
     hashname = options.hashname
     output_format = options.output_format
     relative = options.relative
-    ssh_exe = options.ssh_exe
     path1_only = options.path1_only
     path2_only = options.path2_only
     path12 = options.path12
@@ -284,7 +275,6 @@ class HashIndexCommand(BaseCommand):
           (path1host, path1dir),
           hashname=hashname,
           hashindex_exe=hashindex_exe,
-          ssh_exe=ssh_exe,
           relative=relative,
       ):
         runstate.raiseif()
@@ -296,7 +286,6 @@ class HashIndexCommand(BaseCommand):
           (path2host, path2dir),
           hashname=hashname,
           hashindex_exe=hashindex_exe,
-          ssh_exe=ssh_exe,
           relative=relative,
       ):
         runstate.raiseif()
@@ -341,7 +330,6 @@ class HashIndexCommand(BaseCommand):
     hashname = options.hashname
     output_format = options.output_format
     relative = options.relative
-    ssh_exe = options.ssh_exe
     if not argv:
       argv = ['.']
     xit = 0
@@ -357,7 +345,6 @@ class HashIndexCommand(BaseCommand):
         for h, fspath in hashindex(
             (rhost, lpath),
             hashname=hashname,
-            ssh_exe=ssh_exe,
             hashindex_exe=hashindex_exe,
             relative=relative,
         ):
@@ -395,7 +382,6 @@ class HashIndexCommand(BaseCommand):
     hashname = options.hashname
     move_mode = options.move_mode
     quiet = options.quiet
-    ssh_exe = options.ssh_exe
     symlink_mode = options.symlink_mode
     if not argv:
       warning("missing refdir")
@@ -445,7 +431,6 @@ class HashIndexCommand(BaseCommand):
       for hashcode, fspath in hashindex(
           (refhost, refdir),
           hashname=hashname,
-          ssh_exe=ssh_exe,
           hashindex_exe=hashindex_exe,
           relative=True,
       ):
@@ -489,7 +474,6 @@ class HashIndexCommand(BaseCommand):
                 targetdir,
                 dstdir,
             ],
-            ssh_exe=ssh_exe,
             hashindex_exe=hashindex_exe,
             input=input_s,
             text=True,
@@ -554,7 +538,6 @@ def hashindex(
     *,
     hashname: str,
     hashindex_exe: str,
-    ssh_exe: str,
     relative: bool = False,
     **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
@@ -584,7 +567,6 @@ def hashindex(
           rfspath,
           hashname=hashname,
           hashindex_exe=hashindex_exe,
-          ssh_exe=ssh_exe,
           relative=relative,
           **kw,
       )
@@ -660,8 +642,8 @@ def read_remote_hashindex(
     rdirpath: str,
     *,
     hashname: str,
-    ssh_exe=None,
     hashindex_exe=None,
+    ssh_exe: str,
     relative: bool = False,
     check=True,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
@@ -673,31 +655,23 @@ def read_remote_hashindex(
       * `rhost`: the remote host, or `user@host`
       * `rdirpath`: the remote directory path
       * `hashname`: the file content hash algorithm name
-      * `ssh_exe`: the `ssh` executable,
-        default `SSH_EXE_DEFAULT`: `{SSH_EXE_DEFAULT!r}`
       * `hashindex_exe`: the remote `hashindex` executable,
         default `HASHINDEX_EXE_DEFAULT`: `{HASHINDEX_EXE_DEFAULT!r}`
+      * `ssh_exe`: optional `ssh` command
       * `relative`: optional flag, default `False`;
         if true pass `'-r'` to the remote `hashindex ls` command
       * `check`: whether to check that the remote command has a `0` return code,
         default `True`
   '''
-  if ssh_exe is None:
-    ssh_exe = SSH_EXE_DEFAULT
-  if hashindex_exe is None:
-    hashindex_exe = HASHINDEX_EXE_DEFAULT
-  hashindex_cmd = shlex.join(
-      prep_argv(
-          hashindex_exe,
-          'ls',
-          ('-h', hashname),
-          relative and '-r',
-          '--',
-          localpath(rdirpath),
-      )
-  )
-  remote_argv = [ssh_exe, rhost, hashindex_cmd]
-  remote = pipefrom(remote_argv, quiet=True)
+  remote_argv = [
+      shlex.split(hashindex_exe),
+      'ls',
+      ('-h', hashname),
+      relative and '-r',
+      '--',
+      localpath(rdirpath),
+  ]
+  remote = pipefrom(remote_argv, remote=rhost, ssh_exe=ssh_exe, quiet=quiet)
   yield from read_hashindex(remote.stdout, hashname=hashname)
   if check:
     remote.wait()
@@ -710,7 +684,6 @@ def run_remote_hashindex(
     rhost: str,
     argv,
     *,
-    ssh_exe=None,
     hashindex_exe=None,
     check: bool = True,
     doit: bool,
@@ -726,8 +699,6 @@ def run_remote_hashindex(
       * `rhost`: the remote host, or `user@host`
       * `argv`: the command line arguments to be passed to the
         remote `hashindex` command
-      * `ssh_exe`: the `ssh` executable,
-        default `SSH_EXE_DEFAULT`: `{SSH_EXE_DEFAULT!r}`
       * `hashindex_exe`: the remote `hashindex` executable,
         default `HASHINDEX_EXE_DEFAULT`: `{HASHINDEX_EXE_DEFAULT!r}`
       * `check`: whether to check that the remote command has a `0` return code,
@@ -735,18 +706,17 @@ def run_remote_hashindex(
       * `doit`: whether to actually run the command, default `True`
       Other keyword parameters are passed therough to `cs.psutils.run`.
   '''
-  if ssh_exe is None:
-    ssh_exe = options.ssh_exe
   if hashindex_exe is None:
     hashindex_exe = options.hashindex_exe
   hashindex_cmd = shlex.join(prep_argv(
       hashindex_exe,
       *argv,
   ))
-  remote_argv = [ssh_exe, rhost, hashindex_cmd]
   with above_upd():
     return run(
-        remote_argv, check=check, doit=doit, quiet=quiet, **subp_options
+        shlex.split(hashindex_exe) + argv,
+        remote=rhost,
+        **subp_options,
     )
 
 @uses_fstags
