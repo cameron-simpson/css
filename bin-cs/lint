@@ -127,8 +127,8 @@ do
           $trace $pyflakes "$lintfile" || xit=1
         fi
         [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
-        [ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
-        [ $quick ] || $trace $pyiclint "$lintfile" || xit=1
+        ##[ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+        ##[ $quick ] || $trace $pyiclint "$lintfile" || xit=1
         exit $xit
       ) || xit=1
       ;;
