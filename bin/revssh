@@ -19,8 +19,8 @@ sshopts=
 
 rtmp=/tmp
 rsetx=      # set -x
-ssh_exe=ssh
-rssh_exe=ssh
+ssh_exe=${SSH_EXE:-"sshto -E"}
+rssh_exe=${RSSH_EXE:-$ssh_exe}
 rssh_host=reverse-$HOST
 origin_ssh_endpoint=127.0.0.1:22
 rsetenv=
@@ -58,6 +58,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
+    -e) ssh_exe=$2; shift ;;
     -E) renvvar=$(   expr "x$2" : 'x\([A-Za-z_][A-Za-z_0-9]*\)=.*' )
         renvvalue=$( expr "x$2" : 'x[A-Za-z_][A-Za-z_0-9]*=\(.*\)' || : )
         shift
