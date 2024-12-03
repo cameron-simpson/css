@@ -189,9 +189,16 @@ class HashIndexCommand(BaseCommand):
   @contextmanager
   @uses_fstags
   def run_context(self, *, fstags: FSTags, **kw):
-    with fstags:
-      with super().run_context(**kw):
-        yield
+    hashname = self.options.hashname
+    try:
+      pfx_call(BaseHashCode.hashclass, hashname)
+    except ValueError as e:
+      warning(f'{hashname=} not known: {e}')
+      yield 1
+    else:
+      with fstags:
+        with super().run_context(**kw):
+          yield
 
   #pylint: disable=too-many-locals
   @uses_runstate
