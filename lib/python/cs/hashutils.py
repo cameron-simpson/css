@@ -47,13 +47,19 @@ class BaseHashCode(bytes):
     '''
     try:
       hashfunc = getattr(hashlib, hashname)
-    except AttributeError:
+    except AttributeError as hashlib_e:
       if hashname == 'blake3':
         # see if the blake3 module is around
         # pylint:disable=import-outside-toplevel
-        from blake3 import blake3 as hashfunc
+        try:
+          from blake3 import blake3 as hashfunc
+        except ImportError as import_e:
+          import sys
+          raise ValueError(
+              f'unknown {hashname=}: {import_e}; {sys.path=}'
+          ) from import_e
       else:
-        raise
+        raise ValueError(f'unknown {hashname=}: {hashlib_e}')
     return hashfunc
 
   @classmethod
