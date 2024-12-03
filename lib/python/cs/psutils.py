@@ -202,6 +202,7 @@ def PidFileManager(path, pid=None):
 def run(
     argv,
     *,
+    check=True,
     doit: bool,
     input=None,
     logger=None,
@@ -223,6 +224,8 @@ def run(
       See the `prep_argv` function for details.
 
       Keyword parameters:
+      * `check`: passed to `subprocess.run`, default `True`;
+        NB: _unlike_ the `subprocess.run` default, which is `False`
       * `doit`: optional flag, default `True`;
         if false do not run the command and return `None`
       * `input`: default `None`: alternative to `stdin`;
@@ -278,7 +281,14 @@ def run(
       stdin = subprocess_DEVNULL
   elif stdin is not None:
     raise ValueError("you may not specify both input and stdin")
-  cp = pfx_call(subprocess_run, argv, input=input, stdin=stdin, **subp_options)
+  cp = pfx_call(
+      subprocess_run,
+      argv,
+      check=check,
+      input=input,
+      stdin=stdin,
+      **subp_options,
+  )
   if cp.stderr:
     # TODO: is this a good thing? I have my doubts
     print(" stderr:")
