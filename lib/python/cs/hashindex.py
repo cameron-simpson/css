@@ -437,7 +437,6 @@ class HashIndexCommand(BaseCommand):
               targetdir,
               fspaths_by_hashcode,
               dstdir,
-              doit=doit,
               move_mode=move_mode,
               symlink_mode=symlink_mode,
           )
@@ -627,10 +626,10 @@ def read_remote_hashindex(
     rdirpath: str,
     *,
     hashname: str,
+    quiet=True,
     ssh_exe: str,
     hashindex_exe: str,
     relative: bool = False,
-    check=True,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' A generator which reads a hashindex of a remote directory,
       This runs: `hashindex ls -h hashname -r rdirpath` on the remote host.
@@ -657,10 +656,9 @@ def read_remote_hashindex(
   ]
   remote = pipefrom(remote_argv, remote=rhost, ssh_exe=ssh_exe, quiet=quiet)
   yield from read_hashindex(remote.stdout, hashname=hashname)
-  if check:
-    remote.wait()
-    if remote.returncode != 0:
-      raise CalledProcessError(remote.returncode, remote_argv)
+  remote.wait()
+  if remote.returncode != 0:
+    raise CalledProcessError(remote.returncode, remote_argv)
 
 @fmtdoc
 @uses_cmd_options(hashindex_exe='hashindex')
@@ -668,9 +666,6 @@ def run_remote_hashindex(
     rhost: str,
     argv,
     *,
-    check: bool = True,
-    doit: bool,
-    quiet: bool,
     hashindex_exe: str,
     **subp_options,
 ):
@@ -685,7 +680,6 @@ def run_remote_hashindex(
         remote `hashindex` command
       * `check`: whether to check that the remote command has a `0` return code,
         default `True`
-      * `doit`: whether to actually run the command, default `True`
       Other keyword parameters are passed therough to `cs.psutils.run`.
   '''
   with above_upd():
