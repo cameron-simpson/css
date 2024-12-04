@@ -1,3 +1,4 @@
+default: make an @popopts usable as a cmd method decorator
 uses_cmd_options: append to the function docstring?
 @promote: params to also accept a mapping of param_name to promotion_func
 default: media info: support "http://www.omdbapi.com/?apikey={OMDB_API_KEY}&type=movie&s=&genre={genre}&y={year}" ?
