@@ -59,7 +59,7 @@
 
 from collections import defaultdict
 from contextlib import contextmanager, nullcontext
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import errno
 from getopt import GetoptError
 from io import TextIOBase
@@ -87,16 +87,16 @@ from typing import Iterable, List, Mapping, Optional, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions, vprint
+from cs.cmdutils import BaseCommand, vprint
 from cs.context import contextif, reconfigure_file
-from cs.deco import fmtdoc, uses_quiet, uses_verbose, uses_cmd_options
+from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.lex import r, split_remote_path
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
-from cs.psutils import prep_argv, pipefrom, run
+from cs.psutils import pipefrom, run
 from cs.resources import RunState, uses_runstate
 from cs.upd import above as above_upd, print, run_task  # pylint: disable=redefined-builtin
 
@@ -215,7 +215,6 @@ class HashIndexCommand(BaseCommand):
         _3='path12',
         r='relative',
     )
-    hashname = options.hashname
     output_format = options.output_format
     relative = options.relative
     path1_only = options.path1_only
@@ -242,7 +241,7 @@ class HashIndexCommand(BaseCommand):
               warning("not a directory")
               badopts = True
         elif path1dir == '-':
-          warning("remote \"-\" not supported")
+          warning('remote "-" not supported')
           badopts = True
     if not argv:
       warning("missing path2")
@@ -258,13 +257,13 @@ class HashIndexCommand(BaseCommand):
               warning("not a directory")
               badopts = True
         elif path2dir == '-':
-          warning("remote \"-\" not supported")
+          warning('remote "-" not supported')
           badopts = True
     if argv:
       warning("extra arguments after path2: %r", argv)
       badopts = True
     if path1spec == '-' and path2spec == '-':
-      warning("path1 and path2 may not both be \"-\"")
+      warning('path1 and path2 may not both be "-"')
       badopts = True
     if badopts:
       raise GetoptError('bad arguments')
@@ -386,7 +385,7 @@ class HashIndexCommand(BaseCommand):
               warning("not a directory")
               badopts = True
         elif refdir == '-':
-          warning("remote \"-\" not supported")
+          warning('remote "-" not supported')
           badopts = True
     if not argv:
       warning("missing targetdir")
@@ -452,7 +451,7 @@ class HashIndexCommand(BaseCommand):
             [
                 'rearrange',
                 not doit and '-n',
-                ('-h', hashname),
+                ('-h', options.hashname),
                 move_mode and '--mv',
                 symlink_mode and '-s',
                 '-',
