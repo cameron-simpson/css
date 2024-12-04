@@ -215,7 +215,6 @@ class HashIndexCommand(BaseCommand):
         _3='path12',
         r='relative',
     )
-    hashindex_exe = options.hashindex_exe
     hashname = options.hashname
     output_format = options.output_format
     relative = options.relative
@@ -273,8 +272,6 @@ class HashIndexCommand(BaseCommand):
       fspaths1_by_hashcode = defaultdict(list)
       for hashcode, fspath in hashindex(
           (path1host, path1dir),
-          hashname=hashname,
-          hashindex_exe=hashindex_exe,
           relative=relative,
       ):
         runstate.raiseif()
@@ -284,8 +281,6 @@ class HashIndexCommand(BaseCommand):
       fspaths2_by_hashcode = defaultdict(list)
       for hashcode, fspath in hashindex(
           (path2host, path2dir),
-          hashname=hashname,
-          hashindex_exe=hashindex_exe,
           relative=relative,
       ):
         runstate.raiseif()
@@ -326,8 +321,6 @@ class HashIndexCommand(BaseCommand):
         argv,
         r='relative',
     )
-    hashindex_exe = options.hashindex_exe
-    hashname = options.hashname
     output_format = options.output_format
     relative = options.relative
     if not argv:
@@ -344,8 +337,6 @@ class HashIndexCommand(BaseCommand):
             continue
         for h, fspath in hashindex(
             (rhost, lpath),
-            hashname=hashname,
-            hashindex_exe=hashindex_exe,
             relative=relative,
         ):
           runstate.raiseif()
@@ -378,8 +369,6 @@ class HashIndexCommand(BaseCommand):
         s='symlink_mode',
     )
     doit = options.doit
-    hashindex_exe = options.hashindex_exe
-    hashname = options.hashname
     move_mode = options.move_mode
     quiet = options.quiet
     symlink_mode = options.symlink_mode
@@ -430,8 +419,6 @@ class HashIndexCommand(BaseCommand):
     with run_task(f'hashindex {refspec}'):
       for hashcode, fspath in hashindex(
           (refhost, refdir),
-          hashname=hashname,
-          hashindex_exe=hashindex_exe,
           relative=True,
       ):
         if hashcode is not None:
@@ -450,7 +437,6 @@ class HashIndexCommand(BaseCommand):
               targetdir,
               fspaths_by_hashcode,
               dstdir,
-              hashname=hashname,
               doit=doit,
               move_mode=move_mode,
               symlink_mode=symlink_mode,
@@ -474,7 +460,6 @@ class HashIndexCommand(BaseCommand):
                 targetdir,
                 dstdir,
             ],
-            hashindex_exe=hashindex_exe,
             input=input_s,
             text=True,
             doit=True,  # we pass -n to the remote hashindex
@@ -533,11 +518,11 @@ def file_checksum(
           cached_hash.set(str(hashcode), state=state)
   return hashcode
 
+@uses_cmd_options(hashname=None)
 def hashindex(
     fspath: Union[str, TextIOBase, Tuple[Union[None, str], str]],
     *,
     hashname: str,
-    hashindex_exe: str,
     relative: bool = False,
     **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
@@ -566,7 +551,6 @@ def hashindex(
           rhost,
           rfspath,
           hashname=hashname,
-          hashindex_exe=hashindex_exe,
           relative=relative,
           **kw,
       )
@@ -637,13 +621,14 @@ def localpath(fspath: str) -> str:
   return './' + fspath
 
 @fmtdoc
+@uses_cmd_options(ssh_exe='ssh', hashindex_exe='hashindex')
 def read_remote_hashindex(
     rhost: str,
     rdirpath: str,
     *,
     hashname: str,
-    hashindex_exe=None,
     ssh_exe: str,
+    hashindex_exe: str,
     relative: bool = False,
     check=True,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
@@ -655,9 +640,8 @@ def read_remote_hashindex(
       * `rhost`: the remote host, or `user@host`
       * `rdirpath`: the remote directory path
       * `hashname`: the file content hash algorithm name
-      * `hashindex_exe`: the remote `hashindex` executable,
-        default `HASHINDEX_EXE_DEFAULT`: `{HASHINDEX_EXE_DEFAULT!r}`
       * `ssh_exe`: optional `ssh` command
+      * `hashindex_exe`: the remote `hashindex` executable
       * `relative`: optional flag, default `False`;
         if true pass `'-r'` to the remote `hashindex ls` command
       * `check`: whether to check that the remote command has a `0` return code,
@@ -679,15 +663,15 @@ def read_remote_hashindex(
       raise CalledProcessError(remote.returncode, remote_argv)
 
 @fmtdoc
-@uses_cmd_options(doit=True, quiet=False)
+@uses_cmd_options(hashindex_exe='hashindex')
 def run_remote_hashindex(
     rhost: str,
     argv,
     *,
-    hashindex_exe=None,
     check: bool = True,
     doit: bool,
     quiet: bool,
+    hashindex_exe: str,
     **subp_options,
 ):
   ''' Run a remote `hashindex` command.
@@ -699,19 +683,11 @@ def run_remote_hashindex(
       * `rhost`: the remote host, or `user@host`
       * `argv`: the command line arguments to be passed to the
         remote `hashindex` command
-      * `hashindex_exe`: the remote `hashindex` executable,
-        default `HASHINDEX_EXE_DEFAULT`: `{HASHINDEX_EXE_DEFAULT!r}`
       * `check`: whether to check that the remote command has a `0` return code,
         default `True`
       * `doit`: whether to actually run the command, default `True`
       Other keyword parameters are passed therough to `cs.psutils.run`.
   '''
-  if hashindex_exe is None:
-    hashindex_exe = options.hashindex_exe
-  hashindex_cmd = shlex.join(prep_argv(
-      hashindex_exe,
-      *argv,
-  ))
   with above_upd():
     return run(
         shlex.split(hashindex_exe) + argv,
@@ -764,6 +740,7 @@ def dir_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
   )
 
+@uses_cmd_options(doit=True, hashname=None)
 @uses_fstags
 @uses_runstate
 @require(
