@@ -1,3 +1,4 @@
+default: drop cs.lex.indent, stdlib textwrap.indent does a better job
 default: make an @popopts usable as a cmd method decorator
 uses_cmd_options: append to the function docstring?
 @promote: params to also accept a mapping of param_name to promotion_func
