@@ -370,23 +370,23 @@ class OptionSpec:
         ),
     )
 
-def extract_usage_from_doc(
-    doc: Union[str, None],
-    usage_marker="Usage:"
-) -> Tuple[Union[str, None], str]:
+def split_usage(doc: Union[str, None],
+                usage_marker="Usage:") -> Tuple[str, str, str]:
   ''' Extract a `"Usage:"`paragraph from a docstring
-      and return the unindented usage and the docstring with that paragraph elided.
+      and return a 3-tuple of `(preusage,usage,postusage)`.
 
-      If the usage paragraph is not present, return `(None,doc)`.
+      If the usage paragraph is not present `''` is returned as
+      the middle comonpent, otherwise it is the unindented usage
+      without the leading `"Usage:"`.
   '''
   if not doc:
     # no doc, return unchanged
-    return None, doc
+    return '', '', ''
   try:
     pre_usage, usage_onward = doc.split(usage_marker, 1)
   except ValueError:
     # no usage: paragraph
-    return None, doc
+    return doc, '', ''
   try:
     usage_format, post_usage = usage_onward.split("\n\n", 1)
   except ValueError:
@@ -400,7 +400,7 @@ def extract_usage_from_doc(
     pass
   else:
     usage_format = f'{top_line}\n{indent(post_lines)}'
-  return usage_format, pre_usage + post_usage
+  return pre_usage, usage_format, post_usage
 
 @dataclass
 class SubCommand:
@@ -510,11 +510,11 @@ class SubCommand:
       # the preferred way
       # derive from the docstring or from self.usage_default
       doc = obj_docstring(method)
-      usage_format, doc = extract_usage_from_doc(doc)
+      preusage, usage_format, post_usage = split_usage(doc)
       if not usage_format:
         # No "Usage:" paragraph - use default usage line and first paragraph.
         usage_format = self.usage_default
-        paragraph1 = stripped_dedent(doc.split('\n\n', 1)[0])
+        paragraph1 = stripped_dedent(pre_usage.split('\n\n', 1)[0])
         if paragraph1:
           usage_format += "\n" + indent(paragraph1)
     else:
@@ -1406,21 +1406,19 @@ class BaseCommand:
     ''' Extract the `Usage:` paragraph from `cls__doc__` if present.
         Return a 2-tuple of `(doc_without_usage,usage_text)`
         being the remaining docstring and a full usage message.
+
+        *Note*: this actually sets `cls.USAGE_FORMAT` if that does
+        not already exist.
     '''
     if cmd is None:
       # infer a cmd from the class name
       cmd = cutsuffix(cls.__name__, 'Command').lower()
     instance = cls([cmd])
-    usage_format, doc_without_usage = extract_usage_from_doc(
-        obj_docstring(cls)
-    )
-    ## # This little shuffle is so that instance.usage_text()
-    ## # does not process format strings twice.
-    ## cls.__doc__ = doc_without_usage
+    pre_usage, usage_format, post_usage = split_usage(obj_docstring(cls))
     if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
       cls.USAGE_FORMAT = usage_format
     usage_text = instance.usage_text(recurse=True, short=False)
-    return doc_without_usage, usage_text
+    return pre_usage + post_usage, usage_text
 
   @pfx_method
   # pylint: disable=no-self-use
