@@ -195,7 +195,7 @@ class HashIndexCommand(BaseCommand):
   #pylint: disable=too-many-locals
   @uses_runstate
   def cmd_comm(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} {{-1|-2|-3}} {{path1|-}} {{path2|-}}
+    ''' Usage: {cmd} {{-1|-2|-3|-r}} {{path1|-}} {{path2|-}}
           Compare the filepaths in path1 and path2 by content.
           -1            List hashes and paths only present in path1.
           -2            List hashes and paths only present in path2.
