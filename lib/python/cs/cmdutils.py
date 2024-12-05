@@ -1425,7 +1425,7 @@ class BaseCommand:
   def apply_opt(self, opt, val):
     ''' Handle an individual global command line option.
 
-        This default implementation raises a `RuntimeError`.
+        This default implementation raises a `NotImplementedError`.
         It only fires if `getopt` actually gathered arguments
         and would imply that a `GETOPT_SPEC` was supplied
         without an `apply_opt` or `apply_opts` method to implement the options.
@@ -1553,7 +1553,7 @@ class BaseCommand:
         argv.insert(0, arg0)
       raise
 
-  @OBSOLETE
+  @OBSOLETE("self.options.popopts")
   def popopts(self, argv, options, **opt_specs):
     ''' A convenience shim which returns `self.options.popopts(argv,**opt_specs)`.
     '''
