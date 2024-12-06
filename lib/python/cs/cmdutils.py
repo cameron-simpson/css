@@ -744,8 +744,11 @@ SSH_EXE_ENVVAR = 'SSH_EXE'
 
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
-    dry_run='dry_run',
-    e_=('ssh_exe', 'An ssh-like command to use for remote command execution.'),
+    dry_run=('dry_run', 'Dry run, aka no action.'),
+    e_=(
+        'ssh_exe', '''An ssh-like command to use for remote command execution.
+           The string is a shell-like command string parsable by shlex.split.'''
+    ),
     n=('dry_run', 'No action, aka dry run.'),
     q='quiet',
     v='verbose',
@@ -1029,8 +1032,10 @@ class BaseCommandOptions(HasThreadState):
         "\n".join(
             tabulate(
                 *(
-                    (opt_spec.option_terse(), opt_spec.help_text)
-                    for _, opt_spec in sorted(
+                    (
+                        opt_spec.option_terse(),
+                        stripped_dedent(opt_spec.help_text)
+                    ) for _, opt_spec in sorted(
                         getopt_spec_map.items(),
                         key=lambda kv: kv[0].lstrip('-').lower()
                     )
