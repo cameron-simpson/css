@@ -1763,28 +1763,22 @@ class BaseCommand:
     finally:
       pass
 
+  @popopts(
+      l=('long', 'Long listing.'),
+      r=('recurse', 'Recurse into subcommands.'),
+      s=('short', 'Short listing.'),
+  )
   def cmd_help(self, argv):
     ''' Usage: {cmd} [-l] [-s] [subcommand-names...]
           Print help for subcommands.
           This outputs the full help for the named subcommands,
           or the short help for all subcommands if no names are specified.
-          -l  Long help.
-          -r  Recurse into subcommands.
-          -s  Short help.
     '''
     options = self.options
-    if argv and argv[0].startswith('-'):
-      options.popopts(
-          argv,
-          l=('-short', 'Long listing.'),
-          r=('recurse', 'Recurse into subcommands.'),
-          s=('short', 'Short listing.'),
-      )
-      recurse = options.recurse
-      short = options.short
-    else:
-      short = not argv
-      recurse = False
+    if not options.short and not options.long:
+      options.short = not argv
+    recurse = options.recurse
+    short = options.short
     all_subcmds = self.subcommands()
     subcmds = argv or sorted(all_subcmds)
     unknown = False
