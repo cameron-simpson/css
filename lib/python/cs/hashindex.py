@@ -296,21 +296,20 @@ class HashIndexCommand(BaseCommand):
         for fspath in fspaths1_by_hashcode[hashcode]:
           print(output_format.format(hashcode=hashcode, fspath=fspath))
 
+  @popopts(
+      r=(
+          'relative',
+          ''' Emit relative paths in the listing.
+              This requires each path to be a directory.''',
+      )
+  )
   @uses_runstate
   def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [options...] [[host:]path...]
           Walk filesystem paths and emit a listing.
           The default path is the current directory.
-          Options:
-          -r            Emit relative paths in the listing.
-                        This requires each path to be a directory.
     '''
     options = self.options
-    options.relative = False
-    options.popopts(
-        argv,
-        r='relative',
-    )
     output_format = options.output_format
     relative = options.relative
     if not argv:
@@ -334,13 +333,14 @@ class HashIndexCommand(BaseCommand):
             print(output_format.format(hashcode=h, fspath=fspath))
     return xit
 
+  @popopts(
+      mv='move_mode',
+      s='synmlink_mode',
+  )
   @typechecked
   def cmd_rearrange(self, argv):
     ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir [dstdir]
           Rearrange files from targetdir into dstdir based on their positions in refdir.
-          Options:
-            --mv        Move mode.
-            -s          Symlink mode.
           Other arguments:
             refdir      The reference directory, which may be local or remote
                         or "-" indicating that a hash index will be read from
@@ -353,11 +353,6 @@ class HashIndexCommand(BaseCommand):
     '''
     options = self.options
     badopts = False
-    options.popopts(
-        argv,
-        mv='move_mode',
-        s='symlink_mode',
-    )
     doit = options.doit
     move_mode = options.move_mode
     quiet = options.quiet
