@@ -241,8 +241,6 @@ def run(
 
       Other keyword parameters are passed to `subprocess.run`.
   '''
-  from cs.debug import X
-  X("run quiet=%r argv=%r", quiet, argv)
   argv = prep_argv(*argv, remote=remote, ssh_exe=ssh_exe)
   if logger is True:
     logger = logging.getLogger()
