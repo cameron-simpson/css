@@ -1021,6 +1021,36 @@ class BaseCommandOptions(HasThreadState):
           value = not opt_spec.field_default
         setattr(self, opt_spec.field_name, value)
 
+  @classmethod
+  def usage_options_format(
+      cls,
+      headline="Options:",
+      *,
+      _common_opt_specs=None,
+      **opt_specs_kw,
+  ):
+    ''' Return an options paragraph describing `opt_specs_kw`.
+        or `''` if `opt_specs_kw` is empty.
+    '''
+    if not opt_specs_kw:
+      return ''
+    _, _, getopt_spec_map = cls.getopt_spec_map(
+        opt_specs_kw, _common_opt_specs
+    )
+    return headline + "\n" + indent(
+        "\n".join(
+            tabulate(
+                *(
+                    (opt_spec.option_terse(), opt_spec.help_text)
+                    for _, opt_spec in sorted(
+                        getopt_spec_map.items(),
+                        key=lambda kv: kv[0].lstrip('-').lower()
+                    )
+                ),
+            )
+        )
+    )
+
 class BaseCommand:
   ''' A base class for handling nestable command lines.
 
