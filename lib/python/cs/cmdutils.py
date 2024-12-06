@@ -42,7 +42,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import OBSOLETE, uses_cmd_options
+from cs.deco import decorator, OBSOLETE, uses_cmd_options
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -1036,6 +1036,49 @@ class BaseCommandOptions(HasThreadState):
             )
         )
     )
+
+@decorator
+def popopts(cmd_method, **opt_specs_kw):
+  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`
+      and update `self.options`. This also updates the method's usage message.
+
+      Example:
+
+          @popopts(x=('trace', 'Trace execution.'))
+          def cmd_do_something(self, argv):
+              """ Usage: {cmd} [-x] blah blah
+                    Do some thing to blah.
+              """
+
+      This arranges for cmd_do_something to call `self.options.popopts(argv)`,
+      and updates the usage message with an "Options:" paragraph.
+
+      This avoids needing to manually enumerate the options in the
+      docstring usage and avoids explicitly calling `self.options.popopts`
+      inside the method.
+  '''
+
+  def popopts_cmd_method_wrapper(self, argv, *method_a, **method_kw):
+    self.options.popopts(argv, **opt_specs_kw)
+    return cmd_method(self, argv, *method_a, **method_kw)
+
+  if opt_specs_kw:
+    # patch the cmd_method usage text
+    pre_usage, usage_format, post_usage = split_usage(cmd_method.__doc__ or '')
+    if usage_format:
+      usage_format = (
+          f'Usage: {usage_format}\n' + indent(
+              BaseCommandOptions.usage_options_format(
+                  "Options:",
+                  _common_opt_specs={},
+                  **opt_specs_kw,
+              )
+          )
+      )
+    cmd_method.__doc__ = "\n\n".join((pre_usage, usage_format, post_usage)
+                                     ).strip()
+
+  return popopts_cmd_method_wrapper
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
