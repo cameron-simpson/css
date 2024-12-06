@@ -746,8 +746,9 @@ SSH_EXE_ENVVAR = 'SSH_EXE'
 _COMMON_OPT_SPECS = dict(
     dry_run=('dry_run', 'Dry run, aka no action.'),
     e_=(
-        'ssh_exe', '''An ssh-like command to use for remote command execution.
-           The string is a shell-like command string parsable by shlex.split.'''
+        'ssh_exe',
+        ''' An ssh-like command to use for remote command execution.
+            The string is a shell-like command string parsable by shlex.split.''',
     ),
     n=('dry_run', 'No action, aka dry run.'),
     q='quiet',
