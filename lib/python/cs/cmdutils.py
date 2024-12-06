@@ -1612,17 +1612,6 @@ class BaseCommand:
         argv.insert(0, arg0)
       raise
 
-  @OBSOLETE("self.options.popopts")
-  def popopts(self, argv, options, **opt_specs):
-    ''' A convenience shim which returns `self.options.popopts(argv,**opt_specs)`.
-    '''
-    if options is not self.options:
-      warning(
-          "obsolete use of %s.popopts\n    with options %s\n    is not self.options %s",
-          self.__class__.__name__, r(options), r(self.options)
-      )
-    return options.popopts(argv, **opt_specs)
-
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
     ''' Run a command.
@@ -1928,6 +1917,17 @@ class BaseCommand:
         banner=banner,
         locals_=local,
     )
+
+  @OBSOLETE("self.options.popopts")
+  def popopts(self, argv, options, **opt_specs):
+    ''' A convenience shim which returns `self.options.popopts(argv,**opt_specs)`.
+    '''
+    if options is not self.options:
+      warning(
+          "obsolete use of %s.popopts\n    with options %s\n    is not self.options %s",
+          self.__class__.__name__, r(options), r(self.options)
+      )
+    return options.popopts(argv, **opt_specs)
 
 BaseCommandSubType = subtype(BaseCommand)
 
