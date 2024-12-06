@@ -1367,10 +1367,54 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   return ssh_target, remotepath
 
 def tabulate(*rows, sep='  '):
-  ''' A generator yielding lines of values from `rows` aligned in columns.
+  r''' A generator yielding lines of values from `rows` aligned in columns.
+
+      Each row in rows is a list of strings. If the strings contain
+      newlines they will be split into subrows.
+
+      Example:
+
+          >>> for row in tabulate(
+          ...     ['one col'],
+          ...     ['three', 'column', 'row'],
+          ...     ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
+          ...     ['two', 'cols'],
+          ... ):
+          ...     print(row)
+          ...
+          one col
+          three    column  row
+          row3     multi   goes  and
+                   line    here  here
+                   text
+          two      cols
+          >>>
   '''
   if not rows:
+    # avoids max of empty list
     return
+  # pad short rows with empty columns
+  max_cols = max(map(len, rows))
+  for row in rows:
+    if len(row) < max_cols:
+      row += [''] * (max_cols - len(row))
+  # break rows on newlines
+  srows = []
+  for row in rows:
+    if all("\n" not in cell for cell in row):
+      # no multiline row cells
+      srows.append(row)
+    else:
+      # split multiline cells int columns, pad columns to match
+      cols = [
+          [subcell.rstrip() for subcell in cell.split("\n")] for cell in row
+      ]
+      max_height = max(map(len, cols))
+      for subrow in range(max_height):
+        srows.append(
+            [col[subrow] if subrow < len(col) else '' for col in cols]
+        )
+    rows = srows
   col_widths = [
       max(map(len, (row[c]
                     for row in rows)))
