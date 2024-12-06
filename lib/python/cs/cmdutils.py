@@ -666,6 +666,8 @@ class SubCommand:
       # the seen_subcommands for our subcommands
       sub_seen_subcommands = dict(seen_subcommands)
       sub_seen_subcommands.update(subcommands)
+    # normalise the subcommand names to match the subcommands mapping
+    show_subcmds = [subcmd.replace('-', '_') for subcmd in show_subcmds]
     if short:
       usage_line, desc1, _ = self.usage_format_parts
       usage_format = usage_line
