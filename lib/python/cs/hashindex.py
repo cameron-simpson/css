@@ -87,7 +87,7 @@ from typing import Iterable, List, Mapping, Optional, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, vprint
+from cs.cmdutils import BaseCommand, popopts, vprint
 from cs.context import contextif, reconfigure_file
 from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
 from cs.fs import needdir, shortpath
@@ -194,27 +194,18 @@ class HashIndexCommand(BaseCommand):
 
   #pylint: disable=too-many-locals
   @uses_runstate
+  @popopts(
+      _1=('path1_only', 'List hashes and paths only present in path1.'),
+      _2=('path2_only', 'List hashes and paths only present in path2.'),
+      _3=('path12', 'List hashes and paths present in path1 and path2.'),
+      r=('relative', 'Emit relative paths in the listing.'),
+  )
   def cmd_comm(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} {{-1|-2|-3|-r}} {{path1|-}} {{path2|-}}
           Compare the filepaths in path1 and path2 by content.
-          -1            List hashes and paths only present in path1.
-          -2            List hashes and paths only present in path2.
-          -3            List hashes and paths present in path1 and path2.
-          -r            Emit relative paths in the listing.
     '''
     badopts = False
     options = self.options
-    options.path1_only = False  # pylint: disable=attribute-defined-outside-init
-    options.path2_only = False  # pylint: disable=attribute-defined-outside-init
-    options.path12 = False  # pylint: disable=attribute-defined-outside-init
-    options.relative = False
-    options.popopts(
-        argv,
-        _1='path1_only',
-        _2='path2_only',
-        _3='path12',
-        r='relative',
-    )
     output_format = options.output_format
     relative = options.relative
     path1_only = options.path1_only
