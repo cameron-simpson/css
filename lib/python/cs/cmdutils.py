@@ -893,7 +893,7 @@ class BaseCommandOptions(HasThreadState):
     self.dry_run = not new_doit
 
   @classmethod
-  def getopt_spec_map(cls, opt_specs_kw: Mapping):
+  def getopt_spec_map(cls, opt_specs_kw: Mapping, common_opt_specs=None):
     ''' Return a 3-tuple of (shortopts,longopts,getopt_spec_map)` being:
        - `shortopts`: the `getopt()` short options specification string
        - `longopts`: the `getopts()` long option specification list
@@ -908,7 +908,7 @@ class BaseCommandOptions(HasThreadState):
     # gather up the option specifications and make getopt arguments
     for opt_k, opt_specs in ChainMap(
         opt_specs_kw,
-        cls.COMMON_OPT_SPECS,
+        cls.COMMON_OPT_SPECS if common_opt_specs is None else common_opt_specs,
     ).items():
       with Pfx("opt_spec[%r]=%r", opt_k, opt_specs):
         opt_spec = opt_spec_cls.from_opt_kw(opt_k, opt_specs)
