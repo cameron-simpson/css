@@ -496,7 +496,7 @@ class SubCommand:
       # the preferred way
       # derive from the docstring or from self.usage_default
       doc = obj_docstring(method)
-      preusage, usage_format, post_usage = split_usage(doc)
+      pre_usage, usage_format, post_usage = split_usage(doc)
       if not usage_format:
         # No "Usage:" paragraph - use default usage line and first paragraph.
         usage_format = self.usage_default
