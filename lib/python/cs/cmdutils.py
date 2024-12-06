@@ -472,22 +472,8 @@ class SubCommand:
     ''' The `Common options:` format string paragraph
         or `None` if there are no common options.
     '''
-    common_opts = self.command.options.COMMON_OPT_SPECS
-    if not common_opts:
-      return None
-    _, _, getopt_spec_map = self.command.Options.getopt_spec_map(common_opts)
-    return "Common options:\n" + indent(
-        "\n".join(
-            tabulate(
-                *(
-                    (opt_spec.option_terse(), opt_spec.help_text)
-                    for _, opt_spec in sorted(
-                        getopt_spec_map.items(),
-                        key=lambda kv: kv[0].lstrip('-').lower()
-                    )
-                ),
-            )
-        )
+    return self.command.Options.usage_options_format(
+        "Common options:", **self.command.options.COMMON_OPT_SPECS
     )
 
   @cached_property
