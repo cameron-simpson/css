@@ -9,7 +9,7 @@ from os.path import isdir as isdirpath
 import sys
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
-from cs.cmdutils import qvprint
+from cs.cmdutils import popopts, qvprint
 from cs.context import contextif
 from cs.fstags import uses_fstags, FSTags
 from cs.lex import r, s
@@ -86,15 +86,14 @@ class KindleCommand(EBooksCommonBaseCommand):
     return self.options.kindle.dbshell()
 
   # pylint: disable=too-many-locals
+  @popopts(f=('force', 'Force: replace the AZW3 format if already present.'))
   @uses_runstate
   def cmd_export(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-f] [ASINs...]
           Export AZW files to Calibre library.
-          -f    Force: replace the AZW3 format if already present.
           ASINs Optional ASIN identifiers to export.
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
-    self.popopts(argv, f='force')
     options = self.options
     calibre = options.calibre
     dedrm = options.dedrm
@@ -199,16 +198,14 @@ class KindleCommand(EBooksCommonBaseCommand):
                 ctags[tag_name] = tag_value
     return xit
 
+  @popopts(l='long_mode')
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l]
           List the contents of the library.
-          -l  Long mode.
     '''
     options = self.options
     kindle = options.kindle
-    options.longmode = False
-    options.popopts(argv, l='longmode')
-    longmode = options.longmode
+    long_mode = options.long_mode
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     runstate = options.runstate
@@ -227,7 +224,7 @@ class KindleCommand(EBooksCommonBaseCommand):
         if kbook.sampling:
           line1.append(f'({kbook.sampling})')
         print(*line1)
-        if longmode:
+        if long_mode:
           if kbook.type != 'kindle.ebook':
             print("  type =", kbook.type)
           if kbook.revision is not None:

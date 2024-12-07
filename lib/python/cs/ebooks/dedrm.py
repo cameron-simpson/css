@@ -35,7 +35,7 @@ from zipfile import ZipFile
 
 from typeguard import typechecked
 
-from cs.cmdutils import qvprint
+from cs.cmdutils import popopts, qvprint
 from cs.context import contextif, stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
@@ -79,13 +79,15 @@ class DeDRMCommand(EBooksCommonBaseCommand):
       with contextif(self.options.dedrm):
         yield
 
+  @popopts(
+      inplace=('Replace the original with the decrypted version.'),
+      O='output_dirpath',
+  )
   def cmd_decrypt(self, argv):
     ''' Usage: {cmd} [--inplace] filenames...
           Remove DRM from the specified filenames.
           Write the decrypted contents of path/to/book.ext
           to the file book-decrypted.ext.
-          Options:
-            --inplace   Replace the original with the decrypted version.
     '''
     dedrm = self.options.dedrm
     options = self.options
@@ -95,6 +97,8 @@ class DeDRMCommand(EBooksCommonBaseCommand):
         O_='output_dirpath',
         inplace=bool,
     )
+    if options.output_dirpath is None:
+      options.output_dirpath = '.'
     if not argv:
       raise GetoptError("missing filenames")
     for filename in argv:

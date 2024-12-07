@@ -1550,27 +1550,18 @@ class CalibreCommand(EBooksCommonBaseCommand):
     return 0
 
   # pylint: disable=too-many-locals
+  @popopts(
+      l=('longmode', 'Long mode, listing book details over several lines.'),
+      o_=('ls_format', 'Output format for use in a single line book listing.'),
+      r=('sort_reverse', 'Reverse the listing order.'),
+      t=('sort_timestamp', 'Order listing by timestamp.'),
+  )
   @uses_runstate
   def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-l] [-o ls-format] [book_specs...]
           List the contents of the Calibre library.
-          -l            Long mode, listing book details over several lines.
-          -o ls_format  Output format for use in a single line book listing.
-          -r            Reverse the listing order.
-          -t            Order listing by timestamp.
     '''
     options = self.options
-    options.longmode = False  # pylint: disable=attribute-defined-outside-init
-    options.ls_format = None
-    options.sort_reverse = False
-    options.sort_timestamp = False
-    options.popopts(
-        argv,
-        l='longmode',
-        o_='ls_format',
-        r='sort_reverse',
-        t='sort_timestamp',
-    )
     if options.sort_timestamp:
       cbook_sort_key = lambda cbook: cbook.timestamp
     else:
@@ -1708,11 +1699,16 @@ class CalibreCommand(EBooksCommonBaseCommand):
     return xit
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+  @popopts(
+      f=(
+          'force',
+          'Force. Overwrite existing formats with formats from other-library.'
+      )
+  )
   @uses_runstate
   def cmd_pull(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] [/path/to/other-library] [identifiers...]
+    ''' Usage: {cmd} [-f] [/path/to/other-library] [identifiers...]
           Import formats from another Calibre library.
-          -f    Force. Overwrite existing formats with formats from other-library.
           /path/to/other-library: optional path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
@@ -1724,10 +1720,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
     '''
     options = self.options
     calibre = options.calibre
-    options.popopts(
-        argv,
-        f='force',
-    )
     if argv and argv[0].startswith('/') and isdirpath(argv[0]):
       options.calibre_path_other = argv.pop(0)
     doit = options.doit
