@@ -45,10 +45,15 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.orm import declared_attr, relationship
+from sqlalchemy.orm import (
+    declared_attr,
+    Mapped,
+    mapped_column,
+    relationship,
+)
 from typeguard import typechecked
 
-from cs.cmdutils import qvprint
+from cs.cmdutils import popopts, qvprint
 from cs.context import contextif
 from cs.deco import (
     fmtdoc,
@@ -799,7 +804,7 @@ class CalibreTree(AbstractEbooksTree):
             ) for idk, idv in book.identifiers.items()
         )
       # slow search by arbitrary match_fn
-      for book in self:
+      for book in self.values():
         if match_fn(book):
           yield book
     else:
@@ -1015,6 +1020,7 @@ class CalibreMetadataDB(ORM):
               lambda self: relationship(
                   f'{left_name.title()}s',
                   back_populates=f'{right_name}_links',
+                  lazy='joined',
               )
           )
       )
@@ -1034,6 +1040,7 @@ class CalibreMetadataDB(ORM):
               lambda self: relationship(
                   f'{right_name.title()}s',
                   back_populates=f'{left_name}_links',
+                  lazy='joined',
               )
           )
       )
@@ -1333,18 +1340,14 @@ class CalibreCommand(EBooksCommonBaseCommand):
       cbooks = sorted(cbooks, key=sortkey, reverse=reverse)
     return cbooks
 
+  @popopts(cbz='Also make a CBZ file.')
   def cmd_add(self, argv):
-    ''' Usage: {cmd} [-nqv] bookpaths...
+    ''' Usage: {cmd} [--cbz] bookpaths...
           Add the specified ebook bookpaths to the library.
-          --cbz Also make a CBZ.
     '''
-    options = self.options
-    options.popopts(
-        argv,
-        cbz='make_cbz',
-    )
     if not argv:
       raise GetoptError("missing bookpaths")
+    options = self.options
     calibre = options.calibre
     for bookpath in argv:
       with Pfx(bookpath):
@@ -1358,17 +1361,14 @@ class CalibreCommand(EBooksCommonBaseCommand):
           pfx_call(cbook.make_cbz)
 
   # pylint: disable=too-many-branches,too-many-locals
+  @popopts(
+      f=('force', 'Force: convert even if the format is already present.')
+  )
   @uses_runstate
   def cmd_convert(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] formatkey dbids...
+    ''' Usage: {cmd} [-f] formatkey dbids...
           Convert books to the format `formatkey`.
-          -f    Force: convert even if the format is already present.
     '''
-    options = self.options
-    options.popopts(
-        argv,
-        f='force',
-    )
     dstfmtk = self.poparg(argv).upper()
     srcfmtks, conv_opts = self.CONVERT_MAP.get(dstfmtk, ([], ()))
     if not srcfmtks:
@@ -1382,6 +1382,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
     except ValueError as e:
       raise GetoptError("invalid book specifiers: %s") from e
     xit = 0
+    options = self.options
     doit = options.doit
     force = options.force
     quiet = options.quiet
@@ -1459,31 +1460,27 @@ class CalibreCommand(EBooksCommonBaseCommand):
               xit = 1
     return xit
 
+  @popopts(
+      _1=('first_format', 'Link only the first format found.'),
+      d_=(
+          'linkto_dirpath',
+          '''Specify the target directory, default from
+              ${DEFAULT_LINKTO_DIRPATH_ENVVAR} or {DEFAULT_LINKTO_DIRPATH}.''',
+      ),
+      F_=('formats', 'Source formats, default: {DEFAULT_LINKTO_FORMATS}'),
+      f=('force', 'Force. Replace existing links.'),
+      o_=('link_format', 'Link name format.'),
+  )
   @uses_runstate
   def cmd_linkto(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-1f] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
           Export books to linkto-dir by hard linking.
-          -1              Link only the first format found.
-          -d linkto-dir   Specify the target directory, default from ${DEFAULT_LINKTO_DIRPATH_ENVVAR}
-                          or {DEFAULT_LINKTO_DIRPATH}.
-          -F fmt,...      Source formats, default: {DEFAULT_LINKTO_FORMATS}
-          -f              Force. Replace existing links.
-          -o link-format  Link name format.
     '''
     ##Default with series: {DEFAULT_LINKTO_SERIES_FORMAT}
     ##Default without series: {DEFAULT_LINKTO_NOSERIES_FORMAT}
     options = self.options
-    options.formats = ['CBZ', 'EPUB']
-    options.first_format = False
-    options.link_format = None
-    options.popopts(
-        argv,
-        _1='first_format',
-        d_='linkto_dirpath',
-        F_='formats',
-        f='force',
-        o_='link_format',
-    )
+    if options.formats is None:
+      options.formats = self.DEFAULT_LINKTO_FORMATS
     doit = options.doit
     first_format = options.first_format
     force = options.force
@@ -1553,27 +1550,18 @@ class CalibreCommand(EBooksCommonBaseCommand):
     return 0
 
   # pylint: disable=too-many-locals
+  @popopts(
+      l=('longmode', 'Long mode, listing book details over several lines.'),
+      o_=('ls_format', 'Output format for use in a single line book listing.'),
+      r=('sort_reverse', 'Reverse the listing order.'),
+      t=('sort_timestamp', 'Order listing by timestamp.'),
+  )
   @uses_runstate
   def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-l] [-o ls-format] [book_specs...]
           List the contents of the Calibre library.
-          -l            Long mode, listing book details over several lines.
-          -o ls_format  Output format for use in a single line book listing.
-          -r            Reverse the listing order.
-          -t            Order listing by timestamp.
     '''
     options = self.options
-    options.longmode = False  # pylint: disable=attribute-defined-outside-init
-    options.ls_format = None
-    options.sort_reverse = False
-    options.sort_timestamp = False
-    options.popopts(
-        argv,
-        l='longmode',
-        o_='ls_format',
-        r='sort_reverse',
-        t='sort_timestamp',
-    )
     if options.sort_timestamp:
       cbook_sort_key = lambda cbook: cbook.timestamp
     else:
@@ -1711,11 +1699,16 @@ class CalibreCommand(EBooksCommonBaseCommand):
     return xit
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+  @popopts(
+      f=(
+          'force',
+          'Force. Overwrite existing formats with formats from other-library.'
+      )
+  )
   @uses_runstate
   def cmd_pull(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] [/path/to/other-library] [identifiers...]
+    ''' Usage: {cmd} [-f] [/path/to/other-library] [identifiers...]
           Import formats from another Calibre library.
-          -f    Force. Overwrite existing formats with formats from other-library.
           /path/to/other-library: optional path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
@@ -1727,10 +1720,6 @@ class CalibreCommand(EBooksCommonBaseCommand):
     '''
     options = self.options
     calibre = options.calibre
-    options.popopts(
-        argv,
-        f='force',
-    )
     if argv and argv[0].startswith('/') and isdirpath(argv[0]):
       options.calibre_path_other = argv.pop(0)
     doit = options.doit

@@ -24,7 +24,7 @@ from typing import Optional, Union
 from uuid import UUID
 from zipfile import ZipFile, ZIP_DEFLATED
 
-from cs.cmdutils import BaseCommand, qvprint
+from cs.cmdutils import BaseCommand, popopts, qvprint
 from cs.context import stackattrs
 from cs.deco import fmtdoc, uses_cmd_options
 from cs.fileutils import atomic_filename
@@ -358,18 +358,17 @@ class KoboCommand(EBooksCommonBaseCommand):
           yield
 
   # pylint: disable=too-many-locals
+  @popopts(f=('force', 'Force: replace the EPUB format if already present.'))
   @uses_runstate
   def cmd_export(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-f] [volumeids...]
           Export Kobo books to Calibre library.
-          -f    Force: replace the EPUB format if already present.
           volumeids
                 Optional Kobo volumeid identifiers to export.
                 The default is to export all books.
                 (TODO: just those with no "calibre.dbid" fstag.)
     '''
     options = self.options
-    options.popopts(argv, f='force')
     doit = options.doit
     force = options.force
     quiet = options.quiet

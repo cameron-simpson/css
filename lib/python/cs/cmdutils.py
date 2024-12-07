@@ -711,7 +711,7 @@ class SubCommand:
           # recursive long listing
           subusages.append(
               subcommand.usage_text(
-                  short=not recurse,
+                  short=short,
                   recurse=recurse,
                   seen_subcommands=sub_seen_subcommands,
               )
