@@ -44,13 +44,14 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20241109-post'
+__version__ = '20241207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
+        "Topic :: Text Processing",
     ],
     'install_requires': [
         'cs.dateutils',
@@ -407,7 +408,7 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
-def stripped_dedent(s, post_indent=''):
+def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
@@ -420,7 +421,10 @@ def stripped_dedent(s, post_indent=''):
       The optional `post_indent` parameter may be used to indent
       the dedented text before return.
 
-      Example:
+      The optional `sub_indent` parameter may be used to indent
+      the second and following lines if the dedented text before return.
+
+      Examples:
 
           >>> def func(s):
           ...   """ Slightly smarter dedent which ignores a string's opening indent.
@@ -434,6 +438,18 @@ def stripped_dedent(s, post_indent=''):
           Slightly smarter dedent which ignores a string's opening indent.
           Strip the supplied string `s`. Pull off the leading line.
           Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, sub_indent='  '))
+          Slightly smarter dedent which ignores a string's opening indent.
+            Strip the supplied string `s`. Pull off the leading line.
+            Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, post_indent='  '))
+            Slightly smarter dedent which ignores a string's opening indent.
+            Strip the supplied string `s`. Pull off the leading line.
+            Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, post_indent='  ', sub_indent='| '))
+            Slightly smarter dedent which ignores a string's opening indent.
+            | Strip the supplied string `s`. Pull off the leading line.
+            | Dedent the rest. Put back the leading line.
   '''
   s = s.strip()
   lines = s.split('\n')
@@ -442,7 +458,7 @@ def stripped_dedent(s, post_indent=''):
   line1 = lines.pop(0)
   if not lines:
     return indent(line1, post_indent)
-  adjusted = dedent('\n'.join(lines))
+  adjusted = indent(dedent('\n'.join(lines)), sub_indent)
   return indent(line1 + '\n' + adjusted, post_indent)
 
 @require(lambda offset: offset >= 0)
@@ -1350,9 +1366,55 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
       remotepath = suffix
   return ssh_target, remotepath
 
-def tabulate(*rows, sep=' '):
-  ''' A generator yielding lines of values from `rows` aligned in columns.
+def tabulate(*rows, sep='  '):
+  r''' A generator yielding lines of values from `rows` aligned in columns.
+
+      Each row in rows is a list of strings. If the strings contain
+      newlines they will be split into subrows.
+
+      Example:
+
+          >>> for row in tabulate(
+          ...     ['one col'],
+          ...     ['three', 'column', 'row'],
+          ...     ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
+          ...     ['two', 'cols'],
+          ... ):
+          ...     print(row)
+          ...
+          one col
+          three    column  row
+          row3     multi   goes  and
+                   line    here  here
+                   text
+          two      cols
+          >>>
   '''
+  if not rows:
+    # avoids max of empty list
+    return
+  # pad short rows with empty columns
+  max_cols = max(map(len, rows))
+  for row in rows:
+    if len(row) < max_cols:
+      row += [''] * (max_cols - len(row))
+  # break rows on newlines
+  srows = []
+  for row in rows:
+    if all("\n" not in cell for cell in row):
+      # no multiline row cells
+      srows.append(row)
+    else:
+      # split multiline cells int columns, pad columns to match
+      cols = [
+          [subcell.rstrip() for subcell in cell.split("\n")] for cell in row
+      ]
+      max_height = max(map(len, cols))
+      for subrow in range(max_height):
+        srows.append(
+            [col[subrow] if subrow < len(col) else '' for col in cols]
+        )
+    rows = srows
   col_widths = [
       max(map(len, (row[c]
                     for row in rows)))

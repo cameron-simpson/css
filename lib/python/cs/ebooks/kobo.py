@@ -123,9 +123,19 @@ class KoboTree(AbstractEbooksTree):
   @contextmanager
   def startup_shutdown(self):
     ''' Open/closethe obok library. '''
-    obok = self.import_obok(self.fspath)
+    try:
+      obok = self.import_obok(self.fspath)
+    except ModuleNotFoundError as e:
+      warning(
+          'cannot import the "obok" module from obok_package_path=%r: %s',
+          self.fspath, e
+      )
+      obok = None
     assert self.lib is None
-    with stackattrs(self, lib=obok.KoboLibrary(desktopkobodir=self.fspath)):
+    with stackattrs(
+        self,
+        lib=obok and obok.KoboLibrary(desktopkobodir=self.fspath),
+    ):
       try:
         yield
       finally:
@@ -134,7 +144,8 @@ class KoboTree(AbstractEbooksTree):
           del self.books
         except AttributeError:
           pass
-        self.lib.close()
+        if self.lib is not None:
+          self.lib.close()
 
   @cached_property
   def kobo_lib_books(self):

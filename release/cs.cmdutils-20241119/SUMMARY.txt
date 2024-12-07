@@ -1,0 +1,2 @@
+SubCommand.usage_text: small improvements and a fix.
+New BaseCommand.SubCommandClass attribute for the SubCommand subclass, supports using additional SubCommand subclasses for eg cs.djutils.

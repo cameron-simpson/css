@@ -53,7 +53,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20241007.1-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -144,9 +144,9 @@ def compare(f1, f2, mode="rb"):
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 @contextmanager
-def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
+def NamedTemporaryCopy(f, progress=False, progress_label=None, **nt_kw):
   ''' A context manager yielding a temporary copy of `filename`
-      as returned by `NamedTemporaryFile(**kw)`.
+      as returned by `NamedTemporaryFile(**nt_kw)`.
 
       Parameters:
       * `f`: the name of the file to copy, or an open binary file,
@@ -174,7 +174,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
         S = os.stat(filename)
       fast_mode = stat.S_ISREG(S.st_mode)
     if fast_mode:
-      with NamedTemporaryFile(**kw) as T:
+      with NamedTemporaryFile(**nt_kw) as T:
         with Pfx("shutil.copy(%r,%r)", filename, T.name):
           shutil.copy(filename, T.name)
         yield T
@@ -182,10 +182,10 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
       with Pfx("open(%r)", filename):
         with open(filename, 'rb') as f2:
           with NamedTemporaryCopy(f2, progress=progress,
-                                  progress_label=progress_label, **kw) as T:
+                                  progress_label=progress_label, **nt_kw) as T:
             yield T
     return
-  prefix = kw.pop('prefix', None)
+  prefix = nt_kw.pop('prefix', None)
   if prefix is None:
     prefix = 'NamedTemporaryCopy'
   # prepare the buffer and try to infer the length
@@ -217,7 +217,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   else:
     need_bar = False
     assert isinstance(progress, Progress)
-  with NamedTemporaryFile(prefix=prefix, **kw) as T:
+  with NamedTemporaryFile(prefix=prefix, **nt_kw) as T:
     it = (
         bfr if need_bar else progressbar(
             bfr,
@@ -1742,6 +1742,20 @@ def atomic_filename(
     # recreate the temp file so that it can be cleaned up by NamedTemporaryFile
     with pfx_call(open, T.name, 'xb'):
       pass
+
+def atomic_copy2(srcpath, dstpath, *, follow_symlinks=True, **af_kw):
+  ''' Call `shutil.copy2` to copy `srcpath` to `dstpath` via a
+      temporary file using `atomic_filename`.
+      This differs from `shutil.copy2` in 2 ways:
+      - it is an error if `dstpath` already exists unless you supply
+        `exists_ok=True`
+      - the new copy appears atomicly when the copy is complete
+        instead of be visible partially complete during the copy
+      The `follow_symlinks=True` parameter is passed to `shutil.copy2`.
+      Other keyword parameters are passed to `atomic_filename`.
+  '''
+  with atomic_filename(dstpath, **af_kw) as af:
+    return shutil.copy2(srcpath, af.name, follow_symlinks=follow_symlinks)
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.

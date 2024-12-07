@@ -411,6 +411,7 @@ class Pfx(object):
               value.__class__.__name__, value
           )
       try:
+        setattr(e, attr + '_without_prefix', ovalue)
         setattr(e, attr, value)
       except AttributeError as e2:
         print(
