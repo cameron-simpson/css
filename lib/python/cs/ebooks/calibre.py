@@ -799,8 +799,8 @@ class CalibreTree(AbstractEbooksTree):
             ) for idk, idv in book.identifiers.items()
         )
       # slow search by arbitrary match_fn
-      for book in self:
-        if match_fn(book):
+      for book in self.values():
+        if trace(match_fn)(book):
           yield book
     else:
       # integer dbid
