@@ -48,7 +48,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
-from cs.cmdutils import qvprint
+from cs.cmdutils import popopts, qvprint
 from cs.context import contextif
 from cs.deco import (
     fmtdoc,
@@ -1333,18 +1333,14 @@ class CalibreCommand(EBooksCommonBaseCommand):
       cbooks = sorted(cbooks, key=sortkey, reverse=reverse)
     return cbooks
 
+  @popopts(cbz='Also make a CBZ file.')
   def cmd_add(self, argv):
-    ''' Usage: {cmd} [-nqv] bookpaths...
+    ''' Usage: {cmd} [--cbz] bookpaths...
           Add the specified ebook bookpaths to the library.
-          --cbz Also make a CBZ.
     '''
-    options = self.options
-    options.popopts(
-        argv,
-        cbz='make_cbz',
-    )
     if not argv:
       raise GetoptError("missing bookpaths")
+    options = self.options
     calibre = options.calibre
     for bookpath in argv:
       with Pfx(bookpath):
@@ -1358,17 +1354,14 @@ class CalibreCommand(EBooksCommonBaseCommand):
           pfx_call(cbook.make_cbz)
 
   # pylint: disable=too-many-branches,too-many-locals
+  @popopts(
+      f=('force', 'Force: convert even if the format is already present.')
+  )
   @uses_runstate
   def cmd_convert(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] formatkey dbids...
+    ''' Usage: {cmd} [-f] formatkey dbids...
           Convert books to the format `formatkey`.
-          -f    Force: convert even if the format is already present.
     '''
-    options = self.options
-    options.popopts(
-        argv,
-        f='force',
-    )
     dstfmtk = self.poparg(argv).upper()
     srcfmtks, conv_opts = self.CONVERT_MAP.get(dstfmtk, ([], ()))
     if not srcfmtks:
@@ -1382,6 +1375,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
     except ValueError as e:
       raise GetoptError("invalid book specifiers: %s") from e
     xit = 0
+    options = self.options
     doit = options.doit
     force = options.force
     quiet = options.quiet
@@ -1459,31 +1453,27 @@ class CalibreCommand(EBooksCommonBaseCommand):
               xit = 1
     return xit
 
+  @popopts(
+      _1=('first_format', 'Link only the first format found.'),
+      d_=(
+          'linkto_dirpath',
+          '''Specify the target directory, default from
+              ${DEFAULT_LINKTO_DIRPATH_ENVVAR} or {DEFAULT_LINKTO_DIRPATH}.''',
+      ),
+      F_=('formats', 'Source formats, default: {DEFAULT_LINKTO_FORMATS}'),
+      f=('force', 'Force. Replace existing links.'),
+      o_=('link_format', 'Link name format.'),
+  )
   @uses_runstate
   def cmd_linkto(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-1f] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
           Export books to linkto-dir by hard linking.
-          -1              Link only the first format found.
-          -d linkto-dir   Specify the target directory, default from ${DEFAULT_LINKTO_DIRPATH_ENVVAR}
-                          or {DEFAULT_LINKTO_DIRPATH}.
-          -F fmt,...      Source formats, default: {DEFAULT_LINKTO_FORMATS}
-          -f              Force. Replace existing links.
-          -o link-format  Link name format.
     '''
     ##Default with series: {DEFAULT_LINKTO_SERIES_FORMAT}
     ##Default without series: {DEFAULT_LINKTO_NOSERIES_FORMAT}
     options = self.options
-    options.formats = ['CBZ', 'EPUB']
-    options.first_format = False
-    options.link_format = None
-    options.popopts(
-        argv,
-        _1='first_format',
-        d_='linkto_dirpath',
-        F_='formats',
-        f='force',
-        o_='link_format',
-    )
+    if options.formats is None:
+      options.formats = self.DEFAULT_LINKTO_FORMATS
     doit = options.doit
     first_format = options.first_format
     force = options.force
