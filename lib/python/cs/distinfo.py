@@ -390,14 +390,13 @@ class Module:
     return self.modules.vcs
 
   @cached_property
-  @pfx_method(use_str=True)
   def module(self):
     ''' The module for this package name.
     '''
     try:
       M = pfx_call(importlib.import_module, self.name)
     except (ImportError, ModuleNotFoundError, NameError, SyntaxError) as e:
-      error("import fails: %s", e)
+      warning("import fails: %s", e.msg_original)
       M = None
     return M
 
@@ -407,17 +406,14 @@ class Module:
     '''
     return self.name.startswith(MODULE_PREFIX)
 
-  @pfx_method(use_str=True)
   def isthirdparty(self):
     ''' Test whether this is a third party module.
     '''
     M = self.module
     if M is None:
-      warning("self.module is None")
       return False
     return '/site-packages/' in getattr(M, '__file__', '')
 
-  @pfx_method(use_str=True)
   def isstdlib(self):
     ''' Test if this module exists in the stdlib.
     '''
@@ -1173,7 +1169,6 @@ class Module:
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @cache
   @uses_runstate
-  @pfx_method(use_str=True)
   def problems(self, *, runstate=RunState):
     ''' Sanity check of this module.
 
@@ -1927,30 +1922,31 @@ class CSReleaseCommand(BaseCommand):
       pkg_names = sorted(options.pkg_tagsets.keys())
     with Upd().insert(1) as proxy:
       for pkg_name in progressbar(pkg_names, label="packages"):
-        proxy.prefix = f'{pkg_name}: '
-        if pkg_name.startswith(MODULE_PREFIX):
-          pkg = options.modules[pkg_name]
-          pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
-          if pypi_release is not None:
-            problems = pkg.problems()
-            if not problems:
-              proxy.text = "ok"
-            else:
-              proxy.text = f'{len(problems)} problems'
-              problem_text = (
-                  "%d problems" % (len(problems),) if problems else "ok"
-              )
-              if problems and options.colourise:
-                problem_text = colourise(problem_text, 'yellow')
-              list_argv = [
-                  pkg_name,
-                  pypi_release,
-                  problem_text,
-              ]
-              features = pkg.features(pypi_release)
-              if features:
-                list_argv.append('[' + ' '.join(sorted(features)) + ']')
-              print(*list_argv)
+        with Pfx(pkg_name):
+          proxy.prefix = f'{pkg_name}: '
+          if pkg_name.startswith(MODULE_PREFIX):
+            pkg = options.modules[pkg_name]
+            pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
+            if pypi_release is not None:
+              problems = pkg.problems()
+              if not problems:
+                proxy.text = "ok"
+              else:
+                proxy.text = f'{len(problems)} problems'
+                problem_text = (
+                    "%d problems" % (len(problems),) if problems else "ok"
+                )
+                if problems and options.colourise:
+                  problem_text = colourise(problem_text, 'yellow')
+                list_argv = [
+                    pkg_name,
+                    pypi_release,
+                    problem_text,
+                ]
+                features = pkg.features(pypi_release)
+                if features:
+                  list_argv.append('[' + ' '.join(sorted(features)) + ']')
+                print(*list_argv)
     return 0
 
   def cmd_resolve(self, argv):
