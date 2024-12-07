@@ -218,8 +218,8 @@ def import_extra(extra_package_name, distinfo):
       ]
       if from_extras:
         warning(
-            "package not available; the following extras pull it in: %r" %
-            (sorted(from_extras),)
+            "package not available; the following extras pull it in: %r",
+            sorted(from_extras)
         )
         raise
       # pylint: disable=raise-missing-from
