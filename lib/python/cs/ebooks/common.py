@@ -66,11 +66,18 @@ class EBooksCommonOptions(BaseCommand.Options):
 
   COMMON_OPT_SPECS = dict(
       **BaseCommand.Options.COMMON_OPT_SPECS,
-      C_='calibre_path',
       calibre_='calibre_path',
-      D_='dedrm_package_path',
-      dedrm_='dedrm_package_path',
-      K_='kindle_path',
+      dedrm_=(
+          'dedrm_package_path',
+          '''
+          Specify the filesystem path to the DeDRM/noDRM plugin.
+          This can be a checkout of the git@github.com:noDRM/DeDRM_tools.git
+          repository or the path to the {DeDRMWrapper.DEDRM_PLUGIN_ZIPFILE_NAME} file
+          as would be installed in a Calibre plugin directory.
+          The default comes from the ${DEDRM_PACKAGE_PATH_ENVVAR} environment variable
+          or the plugin zip file in the local Calibre plugins directory.
+          ''',
+      ),
       kindle_='kindle_path',
       kobo_='kobo_path',
   )

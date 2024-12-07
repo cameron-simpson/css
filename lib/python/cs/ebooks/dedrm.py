@@ -59,18 +59,7 @@ def main(argv=None):
   return DeDRMCommand(argv).run()
 
 class DeDRMCommand(EBooksCommonBaseCommand):
-  ''' cs.dedrm command line implementation.
-  '''
-
-  USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand [args...]
-    Operations using the DeDRM/NoDRM package.
-    Options:
-      -D  Specify the filesystem path to the DeDRM/noDRM plugin.
-          This can be a checkout of the git@github.com:noDRM/DeDRM_tools.git
-          repository or the path to the {DeDRMWrapper.DEDRM_PLUGIN_ZIPFILE_NAME} file
-          as would be installed in a Calibre plugin directory.
-          The default comes from the ${DEDRM_PACKAGE_PATH_ENVVAR} environment variable
-          or the plugin zip file in the local Calibre plugins directory.
+  ''' Perform operations using the DeDRM/NoDRM package.
   '''
 
   @contextmanager
