@@ -45,7 +45,12 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.orm import declared_attr, relationship
+from sqlalchemy.orm import (
+    declared_attr,
+    Mapped,
+    mapped_column,
+    relationship,
+)
 from typeguard import typechecked
 
 from cs.cmdutils import popopts, qvprint
@@ -1015,6 +1020,7 @@ class CalibreMetadataDB(ORM):
               lambda self: relationship(
                   f'{left_name.title()}s',
                   back_populates=f'{right_name}_links',
+                  lazy='joined',
               )
           )
       )
@@ -1034,6 +1040,7 @@ class CalibreMetadataDB(ORM):
               lambda self: relationship(
                   f'{right_name.title()}s',
                   back_populates=f'{left_name}_links',
+                  lazy='joined',
               )
           )
       )
