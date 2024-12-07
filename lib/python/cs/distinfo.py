@@ -45,6 +45,7 @@ from cs.context import stackattrs
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
 from cs.fs import atomic_directory, scandirpaths
+from cs.fstags import FSTags
 from cs.lex import (
     cutsuffix,
     get_identifier,
@@ -1526,10 +1527,11 @@ class CSReleaseCommand(BaseCommand):
     ''' Arrange to autosave the package tagsets.
     '''
     with super().run_context():
-      with self.options.pkg_tagsets:
-        with stackattrs(self.options.vcs,
-                        pkg_tagsets=self.options.pkg_tagsets):
-          yield
+      with FSTags():
+        with self.options.pkg_tagsets:
+          with stackattrs(self.options.vcs,
+                          pkg_tagsets=self.options.pkg_tagsets):
+            yield
 
   ##  export      Export release to temporary directory, report directory.
   ##  freshmeat-submit Announce last release to freshmeat.
