@@ -14,7 +14,7 @@ import errno
 from functools import partial
 import gzip
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read, rename
+from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read
 try:
   from os import pread
 except ImportError:
@@ -1658,7 +1658,7 @@ def atomic_filename(
     dir=None,
     prefix=None,
     suffix=None,
-    rename_func=rename,
+    rename_func=None,
     **tempfile_kw
 ):
   ''' A context manager to create `filename` atomicly on completion.
@@ -1685,8 +1685,9 @@ def atomic_filename(
         from `splitext(basename(filename))`
       * `rename_func`: a callable accepting `(tempname,filename)`
         used to rename the temporary file to the final name; the
-        default is `os.rename` and this parametr exists to accept
-        something such as `FSTags.move`
+        default is `os.rename` if `exists_ok` or `placeholder`,
+        otherwise `rename_excl`.
+        This parametr exists to accept something such as `FSTags.move`.
       Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
 
       Example:
@@ -1710,6 +1711,11 @@ def atomic_filename(
     prefix = '.' + fprefix + '-'
   if suffix is None:
     suffix = fsuffix
+  if rename_func is None:
+    if exists_ok or placeholder:
+      rename_func = os.rename
+    else:
+      rename_func = rename_excl
   if not exists_ok and existspath(filename):
     raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
   with NamedTemporaryFile(
