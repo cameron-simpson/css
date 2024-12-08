@@ -103,6 +103,15 @@ def seekable(fp):
     test = lambda: stat.S_ISREG(os.fstat(getfd()).st_mode)
   return test()
 
+def rename_excl(oldpath, newpath):
+  ''' Safely rRename `oldpath` to `newpath`.
+      Raise `FileExistsError` if `newpath` already exists.
+  '''
+  with pfx_call(open, newpath, 'xb'):
+    pass
+  pfx_call(os.rename, oldpath, newpath)
+
+@OBSOLETE("rename_excl")
 def saferename(oldpath, newpath):
   ''' Rename a path using `os.rename()`,
       but raise an exception if the target path already exists.
