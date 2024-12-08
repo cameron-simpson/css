@@ -38,7 +38,7 @@ import time
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import cachedmethod, decorator, fmtdoc, strable
+from cs.deco import cachedmethod, decorator, fmtdoc, OBSOLETE, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
 from cs.gimmicks import TimeoutError  # pylint: disable=redefined-builtin
