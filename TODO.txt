@@ -1,3 +1,4 @@
+pfx: each Pfx to include its sep for joining things up
 default: drop cs.lex.indent, stdlib textwrap.indent does a better job
 default: make an @popopts usable as a cmd method decorator
 uses_cmd_options: append to the function docstring?
