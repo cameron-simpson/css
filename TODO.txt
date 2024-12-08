@@ -1,11 +1,11 @@
 pfx: each Pfx to include its sep for joining things up
 default: drop cs.lex.indent, stdlib textwrap.indent does a better job
-default: make an @popopts usable as a cmd method decorator
+√ default: make an @popopts usable as a cmd method decorator
 uses_cmd_options: append to the function docstring?
 @promote: params to also accept a mapping of param_name to promotion_func
 default: media info: support "http://www.omdbapi.com/?apikey={OMDB_API_KEY}&type=movie&s=&genre={genre}&y={year}" ?
 √ cs.cmdutils: support opt=-field' for an inverted boolean option
-cs.cmdutils: usage_text: in short mode list just subcmd and the usage 1-liner tabulated d
+√ cs.cmdutils: usage_text: in short mode list just subcmd and the usage 1-liner tabulated d
 cs.cmdutils: generate zsh and bash autocompletion rules
 cs.cmdutils: getopt from a called subcommand should only produce the usage for the subcommand
 cs.cmdutils: solidify the thread wide runstate setup in run_context after merging the playon branch
@@ -17,7 +17,7 @@ BaseCommand: move most of __init__ into run-context along with setup_logging con
 cs.app.ydl: adopt the name format in use by cs.app.playon
 cs.binary: _BinaryMultiValue_Base.for_json: use jsonable?
 contextif: bypass the callable check if cmgr has .__enter__
-atomic_filename: use the O_EXCL trick for reliable rename-to-target stuff?
+√ atomic_filename: use the O_EXCL trick for reliable rename-to-target stuff?
 does sqlite need the lock file or can I detect the locked exception and retry?
 find all .from_any methods, convert to use @promote?
 promote: correct typo annotations
