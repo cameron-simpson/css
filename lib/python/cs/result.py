@@ -67,7 +67,7 @@ from cs.py.func import funcname, func_a_kw_fmt
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20240630-post'
+__version__ = '20241119-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -637,7 +637,7 @@ class OnDemandResult(Result):
           "%s.__call__: no parameters expected, received: *%r, **%r" %
           (self, a, kw)
       )
-    with self._lock:
+    with self._Result__lock:
       if self.is_pending:
         self.run_func(self.func, *self.fargs, **self.fkwargs)
     return super().__call__()

@@ -18,7 +18,7 @@ from weakref import WeakValueDictionary
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20241005-post'
+__version__ = '20241009-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -530,7 +530,7 @@ class Sentinel:
     return self is other
 
 def public_subclasses(cls):
-  ''' Return a list of the subclasses of `cls` which has public names.
+  ''' Return a list of the subclasses of `cls` which have public names.
   '''
   classes = []
   q = list(cls.__subclasses__())
@@ -540,8 +540,13 @@ def public_subclasses(cls):
       continue
     if not subcls.__name__.startswith('_'):
       classes.append(subcls)
-      ##print(cls, "classes +", subcls)
-    q.extend(subcls.__subclasses__())
+    try:
+      subclasses = subcls.__subclasses__()
+    except TypeError:
+      # type is a subclass of object, but its __subclasses__ is just a function
+      pass
+    else:
+      q.extend(subcls.__subclasses__())
   return classes
 
 if __name__ == '__main__':

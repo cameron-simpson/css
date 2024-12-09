@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.usage_options_format: support multiline help text via the new tabulate support.
+lib/python/cs/cmdutils.py: cs.cmdutils: format improvement

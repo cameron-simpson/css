@@ -23,10 +23,11 @@ import mobi
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fs import scandirtree
-from cs.logutils import info
+from cs.logutils import error, info
 from cs.pfx import pfx, pfx_call
 
 from .cbz import make_cbz
+from .common import EBooksCommonBaseCommand
 
 class Mobi:
   ''' Work with an existing MOBI ebook file.
@@ -102,7 +103,7 @@ class Mobi:
         pass
     return cbzpath
 
-class MobiCommand(BaseCommand):
+class MobiCommand(EBooksCommonBaseCommand):
   ''' Command line implementation for `mobi2cbz`.
   '''
 
@@ -167,8 +168,12 @@ class MobiCommand(BaseCommand):
       outdirpath, _ = splitext(basename(mobipath))
     print(mobipath)
     MB = Mobi(mobipath)
-    with MB.extracted() as df:
-      dirpath, _ = df
-      for is_dir, subpath in scandirtree(dirpath, sort_names=True):
-        if not is_dir:
-          print(" ", relpath(subpath, dirpath))
+    try:
+      with MB.extracted() as df:
+        dirpath, _ = df
+        for is_dir, subpath in scandirtree(dirpath, sort_names=True):
+          if not is_dir:
+            print(" ", relpath(subpath, dirpath))
+    except mobi.kindleunpack.unpackException as e:
+      error("cannot unpack: %s", e)
+      return 1

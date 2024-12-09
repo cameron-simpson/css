@@ -8,13 +8,13 @@
 '''
 
 from contextlib import contextmanager, redirect_stdout
-from dataclasses import dataclass, field
 from datetime import datetime
 from getopt import GetoptError
 import importlib
 import json
 import os
 from os.path import (
+    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -30,18 +30,21 @@ from shutil import copyfile
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import time
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Union
+from zipfile import ZipFile
 
-from cs.cmdutils import BaseCommand, vprint
-from cs.context import stackattrs
-from cs.deco import fmtdoc, Promotable
+from typeguard import typechecked
+
+from cs.cmdutils import popopts, qvprint
+from cs.context import contextif, stackattrs
+from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
-from cs.fs import FSPathBasedSingleton
+from cs.fs import FSPathBasedSingleton, needdir, shortpath, validate_rpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashindex import file_checksum
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
-from cs.pfx import pfx, Pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -56,45 +59,24 @@ def main(argv=None):
   return DeDRMCommand(argv).run()
 
 class DeDRMCommand(EBooksCommonBaseCommand):
-  ''' cs.dedrm command line implementation.
+  ''' Perform operations using the DeDRM/NoDRM package.
   '''
-
-  GETOPT_SPEC = 'D:'
-  USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
-    Operations using the DeDRM/NoDRM package.
-    Options:
-      -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
-          For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
-          at /path/to/DeDRM_tools--noDRM you could supply:
-          -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
-          or place that value in the $DEDRM_PACKAGE_PATH environment variable.
-  '''
-
-  def apply_opt(self, opt, val):
-    badopt = False
-    if opt == '-D':
-      self.options.dedrm_package_path = val
-    else:
-      raise NotImplementedError("unhandled option")
-    if badopt:
-      raise GetoptError("bad option value")
 
   @contextmanager
   def run_context(self):
     with super().run_context():
-      dedrm = self.options.dedrm
-      if dedrm is None:
-        raise GetoptError(f'could not obtain the DeDRM package')
-      with dedrm:  # prepare the shim modules for the duration
+      with contextif(self.options.dedrm):
         yield
 
+  @popopts(
+      inplace=('Replace the original with the decrypted version.'),
+      O='output_dirpath',
+  )
   def cmd_decrypt(self, argv):
     ''' Usage: {cmd} [--inplace] filenames...
           Remove DRM from the specified filenames.
           Write the decrypted contents of path/to/book.ext
           to the file book-decrypted.ext.
-          Options:
-            --inplace   Replace the original with the decrypted version.
     '''
     dedrm = self.options.dedrm
     options = self.options
@@ -104,6 +86,8 @@ class DeDRMCommand(EBooksCommonBaseCommand):
         O_='output_dirpath',
         inplace=bool,
     )
+    if options.output_dirpath is None:
+      options.output_dirpath = '.'
     if not argv:
       raise GetoptError("missing filenames")
     for filename in argv:
@@ -162,6 +146,13 @@ class DeDRMCommand(EBooksCommonBaseCommand):
               continue
             print("  .%r => %s" % (name, r(value)))
     return xit
+
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          List dedrm infomation.
+    '''
+    super().cmd_info(argv)
+    # TODO: recite the actual DeDRM version
 
   def cmd_kindlekeys(self, argv):
     ''' Usage: {cmd} [base|import|json|print]
@@ -225,8 +216,19 @@ class DeDRMCommand(EBooksCommonBaseCommand):
       else:
         raise GetoptError("expected 'import' or 'print', got %r" % (op,))
 
-class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
+@fmtdoc
+class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
   ''' Class embodying the DeDRM/noDRM package actions.
+
+      This accepts the path to a checkout of the
+      git@github.com:noDRM/DeDRM_tools.git source repositiory or
+      the path to a DeDRM plugins zipfile as would be installed in
+      a Calibre plugin directory.
+
+      If not specified, the environment variable
+      `${DEDRM_PACKAGE_PATH_ENVVAR}` is consulted.
+      If absent, this looks for the plugin zipfile in the local
+      Calibre install.
   '''
 
   # The package name to use for the DeDRM/noDRM package.
@@ -235,6 +237,9 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
   DEDRM_PACKAGE_NAME = 'dedrm'
   DEDRM_PLUGIN_NAME = 'DeDRM'
   DEDRM_PLUGIN_VERSION = '7.2.1'
+
+  # used to locate the plugin zip fil inside a CalibreTree
+  DEDRM_PLUGIN_ZIPFILE_NAME = 'DeDRM_plugin.zip'
 
   @classmethod
   @fmtdoc
@@ -247,10 +252,11 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
 
   @pfx_method
   @fmtdoc
+  @typechecked
   def __init__(
       self,
-      dedrm_package_path: Optional[str] = None,
-      sqltags: Optional[SQLTags] = None
+      dedrm_package_path: str,
+      sqltags: Optional[SQLTags] = None,
   ):
     ''' Initialise the DeDRM package.
 
@@ -262,30 +268,44 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
           under the `self.DEDRM_PACKAGE_NAME.` prefix;
           default from `SQLTags()`
     '''
-    if dedrm_package_path is None:
-      dedrm_package_path = self.get_package_path()
-    with Pfx("dedrm_package_path %r", dedrm_package_path):
-      if not isdirpath(dedrm_package_path):
-        raise ValueError("not a directory")
-      if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
-        raise ValueError("no \"standalone\" subdirectory")
+    if hasattr(self, 'fspath'):
+      # we're already set up
+      return
+    if not existspath(dedrm_package_path):
+      raise ValueError(
+          f'dedrm_package_path does not exist: {dedrm_package_path!r}'
+      )
     self.fspath = dedrm_package_path
     self.sqltags = sqltags or SQLTags()
 
-  @staticmethod
+  @classmethod
   @fmtdoc
-  def get_package_path(dedrm_package_path: str = None) -> str:
+  def get_package_path(
+      cls,
+      dedrm_package_path: str = None,
+      calibre: Optional[Union[str, "CalibreTree"]] = None,
+  ) -> str:
     ''' Return the filesystem path of the DeDRM/noDRM package to use.
-          If the supplied `dedrm_package_path` is `None`,
-          obtain the path from ${DEDRM_PACKAGE_PATH_ENVVAR}.
-      '''
+        If the supplied `dedrm_package_path` is `None`,
+        obtain the path from ${DEDRM_PACKAGE_PATH_ENVVAR}.
+    '''
     if dedrm_package_path is None:
       dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
       if dedrm_package_path is None:
-        raise ValueError(
-            f'no dedrm_package_path and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
+        from .calibre import CalibreTree
+        calibre = CalibreTree.promote(calibre)
+        dedrm_package_path = joinpath(
+            calibre.plugins_dirpath, cls.DEDRM_PLUGIN_ZIPFILE_NAME
         )
-      vprint(f'${DEDRM_PACKAGE_PATH_ENVVAR} -> {dedrm_package_path!r}')
+        if not isfilepath(dedrm_package_path):
+          raise ValueError(
+              'no dedrm_package_path'
+              f' and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
+              f' and no {shortpath(dedrm_package_path)!r}'
+          )
+      qvprint(f'${DEDRM_PACKAGE_PATH_ENVVAR} -> {dedrm_package_path!r}')
+    else:
+      dedrm_package_path = abspath(dedrm_package_path)
     if not existspath(dedrm_package_path):
       raise ValueError(
           f'dedrm_package_path:{dedrm_package_path!r} does not exist'
@@ -340,6 +360,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
               ):
                 yield
 
+  @pfx_method
   def prepare_dedrm_shims(self, libdirpath):
     ''' Create `__version` and `prefs` stub modules in `libdirpath`
         to support the `import_name` method.
@@ -353,7 +374,7 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
       ''' Write Python code `contents` to a top level module named `name`.
       '''
       module_path = joinpath(libdirpath, f'{name}.py')
-      vprint("DeDRM: write module", module_path)
+      qvprint("DeDRM: write module", module_path)
       with pfx_call(open, module_path, 'w') as pyf:
         print(
             stripped_dedent(
@@ -371,7 +392,26 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
       ##os.system(f'set -x; cat {module_path}')
 
     # present the dedrm package as DEDRM_PACKAGE_NAME ('dedrm')
-    os.symlink(self.fspath, joinpath(libdirpath, self.DEDRM_PACKAGE_NAME))
+    dedrm_pkg_path = joinpath(libdirpath, self.DEDRM_PACKAGE_NAME)
+    if isdirpath(self.fspath):
+      # symlink to the source tree
+      pfx_call(os.symlink, self.fspath, dedrm_pkg_path)
+    else:
+      # unpack the plugin zip file
+      qvprint("unpack", self.fspath)
+      pfx_call(os.mkdir, dedrm_pkg_path)
+      with Pfx("unzip %r", self.fspath):
+        with ZipFile(self.fspath) as zipf:
+          for member in zipf.namelist():
+            if member.endswith('/'):
+              qvprint("skip", member)
+              continue
+            with Pfx(member):
+              validate_rpath(member)
+              path = joinpath(dedrm_pkg_path, member)
+              pathdir = dirname(path)
+              needdir(pathdir)
+              pfx_call(zipf.extract, member, dedrm_pkg_path)
     # fake up __version.py
     write_module(
         '__version',
@@ -422,19 +462,28 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
     '''
     with stackattrs(
         sys,
-        path=([
+        path=[
+            # shims first
             self.shimlib_dirpath,
+            # then the dedrm package itself, since it directly imports
+            # with absolute names like "kindlekeys"
             joinpath(self.shimlib_dirpath, self.DEDRM_PACKAGE_NAME),
-        ] + sys.path),
+        ] + sys.path + [
+            # dedrm/standalone/__init__.py self inserts its directory
+            # at the start of the path if it isn't already somewhere
+            # in sys.path (this is bad)
+            # https://github.com/noDRM/DeDRM_tools/issues/653
+            joinpath(self.shimlib_dirpath, self.DEDRM_PACKAGE_NAME,
+                     'standalone'),
+        ],
     ):
       # the DeDRM code is amazingly noisy to stdout
       # so we intercept print and redirect stdout to stderr
       # pylint: disable=import-outside-toplevel
       import builtins
-      with stackattrs(builtins, print=vprint):
+      with stackattrs(builtins, print=qvprint):
         with redirect_stdout(sys.stderr):
           # pylint: disable=import-outside-toplevel
-          import prefs  # imported for its side effect
           yield
 
   def import_name(self, module_name, name=None, *, package=None):
@@ -536,11 +585,11 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
                     (srcpath, booktype)
                 )
               if decrypted_ebook == srcpath:
-                vprint("srcpath is already decrypted")
+                qvprint("srcpath is already decrypted")
                 pfx_call(os.remove, T.name)
                 return False
               if file_checksum(srcpath) == file_checksum(decrypted_ebook):
-                vprint("srcpath content is unchanged by decryption")
+                qvprint("srcpath content is unchanged by decryption")
                 pfx_call(os.remove, T.name)
                 return False
     # copy tags from the srcpath to the dstpath
@@ -605,18 +654,6 @@ class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin, Promotable):
     kk_tags['cache'] = kks
     return kks
 
-  @classmethod
-  def promote(cls, obj) -> "DeDRMWrapper":
-    ''' Promote an object to a `DeDRMWrapper`.
-
-        If `obj` is `None` or a `str` return `DeDRMWrapper(dedrm_package_path=obj)`.
-    '''
-    if isinstance(obj, cls):
-      return obj
-    if obj is None or isinstance(obj, str):
-      return cls(dedrm_package_path=obj)
-    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
-
 class DeDRMOverride:
   ''' A collection of override methods from the DeDRM/noDRM `DeDRM` class
       which we use to make it work outside the calibre plugin stuff.
@@ -650,8 +687,8 @@ def getLibCrypto():
   #
   def _load_crypto_libcrypto():
     from ctypes import (
-        CDLL, byref, POINTER, c_void_p, c_char_p, c_int, c_long, Structure,
-        c_ulong, create_string_buffer, addressof, string_at, cast
+        CDLL, POINTER, c_char_p, c_int, c_long, Structure, c_ulong,
+        create_string_buffer
     )
     from ctypes.util import find_library
 
