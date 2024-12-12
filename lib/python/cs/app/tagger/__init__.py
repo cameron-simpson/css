@@ -145,6 +145,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       except FileNotFoundError:
         return ()
 
+  @uses_cmd_options(hashname=None, modes=None, doit=None, force=False)
   @uses_fstags
   @require(lambda filename: filename and '/' not in filename)
   @typechecked
@@ -154,8 +155,8 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       *,
       fstags: FSTags,
       hashname: str,
-      doit=False,
-      force=False,
+      doit: bool,
+      force: bool,
       modes=RULE_MODES,
   ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
