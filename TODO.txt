@@ -1,5 +1,5 @@
 default: cs.cmdutils: usage_format_parts: return (usage,full_desc), provide usage_desc_split to get line1 and trailing lines, provide usage_format_desc for full desc, use in the tabulated listing
-cs.cmdutils: help -r but no -l - single tabulate call from the top level if subcommands?
+√ cs.cmdutils: help -r but no -l - single tabulate call from the top level if subcommands?
 cs.djutils: return 1 from a cmd_ method seems to be ignored?
 pfx: each Pfx to include its sep for joining things up
 default: drop cs.lex.indent, stdlib textwrap.indent does a better job

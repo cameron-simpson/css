@@ -538,7 +538,7 @@ class SubCommand:
 
   @cached_property
   def usage_format_desc1(self) -> str:
-    ''' The usage line(s) part of the format string.
+    ''' The leading usage line part of the format string.
     '''
     return self.usage_format_parts[1]
 
@@ -617,20 +617,40 @@ class SubCommand:
     '''
     return sorted(self.get_subcommands().keys())
 
-  def short_subusages(self, subcmds: List[str]):
+  def subusage_table(self, subcmds: List[str], *, recurse=False, short=False):
+    ''' Return rows for use with `cs.lex.tabulate`
+        for the short subusage listing.
+    '''
+    rows = []
+    subcommands = self.get_subcommands()
+    for subcmd in subcmds:
+      subcommand = subcommands[subcmd]
+      rows.append(
+          [
+              subcmd.replace('_', '-'),
+              (
+                  # TODO: full desc if not short
+                  subcommand.usage_format_desc1
+                  or f'{subcmd.title()} subcommand.'
+              )
+          ]
+      )
+      if recurse and subcommand.has_subcommands:
+        rows.extend(
+            [indent(subc), indent(subd)]
+            for subc, subd in subcommand.subusage_table(
+                sorted(subcommand.get_subcommands().keys()),
+                recurse=recurse,
+                short=short,
+            )
+        )
+    return rows
+
+  def short_subusages(self, subcmds: List[str], *, recurse=False, short=False):
     ''' Return a list of tabulated one line subcommand summaries.
     '''
-    subcommands = self.get_subcommands()
-    rows = [
-        [
-            subcmd.replace('_', '-'),
-            (
-                subcommands[subcmd].usage_format_desc1
-                or f'{subcmd.title()} subcommand.'
-            )
-        ] for subcmd in subcmds
-    ]
-    return list(tabulate(*rows))
+    table = self.subusage_table(subcmds, recurse=recurse, short=short)
+    return list(tabulate(*table))
 
   @typechecked
   def usage_text(
@@ -685,23 +705,9 @@ class SubCommand:
       usage = usage_format.format_map(mapping)
     if short:
       # the terse one subcommand-per-line listing
-      subusages = self.short_subusages(show_subcmds)
-      if recurse:
-        rsubusages = []
-        for subcmd, subusage in zip(show_subcmds, subusages):
-          rsubusages.append(subusage)
-          subcommand = subcommands[subcmd]
-          if subcommand.has_subcommands:
-            subusage_detail = "\n".join(
-                subcommand.short_subusages(
-                    sorted(
-                        subcommand.get_subcommands().keys() -
-                        sub_seen_subcommands.keys()
-                    )
-                )
-            )
-            rsubusages.extend(indent(subusage_detail).split("\n"))
-        subusages = rsubusages
+      subusages = self.short_subusages(
+          show_subcmds, recurse=recurse, short=short
+      )
     else:
       # the longer descriptions
       subusages = []
