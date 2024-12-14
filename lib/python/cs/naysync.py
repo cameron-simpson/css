@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
+#
+# Idea spawned from a debugging session at python-discord with Draco and JigglyBalls.
+# - Cameron Simpson <cs@cskk.id.au> 14dec2024
+#
 
 ''' An attempt at comingling async-code and nonasync-code-in-a-thread in an argonomic way.
+
+    One of the difficulties in adapting non-async code for use in
+    an async world is that anything asynchronous needs to be turtles
+    all the way down: a single blocking sychornous call anywhere
+    in the call stack blocks the async event loop.
+
+    This module presently provides a pair of decorators for
+    asynchronous generators andfunctions which dispatches them in
+    a `Thread` and presents an async wrapper.
 '''
 
 import asyncio
@@ -19,12 +32,6 @@ DISTINFO = {
         'cs.deco',
     ],
 }
-
-# Idea spawned from a debugging session at python-discord with Draco and JigglyBalls.
-
-# Needs:
-# - a way to call an async function and catch its yield?
-# - a queue with an aget method for reporting results from a thread?
 
 @decorator
 def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
