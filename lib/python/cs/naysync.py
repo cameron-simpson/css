@@ -8,7 +8,7 @@
 
     One of the difficulties in adapting non-async code for use in
     an async world is that anything asynchronous needs to be turtles
-    all the way down: a single blocking sychornous call anywhere
+    all the way down: a single blocking synchronous call anywhere
     in the call stack blocks the async event loop.
 
     This module presently provides a pair of decorators for
