@@ -22,7 +22,7 @@ from threading import Thread
 
 from cs.deco import decorator
 
-__version__ = '20241214-post'
+__version__ = '20241214.1'
 
 DISTINFO = {
     'keywords': ["python3"],
