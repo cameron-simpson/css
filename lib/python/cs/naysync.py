@@ -49,7 +49,7 @@ def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
         `Queue` after it was found to be empty the first time after the
         start or after an item was obtained
 
-      Exceptions in the generator are reraised in the synchronous generator.
+      Exceptions in the synchronous generator are reraised in the asynchronous generator.
 
       Example:
 
