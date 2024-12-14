@@ -9,6 +9,17 @@ from threading import Thread
 
 from cs.deco import decorator
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.deco',
+    ],
+}
+
 # Idea spawned from a debugging session at python-discord with Draco and JigglyBalls.
 
 # Needs:
