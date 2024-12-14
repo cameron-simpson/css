@@ -106,11 +106,9 @@ def afunc(func, poll_delay=0.25, fast_poll_delay=0.001):
   ''' A decorator for a synchronous function which turns it into
       an asynchronous function.
 
-      The parameters are the same as for `@agen`, as this wraps the
-      function in an asynchronous generator which just yields the
-      function result.
-
-      Exceptions in the generator are reraised in the synchronous generator.
+      The parameters are the same as for `@agen` excluding `maxsize`,
+      as this wraps the function in an asynchronous generator which
+      just yields the function result.
 
       Example:
 
