@@ -22,6 +22,8 @@ from threading import Thread
 
 from cs.deco import decorator
 
+__version__ = '20241214'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
