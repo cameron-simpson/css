@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
+#
+# Idea spawned from a debugging session at python-discord with Draco and JigglyBalls.
+# - Cameron Simpson <cs@cskk.id.au> 14dec2024
+#
 
 ''' An attempt at comingling async-code and nonasync-code-in-a-thread in an argonomic way.
+
+    One of the difficulties in adapting non-async code for use in
+    an async world is that anything asynchronous needs to be turtles
+    all the way down: a single blocking sychornous call anywhere
+    in the call stack blocks the async event loop.
+
+    This module presently provides a pair of decorators for
+    asynchronous generators andfunctions which dispatches them in
+    a `Thread` and presents an async wrapper.
 '''
 
 import asyncio
@@ -9,11 +22,18 @@ from threading import Thread
 
 from cs.deco import decorator
 
-# Idea spawned from a debugging session at python-discord with Draco and JigglyBalls.
+__version__ = '20241214.1-post'
 
-# Needs:
-# - a way to call an async function and catch its yield?
-# - a queue with an aget method for reporting results from a thread?
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.deco',
+    ],
+}
 
 @decorator
 def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
@@ -86,11 +106,9 @@ def afunc(func, poll_delay=0.25, fast_poll_delay=0.001):
   ''' A decorator for a synchronous function which turns it into
       an asynchronous function.
 
-      The parameters are the same as for `@agen`, as this wraps the
-      function in an asynchronous generator which just yields the
-      function result.
-
-      Exceptions in the generator are reraised in the synchronous generator.
+      The parameters are the same as for `@agen` excluding `maxsize`,
+      as this wraps the function in an asynchronous generator which
+      just yields the function result.
 
       Example:
 
