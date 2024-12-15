@@ -8,7 +8,7 @@
 
     One of the difficulties in adapting non-async code for use in
     an async world is that anything asynchronous needs to be turtles
-    all the way down: a single blocking sychornous call anywhere
+    all the way down: a single blocking synchronous call anywhere
     in the call stack blocks the async event loop.
 
     This module presently provides a pair of decorators for
@@ -49,7 +49,7 @@ def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
         `Queue` after it was found to be empty the first time after the
         start or after an item was obtained
 
-      Exceptions in the generator are reraised in the synchronous generator.
+      Exceptions in the synchronous generator are reraised in the asynchronous generator.
 
       Example:
 
