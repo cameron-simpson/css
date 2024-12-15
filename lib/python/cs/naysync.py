@@ -102,13 +102,9 @@ def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
   return agen
 
 @decorator
-def afunc(func, poll_delay=0.25, fast_poll_delay=0.001):
+def afunc(func):
   ''' A decorator for a synchronous function which turns it into
       an asynchronous function.
-
-      The parameters are the same as for `@agen` excluding `maxsize`,
-      as this wraps the function in an asynchronous generator which
-      just yields the function result.
 
       Example:
 
@@ -120,19 +116,10 @@ def afunc(func, poll_delay=0.25, fast_poll_delay=0.001):
           slept = await func(5)
   '''
 
-  @agen(poll_delay=poll_delay, fast_poll_delay=fast_poll_delay)
-  def genfunc(*a, **kw):
-    ''' An asynchronous generator to yield the return result of `func`.
-    '''
-    yield func(*a, **kw)
-
   async def afunc(*a, **kw):
     ''' Asynchronous call to `func` via `@agen(fgenfunc)`.
     '''
-    async for item in genfunc(*a, **kw):
-      return item
-    # we should never get here
-    raise RuntimeError
+    return await to_thread(func, *a, **kw)
 
   return afunc
 
