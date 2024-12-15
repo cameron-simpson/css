@@ -36,20 +36,11 @@ DISTINFO = {
 }
 
 @decorator
-def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
+def agen(genfunc):
   ''' A decorator for a synchronous generator which turns it into
       an asynchronous generator.
-
-      Parameters:
-      * `maxsize`: the size of the `Queue` used for communication,
-        default `1`; this governs how greedy the generator may be
-      * `poll_delay`: the async delay between polls of the `Queue`
-        after it was found to be empty twice in succession, default `0.25`s
-      * `fast_poll_delay`: the async delay between polls of the
-        `Queue` after it was found to be empty the first time after the
-        start or after an item was obtained
-
-      Exceptions in the synchronous generator are reraised in the asynchronous generator.
+      Exceptions in the synchronous generator are reraised in the asynchronous
+      generator.
 
       Example:
 
@@ -66,37 +57,19 @@ def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
   async def agen(*a, **kw):
     ''' An async generator yielding items from `genfunc`.
     '''
-    q = Queue(maxsize=maxsize)
     sentinel = object()
-    g = genfunc(*a, **kw)
 
     def rungen():
-      ''' Run the generator and put its items onto the queue.
-      '''
-      try:
-        for item in g:
-          q.put((item, None))
-      except Exception as e:
-        q.put((sentinel, e))
-      else:
-        q.put((sentinel, None))
+      for item in genfunc(*a, **kw):
+        yield item
+      yield sentinel
 
-    T = Thread(target=rungen)
-    T.start()
-    delay = fast_poll_delay
+    g = rungen()
+    next_g = lambda: next(g)
     while True:
-      try:
-        item, e = q.get(block=False)
-      except QEmpty:
-        await asyncio.sleep(delay)
-        delay = poll_delay
-        continue
-      delay = fast_poll_delay
+      item = await to_thread(next_g)
       if item is sentinel:
-        if e is not None:
-          raise e
         break
-      assert e is None
       yield item
 
   return agen
