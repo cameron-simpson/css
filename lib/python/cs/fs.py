@@ -28,11 +28,12 @@ from tempfile import TemporaryDirectory
 from threading import Lock
 from typing import Any, Callable, Optional, Union
 
-from cs.deco import decorator, fmtdoc
+from cs.deco import decorator, fmtdoc, Promotable
+from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20240630-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -53,8 +54,9 @@ pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
-def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
+def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None) -> bool:
   ''' Create the directory `dirpath` if missing.
+      Return `True` if the directory was made, `False` otherwise.
 
       Parameters:
       * `dirpath`: the required directory path
@@ -63,15 +65,17 @@ def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
       * `use_makedirs`: optional creation mode, default `False`;
         if true, use `os.makedirs`, otherwise `os.mkdir`
   '''
-  if not isdirpath(dirpath):
-    if use_makedirs:
-      if log is not None:
-        log("makedirs(%r,0o%3o)", dirpath, mode)
-      pfx_makedirs(dirpath, mode)
-    else:
-      if log is not None:
-        log("mkdir(%r,0o%3o)", dirpath, mode)
-      pfx_mkdir(dirpath, mode)
+  if isdirpath(dirpath):
+    return False
+  if use_makedirs:
+    if log is not None:
+      log("makedirs(%r,0o%3o)", dirpath, mode)
+    pfx_makedirs(dirpath, mode)
+  else:
+    if log is not None:
+      log("mkdir(%r,0o%3o)", dirpath, mode)
+    pfx_mkdir(dirpath, mode)
+  return True
 
 @decorator
 def atomic_directory(infill_func, make_placeholder=False):
@@ -95,9 +99,8 @@ def atomic_directory(infill_func, make_placeholder=False):
       # prevent other users from using this directory
       pfx_mkdir(dirpath, 0o000)
       remove_placeholder = True
-    else:
-      if existspath(dirpath):
-        raise ValueError("directory already exists: %r" % (dirpath,))
+    elif existspath(dirpath):
+      raise ValueError("directory already exists: %r" % (dirpath,))
     work_dirpath = dirname(dirpath)
     try:
       with TemporaryDirectory(
@@ -254,7 +257,7 @@ class HasFSPath:
     ''' Return `os.listdir(self.fspath)`. '''
     return os.listdir(self.fspath)
 
-class FSPathBasedSingleton(SingletonMixin, HasFSPath):
+class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
   '''
 
@@ -266,6 +269,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
       default_attr: str = 'FSPATH_DEFAULT'
   ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
+        This key is used to identify instances in the singleton registry.
 
         Parameters:
         * `fspath`: the filesystem path to resolve;
@@ -292,7 +296,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
       if envvar is not None:
         fspath = os.environ.get(envvar)
         if fspath is not None:
-          return realpath(fspath)
+          return cls.fspath_normalised(fspath)
       default = getattr(cls, default_attr, None)
       if default is not None:
         if callable(default):
@@ -300,7 +304,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         else:
           fspath = expanduser(default)
         if fspath is not None:
-          return realpath(fspath)
+          return cls.fspath_normalised(fspath)
       raise ValueError(
           "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
               (
@@ -311,7 +315,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
               default_attr,
           )
       )
-    return realpath(fspath)
+    return cls.fspath_normalised(fspath)
 
   @classmethod
   def _singleton_key(cls, fspath=None, **_):
@@ -326,18 +330,44 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
 
         On the first call:
         - set `.fspath` to `self._resolve_fspath(fspath)`
-        - set `._lock` to `lock` (or `threading.Lock()` if not specified)
-        - return `True`
-        On subsequent calls return `False`.
-
+        - set `._lock` to `lock` (or `cs.threads.NRLock()` if not specified)
     '''
     if '_lock' in self.__dict__:
       return
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
     if lock is None:
-      lock = Lock()
+      try:
+        from cs.threads import NRLock  # pylint: disable=import-outside-toplevel
+      except ImportError:
+        lock = Lock()
+      else:
+        lock = NRLock()
     self._lock = lock
+
+  @classmethod
+  def fspath_normalised(cls, fspath: str):
+    ''' Return the normalised form of the filesystem path `fspath`,
+        used as the key for the singleton registry.
+
+        This default returns `realpath(fspath)`.
+
+        As a contracting example, the `cs.ebooks.kindle.classic.KindleTree`
+        class tries to locate the directory containing the book
+        database, and returns its realpath, allowing some imprecision.
+    '''
+    return realpath(fspath)
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `None` or `str` to a `CalibreTree`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    # TODO: or Pathlike?
+    if obj is None or isinstance(obj, str):
+      return cls(obj)
+    raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
 
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 

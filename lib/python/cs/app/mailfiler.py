@@ -103,16 +103,18 @@ DISTINFO = {
         'cs.excutils',
         'cs.filestate',
         'cs.fileutils',
+        'cs.fs',
         'cs.lex',
         'cs.logutils',
         'cs.mailutils',
         'cs.obj',
         'cs.pfx',
-        'cs.py.func',
         'cs.py.modules',
+        'cs.resources',
         'cs.rfc2047',
         'cs.seq',
         'cs.threads',
+        'cs.upd',
     ],
     'entry_points': {
         'console_scripts': [
@@ -180,12 +182,10 @@ class MailFilerCommand(BaseCommand):
     options.delay = None
     options.no_remove = False
     badopts = False
-    self.popopts(
+    options.popopts(
         argv,
-        options,
         _1='justone',
         d_=('delay', int, lambda delay: delay > 0),
-        n='justone'
     )
     if badopts:
       raise GetoptError("invalid arguments")

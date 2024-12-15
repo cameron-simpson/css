@@ -6,19 +6,24 @@
 import abc
 import importlib
 from inspect import (
-    getcomments, getmodule, isclass, isdatadescriptor, isfunction, ismethod,
-    signature
+    getcomments,
+    getmodule,
+    isclass,
+    isdatadescriptor,
+    isfunction,
+    ismethod,
+    signature,
 )
 from itertools import chain
 
 from cs.fsm import FSM
-from cs.gvutils import gvdataurl, GVDATAURL
-from cs.lex import cutprefix, stripped_dedent
+from cs.gvutils import gvdataurl, GVDATAURL, gvsvg
+from cs.lex import cutprefix, stripped_dedent, indent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.py.modules import module_attributes
 
-__version__ = '20240709-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -58,6 +63,7 @@ def module_doc(
         the default is to document `__init__`, then CONSTANTS, the
         dunders, then other public names
   '''
+  from cs.cmdutils import BaseCommand
   if isinstance(module, str):
     module = pfx_call(importlib.import_module, module)
   full_docs = [obj_docstring(module)]
@@ -75,15 +81,20 @@ def module_doc(
       obj_doc = obj_docstring(obj) if obj_module else ''
       if not callable(obj):
         if obj_doc:
-          full_docs.append(f'\n\n## `{Mname} = {obj!r}`\n\n{obj_doc}')
+          full_docs.append(
+              f'\n\n## <a name="{Mname}"></a>`{Mname} = {obj!r}`\n\n{obj_doc}'
+          )
         continue
       if not obj_doc:
         continue
       if isfunction(obj):
         sig = signature(obj)
-        full_docs.append(f'\n\n## `{Mname}{sig}`\n\n{obj_doc}')
+        full_docs.append(
+            f'\n\n## <a name="{Mname}"></a>`{Mname}{sig}`\n\n{obj_doc}'
+        )
       elif isclass(obj):
         classname_etc = Mname
+        # compute the list of immediate superclass names
         mro_names = []
         mro_set = set(obj.__mro__)
         for superclass in obj.__mro__:
@@ -99,8 +110,8 @@ def module_doc(
             mro_set.difference_update(superclass.__mro__)
         if mro_names:
           classname_etc += '(' + ', '.join(mro_names) + ')'
-          ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
         if issubclass(obj, FSM) and hasattr(obj, 'FSM_TRANSITIONS'):
+          # append an FSM state diagram
           obj_doc += (
               f'\n\nState diagram:\n![{Mname} State Diagram](' + gvdataurl(
                   obj.fsm_state_diagram_as_dot(
@@ -111,7 +122,19 @@ def module_doc(
                   dataurl_encoding='base64',
               ) + f' "{Mname} State Diagram")\n'
           )
-        full_docs.append(f'\n\n## Class `{classname_etc}`\n\n{obj_doc}')
+        if issubclass(obj, BaseCommand):
+          # extract the Usage: paragraph if present, append a full usage
+          doc_without_usage, usage_text = obj.extract_usage()
+          obj_doc = ''.join(
+              (
+                  doc_without_usage,
+                  "\n\nUsage summary:\n\n",
+                  indent("Usage: " + usage_text, "    "),
+              )
+          )
+        full_docs.append(
+            f'\n\n## <a name="{Mname}"></a>Class `{classname_etc}`\n\n{obj_doc}'
+        )
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order

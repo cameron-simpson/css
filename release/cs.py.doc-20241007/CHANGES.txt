@@ -1,0 +1,6 @@
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: for subclasses of cs.fsm.FSM embed an SVG state transition diagram
+lib/python/cs/py/doc.py: cs.py.doc: logic tidy up
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: put HTML named anchors on the headings
+lib/python/cs/py/doc.py: cs.py.doc: formatting tweak, comment
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: use BaseCommand.extract_usage() with BaseCOmmand subclasses
+lib/python/cs/py/doc.py: cs.py.doc: remove debug

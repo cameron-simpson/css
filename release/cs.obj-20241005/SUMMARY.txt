@@ -1,0 +1,1 @@
+New public_subclasses(cls) returning all subclasses with public names.

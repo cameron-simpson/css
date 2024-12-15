@@ -34,7 +34,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20240630-post'
+__version__ = '20241005-post'
 
 DISTINFO = {
     'description':
@@ -273,7 +273,6 @@ class HasThreadState(ContextManagerMixin):
           yield from with_enter_objects()
         else:
           if for_with:
-            print("WITH enter_obj", enter_obj)
             with enter_obj:
               yield from with_enter_objects()
           else:

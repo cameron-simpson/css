@@ -1,0 +1,1 @@
+The MutliOpen wrapper class is now obsolete (NB: not the MultiOpenMixin class).

@@ -247,6 +247,14 @@ class SpacesCommand(BaseCommand):
       with stackattrs(options, spaces=Spaces()):
         yield
 
+  def cmd_current(self, argv):
+    ''' Usage: {cmd}
+          Print the current space number.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print(self.options.spaces.current_index + 1)
+
   def cmd_monitor(self, argv):
     ''' Usage: {cmd}
           Monitor space switches.

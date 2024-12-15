@@ -1,0 +1,1 @@
+needdir: now returns True if the directory was made, False if it already existed.

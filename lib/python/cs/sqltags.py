@@ -32,6 +32,10 @@ import csv
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from fnmatch import fnmatchcase
+try:
+  from functools import cached_property  # 3.8 onward
+except ImportError:
+  cached_property = lambda func: property(cache(func))
 from getopt import getopt, GetoptError
 import operator
 import os
@@ -78,7 +82,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20240316-post'
+__version__ = '20240723-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -881,14 +885,18 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
-    self.define_schema()
+    self.__first_use = True
 
-  def define_schema(self):
-    ''' Instantiate the schema and define the root metanode.
-    '''
-    with self.sqla_state.auto_session() as session:
-      self.Base.metadata.create_all(bind=self.engine)
-      self.prepare_metanode(session=session)
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      # make sure the schema is up to date
+      # in particular, create the metanode 0 if missing
+      if self.__first_use:
+        with self.sqla_state.auto_session() as session:
+          self.prepare_metanode(session=session)
+        self.__first_use = False
+      yield
 
   def prepare_metanode(self, *, session):
     ''' Ensure row id 0, the metanode, exists.
@@ -1838,11 +1846,6 @@ class SQLTags(BaseTagSets, Promotable):
       db_url = expanduser(default_path)
     return db_url
 
-  def init(self):
-    ''' Initialise the database.
-    '''
-    self.orm.define_schema()
-
   def db_entity(self, index):
     ''' Return the `Entities` instance for `index` or `None`.
     '''
@@ -2390,29 +2393,28 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   # init
   #   Initialise the database.
 
-  USAGE_FORMAT = '''Usage: {cmd} [-f db_url] subcommand [...]
-  -f db_url SQLAlchemy database URL or filename.
-            Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').'''
-
-  USAGE_KEYWORDS = {
-      'DBURL_DEFAULT': DBURL_DEFAULT,
-      'DBURL_ENVVAR': DBURL_ENVVAR,
-      'FIND_OUTPUT_FORMAT_DEFAULT': FIND_OUTPUT_FORMAT_DEFAULT,
-  }
+  USAGE_FORMAT = '''
+    Usage: {cmd} [-f db_url] subcommand [...]
+      --db db_url SQLAlchemy database URL or filename.
+                  Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').
+  '''
 
   @dataclass
   class Options(BaseCommand.Options):
     db_url: str = None
-    sqltags: Optional[SQLTags] = None
 
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
+    COMMON_OPT_SPECS = dict(
+        db=('db_url', 'SQLTags database URL.'),
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
+
+  @cached_property
+  def sqltags(self):
     options = self.options
-    if opt == '-f':
-      options.db_url = val
-    else:
-      super().apply_opt(opt, val)
+    db_url = options.db_url
+    if db_url is None:
+      db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
+    return self.TAGSETS_CLASS(db_url)
 
   @contextmanager
   def run_context(self):
@@ -2420,12 +2422,8 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
     '''
     with super().run_context():
       options = self.options
-      db_url = options.db_url
-      if db_url is None:
-        db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
-      sqltags = self.TAGSETS_CLASS(db_url)
-      with sqltags:
-        with stackattrs(options, sqltags=sqltags, verbose=True):
+      with stackattrs(options, verbose=True):
+        with self.sqltags:
           yield
 
   @classmethod

@@ -1,0 +1,1 @@
+BaseCommandOptions.usage_options_format: support multiline help text via the new tabulate support.

@@ -27,7 +27,7 @@ from cs.env import getenv
 from cs.lex import r
 from cs.pfx import pfx_call
 
-__version__ = '20230407-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -171,6 +171,7 @@ def remove_decorations(figure_or_ax: Union[Figure, Axes]):
 @contextmanager
 def saved_figure(figure_or_ax, dir=None, ext=None):
   ''' Context manager to save a `Figure` to a file and yield the file path.
+      The file is removed on exit from the context.
 
       Parameters:
       * `figure_or_ax`: a `matplotlib.figure.Figure` or an object
