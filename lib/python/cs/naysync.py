@@ -12,13 +12,11 @@
     in the call stack blocks the async event loop.
 
     This module presently provides a pair of decorators for
-    asynchronous generators andfunctions which dispatches them in
+    asynchronous generators and functions which dispatches them in
     a `Thread` and presents an async wrapper.
 '''
 
-import asyncio
-from queue import Queue, Empty as QEmpty
-from threading import Thread
+from asyncio import run, to_thread
 
 from cs.deco import decorator
 
@@ -36,20 +34,11 @@ DISTINFO = {
 }
 
 @decorator
-def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
+def agen(genfunc):
   ''' A decorator for a synchronous generator which turns it into
       an asynchronous generator.
-
-      Parameters:
-      * `maxsize`: the size of the `Queue` used for communication,
-        default `1`; this governs how greedy the generator may be
-      * `poll_delay`: the async delay between polls of the `Queue`
-        after it was found to be empty twice in succession, default `0.25`s
-      * `fast_poll_delay`: the async delay between polls of the
-        `Queue` after it was found to be empty the first time after the
-        start or after an item was obtained
-
-      Exceptions in the synchronous generator are reraised in the asynchronous generator.
+      Exceptions in the synchronous generator are reraised in the asynchronous
+      generator.
 
       Example:
 
@@ -66,49 +55,27 @@ def agen(genfunc, maxsize=1, poll_delay=0.25, fast_poll_delay=0.001):
   async def agen(*a, **kw):
     ''' An async generator yielding items from `genfunc`.
     '''
-    q = Queue(maxsize=maxsize)
     sentinel = object()
-    g = genfunc(*a, **kw)
 
     def rungen():
-      ''' Run the generator and put its items onto the queue.
-      '''
-      try:
-        for item in g:
-          q.put((item, None))
-      except Exception as e:
-        q.put((sentinel, e))
-      else:
-        q.put((sentinel, None))
+      for item in genfunc(*a, **kw):
+        yield item
+      yield sentinel
 
-    T = Thread(target=rungen)
-    T.start()
-    delay = fast_poll_delay
+    g = rungen()
+    next_g = lambda: next(g)
     while True:
-      try:
-        item, e = q.get(block=False)
-      except QEmpty:
-        await asyncio.sleep(delay)
-        delay = poll_delay
-        continue
-      delay = fast_poll_delay
+      item = await to_thread(next_g)
       if item is sentinel:
-        if e is not None:
-          raise e
         break
-      assert e is None
       yield item
 
   return agen
 
 @decorator
-def afunc(func, poll_delay=0.25, fast_poll_delay=0.001):
+def afunc(func):
   ''' A decorator for a synchronous function which turns it into
       an asynchronous function.
-
-      The parameters are the same as for `@agen` excluding `maxsize`,
-      as this wraps the function in an asynchronous generator which
-      just yields the function result.
 
       Example:
 
@@ -120,19 +87,10 @@ def afunc(func, poll_delay=0.25, fast_poll_delay=0.001):
           slept = await func(5)
   '''
 
-  @agen(poll_delay=poll_delay, fast_poll_delay=fast_poll_delay)
-  def genfunc(*a, **kw):
-    ''' An asynchronous generator to yield the return result of `func`.
-    '''
-    yield func(*a, **kw)
-
   async def afunc(*a, **kw):
     ''' Asynchronous call to `func` via `@agen(fgenfunc)`.
     '''
-    async for item in genfunc(*a, **kw):
-      return item
-    # we should never get here
-    raise RuntimeError
+    return await to_thread(func, *a, **kw)
 
   return afunc
 
@@ -146,7 +104,7 @@ if __name__ == '__main__':
     async for item in gen():
       print("async_demo", repr(item))
 
-  asyncio.run(async_generator_demo())
+  run(async_generator_demo())
 
   import time
 
@@ -157,4 +115,4 @@ if __name__ == '__main__':
     print("func demo: return result", result)
     return result
 
-  asyncio.run(async_function_demo(4.0, 9))
+  run(async_function_demo(4.0, 9))
