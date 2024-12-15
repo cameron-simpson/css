@@ -94,7 +94,7 @@ cs.mediainfo ok_revision="211e1a295e5dd5beba0facbc1ba24c8ea3389440" pypi.release
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mobi
 cs.mplutils ok_revision=c3516c78f9d056d621055c19e4ad3d2f597b5c23 pypi.release="20241122" features={"20220918":["FigureSize"]}
-cs.naysync ok_revision="97a16ce5621d54b14cd0d93c29152bf52dd9ae6b" features={"20241214":["afunc","agen"]} pypi.release="20241214.1"
+cs.naysync ok_revision="3e16d9e73f7e78e7e40de2d36cfbba180bde90b1" features={"20241214":["afunc","agen"]} pypi.release="20241214.1"
 cs.ndjson ok_revision="9df558bd5a344fc076056fac0a84e1cf7f050872" pypi.release="20211208"
 cs.node
 cs.nodedb pypi.release=20160828
