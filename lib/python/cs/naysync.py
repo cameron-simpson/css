@@ -12,13 +12,11 @@
     in the call stack blocks the async event loop.
 
     This module presently provides a pair of decorators for
-    asynchronous generators andfunctions which dispatches them in
+    asynchronous generators and functions which dispatches them in
     a `Thread` and presents an async wrapper.
 '''
 
-import asyncio
-from queue import Queue, Empty as QEmpty
-from threading import Thread
+from asyncio import run, to_thread
 
 from cs.deco import decorator
 
@@ -106,7 +104,7 @@ if __name__ == '__main__':
     async for item in gen():
       print("async_demo", repr(item))
 
-  asyncio.run(async_generator_demo())
+  run(async_generator_demo())
 
   import time
 
@@ -117,4 +115,4 @@ if __name__ == '__main__':
     print("func demo: return result", result)
     return result
 
-  asyncio.run(async_function_demo(4.0, 9))
+  run(async_function_demo(4.0, 9))
