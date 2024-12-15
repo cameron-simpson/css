@@ -20,7 +20,7 @@ from asyncio import run, to_thread
 
 from cs.deco import decorator
 
-__version__ = '20241214.1-post'
+__version__ = '20241215'
 
 DISTINFO = {
     'keywords': ["python3"],
