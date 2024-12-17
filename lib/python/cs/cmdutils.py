@@ -713,8 +713,11 @@ class SubCommand:
       # the longer descriptions
       subusages = []
       for subcmd in show_subcmds:
-        subcommand = subcommands[subcmd]
-        if True:  ##recurse:
+        try:
+          subcommand = subcommands[subcmd]
+        except KeyError:
+          warning("unknown subcommand %r", subcmd)
+        else:
           # recursive long listing
           subusages.append(
               subcommand.usage_text(
@@ -723,8 +726,6 @@ class SubCommand:
                   seen_subcommands=sub_seen_subcommands,
               )
           )
-        else:
-          subusages.extend(self.short_subusages(show_subcmds))
     subusage_listing = []
     if common_subcmds:
       common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
