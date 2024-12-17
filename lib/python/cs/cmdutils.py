@@ -1865,16 +1865,6 @@ class BaseCommand:
       print(line)
     return xit
 
-  @uses_upd
-  def cmd_shell(self, argv, *, upd: Upd):
-    ''' Usage: {cmd}
-          Run a command prompt via cmd.Cmd using this command's subcommands.
-    '''
-    if argv:
-      raise GetoptError("extra arguments")
-    with upd.without():
-      self.cmdloop()
-
   def repl(self, *argv, banner=None, local=None):
     ''' Run an interactive Python prompt with some predefined local names.
         Aka REPL (Read Evaluate Print Loop).
@@ -1938,6 +1928,16 @@ class BaseCommand:
     banner = options.banner
     del options.banner
     return self.repl(*argv, banner=banner)
+
+  @uses_upd
+  def cmd_shell(self, argv, *, upd: Upd):
+    ''' Usage: {cmd}
+          Run a command prompt via cmd.Cmd using this command's subcommands.
+    '''
+    if argv:
+      raise GetoptError("extra arguments")
+    with upd.without():
+      self.cmdloop()
 
   @OBSOLETE("self.options.popopts")
   def popopts(self, argv, options, **opt_specs):
