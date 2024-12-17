@@ -28,6 +28,7 @@ from getopt import getopt, GetoptError
 from inspect import isclass
 import os
 from os.path import basename
+from pprint import pformat
 # this enables readline support in the docmd stuff
 try:
   import readline  # pylint: disable=unused-import
@@ -1889,30 +1890,30 @@ class BaseCommand:
         * `self`: from `self`
         * the attributes of `options`
         * the attributes of `self`
-
-        This is not presented automatically as a subcommand, but
-        commands wishing such a command should provide something
-        like this:
-
-            def cmd_repl(self, argv):
-                """ Usage: {cmd}
-                      Run an interactive Python prompt with some predefined local names.
-                """
-                return self.repl(*argv)
     '''
     options = self.options
-    if banner is None:
-      banner = self.cmd
-      try:
-        sqltags = options.sqltags
-      except AttributeError:
-        pass
-      else:
-        banner += f': {sqltags}'
     if local is None:
-      local = dict(self.__dict__)
-      local.update(options.__dict__)
+      pub_mapping = lambda d: {
+          k: v
+          for k, v in d.items()
+          if k and not k.startswith('_')
+      }
+      local = pub_mapping(self.__dict__)
+      local.update(pub_mapping(options.__dict__))
       local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+    if banner is None:
+      vars_banner = indent(
+          "\n".join(
+              tabulate(
+                  *(
+                      [k, pformat(v)]
+                      for k, v in sorted(local.items())
+                      if k and not k.startswith('_')
+                  )
+              )
+          )
+      )
+      banner = f'{self.cmd}\n\n{vars_banner}\n'
     try:
       # pylint: disable=import-outside-toplevel
       from bpython import embed
@@ -1925,6 +1926,18 @@ class BaseCommand:
         banner=banner,
         locals_=local,
     )
+
+  @popopts(banner_=None)
+  def cmd_repl(self, argv):
+    ''' Usage: {cmd}
+          Run a REPL (Read Evaluate Print Loop), an interactive Python prompt.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    banner = options.banner
+    del options.banner
+    return self.repl(*argv, banner=banner)
 
   @OBSOLETE("self.options.popopts")
   def popopts(self, argv, options, **opt_specs):
