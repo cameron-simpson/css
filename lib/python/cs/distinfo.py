@@ -266,23 +266,6 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
       raise RuntimeError("onimplemenented op %r" % (self.op,))
     return ''.join((self.module_name, self.op, release_version))
 
-@typechecked
-def cd_run(
-    cwd: str,
-    *argv,
-    check: bool = True,
-    stdin=DEVNULL,
-    quiet=False,
-    **run_kw,
-):
-  ''' Run the command `argv` in the directory `cwd`.
-      Return its exit status.
-  '''
-  if not isdirpath(cwd):
-    raise ValueError("not a directory: %r" % (cwd,))
-  run_kw.update(cwd=cwd, check=check, stdin=stdin, quiet=quiet)
-  return run(argv, **run_kw).returncode
-
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
   '''
@@ -1056,7 +1039,7 @@ class Module:
     if repo is None:
       repo = 'pypi'
     distfiles = self.reldistfiles(pkg_dir)
-    cd_run(pkg_dir, 'twine', 'upload', '--repository', repo, *distfiles)
+    run(['twine', 'upload', '--repository', repo, *distfiles], cwd=pkg_dir)
 
   @pfx_method(use_str=True)
   def log_since(self, vcstag=None, ignored=False):
@@ -1406,8 +1389,8 @@ class Module:
             warning("man path already exists: %r", manpath)
             continue
           with pfx_call(open, manpath, 'x') as manf:
-            ##cd_run('.', 'md2man-roff', path, stdout=manf)
-            cd_run('.', 'go-md2man', path, stdout=manf)
+            # was md2man-roff
+            run(['go-md2man', path], stdout=manf)
           continue
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
@@ -1448,16 +1431,18 @@ class Module:
     path_name = path_name.replace('.', '_')
     sdist_rpath = f'dist/{path_name}-{path_version}.tar.gz'
     wheel_rpath = f'dist/{path_name}-{path_version}-py3-none-any.whl'
-    cd_run(
-        pkg_dir,
-        ('python3', '-m', 'build'),
-        ('--outdir', 'dist'),
-        ('--sdist', '--wheel'),
-        (
-            '--skip-dependency-check',
-            '--no-isolation',
-        ),
-        '.',
+    run(
+        [
+            ('python3', '-m', 'build'),
+            ('--outdir', 'dist'),
+            ('--sdist', '--wheel'),
+            (
+                '--skip-dependency-check',
+                '--no-isolation',
+            ),
+            '.',
+        ],
+        cwd=pkg_dir,
     )
     print()
     os.system(f'ls -ld {pkg_dir}/{sdist_rpath!r}')
