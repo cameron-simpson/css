@@ -44,7 +44,6 @@ from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import isodate
-from cs.deco import cachedmethod
 from cs.fs import atomic_directory, scandirpaths
 from cs.fstags import FSTags
 from cs.lex import (
@@ -572,7 +571,7 @@ class Module:
         PKG_TAGS
     )
 
-  @cachedmethod
+  @cache
   def release_tags(self):
     ''' Return the `ReleaseTag`s for this package.
     '''
@@ -1281,8 +1280,7 @@ class Module:
       problems.append(subproblems)
     return problems
 
-  @property
-  @cachedmethod
+  @cached_property
   def imported_names(self):
     ''' Return a set containing the module names imported by this module
         both directly and indirectly.
