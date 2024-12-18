@@ -1113,39 +1113,36 @@ class Module:
             tf.write(line)
     return toppath
 
-  @property
+  @cached_property
+  @pfx_method(use_str=True)
   def DISTINFO(self):
     ''' The `DISTINFO` from `self.module`.
     '''
-    D = self._distinfo
-    if D is None:
-      with Pfx("%s.DISTINFO", self.name):
-        D = {}
-        M = self.module
-        if M is None:
-          warning("cannot load module")
+    D = {}
+    M = self.module
+    if M is None:
+      warning("cannot load module")
+    else:
+      try:
+        D = M.DISTINFO
+      except AttributeError:
+        pkg_name = self.package_name
+        if pkg_name is None or pkg_name == self.name:
+          warning("missing DISTINFO")
         else:
+          # look in the package
+          P = self.modules[pkg_name]
+          PM = P.module
           try:
-            D = M.DISTINFO
+            D = PM.DISTINFO
           except AttributeError:
-            pkg_name = self.package_name
-            if pkg_name is None or pkg_name == self.name:
-              warning("missing DISTINFO")
-            else:
-              # look in the package
-              P = self.modules[pkg_name]
-              PM = P.module
-              try:
-                D = PM.DISTINFO
-              except AttributeError:
-                warning("missing and also missing from package %r", pkg_name)
-              else:
-                ##warning("DISTINFO from package %r", pkg_name)
-                pass
+            warning("missing and also missing from package %r", pkg_name)
           else:
-            ##warning("DISTINFO from this module")
+            ##warning("DISTINFO from package %r", pkg_name)
             pass
-        self._distinfo = D
+      else:
+        ##warning("DISTINFO from this module")
+        pass
     return D
 
   @property
