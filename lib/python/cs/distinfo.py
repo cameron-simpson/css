@@ -334,7 +334,10 @@ class Modules(defaultdict):
     assert is_dotted_identifier(
         mod_name, extras='_-'
     ), ("not a dotted identifier: %r" % (mod_name,))
-    M = Module(mod_name, self)
+    try:
+      M = Module(mod_name, self)
+    except ValueError as e:
+      raise KeyError(mod_name) from e
     self[mod_name] = M
     return M
 
@@ -360,6 +363,8 @@ class Module:
     self._distinfo = None
     self._checking = False
     self._module_problems = None
+    if self.ismine and not self.paths():
+      raise ValueError(f'no file paths for Module({name!r})')
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.name)
@@ -1705,7 +1710,10 @@ class CSReleaseCommand(BaseCommand):
     options = self.options
     vcs = options.vcs
     pkg_name = argv.pop(0)
-    pkg = options.modules[pkg_name]
+    try:
+      pkg = options.modules[pkg_name]
+    except KeyError as e:
+      raise GetoptError(f'unknown {pkg_name=}') from e
     if argv:
       version = argv.pop(0)
     else:
