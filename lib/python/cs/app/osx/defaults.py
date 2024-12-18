@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Access the MacOS degfaults via the `defaults` command.
+''' Access the MacOS defaults via the `defaults` command.
 '''
 
 from subprocess import PIPE
@@ -12,7 +12,7 @@ from cs.psutils import run
 
 from typeguard import typechecked
 
-__version__ = '20240316-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -52,14 +52,13 @@ class Defaults:
   def __init__(self, host=None):
     self.host = host
 
-  def run(self, argv, doit=True, quiet=False) -> str:
+  def run(self, argv, doit=True) -> str:
     ''' Run a `defaults` subcommand, return the output decoded from UTF-8.
     '''
     return defaults(
         argv,
         host=self.host,
         doit=doit,
-        quiet=quiet,
         stdout=PIPE,
         encoding='utf-8',
     ).stdout

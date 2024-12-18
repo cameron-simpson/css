@@ -6,8 +6,9 @@
 '''
 
 from code import interact
+from collections import ChainMap
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import filecmp
 from functools import cached_property, total_ordering
@@ -31,10 +32,9 @@ import shlex
 from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
-from typing import Optional, Union
+from typing import Iterable, Optional, Union
 from uuid import UUID
 
-from icontract import require
 from sqlalchemy import (
     Boolean,
     Column,
@@ -45,17 +45,30 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.orm import declared_attr, relationship
+from sqlalchemy.orm import (
+    declared_attr,
+    Mapped,
+    mapped_column,
+    relationship,
+)
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import popopts, qvprint
 from cs.context import contextif
-from cs.deco import fmtdoc
-from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
+from cs.deco import (
+    fmtdoc,
+    uses_cmd_options,
+    uses_doit,
+    uses_force,
+    uses_quiet,
+    uses_verbose,
+)
+from cs.fs import HasFSPath, shortpath
 from cs.lex import (
     cutprefix,
     get_dotted_identifier,
     lc_,
+    stripped_dedent,
     FormatableMixin,
     FormatAsError,
 )
@@ -65,21 +78,25 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.resources import RunState, uses_runstate
+from cs.seq import unrepeated
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy, proxy_on_demand_field
 )
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import UpdProxy, uses_upd, print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, print, run_task  # pylint: disable=redefined-builtin
 
-from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
+from .common import AbstractEbooksTree, EBooksCommonBaseCommand
+from .dedrm import DeDRMWrapper
 from .mobi import Mobi  # pylint: disable=import-outside-toplevel
 from .pdf import PDFDocument
 
 CALIBRE_FSPATH = '~/Calibre Library'
 CALIBRE_FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
+# envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
+OTHER_LIBRARY_PATH_ENVVAR = CALIBRE_FSPATH_ENVVAR + '_OTHER'
 CALIBRE_BINDIR_DEFAULT = '/usr/bin'
 CALIBRE_PREFSDIR_DEFAULT = expanduser('~/.config/calibre')
 if sys.platform == 'darwin':
@@ -87,7 +104,7 @@ if sys.platform == 'darwin':
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
   CALIBRE_PREFSDIR_DEFAULT = expanduser('~/Library/Preferences/calibre')
 
-class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
+class CalibreTree(AbstractEbooksTree):
   ''' Work with a Calibre ebook tree.
   '''
 
@@ -121,10 +138,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isdirpath(self.fspath):
       raise ValueError(f'no directory at {self.fspath!r}')
     self.bin_dirpath = bin_dirpath or CALIBRE_BINDIR_DEFAULT
-    self.prefs_dirpath = (
-        prefs_dirpath or os.environ.get('CALIBRE_CONFIG_DIRECTORY')
-        or expanduser(CALIBRE_PREFSDIR_DEFAULT)
-    )
+    self.prefs_dirpath = prefs_dirpath or self.get_default_prefs_dirpath()
+    self.books_by_dbib = {}
 
     # define the proxy classes
     class CalibreBook(SingletonMixin, RelationProxy(self.db.books, [
@@ -195,9 +210,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         return tags
 
       def format_kwargs(self):
+        ''' Return the `CalibreTree` format `TagSet` as a mapping.
+        '''
         return self.format_tagset()
 
-      def get_arg_name(self, field_name):
+      @staticmethod
+      def get_arg_name(field_name):
         ''' Override for `FormattableMixin.get_arg_name`:
             return the leading dotted identifier,
             which represents a tag or tag prefix.
@@ -285,6 +303,32 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         except KeyError:
           return None
         return self.pathto(fmtsubpath)
+
+      @property
+      def dedrm(self):
+        ''' The available `DeDRMWrapper` is any, or `None`.
+        '''
+        return self.tree.dedrm
+
+      @uses_cmd_options(dedrm=None)
+      @pfx_method
+      def decrypt(self, dedrm: "DeDRMWrapper", fmtk='AZW'):
+        ''' Decrypt the book file in format `fmtk`.
+        '''
+        bookpath = self.formatpath(fmtk)
+        if bookpath is None:
+          raise KeyError(fmtk)
+        if dedrm is None:
+          raise NotImplementedError('no DeDRMWrapper available')
+        with dedrm:
+          decrypted = pfx_call(
+              dedrm.decrypt, bookpath, bookpath, exists_ok=True
+          )
+          if decrypted:
+            qvprint("decrypted:", shortpath(bookpath))
+          else:
+            qvprint("already decrypted:", shortpath(bookpath))
+        return decrypted
 
       @pfx_method
       @typechecked
@@ -481,15 +525,19 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
                   verbose=verbose
               )
 
+      @uses_doit
+      @uses_force
+      @uses_quiet
+      @uses_verbose
       def pull_format(
           self,
           ofmtpath,
           *,
           fmtk=None,
-          doit=True,
-          force=False,
-          quiet=False,
-          verbose=False,
+          doit,
+          force,
+          quiet,
+          verbose,
       ):
         ''' Pull a format file, typically from another `CalibreBook`.
 
@@ -525,9 +573,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           if fmtpath is not None and not force:
             if filecmp.cmp(fmtpath, ofmtpath):
               # pylint: disable=expression-not-assigned
-              verbose and print(
-                  self, fmtk, "identical to", shortpath(ofmtpath)
-              )
+              qvprint(self, fmtk, "identical to", shortpath(ofmtpath))
             else:
               # pylint: disable=expression-not-assigned
               verbose and warning(
@@ -539,15 +585,17 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
               )
             return
         # pylint: disable=expression-not-assigned
-        quiet or print(
-            self, self.formats, '+', fmtk, '<=', shortpath(ofmtpath)
-        )
+        qvprint(self, self.formats, '+', fmtk, '<=', shortpath(ofmtpath))
         self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
 
     self.CalibreBook = CalibreBook
 
-  def __str__(self):
-    return "%s:%s" % (type(self).__name__, self.shortpath)
+  @staticmethod
+  def get_default_prefs_dirpath():
+    return (
+        os.environ.get('CALIBRE_CONFIG_DIRECTORY')
+        or expanduser(CALIBRE_PREFSDIR_DEFAULT)
+    )
 
   @contextmanager
   def startup_shutdown(self):
@@ -583,49 +631,59 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.db.shell()
 
-  @uses_upd
-  def preload(self):
+  def refresh_dbid(self, dbid, session=None):
+    ''' Refresh our knowledge of `dbid` from the database,
+        which may be a new `dbid` not previously known.
+    '''
+    db = self.db
+    with db.session() as session:
+      db_book = self.db.books.lookup1(id=dbid, session=session)
+      if db_book is None:
+        raise ValueError(f'unknown database book id {dbid!r}')
+      book = self.books_by_dbib.get(dbid)
+      if book is None:
+        self.books_by_dbib[dbid] = self.CalibreBook(
+            self, dbid, db_book=db_book
+        )
+      else:
+        book.refresh_from_db(db_book)
+
+  @uses_quiet
+  @uses_verbose
+  def preload(self, *, quiet, verbose):
     ''' Scan all the books, preload their data.
     '''
-    with run_task(f'preload {self}'):
+    with contextif(
+        not quiet,
+        run_task,
+        f'preload {self}',
+        report_print=verbose,
+    ):
       db = self.db
       with db.session() as session:
         for db_book in self.db.books.lookup(session=session):
-          self.book_by_dbid(db_book.id, db_book=db_book)
+          dbid = db_book.id
+          book = self.books_by_dbib.get(dbid)
+          if book is None:
+            self.books_by_dbib[dbid] = self.CalibreBook(
+                self, dbid, db_book=db_book
+            )
+          else:
+            book.refresh_from_db(db_book)
 
-  @typechecked
+  def get_library_books_mapping(self, preload=False):
+    if preload or not self.books_by_dbib:
+      self.preload()
+    return self.books_by_dbib
+
   def __getitem__(self, dbid: int):
-    return self.book_by_dbid(dbid)
-
-  def __contains__(self, dbid: int):
-    db = self.db
+    mapping = self.get_library_books_mapping()
     try:
-      with db.session() as session:
-        db.books.by_id(dbid, session=session)
-    except IndexError:
-      return False
-    return True
-
-  @require(lambda dbid: dbid > 0)
-  @typechecked
-  def book_by_dbid(self, dbid: int, *, db_book=None):
-    ''' Return a cached `CalibreBook` for `dbid`.
-    '''
-    return self.CalibreBook(self, dbid, db_book=db_book)
-
-  def __iter__(self):
-    ''' Generator yielding `CalibreBook`s.
-    '''
-    db = self.db
-    seen_dbids = set()
-    with db.session() as session:
-      for author in sorted(db.authors.lookup(session=session)):
-        with Pfx("%d:%s", author.id, author.name):
-          for book in sorted(author.books):
-            if book.id in seen_dbids:
-              continue
-            yield self.book_by_dbid(book.id, db_book=book)
-            seen_dbids.add(book.id)
+      cbook = mapping[dbid]
+    except KeyError:
+      self.refresh_dbid(dbid)
+      cbook = mapping[dbid]
+    return cbook
 
   def identifier_names(self):
     ''' Return an iterable of the identifiers in use in the library.
@@ -638,8 +696,11 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     db = self.db
     with db.session() as session:
-      for identifier in db.identifiers.lookup(session=session, type=type_,
-                                              val=value):
+      for identifier in db.identifiers.lookup(
+          session=session,
+          type=type_,
+          val=value,
+      ):
         yield self[identifier.book_id]
 
   def by_asin(self, asin):
@@ -677,10 +738,78 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isabspath(calcmd):
       calcmd = joinpath(self.bin_dirpath, calcmd)
     calargv = [calcmd, *calargv]
-    cp = run(calargv, doit=doit, quiet=quiet, **subp_options)
+    cp = run(calargv, doit=doit, quiet=quiet, print=print, **subp_options)
     if cp is not None and cp.stdout and not quiet:
       print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
     return cp
+
+  def by_spec(self, book_spec):
+    ''' A generator yielding `CalibreBook` instances from `book_spec`.
+
+        Book specifications:
+        - dbid: an integer Calibre book id
+        - FORMAT: an upper case format name, eg EPUB
+        - /regexp: a case insensitive regular expression matching book
+          authors, titles series names or tags
+        - [identfier,...=]value,...: values to match against a Calibre
+          identifier such as asin
+    '''
+    # raw dbid
+    try:
+      dbid = int(book_spec)
+    except ValueError:
+      # FORMAT
+      if book_spec.isupper():
+        # TODO: fast search of book formats? like identifiers
+        match_fn = lambda book: book_spec in book.formats
+      # /regexp
+      elif book_spec.startswith('/'):
+        re_s = book_spec[1:]
+        if not re_s:
+          raise ValueError("empty regexp")  # pylint: disable=raise-missing-from
+        regexp = re.compile(re_s, re.I)
+        match_fn = lambda book: (
+            regexp.search(book.title) or any(
+                map(regexp.search, book.author_names)
+            ) or regexp.search(book.series_name or "") or
+            any(map(regexp.search, book.tags))
+        )
+      else:
+        # [identifier=]id-value,...
+        try:
+          identifiers_s, values_s = book_spec.split('=', 1)
+        except ValueError:
+          # id-value,...
+          identifiers = None
+          values_s = book_spec
+        else:
+          identifiers = identifiers_s.split(',')
+        values = list(map(str.lower, values_s.split(',')))
+        if identifiers:
+          # fast search by identifier fields
+          yield from unrepeated(
+              chain(
+                  *(
+                      self.by_identifier(identifier, value)
+                      for identifier in identifiers
+                      for value in values
+                  )
+              )
+          )
+          return
+        match_fn = lambda book: any(
+            (
+                (identifiers is None or idk in identifiers) and idv.lower() in
+                values
+            ) for idk, idv in book.identifiers.items()
+        )
+      # slow search by arbitrary match_fn
+      for book in self.values():
+        if match_fn(book):
+          yield book
+    else:
+      # integer dbid
+      yield self[dbid]
 
   def calibredb(self, dbcmd, *argv, doit=True, quiet=False, **subp_options):
     ''' Run `dbcmd` via the `calibredb` command.
@@ -718,14 +847,15 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ]
     return self._run(*subp_argv, doit=doit, quiet=quiet, **subp_options)
 
+  @uses_cmd_options(dedrm=None, doit=True, quiet=False)
   @pfx_method
   def add(
       self,
       bookpath,
       *,
-      dedrm=None,
-      doit=True,
-      quiet=False,
+      dedrm,
+      doit,
+      quiet,
       add_args=(),
       **subp_options,
   ):
@@ -742,7 +872,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       # try to remove DRM from the book file
       # and add the cleared temporary copy
       if doit:
-        with dedrm.removed(bookpath) as clearpath:
+        with dedrm.decrypted(bookpath) as clearpath:
+          # bookpath is not encrypted, use as is
+          if clearpath is None:
+            clearpath = bookpath
           return self.add(clearpath, doit=doit, quiet=quiet, **subp_options)
     cp = self.calibredb(
         'add',
@@ -776,6 +909,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       )
       return None
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
+    self.refresh_dbid(dbid)
     return dbid
 
 # pylint: disable=too-many-instance-attributes
@@ -817,8 +951,7 @@ class CalibreMetadataDB(ORM):
   def shell(self):
     ''' Interactive db shell.
     '''
-    print("sqlite3", self.db_path)
-    run(['sqlite3', self.db_path], check=True)
+    run(['sqlite3', self.db_path], check=True, quiet=False, stdin=sys.stdin)
     return 0
 
   # lifted from SQLTags
@@ -887,6 +1020,7 @@ class CalibreMetadataDB(ORM):
               lambda self: relationship(
                   f'{left_name.title()}s',
                   back_populates=f'{right_name}_links',
+                  lazy='joined',
               )
           )
       )
@@ -906,6 +1040,7 @@ class CalibreMetadataDB(ORM):
               lambda self: relationship(
                   f'{right_name.title()}s',
                   back_populates=f'{left_name}_links',
+                  lazy='joined',
               )
           )
       )
@@ -1084,23 +1219,23 @@ class CalibreMetadataDB(ORM):
     self.tags = Tags
     Tags.orm = self
 
-class CalibreCommand(BaseCommand):
+class CalibreCommand(EBooksCommonBaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
   '''
 
-  GETOPT_SPEC = 'C:K:O:'
-
-  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]
-  -C calibre_library
-    Specify calibre library location.
-  -K kindle_library
-    Specify kindle library location.
-  -O other_calibre_library
-    Specify alternate calibre library location, the default library
-    for pull etc. The default comes from ${OTHER_LIBRARY_PATH_ENVVAR}.'''
-
-  # envar $CALIBRE_LIBRARY_OTHER as push/pull etc "other library"
-  OTHER_LIBRARY_PATH_ENVVAR = CalibreTree.FSPATH_ENVVAR + '_OTHER'
+  USAGE_FORMAT = '\n'.join(
+      (
+          'Usage: {cmd} subcommand [...]',
+          *(
+              stripped_dedent(paragraph, "  ") for paragraph in (
+                  ''' Operate on a Calibre library.
+                  ''',
+                  # by_spec docs
+                  CalibreTree.by_spec.__doc__.split("\n\n")[1],
+              )
+          )
+      ),
+  )
 
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
@@ -1113,150 +1248,65 @@ class CalibreCommand(BaseCommand):
   DEFAULT_LINKTO_SERIES_FORMAT = '{series.name:lc}--{series.index}--{title:lc}'
   DEFAULT_LINKTO_NOSERIES_FORMAT = '{title:lc}'
 
-  USAGE_KEYWORDS = {
-      'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
-      'OTHER_LIBRARY_PATH_ENVVAR': OTHER_LIBRARY_PATH_ENVVAR,
-      'DEFAULT_LINKTO_DIRPATH': DEFAULT_LINKTO_DIRPATH,
-      'DEFAULT_LINKTO_DIRPATH_ENVVAR': DEFAULT_LINKTO_DIRPATH_ENVVAR,
-      'DEFAULT_LINKTO_FORMATS': DEFAULT_LINKTO_FORMATS,
-      'DEFAULT_LINKTO_SELECTORS': DEFAULT_LINKTO_SELECTORS,
-      'DEFAULT_LINKTO_SERIES_FORMAT': DEFAULT_LINKTO_SERIES_FORMAT,
-      'DEFAULT_LINKTO_NOSERIES_FORMAT': DEFAULT_LINKTO_NOSERIES_FORMAT,
-  }
-
   # mapping of target format key to source format and extra options
   CONVERT_MAP = {
       'EPUB': (['MOBI', 'AZW', 'AZW3'], ()),
   }
 
   @dataclass
-  class Options(BaseCommand.Options):
+  class Options(EBooksCommonBaseCommand.Options):
     ''' Special class for `self.options` with various properties.
     '''
 
-    calibre_path: str = field(
-        default_factory=lambda: os.environ.get(CalibreTree.FSPATH_ENVVAR)
-    )
-    calibre_path_other: Optional[str] = field(
-        default_factory=lambda: os.environ.
-        get(CalibreCommand.OTHER_LIBRARY_PATH_ENVVAR),
-    )
-    dedrm_package_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR),
-    )
-
-    def _default_kindle_path():
-      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-      return (
-          KindleTree._resolve_fspath(None)
-          if KindleTree.FSPATH_ENVVAR in os.environ else None
-      )
-
-    kindle_path: Optional[str] = field(default_factory=_default_kindle_path)
-    linkto_dirpath: str = field(
-        default_factory=lambda: os.environ.get(
-            CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
-        ) or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
-    )
+    calibre_path_other: Optional[str] = None
+    linkto_dirpath: Optional[str] = None
     # used by "calibre add [--cbz]"
     make_cbz: bool = False
 
-    COMMON_OPT_SPECS = dict(
-        C_='calibre_path',
-        K_='kindle_path',
-        **BaseCommand.Options.COMMON_OPT_SPECS,
-    )
-
-    @property
-    def calibre(self):
-      ''' The `CalibreTree` from `self.calibre_path`.
-      '''
-      return CalibreTree(self.calibre_path)
-
-    @property
+    @cached_property
     def calibre_other(self):
       ''' The alternate `CalibreTree` from `self.calibre_path_other`.
       '''
       if self.calibre_path_other is None:
-        raise AttributeError(".calibre_other: no .calibre_path_other")
+        self.calibre_path_other = os.environ.get(OTHER_LIBRARY_PATH_ENVVAR)
+        if self.calibre_path_other is None:
+          raise AttributeError(
+              f'.calibre_other: no .calibre_path_other and no ${OTHER_LIBRARY_PATH_ENVVAR}'
+          )
       return CalibreTree(self.calibre_path_other)
 
-    @property
-    def kindle(self):
-      ''' The `KindleTree` from `self.kindle_path`.
-      '''
-      if self.kindle_path is None:
-        raise AttributeError(".kindle: no .kindle_path")
-      from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
-      return KindleTree(self.kindle_path)
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
-    options = self.options
-    if opt == '-C':
-      options.calibre_path = val
-    elif opt == '-K':
-      options.kindle_path = val
-    elif opt == '-O':
-      options.calibre_path_other = val
-    else:
-      super().apply_opt(opt, val)
+    COMMON_OPT_SPECS = ChainMap(
+        dict(
+            O_=(
+                'calibre_path_other',
+                f'Path to secondary Calibre library, default from ${OTHER_LIBRARY_PATH_ENVVAR}.',
+                str,
+                isdirpath,
+                'not a directory',
+            ),
+        ),
+        EBooksCommonBaseCommand.Options.COMMON_OPT_SPECS,
+    )
 
   @contextmanager
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     with super().run_context():
-      calibre = self.options.calibre
-      with calibre:
+      options = self.options
+      if options.calibre_path_other is None:
+        options.calibre_path_other = os.environ.get(OTHER_LIBRARY_PATH_ENVVAR)
+      if options.linkto_dirpath is None:
+        options.linkto_dirpath = os.environ.get(
+            CalibreCommand.DEFAULT_LINKTO_DIRPATH_ENVVAR
+        ) or expanduser(CalibreCommand.DEFAULT_LINKTO_DIRPATH)
+      with options.calibre:
         yield
 
-  @staticmethod
-  def books_from_spec(calibre, book_spec):
-    ''' Generator yielding `CalibreBook` instances from `book_spec`.
+  def books_from_spec(self, book_spec) -> Iterable["CalibreBook"]:
+    ''' A generator yielding `CalibreBook` instances from `book_spec`.
     '''
-    # raw dbid
-    try:
-      dbid = int(book_spec)
-    except ValueError:
-      # FORMAT
-      if book_spec.isupper():
-        match_fn = lambda book: book_spec in book.formats
-      # /regexp
-      elif book_spec.startswith('/'):
-        re_s = book_spec[1:]
-        if not re_s:
-          raise ValueError("empty regexp")  # pylint: disable=raise-missing-from
-        regexp = re.compile(re_s, re.I)
-        match_fn = lambda book: (
-            regexp.search(book.title) or any(
-                map(regexp.search, book.author_names)
-            ) or regexp.search(book.series_name or "") or
-            any(map(regexp.search, book.tags))
-        )
-      else:
-        # [identifier=]id-value,...
-        try:
-          identifiers_s, values_s = book_spec.split('=', 1)
-        except ValueError:
-          # id-value,...
-          identifiers = None
-          values_s = book_spec
-        else:
-          identifiers = identifiers_s.split(',')
-        values = list(map(str.lower, values_s.split(',')))
-        match_fn = lambda book: any(
-            (
-                (identifiers is None or idk in identifiers) and idv.lower() in
-                values
-            ) for idk, idv in book.identifiers.items()
-        )
-      for book in calibre:
-        if match_fn(book):
-          yield book
-    else:
-      yield calibre[dbid]
+    return self.options.calibre.by_spec(book_spec)
 
   @staticmethod
   def cbook_default_sortkey(cbook):
@@ -1278,11 +1328,10 @@ class CalibreCommand(BaseCommand):
         If `sortkey` is not `None`, sort the returned books by this function.
     '''
     options = self.options
-    calibre = options.calibre
     cbooks = []
     while argv:
       book_spec = self.poparg(argv, "book_spec")
-      cbooks.extend(self.books_from_spec(calibre, book_spec))
+      cbooks.extend(self.books_from_spec(book_spec))
       if once:
         break
     if sortkey is not None and sortkey is not False:
@@ -1291,31 +1340,19 @@ class CalibreCommand(BaseCommand):
       cbooks = sorted(cbooks, key=sortkey, reverse=reverse)
     return cbooks
 
+  @popopts(cbz='Also make a CBZ file.')
   def cmd_add(self, argv):
-    ''' Usage: {cmd} [-nqv] bookpaths...
+    ''' Usage: {cmd} [--cbz] bookpaths...
           Add the specified ebook bookpaths to the library.
-          --cbz Also make a CBZ.
-          -n    No action: recite planned actions.
-          -q    Quiet: only emit warnings.
-          -v    Verbose: report all actions and decisions.
     '''
-    options = self.options
-    dedrm = (
-        DeDRMWrapper(options.dedrm_package_path)
-        if options.dedrm_package_path else None
-    )
-    options.popopts(
-        argv,
-        cbz='make_cbz',
-    )
     if not argv:
       raise GetoptError("missing bookpaths")
+    options = self.options
     calibre = options.calibre
     for bookpath in argv:
       with Pfx(bookpath):
         dbid = calibre.add(
             bookpath,
-            dedrm=dedrm,
             doit=options.doit,
             quiet=options.quiet,
         )
@@ -1324,20 +1361,14 @@ class CalibreCommand(BaseCommand):
           pfx_call(cbook.make_cbz)
 
   # pylint: disable=too-many-branches,too-many-locals
+  @popopts(
+      f=('force', 'Force: convert even if the format is already present.')
+  )
   @uses_runstate
   def cmd_convert(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] formatkey dbids...
+    ''' Usage: {cmd} [-f] formatkey dbids...
           Convert books to the format `formatkey`.
-          -f    Force: convert even if the format is already present.
-          -n    No action: recite planned actions.
-          -q    Quiet: only emit warnings.
-          -v    Verbose: report all actions and decisions.
     '''
-    options = self.options
-    options.popopts(
-        argv,
-        f='force',
-    )
     dstfmtk = self.poparg(argv).upper()
     srcfmtks, conv_opts = self.CONVERT_MAP.get(dstfmtk, ([], ()))
     if not srcfmtks:
@@ -1351,6 +1382,7 @@ class CalibreCommand(BaseCommand):
     except ValueError as e:
       raise GetoptError("invalid book specifiers: %s") from e
     xit = 0
+    options = self.options
     doit = options.doit
     force = options.force
     quiet = options.quiet
@@ -1364,7 +1396,7 @@ class CalibreCommand(BaseCommand):
             verbose and warning("replacing format %r")
           else:
             # pylint: disable=expression-not-assigned
-            verbose and print(f"{cbook}: format {dstfmtk!r} already present")
+            qvprint(f"{cbook}: format {dstfmtk!r} already present")
             continue
         for srcfmtk in srcfmtks:
           if srcfmtk in cbook.formats:
@@ -1393,46 +1425,62 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     return self.options.calibre.dbshell()
 
-  def cmd_info(self, argv):
-    ''' Usage: {cmd}
-          Report basic information.
+  def cmd_decrypt(self, argv):
+    ''' Usage: {cmd} [dbids...]
+          Remove DRM from the specified books.
     '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    print("calibre", self.options.calibre.shortpath)
-    if self.options.calibre_path_other:
-      print("calibre_other", shortpath(self.options.calibre_path_other))
-    if self.options.kindle_path:
-      print("kindle", shortpath(self.options.kindle_path))
+    options = self.options
+    calibre = options.calibre
+    dedrm = options.dedrm
+    if not self.options.dedrm:
+      warning("no DeDRM available")
+      return 1
+    if not argv:
+      argv = ['AZW', 'AZW3']
+    try:
+      cbooks = self.popbooks(argv)
+    except ValueError as e:
+      raise GetoptError("invalid book specifiers: %s") from e
+    runstate = self.options.runstate
+    xit = 0
+    with run_task("decrypt") as proxy:
+      for cbook in progressbar(list(unrepeated(cbooks)), "decrypt"):
+        runstate.raiseif()
+        proxy.text = str(cbook)
+        with Pfx(cbook):
+          for fmtk in 'AZW', 'AZW3':
+            proxy.text = f'{cbook} {fmtk}'
+            try:
+              if cbook.decrypt(fmtk):
+                print("decrypted", fmtk, "of", cbook)
+            except KeyError:
+              continue
+            except dedrm.DeDRMError as e:
+              warning("count not decrypt: %s", e)
+              xit = 1
+    return xit
 
+  @popopts(
+      _1=('first_format', 'Link only the first format found.'),
+      d_=(
+          'linkto_dirpath',
+          '''Specify the target directory, default from
+              ${DEFAULT_LINKTO_DIRPATH_ENVVAR} or {DEFAULT_LINKTO_DIRPATH}.''',
+      ),
+      F_=('formats', 'Source formats, default: {DEFAULT_LINKTO_FORMATS}'),
+      f=('force', 'Force. Replace existing links.'),
+      o_=('link_format', 'Link name format.'),
+  )
   @uses_runstate
   def cmd_linkto(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-1fnqv] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
+    ''' Usage: {cmd} [-1f] [-d linkto-dir] [-F fmt,...] [-o link-format] [dbids...]
           Export books to linkto-dir by hard linking.
-          -1              Link only the first format found.
-          -d linkto-dir   Specify the target directory, default from ${DEFAULT_LINKTO_DIRPATH_ENVVAR}
-                          or {DEFAULT_LINKTO_DIRPATH}.
-          -F fmt,...      Source formats, default: {DEFAULT_LINKTO_FORMATS}
-          -f              Force. Replace existing links.
-          -n              No action. Report planned actions.
-          -o link-format  Link name format.
-          -q              Quiet.
-          -v              Verbose.
     '''
     ##Default with series: {DEFAULT_LINKTO_SERIES_FORMAT}
     ##Default without series: {DEFAULT_LINKTO_NOSERIES_FORMAT}
     options = self.options
-    options.formats = ['CBZ', 'EPUB']
-    options.first_format = False
-    options.link_format = None
-    options.popopts(
-        argv,
-        _1='first_format',
-        d_='linkto_dirpath',
-        F_='formats',
-        f='force',
-        o_='link_format',
-    )
+    if options.formats is None:
+      options.formats = self.DEFAULT_LINKTO_FORMATS
     doit = options.doit
     first_format = options.first_format
     force = options.force
@@ -1445,7 +1493,7 @@ class CalibreCommand(BaseCommand):
     linkto_dirpath = options.linkto_dirpath
     quiet = options.quiet
     verbose = options.verbose
-    quiet or print(
+    qvprint(
         "linkto", calibre.shortpath, "=>", shortpath(options.linkto_dirpath)
     )
     cbooks = sorted(
@@ -1491,7 +1539,7 @@ class CalibreCommand(BaseCommand):
                 continue
             dstdir = dirname(dstpath)
             if not isdirpath(dstdir) and doit:
-              verbose and print("mkdir", shortpath(dstdir))
+              qvprint("mkdir", shortpath(dstdir))
               pfx_call(os.mkdir, dstdir)
             (quiet and doit
              ) or print("link", shortpath(srcpath), '=>', shortpath(dstpath))
@@ -1502,27 +1550,18 @@ class CalibreCommand(BaseCommand):
     return 0
 
   # pylint: disable=too-many-locals
+  @popopts(
+      l=('longmode', 'Long mode, listing book details over several lines.'),
+      o_=('ls_format', 'Output format for use in a single line book listing.'),
+      r=('sort_reverse', 'Reverse the listing order.'),
+      t=('sort_timestamp', 'Order listing by timestamp.'),
+  )
   @uses_runstate
   def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-l] [-o ls-format] [book_specs...]
           List the contents of the Calibre library.
-          -l            Long mode, listing book details over several lines.
-          -o ls_format  Output format for use in a single line book listing.
-          -r            Reverse the listing order.
-          -t            Order listing by timestamp.
     '''
     options = self.options
-    options.longmode = False  # pylint: disable=attribute-defined-outside-init
-    options.ls_format = None
-    options.sort_reverse = False
-    options.sort_timestamp = False
-    options.popopts(
-        argv,
-        l='longmode',
-        o_='ls_format',
-        r='sort_reverse',
-        t='sort_timestamp',
-    )
     if options.sort_timestamp:
       cbook_sort_key = lambda cbook: cbook.timestamp
     else:
@@ -1545,7 +1584,9 @@ class CalibreCommand(BaseCommand):
       else:
         with contextif(verbose, run_task, "sort calibre contents"):
           cbooks = sorted(
-              calibre, key=cbook_sort_key, reverse=options.sort_reverse
+              calibre.books(),
+              key=cbook_sort_key,
+              reverse=options.sort_reverse
           )
       for cbook in cbooks:
         runstate.raiseif()
@@ -1576,6 +1617,7 @@ class CalibreCommand(BaseCommand):
             print(output)
           if longmode:
             print(" ", cbook.path)
+            print(" ", shortpath(cbook.shortpath))
             tags = cbook.tags
             if tags:
               print("   ", ", ".join(sorted(tags)))
@@ -1657,14 +1699,16 @@ class CalibreCommand(BaseCommand):
     return xit
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+  @popopts(
+      f=(
+          'force',
+          'Force. Overwrite existing formats with formats from other-library.'
+      )
+  )
   @uses_runstate
   def cmd_pull(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] [/path/to/other-library] [identifiers...]
+    ''' Usage: {cmd} [-f] [/path/to/other-library] [identifiers...]
           Import formats from another Calibre library.
-          -f    Force. Overwrite existing formats with formats from other-library.
-          -n    No action: recite planned actions.
-          -q    Quiet. Only issue warnings and errors.
-          -v    Verbose. Print more information.
           /path/to/other-library: optional path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
@@ -1676,10 +1720,6 @@ class CalibreCommand(BaseCommand):
     '''
     options = self.options
     calibre = options.calibre
-    options.popopts(
-        argv,
-        f='force',
-    )
     if argv and argv[0].startswith('/') and isdirpath(argv[0]):
       options.calibre_path_other = argv.pop(0)
     doit = options.doit
@@ -1687,8 +1727,13 @@ class CalibreCommand(BaseCommand):
     quiet = options.quiet
     verbose = options.verbose
     other_library = options.calibre_other
-    quiet or print("pull", other_library.shortpath, "=>", calibre.shortpath)
-    with run_task("pull " + shlex.join(argv)) as proxy:
+    qvprint("pull", other_library.shortpath, "=>", calibre.shortpath)
+    with contextif(
+        not quiet,
+        run_task,
+        "pull " + shlex.join(argv),
+        report_print=verbose,
+    ):
       with Pfx(other_library.shortpath):
         with other_library:
           if other_library is calibre:
@@ -1707,7 +1752,12 @@ class CalibreCommand(BaseCommand):
             for identifier_name in sorted(other_library.identifier_names()):
               print(" ", identifier_name)
             return 0
-          with run_task(f'scan identifiers from {other_library}...'):
+          with contextif(
+              not quiet,
+              run_task,
+              f'scan identifiers from {other_library}...',
+              report_print=verbose,
+          ):
             obooks_map = {
                 idv: obook
                 for idv, obook in (
@@ -1752,7 +1802,7 @@ class CalibreCommand(BaseCommand):
                     "%s=%s: %s" % (identifier_name, identifier_value, obook)):
                   if not obook.formats:
                     # pylint: disable=expression-not-assigned
-                    verbose and print("no formats to pull")
+                    qvprint("no formats to pull")
                     continue
                   cbooks = list(
                       calibre.by_identifier(identifier_name, identifier_value)
@@ -1779,13 +1829,13 @@ class CalibreCommand(BaseCommand):
                     else:
                       cbook = calibre[dbid]
                       # pylint: disable=expression-not-assigned
-                      quiet or print('new', cbook, '<=', obook)
+                      qvprint('new', cbook, '<=', obook)
                   elif len(cbooks) > 1:
                     # pylint: disable=expression-not-assigned
-                    verbose or warning(
+                    verbose and warning(
                         "  \n".join(
                             [
-                                "multiple \"local\" books with this identifier:",
+                                'multiple "local" books with this identifier:',
                                 *map(str, cbooks)
                             ]
                         )
@@ -1821,13 +1871,12 @@ class CalibreCommand(BaseCommand):
     )
 
   def cmd_tag(self, argv):
-    ''' Usage: {cmd} [-n] [--] [-]tag[,tag...] book_specs...
+    ''' Usage: {cmd} [--] [-]tag[,tag...] book_specs...
           Modify the tags of the specified books.
+          Note the required -- separator if you are removing a tag with "-tag".
     '''
     options = self.options
-    if argv and argv[0] == '-n':
-      argv.pop(0)
-      options.doit = False
+    options.popopts(argv)
     doit = options.doit
     tags = self.poparg(argv, "tags")
     add_mode = True

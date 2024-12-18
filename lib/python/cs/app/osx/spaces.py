@@ -27,18 +27,22 @@ from cs.delta import monitor
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 
+from .misc import macos_version
 from .objc import apple, cg
+
+__version__ = '20240622-post'
 
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        "Development Status :: 3 - Beta",
+        "Development Status :: 4 - Beta",
         "Environment :: MacOS X",
         "Intended Audience :: End Users/Desktop",
         "Programming Language :: Python :: 3",
         "Topic :: Desktop Environment",
     ],
     'install_requires': [
+        'cs.app.osx.misc',
         'cs.app.osx.objc',
         'cs.cmdutils',
         'cs.context',
@@ -46,6 +50,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'pyobjc[allbindings]',
+        'typeguard',
     ],
     'entry_points': {
         'console_scripts': {
@@ -242,6 +247,14 @@ class SpacesCommand(BaseCommand):
       with stackattrs(options, spaces=Spaces()):
         yield
 
+  def cmd_current(self, argv):
+    ''' Usage: {cmd}
+          Print the current space number.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print(self.options.spaces.current_index + 1)
+
   def cmd_monitor(self, argv):
     ''' Usage: {cmd}
           Monitor space switches.
@@ -295,20 +308,48 @@ class SpacesCommand(BaseCommand):
               return 1
             lastname = random.choice(images)
             imagepath = abspath(joinpath(wp_path, lastname))
-            # pylint: disable=use-dict-literal
-            wp_config = dict(
-                BackgroundColor=(0, 0, 0),
-                Change='TimeInterval',
-                ChangePath=abspath(wp_path),
-                NewChangePath=abspath(wp_path),
-                ChangeTime=5,
-                DynamicStyle=0,
-                ImageFilePath=imagepath,
-                NewImageFilePath=imagepath,
-                LastName=lastname,
-                Placement='SizeToFit',
-                Random=True,
-            )  # pylint: disable=use-dict-literal
+            if macos_version < (14, 5):
+              # This worked before I upgraded to Sonoma, MacOS 14.5.
+              # pylint: disable=use-dict-literal
+              wp_config = dict(
+                  BackgroundColor=(0, 0, 0),
+                  Change='TimeInterval',
+                  ChangePath=abspath(wp_path),
+                  NewChangePath=abspath(wp_path),
+                  ChangeTime=5,
+                  DynamicStyle=0,
+                  ImageFilePath=imagepath,
+                  NewImageFilePath=imagepath,
+                  LastName=lastname,
+                  Placement='SizeToFit',
+                  Random=True,
+              )  # pylint: disable=use-dict-literal
+            else:
+              # MacOS Sonoma onward
+              # There's some hideous bug in the DesktopPictureSetDisplayForSpace
+              # library where it seems to see a leading home directory path
+              # and replace it with '/~' (instead of something plausible like '~'),
+              # perhaps intended for making paths track homedir moves.
+              # It turns out that providing a _relative_ path from '/'
+              # does The Right Thing. Ugh.
+              wp_path = abspath(wp_path)
+              wp_path = wp_path[1:]
+              ##rwp_path = relpath(wp_path, os.environ['HOME'])
+              ##if not rwp_path.startswith('../'):
+              ##  wp_path = rwp_path
+              wp_config = dict(
+                  BackgroundColor=(0, 0, 0),
+                  Change='TimeInterval',
+                  ChangePath=wp_path,
+                  NewChangePath=wp_path,
+                  ChangeDuration=5.0,
+                  DynamicStyle=0,
+                  ##ImageFilePath=imagepath,
+                  ##NewImageFilePath=imagepath,
+                  LastName=lastname,
+                  Placement='SizeToFit',
+                  Random=True,
+              )  # pylint: disable=use-dict-literal
           else:
             # pylint: disable=use-dict-literal
             wp_config = dict(ImageFilePath=abspath(wp_path),)

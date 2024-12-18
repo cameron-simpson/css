@@ -4,7 +4,6 @@
 '''
 
 from contextlib import contextmanager
-import signal
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
@@ -15,9 +14,14 @@ except ImportError:
     '''
     yield None
 
+from functools import partial
+import signal
+from typing import Callable, Iterable
+
+from cs.deco import decorator
 from cs.gimmicks import error
 
-__version__ = '20240412-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -26,7 +30,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks'],
+    'install_requires': ['cs.deco', 'cs.gimmicks'],
 }
 
 @contextmanager
@@ -57,7 +61,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
 
       The signature is flexible, offering 2 basic modes of use.
 
-      Flagged use: `contextif(flag,cmgr,*a,**kw)`: if `flag` is a
+      *Flagged use*: `contextif(flag,cmgr,*a,**kw)`: if `flag` is a
       Boolean then it governs whether the context manager `cmgr`
       is used. Historically the driving use case was verbosity
       dependent status lines or progress bars. Example:
@@ -66,21 +70,31 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
           with contextif(verbose, run_task, ....) as proxy:
               ... do stuff, updating proxy if not None ...
 
-      Unflagged use: `contextif(cmgr,*a,**kw)`: use `cmgr` as the
-      flag: if false (eg `None`) then `cmgr` is not used.
-
-      Additionally, `cmgr` may be a callable, in which case the
-      context manager itself is obtained by calling
-      `cmgr,*cmgr_args,**cmgr_kwargs)`. Otherwise `cmgr` is assumed
-      to be a context manager already, and it is an error to provide
-      `cmgr_args` or `cmgr_kwargs`.
-
       In the `cs.upd` example above, `run_task` is a context manager
       function which pops up an updatable status line, normally
       used as:
 
           with run_task("doing thing") as proxy:
               ... do the thing, setting proxy.text as needed ...
+
+      *Unflagged use*: `contextif(cmgr,*a,**kw)`: use `cmgr` as the
+      flag: if false (eg `None`) then `cmgr` is not used.
+
+      Additionally, `cmgr` may be a callable, in which case the
+      context manager itself is obtained by calling
+      `cmgr(*cmgr_args,**cmgr_kwargs)`. Otherwise `cmgr` is assumed
+      to be a context manager already, and it is an error to provide
+      `cmgr_args` or `cmgr_kwargs`.
+
+      This last mode can be a bit fiddly. If `cmgr` is a context
+      manager _but is also callable for other purposes_ you will
+      need to do a little shuffle to avoid the implied call:
+
+          with contexif(flag, lambda: cmgr):
+              ... do stuff ...
+
+      This provides a callable (the lambda) which returns the context
+      manager itself.
   '''
   if callable(cmgr):
     flag = True
@@ -682,6 +696,19 @@ def withif(obj):
     return obj
   return nullcontext()
 
+@decorator
+def with_self(method, get_context_from_self=None):
+  ''' A decorator to run a method inside `with self:` for classes
+      which need to be "held open"/"marked as in use" while the
+      method runs.
+  '''
+
+  def with_self_wrapper(self, *a, **kw):
+    with get_context(self) if get_context else self:
+      return method(self, *a, **kw)
+
+  return with_self_wrapper
+
 def _withall(obj_it):
   ''' A generator to enter every object `obj` from the iterator
       `obj_it` using `with obj:`, then yield.
@@ -696,10 +723,23 @@ def _withall(obj_it):
 
 @contextmanager
 def withall(objs):
-  ''' Enter every object `obj` in `obj_list` except those which are `None`
+  ''' Enter every object `obj` in `objs` except those which are `None`
       using `with obj:`, then yield.
   '''
   yield from _withall(obj for obj in objs if obj is not None)
+
+def closeall(objs: Iterable) -> Callable:
+  ''' Enter all the objects from `objs` using `with`
+      and return a function to close them all.
+
+      This is for situations where resources must be obtained now
+      but released at a later time on completion of some operation,
+      for example where we are dispatching a thread to work with
+      the resources.
+  '''
+  cmgr_it = twostep(withall(objs))
+  next(cmgr_it)
+  return partial(next, cmgr_it)
 
 @contextmanager
 def reconfigure_file(f, **kw):

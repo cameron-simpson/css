@@ -83,7 +83,7 @@ cd "$rd"
   while read -r img
   do
     [ $first ] && rm -f ./*
-    ln -s -- "$img" .
+    ln -- "$img" . || ln -s -- "$img" .
     first=
   done
   [ -t 1 ] && $trace ls "$rd/"

@@ -1,0 +1,56 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: replace underscores with dashes in the subcommand name
+lib/python/cs/cmdutils.py: merge ebooks ==> default: cs.ebooks.dedrm: support for getting the DeDRM stuff from the calibre plugin zip file
+lib/python/cs/cmdutils.py: SubCommand.usage_text(): use a ChainMap as an elaborate search path for symbols in the usage format string
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.popopts: update docstring example, use a ChainMap to present the opt_specs and the COMMON_OPT_SPECS
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: make a copy of the options so that we can apply options freely, facilitate the migration to popopts if there's no GETOPT_SPEC
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: if self.run_context() yields not None, exit immediately with that value
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: fill out the docstring with the details of the method semantics
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec: no longer promptable (too complex), more fields, infer self.field_name post init, new from_opt_kw() class factory method for producing an OptionSpec from the keyword=specs from popopts, make the parse of specs far more ordered
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec: not Promotable (missed in previous commit), handle self.parse=None, fix exception type
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec: new getopt_short and getopt_long properties, new option_terse method, new help_text_from_field_name method, new option_usage method
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: new show_command=False parameter, controls showing automatic usage for the common options in the long usage message
+lib/python/cs/cmdutils.py: cs.cmdutils: plumb the common opts logic through the rest of the usage message code
+lib/python/cs/cmdutils.py: cs.cmdutils: the popopts method main logic is now part of OptionSpec.popopts and better broken up; BaseCommand.popopts is now the shim
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.apply_preargv: this base method is now a no-op since we parse the common options before this; some other minor tweaks
+lib/python/cs/cmdutils.py: cs.cmdutils: clean some lint
+lib/python/cs/cmdutils.py: cs.cmdutils: a basic BaseCommand.cmd_info to recite the contents of self.options
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_info: new options field_names parameter to enumerate desired fields and their order
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_info: allow explicit fields to be requested, add optional skip-fields parameter, document semantics
+lib/python/cs/cmdutils.py: cs/cmdutils: OptionSpec: autofill help_text is missing; OptionSpec.from_opt_kw: make the instance as the last thing, fix a bunch of setup problems
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: sort the common options by option name lowercased, separate tabulation columns with 2 dpaces for clarity
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: modify the original .options, not a copy
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec.from_opt_kw: assorted small bugfixes
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.poparg: update for recent OptionSpec class changes
+lib/python/cs/cmdutils.py: cs.cdutils: clarify a comment
+lib/python/cs/cmdutils.py: cs.cmdutils: supplant vprint with qvprint which honours quiet and verbose, provide vprint as a shim with a hardwired quiet=False
+lib/python/cs/cmdutils.py: cs.cmdutils: tidy import, fix reference to SUBCOMMAND_METHOD_PREFIX
+lib/python/cs/cmdutils.py: cs.cmdutils,cs.deco: drop cs.cmdutils.uses_cmd_options, rename cs.deco.uses_cmd_option to uses_cmd_options, provide "options" if no option_defaults
+lib/python/cs/cmdutils.py: merge ebooks ==> default: many updates, mostly for the cs.cmdutils updates
+lib/python/cs/cmdutils.py: cs.cmdutils: small module docstring update
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.has_subcommands: also ignore cmd_info
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popopts: mark as OBSOLETE, and sanity check the options argument
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec.from_opt_kw: accept specs=None, use the inferred field_name
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec.parse_value: catch ValueError from self.parse and reraise as a GetoptError
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec.from_opt_kw: accept unvalidated_message if parse or validate, as parse can now raise ValueErrors as a kind of "not valid" mode
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions: new fields_as_dict method, update copy() to start with fields_as_dict, overlay as_dict, overlay updates
+lib/python/cs/cmdutils.py: merge vt ==> default
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: stripped_dedent then indent the USAGE_FORMAT attribute
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommandusage_text: show_common overrides short
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: fix setting argv=["help"] for the help mode
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_format: fix the alignment of usage obtained from the USAGE_FORMAT attribute
+lib/python/cs/cmdutils.py: cs.cmdutils: backport for Python pre-3.9
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec.from_opt_kw: a bare callable is also accepted
+lib/python/cs/cmdutils.py: cs.cmdutils: extract_usage_from_doc: update return type annotation and backport for older Python
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCOmmand: make the default command "info" instead of "shell"
+lib/python/cs/cmdutils.py: cs,cmdutils: in upcoming cs.djutils the BaseCommand subclass will almost always be named "Command", so fall back to the module name; overtly get the Options from the class instead of the instance
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_info: fix call to popopts
+lib/python/cs/cmdutils.py: cs.cmdutils: autoformat
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec: new add_argument(parser[,options]) method to add this option to an argparse style option parser (again, for the upcoming cs.djutils module)
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec: fix references to self, improve the default=
+lib/python/cs/cmdutils.py: cs.cmdutils: tidy imports, fix a typo
+lib/python/cs/cmdutils.py: cs.cmdutils: clean some lint
+lib/python/cs/cmdutils.py: merge default ==> djangohacks: cs.cmdutils fix
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.has_subcommands: now a class method which just scans for cmd_* which do not come from baseCommand itself
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_info: catch unknown field names if provided
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.popopts: infill None for extra attributes not present on the options
+lib/python/cs/cmdutils.py: cs.cmdutils: autoformat

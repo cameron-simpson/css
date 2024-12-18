@@ -42,7 +42,7 @@ but used with a little discretion produces far more debuggable results.
 from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
-from inspect import isgeneratorfunction
+from inspect import isclass, isgeneratorfunction
 import logging
 import sys
 import threading
@@ -54,7 +54,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20240412-post'
+__version__ = '20241208-post'
 
 DISTINFO = {
     'description':
@@ -338,6 +338,7 @@ class Pfx(object):
   @classmethod
   def prefixify_exception(cls, e):  # noqa: C901
     ''' Modify the supplied exception `e` with the current prefix.
+        The original value of some .attr is preserved as .{attr}_without_prefix.
         Return `True` if modified, `False` if unable to modify.
     '''
     current_prefix = cls._state.prefix
@@ -411,6 +412,7 @@ class Pfx(object):
               value.__class__.__name__, value
           )
       try:
+        setattr(e, attr + '_without_prefix', ovalue)
         setattr(e, attr, value)
       except AttributeError as e2:
         print(
@@ -703,7 +705,10 @@ def pfx_method(method, use_str=False, with_args=False):
   def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
-    classref = self if use_str else type(self).__name__
+    classref = (
+        self
+        if use_str else self.__name__ if isclass(self) else type(self).__name__
+    )
     pfxfmt, pfxargs = func_a_kw_fmt(method, *a, **kw)
     with Pfx("%s." + pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)

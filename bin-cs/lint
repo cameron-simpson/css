@@ -120,15 +120,14 @@ do
         xit=0
         if [ $ruff ]
         then
-          # drop grep when ruff>3.5.0
-          $trace ruff check "$lintfile" || exit 1
+          $trace ruff check --output-format=concise "$lintfile" || xit=1
         else
           $trace $python -We:invalid -m py_compile "$lintfile" || exit 1
           $trace $pyflakes "$lintfile" || xit=1
-          [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
-          [ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
         fi
-        [ $quick ] || $trace $pyiclint "$lintfile" || xit=1
+        [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
+        ##[ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+        ##[ $quick ] || $trace $pyiclint "$lintfile" || xit=1
         exit $xit
       ) || xit=1
       ;;

@@ -1,0 +1,1 @@
+module_doc: build the usage message from an instance of the baseCommand, needed since the last cs.cmdutils release.

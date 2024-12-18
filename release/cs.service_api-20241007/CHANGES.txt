@@ -1,0 +1,1 @@
+lib/python/cs/service_api.py: cs.resources: HTTPServiceAPI.suburl: support interruption by RunState.cancel

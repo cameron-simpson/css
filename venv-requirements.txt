@@ -1,12 +1,13 @@
 arrow
 b2sdk
 bs4
+blake3
 build
 ## not a package, no pyproject.toml
 ## -e git+https://github.com/noDRM/DeDRM_tools.git@v7.2.1#egg=dedrm&subdirectory=DeDRM_plugin
 discid
 enum34
--e git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python
+ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git@master
 icontract
 lmdb
 lxml
@@ -23,6 +24,7 @@ pycryptodome
 pyflakes
 pyicontract-lint
 pylint
+##pylzma - seems to be stale, what was I using this for? - cameron 30nov2024
 ##pyobjc[allbindings]  ## macos only
 pytest
 python-dateutil
@@ -37,4 +39,4 @@ typeguard
 watchdog
 yapf
 ##youtube-dl
--e git+https://github.com/ytdl-org/youtube-dl.git@26035bde4#egg=youtube-dl
+youtube-dl @ git+https://github.com/ytdl-org/youtube-dl.git@26035bde4

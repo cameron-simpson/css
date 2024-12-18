@@ -44,13 +44,14 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20240316-post'
+__version__ = '20241207-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
+        "Topic :: Text Processing",
     ],
     'install_requires': [
         'cs.dateutils',
@@ -215,14 +216,14 @@ def htmlquote(s):
   ''' Quote a string for use in HTML.
   '''
   s = htmlify(s)
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def jsquote(s):
   ''' Quote a string for use in JavaScript.
   '''
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def phpquote(s):
   ''' Quote a string for use in PHP code.
@@ -303,12 +304,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
           chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
         offset0 = offset
-    else:
-      if b in whitelist:
-        inwhite = True
-        chunk = hexify(bs[offset0:offset])
-        chunks.append(chunk)
-        offset0 = offset
+    elif b in whitelist:
+      inwhite = True
+      chunk = hexify(bs[offset0:offset])
+      chunks.append(chunk)
+      offset0 = offset
     offset += 1
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
@@ -401,7 +401,14 @@ def skipwhite(s, offset=0):
   _, offset = get_white(s, offset=offset)
   return offset
 
-def stripped_dedent(s):
+def indent(paragraph, line_indent="  "):
+  ''' Return the `paragraph` indented by `line_indent` (default `"  "`).
+  '''
+  return "\n".join(
+      line and line_indent + line for line in paragraph.split("\n")
+  )
+
+def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
@@ -411,7 +418,13 @@ def stripped_dedent(s):
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
 
-      Example:
+      The optional `post_indent` parameter may be used to indent
+      the dedented text before return.
+
+      The optional `sub_indent` parameter may be used to indent
+      the second and following lines if the dedented text before return.
+
+      Examples:
 
           >>> def func(s):
           ...   """ Slightly smarter dedent which ignores a string's opening indent.
@@ -425,6 +438,18 @@ def stripped_dedent(s):
           Slightly smarter dedent which ignores a string's opening indent.
           Strip the supplied string `s`. Pull off the leading line.
           Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, sub_indent='  '))
+          Slightly smarter dedent which ignores a string's opening indent.
+            Strip the supplied string `s`. Pull off the leading line.
+            Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, post_indent='  '))
+            Slightly smarter dedent which ignores a string's opening indent.
+            Strip the supplied string `s`. Pull off the leading line.
+            Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, post_indent='  ', sub_indent='| '))
+            Slightly smarter dedent which ignores a string's opening indent.
+            | Strip the supplied string `s`. Pull off the leading line.
+            | Dedent the rest. Put back the leading line.
   '''
   s = s.strip()
   lines = s.split('\n')
@@ -432,9 +457,9 @@ def stripped_dedent(s):
     return ''
   line1 = lines.pop(0)
   if not lines:
-    return line1
-  adjusted = dedent('\n'.join(lines))
-  return line1 + '\n' + adjusted
+    return indent(line1, post_indent)
+  adjusted = indent(dedent('\n'.join(lines)), sub_indent)
+  return indent(line1 + '\n' + adjusted, post_indent)
 
 @require(lambda offset: offset >= 0)
 def get_prefix_n(s, prefix, n=None, *, offset=0):
@@ -491,6 +516,81 @@ def get_prefix_n(s, prefix, n=None, *, offset=0):
   if n is not None and gn != n:
     return no_match
   return matched, gn, offset
+
+NUMERAL_NAMES = {
+    'en': {
+        # all the single word numbers
+        'zero': 0,
+        'nought': 0,
+        'one': 1,
+        'two': 2,
+        'three': 3,
+        'four': 4,
+        'five': 5,
+        'six': 6,
+        'seven': 7,
+        'eight': 8,
+        'nine': 9,
+        'ten': 10,
+        'eleven': 11,
+        'twelve': 12,
+        'thirteen': 13,
+        'fourteen': 14,
+        'fifteen': 15,
+        'sixteen': 16,
+        'seventeen': 17,
+        'eighteen': 18,
+        'nineteen': 19,
+        'twenty': 20,
+    },
+}
+
+def get_suffix_part(s, *, keywords=('part',), numeral_map=None):
+  ''' Strip a trailing "part N" suffix from the string `s`.
+      Return the matched suffix and the number part number.
+      Retrn `(None,None)` on no match.
+
+      Parameters:
+      * `s`: the string
+      * `keywords`: an iterable of `str` to match, or a single `str`;
+        default `'part'`
+      * `numeral_map`: an optional mapping of numeral names to numeric values;
+        default `NUMERAL_NAMES['en']`, the English numerals
+
+      Exanmple:
+
+          >>> get_suffix_part('s09e10 - A New World: Part One')
+          (': Part One', 1)
+  '''
+  if isinstance(keywords, str):
+    keywords = (keywords,)
+  if numeral_map is None:
+    numeral_map = NUMERAL_NAMES['en']
+  regexp_s = ''.join(
+      (
+          r'\W+(',
+          r'|'.join(keywords),
+          r')\s+(?P<numeral>\d+|',
+          r'|'.join(numeral_map.keys()),
+          r')\s*$',
+      )
+  )
+  regexp = re.compile(regexp_s, re.I)
+  m = regexp.search(s)
+  if not m:
+    return None, None
+  numeral = m.group('numeral')
+  try:
+    part_n = int(numeral)
+  except ValueError:
+    try:
+      part_n = numeral_map[numeral]
+    except KeyError:
+      try:
+        part_n = numeral_map[numeral.lower()]
+      except KeyError:
+        return None, None
+  return m.group(0), part_n
 
 # pylint: disable=redefined-outer-name
 def get_nonwhite(s, offset=0):
@@ -1266,6 +1366,65 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
       remotepath = suffix
   return ssh_target, remotepath
 
+def tabulate(*rows, sep='  '):
+  r''' A generator yielding lines of values from `rows` aligned in columns.
+
+      Each row in rows is a list of strings. If the strings contain
+      newlines they will be split into subrows.
+
+      Example:
+
+          >>> for row in tabulate(
+          ...     ['one col'],
+          ...     ['three', 'column', 'row'],
+          ...     ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
+          ...     ['two', 'cols'],
+          ... ):
+          ...     print(row)
+          ...
+          one col
+          three    column  row
+          row3     multi   goes  and
+                   line    here  here
+                   text
+          two      cols
+          >>>
+  '''
+  if not rows:
+    # avoids max of empty list
+    return
+  # pad short rows with empty columns
+  max_cols = max(map(len, rows))
+  for row in rows:
+    if len(row) < max_cols:
+      row += [''] * (max_cols - len(row))
+  # break rows on newlines
+  srows = []
+  for row in rows:
+    if all("\n" not in cell for cell in row):
+      # no multiline row cells
+      srows.append(row)
+    else:
+      # split multiline cells int columns, pad columns to match
+      cols = [
+          [subcell.rstrip() for subcell in cell.split("\n")] for cell in row
+      ]
+      max_height = max(map(len, cols))
+      for subrow in range(max_height):
+        srows.append(
+            [col[subrow] if subrow < len(col) else '' for col in cols]
+        )
+    rows = srows
+  col_widths = [
+      max(map(len, (row[c]
+                    for row in rows)))
+      for c in range(max(map(len, rows)))
+  ]
+  for row in rows:
+    yield sep.join(
+        f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
+    ).rstrip()
+
 # pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
@@ -1574,9 +1733,11 @@ class FormatableFormatter(Formatter):
     offset = 0
     while offset < len(format_spec):
       if format_spec.startswith(':', offset):
+        # an empty spec
         subspec = ''
         offset += 1
       else:
+        # match a FORMAT_RE_FIELD_EXPR
         m_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
         if m_subspec:
           subspec = m_subspec.group()
@@ -1604,8 +1765,7 @@ class FormatableFormatter(Formatter):
     '''
     # parse the format_spec into multiple subspecs
     format_subspecs = cls.get_format_subspecs(format_spec) or []
-    while format_subspecs:
-      format_subspec = format_subspecs.pop(0)
+    for format_subspec in format_subspecs:
       with Pfx("subspec %r", format_subspec):
         assert isinstance(format_subspec, str)
         assert len(format_subspec) > 0
@@ -1615,7 +1775,7 @@ class FormatableFormatter(Formatter):
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
-              value.convert_via_method_or_attr
+              value.convert_via_method_or_attr  # noqa
             except AttributeError:
               # promote to something with convert_via_method_or_attr
               if isinstance(value, str):

@@ -13,17 +13,16 @@
 
 from contextlib import contextmanager
 import os
-from os import fstat, SEEK_SET, SEEK_CUR, SEEK_END
+from os import fstat, pread, SEEK_SET, SEEK_CUR, SEEK_END
 import mmap
 from stat import S_ISREG
 import sys
-from threading import Thread
+from threading import Lock, Thread
 
 from cs.deco import Promotable
 from cs.gimmicks import r
-from cs.py3 import pread
 
-__version__ = '20240412-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -32,7 +31,11 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
-    'install_requires': ['cs.deco', 'cs.gimmicks', 'cs.py3'],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+        'python_version>=3.3',  # for os.pread
+    ],
 }
 
 DEFAULT_READSIZE = 131072
@@ -44,12 +47,23 @@ class CornuCopyBuffer(Promotable):
   ''' An automatically refilling buffer intended to support parsing
       of data streams.
 
-      Its purpose is to aid binary parsers
+      Its primary purpose is to aid binary parsers
       which do not themselves need to handle sources specially;
       `CornuCopyBuffer`s are trivially made from `bytes`,
       iterables of `bytes` and file-like objects.
       See `cs.binary` for convenient parsing classes
-      which work against `CornuCopyBuffer`s.
+      which work with `CornuCopyBuffer`s.
+
+      A `CornuCopyBuffer` is iterable, yielding data in whatever
+      sizes come from its `input_data` source, preceeded by any
+      content in the internal buffer.
+
+      A `CornuCopyBuffer` also supports the file methods `.read`,
+      `.tell` and `.seek` supporting drop in use of the buffer in
+      many file contexts. Backward seeks are not supported. `.seek`
+      will take advantage of the `input_data`'s `.seek` method if it
+      has one, otherwise it will use consume the `input_data`
+      as required.
 
       Attributes:
       * `buf`: the first of any buffered leading chunks
@@ -62,7 +76,9 @@ class CornuCopyBuffer(Promotable):
       *Note*: the initialiser may supply a cleanup function;
       although this will be called via the buffer's `.__del__` method
       a prudent user of a buffer should call the `.close()` method
-      when finished with the buffer to ensure prompt cleanup.
+      when finished with the buffer to ensure prompt cleanup;
+      the `contextlib.closing` context manager provides an easy way
+      to do this in common cases.
 
       The primary methods supporting parsing of data streams are
       `.extend()` and `take()`.
@@ -78,17 +94,6 @@ class CornuCopyBuffer(Promotable):
 
       Indexing a `CornuCopyBuffer` accesses the buffered data only,
       returning an individual byte's value (an `int`).
-
-      A `CornuCopyBuffer` is also iterable, yielding data in whatever
-      sizes come from its `input_data` source, preceeded by any
-      content in the internal buffer.
-
-      A `CornuCopyBuffer` also supports the file methods `.read`,
-      `.tell` and `.seek` supporting drop in use of the buffer in
-      many file contexts. Backward seeks are not supported. `.seek`
-      will take advantage of the `input_data`'s .seek method if it
-      has one, otherwise it will use consume the `input_data`
-      as required.
   '''
 
   # pylint: disable=too-many-arguments
@@ -102,6 +107,7 @@ class CornuCopyBuffer(Promotable):
       copy_chunks=None,
       close=None,
       progress=None,
+      final_offset=None,
   ):
     ''' Prepare the buffer.
 
@@ -139,6 +145,11 @@ class CornuCopyBuffer(Promotable):
         * `progress`: an optional `cs.Progress.progress` instance
           to which to report data consumed from `input_data`;
           any object supporting `+=` is acceptable
+        * `final_offset`: optional `int` specifying the largest
+          offset expected to be reached, intended for uses such as
+          callers presenting a pregress indication; this is, for
+          example, provided by `CornuCopyBuffer.from_fd` for regular
+          files using the `stat.st_size` field
     '''
     self.bufs = []
     if buf is None or not buf:
@@ -162,6 +173,7 @@ class CornuCopyBuffer(Promotable):
     self.input_offset_displacement = input_offset - offset
     self._close = close
     self.progress = progress
+    self.final_offset = final_offset
 
   def selfcheck(self, msg=''):
     ''' Integrity check for the buffer, useful during debugging.
@@ -190,15 +202,11 @@ class CornuCopyBuffer(Promotable):
 
   def close(self):
     ''' Close the buffer.
-        This calls the `close` callable supplied
-        when the buffer was initialised, if any,
-        in order to release resources such as open file descriptors.
-        The callable will be called only on the first `close()` call.
-
-        *Note*: this does *not* prevent subsequent reads or iteration
-        from the buffer; it is only for resource cleanup,
-        though that cleanup might itself break iteration.
+        This discards the internal buffer of "read but not consumed" data
+        and calls the `close` callable supplied when the buffer was
+        initialised, if any.
     '''
+    self.bufs = None
     if self._close:
       self._close()
       self._close = None
@@ -208,18 +216,33 @@ class CornuCopyBuffer(Promotable):
     '''
     self.close()
 
+  @staticmethod
+  def _stat_final_offset(f):
+    ''' Return the `final_offset` value from a file descriptor or file,
+        or `None` if it cannot be determined from `os.fstat()`.
+    '''
+    if isinstance(f, int):
+      st = fstat(f)
+    else:
+      try:
+        fd = f.fileno()
+      except AttributeError:
+        return None
+      if fd is None:
+        return None
+      st = fstat(fd)
+    if not S_ISREG(st.st_mode):
+      return None
+    return st.st_size
+
   @classmethod
-  def from_fd(cls, fd, readsize=None, offset=None, **kw):
+  def from_fd(cls, fd, readsize=None, offset=None, final_offset=None, **kw):
     ''' Return a new `CornuCopyBuffer` attached to an open file descriptor.
 
         Internally this constructs a `SeekableFDIterator` for regular
         files or an `FDIterator` for other files, which provides the
         iteration that `CornuCopyBuffer` consumes, but also seek
         support if the underlying file descriptor is seekable.
-
-        *Note*: a `SeekableFDIterator` makes an `os.dup` of the
-        supplied file descriptor, so the caller is responsible for
-        closing the original.
 
         Parameters:
         * `fd`: the operating system file descriptor
@@ -229,11 +252,16 @@ class CornuCopyBuffer(Promotable):
           start with this offset
         Other keyword arguments are passed to the buffer constructor.
     '''
-    if S_ISREG(fstat(fd).st_mode):
+    st = fstat(fd)
+    if S_ISREG(st.st_mode):
+      if final_offset is None:
+        final_offset = st.st_size
       it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
     else:
       it = FDIterator(fd, readsize=readsize, offset=offset)
-    return cls(it, offset=it.offset, close=it.close, **kw)
+    return cls(
+        it, close=it.close, offset=it.offset, final_offset=final_offset, **kw
+    )
 
   def as_fd(self, maxlength=Ellipsis):
     ''' Create a pipe and dispatch a `Thread` to copy
@@ -279,10 +307,6 @@ class CornuCopyBuffer(Promotable):
         provides the iteration that `CornuCopyBuffer` consumes, but
         also seek support.
 
-        *Note*: a `SeekableMMapIterator` makes an `os.dup` of the
-        supplied file descriptor, so the caller is responsible for
-        closing the original.
-
         Parameters:
         * `fd`: the operating system file descriptor
         * `readsize`: an optional preferred read size
@@ -292,10 +316,12 @@ class CornuCopyBuffer(Promotable):
         Other keyword arguments are passed to the buffer constructor.
     '''
     it = SeekableMMapIterator(fd, readsize=readsize, offset=offset)
-    return cls(it, offset=it.offset, **kw)
+    return cls(
+        it, offset=it.offset, close=it.close, final_offset=it.end_offset, **kw
+    )
 
   @classmethod
-  def from_file(cls, f, readsize=None, offset=None, **kw):
+  def from_file(cls, f, readsize=None, offset=None, final_offset=None, **kw):
     ''' Return a new `CornuCopyBuffer` attached to an open file.
 
         Internally this constructs a `SeekableFileIterator`, which
@@ -325,14 +351,16 @@ class CornuCopyBuffer(Promotable):
         is_seekable = True
     if offset is None:
       offset = foffset
+    if final_offset is None:
+      final_offset = cls._stat_final_offset(f)
     it = (
         SeekableFileIterator(f, readsize=readsize, offset=offset)
         if is_seekable else FileIterator(f, readsize=readsize, offset=offset)
     )
-    return cls(it, offset=it.offset, **kw)
+    return cls(it, offset=it.offset, final_offset=final_offset, **kw)
 
   @classmethod
-  def from_filename(cls, filename: str, offset=None, **kw):
+  def from_filename(cls, filename: str, offset=None, final_offset=None, **kw):
     ''' Open the file named `filename` and return a new `CornuCopyBuffer`.
 
         If `offset` is provided, skip to that position in the file.
@@ -342,7 +370,9 @@ class CornuCopyBuffer(Promotable):
         Other keyword arguments are passed to the buffer constructor.
     '''
     f = open(filename, 'rb')  # pylint: disable=consider-using-with
-    bfr = cls.from_file(f, close=f.close, **kw)
+    if final_offset is None:
+      final_offset = cls._stat_final_offset(f)
+    bfr = cls.from_file(f, close=f.close, final_offset=final_offset, **kw)
     if offset is not None:
       if offset < 0:
         S = os.fstat(f.fileno())
@@ -391,11 +421,11 @@ class CornuCopyBuffer(Promotable):
     bs = memoryview(bs)
     if offset > 0 or end_offset < len(bs):
       bs = bs[offset:end_offset]
-    return cls([bs], offset=offset, **kw)
+    return cls([bs], offset=offset, final_offset=end_offset, **kw)
 
   def __str__(self):
-    return "%s(offset:%d,buf:%d)" % (
-        type(self).__name__, self.offset, self.buflen
+    return "%s(offset:%d:%r,buf:%d)" % (
+        type(self).__name__, self.offset, self.final_offset, self.buflen
     )
 
   def __len__(self):
@@ -566,6 +596,7 @@ class CornuCopyBuffer(Promotable):
       try:
         next_chunk = next(self.input_data)
       except StopIteration:
+        # no more input_data
         if min_size is Ellipsis or short_ok:
           return
         # pylint: disable=raise-missing-from
@@ -573,12 +604,11 @@ class CornuCopyBuffer(Promotable):
             "insufficient input data, wanted %d bytes but only found %d" %
             (min_size, self.buflen)
         )
-      else:
-        if self.progress is not None:
-          self.progress += len(next_chunk)
       if next_chunk:
         self.bufs.append(next_chunk)
         self.buflen += len(next_chunk)
+        if self.progress is not None:
+          self.progress += len(next_chunk)
     ##assert self.buflen >= min_size
     ##assert self.buflen == sum(len(buf) for buf in self.bufs)
 
@@ -597,7 +627,7 @@ class CornuCopyBuffer(Promotable):
   def takev(self, size, short_ok=False):
     ''' Return the next `size` bytes as a list of chunks
         (because the internal buffering is also a list of chunks).
-        Other arguments are as for extend().
+        Other arguments are as for `.extend()`.
 
         See `.take()` to get a flat chunk instead of a list.
     '''
@@ -653,7 +683,7 @@ class CornuCopyBuffer(Promotable):
     return b''.join(taken)
 
   def readline(self):
-    ''' Return a binary "line" from `self`, where a line is defined by
+    r'''Return a binary "line" from `self`, where a line is defined by
         its ending `b'\n'` delimiter.
         The final line from a buffer might not have a trailing newline;
         `b''` is returned at EOF.
@@ -881,7 +911,7 @@ class CornuCopyBuffer(Promotable):
     finally:
       subbfr.flush()
 
-  def bounded(self, end_offset):
+  def bounded(self, end_offset) -> "CornuCopyBuffer":
     ''' Return a new `CornuCopyBuffer` operating on a bounded view
         of this buffer.
 
@@ -953,7 +983,9 @@ class CornuCopyBuffer(Promotable):
         be suspended.
     '''
     bfr2 = CornuCopyBuffer(
-        _BoundedBufferIterator(self, end_offset), offset=self.offset
+        _BoundedBufferIterator(self, end_offset),
+        offset=self.offset,
+        final_offset=end_offset,
     )
 
     def flush():
@@ -981,13 +1013,13 @@ class CornuCopyBuffer(Promotable):
     if isinstance(obj, cls):
       return obj
     if isinstance(obj, int):
-      obj = cls.from_fd(obj)
-    elif isinstance(obj, str):
-      obj = cls.from_filename(obj)
-    elif isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
-      obj = cls.from_bytes(obj)
-    elif hasattr(obj, 'read1') or hasattr(obj, 'read'):
-      obj = cls.from_file(obj)
+      return cls.from_fd(obj)
+    if isinstance(obj, str):
+      return cls.from_filename(obj)
+    if isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
+      return cls.from_bytes(obj)
+    if hasattr(obj, 'read1') or hasattr(obj, 'read'):
+      return cls.from_file(obj)
     try:
       iter(obj)
     except TypeError:
@@ -1082,8 +1114,8 @@ class CopyingIterator(object):
     # proxy other attributes from the base iterator
     return getattr(self.it, attr)
 
-class _Iterator(object):
-  ''' A base class for iterators over seekable things.
+class _FetchIterator:
+  ''' A base class for iterators over objects with a read-like `_fetch()` method.
   '''
 
   def __init__(self, offset=0, readsize=None, align=False):
@@ -1110,14 +1142,7 @@ class _Iterator(object):
     self.readsize = readsize
     self.align = align
     self.next_hint = None
-
-  def __del__(self):
-    self.close()
-
-  def close(self):
-    ''' Close the iterator; required by subclasses.
-    '''
-    raise NotImplementedError("missing close method")
+    self._lock = Lock()
 
   def _fetch(self, readsize):
     raise NotImplementedError("no _fetch method in class %s" % (type(self),))
@@ -1164,38 +1189,35 @@ class _Iterator(object):
     return data
 
 # pylint: disable=too-few-public-methods
-class SeekableIteratorMixin(object):
+class SeekableIteratorMixin:
   ''' Mixin supplying a logical with a `seek` method.
   '''
 
   def seek(self, new_offset, mode=SEEK_SET):
     ''' Move the logical offset.
     '''
-    if mode == SEEK_SET:
-      pass
-    elif mode == SEEK_CUR:
-      new_offset += self.offset
-    elif mode == SEEK_END:
-      try:
-        end_offset = self.end_offset
-      except AttributeError as e:
-        # pylint: disable=raise-missing-from
-        raise ValueError("mode=SEEK_END unsupported: %s" % (e,))
-      new_offset += end_offset
-    else:
-      raise ValueError("unknown mode %d" % (mode,))
-    self.offset = new_offset
-    return new_offset
+    with self._lock:
+      if mode == SEEK_SET:
+        pass
+      elif mode == SEEK_CUR:
+        new_offset += self.offset
+      elif mode == SEEK_END:
+        try:
+          end_offset = self.end_offset
+        except AttributeError as e:
+          # pylint: disable=raise-missing-from
+          raise ValueError("mode=SEEK_END unsupported: %s" % (e,))
+        new_offset += end_offset
+      else:
+        raise ValueError("unknown mode %d" % (mode,))
+      self.offset = new_offset
+      return new_offset
 
-class FDIterator(_Iterator):
+class FDIterator(_FetchIterator):
   ''' An iterator over the data of a file descriptor.
-
-      *Note*: the iterator works with an os.dup() of the file
-      descriptor so that it can close it with impunity; this requires
-      the caller to close their descriptor.
   '''
 
-  def __init__(self, fd, offset=None, readsize=None, align=True):
+  def __init__(self, fd: int, offset=None, readsize=None, align=True):
     ''' Initialise the iterator.
 
         Parameters:
@@ -1210,36 +1232,38 @@ class FDIterator(_Iterator):
     '''
     if offset is None:
       offset = 0
-    _Iterator.__init__(self, offset=offset, readsize=readsize, align=align)
-    # dup the fd so that we can close it with impunity
+    super().__init__(offset=offset, readsize=readsize, align=align)
+    # dup the fd so that it cannot be closed out from under us
+    # (well, via the original fd - anyone can call os.close())
     self.fd = os.dup(fd)
 
-  def close(self):
-    ''' Close the file descriptor.
-    '''
-    if self.fd is not None:
-      os.close(self.fd)
-      self.fd = None
+  def __del__(self):
+    self.close()
 
-  __del__ = close
+  def close(self):
+    ''' Close `self.fd` if it is nt yet `None`.
+    '''
+    with self._lock:
+      if self.fd is not None:
+        os.close(self.fd)
+        self.fd = None
 
   def _fetch(self, readsize):
-    return os.read(self.fd, readsize)
+    with self._lock:
+      return os.read(self.fd, readsize)
 
 class SeekableFDIterator(FDIterator, SeekableIteratorMixin):
   ''' An iterator over the data of a seekable file descriptor.
-
-      *Note*: the iterator works with an `os.dup()` of the file
-      descriptor so that it can close it with impunity; this requires
-      the caller to close their descriptor.
   '''
 
   def __init__(self, fd, offset=None, **kw):
     if offset is None:
       offset = os.lseek(fd, 0, SEEK_CUR)
-    FDIterator.__init__(self, fd, offset=offset, **kw)
+    super().__init__(fd, offset=offset, **kw)
 
   def _fetch(self, readsize):
+    ''' Fetch data using `os.pread`.
+    '''
     return pread(self.fd, readsize, self.offset)
 
   @property
@@ -1248,11 +1272,8 @@ class SeekableFDIterator(FDIterator, SeekableIteratorMixin):
     '''
     return os.fstat(self.fd).st_size
 
-class FileIterator(_Iterator, SeekableIteratorMixin):
+class FileIterator(_FetchIterator, SeekableIteratorMixin):
   ''' An iterator over the data of a file object.
-
-      *Note*: the iterator closes the file on `__del__` or if its
-      `.close` method is called.
   '''
 
   def __init__(self, fp, offset=None, readsize=None, align=False):
@@ -1270,7 +1291,9 @@ class FileIterator(_Iterator, SeekableIteratorMixin):
     '''
     if offset is None:
       offset = 0
-    _Iterator.__init__(self, offset=offset, readsize=readsize, align=align)
+    _FetchIterator.__init__(
+        self, offset=offset, readsize=readsize, align=align
+    )
     self.fp = fp
     # try to use the frugal read method if available
     try:
@@ -1319,15 +1342,11 @@ class SeekableFileIterator(FileIterator, SeekableIteratorMixin):
     new_offset = self.fp.seek(new_offset, mode)
     return super().seek(new_offset, SEEK_SET)
 
-class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
+class SeekableMMapIterator(_FetchIterator, SeekableIteratorMixin):
   ''' An iterator over the data of a mappable file descriptor.
-
-      *Note*: the iterator works with an `mmap` of an `os.dup()` of the
-      file descriptor so that it can close it with impunity; this
-      requires the caller to close their descriptor.
   '''
 
-  def __init__(self, fd, offset=None, readsize=None, align=True):
+  def __init__(self, fd: int, offset=None, readsize=None, align=True):
     ''' Initialise the iterator.
 
         Parameters:
@@ -1341,8 +1360,10 @@ class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
     '''
     if offset is None:
       offset = os.lseek(fd, 0, SEEK_CUR)
-    _Iterator.__init__(self, offset=offset, readsize=readsize, align=align)
-    self.fd = os.dup(fd)
+    _FetchIterator.__init__(
+        self, offset=offset, readsize=readsize, align=align
+    )
+    self.fd = fd
     self.base_offset = 0
     self.mmap = mmap.mmap(
         self.fd, 0, flags=mmap.MAP_PRIVATE, prot=mmap.PROT_READ
@@ -1350,17 +1371,15 @@ class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
     self.mv = memoryview(self.mmap)
 
   def close(self):
-    ''' Detach from the file descriptor and mmap and close.
+    ''' Close the mmap and detach.
     '''
-    if self.fd is not None:
+    if self.mmap is not None:
       try:
         self.mmap.close()
       except BufferError:
         pass
       else:
         self.mmap = None
-        os.close(self.fd)
-        self.fd = None
 
   @property
   def end_offset(self):

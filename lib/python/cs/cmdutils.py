@@ -4,20 +4,32 @@
 #
 # pylint: disable=too-many-lines
 
-''' Convenience functions for working with the Cmd module,
+''' Convenience functions for working with the cmd stdlib module,
     the BaseCommand class for constructing command line programmes,
     and other command line related stuff.
 '''
 
-from abc import ABC, abstractmethod
 from cmd import Cmd
 from code import interact
-from collections import namedtuple
+from collections import ChainMap
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
+try:
+  from functools import cache  # 3.9 onward
+except ImportError:
+  from functools import lru_cache
+  cache = lru_cache(maxsize=None)
+try:
+  from functools import cached_property  # 3.8 onward
+except ImportError:
+  cached_property = lambda func: property(cache(func))
+
 from getopt import getopt, GetoptError
-from inspect import isclass, ismethod
+from inspect import isclass
+import os
 from os.path import basename
+from pprint import pformat
+# this enables readline support in the docmd stuff
 try:
   import readline  # pylint: disable=unused-import
 except ImportError:
@@ -25,19 +37,21 @@ except ImportError:
 import shlex
 from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 import sys
-from typing import Callable, List, Mapping, Optional, Tuple
+from textwrap import dedent
+from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, Promotable
+from cs.deco import decorator, OBSOLETE, uses_cmd_options
 from cs.lex import (
     cutprefix,
     cutsuffix,
-    format_escape,
+    indent,
     is_identifier,
     r,
     stripped_dedent,
+    tabulate,
 )
 from cs.logutils import setup_logging, warning, error, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -46,9 +60,9 @@ from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
 from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
-from cs.upd import Upd, uses_upd
+from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20240422-post'
+__version__ = '20241218-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -118,154 +132,633 @@ def docmd(dofunc):
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
 
-class _BaseSubCommand(ABC):
-  ''' The basis for the classes implementing subcommands.
+@dataclass
+class OptionSpec:
+  ''' A class to support parsing an option value.
   '''
 
-  def __init__(self, cmd, method, *, usage_mapping=None):
-    self.cmd = cmd
-    self.method = method
-    self.usage_mapping = usage_mapping or {}
+  UNVALIDATED_MESSAGE_DEFAULT = "invalid value"
 
-  def __str__(self):
-    return "%s(cmd=%r,method=%s,..)" % (
-        type(self).__name__, self.cmd, self.method
+  # the option name, eg 'n' for -n or 'dry-run' for --dry-run
+  opt_name: str
+  # whether an argument is expected
+  # the argument usage name or None
+  # eg "username"
+  arg_name: Optional[str] = None
+  # the name of the options field/attribute
+  field_name: Optional[str] = None
+  # the initial value of the option
+  field_default: Optional[Any] = None
+  # the help text
+  help_text: Optional[str] = None
+  # optional callable to convert the argument to the value
+  parse: Optional[Callable[[str], Any]] = None
+  # optional callable to validate the value
+  validate: Optional[Callable[[Any], bool]] = None
+  # optional message for invalid values
+  unvalidated_message: str = UNVALIDATED_MESSAGE_DEFAULT
+
+  def __post_init__(self):
+    ''' Infer `field_name` and `help_text` if unspecified.
+    '''
+    if self.field_name is None:
+      self.field_name = self.opt_name.replace('-', '_')
+    if self.help_text is None:
+      self.help_text = self.help_text_from_field_name(self.field_name)
+
+  def parse_value(self, value):
+    ''' Parse `value` according to the spec.
+        Raises `GetoptError` for invalid values.
+    '''
+    if self.parse is None:
+      return value
+    with Pfx("%s %r", self.help_text, value):
+      try:
+        value = pfx_call(self.parse, value)
+        if self.validate is not None:
+          try:
+            if not pfx_call(self.validate, value):
+              raise GetoptError(self.unvalidated_message)
+          except ValueError as e:
+            raise GetoptError(
+                f'{self.unvalidated_message}: {e.__class__.__name__}:{e}'
+            ) from e
+      except ValueError as e:
+        raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
+    return value
+
+  @classmethod
+  @pfx_method
+  def from_opt_kw(cls, opt_k: str, specs: Union[str, List, Tuple, None]):
+    ''' Factory to produce an `OptionSpec` from a `(key,specs)` 2-tuple
+        as from the `items()` from a `popopts()` call.
+
+        The `specs` is normally a list or tuple, but a bare string
+        will be promoted to a 1-element list containing the string.
+
+        The elements of `specs` are considered in order for:
+        - an identifier specifying the `arg_name`,
+          optionally prepended with a dash to indicate an inverted option
+        - a help text about the option
+        - a callable to parse the option string value to obtain the actual value
+        - a callable to validate the option value
+        - a message for use when validation fails
+    '''
+    # produce needs_arg and cleaned up opt_name from the opt_k
+    needs_arg = False
+    # leading underscore for numeric options like -1
+    if opt_k.startswith('_'):
+      opt_k = opt_k[1:]
+      if is_identifier(opt_k):
+        warning("unnecessary leading underscore on valid identifier option")
+    # trailing underscore indicates that the option expected an argument
+    if opt_k.endswith('_'):
+      needs_arg = True
+      opt_k = opt_k[:-1]
+    opt_name = opt_k.replace('_', '-')
+    field_name = opt_k.replace('-', '_')
+    field_default = None
+    help_text = None
+    parse = None
+    validate = None
+    unvalidated_message = None
+    # apply the provided specifications
+    if specs is None:
+      specs = [field_name]
+    elif isinstance(specs, str):
+      # bare field name or help text
+      specs = [specs]
+    elif isinstance(specs, (list, tuple)):
+      specs = list(specs)
+    elif callable(specs):
+      # bare conversion function (or a type eg int)
+      specs = [specs]
+    else:
+      raise TypeError(
+          f'expected str or list or tuple for specs, got {r(specs)}'
+      )
+    spec0 = specs.pop(0) if specs else None
+    # first: optional field_name
+    # field_name, an identifier
+    if isinstance(spec0, str) and is_identifier(spec0):
+      field_name = spec0
+      spec0 = specs.pop(0) if specs else None
+    # -field_name, a dash followed by an identifier
+    elif (isinstance(spec0, str) and spec0.startswith('-')
+          and is_identifier(spec0[1:])):
+      field_name = spec0[1:]
+      if needs_arg:
+        raise ValueError(
+            f'field name {field_name!r} expects an aegument'
+            ': inverted options only make sense for Boolean options'
+        )
+      field_default = True
+      spec0 = specs.pop(0) if specs else None
+    # optional help text
+    if isinstance(spec0, str):
+      help_text = spec0
+      spec0 = specs.pop(0) if specs else None
+    # optional parse callable
+    if callable(spec0):
+      parse = spec0
+      spec0 = specs.pop(0) if specs else None
+    # optional validate callable
+    if callable(spec0):
+      validate = spec0
+      spec0 = specs.pop(0) if specs else None
+    # optional unvalidated_message
+    if isinstance(spec0, str):
+      if not parse and not validate:
+        raise ValueError(
+            f'unexpected unvalidated_message {spec0!r} when there is no parse or validate callable'
+        )
+      unvalidated_message = spec0
+      spec0 = specs.pop(0) if specs else None
+    if spec0 is not None:
+      raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
+    if not needs_arg:
+      # sanity check Boolean option
+      if field_default is None:
+        field_default = False
+      elif not isinstance(field_default, bool):
+        raise ValueError(
+            f'non-Booolean specified for the field default: {r(field_default)}'
+        )
+    if field_default is None and not needs_arg:
+      field_default = False
+    self = cls(
+        opt_name=opt_name,
+        arg_name=(field_name.replace('_', '-') if needs_arg else None),
+        field_name=field_name,
+        field_default=field_default,
+        help_text=help_text,
+        parse=parse,
+        validate=validate,
+        unvalidated_message=unvalidated_message,
+    )
+    return self
+
+  @property
+  def needs_arg(self):
+    ''' Whether we expect an argument: we have a `self.arg_name`.
+    '''
+    return bool(self.arg_name)
+
+  @property
+  def getopt_opt(self):
+    ''' The `opt` we expect from `opt,val=getopt(argv,...)`.
+    '''
+    return (
+        f'-{self.opt_name}'
+        if len(self.opt_name) == 1 else f'--{self.opt_name}'
     )
 
-  @abstractmethod
-  def __call__(
-      self, subcmd: str, base_command: "BaseCommandSubType", argv: List[str]
-  ):
+  @property
+  def getopt_short(self):
+    ''' The option specification for a getopt short option.
+        Return `''` if `self.opt_name` is longer than 1 character.
+    '''
+    if len(self.opt_name) > 1:
+      return ''
+    opt_char = self.opt_name[0]
+    return f'{opt_char}:' if self.needs_arg else opt_char
+
+  @property
+  def getopt_long(self):
+    ''' The option specification for a getopt long option.
+        Return `None` if `self.opt_name` is only 1 character.
+    '''
+    if len(self.opt_name) < 2:
+      return None
+    return f'{self.opt_name}=' if self.needs_arg else f'{self.opt_name}'
+
+  def option_terse(self):
+    ''' Return the `"-x"` or `"--name"` option string (with the arg name if expected).
+    '''
+    return f'{self.getopt_opt} {self.arg_name}' if self.needs_arg else self.getopt_opt
+
+  @staticmethod
+  def help_text_from_field_name(field_name):
+    ''' Compute an inferred `help_text` from an option `field_name`.
+    '''
+    help_text = field_name.replace('_', ' ')
+    return help_text[0].upper() + help_text[1:] + '.'
+
+  def option_usage(self):
+    ''' A 2 line usage entry for this option.
+        Example:
+
+            -j jobs
+              Job limit.
+    '''
+    line1 = self.option_terse()
+    # TODO: allow multiline help_text, indent it here
+    return f'{line1}\n  {self.help_text}'
+
+  def add_argument(self, parser, options=None):
+    ''' Add this option to an `argparser`-style option parser.
+        The optional `options` parameter may be used to supply an
+        `Options` instance to provide a default value.
+    '''
+    parser.add_argument(
+        self.getopt_opt,
+        action=('store' if self.arg_name else 'store_true'),
+        dest=self.field_name,
+        help=self.help_text,
+        default=(
+            (None if self.arg_name else False)
+            if options is None else getattr(options, self.field_name, None)
+        ),
+    )
+
+def split_usage(doc: Union[str, None],
+                usage_marker="Usage:") -> Tuple[str, str, str]:
+  ''' Extract a `"Usage:"`paragraph from a docstring
+      and return a 3-tuple of `(preusage,usage,postusage)`.
+
+      If the usage paragraph is not present `''` is returned as
+      the middle comonpent, otherwise it is the unindented usage
+      without the leading `"Usage:"`.
+  '''
+  if not doc:
+    # no doc, return unchanged
+    return '', '', ''
+  try:
+    pre_usage, usage_onward = doc.split(usage_marker, 1)
+  except ValueError:
+    # no usage: paragraph
+    return doc, '', ''
+  try:
+    usage_format, post_usage = usage_onward.split("\n\n", 1)
+  except ValueError:
+    usage_format, post_usage = usage_onward.rstrip(), ''
+  usage_format = stripped_dedent(usage_format)
+  # indent the second and following lines
+  try:
+    top_line, post_lines = usage_format.split("\n", 1)
+  except ValueError:
+    # single line usage only
+    pass
+  else:
+    usage_format = f'{top_line}\n{indent(post_lines)}'
+  return pre_usage, usage_format, post_usage
+
+@dataclass
+class SubCommand:
+  ''' An implementation for a subcommand.
+  '''
+
+  # the BaseCommand instance with which we're associated
+  command: "BaseCommand"
+  # a method or a subclass of BaseCommand
+  method: Callable
+  # the notional name of the command/subcommand
+  cmd: str = None
+  # optional additional usage keyword mapping
+  usage_mapping: Mapping[str, Any] = field(default_factory=dict)
+
+  @property
+  def instance(self):
+    ''' An instance of the class for `self.method`.
+    '''
+    return self.method(...) if isclass(self.method) else self.method.__self__
+
+  def get_cmd(self) -> str:
+    ''' Return the `cmd` string for this `SubCommand`,
+        derived from the subcommand's method name or class name
+        if `self.cmd` is not set.
+    '''
+    if self.cmd is None:
+      method = self.method
+      if isclass(method):
+        return cutsuffix(method.__name__, 'Command').lower()
+      return cutprefix(method.__name__, self.command.SUBCOMMAND_METHOD_PREFIX)
+    return self.cmd
+
+  @typechecked
+  def __call__(self, argv: List[str]):
     ''' Run the subcommand.
 
         Parameters:
-        * `subcmd`: the subcommand name
-        * `base_command`: the instance of `BaseCommand`
         * `argv`: the command line arguments after the subcommand name
     '''
-    raise NotImplementedError
+    method = self.method
+    if isclass(method):
+      # plumb self.command.options through to the subcommand
+      updates = self.command.options.as_dict()
+      updates.update(cmd=self.get_cmd())
+      return pfx_call(method, argv, **updates).run()
+    return method(argv)
 
-  @staticmethod
-  def from_class(command_cls: "BaseCommandSubType") -> Mapping[str, Callable]:
-    ''' Return a mapping of subcommand names to subcommand specifications
-        for class attributes which commence with
-        `command_cls.SUBCOMMAND_METHOD_PREFIX`,
-        by default `'cmd_'`.
+  @cached_property
+  def usage_default(self):
+    ''' The fallback usage line if nothing specified:
+        `'{cmd} [options...]'` or `'{cmd} subcommand [options...]'`.
     '''
-    prefix = command_cls.SUBCOMMAND_METHOD_PREFIX
-    subcommands_map = {}
-    for attr in dir(command_cls):
-      if attr.startswith(prefix):
-        subcmd = cutprefix(attr, prefix)
-        method = getattr(command_cls, attr)
-        if isclass(method):
-          subcommands_map[subcmd] = _ClassSubCommand(
-              subcmd,
-              method,
-              usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', ())),
-          )
-        else:
-          subcommands_map[subcmd] = _MethodSubCommand(
-              subcmd,
-              method,
-              usage_mapping=dict(getattr(command_cls, 'USAGE_KEYWORDS', ())),
-          )
-    return subcommands_map
+    if isclass(self.method):
+      has_subcommands_test = getattr(
+          self.instance, 'has_subcommands', lambda: False
+      )
+    else:
+      has_subcommands_test = getattr(
+          self.method, 'has_subcommands', lambda: False
+      )
+    return (
+        '{cmd} subcommand [options...]'
+        if has_subcommands_test() else '{cmd} [options...]'
+    )
 
+  @cached_property
+  def usage_commonopts_format(self):
+    ''' The `Common options:` format string paragraph
+        or `None` if there are no common options.
+    '''
+    return self.command.Options.usage_options_format(
+        "Common options:", **self.command.options.COMMON_OPT_SPECS
+    )
+
+  @cached_property
+  def usage_format(self) -> str:
+    ''' The usage format string for this subcommand.
+        *Note*: no leading "Usage:" prefix.
+
+        This first tries the legacy `self.method.USAGE_FORMAT`,
+        falling back to deriving it from `obj_docstring(self.method)`.
+
+        When deriving from the docstring we look for a paragraph
+        commencing with the string `Usage:` and otherwise fall back
+        to its first parapgraph.
+    '''
+    method = self.method
+    try:
+      # the old way
+      usage_format = method.USAGE_FORMAT
+    except AttributeError:
+      # the preferred way
+      # derive from the docstring or from self.usage_default
+      doc = obj_docstring(method)
+      pre_usage, usage_format, post_usage = split_usage(doc)
+      if not usage_format:
+        # No "Usage:" paragraph - use default usage line and first paragraph.
+        usage_format = self.usage_default
+        paragraph1 = stripped_dedent(pre_usage.split('\n\n', 1)[0])
+        if paragraph1:
+          usage_format += "\n" + indent(paragraph1)
+    else:
+      # The existing USAGE_FORMAT based usages have the word "Usage:"
+      # at the front but this is supplied at print time now.
+      usage_format = indent(
+          stripped_dedent(cutprefix(usage_format.lstrip(), 'Usage:'))
+      ).lstrip()
+    return usage_format
+
+  @cached_property
+  def usage_format_parts(
+      self
+  ) -> Tuple[str, Union[str, None], Union[str, None]]:
+    ''' The usage description format string brokoen into:
+        - the usage line (or lines if slosh extended)
+        - the first line of the description, or `None`
+        - the trailing lines of the description, or `None`
+    '''
+    lines = self.usage_format.split('\n')
+    usage_lines = [lines.pop(0)]
+    while usage_lines[-1].endswith('\\'):
+      usage_lines.append(lines.pop(0))
+    return (
+        "\n".join(usage_lines),
+        lines.pop(0).lstrip() if lines and lines[0].endswith('.') else None,
+        dedent("\n".join(lines)) if lines else None,
+    )
+
+  @cached_property
+  def usage_format_usage(self) -> str:
+    ''' The usage line(s) part of the format string.
+    '''
+    return self.usage_format_parts[0]
+
+  @cached_property
+  def usage_format_desc1(self) -> str:
+    ''' The leading usage line part of the format string.
+    '''
+    return self.usage_format_parts[1]
+
+  def get_usage_format(self, show_common=False) -> str:
+    ''' Return the usage format string for this subcommand.
+        *Note*: no leading "Usage:" prefix.
+        If `show_common` is true, include the `Common options:` paragraph.
+    '''
+    usage_format = self.usage_format
+    if show_common:
+      copts_format = self.usage_commonopts_format
+      if copts_format:
+        usage_format += "\n" + indent(copts_format)
+    return usage_format
+
+  def get_usage_keywords(
+      self,
+      *,
+      cmd: Optional[str] = None,
+      usage_mapping: Optional[Mapping] = None,
+  ) -> str:
+    ''' Return a mapping to be used when formatting the usage format string.
+
+        This is an elaborate `ChainMap` of:
+        - the optional `cmd` or `self.get_cmd()`
+        - the optional `usage_mapping`
+        - `self.usage_mapping`
+        - `self.method.USAGE_KEYWORDS` if present
+        - the attributes of `self.command`
+        - the attributes of `type(self.command)`
+        - the attributes of the module for `type(self.command)`
+    '''
+    # TODO maybe this should return the ChainMap used in usage_text
+    # elaborate search path for symbols in the usage format string
+    # TODO: should this _be_ get_usage_keywords? pretty verbose
+    format_cmd = cmd or self.get_cmd().replace('_', '-')
+    if self.command.options.COMMON_OPT_SPECS:
+      format_cmd += ' [common-options...]'
+    return ChainMap(
+        # normalised cmd name
+        {'cmd': format_cmd},
+        # supplied usage_mapping, if any
+        usage_mapping or {},
+        # direct .usage_mapping attribute
+        self.usage_mapping or {},
+        # usage mapping via the method
+        dict(getattr(self.method, 'USAGE_KEYWORDS', {})),
+        # the names in the command
+        self.command.__dict__,
+        # ... and its class
+        self.command.__class__.__dict__,
+        # ... and its module's top level
+        sys.modules[self.command.__module__].__dict__,
+    )
+
+  def get_subcommands(self):
+    ''' Return `self.method`'s mapping of subcommand name to `SubCommand`.
+    '''
+    method = self.method
+    if isclass(method):
+      method = method(...)
+    try:
+      get_subcommands = method.subcommands
+    except AttributeError:
+      return {}
+    return get_subcommands()
+
+  @property
+  def has_subcommands(self):
+    ''' Whether this `SubCommand`'s `.method` has subcommands.
+    '''
+    return bool(self.get_subcommands())
+
+  def get_subcmds(self):
+    ''' Return the names of `self.method`'s subcommands in lexical order.
+    '''
+    return sorted(self.get_subcommands().keys())
+
+  def subusage_table(self, subcmds: List[str], *, recurse=False, short=False):
+    ''' Return rows for use with `cs.lex.tabulate`
+        for the short subusage listing.
+    '''
+    rows = []
+    subcommands = self.get_subcommands()
+    for subcmd in subcmds:
+      subcommand = subcommands[subcmd]
+      rows.append(
+          [
+              subcmd.replace('_', '-'),
+              (
+                  # TODO: full desc if not short
+                  subcommand.usage_format_desc1
+                  or f'{subcmd.title()} subcommand.'
+              )
+          ]
+      )
+      if recurse and subcommand.has_subcommands:
+        rows.extend(
+            [indent(subc), indent(subd)]
+            for subc, subd in subcommand.subusage_table(
+                sorted(subcommand.get_subcommands().keys()),
+                recurse=recurse,
+                short=short,
+            )
+        )
+    return rows
+
+  def short_subusages(self, subcmds: List[str], *, recurse=False, short=False):
+    ''' Return a list of tabulated one line subcommand summaries.
+    '''
+    table = self.subusage_table(subcmds, recurse=recurse, short=short)
+    return list(tabulate(*table))
+
+  @typechecked
   def usage_text(
       self,
+      *,
+      cmd=None,
       short: bool,
-      usage_format_mapping: Optional[Mapping] = None
+      recurse: bool = False,
+      show_common: bool = False,
+      show_subcmds: Optional[Union[bool, str, List[str]]] = None,
+      usage_mapping: Optional[Mapping] = None,
+      seen_subcommands: Optional[Mapping] = None,
   ) -> str:
     ''' Return the filled out usage text for this subcommand.
     '''
-    usage_format_mapping = usage_format_mapping or {}
-    subusage_format = self.usage_format()  # pylint: disable=no-member
-    if subusage_format:
-      if short:
-        # the summary line and opening sentence of the description
-        lines = subusage_format.split('\n')
-        subusage_lines = [lines.pop(0)]
-        while subusage_lines[-1].endswith('\\'):
-          subusage_lines.append(lines.pop(0))
-        if lines and lines[0].endswith('.'):
-          subusage_lines.append(lines.pop(0))
-        subusage_format = '\n'.join(subusage_lines)
-      mapping = {
-          k: v
-          for k, v in sys.modules[self.method.__module__].__dict__.items()
-          if k and not k.startswith('_')
-      }
-      if usage_format_mapping:
-        mapping.update(usage_format_mapping)
-      if self.usage_mapping:
-        mapping.update(self.usage_mapping)
-      mapping.update(cmd=self.cmd)
-      with Pfx("format %r using %r", subusage_format, mapping):
-        subusage = subusage_format.format_map(mapping)
-    return subusage or None
-
-class _MethodSubCommand(_BaseSubCommand):
-  ''' A class to represent a subcommand implemented with a method.
-  '''
-
-  def __call__(
-      self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
-  ):
-    with Pfx(subcmd):
-      method = self.method
-      if ismethod(method):
-        # already bound
-        return method(argv)
-      # unbound - supply the instance for use as self
-      return method(command, argv)
-
-  def usage_format(self):
-    ''' Return the usage format string from the method docstring.
-    '''
-    doc = obj_docstring(self.method)
-    if doc:
-      if 'Usage:' in doc:
-        # extract the Usage: paragraph
-        pre_usage, post_usage = doc.split('Usage:', 1)
-        pre_usage = pre_usage.strip()
-        post_usage_format, *_ = post_usage.split('\n\n', 1)
-        subusage_format = stripped_dedent(post_usage_format)
-      else:
-        # extract the first paragraph
-        lines = ['{cmd} ...']
-        doc_p1 = stripped_dedent(doc.split('\n\n', 1)[0])
-        if doc_p1:
-          lines.extend(map(format_escape, doc_p1.split('\n')))
-        subusage_format = "\n  ".join(lines)
+    if show_subcmds is None:
+      show_subcmds = True
+    if seen_subcommands is None:
+      seen_subcommands = {}
+    subcommands = self.get_subcommands()
+    if show_subcmds:
+      # compute those already seen and those new
+      common_subcmds = subcommands.keys() & seen_subcommands.keys()
+      additional_subcommands = subcommands.keys() - common_subcmds
+      # turn show_subcmds into the list of subcommand names to show in the usage
+      if isinstance(show_subcmds, bool):
+        # all the subcommands winnowed by the sub_seen_subcommands
+        assert show_subcmds is True
+        show_subcmds = sorted(additional_subcommands)
+      elif isinstance(show_subcmds, str):
+        # show a single subcommand
+        show_subcmds = [show_subcmds]
+      # the seen_subcommands for our subcommands
+      sub_seen_subcommands = dict(seen_subcommands)
+      sub_seen_subcommands.update(subcommands)
+    # normalise the subcommand names to match the subcommands mapping
+    show_subcmds = [subcmd.replace('-', '_') for subcmd in show_subcmds]
+    if short:
+      usage_line, desc1, _ = self.usage_format_parts
+      usage_format = usage_line
+      if desc1:
+        usage_format += '\n' + indent(desc1)
     else:
-      # default usage text
-      subusage_format = '{cmd} ...'
-    return subusage_format
+      usage_format = self.usage_format
+    if show_common:
+      copts_format = self.usage_commonopts_format
+      if copts_format:
+        usage_format += "\n" + indent(copts_format)
+    # the elaborate search path for symbols in the usage format string
+    mapping = self.get_usage_keywords(cmd=cmd, usage_mapping=usage_mapping)
+    with Pfx("format %r using %r", usage_format, mapping):
+      usage = usage_format.format_map(mapping)
+    if short:
+      # the terse one subcommand-per-line listing
+      subusages = self.short_subusages(
+          show_subcmds, recurse=recurse, short=short
+      )
+    else:
+      # the longer descriptions
+      subusages = []
+      for subcmd in show_subcmds:
+        try:
+          subcommand = subcommands[subcmd]
+        except KeyError:
+          warning("unknown subcommand %r", subcmd)
+        else:
+          # recursive long listing
+          subusages.append(
+              subcommand.usage_text(
+                  short=short,
+                  recurse=recurse,
+                  seen_subcommands=sub_seen_subcommands,
+              )
+          )
+    subusage_listing = []
+    if common_subcmds:
+      common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
+    if subusages:
+      subcmds_header = (
+          'Subcommands'
+          if show_subcmds is None or len(show_subcmds) > 1 else 'Subcommand'
+      )
+      subusage_listing.append(f'{subcmds_header}:')
+      if common_subcmds:
+        subusage_listing.append(indent(common_subcmds_line))
+      subusage_listing.extend(map(indent, subusages))
+    else:
+      if common_subcmds:
+        subusage_listing.append(common_subcmds_line)
+    if subusage_listing:
+      subusage = "\n".join(subusage_listing)
+      usage = f'{usage}\n{indent(subusage)}'
+    return usage
 
-class _ClassSubCommand(_BaseSubCommand):
-  ''' A class to represent a subcommand implemented with a `BaseCommand` subclass.
-  '''
+# exposed outside the class for @fmtdoc
+SSH_EXE_DEFAULT = 'ssh'
+SSH_EXE_ENVVAR = 'SSH_EXE'
 
-  def __call__(
-      self, subcmd: str, command: "BaseCommandSubType", argv: List[str]
-  ):
-    subcmd_class = self.method
-    updates = dict(command.options.__dict__)
-    updates.update(cmd=subcmd)
-    command = pfx_call(subcmd_class, argv, **updates)
-    return command.run()
-
-  def usage_format(self) -> str:
-    ''' Return the usage format string from the class.
-    '''
-    doc = self.method.usage_text(cmd=self.cmd)
-    subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
-    return subusage_format
-
-# gimmkicked name to support @fmtdoc on BaseCommandOptions.popopts
+# gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
-    n='dry_run',
+    dry_run=('dry_run', 'Dry run, aka no action.'),
+    e_=(
+        'ssh_exe',
+        ''' An ssh-like command to use for remote command execution.
+            The string is a shell-like command string parsable by shlex.split.''',
+    ),
+    n=('dry_run', 'No action, aka dry run.'),
     q='quiet',
     v='verbose',
 )
@@ -284,10 +777,11 @@ class BaseCommandOptions(HasThreadState):
       * `.dry_run=False`
       * `.force=False`
       * `.quiet=False`
+      * `.ssh_exe='ssh'`
       * `.verbose=False`
       and a `.doit` property which is the inverse of `.dry_run`.
 
-      It is recommended that if ``BaseCommand` subclasses use a
+      It is recommended that if `BaseCommand` subclasses use a
       different type for their `Options` that it should be a
       subclass of `BaseCommandOptions`.
       Since `BaseCommandOptions` is a data class, this typically looks like:
@@ -300,14 +794,37 @@ class BaseCommandOptions(HasThreadState):
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
   COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
+  # the cmd prefix while a command runs
   cmd: Optional[str] = None
+  # dry run, no action
   dry_run: bool = False
   force: bool = False
   quiet: bool = False
+  runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
+  ssh_exe: str = field(
+      default_factory=lambda: (
+          os.environ.get(SSH_EXE_ENVVAR, os.environ.get('RSYNC_RSH', '')) or
+          SSH_EXE_DEFAULT
+      )
+  )
   verbose: bool = False
 
+  opt_spec_class = OptionSpec
+
   perthread_state = ThreadState()
+
+  def as_dict(self):
+    ''' Return the options as a `dict`.
+        This contains all the public attributes of `self`.
+    '''
+    return {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
+
+  def fields_as_dict(self):
+    ''' Return the options' fields as a `dict`.
+        This contains all the field values of `self`.
+    '''
+    return {f.name: getattr(self, f.name) for f in fields(self)}
 
   def copy(self, **updates):
     ''' Return a new instance of `BaseCommandOptions` (well, `type(self)`)
@@ -315,14 +832,12 @@ class BaseCommandOptions(HasThreadState):
 
         Any keyword arguments are applied as attribute updates to the copy.
     '''
-    copied = pfx_call(
-        type(self),
-        **{
-            k: v
-            for k, v in self.__dict__.items()
-            if not k.startswith('_')
-        },
-    )
+    # instantiate copied with the fields
+    copied = pfx_call(type(self), **self.fields_as_dict())
+    # infill any attributes which were not fields
+    for k, v in self.as_dict().items():
+      setattr(copied, k, v)
+    # apply the supplied updates
     for k, v in updates.items():
       setattr(copied, k, v)
     return copied
@@ -367,8 +882,7 @@ class BaseCommandOptions(HasThreadState):
 
   @property
   def doit(self):
-    ''' I usually use a `doit` flag,
-        the inverse of `dry_run`.
+    ''' I usually use a `doit` flag, the inverse of `dry_run`.
     '''
     return not self.dry_run
 
@@ -378,14 +892,50 @@ class BaseCommandOptions(HasThreadState):
     '''
     self.dry_run = not new_doit
 
-  @fmtdoc
-  def popopts(self, argv, **opt_specs):
-    ''' Convenience method to appply `BaseCommand.popopts` to the options (`self`).
+  @classmethod
+  def getopt_spec_map(cls, opt_specs_kw: Mapping, common_opt_specs=None):
+    ''' Return a 3-tuple of (shortopts,longopts,getopt_spec_map)` being:
+       - `shortopts`: the `getopt()` short options specification string
+       - `longopts`: the `getopts()` long option specification list
+       - `getopt_spec_map`: a mapping of `opt`->`OptionSpec`
+         where `opt` is as from `opt,val` from `getopt()`
+         and `opt_spec` is the associated `OptionSpec` instance
+    '''
+    opt_spec_cls = cls.opt_spec_class
+    shortopts = ''
+    longopts = []
+    getopt_spec_map = {}
+    # gather up the option specifications and make getopt arguments
+    for opt_k, opt_specs in ChainMap(
+        opt_specs_kw,
+        cls.COMMON_OPT_SPECS if common_opt_specs is None else common_opt_specs,
+    ).items():
+      with Pfx("opt_spec[%r]=%r", opt_k, opt_specs):
+        opt_spec = opt_spec_cls.from_opt_kw(opt_k, opt_specs)
+        if opt_spec.getopt_opt in getopt_spec_map:
+          raise ValueError(f'repeated spec for {opt_spec.getopt_opt}')
+        getopt_spec_map[opt_spec.getopt_opt] = opt_spec
+        # update the arguments for getopt()
+        shortopts += opt_spec.getopt_short
+        getopt_long = opt_spec.getopt_long
+        if getopt_long is not None:
+          longopts.append(getopt_long)
+    return shortopts, longopts, getopt_spec_map
 
-        Example for a `BaseCommand` `cmd_foo` method:
+  def popopts(
+      self,
+      argv,
+      **opt_specs_kw,
+  ):
+    ''' Parse option switches from `argv`, a list of command line strings
+        with leading option switches and apply them to `self`.
+        Modify `argv` in place.
+
+        Example use in a `BaseCommand` `cmd_foo` method:
 
             def cmd_foo(self, argv):
-                self.options.popopts(
+                options = self.options
+                options.popopts(
                     c_='config',
                     l='long',
                     x='trace',
@@ -393,65 +943,158 @@ class BaseCommandOptions(HasThreadState):
                 if self.options.dry_run:
                     print("dry run!")
 
-        The class attribute `COMMON_OPT_SPECS` is a mapping of
-        options which are always supported. `BaseCommandOptions`
-        has: `COMMON_OPT_SPECS={_COMMON_OPT_SPECS!r}`.
+        The expected options are specified by the keyword parameters
+        in `opt_specs`.
+        Each keyword name has the following semantics:
+        * options not starting with a letter may be preceeded by an underscore
+          to allow use in the parameter list, for example `_1='once'`
+          for a `-1` option setting the `once` option name
+        * a single letter name specifies a short option
+          and a multiletter name specifies a long option
+        * options requiring an argument have a trailing underscore
+        * options not requiring an argument normally imply a value
+          of `True`; if their synonym commences with a dash they will
+          imply a value of `False`, for example `n='dry_run',y='-dry_run'`.
 
-        A subclass with more common options might extend this like so,
-        from `cs.hashindex`:
+        The `BaseCommand` class provides a `popopts` method
+        which is a shim for this method applied to its `.options`.
+        So common use in a command method usually looks like this:
 
-            COMMON_OPT_SPECS = dict(
-                e='ssh_exe',
-                h_='hashname',
-                H_='hashindex_exe',
-                **BaseCommand.Options.COMMON_OPT_SPECS,
-            )
+            class SomeCommand(BaseCommand):
 
+                def cmd_foo(self, argv):
+                    # accept a -j or --jobs options
+                    self.popopts(argv, jobs=1, j='jobs')
+                    print("jobs =", self.options.jobs)
+
+        The `self.options` object is preprovided as an instance of
+        the `self.Options` class, which is `BaseCommandOptions` by
+        default. There is presupplies support for some basic options
+        like `-v` for "verbose" and so forth, and a subcommand
+        need not describe these in a call to `self.options.popopts()`.
+
+        Example:
+
+            >>> import os.path
+            >>> from typing import Optional
+            >>> @dataclass
+            ... class DemoOptions(BaseCommandOptions):
+            ...   all: bool = False
+            ...   jobs: int = 1
+            ...   number: int = 0
+            ...   once: bool = False
+            ...   path: Optional[str] = None
+            ...   trace_exec: bool = False
+            ...
+            >>> options = DemoOptions()
+            >>> argv = ['-1', '-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
+            >>> opt_dict = options.popopts(
+            ...   argv,
+            ...   _1='once',
+            ...   a='all',
+            ...   j_=('jobs',int),
+            ...   x='-trace_exec',
+            ...   y='-dry_run',
+            ...   dry_run=None,
+            ...   path_=(str, os.path.isabs, 'not an absolute path'),
+            ...   verbose=None,
+            ... )
+            >>> opt_dict
+            {'once': True, 'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
+            >>> options # doctest: +ELLIPSIS
+            DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
     '''
-    for k, v in self.COMMON_OPT_SPECS.items():
-      opt_specs.setdefault(k, v)
-    return BaseCommand.popopts(argv, self, **opt_specs)
+    shortopts, longopts, getopt_spec_map = self.getopt_spec_map(opt_specs_kw)
+    # infill default False/None for new fields
+    for opt_spec in getopt_spec_map.values():
+      field_name = opt_spec.field_name
+      if not hasattr(self, field_name):
+        setattr(self, field_name, opt_spec.field_default)
+    opts, argv[:] = getopt(argv, shortopts, longopts)
+    for opt, val in opts:
+      with Pfx(opt):
+        opt_spec = getopt_spec_map[opt]
+        if opt_spec.needs_arg:
+          with Pfx("%r", val):
+            value = opt_spec.parse_value(val)
+        else:
+          value = not opt_spec.field_default
+        setattr(self, opt_spec.field_name, value)
 
-def uses_cmd_options(
-    func, cls=BaseCommandOptions, options_param_name='options'
-):
-  ''' A decorator to provide a default parameter containing the
-      prevailing `BaseCommandOptions` instance as the `options` keyword
-      argument, using the `cs.deco.default_params` decorator factory.
+  @classmethod
+  def usage_options_format(
+      cls,
+      headline="Options:",
+      *,
+      _common_opt_specs=None,
+      **opt_specs_kw,
+  ):
+    ''' Return an options paragraph describing `opt_specs_kw`.
+        or `''` if `opt_specs_kw` is empty.
+    '''
+    if not opt_specs_kw:
+      return ''
+    _, _, getopt_spec_map = cls.getopt_spec_map(
+        opt_specs_kw, _common_opt_specs
+    )
+    return headline + "\n" + indent(
+        "\n".join(
+            tabulate(
+                *(
+                    (
+                        opt_spec.option_terse(),
+                        stripped_dedent(opt_spec.help_text)
+                    ) for _, opt_spec in sorted(
+                        getopt_spec_map.items(),
+                        key=lambda kv: kv[0].lstrip('-').lower()
+                    )
+                ),
+            )
+        )
+    )
 
-      This allows functions to utilitse global options set by a
-      command such as `options.dry_run` or `options.verbose` without
-      the tedious plumbing through the entire call stack.
+@decorator
+def popopts(cmd_method, **opt_specs_kw):
+  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`
+      and update `self.options`. This also updates the method's usage message.
 
-      Parameters:
-      * `cls`: the `BaseCommandOptions` or `BaseCommand` class,
-        default `BaseCommandOptions`. If a `BaseCommand` subclass is
-        provided its `cls.Options` class is used.
-      * `options_param_name`: the parameter name to provide, default `options`
+      Example:
 
-      Examples:
+          @popopts(x=('trace', 'Trace execution.'))
+          def cmd_do_something(self, argv):
+              """ Usage: {cmd} [-x] blah blah
+                    Do some thing to blah.
+              """
 
-          @uses_cmd_options
-          def f(x,*,options):
-              """ Run directly from the prevailing options. """
-              if options.verbose:
-                  print("doing f with x =", x)
-              ....
+      This arranges for cmd_do_something to call `self.options.popopts(argv)`,
+      and updates the usage message with an "Options:" paragraph.
 
-          @uses_cmd_options
-          def f(x,*,verbose=None,options):
-              """ Get defaults from the prevailing options. """
-              if verbose is None:
-                  verbose = options.verbose
-              if verbose:
-                  print("doing f with x =", x)
-              ....
+      This avoids needing to manually enumerate the options in the
+      docstring usage and avoids explicitly calling `self.options.popopts`
+      inside the method.
   '''
-  if issubclass(cls, BaseCommand):
-    cls = cls.Options
-  return default_params(
-      func, **{options_param_name: lambda: cls.default() or cls()}
-  )
+
+  def popopts_cmd_method_wrapper(self, argv, *method_a, **method_kw):
+    self.options.popopts(argv, **opt_specs_kw)
+    return cmd_method(self, argv, *method_a, **method_kw)
+
+  if opt_specs_kw:
+    # patch the cmd_method usage text
+    pre_usage, usage_format, post_usage = split_usage(cmd_method.__doc__ or '')
+    if usage_format:
+      usage_format = (
+          f'Usage: {usage_format}\n' + indent(
+              BaseCommandOptions.usage_options_format(
+                  "Options:",
+                  _common_opt_specs={},
+                  **opt_specs_kw,
+              )
+          )
+      )
+    cmd_method.__doc__ = "\n\n".join((pre_usage, usage_format, post_usage)
+                                     ).strip()
+
+  return popopts_cmd_method_wrapper
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
@@ -506,9 +1149,8 @@ class BaseCommand:
           cmd_subthing = SubThingCommand
 
       Returning to methods, if there is a paragraph in the method docstring
-      commencing with `Usage:`
-      then that paragraph is incorporated automatically
-      into the main usage message.
+      commencing with `Usage:` then that paragraph is incorporated
+      into the main usage message automatically.
       Example:
 
           def cmd_ls(self, argv):
@@ -528,6 +1170,10 @@ class BaseCommand:
         `opts` is an `(option,value)` sequence
         as returned by `getopot.getopt`.
         The default implementation iterates over these and calls `apply_opt`.
+      * `run_context()`:
+        a context manager to provide setup or teardown actions
+        to occur before and after the command implementation respectively,
+        such as to open and close a database.
       * `cmd_`*subcmd*`(argv)`:
         if the command line options are followed by an argument
         whose value is *subcmd*,
@@ -535,15 +1181,8 @@ class BaseCommand:
         will be called where `subcmd_argv` contains the command line arguments
         following *subcmd*.
       * `main(argv)`:
-        if there are no command line arguments after the options
-        or the first argument does not have a corresponding
-        `cmd_`*subcmd* method
-        then method `main(argv)`
+        if there are no `cmd_`*subcmd*` methods then method `main(argv)`
         will be called where `argv` contains the command line arguments.
-      * `run_context()`:
-        a context manager to provide setup or teardown actions
-        to occur before and after the command implementation respectively,
-        such as to open and close a database.
 
       Editorial: why not arparse?
       Primarily because when incorrectly invoked
@@ -553,24 +1192,11 @@ class BaseCommand:
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
-  GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = None
+  SubCommandClass = SubCommand
+
+  GETOPT_SPEC = ''
   Options = BaseCommandOptions
-
-  def __init_subclass__(cls):
-    ''' Update subclasses of `BaseCommand`.
-
-        Appends the usage message to the class docstring.
-    '''
-    usage_message = cls.usage_text()
-    # NB: 2 leading lines so that the dedenting preserves the indents for MarkDown.
-    usage_doc = (
-        'Command line implementation.\n\nUsage summary:\n\n    ' +
-        usage_message.replace('\n', '\n    ')
-    )
-    cls_doc = obj_docstring(cls)
-    cls_doc = cls_doc + '\n\n' + usage_doc if cls_doc else usage_doc
-    cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
@@ -630,58 +1256,68 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
-    subcmds = self.subcommands()
-    has_subcmds = subcmds and sorted(subcmds) != ['help', 'shell']
     if argv is None:
-      # using sys.argv:
-      # argv0 comes from sys.argv[0], which is discarded
+      # using sys.argv
       argv = list(sys.argv)
-      argv0 = argv.pop(0)
+    elif argv is ...:
+      # dummy mode for BaseCOmmand instances made to access this
+      # but not run a command
+      pass
     else:
-      # argv provided:
-      # if cmd is None, pop argv0 from argv
-      # otherwise set argv0=cmd
+      # argv provided
       argv = list(argv)
-      if cmd is None:
-        argv0 = argv.pop(0)
-      else:
-        argv0 = cmd
     if cmd is None:
-      cmd = basename(argv0)
-    self.cmd = cmd
-    log_level = getattr(options, 'log_level', None)
-    loginfo = setup_logging(cmd, level=log_level)
-    # post: argv is list of arguments after the command name
-    self.loginfo = loginfo
-    options = self.options = self.Options(cmd=self.cmd)
+      if argv is ... or not argv:
+        cmd = cutsuffix(self.__class__.__name__, 'Command').lower()
+      else:
+        cmd = basename(argv.pop(0))
+        if cmd.endswith('.py'):
+          # "python -m foo" sets argv[0] to "..../foo.py"
+          # fall back to the class name
+          cmd = (
+              cutsuffix(self.__class__.__name__, 'Command').lower()
+              or self.__class__.__module__
+          )
+    options = self.__class__.Options(cmd=cmd)
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
+    self.cmd = cmd
     self._argv = argv
-    self._run = lambda subcmd, command, argv: 2
-    self._subcmd = None
-    self._printed_usage = False
+    self.options = options
+
+  def _prerun_setup(self):
+    argv = self._argv
+    options = self.options
+    subcmds = self.subcommands()
+    has_subcmds = self.has_subcommands()
+    log_level = getattr(options, 'log_level', None)
+    loginfo = setup_logging(cmd=self.cmd, level=log_level)
+    # post: argv is list of arguments after the command name
+    self.loginfo = loginfo
+    self._run = lambda argv: 2
     # we catch GetoptError from this suite...
     subcmd = None  # default: no subcmd specific usage available
-    short_usage = False
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
       # catch bare -h or --help if no 'h' in the getopt_spec
-      if ('h' not in getopt_spec and len(argv) == 1
-          and argv[0] in ('-h', '-help', '--help')):
-        argv = ['help']
+      if (len(argv) == 1
+          and (argv[0] in ('-help', '--help') or
+               ('h' not in getopt_spec and argv[0] in ('-h',)))):
+        argv = self._argv = ['help', '-l']
       else:
-        # we do this regardless in order to honour '--'
-        try:
+        if getopt_spec:
+          # legacy GETOPT_SPEC mode
+          # we do this regardless in order to honour '--'
           opts, argv = getopt(argv, getopt_spec, '')
-        except GetoptError:
-          short_usage = True
-          raise
-        self.apply_opts(opts)
-        # we do this regardless so that subclasses can do some presubcommand parsing
-        # after any command line options
+          self.apply_opts(opts)
+        else:
+          # modern mode
+          # use the options.COMMON_OPT_SPECS
+          options.popopts(argv)
+        # We do this regardless so that subclasses can do some presubcommand parsing
+        # _after_ any command line options.
         argv = self._argv = self.apply_preargv(argv)
-
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
@@ -690,147 +1326,118 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = _MethodSubCommand(None, main)
+        self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
         if not argv:
-          default_argv = getattr(self, 'SUBCOMMAND_ARGV_DEFAULT', None)
+          default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
-            short_usage = True
-            raise GetoptError(
-                "missing subcommand, expected one of: %s" %
-                (', '.join(sorted(subcmds.keys())),)
+            warning(
+                "missing subcommand, expected one of: %s",
+                ', '.join(sorted(subcmds.keys()))
             )
+            default_argv = ['help', '-s']
           argv = (
               [default_argv]
               if isinstance(default_argv, str) else list(default_argv)
           )
         subcmd = argv.pop(0)
-        subcmd_ = subcmd.replace('-', '_').replace('.', '_')
         try:
-          subcommand = subcmds[subcmd_]
+          subcommand = self.subcommand(subcmd)
         except KeyError:
           # pylint: disable=raise-missing-from
-          short_usage = True
           bad_subcmd = subcmd
           subcmd = None
           raise GetoptError(
-              "%s: unrecognised subcommand, expected one of: %s" % (
-                  bad_subcmd,
-                  ', '.join(sorted(subcmds.keys())),
-              )
+              f'unrecognised subcommand {bad_subcmd!r}, expected one of:'
+              f' {", ".join(sorted(subcmds.keys()))}'
           )
-        self._run = subcommand
-      self._subcmd = subcmd
+
+        def _run(argv):
+          with Pfx(subcmd):
+            return subcommand(argv)
+
+        self._run = _run
     except GetoptError as e:
       if self.getopt_error_handler(
-          cmd,
+          options.cmd,
           self.options,
           e,
-          self.usage_text(subcmd=subcmd, short=short_usage),
+          self.usage_text(short=True, show_subcmds=subcmd),
       ):
-        self._printed_usage = True
         return
       raise
 
   @classmethod
-  def subcommands(cls):
+  def method_cmdname(cls, method_name: str):
+    ''' The `cmd` value from a method name.
+    '''
+    return cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
+
+  @cache
+  def subcommands(self):
     ''' Return a mapping of subcommand names to subcommand specifications
         for class attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
         by default `'cmd_'`.
     '''
-    try:
-      subcmds = cls.__dict__['_subcommands']
-    except KeyError:
-      subcmds = cls._subcommands = _BaseSubCommand.from_class(cls)
-    return subcmds
+    cls = type(self)
+    prefix = cls.SUBCOMMAND_METHOD_PREFIX
+    usage_mapping = getattr(cls, 'USAGE_KEYWORDS', {})
+    mapping = {}
+    for method_name in dir(cls):
+      if method_name.startswith(prefix):
+        subcmd = self.method_cmdname(method_name)
+        method = getattr(self, method_name)
+        subusage_mapping = dict(usage_mapping)
+        method_keywords = getattr(method, 'USAGE_KEYWORDS', {})
+        subusage_mapping.update(method_keywords)
+        subusage_mapping.update(cmd=subcmd)
+        mapping[subcmd] = self.SubCommandClass(
+            self,
+            method,
+            cmd=subcmd,
+            usage_mapping=subusage_mapping,
+        )
+    return mapping
 
   @classmethod
-  def usage_text(
-      cls, *, cmd=None, format_mapping=None, subcmd=None, short=False
-  ):
-    ''' Compute the "Usage:" message for this class
-        from the top level `USAGE_FORMAT`
-        and the `'Usage:'`-containing docstrings of its `cmd_*` methods.
-
-        Parameters:
-        * `cmd`: optional command name, default derived from the class name
-        * `format_mapping`: an optional format mapping for filling
-          in format strings in the usage text
-        * `subcmd`: constrain the usage to a particular subcommand named `subcmd`;
-          this is used to produce a shorter usage for subcommand usage failures
+  def has_subcommands(cls):
+    ''' Test whether the class defines additional subcommands.
     '''
-    if cmd is None:
-      cmd = cutsuffix(cls.__name__, 'Command').lower()
-    if format_mapping is None:
-      format_mapping = {}
-    format_mapping.setdefault('cmd', cmd)
-    subcmds = cls.subcommands()
-    has_subcmds = subcmds and list(subcmds) != ['help']
-    usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
-    usage_format_mapping.update(format_mapping)
-    usage_format = getattr(
-        cls,
-        'USAGE_FORMAT',
-        (
-            'Usage: {cmd} subcommand [...]'
-            if has_subcmds else 'Usage: {cmd} [...]'
-        ),
-    )
-    usage_message = usage_format.format_map(usage_format_mapping)
-    if subcmd:
-      if not has_subcmds:
-        raise ValueError("subcmd=%r: no subcommands!" % (subcmd,))
-      subcmd_ = subcmd.replace('-', '_').replace('.', '_')
-      try:
-        subcmds[subcmd_]
-      except KeyError:
-        # pylint: disable=raise-missing-from
-        raise ValueError(
-            "subcmd=%r: unknown subcommand, I know %r" %
-            (subcmd, sorted(subcmds.keys()))
-        )
-      subcmd = subcmd_
-    if has_subcmds:
-      subusages = []
-      for attr, subcmd_spec in (sorted(subcmds.items()) if subcmd is None else
-                                ((subcmd, subcmds[subcmd]),)):
-        with Pfx(attr):
-          subusage = subcmd_spec.usage_text(
-              short=short, usage_format_mapping=usage_format_mapping
-          )
-          cls.subcommand_usage_text(
-              attr, usage_format_mapping=usage_format_mapping, short=short
-          )
-          if subusage:
-            subusages.append(subusage.replace('\n', '\n  '))
-      if subusages:
-        subcmds_header = 'Subcommands' if subcmd is None else 'Subcommand'
-        if short:
-          subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
-        usage_message = '\n'.join(
-            [
-                usage_message,
-                '  ' + subcmds_header + ':',
-            ] + [
-                '    ' + subusage.replace('\n', '\n    ')
-                for subusage in subusages
-            ]
-        )
-    return usage_message
+    prefix = cls.SUBCOMMAND_METHOD_PREFIX
+    for method_name in dir(cls):
+      if not method_name.startswith(prefix):
+        continue
+      if getattr(cls, method_name) is getattr(BaseCommand, method_name, None):
+        continue
+      return True
+    return False
 
-  @classmethod
+  @cache
+  def subcommand(self, subcmd: str):
+    ''' Return the `SubCommand` associated with `subcmd`.
+    '''
+    subcmd_ = subcmd.replace('-', '_').replace('.', '_')
+    subcommands = self.subcommands()
+    return subcommands[subcmd_]
+
+  def usage_text(
+      self,
+      **subcommand_kw,
+  ):
+    ''' Compute the "Usage:" message for this class.
+        Parameters are as for `SubCommand.usage_text`.
+    '''
+    return self.SubCommandClass(
+        self, method=type(self)
+    ).usage_text(**subcommand_kw)
+
   def subcommand_usage_text(
-      cls, subcmd, usage_format_mapping=None, short=False
+      self, subcmd, usage_format_mapping=None, short=False
   ):
     ''' Return the usage text for a subcommand.
-
-        Parameters:
-        * `subcmd`: the subcommand name
-        * `short`: just include the first line of the usage message,
-          intented for when there are many subcommands
     '''
-    method = cls.subcommands()[subcmd].method
+    method = self.subcommands()[subcmd].method
     subusage = None
     # support (method, get_suboptions)
     try:
@@ -839,7 +1446,7 @@ class BaseCommand:
       classy = False
     if classy:
       # first paragraph of the class usage text
-      doc = method.usage_text(cmd=subcmd)
+      doc = method([]).usage_text(cmd=subcmd)
       subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
     else:
       # extract the usage from the object docstring
@@ -867,19 +1474,38 @@ class BaseCommand:
         mapping.update(usage_format_mapping)
       mapping.update(cmd=subcmd)
       subusage = subusage_format.format_map(mapping)
-    return subusage or None
+    return subusage.replace('\n', '\n  ')
+
+  @classmethod
+  def extract_usage(cls, cmd=None):
+    ''' Extract the `Usage:` paragraph from `cls__doc__` if present.
+        Return a 2-tuple of `(doc_without_usage,usage_text)`
+        being the remaining docstring and a full usage message.
+
+        *Note*: this actually sets `cls.USAGE_FORMAT` if that does
+        not already exist.
+    '''
+    if cmd is None:
+      # infer a cmd from the class name
+      cmd = cutsuffix(cls.__name__, 'Command').lower()
+    instance = cls([cmd])
+    pre_usage, usage_format, post_usage = split_usage(obj_docstring(cls))
+    if usage_format and not hasattr(cls, 'USAGE_FORMAT'):
+      cls.USAGE_FORMAT = usage_format
+    usage_text = instance.usage_text(recurse=True, short=False)
+    return pre_usage + post_usage, usage_text
 
   @pfx_method
   # pylint: disable=no-self-use
   def apply_opt(self, opt, val):
     ''' Handle an individual global command line option.
 
-        This default implementation raises a `RuntimeError`.
+        This default implementation raises a `NotImplementedError`.
         It only fires if `getopt` actually gathered arguments
         and would imply that a `GETOPT_SPEC` was supplied
         without an `apply_opt` or `apply_opts` method to implement the options.
     '''
-    raise RuntimeError("unhandled option %r" % (opt,))
+    raise NotImplementedError("unhandled option %r" % (opt,))
 
   def apply_opts(self, opts):
     ''' Apply command line options.
@@ -907,85 +1533,17 @@ class BaseCommand:
         supported by `self.options` (an instance of `self.Options`
         class).
     '''
-    self.options.popopts(argv)
     return argv
 
-  class _OptSpec(
-      namedtuple('_OptSpec',
-                 'help_text, parse, validate, unvalidated_message'),
-      Promotable,
-  ):
-    ''' A class to support parsing an option value.
-    '''
-
-    @classmethod
-    def promote(cls, obj):
-      ''' Construct an `_OptSpec` from a list of positional parameters
-          as for `poparg()`.
-      '''
-      if isinstance(obj, cls):
-        return obj
-      if isinstance(obj, str):
-        # the help text
-        specs = (obj,)
-      elif callable(obj):
-        # the factory
-        specs = (obj,)
-      else:
-        # some iterable
-        specs = obj
-      parse = None
-      help_text = None
-      validate = None
-      unvalidated_message = None
-      for spec in specs:
-        with Pfx("%r", spec):
-          if help_text is None and isinstance(spec, str):
-            help_text = spec
-          elif unvalidated_message is None and isinstance(spec, str):
-            unvalidated_message = spec
-          elif parse is None and callable(spec):
-            parse = spec
-          elif validate is None and callable(spec):
-            validate = spec
-          else:
-            raise TypeError(
-                "unexpected argument, expected help_text or parse,"
-                " then optional validate and optional invalid message,"
-                " received %s" % (r(spec),)
-            )
-      if help_text is None:
-        help_text = (
-            "string value" if parse is None else "value for %s" % (parse,)
-        )
-      if parse is None:
-        # pass option value through unchanged
-        parse = lambda val: val  # pylint: disable=unnecessary-lambda-assignment
-      if unvalidated_message is None:
-        unvalidated_message = "invalid value"
-      return cls(
-          help_text=help_text,
-          parse=parse,
-          validate=validate,
-          unvalidated_message=unvalidated_message,
-      )
-
-    def parse_value(self, value):
-      ''' Parse `value` according to the spec.
-          Raises a `GetoptError` for invalid values.
-      '''
-      try:
-        with Pfx("%s %r", self.help_text, value):
-          value = pfx_call(self.parse, value)
-          if self.validate is not None:
-            if not pfx_call(self.validate, value):
-              raise ValueError(self.unvalidated_message)
-      except ValueError as e:
-        raise GetoptError(str(e)) from e  # pylint: disable=raise-missing-from
-      return value
-
   @classmethod
-  def poparg(cls, argv: List[str], *a, unpop_on_error=False):
+  @typechecked
+  def poparg(
+      cls,
+      argv: List[str],
+      *specs,
+      unpop_on_error: bool = False,
+      opt_spec_class=None
+  ):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
         Raises `getopt.GetoptError` on a missing or invalid argument.
@@ -1043,7 +1601,7 @@ class BaseCommand:
               ...
             getopt.GetoptError: length: missing argument
             >>> argv = ['-5', 'zz']
-            >>> BaseCommand.poparg(argv, float, "size", lambda f: f>0, "size should be >0")
+            >>> BaseCommand.poparg(argv, float, "size", lambda size: size > 0, "size should be >0")
             Traceback (most recent call last):
               ...
             getopt.GetoptError: size '-5': size should be >0
@@ -1056,7 +1614,9 @@ class BaseCommand:
             >>> argv  # zz was pushed back
             ['zz']
     '''
-    opt_spec = cls._OptSpec.promote(a)
+    if opt_spec_class is None:
+      opt_spec_class = OptionSpec
+    opt_spec = opt_spec_class.from_opt_kw('_', specs)
     with Pfx(opt_spec.help_text):
       if not argv:
         raise GetoptError("missing argument")
@@ -1067,168 +1627,6 @@ class BaseCommand:
       if unpop_on_error:
         argv.insert(0, arg0)
       raise
-
-  @classmethod
-  def popopts(
-      cls,
-      argv,
-      attrfor=None,
-      **opt_specs,
-  ):
-    ''' Parse option switches from `argv`, a list of command line strings
-        with leading option switches.
-        Modify `argv` in place and return a dict mapping switch names to values.
-
-        The optional positional argument `attrfor`
-        may supply an object whose attributes may be set by the options,
-        for example:
-
-            def cmd_foo(self, argv):
-                self.popopts(argv, self.options, a='all', j_=('jobs', int))
-                ... use self.options.jobs etc ...
-
-        The expected options are specified by the keyword parameters
-        in `opt_specs`:
-        * options not starting with a letter may be preceeded by an underscore
-          to allow use in the parameter list, for example `_1='once'`
-          for a `-1` option setting the `once` option name
-        * a single letter name specifies a short option
-          and a multiletter name specifies a long option
-        * options requiring an argument have a trailing underscore
-        * options not requiring an argument normally imply a value
-          of `True`; if their synonym commences with a dash they will
-          imply a value of `False`, for example `n='dry_run',y='-dry_run'`
-
-        The `BaseCommandOptions` class provides a `popopts` method
-        which is a shim for this method with `attrfor=self` i.e.
-        the options object.
-        So common use in a command method usually looks like this:
-
-            class SomeCommand(BaseCommand):
-
-                def cmd_foo(self, argv):
-                    options = self.options
-                    # accept a -j or --jobs options
-                    options.popopts(argv, jobs=1, j='jobs')
-                    print("jobs =", options.jobs)
-
-        The `self.options` object is preprovided as an instance of
-        the `self.Options` class, which is `BaseCommandOptions` by
-        default. This presupplies support for some basic options
-        like `-v` for "verbose" and so forth, and a subcommand
-        need not describe these in a call to `self.options.popopts()`.
-
-        Example:
-
-            >>> import os.path
-            >>> from typing import Optional
-            >>> @dataclass
-            ... class DemoOptions(BaseCommandOptions):
-            ...   all: bool = False
-            ...   jobs: int = 1
-            ...   number: int = 0
-            ...   once: bool = False
-            ...   path: Optional[str] = None
-            ...   trace_exec: bool = False
-            ...
-            >>> options = DemoOptions()
-            >>> argv = ['-1', '-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
-            >>> opt_dict = options.popopts(
-            ...   argv,
-            ...   _1='once',
-            ...   a='all',
-            ...   j_=('jobs',int),
-            ...   x='-trace_exec',
-            ...   y='-dry_run',
-            ...   dry_run=None,
-            ...   path_=(str, os.path.isabs, 'not an absolute path'),
-            ...   verbose=None,
-            ... )
-            >>> opt_dict
-            {'once': True, 'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
-            >>> options # doctest: +ELLIPSIS
-            DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
-    '''
-    keyfor = {}
-    shortopts = ''
-    longopts = []
-    opt_spec_map = {}
-    opt_name_map = {}
-    for opt_name, opt_spec in opt_specs.items():
-      with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
-        needs_arg = False
-        # leading underscore for numeric options like -1
-        if opt_name.startswith('_'):
-          opt_name = opt_name[1:]
-          if is_identifier(opt_name):
-            warning(
-                "unnecessary leading underscore on valid identifier option"
-            )
-        # trailing underscore indicates that the option expected an argument
-        if opt_name.endswith('_'):
-          needs_arg = True
-          opt_name = opt_name[:-1]
-        # single character option -x
-        if len(opt_name) == 1:
-          opt = '-' + opt_name
-          shortopts += opt_name
-          if needs_arg:
-            shortopts += ':'
-        # long option
-        elif len(opt_name) > 1:
-          opt_dashed = opt_name.replace('_', '-')
-          opt = '--' + opt_dashed
-          longopts.append(opt_dashed + '=' if needs_arg else opt_dashed)
-          default_help_text = opt
-        else:
-          raise ValueError("unexpected opt_name %s" % (r(opt_name),))
-        # construct an option specification list containing:
-        #   [opt_name:str] [help_text:str] [parse:Callable [validate:Callable [invalid_msg:str]]]
-        if opt_spec is None:
-          # default opt_spec: opt citation and type str
-          specs = [opt_name, str]
-        elif isinstance(opt_spec, (list, tuple)):
-          # list or tuple: copyt to a list
-          specs = list(opt_spec)
-        else:
-          # promote scaler to single element list
-          specs = [opt_spec]
-        if specs:
-          # see if the leading spec is an option citation
-          spec0 = specs[0]
-          if isinstance(spec0, str) and (is_identifier(spec0) or
-                                         (spec0.startswith('-')
-                                          and is_identifier(spec0[1:]))):
-            opt_name = specs[0]
-            if len(specs) > 1 and isinstance(specs[1], str):
-              specs.pop(0)
-        if not specs or not isinstance(specs[0], str):
-          specs.insert(0, default_help_text)
-        if needs_arg:
-          opt_spec = cls._OptSpec.promote(specs)
-          opt_spec_map[opt] = opt_spec
-        opt_name_map[opt] = opt_name
-    opts, post_argv = getopt(argv, shortopts, longopts)
-    argv[:] = post_argv
-    for opt, val in opts:
-      with Pfx(opt):
-        opt_name = opt_name_map[opt]
-        try:
-          opt_spec = opt_spec_map[opt]
-        except KeyError:
-          # option expected no arguments
-          assert val == ''
-          if opt_name.startswith('-'):
-            value = False
-            opt_name = opt_name[1:]
-          else:
-            value = True
-        else:
-          value = opt_spec.parse_value(val)
-        keyfor[opt_name] = value
-        if attrfor is not None:
-          setattr(attrfor, opt_name, value)
-    return keyfor
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
@@ -1252,36 +1650,36 @@ class BaseCommand:
         then this may be provided by the `run_context()`
         context manager method.
     '''
-    # short circuit if we've already complainted about bad invocation
-    if self._printed_usage:
-      return 2
+    self._prerun_setup()
     options = self.options
     try:
-      with self.run_context(**kw_options):
-        try:
-          return self._run(self._subcmd, self, self._argv)
-        except CancellationError:
-          error("cancelled")
-          return 1
+      try:
+        with self.run_context(**kw_options) as xit:
+          if xit is not None:
+            error("exit status from run_context: %s", xit)
+            return xit
+          return self._run(self._argv)
+      except CancellationError:
+        error("cancelled")
+        return 1
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
           options,
           e,
-          (None if self._printed_usage else self.usage_text(
-              cmd=self.cmd, subcmd=self._subcmd)),
-          subcmd=self._subcmd,
+          self.usage_text(cmd=self.cmd, short=False),
       ):
-        self._printed_usage = True
         return 2
       raise
 
-  @classmethod
-  def cmdloop(cls, intro=None):
+  def cmdloop(self, intro=None):
     ''' Use `cmd.Cmd` to run a command loop which calls the `cmd_`* methods.
     '''
+    if not sys.stdin.isatty():
+      raise GetoptError("input is not a tty")
     # TODO: get intro from usage/help
-    cmdobj = BaseCommandCmd(cls)
+    cmdobj = BaseCommandCmd(self)
+    cmdobj.prompt = f'{self.cmd}> '
     cmdobj.cmdloop(intro)
 
   # pylint: disable=unused-argument
@@ -1319,7 +1717,7 @@ class BaseCommand:
     '''
     warning("%s", e)
     if usage:
-      print(usage.rstrip(), file=sys.stderr)
+      print("Usage:", usage, file=sys.stderr)
     return True
 
   @uses_runstate
@@ -1331,8 +1729,11 @@ class BaseCommand:
   @contextmanager
   @uses_runstate
   @uses_upd
-  def run_context(self, *, runstate: RunState, upd: Upd, **kw_options):
+  def run_context(self, *, runstate: RunState, upd: Upd, **options_kw):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
+        Normally this will have a bare `yield`, but you can yield
+        a not `None` value to exit before the command, for example
+        if the run setup fails.
 
         This default does several things, and subclasses should
         override it like this:
@@ -1345,71 +1746,125 @@ class BaseCommand:
                     yield
                 finally:
                   ... any unconditional cleanup ...
+
+        This base implementation does the following things:
+        - provides a `self.options` which is a copy of the original
+          `self.options` so that it may freely be modified during the
+          command
+        - provides a prevailing `RunState` as `self.options.runstate`
+          if one is not already present
+        - provides a `cs.upd.Upd` context for status lines
+        - catches `self.options.runstate_signals` and handles them
+          with `self.handle_signal`
     '''
+    # prefer the runstate from the options if specified
+    runstate = self.options.runstate or runstate
     # redundant try/finally to remind subclassers of correct structure
     try:
-      run_options = self.options.copy(**kw_options)
+      run_options = self.options.copy(runstate=runstate, **options_kw)
       with run_options:  # make the default ThreadState
-        with stackattrs(self, options=run_options):
-          with stackattrs(self, cmd=self._subcmd or self.cmd):
-            with upd:
-              with runstate:
-                with runstate.catch_signal(
-                    run_options.runstate_signals,
-                    call_previous=False,
-                    handle_signal=self.handle_signal,
-                ):
-                  yield
+        with stackattrs(
+            self,
+            options=run_options,
+        ):
+          with upd:
+            with runstate:
+              with runstate.catch_signal(
+                  run_options.runstate_signals,
+                  call_previous=False,
+                  handle_signal=self.handle_signal,
+              ):
+                yield
 
     finally:
       pass
 
-  # pylint: disable=unused-argument
-  @classmethod
-  def cmd_help(cls, argv):
-    ''' Usage: {cmd} [-l] [subcommand-names...]
+  @popopts(
+      l=('long', 'Long listing.'),
+      r=('recurse', 'Recurse into subcommands.'),
+      s=('short', 'Short listing.'),
+  )
+  def cmd_help(self, argv):
+    ''' Usage: {cmd} [-l] [-s] [subcommand-names...]
           Print help for subcommands.
           This outputs the full help for the named subcommands,
           or the short help for all subcommands if no names are specified.
-          -l  Long help even if no subcommand-names provided.
     '''
-    subcmds = cls.subcommands()
-    if argv and argv[0] == '-l':
-      argv.pop(0)
-      short = False
-    elif argv:
-      short = False
-    else:
-      short = True
-    argv = argv or sorted(subcmds)
-    xit = 0
-    print("help:")
+    options = self.options
+    if not options.short and not options.long:
+      options.short = not argv
+    recurse = options.recurse
+    short = options.short
+    all_subcmds = self.subcommands()
+    subcmds = argv or sorted(all_subcmds)
     unknown = False
-    for subcmd in argv:
-      with Pfx(subcmd):
-        subcmd_ = subcmd.replace('-', '_').replace('.', '_')
-        try:
-          subcommand = subcmds[subcmd_]
-        except KeyError:
-          warning("unknown subcommand")
-          unknown = True
-          xit = 1
-          continue
-        subusage = subcommand.usage_text(short)
-        if not subusage:
-          warning("no help")
-          xit = 1
-          continue
-        print(' ', subusage.replace('\n', '\n    '))
+    show_subcmds = []
+    for subcmd in subcmds:
+      if subcmd in subcmds:
+        show_subcmds.append(subcmd)
+      else:
+        warning("unknown subcommand %r", subcmd)
+        unknown = True
     if unknown:
-      warning("I know: %s", ', '.join(sorted(subcmds.keys())))
-    return xit
+      warning("I know: %s", ', '.join(sorted(all_subcmds)))
+    if short:
+      print("Longer help with the -l option.")
+    if not recurse:
+      print("Recursive help with the -r option.")
+    print(
+        "Usage:",
+        self.usage_text(
+            short=short,
+            recurse=recurse,
+            show_common=not short,
+            show_subcmds=show_subcmds or None
+        )
+    )
 
-  def cmd_shell(self, argv):
-    ''' Usage: {cmd}
-          Run a command prompt via cmd.Cmd using this command's subcommands.
+  def cmd_info(self, argv, *, field_names=None, skip_names=None):
+    ''' Usage: {cmd} [field-names...]
+          Recite general information.
+          Explicit field names may be provided to override the default listing.
+
+        This default method recites the values from `self.options`,
+        excluding the basic fields from `BaseCommandOptions` other
+        than `cmd` and `dry_run`.
+
+        This base method provides two optional parameters to allow
+        subclasses to tune its behaviour:
+        - `field_namees`: an explicit list of options attributes to print
+        - `skip_names`: a list of option attributes to not print
+          if `field_names` is not specified; the default is the
+          field names of `BaseCommandOptions` excepting `cmd` and
+          `dry_run`
     '''
-    self.cmdloop()
+    if skip_names is None:
+      skip_names = tuple(
+          F.name
+          for F in fields(BaseCommandOptions)
+          if F.name not in ('cmd', 'dry_run')
+      )
+    self.options.popopts(argv)
+    xit = 0
+    options = self.options
+    if argv:
+      field_names = []
+      for field_name in argv:
+        if not hasattr(options, field_name):
+          warning("no options.%s attribute", field_name)
+          xit = 1
+        else:
+          field_names.append(field_name)
+    if not field_names:
+      field_names = sorted(
+          field_name for field_name in options.as_dict().keys()
+          if field_name not in skip_names
+      )
+    for line in tabulate(*((f'{field_name}:',
+                            str(getattr(options, field_name)))
+                           for field_name in field_names)):
+      print(line)
+    return xit
 
   def repl(self, *argv, banner=None, local=None):
     ''' Run an interactive Python prompt with some predefined local names.
@@ -1426,30 +1881,30 @@ class BaseCommand:
         * `self`: from `self`
         * the attributes of `options`
         * the attributes of `self`
-
-        This is not presented automatically as a subcommand, but
-        commands wishing such a command should provide something
-        like this:
-
-            def cmd_repl(self, argv):
-                """ Usage: {cmd}
-                      Run an interactive Python prompt with some predefined local names.
-                """
-                return self.repl(*argv)
     '''
     options = self.options
-    if banner is None:
-      banner = self.cmd
-      try:
-        sqltags = options.sqltags
-      except AttributeError:
-        pass
-      else:
-        banner += f': {sqltags}'
     if local is None:
-      local = dict(self.__dict__)
-      local.update(options.__dict__)
+      pub_mapping = lambda d: {
+          k: v
+          for k, v in d.items()
+          if k and not k.startswith('_')
+      }
+      local = pub_mapping(self.__dict__)
+      local.update(pub_mapping(options.__dict__))
       local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+    if banner is None:
+      vars_banner = indent(
+          "\n".join(
+              tabulate(
+                  *(
+                      [k, pformat(v)]
+                      for k, v in sorted(local.items())
+                      if k and not k.startswith('_')
+                  )
+              )
+          )
+      )
+      banner = f'{self.cmd}\n\n{vars_banner}\n'
     try:
       # pylint: disable=import-outside-toplevel
       from bpython import embed
@@ -1463,6 +1918,39 @@ class BaseCommand:
         locals_=local,
     )
 
+  @popopts(banner_=None)
+  def cmd_repl(self, argv):
+    ''' Usage: {cmd}
+          Run a REPL (Read Evaluate Print Loop), an interactive Python prompt.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    banner = options.banner
+    del options.banner
+    return self.repl(*argv, banner=banner)
+
+  @uses_upd
+  def cmd_shell(self, argv, *, upd: Upd):
+    ''' Usage: {cmd}
+          Run a command prompt via cmd.Cmd using this command's subcommands.
+    '''
+    if argv:
+      raise GetoptError("extra arguments")
+    with upd.without():
+      self.cmdloop()
+
+  @OBSOLETE("self.options.popopts")
+  def popopts(self, argv, options, **opt_specs):
+    ''' A convenience shim which returns `self.options.popopts(argv,**opt_specs)`.
+    '''
+    if options is not self.options:
+      warning(
+          "obsolete use of %s.popopts\n    with options %s\n    is not self.options %s",
+          self.__class__.__name__, r(options), r(self.options)
+      )
+    return options.popopts(argv, **opt_specs)
+
 BaseCommandSubType = subtype(BaseCommand)
 
 class BaseCommandCmd(Cmd):
@@ -1470,46 +1958,57 @@ class BaseCommandCmd(Cmd):
       command's subcommands.
 
       The `BaseCommand.cmdloop()` class method instantiates an
-      instance of this cand calls its `.cmdloop()` method
+      instance of this and calls its `.cmdloop()` method
       i.e. `cmd.Cmd.cmdloop`.
   '''
 
-  def __init__(self, command_class: BaseCommandSubType):
-    super().__init__()
-    self.command_class = command_class
-
   @typechecked
-  def _doarg(self, subcmd: str, arg: str):
-    cls = self.command_class
-    argv = shlex.split(arg)
-    command = cls([cls.__name__, subcmd] + argv)
-    with stackattrs(command, _subcmd=subcmd):
-      command.run()
+  def __init__(self, command: BaseCommandSubType):
+    super().__init__()
+    self.__command = command
 
   def get_names(self):
-    cls = self.command_class
+    cmdcls = type(self.__command)
     names = []
-    for method_name in dir(cls):
-      if method_name.startswith(cls.SUBCOMMAND_METHOD_PREFIX):
-        subcmd = cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
+    for method_name in dir(cmdcls):
+      if method_name.startswith(cmdcls.SUBCOMMAND_METHOD_PREFIX):
+        subcmd = cutprefix(method_name, cmdcls.SUBCOMMAND_METHOD_PREFIX)
         names.append('do_' + subcmd)
         ##names.append('help_' + subcmd)
     return names
 
   def __getattr__(self, attr):
-    cls = self.command_class
+    command = self.__command
+    cmdcls = type(command)
     subcmd = cutprefix(attr, 'do_')
     if subcmd is not attr:
-      method_name = cls.SUBCOMMAND_METHOD_PREFIX + subcmd
+      method_name = cmdcls.SUBCOMMAND_METHOD_PREFIX + subcmd
       try:
-        method = getattr(cls, method_name)
+        method = getattr(command, method_name)
       except AttributeError:
         pass
       else:
-        do_subcmd = lambda arg: self._doarg(subcmd, arg)
+
+        def do_subcmd(arg: str):
+          argv = shlex.split(arg)
+          method(argv)
+
         do_subcmd.__name__ = attr
-        do_subcmd.__doc__ = method.__doc__.format(cmd=subcmd)
+        do_subcmd.__doc__ = command.subcommand_usage_text(subcmd)
         return do_subcmd
       if subcmd in ('EOF', 'exit', 'quit'):
         return lambda _: True
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+
+@uses_cmd_options(quiet=False, verbose=False)
+def qvprint(*print_a, quiet, verbose, **print_kw):
+  ''' Call `print()` if `options.verbose` and not `options.quiet`.
+  '''
+  if verbose and not quiet:
+    print(*print_a, **print_kw)
+
+def vprint(*print_a, **qvprint_kw):
+  ''' Call `print()` if `options.verbose`.
+      This is a compatibility shim for `qvprint()` with `quiet=False`.
+  '''
+  return qvprint(*print_a, quiet=False, **qvprint_kw)
