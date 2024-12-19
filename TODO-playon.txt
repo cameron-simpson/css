@@ -1,3 +1,4 @@
+strip series:- from title
 strip episode-n:- in title
 refresh should expire old entries which do not appear in the API response
 SEI.from_Recording: also parse leading sSSeEE - from the playon.Name field
