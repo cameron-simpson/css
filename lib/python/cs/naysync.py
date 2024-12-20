@@ -11,12 +11,15 @@
     all the way down: a single blocking synchronous call anywhere
     in the call stack blocks the async event loop.
 
-    This module presently provides a pair of decorators for
-    asynchronous generators and functions which dispatches them in
-    a `Thread` and presents an async wrapper.
+    This module presently provides:
+    - `@afunc`: a decorator to make a synchronous function asynchronous
+    - `@agen`: a decorator to make a synchronous generator asynchronous
+    - `amap(func,iterable)`: asynchronous mapping of `func` over an iterable
+    - `async_iter(iterable)`: return an asynchronous iterator of an iterable
 '''
 
 from asyncio import create_task, run, to_thread, Queue as AQueue
+from functools import partial
 from heapq import heappush, heappop
 from inspect import iscoroutinefunction
 from typing import Any, Callable, Iterable
@@ -55,23 +58,10 @@ def agen(genfunc):
               print(item)
   '''
 
-  async def agen(*a, **kw):
-    ''' An async generator yielding items from `genfunc`.
+  def agen(*a, **kw):
+    ''' Return an async iterator yielding items from `genfunc`.
     '''
-    sentinel = object()
-
-    def rungen():
-      for item in genfunc(*a, **kw):
-        yield item
-      yield sentinel
-
-    g = rungen()
-    next_g = lambda: next(g)
-    while True:
-      item = await to_thread(next_g)
-      if item is sentinel:
-        break
-      yield item
+    return async_iter(genfunc(*a, **kw))
 
   return agen
 
@@ -89,13 +79,7 @@ def afunc(func):
 
           slept = await func(5)
   '''
-
-  async def afunc(*a, **kw):
-    ''' Asynchronous call to `func` via `@agen(fgenfunc)`.
-    '''
-    return await to_thread(func, *a, **kw)
-
-  return afunc
+  return partial(to_thread, func)
 
 async def async_iter(it: Iterable):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
@@ -127,6 +111,8 @@ async def amap(
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
       for each `item` in the asynchronous iterable `it`.
+
+      `func` may be a synchronous or asynchronous callable.
 
       If `concurrent` is `False` (the default), run each `func(item)`
       call in series.
@@ -211,7 +197,7 @@ if __name__ == '__main__':
 
   async def async_generator_demo():
     async for item in gen():
-      print("async_demo", repr(item))
+      print("@gen(gen)", repr(item))
 
   run(async_generator_demo())
 
@@ -219,41 +205,40 @@ if __name__ == '__main__':
 
   @afunc
   def async_function_demo(sleep_time, result):
-    print("func demo: sleep", sleep_time)
+    print("@afunc(func): sleep", sleep_time)
     time.sleep(sleep_time)
-    print("func demo: return result", result)
+    print("@afunc(func): return result", result)
     return result
 
-  ##run(async_function_demo(4.0, 9))
+  run(async_function_demo(2.0, 9))
 
   print("amap...")
   import random
 
-  def func(sleep_time):
+  def sync_sleep(sleep_time):
     ##print('func sleep_time', sleep_time, 'start')
     time.sleep(sleep_time)
     ##print('func sleep_time', sleep_time, 'done')
-    return f'slept {sleep_time}'
+    return f'amap(sync_sleep({sleep_time})): slept'
 
   async def test_amap():
     for concurrent in False, True:
       for unordered in False, True:
         for indexed in False, True:
           print(
-              "concurrent",
-              concurrent,
-              "unordered",
-              unordered,
-              "indexed",
-              indexed,
+              f'{concurrent=}',
+              f'{unordered=}',
+              f'{indexed=}',
           )
+          start_time = time.time()
           async for result in amap(
-              func,
+              sync_sleep,
               [random.randint(1, 10) / 10 for _ in range(5)],
               concurrent=concurrent,
               unordered=unordered,
               indexed=indexed,
           ):
             print(" ", result)
+          print(f'elapsed {round(time.time()-start_time,2)}')
 
   run(test_amap())
