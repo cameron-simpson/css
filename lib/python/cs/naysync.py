@@ -197,7 +197,7 @@ if __name__ == '__main__':
 
   async def async_generator_demo():
     async for item in gen():
-      print("async_demo", repr(item))
+      print("@gen(gen)", repr(item))
 
   run(async_generator_demo())
 
@@ -205,9 +205,9 @@ if __name__ == '__main__':
 
   @afunc
   def async_function_demo(sleep_time, result):
-    print("func demo: sleep", sleep_time)
+    print("@afunc(func): sleep", sleep_time)
     time.sleep(sleep_time)
-    print("func demo: return result", result)
+    print("@afunc(func): return result", result)
     return result
 
   run(async_function_demo(2.0, 9))
@@ -215,31 +215,30 @@ if __name__ == '__main__':
   print("amap...")
   import random
 
-  def func(sleep_time):
+  def sync_sleep(sleep_time):
     ##print('func sleep_time', sleep_time, 'start')
     time.sleep(sleep_time)
     ##print('func sleep_time', sleep_time, 'done')
-    return f'slept {sleep_time}'
+    return f'amap(sync_sleep({sleep_time})): slept'
 
   async def test_amap():
     for concurrent in False, True:
       for unordered in False, True:
         for indexed in False, True:
           print(
-              "concurrent",
-              concurrent,
-              "unordered",
-              unordered,
-              "indexed",
-              indexed,
+              f'{concurrent=}',
+              f'{unordered=}',
+              f'{indexed=}',
           )
+          start_time = time.time()
           async for result in amap(
-              func,
+              sync_sleep,
               [random.randint(1, 10) / 10 for _ in range(5)],
               concurrent=concurrent,
               unordered=unordered,
               indexed=indexed,
           ):
             print(" ", result)
+          print(f'elapsed {round(time.time()-start_time,2)}')
 
   run(test_amap())
