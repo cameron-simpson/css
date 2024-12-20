@@ -58,23 +58,10 @@ def agen(genfunc):
               print(item)
   '''
 
-  async def agen(*a, **kw):
-    ''' An async generator yielding items from `genfunc`.
+  def agen(*a, **kw):
+    ''' Return an async iterator yielding items from `genfunc`.
     '''
-    sentinel = object()
-
-    def rungen():
-      for item in genfunc(*a, **kw):
-        yield item
-      yield sentinel
-
-    g = rungen()
-    next_g = lambda: next(g)
-    while True:
-      item = await to_thread(next_g)
-      if item is sentinel:
-        break
-      yield item
+    return async_iter(genfunc(*a, **kw))
 
   return agen
 
