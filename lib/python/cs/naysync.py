@@ -94,6 +94,27 @@ def afunc(func):
 
   return afunc
 
+async def await_iter(it: Iterable):
+  ''' Return an asynchronous iterator yielding items from the iterable `it`.
+  '''
+  it = iter(it)
+  sentinel = object()
+
+  def gen():
+    while True:
+      try:
+        yield next(it)
+      except StopIteration:
+        break
+    yield sentinel
+
+  next_it = lambda: next(gen())
+  while True:
+    item = await to_thread(next_it)
+    if item is sentinel:
+      break
+    yield item
+
 if __name__ == '__main__':
 
   @agen
