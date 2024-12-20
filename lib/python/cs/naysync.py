@@ -112,6 +112,8 @@ async def amap(
   ''' An asynchronous generator yielding the results of `func(item)`
       for each `item` in the asynchronous iterable `it`.
 
+      `func` may be a synchronous or asynchronous callable.
+
       If `concurrent` is `False` (the default), run each `func(item)`
       call in series.
 
