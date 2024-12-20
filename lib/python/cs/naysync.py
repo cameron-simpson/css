@@ -14,7 +14,7 @@
     This module presently provides:
     - `@afunc`: a decorator to make a synchronous function asynchronous
     - `@agen`: a decorator to make a synchronous generator asynchronous
-    - `amap(func,iterable)`: asyncrhonous mapping of `func` over an iterable
+    - `amap(func,iterable)`: asynchronous mapping of `func` over an iterable
     - `async_iter(iterable)`: return an asynchronous iterator of an iterable
 '''
 
