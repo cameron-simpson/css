@@ -26,7 +26,7 @@ from typing import Any, Callable, Iterable
 
 from cs.deco import decorator
 
-__version__ = '20241221-post'
+__version__ = '20241221.1'
 
 DISTINFO = {
     'keywords': ["python3"],
