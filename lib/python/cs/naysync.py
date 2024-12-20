@@ -19,6 +19,7 @@
 '''
 
 from asyncio import create_task, run, to_thread, Queue as AQueue
+from functools import partial
 from heapq import heappush, heappop
 from inspect import iscoroutinefunction
 from typing import Any, Callable, Iterable
@@ -91,13 +92,7 @@ def afunc(func):
 
           slept = await func(5)
   '''
-
-  async def afunc(*a, **kw):
-    ''' Asynchronous call to `func` via `@agen(fgenfunc)`.
-    '''
-    return await to_thread(func, *a, **kw)
-
-  return afunc
+  return partial(to_thread, func)
 
 async def async_iter(it: Iterable):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
@@ -226,7 +221,7 @@ if __name__ == '__main__':
     print("func demo: return result", result)
     return result
 
-  ##run(async_function_demo(4.0, 9))
+  run(async_function_demo(2.0, 9))
 
   print("amap...")
   import random
