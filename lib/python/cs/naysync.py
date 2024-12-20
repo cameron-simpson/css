@@ -16,7 +16,10 @@
     a `Thread` and presents an async wrapper.
 '''
 
-from asyncio import run, to_thread
+from asyncio import create_task, run, to_thread, Queue as AQueue
+from heapq import heappush, heappop
+from inspect import iscoroutinefunction
+from typing import Any, Callable, Iterable
 
 from cs.deco import decorator
 
@@ -221,4 +224,36 @@ if __name__ == '__main__':
     print("func demo: return result", result)
     return result
 
-  run(async_function_demo(4.0, 9))
+  ##run(async_function_demo(4.0, 9))
+
+  print("amap...")
+  import random
+
+  def func(sleep_time):
+    ##print('func sleep_time', sleep_time, 'start')
+    time.sleep(sleep_time)
+    ##print('func sleep_time', sleep_time, 'done')
+    return f'slept {sleep_time}'
+
+  async def test_amap():
+    for concurrent in False, True:
+      for unordered in False, True:
+        for indexed in False, True:
+          print(
+              "concurrent",
+              concurrent,
+              "unordered",
+              unordered,
+              "indexed",
+              indexed,
+          )
+          async for result in amap(
+              func,
+              [random.randint(1, 10) / 10 for _ in range(5)],
+              concurrent=concurrent,
+              unordered=unordered,
+              indexed=indexed,
+          ):
+            print(" ", result)
+
+  run(test_amap())
