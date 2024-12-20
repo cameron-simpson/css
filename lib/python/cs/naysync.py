@@ -11,9 +11,11 @@
     all the way down: a single blocking synchronous call anywhere
     in the call stack blocks the async event loop.
 
-    This module presently provides a pair of decorators for
-    asynchronous generators and functions which dispatches them in
-    a `Thread` and presents an async wrapper.
+    This module presently provides:
+    - `@afunc`: a decorator to make a synchronous function asynchronous
+    - `@agen`: a decorator to make a synchronous generator asynchronous
+    - `amap(func,iterable)`: asyncrhonous mapping of `func` over an iterable
+    - `async_iter(iterable)`: return an asynchronous iterator of an iterable
 '''
 
 from asyncio import create_task, run, to_thread, Queue as AQueue
