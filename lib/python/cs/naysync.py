@@ -110,7 +110,7 @@ async def amap(
     indexed=False,
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
-      for each `item` in the asynchronous iterable `it`.
+      for each `item` in the iterable `it`.
 
       `func` may be a synchronous or asynchronous callable.
 
