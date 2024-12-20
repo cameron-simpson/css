@@ -97,7 +97,7 @@ def afunc(func):
 
   return afunc
 
-async def await_iter(it: Iterable):
+async def async_iter(it: Iterable):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
   '''
   it = iter(it)
@@ -158,7 +158,7 @@ async def amap(
   if not iscoroutinefunction(func):
     func = afunc(func)
   # promote it to an asynchronous iterator
-  ait = await_iter(it)
+  ait = async_iter(it)
   if not concurrent:
     # call func serially
     i = 0
