@@ -2,8 +2,10 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import cached_property
 import os
 import os.path
+from os.path import expanduser
 from getopt import GetoptError
 import sys
 from threading import Thread
@@ -20,10 +22,8 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.debug import ifdebug
 from cs.env import envsub
-from cs.later import Later
-from cs.lex import (
-    cutprefix, cutsuffix, get_identifier, is_identifier
-)
+from cs.later import Later, uses_later
+from cs.lex import (cutprefix, cutsuffix, get_identifier, is_identifier)
 import cs.logutils
 from cs.logutils import (debug, error, warning, D)
 import cs.pfx
@@ -31,6 +31,11 @@ from cs.pfx import Pfx
 from cs.pipeline import pipeline, StageType
 from cs.queues import NullQueue
 from cs.resources import uses_runstate
+
+from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, Pilfer
+from .actions import Action
+from .pipelines import PipeSpec
+from .rc import load_pilferrcs, PilferRC
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -151,60 +156,55 @@ class PilferCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
-    quiet: bool = False
+    configpath: str = ''
     jobs: int = DEFAULT_JOBS
     flagnames: str = DEFAULT_FLAGS_CONJUNCTION
 
-  def apply_opts(self, opts):
-    options = self.options
-    badopts = False
-    P = options.pilfer
-    for opt, val in opts:
-      with Pfx("%s", opt):
-        if opt == '-c':
-          P.rcs[0:0] = load_pilferrcs(val)
-        elif opt == '-F':
-          options.flagnames = val
-        elif opt == '-j':
-          options.jobs = int(val)
-        elif opt == '-q':
-          options.quiet = True
-        elif opt == '-u':
-          P.flush_print = True
-        elif opt == '-x':
-          P.do_trace = True
-        else:
-          raise NotImplementedError("unimplemented option")
-    # sanity check the flagnames
-    for raw_flagname in options.flagnames.split():
-      with Pfx(raw_flagname):
-        flagname = cutprefix(raw_flagname, '!')
-        if not is_identifier(flagname):
-          error('invalid flag specifier')
-          badopts = True
-    if badopts:
-      raise GetoptError("invalid options")
-    dflt_rc = os.environ.get('PILFERRC')
-    if dflt_rc is None:
-      dflt_rc = envsub('$HOME/.pilferrc')
-    if dflt_rc:
-      with Pfx("$PILFERRC: %s", dflt_rc):
-        P.rcs.extend(load_pilferrcs(dflt_rc))
+    @cached_property
+    @trace(retval=True)
+    def configpaths(self):
+      ''' A list of the config filesystem paths.
+      '''
+      configpath = self.configpath
+      if not configpath:
+        configpath = os.environ.get('PILFERRC') or expanduser('~/.pilferrc')
+      return [fspath for fspath in configpath.split(':') if fspath]
+
+    COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+        c_=('configpath', 'Colon separated list of config paths.'),
+        j_=('jobs', int),
+        F_=(
+            'flagnames',
+            'Flags which must be true for operation to continue.',
+            lambda s: s.replace(',', ' ').split(),
+        ),
+        u='unbuffered',
+        x=('trace', 'Trace action execution.'),
+    )
 
   @contextmanager
   @uses_runstate
   def run_context(self, *, runstate):
     ''' Apply the `options.runstate` to the main `Pilfer`.
     '''
+    options = self.options
+    # sanity check the flagnames
+    for raw_flagname in options.flagnames:
+      with Pfx(raw_flagname):
+        flagname = cutprefix(raw_flagname, '!')
+        if not is_identifier(flagname):
+          error('invalid flag specifier')
+          badopts = True
     with super().run_context():
-      later = Later(options.jobs)
+      later = Later(self.options.jobs)
       with later:
         pilfer = Pilfer(later=later)
+        pilfer.rcs.extend(options.configpaths)
         with stackattrs(
-            options,
+            self.options,
             later=later,
             pilfer=pilfer,
-            runstate=options.runstate,
         ):
           yield
 
