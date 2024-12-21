@@ -1860,9 +1860,10 @@ class BaseCommand:
           field_name for field_name in options.as_dict().keys()
           if field_name not in skip_names
       )
-    for line in tabulate(*((f'{field_name}:',
-                            str(getattr(options, field_name)))
-                           for field_name in field_names)):
+    for line in tabulate(
+        *((f'{field_name}:',
+           pformat(getattr(options, field_name), compact=True))
+          for field_name in field_names)):
       print(line)
     return xit
 
