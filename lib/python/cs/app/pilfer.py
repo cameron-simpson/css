@@ -390,15 +390,13 @@ def argv_pipefuncs(argv, action_map, do_trace):
         pipespec = PipeSpec(name, argv)
 
         def per(P):
-          pipe = pipeline(
-              P.later,
-              pipespec.actions,
-              inputs=(P,),
-              name="%s(%s)" % (name, P)
-          )
-          with P.later.release():
-            for P2 in pipe.outQ:
-              yield P2
+          with P:
+            pipe = pipeline(
+                pipespec.actions, inputs=(P,), name="%s(%s)" % (name, P)
+            )
+            with P.later.release():
+              for P2 in pipe.outQ:
+                yield P2
 
         pipe_funcs.append((StageType.ONE_TO_MANY, per))
       argv = []
