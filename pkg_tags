@@ -53,7 +53,7 @@ cs.deco pypi.release="20241206" ok_revision=d3db61c53b2d23dd1c0cd18ee3bb7488f85b
 cs.dedrm
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.distinfo
-cs.djutils ok_revision="0f94ee0c69f162f760bd5ee1dbe79f9440b64ca9" features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"],"20241222":["options_settings"]} pypi.release="20241119"
+cs.djutils ok_revision=ad22cf3ae5208d34bd29e2b14be8d44ede621279 features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"],"20241222":["options_settings"]} pypi.release="20241119"
 cs.dockerutils ok_revision=f846ece6e9f9353b443df14f81512ae6438681e6 pypi.release="20240519" features={"20240305":["DockerRun__network"]}
 cs.ebooks ok_revision="3379fcbf1eb008df3cd38e9afd40f1d0db9afbd4" pypi.release="20241007" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -100,6 +100,7 @@ cs.node
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063124469c features={"20220606":["intif"]}
 cs.obj pypi.release="20241009" ok_revision="52e932075b27dc9e21630033e2d5e2c6b61b906d" features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"],"20241005":["public_subclasses"]}
+cs.other_command
 cs.packetstream pypi.release="20240630" ok_revision="1bc8c692373663edd0678222e3a7c30fd5292116" features={"20240630":["BaseRequest","HasPacketConnection"]}
 cs.pdf
 cs.pfx pypi.release="20241208" ok_revision="6ab24ce1f823c62b68d614c7f20f63c0f1d8d0ca" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
