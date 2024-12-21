@@ -13,6 +13,7 @@ from django.core.management.base import (
     BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
+from django.utils.functional import empty as djf_empty
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand as CSBaseCommand
@@ -157,10 +158,14 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   @dataclass
   class Options(CSBaseCommand.Options):
     settings: type(settings) = field(
-        default_factory=lambda: dict(
-            (k, v) for k, v in sorted(settings.__dict__.items()) if k and not k
-            .startswith('_')
-        )
+        default_factory=lambda: (
+            settings._wrapped is djf_empty and settings.configure(),
+            dict(
+                (k, getattr(settings, k, None))
+                for k in sorted(dir(settings))
+                if k and not k.startswith('_') and k not in ('SECRET_KEY',)
+            )
+        )[-1]
     )
 
   @classmethod
