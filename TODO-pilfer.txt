@@ -1,3 +1,4 @@
+shutdown mode: every stage should be inspectable for idleness? wait for all idle?
 fill in pipeline staging using function type annotations?
 use requests for the cs.urlutils URL class
 cs.logutils,pilfer: drop D_mode and the D function
