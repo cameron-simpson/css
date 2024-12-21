@@ -1891,8 +1891,14 @@ class BaseCommand:
           if k and not k.startswith('_')
       }
       local = pub_mapping(self.__dict__)
-      local.update(pub_mapping(options.__dict__))
-      local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+      del local['options']
+      local.update(
+          {
+              f'options.{k}': v
+              for k, v in sorted(pub_mapping(options.__dict__).items())
+          }
+      )
+      local.update(argv=argv, cmd=self.cmd, self=self)
     if banner is None:
       vars_banner = indent(
           "\n".join(
