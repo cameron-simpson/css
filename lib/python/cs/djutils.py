@@ -3,10 +3,12 @@
 ''' My collection of things for working with Django.
 '''
 
+from dataclasses import dataclass
 from inspect import isclass
 import sys
 from typing import List
 
+from django.conf import settings
 from django.core.management.base import (
     BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
@@ -151,6 +153,14 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
 
   # use our Django specific subclass of CSBaseCommand.SubCommandClass
   SubCommandClass = DjangoSpecificSubCommand
+
+  @dataclass
+  class Options(CSBaseCommand.Options):
+    settings: type(settings) = dict(
+        (k, v)
+        for k, v in sorted(settings.__dict__.items())
+        if k and not k.startswith('_')
+    )
 
   @classmethod
   def run_from_argv(cls, argv):
