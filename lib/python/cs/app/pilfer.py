@@ -652,7 +652,7 @@ class Pilfer(MultiOpenMixin, RunStateMixin):
       if self.flush_print:
         file.flush()
 
-  @require(lambda kw: all(isinstance(v, str) for v in kw))
+  ##@require(lambda kw: all(isinstance(v, str) for v in kw))
   def set_user_vars(self, **kw):
     ''' Update self.user_vars from the keyword arguments.
     '''
@@ -1072,6 +1072,7 @@ def pilferifysel(func):
   pf.__name__ = "@pilferifysel(%s)" % funcname(func)
   return pf
 
+@trace_func(retval=True)
 def parse_action(action, do_trace):
   ''' Accept a string `action` and return an BaseAction subclass
       instance or a `(sig,function)` tuple.
@@ -1710,21 +1711,6 @@ class BaseAction:
     '''
     return self.functor()(P, *self.args, **self.kwargs)
 
-  @property
-  def variety(self):
-    ''' Textual representation of functor style.
-    '''
-    sig = self.sig
-    if sig == FUNC_ONE_TO_ONE:
-      return "ONE_TO_ONE"
-    if sig == FUNC_ONE_TO_MANY:
-      return "SELECTOR"
-    if sig == FUNC_MANY_TO_MANY:
-      return "MANY_TO_MANY"
-    if sig == FUNC_PIPELINE:
-      return "PIPELINE"
-    return "UNKNOWN(%d)" % (sig,)
-
 class ActionFunction(BaseAction):
 
   def __init__(self, action0, sig, func):
@@ -1998,11 +1984,6 @@ def action_pipecmd(shcmd):
 class PipeSpec(namedtuple('PipeSpec', 'name argv')):
   ''' A pipeline specification: a name and list of actions.
   '''
-
-  def __init__(self, name, argv):
-    super().__init__()
-    self.name = name
-    self.argv = argv
 
   @logexc
   def pipe_funcs(self, L, action_map, do_trace):
