@@ -1072,7 +1072,6 @@ def pilferifysel(func):
   pf.__name__ = "@pilferifysel(%s)" % funcname(func)
   return pf
 
-@trace_func(retval=True)
 def parse_action(action, do_trace):
   ''' Accept a string `action` and return an BaseAction subclass
       instance or a `(sig,function)` tuple.
