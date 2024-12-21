@@ -15,13 +15,15 @@ import stat
 import sys
 from threading import Lock
 import time
+from typing import Mapping, Optional
 from uuid import UUID, uuid4
+
+from typeguard import typechecked
 
 from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.resources import uses_runstate
@@ -85,8 +87,8 @@ class DirentRecord(BinarySingleValue):
     return self.value
 
   @classmethod
-  def parse_value(cls, bfr):
-    ''' Unserialise a serialised Dirent.
+  def parse_value(cls, bfr) -> "_Dirent":
+    ''' Unserialise a single serialised Dirent from `bfr`.
     '''
     type_ = BSUInt.parse_value(bfr)
     flags = DirentFlags(BSUInt.parse_value(bfr))
@@ -172,8 +174,20 @@ class DirentRecord(BinarySingleValue):
 
 class _Dirent(Transcriber, prefix=None):
   ''' Incomplete base class for *`Dirent` objects.
+
+      Special notes:
+
+      We have a `._prev_dirent_blockref` private attribute, passed
+      as the optional `prev_dirent_blockref` init parameter, which
+      is a `Block` containing the encoding of the immediate ancestor
+      `Dirent` if this `Dirent` is a revision, such as a more recent
+      backup snapshot. This is a `Block` because being an actual
+      `Dirent` would lead to an unbounded recursion of `Dirent`s.
+      Instead the `Block` is fetched and decoded at need in the
+      `.prev_dirent` property.
   '''
 
+  @typechecked
   def __init__(
       self,
       type_,
@@ -182,7 +196,7 @@ class _Dirent(Transcriber, prefix=None):
       meta=None,
       uuid=None,
       parent=None,
-      prevblock=None,
+      prev_dirent_blockref: Optional[Block] = None,
       block=None,
       **kw
   ):
@@ -196,7 +210,7 @@ class _Dirent(Transcriber, prefix=None):
           *note*: for `IndirectDirent`s this is a reference to another
           `Dirent`'s UUID.
         * `parent`: optional parent Dirent
-        * `prevblock`: optional Block whose contents are the binary
+        * `prev_dirent_blockref`: optional Block whose contents are the binary
           transcription of this Dirent's previous state - another
           Dirent
     '''
@@ -214,9 +228,9 @@ class _Dirent(Transcriber, prefix=None):
       self.type = type_
       self.name = name
       self.uuid = uuid
-      assert prevblock is None or isinstance(prevblock, Block), \
-          "not Block: prevblock=%r" % (prevblock,)
-      self._prev_dirent_blockref = prevblock
+      assert prev_dirent_blockref is None or isinstance(prev_dirent_blockref, Block), \
+          "not Block: prev_dirent_blockref=%r" % (prev_dirent_blockref,)
+      self._prev_dirent_blockref = prev_dirent_blockref
       if not isinstance(meta, Meta):
         M = Meta({'a': DEFAULT_DIR_ACL if self.isdir else DEFAULT_FILE_ACL})
         if meta is None:
@@ -322,7 +336,7 @@ class _Dirent(Transcriber, prefix=None):
         attrs['block'] = block
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
-      attrs['prevblock'] = prev_blockref
+      attrs['prev_dirent_blockref'] = prev_blockref
     tokens.append(self.transcribe_mapping_inner(attrs))
     return ''.join(tokens)
 
@@ -380,11 +394,11 @@ class _Dirent(Transcriber, prefix=None):
         and (block is None if oblock is None else block == oblock)
     )
 
-  @prop
+  @property
   def prev_dirent(self):
     ''' Return the previous Dirent.
 
-        If not None, during encoding or transcription, if self !=
+        If not `None`, during encoding or transcription, if self !=
         prev_dirent, include it in the encoding or transcription.
 
         TODO: parse out multiple blockrefs.
@@ -660,7 +674,7 @@ class IndirectDirent(_Dirent, prefix='Indirect'):
       raise
     return I.E
 
-  @prop
+  @property
   def ref(self):
     ''' The referenced Dirent via the default FileSystem.
     '''
@@ -681,7 +695,7 @@ class IndirectDirent(_Dirent, prefix='Indirect'):
     '''
     self.ref.meta = new_meta
 
-  @prop
+  @property
   def block(self):
     ''' The content block for the referenced Dirent.
     '''
@@ -915,7 +929,7 @@ class Dir(_Dirent, DirLike, prefix='D'):
   # DirLike.lstat uses the common stat method
   lstat = stat
 
-  @prop
+  @property
   def changed(self):
     ''' Whether this Dir has been changed.
     '''
@@ -954,7 +968,7 @@ class Dir(_Dirent, DirLike, prefix='D'):
 
   @property
   @locked
-  def entries(self):
+  def entries(self) -> Mapping[str, _Dirent]:
     ''' Property containing the live dictionary holding the Dir entries.
     '''
     emap = self._entries

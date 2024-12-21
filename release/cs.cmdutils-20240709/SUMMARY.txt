@@ -1,0 +1,1 @@
+BaseCommand: support putting the top level Usage in the class docstring instead of as .USAGE_FORMAT, append full usage to the class docstring in `BaseCommand.__init_subclass__`.

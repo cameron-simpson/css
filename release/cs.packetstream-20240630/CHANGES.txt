@@ -1,0 +1,65 @@
+lib/python/cs/packetstream.py: cs.packetstream: reduce a warning verbosity
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: make _running a ResultSet
+lib/python/cs/packetstream.py: cs.vt.packetstream: PacketConnection shutdown: wait for the outstanding Later functions instead of overall Later shutdown
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.do: tweak Result collection and call
+lib/python/cs/packetstream.py: cs.packetstream: use Packet.write() instead of iterating over Packet.transcribe_flat()
+lib/python/cs/packetstream.py: cs.packetstream: new ERQ_Packet to indicate end of client requests, make _tag_seq a defaultdict of Seq instances for per-channel tag sequences, bump the sequence for channel0 to accomodate EOF_Packet and ERQ_Packet
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.startup_shutdown: provide progress bars for rq counts, send ERQ_Packet at stream shutdown
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: rename ._running to requests_in_progress for clarity
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: dummy values for ._sendQ, ._sent, ._send_queued to avoid AttributeErrors
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._run_request: type annotations
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.startup_shutdown: show various shutdown steps, remove a noisy warning
+lib/python/cs/packetstream.py: cs.packetstream: another shutdown step
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._reject: conceal EOFError (send queue closed) for rejection messages
+lib/python/cs/packetstream.py: cs.packetsream: PacketConnection._queue_packet: raise EOFError if self._sendQ is None (send queue closed)
+lib/python/cs/packetstream.py: cs.packetstream: new PacketConnection.end_requests() method to queue an ERQ_Packet to the send queue
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._receive_loop: handle ERQ_Packet by setting self.requests_allowed = False, reject requests after ERQ_Packet
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._send_loop: leave loop if not self.requests_allowed (we will not be requesting more work from the remote) and not self.requests_in_progress (no outstanding work to complete for the remote)
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._receive_loop: in the duplicate packet detection, just warn about seeing EOF_Packet or ERQ_Packet a second time instead of raising an exception
+lib/python/cs/packetstream.py: cs.packetstream: add comment, tweak formatting
+lib/python/cs/packetstream.py: cs.packetstream: drop redundant assignment
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.startup_shutdown: note runstate expected transitions, check for outstanding later items and warn+wait if they are there
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.request: check for runstate.running, we don't cancel things
+lib/python/cs/packetstream.py: cs.packetstream: fix up a progress bar label
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.__init__: make `name` the last optional positional parameter instead of keyword only
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._pending_cancel: snapshot the pending requests before iterating over them
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.join: wait for the send thread as well as the receive thread
+lib/python/cs/packetstream.py: cs.packstream: PacketConnection._reject: better idiom
+lib/python/cs/packetstream.py: cs.packetstream: new PacketConnection.send_eof(), rarely needed method to dispatch the magic EOF packet
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: do not clear .-recv or ._send and the ends of the worker threads - we might resume operation later
+lib/python/cs/packetstream.py: cs.packetstream: since we're not clearing self._recv, do not require that to be so
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: do not @promote the `recv` parameter, instead cleanly make and close a CornuCopyBuffer from it in startup_shutdown, ensuring timely close of the file descriptor or whatever, rather than accidental late close of it during some garbage collection (when it can be the fd of something else)
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.startup_shutdown: fdopen and close the send object in a timely fashion
+lib/python/cs/packetstream.py: cs.packetstream: update imports, remove debugging, new PacketConnection.__repr__, clean lint
+lib/python/cs/packetstream.py: cs.packetstream: new (recv,send) setup for "on demand" connections, update docstrings, rename _receive_loop to _recv_loop
+lib/python/cs/packetstream.py: cs.packetstream: PacketStream: BREAKING: replace the recv and send parameters with a singe recv_send parameter; new PacketConnectionRecv,PacketConnectionSend,PacketConnectionRecvSend detailing the choices
+lib/python/cs/packetstream.py: cs.packstream: PacketConnection.__init__: update docstring
+lib/python/cs/packetstream.py: cs.packetstream.py: PacketConnection.request: open the connection and close on request completion
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._recv_loop: move the request/response logic into their own functions, aids debugging the primary loop
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.startup_shutdown: explicitly send the EOF packet on shutdown, forces shutdown of the send loop and explicitly notifies the remote receiver
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._recv_loop: fix test for bogus EOF packet, update progress idiom
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.request,do: allow an optional label to apply to the Result name, aids debugging
+lib/python/cs/packetstream.py: cs.packetstream: improve warning message text
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._recv_loop.recv_request: submit the request handler via Later.submit so that we can give a meaningful name to its worker Thread
+lib/python/cs/packetstream.py: cs.packstream.py: some type annotations
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._pending_states: hold the mutex
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._recv_loop.recv_response: update the Result completion idiom
+lib/python/cs/packetstream.py: cs.packetstream: fix spelling of RequestState
+lib/python/cs/packetstream.py: cs.packetstream: move the request cancel/complete/fail logic into the RequestsState class
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: drop .tick, no longer used
+lib/python/cs/packetstream.py: cs.packetstream,cs.vt.stream: rename PacketConnection.request to PacketConnection.submit
+lib/python/cs/packetstream.py: cs.packetstream,cs.vt.stream: PacketConnection.submit: switch flags and payload positional parameters because lacking flags should be more common than lacking a payload
+lib/python/cs/packetstream.py: cs.packetstream: rename PacketConnection.do to PacketConnection.__call__
+lib/python/cs/packetstream.py: cs.packetstream,cs.vt.stream: switch arguments back to flags,payload, too much cognitive churn
+lib/python/cs/packetstream.py: cs.packetstream: new BaseRequest and HasPacketConnection helper classes to make it easy to use a PacketConnection for a protocol
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: supply a name for the send queue
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._send_loop: exit the loop without sending if we receive an explicit EOF_Packet on the send queue, then unconditionally send a terminating EOF_Packet outside the loop
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._send_loop: we have already dealt with an EOF_Packet here
+lib/python/cs/packetstream.py: cs.packetstream: rename end_requests to send_erq, add trace_log calls, update imports, clean lint, remove debug
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: issue warnings if the sendQ is not empty after the send worker finishes
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: send the EOF_Packet from the send worker instead of from startup_shutdown, shuffle the ERQ_Packet handling
+lib/python/cs/packetstream.py: cs.packetstream: lint: fold up an "else if"
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: new join_recv to wait for the receive worker, to be the public interface for the server end of a connection to await EOF from the client
+lib/python/cs/packetstream.py: cs.packetstream: add a couple of assertions, improve a task message, PacketConnection.join now waits for the receive worker first (should have no semantic effect, just easier to think about), a warning message tweak, a little additional tracing
+lib/python/cs/packetstream.py: cs.packetstream: HasPacketConnection.__init__: extra keyword arguments are passed to PacketConnection()
+lib/python/cs/packetstream.py: cs.packetstream: HasPacketConnection.conn_do_remote: hold the connection open while we wait for the request to be fulfilled; conn_handle_request: hold the connection open while we fulfil the request

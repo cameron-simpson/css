@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Decorators.
-#   - Cameron Simpson <cs@cskk.id.au> 02jul2017
+# - Cameron Simpson <cs@cskk.id.au> 02jul2017
 #
 
 r'''
@@ -18,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20240412-post'
+__version__ = '20241206-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -499,7 +499,7 @@ def cachedmethod(
 
 @decorator
 def OBSOLETE(func, suggestion=None):
-  ''' Decorator for obsolete functions.
+  ''' A decorator for obsolete functions or classes.
 
       Use:
 
@@ -517,7 +517,7 @@ def OBSOLETE(func, suggestion=None):
 
   callers = set()
 
-  def wrapped(*args, **kwargs):
+  def OBSOLETE_func_wrapper(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
     frame = traceback.extract_stack(None, 2)[0]
@@ -538,12 +538,12 @@ def OBSOLETE(func, suggestion=None):
 
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
-  doc = "OBSOLETE FUNCTION " + funcname
+  doc = "OBSOLETE " + funcname
+  func.__doc__ = doc + '\n\n' + funcdoc
   if suggestion:
     doc += ' suggestion: ' + suggestion
-  wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  wrapped.__doc__ = doc + '\n\n' + funcdoc
-  return wrapped
+  OBSOLETE_func_wrapper.__name__ = '@OBSOLETE(%s)' % (funcname,)
+  return OBSOLETE_func_wrapper
 
 @OBSOLETE(suggestion='cachedmethod')
 def cached(*a, **kw):
@@ -803,20 +803,114 @@ def default_params(func, _strict=False, **param_defaults):
       ]
   )
   sig0 = signature(func)
-  new_params = []
+  sig = sig0
+  modified_params = []
   for param in sig0.parameters.values():
+    modified_param = None
     try:
       param_default = param_defaults[param.name]
     except KeyError:
-      new_params.append(param)
+      pass
     else:
-      new_param = param.replace(
+      modified_param = param.replace(
           annotation=typing.Optional[param.annotation],
           default=None if param_default is param.empty else param_default,
       )
-      new_params.append(new_param)
-  defaulted_func.__signature__ = sig0.replace(parameters=new_params)
+    if modified_param is None:
+      modified_param = param.replace()
+    modified_params.append(modified_param)
+  sig = sig.replace(parameters=modified_params)
+  defaulted_func.__signature__ = sig
   return defaulted_func
+
+@decorator
+def uses_cmd_options(
+    func, _strict=False, _options_param_name='options', **option_defaults
+):
+  ''' A decorator to provide default keyword arguments
+      from the prevailing `cs.cmdutils.BaseCommandOptions`
+      if available, otherwise from `option_defaults`.
+
+      This exists to provide plumbing free access to options set
+      up by a command line invocation using `cs.cmdutils.BaseCommand`.
+
+      If no `option_defaults` are provided, a single `options`
+      keyword argument is provided which is the prevailing
+      `BaseCommand.Options` instance.
+
+      The decorator accepts two optional "private" keyword arguments
+      commencing with underscores:
+      * `_strict`: default `False`; if true then an `option_defaults`
+        will only be applied if the argument is _missing_ from the
+        function arguments, otherwise it will be applied if the
+        argument is missing or `None`
+      * `_options_param_name`: default `'options'`; this is the
+        name of the single `options` keyword argument which will be
+        supplied if there are no `option_defaults`
+
+      Examples:
+
+          @uses_cmd_options(doit=True, quiet=False)
+          def func(x, *, doit, quiet, **kw):
+              if not quiet:
+                  print("something", x, kw)
+              if doit:
+                 ... do the thing ...
+              ... etc ...
+
+          @uses_cmd_options()
+          def func(x, *, options, **kw):
+              if not options.quiet:
+                  print("something", x, kw)
+              if options.doit:
+                 ... do the thing ...
+              ... etc ...
+  '''
+
+  def uses_cmd_wrapper(*func_a, **func_kw):
+    # fill in the func_kw from the defaults
+    # and keep a record of the chosen values
+    # run with the prevailing BaseCommand suitably updated
+    try:
+      from cs.cmdutils import BaseCommand
+      from cs.context import stackattrs
+    except ImportError:
+      # missing cs.cmdutils or cs.context,
+      # make an options with no attributes
+      class Options:
+        '''Dummy options object for accruing attributes.'''
+
+      options = Options()
+    else:
+      options_class = BaseCommand.Options
+      options = options_class.default() or options_class()
+    option_updates = {}
+    if not option_defaults:
+      option_defaults[_options_param_name] = options
+    for option_name, option_default in option_defaults.items():
+      if _strict:
+        # skip if the option is not provided by the caller
+        if option_name in func_kw:
+          continue
+      elif func_kw.get(option_name) is not None:
+        # skip if the option is not provided by the caller
+        # or is provided as None
+        continue
+      option_value = getattr(options, option_name, None)
+      if option_value is None:
+        option_value = option_default
+      option_updates[option_name] = option_value
+    func_kw.update(option_updates)
+    with stackattrs(options, **option_updates):
+      with options:
+        return func(*func_a, **func_kw)
+
+  return uses_cmd_wrapper
+
+uses_doit = uses_cmd_options(doit=True)
+uses_force = uses_cmd_options(force=False)
+uses_quiet = uses_cmd_options(quiet=False)
+uses_verbose = uses_cmd_options(verbose=False)
 
 # pylint: disable=too-many-statements
 @decorator
@@ -950,6 +1044,7 @@ def promote(func, params=None, types=None):
     if param.default is not Parameter.empty:
       anno_origin = typing.get_origin(annotation)
       anno_args = typing.get_args(annotation)
+      # recognise Optional[T], which becomes Union[T,None]
       if (anno_origin is typing.Union and len(anno_args) == 2
           and anno_args[-1] is type(None)):
         optional = True
@@ -963,7 +1058,7 @@ def promote(func, params=None, types=None):
       continue
     if not callable(promote_method):
       continue
-    promotions[param_name] = (annotation, promote_method, optional)
+    promotions[param_name] = (param, annotation, promote_method, optional)
   if not promotions:
     warning("@promote(%s): no promotable parameters", func)
     return func
@@ -979,43 +1074,51 @@ def promote(func, params=None, types=None):
             __name__, arg_value
         )
     )
-    for param_name, (annotation, promote_method,
+    for param_name, (param, annotation, promote_method,
                      optional) in promotions.items():
       try:
         arg_value = arg_mapping[param_name]
       except KeyError:
         # parameter not supplied
-        continue
-      if optional and arg_value is None:
-        # skip omitted optional value
-        continue
+        if param.default is Parameter.empty:
+          continue
+        # fill in the default values
+        arg_value = param.default
       if isinstance(arg_value, annotation):
         # already of the desired type
         continue
       try:
-        promoted_value = promote_method(arg_value)
-      except TypeError as te:
-        # see if the value has an as_TypeName() method
-        as_method_name = "as_" + annotation.__name__
         try:
-          as_annotation = getattr(arg_value, as_method_name)
-        except AttributeError:
-          # no .as_TypeName, reraise the original TypeError
-          raise te  # pylint: disable=raise-missing-from
-        else:
-          if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
-            # bound instance method of arg_value
-            try:
-              as_value = as_annotation()
-            except (TypeError, ValueError) as e:
-              raise TypeError(
-                  "%s: %s.%s(): %s" %
-                  (get_context(), param_name, as_method_name, e)
-              ) from e
+          promoted_value = promote_method(arg_value)
+        except TypeError as te:
+          # see if the value has an as_TypeName() method
+          as_method_name = "as_" + annotation.__name__
+          try:
+            as_annotation = getattr(arg_value, as_method_name)
+          except AttributeError:
+            # no .as_TypeName, reraise the original TypeError
+            raise te  # pylint: disable=raise-missing-from
           else:
-            # assuming a property or even a plain attribute
-            as_value = as_annotation
-          arg_value = as_value
+            if ismethod(as_annotation) and as_annotation.__self__ is arg_value:
+              # bound instance method of arg_value
+              try:
+                as_value = as_annotation()
+              except (TypeError, ValueError) as e:
+                raise TypeError(
+                    "%s: %s.%s(): %s" %
+                    (get_context(), param_name, as_method_name, e)
+                ) from e
+            else:
+              # assuming a property or even a plain attribute
+              as_value = as_annotation
+            arg_value = as_value
+      except TypeError:
+        # promotion fails
+        if (optional and arg_value is param.default
+            and param.default is not Parameter.empty):
+          # allow omitted/unconverted optional value with default None
+          continue
+        raise
       else:
         arg_value = promoted_value
       arg_mapping[param_name] = arg_value
@@ -1029,12 +1132,13 @@ class Promotable:
   '''
 
   @classmethod
-  def promote(cls, obj):
+  def promote(cls, obj, **from_t_kw):
     ''' Promote `obj` to an instance of `cls` or raise `TypeError`.
         This method supports the `@promote` decorator.
 
-        This base method will call the `from_`*typename*`(obj)` class factory
-        method if present, where *typename* is `obj.__class__.__name__`.
+        This base method will call the `from_`*typename*`(obj,**from_t_kw)`
+        class factory method if present, where *typename* is
+        `obj.__class__.__name__`.
 
         Subclasses may override this method to promote other types,
         typically:
@@ -1047,6 +1151,30 @@ class Promotable:
                 ... not done via a from_typename factory method
                 # fall back to Promotable.promote
                 return super().promote(obj)
+
+        An typical `from_`*typename*` factory method:
+
+            class Foo(Promotable):
+
+                def __init__(self, dbkey, dbrow):
+                    self.key = dbkey
+                    self.row_data = row
+
+                @classmethod
+                def from_str(cls, s : str):
+                    """Accept a database key string, return a `Foo` instance."""
+                    row = db_lookup(s)
+                    return cls(s, row)
+
+        This supports using `@promote` on functions with `Foo` instances:
+
+            @promote
+            def do_it(foo : Foo):
+                ... work with foo ...
+
+        but calling it as:
+
+            do_it("foo_key_value")
     '''
     if isinstance(obj, cls):
       return obj
@@ -1055,7 +1183,7 @@ class Promotable:
     except AttributeError:
       pass
     else:
-      return from_type(obj)
+      return from_type(obj, **from_t_kw)
     raise TypeError(
         f'{cls.__name__}.promote: cannot promote {obj.__class__.__name__}:{obj!r}'
     )

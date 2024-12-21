@@ -1,3 +1,4 @@
+subcommand to dump HTML tags and classes to aid in writing scrapers and recipe decoders etc
 shutdown mode: every stage should be inspectable for idleness? wait for all idle?
 fill in pipeline staging using function type annotations?
 use requests for the cs.urlutils URL class

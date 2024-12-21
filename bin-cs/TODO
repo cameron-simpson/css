@@ -21,6 +21,22 @@ usage="Usage:
     $cmd NEW issue title
     $cmd [number] todo text"
 
+if [ $# = 1 ]
+then
+  case "${1:-}" in
+    help | -\? | -h | -help | --help )
+      echo "$usage"
+      exit 0
+      ;;
+  esac
+fi
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing arguments" >&2
+  echo "$usage" >&2
+  exit 2
+}
+
 # TODO files (the default) or "gh" :CLI tool
 mode=TODO   # vs GH
 [ -n "$GH_REPO" ] && mode=GH
@@ -30,26 +46,25 @@ case "$mode" in
     category=
     todo_path=$( findup TODO.txt || : )
 
-    if [ $# -gt 0 ]
+    case "$1" in
+      ?*:)
+        category=$( expr "x$1" : 'x\(.*\):' )
+        shift
+        ;;
+      *)category=$( vcs branch || :)
+        ;;
+    esac
+    if [ -n "$category" ]
     then
-      case "$1" in
-        help | -\? | -h | -help | --help )
-          if [ $# = 1 ]
-          then
-            echo "$usage" >&2
-            exit 2
-          fi
-          ;;
-        ?*:)
-          category=$( expr "x$1" : 'x\(.*\):' )
-          todo_path2=$( findup "TODO-$category.txt" || : )
-          [ -f "$todo_path2" ] && { todo_path=$todo_path2; shift; }
-          ;;
-      esac
+        todo_path2=$( findup "TODO-$category.txt" || : )
+        if [ -f "$todo_path2" ]
+        then  todo_path=$todo_path2
+        else  set -- "$category:" ${1+"$@"}
+        fi
     fi
 
     [ -f "$todo_path" ] || {
-      echo "$cmd: no TODO.txt file found" >&2
+      echo "$cmd: no TODO.txt file found: $todo_path" >&2
       exit 1
     }
 

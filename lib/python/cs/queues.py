@@ -37,8 +37,6 @@ from cs.seq import seq, unrepeated
 __version__ = '20240412-post'
 
 DISTINFO = {
-    'description':
-    "some Queue subclasses and ducktypes",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -57,8 +55,8 @@ DISTINFO = {
 }
 
 class QueueIterator(MultiOpenMixin):
-  ''' A `QueueIterator` is a wrapper for a `Queue` (or ducktype) which
-      presents an iterator interface to collect items.
+  ''' A `QueueIterator` is a wrapper for a `Queue`like object
+      which presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
   '''
 
@@ -712,7 +710,7 @@ def get_batch(q, max_batch=128, *, poll_delay=0.01):
       within `poll_delay` seconds, append that item to the batch.
 
       This requires `get_batch()` to be the sole consumer of `q`
-      for correct operation as it polls `q.empty()`.
+      for correct operation as it makes decisions based on `q.empty()`.
   '''
   if max_batch < 2:
     raise ValueError("max_batch:%r should be >= 2" % (max_batch,))

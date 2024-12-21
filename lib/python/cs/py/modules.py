@@ -11,11 +11,11 @@ from inspect import getmodule
 import os.path
 import sys
 
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.gimmicks import warning
 from cs.pfx import Pfx
 
-__version__ = '20220606-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -27,41 +27,38 @@ DISTINFO = {
     'install_requires': ['cs.context', 'cs.gimmicks', 'cs.pfx'],
 }
 
-def import_module_name(module_name, name, path=None, lock=None):
+def import_module_name(module_name, name=None, sys_path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
 
       Parameters:
       * `module_name`: the module name to import.
-      * `name`: the name within the module whose value is returned;
+      * `name`: optional name within the module whose value is returned;
         if `name` is `None`, return the module itself.
-      * `path`: an array of paths to use as sys.path during the import.
-      * `lock`: a lock to hold during the import (recommended).
+      * `sys_path`optional list array of paths to use as `sys.path` during the import.
+      * `lock`: an optional lock to hold during the import (recommended).
   '''
-  if lock:
-    with lock:
-      return import_module_name(module_name, name, path)
-  osyspath = sys.path
-  if path:
-    sys.path = path
-  try:
-    M = importlib.import_module(module_name)
-  except ImportError as e:
-    # pylint: disable=raise-missing-from
-    raise ImportError("no module named %r: %s: %s" % (module_name, type(e), e))
-  finally:
-    if path:
-      sys.path = osyspath
-  if M is not None:
-    if name is None:
-      return M
-    try:
-      return getattr(M, name)
-    except AttributeError as e:
-      # pylint: disable=raise-missing-from
-      raise ImportError(
-          "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
-      )
-  return None
+  with contextif(lock):
+    if sys_path is None:
+      sys_path = sys.path
+    with stackattrs(sys, path=sys_path):
+      try:
+        M = importlib.import_module(module_name)
+      except ImportError as e:
+        # pylint: disable=raise-missing-from
+        raise ImportError(
+            "no module named %r: %s: %s" % (module_name, type(e), e)
+        )
+    if M is not None:
+      if name is None:
+        return M
+      try:
+        return getattr(M, name)
+      except AttributeError as e:
+        # pylint: disable=raise-missing-from
+        raise ImportError(
+            "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
+        )
+    return None
 
 def import_module_from_file(module_name, source_file, sys_path=None):
   ''' Import a specific file as a module instance,
@@ -116,6 +113,7 @@ def module_names(M):
   '''
   return [attr for attr, value in module_attributes(M)]
 
+# TODO: use the AST module to do a real parse?
 # pylint: disable=too-many-branches
 def direct_imports(src_filename, module_name=None):
   ''' Crudely parse `src_filename` for `import` statements.
@@ -132,8 +130,8 @@ def direct_imports(src_filename, module_name=None):
     with open(src_filename, encoding='utf-8') as codefp:
       for lineno, line in enumerate(codefp, 1):
         with Pfx(lineno):
+          line = line.strip()
           if line.startswith('import ') or line.startswith('from '):
-            line = line.strip()
             # quick hack to strip trailing "; second-statement"
             try:
               line, _ = line.split(';', 1)
@@ -150,20 +148,24 @@ def direct_imports(src_filename, module_name=None):
             if word0 == 'from' and (len(words) < 4 or words[2] != 'import'):
               continue
             subimport = words[1]
-            if module_name and subimport.startswith('.'):
-              if subimport == '.':
-                subimport = module_name
-              else:
-                # resolve relative import name
+            if subimport.startswith('.'):
+              # relative import, must be in a package
+              if not module_name:
+                # can't be in a package, just ignore it
+                continue
+              module_parts = module_name.split('.')
+              while subimport.startswith('.'):
+                module_parts = module_parts[:-1]
                 subimport = subimport[1:]
-                module_parts = module_name.split('.')
-                while subimport.startswith('.'):
-                  module_parts.pop(-1)
-                  subimport = subimport[1:]
-                if module_parts:
-                  if subimport:
-                    module_parts.append(subimport)
-                subimport = '.'.join(module_parts)
+              if not module_parts:
+                # walked off the top of the path
+                continue
+              if subimport:
+                module_parts.append(subimport)
+              subimport = '.'.join(module_parts)
+            if subimport == module_name:
+              # HACK: simplistic parse finding ourself in a docstring
+              continue
             subnames.add(subimport)
   return subnames
 
@@ -216,8 +218,8 @@ def import_extra(extra_package_name, distinfo):
       ]
       if from_extras:
         warning(
-            "package not available; the following extras pull it in: %r" %
-            (sorted(from_extras),)
+            "package not available; the following extras pull it in: %r",
+            sorted(from_extras)
         )
         raise
       # pylint: disable=raise-missing-from

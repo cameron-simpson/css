@@ -15,7 +15,6 @@ import json
 import os
 from os.path import (
     dirname,
-    isdir as isdirpath,
     isfile as isfilepath,
 )
 import shlex
@@ -35,7 +34,7 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, print_argv
 from cs.tagset import TagSet
 
-__version__ = '20240519-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -69,6 +68,7 @@ FFMPEG_EXE_ENVVAR = 'FFMPEG_EXE'
 # executable and image for use with docker
 FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
 FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
+FFMPEG_DOCKER_IMAGE_ENVVAR = 'FFMPEG_DOCKER_IMAGE'
 
 def main_ffmpeg_docker(argv=None):
   ''' The `ffm[peg-docker` command line implementation.
@@ -360,7 +360,9 @@ def ffmpeg_docker(
   if ffmpeg_exe is None:
     ffmpeg_exe = FFMPEG_DOCKER_EXE_DEFAULT
   if image is None:
-    image = FFMPEG_DOCKER_IMAGE_DEFAULT
+    image = os.environ.get(
+        FFMPEG_DOCKER_IMAGE_ENVVAR, FFMPEG_DOCKER_IMAGE_DEFAULT
+    )
   DR = DockerRun(image=image)
   DR.popopts(docker_run_opts)
   if docker_run_opts:

@@ -15,14 +15,16 @@ import sys
 
 from icontract import require
 
-from cs.cache import CachingMapping
-from cs.deco import fmtdoc
+from cs.cache import CachingMapping, ConvCache
+from cs.deco import fmtdoc, promote
+from cs.hashindex import file_checksum
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.queues import Channel, IterableQueue
 from cs.resources import openif, RunState, uses_runstate
 from cs.result import Result, report
+from cs.seq import get0
 from cs.threads import bg as bg_thread
 
 from . import (
@@ -34,7 +36,7 @@ from . import (
 from .backingfile import BackingFileIndexEntry, BinaryHashCodeIndex, CompressibleBackingFile
 from .cache import FileDataMappingProxy, MemoryCacheMapping
 from .datadir import DataDir, PlatonicDir
-from .hash import DEFAULT_HASHCLASS
+from .hash import HashCodeType
 from .index import choose as choose_indexclass
 
 class StoreError(Exception):
@@ -137,7 +139,7 @@ class ProxyStore(StoreSyncBase):
       * Read Stores. Requested data may be obtained from these Stores.
       * Copy Stores. Data retrieved from a `read2` Store is copied to these Stores.
 
-      A example setup utilising a working ProxyStore might look like this:
+      A example setup utilising a working `ProxyStore` might look like this:
 
           ProxyStore(
             save=[local,upstream],
@@ -152,11 +154,10 @@ class ProxyStore(StoreSyncBase):
       * `upstream`: is a remote high latency Store such as a `TCPStore`.
       * `spool`: is a local secondary Store, probably a `DataDirStore`.
 
-      This setup causes all saved data to be saved to `local` and
-      `upstream`.
-      If a save to `local` or `upstream` fails,
-      for example if the upstream is offline,
-      the save is repeated to the `spool`,
+      This example setup causes all saved data to be saved to `local`
+      and `upstream`.
+      If a save to `local` or `upstream` fails, for example if the
+      upstream is offline, the save is repeated to the `spool`,
       intended as a holding location for data needing a resave.
 
       Reads are attempted first from the `read` Stores, then from
@@ -170,7 +171,7 @@ class ProxyStore(StoreSyncBase):
       This supports obtaining an Archive by name
       from the first Store whose glob matches the name.
 
-      TODO: replay and purge the spool? Probably better as a separate
+      TODO: replay and purge the `save2` spool? Probably better as a separate
       pushto operation:
 
           vt -S spool_store pushto --delete upstream_store
@@ -186,12 +187,13 @@ class ProxyStore(StoreSyncBase):
       read2=(),
       copy2=(),
       archives=(),
+      conv_cache=None,
       **kw
   ):
     ''' Initialise a ProxyStore.
 
         Parameters:
-        * `name`: ProxyStore name.
+        * `name`: `ProxyStore` name
         * `save`: iterable of Stores to which to save blocks
         * `read`: iterable of Stores from which to fetch blocks
         * `save2`: fallback Store for saves which fail
@@ -201,8 +203,14 @@ class ProxyStore(StoreSyncBase):
         * `copy2`: optional iterable of Stores to receive copies
           of data obtained via `read2` Stores.
         * `archives`: search path for archive names
+        * `conv_cache`: optional `cs.cache.ConvCache`, default will
+          be inferred from `read`
     '''
-    super().__init__(name, **kw)
+    if conv_cache is None:
+      # use the firsy .conv_cache from the read Stores
+      read = list(read)
+      conv_cache = get0(filter(lambda readStore: readStore.conv_cache, read))
+    super().__init__(name, conv_cache=conv_cache, **kw)
     self.save = frozenset(save)
     self.read = frozenset(read)
     self.save2 = frozenset(save2)
@@ -444,36 +452,34 @@ class DataDirStore(MappingStore):
   ''' A `MappingStore` using a `DataDir` as its backend.
   '''
 
-  @fmtdoc
+  @promote
   def __init__(
       self,
       name,
       topdirpath,
       *,
-      hashclass=None,
+      hashclass: HashCodeType = None,
       indexclass=None,
       rollover=None,
       lock=None,
-      **kw
+      conv_cache=None,
+      **mapping_store_kw
   ):
     ''' Initialise the DataDirStore.
 
         Parameters:
-        * `name`: Store name.
-        * `topdirpath`: top directory path.
-        * `hashclass`: hash class,
-          default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`).
-        * `indexclass`: passed to the data dir.
-        * `rollover`: passed to the data dir.
-        * `lock`: passed to the mapping.
+        * `name`: Store name
+        * `topdirpath`: top directory path
+        * `hashclass`: hash class or hash class name,
+          default from `Store.get_default_hashclass()`
+        * `indexclass`: passed to the data dir
+        * `rollover`: passed to the data dir
+        * `lock`: optional `RLock`, passed to the `DataDir` mapping
     '''
     if lock is None:
       lock = RLock()
     self._lock = lock
     self.topdirpath = topdirpath
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
-    self.hashclass = hashclass
     self.indexclass = indexclass
     self.rollover = rollover
     self._datadir = DataDir(
@@ -482,11 +488,17 @@ class DataDirStore(MappingStore):
         indexclass=indexclass,
         rollover=rollover,
     )
+    if conv_cache is None:
+      conv_cache = ConvCache(
+          self._datadir.pathto('convof'),
+          content_key_func=partial(file_checksum, hashname=hashclass.hashname),
+      )
     super().__init__(
         name,
         CachingMapping(self._datadir, missing_fallthrough=True),
         hashclass=hashclass,
-        **kw,
+        conv_cache=conv_cache,
+        **mapping_store_kw,
     )
     self._modify_index_lock = Lock()
 
@@ -534,7 +546,15 @@ class DataDirStore(MappingStore):
       with self._datadir.modify_index_entry(hashcode) as entry:
         yield entry
 
-def PlatonicStore(name, topdirpath, *a, meta_store=None, hashclass=None, **kw):
+@promote
+def PlatonicStore(
+    name,
+    topdirpath,
+    *a,
+    meta_store=None,
+    hashclass: HashCodeType = None,
+    **kw,
+):
   ''' Factory function for platonic Stores.
 
       This is needed because if a meta_store is specified then it
@@ -559,12 +579,13 @@ class _PlatonicStore(MappingStore):
   ''' A `MappingStore` using a `PlatonicDir` as its backend.
   '''
 
+  @promote
   def __init__(
       self,
       name,
       topdirpath,
       *,
-      hashclass,
+      hashclass: HashCodeType = None,
       indexclass=None,
       follow_symlinks=False,
       archive=None,
@@ -573,8 +594,6 @@ class _PlatonicStore(MappingStore):
       lock=None,
       **kw
   ):
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
     if lock is None:
       lock = RLock()
     self.lock = lock
@@ -614,34 +633,39 @@ def MemoryCacheStore(name, max_data, hashclass=None):
   return MappingStore(name, MemoryCacheMapping(max_data), hashclass=hashclass)
 
 @pfx_method
-def VTDStore(name, path, *, hashclass, index=None, preferred_indexclass=None):
+@promote
+def VTDStore(
+    name,
+    path,
+    *,
+    hashclass: HashCodeType = None,
+    index=None,
+    preferred_indexclass=None,
+):
   ''' Factory to return a `MappingStore` using a `BackingFile`
       using a single `.vtd` file.
   '''
-  if hashclass is None:
-    hashclass = DEFAULT_HASHCLASS
-  with Pfx(path):
-    if not path.endswith('.vtd'):
-      warning("does not end with .vtd")
-    if not isfilepath(path):
-      raise ValueError("missing path %r" % (path,))
-    pathbase, _ = splitext(path)
-    if index is None:
-      index_basepath = f"{pathbase}-index-{hashclass.hashname}"
-      indexclass = choose_indexclass(
-          index_basepath, preferred_indexclass=preferred_indexclass
-      )
-      binary_index = indexclass(index_basepath)
-      index = BinaryHashCodeIndex(
-          hashclass=hashclass,
-          binary_index=binary_index,
-          index_entry_class=BackingFileIndexEntry
-      )
-    return MappingStore(
-        name,
-        CompressibleBackingFile(path, hashclass=hashclass, index=index),
-        hashclass=hashclass
+  if not path.endswith('.vtd'):
+    warning("does not end with .vtd")
+  if not isfilepath(path):
+    raise ValueError("missing path %r" % (path,))
+  pathbase, _ = splitext(path)
+  if index is None:
+    index_basepath = f"{pathbase}-index-{hashclass.hashname}"
+    indexclass = choose_indexclass(
+        index_basepath, preferred_indexclass=preferred_indexclass
     )
+    binary_index = indexclass(index_basepath)
+    index = BinaryHashCodeIndex(
+        hashclass=hashclass,
+        binary_index=binary_index,
+        index_entry_class=BackingFileIndexEntry
+    )
+  return MappingStore(
+      name,
+      CompressibleBackingFile(path, hashclass=hashclass, index=index),
+      hashclass=hashclass
+  )
 
 class FileCacheStore(StoreSyncBase):
   ''' A Store wrapping another Store that provides fast access to
@@ -677,8 +701,8 @@ class FileCacheStore(StoreSyncBase):
         Other keyword arguments are passed to `StoreSyncBase.__init__`.
     '''
     super().__init__(name, runstate=runstate, **kw)
-    self._str_attrs.update(backend=backend)
     self._backend = None
+    self._str_attrs.update(backend=backend)
     self.cache = FileDataMappingProxy(
         backend,
         dirpath=dirpath,
@@ -693,7 +717,7 @@ class FileCacheStore(StoreSyncBase):
     self.backend = backend
 
   def __getattr__(self, attr):
-    return getattr(self.backend, attr)
+    return getattr(self._backend, attr)
 
   @property
   def backend(self):
