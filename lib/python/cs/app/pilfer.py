@@ -57,7 +57,7 @@ from cs.queues import NullQueue
 from cs.resources import MultiOpenMixin, RunStateMixin, uses_runstate
 from cs.seq import seq
 from cs.threads import locked
-from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
+from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.x import X
 
 def main(argv=None):
@@ -431,9 +431,8 @@ class Pilfer(MultiOpenMixin, RunStateMixin):
   '''
 
   @uses_later
-  def __init__(self, item=None, later: Later):
+  def __init__(self, item=None, later: Later = None):
     self._name = 'Pilfer-%d' % (seq(),)
-    self._lock = Lock()
     self.user_vars = {'_': item, 'save_dir': '.'}
     self.flush_print = False
     self.do_trace = False
@@ -441,6 +440,7 @@ class Pilfer(MultiOpenMixin, RunStateMixin):
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
+    ##self._lock = Lock()
     self._lock = RLock()
     self.rcs = []  # chain of PilferRC libraries
     self.seensets = {}
@@ -1053,16 +1053,19 @@ def pilferify11(func):
   def pf(P, *a, **kw):
     return P.copy_with_vars(_=func(P, *a, **kw))
 
+  pf.__name__ = "@pilferify11(%s)" % funcname(func)
   return pf
 
 def pilferify1m(func):
   ''' Decorator for 1-to-many Pilfer=>nonPilfers functions to yield Pilfers.
   '''
 
-  def pf(P, *a, **kw):
+  @promote
+  def pf(P: Pilfer, *a, **kw):
     for value in func(P, *a, **kw):
       yield P.copy_with_vars(_=value)
 
+  pf.__name__ = "@pilferify1m(%s)" % funcname(func)
   return pf
 
 def pilferifymm(func):
@@ -1077,6 +1080,7 @@ def pilferifymm(func):
       for value in func(Ps, *a, **kw):
         yield P0.copy_with_vars(_=value)
 
+  pf.__name__ = "@pilferifymm(%s)" % funcname(func)
   return pf
 
 def pilferifysel(func):
@@ -1088,6 +1092,7 @@ def pilferifysel(func):
       if func(P, *a, **kw):
         yield P
 
+  pf.__name__ = "@pilferifysel(%s)" % funcname(func)
   return pf
 
 def parse_action(action, do_trace):
@@ -1353,7 +1358,7 @@ def parse_action(action, do_trace):
       result = ''.join(strs)
       debug("SUBSTITUTE: src=%r, result=%r", src, result)
       if isinstance(src, URL):
-        result = URL(result, src.referer)
+        result = URL.promote(result)
       return result
 
     return StageType.ONE_TO_ONE, substitute
@@ -1625,6 +1630,7 @@ def parse_action(action, do_trace):
   elif name in one_to_many:
     sig = StageType.ONE_TO_MANY
     func = one_to_many[name]
+    func.__name__ = "one_to_many[%r]:%s" % (name, func)
   elif name in one_to_one:
     func = one_to_one[name]
     sig = StageType.ONE_TO_ONE
@@ -1747,7 +1753,11 @@ class ActionFunction(BaseAction):
   def __init__(self, action0, sig, func):
     super().__init__(action0, sig)
     # stash a retriable version of the function
+    func0 = func
     self.func = retriable(func)
+    self.func.__name__ = "%s(%r,func=%s)" % (
+        type(self).__name__, action0, funcname(func0)
+    )
 
   def functor(self, L):
     return self.func
@@ -1934,6 +1944,7 @@ def action_shcmd(shcmd):
         with open('/dev/null') as fp0:
           fd0 = fp0.fileno()
           try:
+            # TODO: use cs.psutils.run
             subp = Popen(
                 ['/bin/sh', '-c', 'sh -uex; ' + v],
                 stdin=fd0,
