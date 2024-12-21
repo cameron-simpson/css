@@ -62,7 +62,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20241218-post'
+__version__ = '20241222.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1860,9 +1860,10 @@ class BaseCommand:
           field_name for field_name in options.as_dict().keys()
           if field_name not in skip_names
       )
-    for line in tabulate(*((f'{field_name}:',
-                            str(getattr(options, field_name)))
-                           for field_name in field_names)):
+    for line in tabulate(
+        *((f'{field_name}:',
+           pformat(getattr(options, field_name), compact=True))
+          for field_name in field_names)):
       print(line)
     return xit
 
@@ -1890,14 +1891,20 @@ class BaseCommand:
           if k and not k.startswith('_')
       }
       local = pub_mapping(self.__dict__)
-      local.update(pub_mapping(options.__dict__))
-      local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+      del local['options']
+      local.update(
+          {
+              f'options.{k}': v
+              for k, v in sorted(pub_mapping(options.__dict__).items())
+          }
+      )
+      local.update(argv=argv, cmd=self.cmd, self=self)
     if banner is None:
       vars_banner = indent(
           "\n".join(
               tabulate(
                   *(
-                      [k, pformat(v)]
+                      [k, pformat(v, compact=True)]
                       for k, v in sorted(local.items())
                       if k and not k.startswith('_')
                   )
@@ -2012,3 +2019,14 @@ def vprint(*print_a, **qvprint_kw):
       This is a compatibility shim for `qvprint()` with `quiet=False`.
   '''
   return qvprint(*print_a, quiet=False, **qvprint_kw)
+
+if __name__ == '__main__':
+
+  class DemoCommand(BaseCommand):
+
+    @popopts
+    def cmd_demo(self, argv):
+      print("This is a demo.")
+      print("argv =", argv)
+
+  sys.exit(DemoCommand(sys.argv).run())
