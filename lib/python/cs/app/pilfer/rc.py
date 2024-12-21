@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 
+from configparser import ConfigParser
+import os
+import os.path
+import shlex
+from threading import Lock
+try:
+  import xml.etree.cElementTree as ElementTree
+except ImportError:
+  pass
+
+
+from cs.logutils import (debug, warning, trace)
+from cs.pfx import Pfx
+from cs.threads import locked
+
 def load_pilferrcs(pathname):
   ''' Load `PilferRC` instances from the supplied `pathname`,
       recursing if this is a directory.

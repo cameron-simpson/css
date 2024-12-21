@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
 
+import re
+from string import whitespace
+from typing import Iterable
+try:
+  import xml.etree.cElementTree as ElementTree
+except ImportError:
+  pass
+
+from typeguard import typechecked
+
+from cs.lex import (
+    get_dotted_identifier, get_identifier, get_other_chars, get_qstr
+)
+from cs.logutils import (debug, error, exception)
+from cs.pfx import Pfx
+from cs.pipeline import StageType
+from cs.urlutils import URL
+
 # regular expressions used when parsing actions
 re_GROK = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 

@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+from string import Formatter
+try:
+  import xml.etree.cElementTree as ElementTree
+except ImportError:
+  pass
+
+
+from cs.pfx import Pfx
+from cs.urlutils import URL
+
 class FormatArgument(str):
 
   @property

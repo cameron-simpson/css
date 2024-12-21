@@ -3,6 +3,33 @@
 ''' Implementations of actions.
 '''
 
+import os
+import os.path
+import errno
+from subprocess import Popen, PIPE
+from threading import Thread
+from time import sleep
+from typing import Iterable
+from urllib.parse import unquote
+from urllib.error import HTTPError, URLError
+try:
+  import xml.etree.cElementTree as ElementTree
+except ImportError:
+  pass
+
+from typeguard import typechecked
+
+from cs.deco import promote
+from cs.fileutils import mkdirn
+from cs.later import RetryError
+from cs.logutils import (debug, error, warning, exception)
+from cs.pfx import Pfx
+from cs.pipeline import StageType
+from cs.py.func import funcname
+from cs.resources import MultiOpenMixin
+from cs.urlutils import URL
+from cs.x import X
+
 def Action(action_text, do_trace):
   ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an BaseAction.
   '''
@@ -311,3 +338,58 @@ def action_pipecmd(shcmd):
           warning("exit code = %d", xit)
 
   return function, StageType.MANY_TO_MANY
+
+def new_dir(dirpath):
+  ''' Create the directory `dirpath` or `dirpath-n` if `dirpath` exists.
+      Return the path of the directory created.
+  '''
+  try:
+    os.makedirs(dirpath)
+  except OSError as e:
+    if e.errno != errno.EEXIST:
+      exception("os.makedirs(%r): %s", dirpath, e)
+      raise
+    dirpath = mkdirn(dirpath, '-')
+  return dirpath
+
+def url_delay(U, delay, *a):
+  sleep(float(delay))
+  return U
+
+@promote
+def url_query(U: URL, *a):
+  if not a:
+    return U.query
+  qsmap = dict(
+      [
+          (qsp.split('=', 1) if '=' in qsp else (qsp, ''))
+          for qsp in U.query.split('&')
+      ]
+  )
+  return ','.join([unquote(qsmap.get(qparam, '')) for qparam in a])
+
+def url_io(func, onerror, *a, **kw):
+  ''' Call `func` and return its result.
+      If it raises URLError or HTTPError, report the error and return `onerror`.
+  '''
+  debug("url_io(%s, %s, %s, %s)...", func, onerror, a, kw)
+  try:
+    return func(*a, **kw)
+  except (URLError, HTTPError) as e:
+    warning("%s", e)
+    return onerror
+
+def retriable(func):
+  ''' A decorator for a function to probe the `Pilfer` flags
+      and raise `RetryError` if unsatisfied.
+  '''
+
+  def retry_func(P, *a, **kw):
+    ''' Call `func` after testing `P.test_flags()`.
+    '''
+    if not P.test_flags():
+      raise RetryError('flag conjunction fails: %s' % (' '.join(P.flagnames)))
+    return func(P, *a, **kw)
+
+  retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
+  return retry_func

@@ -1,7 +1,72 @@
 #!/usr/bin/env python3
+#
+# A web scraper. - Cameron Simpson <cs@cskk.id.au> 07jul2010
+#
 
 ''' Pilfer, a web scraping tool.
 '''
+
+from collections import namedtuple
+from configparser import ConfigParser
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+import os
+import os.path
+import errno
+from getopt import GetoptError
+import re
+import shlex
+from string import Formatter, whitespace
+from subprocess import Popen, PIPE
+import sys
+from threading import Lock, RLock, Thread
+from time import sleep
+from typing import Iterable
+from urllib.parse import quote, unquote
+from urllib.error import HTTPError, URLError
+from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
+try:
+  import xml.etree.cElementTree as ElementTree
+except ImportError:
+  from xml.etree import ElementTree
+
+from icontract import require
+from typeguard import typechecked
+
+from cs.app.flag import PolledFlags
+from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
+from cs.deco import promote
+from cs.debug import ifdebug
+from cs.env import envsub
+from cs.excutils import logexc, LogExceptions
+from cs.fileutils import mkdirn
+from cs.later import Later, RetryError
+from cs.lex import (
+    cutprefix, cutsuffix, get_dotted_identifier, get_identifier, is_identifier,
+    get_other_chars, get_qstr
+)
+import cs.logutils
+from cs.logutils import (debug, error, warning, exception, trace, D)
+from cs.mappings import MappingChain, SeenSet
+from cs.obj import copy as obj_copy
+import cs.pfx
+from cs.pfx import Pfx
+from cs.pipeline import pipeline, StageType
+from cs.py.func import funcname
+from cs.py.modules import import_module_name
+from cs.queues import NullQueue
+from cs.resources import MultiOpenMixin, RunStateMixin, uses_runstate
+from cs.seq import seq
+from cs.threads import locked
+from cs.urlutils import URL, NetrcHTTPPasswordMgr
+from cs.x import X
+
+# parallelism of jobs
+DEFAULT_JOBS = 4
+
+# default flag status probe
+DEFAULT_FLAGS_CONJUNCTION = '!PILFER_DISABLE'
 
 class Pilfer(MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.

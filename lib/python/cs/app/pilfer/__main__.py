@@ -1,9 +1,133 @@
 #!/usr/bin/env python3
 
+from contextlib import contextmanager
+from dataclasses import dataclass
+import os
+import os.path
+from getopt import GetoptError
+import sys
+from threading import Thread
+from time import sleep
+from typing import Iterable
+try:
+  import xml.etree.cElementTree as ElementTree
+except ImportError:
+  pass
+
+from typeguard import typechecked
+
+from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
+from cs.debug import ifdebug
+from cs.env import envsub
+from cs.later import Later
+from cs.lex import (
+    cutprefix, cutsuffix, get_identifier, is_identifier
+)
+import cs.logutils
+from cs.logutils import (debug, error, warning, D)
+import cs.pfx
+from cs.pfx import Pfx
+from cs.pipeline import pipeline, StageType
+from cs.queues import NullQueue
+from cs.resources import uses_runstate
+
 def main(argv=None):
   ''' Pilfer command line function.
   '''
   return PilferCommand(argv).run()
+
+@typechecked
+def urls(url, stdin=None, cmd=None) -> Iterable[str]:
+  ''' Generator to yield input URLs.
+  '''
+  if stdin is None:
+    stdin = sys.stdin
+  if cmd is None:
+    cmd = cs.pfx.cmd
+  if url != '-':
+    # literal URL supplied, deliver to pipeline
+    yield url
+  else:
+    # read URLs from stdin
+    try:
+      do_prompt = stdin.isatty()
+    except AttributeError:
+      do_prompt = False
+    if do_prompt:
+      # interactively prompt for URLs, deliver to pipeline
+      prompt = cmd + ".url> "
+      while True:
+        try:
+          url = input(prompt)
+        except EOFError:
+          break
+        else:
+          yield url
+    else:
+      # read URLs from non-interactive stdin, deliver to pipeline
+      lineno = 0
+      for line in stdin:
+        lineno += 1
+        with Pfx("stdin:%d", lineno):
+          if not line.endswith('\n'):
+            raise ValueError("unexpected EOF - missing newline")
+          url = line.strip()
+          if not line or line.startswith('#'):
+            debug("SKIP: %s", url)
+            continue
+          yield url
+
+# TODO: recursion protection in action_map expansion
+def argv_pipefuncs(argv, action_map, do_trace):
+  ''' Process command line strings and return a corresponding list
+      of actions to construct a Later.pipeline.
+  '''
+  # we reverse the list to make action expansion easier
+  argv = list(argv)
+  errors = []
+  pipe_funcs = []
+  while argv:
+    action = argv.pop(0)
+    # support commenting-out of individual actions
+    if action.startswith('#'):
+      continue
+    # macro - prepend new actions
+    func_name, offset = get_identifier(action)
+    if func_name and func_name in action_map:
+      expando = action_map[func_name]
+      argv[:0] = expando
+      continue
+    if action == "per":
+      # fork a new pipeline instance per item
+      # terminate this pipeline with a function to spawn subpipelines
+      # using the tail of the action list from this point
+      if not argv:
+        errors.append("no actions after %r" % (action,))
+      else:
+        tail_argv = list(argv)
+        name = "%s:[%s]" % (action, ','.join(argv))
+        pipespec = PipeSpec(name, argv)
+
+        def per(P):
+          with P:
+            pipe = pipeline(
+                pipespec.actions, inputs=(P,), name="%s(%s)" % (name, P)
+            )
+            with P.later.release():
+              for P2 in pipe.outQ:
+                yield P2
+
+        pipe_funcs.append((StageType.ONE_TO_MANY, per))
+      argv = []
+      continue
+    try:
+      A = Action(action, do_trace)
+    except ValueError as e:
+      errors.append("bad action %r: %s" % (action, e))
+    else:
+      pipe_funcs.append(A)
+  return pipe_funcs, errors
 
 class PilferCommand(BaseCommand):
 
@@ -220,7 +344,7 @@ class PilferCommand(BaseCommand):
     start_arg = argv[argv_offset]
     pipe_name = cutsuffix(start_arg, ':{')
     if pipe_name is start_arg:
-      raise ValueError("expected \"pipe_name:{\", got: %r" % (start_arg,))
+      raise ValueError('expected "pipe_name:{", got: %r' % (start_arg,))
     with Pfx(start_arg):
       argv_offset += 1
       spec_offset = argv_offset
