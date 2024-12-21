@@ -3,6 +3,18 @@
 ''' Implementations of actions.
 '''
 
+def Action(action_text, do_trace):
+  ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an BaseAction.
+  '''
+  parsed = parse_action(action_text, do_trace)
+  try:
+    sig, function = parsed
+  except TypeError:
+    action = parsed
+  else:
+    action = ActionFunction(action_text, sig, function)
+  return action
+
 class BaseAction:
   ''' The base class for all actions.
 

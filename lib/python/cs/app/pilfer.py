@@ -692,18 +692,6 @@ one_test = {
     lambda P, regexp: regexp.search(P._),
 }
 
-def Action(action_text, do_trace):
-  ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an BaseAction.
-  '''
-  parsed = parse_action(action_text, do_trace)
-  try:
-    sig, function = parsed
-  except TypeError:
-    action = parsed
-  else:
-    action = ActionFunction(action_text, sig, function)
-  return action
-
 def pilferify11(func):
   ''' Decorator for 1-to-1 Pilfer=>nonPilfer functions to return a Pilfer.
   '''
