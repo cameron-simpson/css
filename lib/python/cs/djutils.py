@@ -3,7 +3,7 @@
 ''' My collection of things for working with Django.
 '''
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from inspect import isclass
 import sys
 from typing import List
@@ -156,10 +156,11 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
 
   @dataclass
   class Options(CSBaseCommand.Options):
-    settings: type(settings) = dict(
-        (k, v)
-        for k, v in sorted(settings.__dict__.items())
-        if k and not k.startswith('_')
+    settings: type(settings) = field(
+        default_factory=lambda: dict(
+            (k, v) for k, v in sorted(settings.__dict__.items()) if k and not k
+            .startswith('_')
+        )
     )
 
   @classmethod
