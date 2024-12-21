@@ -262,30 +262,9 @@ class PilferCommand(BaseCommand):
         error("%s: RECEIVED %r", busy_div, item)
       later.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
       divnames = P.open_diversion_names
-      while divnames:
-        busy_name = None
-        for divname in divnames:
-          div = P.diversion(divname)
-          if div._busy:
-            busy_name = divname
-            break
-        # nothing busy? pick the first one arbitrarily
-        if not busy_name:
-          busy_name = divnames[0]
-        busy_div = P.diversion(busy_name)
-        LTR.state("CLOSE DIV %s", busy_div)
-        busy_div.close(enforce_final_close=True)
-        outQ = busy_div.outQ
-        D("DRAIN DIV %s", busy_div)
-        LTR.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
-        for item in outQ:
-          # diversions are supposed to discard their outputs
-          error("%s: RECEIVED %r", busy_div, item)
-        LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
-        divnames = P.open_diversion_names
-      LTR.state("quiescing")
-      L.wait_outstanding(until_idle=True)
-      # Now the diversions should have completed and closed.
+    later.state("quiescing")
+    L.wait_outstanding(until_idle=True)
+    # Now the diversions should have completed and closed.
     # out of the context manager, the Later should be shut down
     later.state("WAIT...")
     L.wait()
