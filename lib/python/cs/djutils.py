@@ -5,6 +5,7 @@
 
 from dataclasses import dataclass, field
 from inspect import isclass
+import os
 import sys
 from typing import List
 
@@ -17,6 +18,7 @@ from django.utils.functional import empty as djf_empty
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand as CSBaseCommand
+from cs.gimmicks import warning
 from cs.lex import cutprefix, stripped_dedent
 
 __version__ = '20241222.2-post'
@@ -29,11 +31,16 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils',
+        'cs.gimmicks',
         'cs.lex',
         'django',
         'typeguard',
     ],
 }
+if (settings._wrapped is djf_empty
+    and not os.environ.get('DJANGO_SETTINGS_MODULE')):
+  warning("%s: calling settings.configure()", __name__)
+  settings.configure()
 
 class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
   ''' A subclass of `cs.cmdutils.SubCOmmand` with additional support
@@ -158,14 +165,10 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   @dataclass
   class Options(CSBaseCommand.Options):
     settings: type(settings) = field(
-        default_factory=lambda: (
-            settings._wrapped is djf_empty and settings.configure(),
-            dict(
-                (k, getattr(settings, k, None))
-                for k in sorted(dir(settings))
-                if k and not k.startswith('_') and k not in ('SECRET_KEY',)
-            )
-        )[-1]
+        default_factory=lambda: dict(
+            (k, getattr(settings, k, None)) for k in sorted(dir(settings)) if k
+            and not k.startswith('_') and k not in ('SECRET_KEY',)
+        )
     )
 
   @classmethod
