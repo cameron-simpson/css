@@ -106,8 +106,7 @@ _venv:
     set -uex \
     [ -d $(venv_dir) ] || { \
         $(base_python) -m ensurepip \
-        $(base_pip) install -U pip \
-        $(base_pip) install -U uv \
+        $(base_pip) install -U pip wheel build uv \
         $(uv) venv --python $(base_python) --seed $(venv_dir) \
     }
     uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
