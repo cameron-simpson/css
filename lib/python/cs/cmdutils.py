@@ -2012,3 +2012,14 @@ def vprint(*print_a, **qvprint_kw):
       This is a compatibility shim for `qvprint()` with `quiet=False`.
   '''
   return qvprint(*print_a, quiet=False, **qvprint_kw)
+
+if __name__ == '__main__':
+
+  class DemoCommand(BaseCommand):
+
+    @popopts
+    def cmd_demo(self, argv):
+      print("This is a demo.")
+      print("argv =", argv)
+
+  sys.exit(DemoCommand(sys.argv).run())
