@@ -3,14 +3,21 @@
 ''' Function pipelines mediated by queues and a Later.
 '''
 
+from contextlib import contextmanager
 from enum import Enum, auto as auto_enum, unique as unique_enum
+from functools import partial
+from typing import Iterable
+
 from icontract import require
-from cs.later import DEFAULT_RETRY_DELAY
+from typeguard import typechecked
+
+from cs.later import DEFAULT_RETRY_DELAY, Later, uses_later
 from cs.logutils import debug, error
 from cs.pfx import pfx
 from cs.py.func import funcname
 from cs.queues import IterableQueue, PushQueue
 from cs.resources import MultiOpenMixin
+from cs.result import not_cancelled
 from cs.seq import TrackingCounter
 from cs.threads import bg as bg_thread
 
@@ -271,12 +278,11 @@ class Pipeline(MultiOpenMixin):
         PQ = _PipelineStageOneToOne(pq_name, self, functor, RHQ)
       elif func_sig == StageType.SELECTOR:
 
-        select_by = functor
-
-        def selector(item):
+        def selector(item, *, select_by):
           if select_by(item):
             yield item
 
+        selector = partial(selector, select_by=functor)
         PQ = _PipelineStageOneToMany(pq_name, self, selector, RHQ)
       elif func_sig == StageType.MANY_TO_MANY:
         PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
