@@ -224,6 +224,7 @@ class PilferCommand(BaseCommand):
           URL may be "-" to read URLs from standard input.
     '''
     options = self.options
+    later = options.later
     P = options.pilfer
     if not argv:
       raise GetoptError("missing URL")
@@ -261,15 +262,18 @@ class PilferCommand(BaseCommand):
     P.flagnames = options.flagnames.split()
     if cs.logutils.D_mode or ifdebug():
       # poll the status of the Later regularly
-      def pinger(L):
+      def pinger(later):
         while True:
-          D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
+          D(
+              "PINGER: later: quiescing=%s, state=%r: %s", later._quiescing,
+              later._state, later
+          )
           sleep(2)
 
       ping = Thread(target=pinger, args=(later,))
       ping.daemon = True
       ping.start()
-    P.later = L
+    P.later = later
     # construct the pipeline
     pipe = pipeline(
         pipe_funcs,
@@ -321,11 +325,11 @@ class PilferCommand(BaseCommand):
       later.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
       divnames = P.open_diversion_names
     later.state("quiescing")
-    L.wait_outstanding(until_idle=True)
+    later.wait_outstanding(until_idle=True)
     # Now the diversions should have completed and closed.
     # out of the context manager, the Later should be shut down
     later.state("WAIT...")
-    L.wait()
+    later.wait()
     later.state("WAITED")
 
   @staticmethod
@@ -353,3 +357,5 @@ class PilferCommand(BaseCommand):
       spec = PipeSpec(pipe_name, argv[spec_offset:argv_offset])
       argv_offset += 1
       return spec, argv_offset
+
+sys.exit(main(sys.argv))
