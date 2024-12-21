@@ -692,9 +692,6 @@ one_test = {
     lambda P, regexp: regexp.search(P._),
 }
 
-# regular expressions used when parsing actions
-re_GROK = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
-
 def Action(action_text, do_trace):
   ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an BaseAction.
   '''
