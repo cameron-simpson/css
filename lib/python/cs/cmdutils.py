@@ -1897,7 +1897,7 @@ class BaseCommand:
           "\n".join(
               tabulate(
                   *(
-                      [k, pformat(v)]
+                      [k, pformat(v, compact=True)]
                       for k, v in sorted(local.items())
                       if k and not k.startswith('_')
                   )
