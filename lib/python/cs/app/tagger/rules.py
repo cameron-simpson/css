@@ -764,7 +764,11 @@ class Rule(Promotable):
     rules = []
     for lineno, line in enumerate(lines, start_lineno):
       with Pfx(lineno):
-        R = cls.from_str(line.rstrip(), filename=filename, lineno=lineno)
+        line_ = line.rstrip()
+        _line_ = line_.lstrip()
+        if not _line_ or _line_.startswith('#'):
+          continue
+        R = cls.from_str(line_, filename=filename, lineno=lineno)
         if R is not None:
           rules.append(R)
     return rules
