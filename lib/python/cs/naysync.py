@@ -92,17 +92,23 @@ def afunc(func):
     return func
   return partial(to_thread, func)
 
-async def async_iter(it: AnyIterable, fast=False):
+async def async_iter(it: AnyIterable, fast=None):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
       An asynchronous iterable returns `aiter(it)` directly.
 
-      If `fast` is true (default `False`) then `it` is iterated
-      directly instead of via a distinct async generator.
+      If `fast` is true then `it` is iterated directly instead of
+      via a distinct async generator. If not specified, `fast` is
+      set to `True` if `it` is a `list` or `tuple` or `set`. A true
+      value for this parameter indicates that fetching the next
+      item from `it` is always effectively instant and never blocks.
   '''
   try:
     # is it already an asynchronous iterable?
     dund_aiter = it.__aiter__
   except AttributeError:
+    # not already an asynchronous iterable
+    if fast is None:
+      fast = type(it) in (list, tuple, set)
     it = iter(it)
     if fast:
       # yield directly from the iterator
