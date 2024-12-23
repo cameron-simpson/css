@@ -25,6 +25,7 @@ from inspect import isasyncgenfunction, iscoroutinefunction
 from typing import Any, Callable, Iterable
 
 from cs.deco import decorator
+from cs.semantics import ClosedError, not_closed
 
 __version__ = '20241221.1-post'
 
@@ -36,6 +37,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.semantics',
     ],
 }
 
@@ -198,6 +200,60 @@ async def amap(
     # this should have cleared the heap
     assert len(results) == 0
 
+class IterableAsyncQueue(AQueue):
+  ''' An iterable subclass of `asyncio.Queue`.
+
+      This modifies `asyncio.Queue` by:
+      - adding a `.close()` async method
+      - making the queue iterable, with each iteration consuming an item via `.get()`
+  '''
+
+  def __init__(self, maxsize=0):
+    super().__init__(maxsize=maxsize)
+    self.__sentinel = object()
+    self.closed = False
+
+  def __aiter__(self):
+    return self
+
+  async def __anext__(self):
+    ''' Fetch the next item from the queue.
+    '''
+    item = await super().get()
+    if item is self.__sentinel:
+      await self.close()
+      raise StopAsyncIteration
+    return item
+
+  async def get(self):
+    ''' We do not allow `.get()`. '''
+    raise NotImplementedError
+
+  def get_nowat(self):
+    ''' We do not allow `.get_nowait()`. '''
+    raise NotImplementedError
+
+  async def close(self):
+    ''' Close the queue.
+        It is not an error to close the queue more than once.
+    '''
+    if not self.closed:
+      self.closed = True
+      await super().put(self.__sentinel)
+
+  @not_closed
+  async def put(self, item):
+    ''' Put `item` onto the queue.
+    '''
+    return await super().put(item)
+
+  def put_nowait(self, item):
+    ''' Put an item onto the queue without blocking.
+    '''
+    if self.closed and item is not self.__sentinel:
+      raise ClosedError
+    return super().put_nowait(item)
+
 if __name__ == '__main__':
 
   @agen
@@ -251,3 +307,17 @@ if __name__ == '__main__':
           print(f'elapsed {round(time.time()-start_time,2)}')
 
   run(test_amap())
+  async def putrange(n, q):
+    for i in range(n):
+      print("putrange", i)
+      await q.put(i)
+    print("putrange close")
+    await q.close()
+
+  async def readq(q):
+    create_task(putrange(5, q))
+    async for item in q:
+      print("readq got", item)
+
+  Q = IterableAsyncQueue()
+  run(readq(Q))
