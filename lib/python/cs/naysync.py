@@ -95,7 +95,7 @@ async def async_iter(it: Iterable):
       An asynchronous iterable returns `aiter(it)` directly.
   '''
   try:
-    return aiter(it)
+    return it.__aiter__()
   except TypeError:
     it = iter(it)
     sentinel = object()
