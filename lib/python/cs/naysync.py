@@ -92,24 +92,28 @@ def afunc(func):
 
 async def async_iter(it: Iterable):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
+      An asynchronous iterable returns `aiter(it)` directly.
   '''
-  it = iter(it)
-  sentinel = object()
+  try:
+    return aiter(it)
+  except TypeError:
+    it = iter(it)
+    sentinel = object()
 
-  def gen():
+    def gen():
+      while True:
+        try:
+          yield next(it)
+        except StopIteration:
+          break
+      yield sentinel
+
+    next_it = lambda: next(gen())
     while True:
-      try:
-        yield next(it)
-      except StopIteration:
+      item = await to_thread(next_it)
+      if item is sentinel:
         break
-    yield sentinel
-
-  next_it = lambda: next(gen())
-  while True:
-    item = await to_thread(next_it)
-    if item is sentinel:
-      break
-    yield item
+      yield item
 
 async def amap(
     func: Callable[[Any], Any],
