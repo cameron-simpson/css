@@ -493,23 +493,28 @@ class AsyncPipeLine:
 
 if __name__ == '__main__':
 
+  import time
+  import random
+
+  print_ = partial(print, end='', flush=True)
+
   @agen
   def gen():
     yield from range(5)
 
   async def async_generator_demo():
+    print_("async_generator_demo @gen(gen):")
     async for item in gen():
-      print("@gen(gen)", repr(item))
+      print_("", repr(item))
+    print()
 
   run(async_generator_demo())
 
-  import time
-
   @afunc
   def async_function_demo(sleep_time, result):
-    print("@afunc(func): sleep", sleep_time)
+    print_("@afunc(func): sleep", sleep_time)
     time.sleep(sleep_time)
-    print("@afunc(func): return result", result)
+    print(", return result", result)
     return result
 
   run(async_function_demo(2.0, 9))
@@ -523,9 +528,10 @@ if __name__ == '__main__':
     yield 'agen2'
 
   async def async_iter_demo(it: AnyIterable, fast=None):
-    print("async_iter", type(it), "fast", fast)
+    print_("async_iter", type(it), "fast", fast)
     async for item in async_iter(it):
-      print(" ", item)
+      print_("", item)
+    print()
 
   for fast in None, False, True:
     for it in (
@@ -537,20 +543,18 @@ if __name__ == '__main__':
     ):
       run(async_iter_demo(it, fast=fast))
 
-  print("amap...")
-  import random
-
   def sync_sleep(sleep_time):
     ##print('func sleep_time', sleep_time, 'start')
     time.sleep(sleep_time)
     ##print('func sleep_time', sleep_time, 'done')
-    return f'amap(sync_sleep({sleep_time})): slept'
+    return f'slept {sleep_time}'
 
   async def test_amap():
     for concurrent in False, True:
       for unordered in False, True:
         for indexed in False, True:
-          print(
+          print_(
+              'amap',
               f'{concurrent=}',
               f'{unordered=}',
               f'{indexed=}',
@@ -563,22 +567,37 @@ if __name__ == '__main__':
               unordered=unordered,
               indexed=indexed,
           ):
-            print(" ", result)
-          print(f'elapsed {round(time.time()-start_time,2)}')
+            print_("", result)
+          print(f': elapsed {round(time.time()-start_time,2)}')
 
   run(test_amap())
 
   async def putrange(n, q):
     for i in range(n):
-      print("putrange", i)
       await q.put(i)
-    print("putrange close")
     await q.close()
 
   async def readq(q):
+    print("putrange(5,q):")
     create_task(putrange(5, q))
     async for item in q:
-      print("readq got", item)
+      print_("", item)
+    print()
 
   Q = IterableAsyncQueue()
   run(readq(Q))
+
+  def double(item):
+    yield item
+    yield item
+
+  def stringify(item):
+    yield f'string {item!r}'
+
+  async def demo_pipeline(it: AnyIterable):
+    print("pipeline(double,stringify)[1,2,3]...")
+    pipeline = AsyncPipeLine.from_stages(double, stringify)
+    async for result in pipeline(it):
+      print(result)
+
+  run(demo_pipeline([1, 2, 3]))
