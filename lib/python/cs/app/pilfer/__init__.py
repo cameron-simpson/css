@@ -18,6 +18,7 @@ from cs.deco import promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.later import Later, uses_later
+from cs.lex import r
 from cs.logutils import (debug, error, warning, exception, D)
 from cs.mappings import MappingChain, SeenSet
 from cs.obj import copy as obj_copy
@@ -100,7 +101,7 @@ class Pilfer(MultiOpenMixin, RunStateMixin):
   @_.setter
   def _(self, value):
     if value is not None and not isinstance(value, str):
-      raise TypeError("Pilfer._: expected string, received: %r" % (value,))
+      raise TypeError(f'Pilfer._: expected string, received: {r(value)}')
     self.user_vars['_'] = value
 
   @property
@@ -257,7 +258,7 @@ class Pilfer(MultiOpenMixin, RunStateMixin):
     else:
       spec = self.pipes.get(pipe_name)
       if spec is None:
-        raise ValueError("no pipe specification named %r" % (pipe_name,))
+        raise ValueError(f'no pipe specification named {pipe_name!r}')
     if name is None:
       name = "pipe_from_spec:%s" % (spec,)
     with Pfx(spec):
@@ -265,7 +266,7 @@ class Pilfer(MultiOpenMixin, RunStateMixin):
       if errors:
         for err in errors:
           error(err)
-        raise ValueError("invalid pipe specification")
+        raise ValueError('invalid pipe specification')
     return pipeline(self.later, pipe_funcs, name=name, inputs=inputs)
 
   def _rc_pipespecs(self):
@@ -287,7 +288,7 @@ class Pilfer(MultiOpenMixin, RunStateMixin):
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
     if kw:
-      raise ValueError("unexpected kwargs %r" % (kw,))
+      raise ValueError(f'unexpected kwargs {kw!r}')
     with self._print_lock:
       if file is None:
         file = self._print_to if self._print_to else sys.stdout
