@@ -306,6 +306,29 @@ if __name__ == '__main__':
 
   run(async_function_demo(2.0, 9))
 
+  def async_iter_gen():
+    yield 'gen1'
+    yield 'gen2'
+
+  async def async_iter_agen():
+    yield 'agen1'
+    yield 'agen2'
+
+  async def async_iter_demo(it: AnyIterable, fast=None):
+    print("async_iter", type(it), "fast", fast)
+    async for item in async_iter(it):
+      print(" ", item)
+
+  for fast in None, False, True:
+    for it in (
+        [1, 2, 3],
+        (4, 5, 6),
+        {7, 8, 9},
+        async_iter_gen(),
+        async_iter_agen(),
+    ):
+      run(async_iter_demo(it, fast=fast))
+
   print("amap...")
   import random
 
