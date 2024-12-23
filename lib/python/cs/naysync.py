@@ -22,7 +22,7 @@ from asyncio import create_task, run, to_thread, Queue as AQueue
 from functools import partial
 from heapq import heappush, heappop
 from inspect import isasyncgenfunction, iscoroutinefunction
-from typing import Any, Callable, Iterable
+from typing import Any, AsyncIterable, Callable, Iterable
 
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
@@ -40,6 +40,8 @@ DISTINFO = {
         'cs.semantics',
     ],
 }
+
+AnyIterable = Union[Iterable, AsyncIterable]
 
 @decorator
 def agen(genfunc):
@@ -90,7 +92,7 @@ def afunc(func):
     return func
   return partial(to_thread, func)
 
-async def async_iter(it: Iterable):
+async def async_iter(it: AnyIterable, fast=False):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
       An asynchronous iterable returns `aiter(it)` directly.
   '''
@@ -117,13 +119,15 @@ async def async_iter(it: Iterable):
 
 async def amap(
     func: Callable[[Any], Any],
-    it: Iterable,
+    it: AnyIterable,
     concurrent=False,
     unordered=False,
     indexed=False,
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
       for each `item` in the iterable `it`.
+
+      `it` may be a synchronous or asynchronous iterable.
 
       `func` may be a synchronous or asynchronous callable.
 
