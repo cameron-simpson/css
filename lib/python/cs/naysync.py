@@ -22,7 +22,7 @@ from asyncio import create_task, run, to_thread, Queue as AQueue
 from functools import partial
 from heapq import heappush, heappop
 from inspect import isasyncgenfunction, iscoroutinefunction
-from typing import Any, AsyncIterable, Callable, Iterable
+from typing import Any, AsyncIterable, Callable, Iterable, Union
 
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
