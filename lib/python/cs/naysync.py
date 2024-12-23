@@ -18,11 +18,25 @@
     - `async_iter(iterable)`: return an asynchronous iterator of an iterable
 '''
 
-from asyncio import create_task, run, to_thread, Queue as AQueue
+from asyncio import create_task, run, to_thread, Queue as AQueue, Task
+from dataclasses import dataclass
 from functools import partial
 from heapq import heappush, heappop
-from inspect import isasyncgenfunction, iscoroutinefunction
-from typing import Any, AsyncIterable, Callable, Iterable, Union
+from inspect import (
+    isasyncgenfunction,
+    iscoroutinefunction,
+    isgeneratorfunction,
+)
+from typing import (
+    Any,
+    AsyncIterable,
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
@@ -282,6 +296,200 @@ class IterableAsyncQueue(AQueue):
     if self.closed and item is not self.__sentinel:
       raise ClosedError
     return super().put_nowait(item)
+
+@dataclass
+class AsyncPipeLine:
+  ''' An `AsyncPipeLine` is an asynchronous iterable with a `put` method
+      to provide input for processing.
+
+      A new pipeline is usually constructed via the factory method
+      `AsyncPipeLine.from_stages(stage_func,...)`.
+
+      It has the same methods as an `IterableAsyncQueue`:
+      - `async put(item)` to queue an item for processing
+      - `async close()` to close the input, indicating end of the input items
+      - iteration to consume the processed results
+
+      It also has the following methods:
+      - `async submit(AnyIterable)` to submit multiple items for processing
+      - `async __call__(AnyIterable)` to submit the iterable for
+        processing and consume the results by iteration
+
+
+      Example:
+
+          def double(item):
+              yield item
+              yield item
+          pipeline = AsyncPipeLine.from_stages(
+              double,
+              double,
+          )
+          async for result in pipeline([1,2,3,4]):
+              print(result)
+ '''
+
+  inq: IterableAsyncQueue
+  tasks: List[Task]
+  outq: IterableAsyncQueue
+
+  def __aiter__(self):
+    return self
+
+  async def __anext__(self):
+    return await next(self.outq)
+
+  async def __call__(self, it: AnyIterable, fast=None):
+    ''' Call the pipeline with an iterable.
+    '''
+
+    # submit the items from `it` to the pipeline and close `it`
+    async def submitter():
+      await self.submit(it, fast=fast)
+      await self.close()
+
+    create_task(submitter())
+    async for result in self.outq:
+      yield result
+
+  async def put(self, item):
+    ''' Put `item` onto the input queue.
+    '''
+    return await self.inq.put(item)
+
+  async def close(self):
+    ''' Close the input queue.
+    '''
+    return await self.inq.close()
+
+  async def submit(self, it: AnyIterable, fast=None):
+    ''' Submit the items from `it` to the pipeline.
+    '''
+    async for item in async_iter(it, fast=fast):
+      await self.inq.put(item)
+
+  @classmethod
+  def from_stages(
+      cls,
+      *stage_specs,
+      maxsize=0,
+  ) -> Tuple[IterableAsyncQueue, IterableAsyncQueue]:
+    ''' Prepare an `AsyncPipeLine` from stage specifications.
+        Return `(inq,tasks,outq)` 3-tuple being an input `IterableAsyncQueue`
+        to receive items to process, a list of `asyncio.Task`s per
+        stage specification, and an output `IterableAsyncQueue` to
+        produce results. If there are no stage_specs the 2 queues
+        are the same queue.
+
+        Each stage specification is either:
+        - an stage function suitable for `run_stage`
+        - a 2-tuple of `(stage_func,batchsize)`
+        In the latter case:
+        - `stage_func` is an stage function suitable for `run_stage`
+        - `batchsize` is an `int`, where `0` means to gather all the
+          items from `inq` and supply them as a single batch to
+          `stage_func` and where a value `>0` collects items up to a limit
+          of `batchsize` and supplies each batch to `stage_func`
+        If the `batchsize` is `0` the `stage_func` is called exactly
+        once with all the input items, even if there are no input
+        items.
+    '''
+    inq = IterableAsyncQueue(maxsize)
+    inq0, outq = inq, inq
+    tasks = []
+    for stage_spec in stage_specs:
+      new_outq = IterableAsyncQueue(maxsize)
+      try:
+        stage_func, batchsize = stage_spec
+      except (
+          TypeError,  # not an iterable
+          ValueError,  # wrong number of parts
+      ):
+        # we expect just a stage_func
+        stage_func = stage_spec
+        batchsize = None
+      else:
+        assert batchsize >= 0
+      assert callable(stage_func)
+      tasks.append(
+          create_task(
+              cls.run_stage(inq, stage_func, new_outq, batchsize=batchsize)
+          )
+      )
+      inq, outq = new_outq, new_outq
+    return cls(inq=inq0, tasks=tasks, outq=outq)
+
+  @staticmethod
+  async def run_stage(
+      inq: IterableAsyncQueue,
+      stage_func,
+      outq: IterableAsyncQueue,
+      batchsize: Optional[Union[int, None]] = None,
+  ):
+    ''' Run a pipeline stage, copying items from `inq` to the `stage_func`
+        and putting results onto `outq`. After processing, `outq` is
+        closed.
+
+        `stage_func` is a callable which may be:
+        - a sync or async generator which yields results to place onto `outq`
+        - a sync or async function which returns a single result
+
+        If `batchsize` is `None`, the default, each input item is
+        passed to `stage_func(item)`, which yields the results from the
+        single item.
+
+        If `batchsize` is an `int`, items from `inq` are collected
+        into batches up to a limit of `batchsize` (no limit if
+        `batchsize` is `0`) and passed to `stage_func(batch)`, which
+        yields the results from the batch of items.
+        If the `batchsize` is `0` the `stage_func` is called exactly
+        once with all the input items, even if there are no input
+        items.
+    '''
+    if isasyncgenfunction(stage_func):
+      pass
+    elif isgeneratorfunction(stage_func):
+      stage_func = agen(stage_func)
+    else:
+      # a callable, turn it into a single result generator
+      if not iscoroutinefunction(stage_func):
+        stage_func = afunc(stage_func)
+      stage_func0 = stage_func
+
+      async def stage_func(item):
+        yield await stage_func0(item)
+
+    if batchsize is None:
+      batch = None
+    elif batchsize < 0:
+      raise ValueError(
+          f'batchsize must be None or a nonnegative integer, got {type(batchsize)}:{batchsize!r}'
+      )
+    else:
+      batch = []
+      first_batch = True
+
+    try:
+      async for item in inq:
+        if batchsize is None:
+          # process each ite in turn
+          async for result in stage_func(item):
+            await outq.put(result)
+        else:
+          # gather items into a batch and process the batch
+          batch.append(item)
+          if batchsize != 0 and len(batch) >= batchsize:
+            async for result in stage_func(batch):
+              await outq.put(result)
+            batch = []
+            first_batch = False
+
+      if batch is not None and (first_batch or batch):
+        async for result in stage_func(batch):
+          await outq.put(result)
+
+    finally:
+      await outq.close()
 
 if __name__ == '__main__':
 
