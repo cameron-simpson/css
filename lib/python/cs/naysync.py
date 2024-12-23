@@ -307,6 +307,7 @@ if __name__ == '__main__':
           print(f'elapsed {round(time.time()-start_time,2)}')
 
   run(test_amap())
+
   async def putrange(n, q):
     for i in range(n):
       print("putrange", i)
