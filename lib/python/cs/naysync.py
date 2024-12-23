@@ -95,11 +95,21 @@ def afunc(func):
 async def async_iter(it: AnyIterable, fast=False):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
       An asynchronous iterable returns `aiter(it)` directly.
+
+      If `fast` is true (default `False`) then `it` is iterated
+      directly instead of via a distinct async generator.
   '''
   try:
     return it.__aiter__()
   except TypeError:
     it = iter(it)
+    if fast:
+      # yield directly from the iterator
+      for item in it:
+        yield item
+      return
+
+    # otherwise we use asyncio.to_thread(next(it))
     sentinel = object()
 
     def gen():
