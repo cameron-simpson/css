@@ -152,16 +152,20 @@ async def amap(
   # promote it to an asynchronous iterator
   ait = async_iter(it)
   if not concurrent:
-    # call func serially
+    # serial operation
     i = 0
     async for item in ait:
       result = await func(item)
       yield (i, result) if indexed else result
       i += 1
     return
+
   # concurrent operation
   # dispatch calls to func() as tasks
   # yield results from an asyncio.Queue
+
+  # a queue of (index, result)
+  Q = AQueue()
 
   # run func(item) and yield its sequence number and result
   # this allows us to yield in order from a heap
@@ -169,7 +173,6 @@ async def amap(
     await Q.put((i, await func(item)))
 
   # queue all the tasks with their sequence numbers
-  Q = AQueue()
   queued = 0
   # Does this also need to be an async function in case there's
   # some capacity limitation on the event loop? I hope not.
