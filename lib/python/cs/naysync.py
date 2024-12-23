@@ -21,7 +21,7 @@
 from asyncio import create_task, run, to_thread, Queue as AQueue
 from functools import partial
 from heapq import heappush, heappop
-from inspect import iscoroutinefunction
+from inspect import isasyncgenfunction, iscoroutinefunction
 from typing import Any, Callable, Iterable
 
 from cs.deco import decorator
@@ -43,6 +43,7 @@ DISTINFO = {
 def agen(genfunc):
   ''' A decorator for a synchronous generator which turns it into
       an asynchronous generator.
+      If `genfunc` already an asynchronous generator it is returned unchanged.
       Exceptions in the synchronous generator are reraised in the asynchronous
       generator.
 
@@ -58,6 +59,9 @@ def agen(genfunc):
               print(item)
   '''
 
+  if isasyncgenfunction(genfunc):
+    return genfunc
+
   def agen(*a, **kw):
     ''' Return an async iterator yielding items from `genfunc`.
     '''
@@ -69,6 +73,7 @@ def agen(genfunc):
 def afunc(func):
   ''' A decorator for a synchronous function which turns it into
       an asynchronous function.
+      If `func` is already an asynchronous function it is returned unchanged.
 
       Example:
 
@@ -79,6 +84,8 @@ def afunc(func):
 
           slept = await func(5)
   '''
+  if iscoroutinefunction(func):
+    return func
   return partial(to_thread, func)
 
 async def async_iter(it: Iterable):
@@ -141,8 +148,7 @@ async def amap(
                   yield urls[i], response
   '''
   # promote a synchronous function to an asynchronous function
-  if not iscoroutinefunction(func):
-    func = afunc(func)
+  func = afunc(func)
   # promote it to an asynchronous iterator
   ait = async_iter(it)
   if not concurrent:
