@@ -100,8 +100,9 @@ async def async_iter(it: AnyIterable, fast=False):
       directly instead of via a distinct async generator.
   '''
   try:
-    return it.__aiter__()
-  except TypeError:
+    # is it already an asynchronous iterable?
+    dund_aiter = it.__aiter__
+  except AttributeError:
     it = iter(it)
     if fast:
       # yield directly from the iterator
@@ -125,6 +126,10 @@ async def async_iter(it: AnyIterable, fast=False):
       item = await to_thread(next_it)
       if item is sentinel:
         break
+      yield item
+  else:
+    # an asynchronous iterable
+    async for item in dund_aiter():
       yield item
 
 async def amap(
