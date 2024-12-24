@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import cached_property
@@ -26,6 +27,7 @@ from cs.later import Later, uses_later
 from cs.lex import (cutprefix, cutsuffix, get_identifier, is_identifier)
 import cs.logutils
 from cs.logutils import (debug, error, warning, D)
+from cs.naysync import async_iter
 import cs.pfx
 from cs.pfx import Pfx
 from cs.pipeline import pipeline, StageType
@@ -34,7 +36,7 @@ from cs.resources import uses_runstate
 
 from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, Pilfer
 from .actions import Action
-from .pipelines import PipeSpec
+from .pipelines import PipeLineSpec
 from .rc import load_pilferrcs, PilferRC
 
 def main(argv=None):
@@ -193,96 +195,25 @@ class PilferCommand(BaseCommand):
     # now load the main pipeline
     if not argv:
       raise GetoptError("missing main pipeline")
-
-    # TODO: main_spec never used?
-    main_spec = PipeSpec(None, argv)
-
     # gather up the remaining definition as the running pipeline
-    pipe_funcs, errors = argv_pipefuncs(argv, P.action_map, P.do_trace)
+    pipespec = PipeLineSpec(name="CLI", stage_specs=argv)
 
-    # report accumulated errors and set badopts
-    if errors:
-      for err in errors:
-        error(err)
-      raise GetoptError("invalid main pipeline")
+    async def print_from(items):
+      async for item in items:
+        print(item)
 
-    P.flagnames = options.flagnames.split()
-    if cs.logutils.D_mode or ifdebug():
-      # poll the status of the Later regularly
-      def pinger(later):
-        while True:
-          D(
-              "PINGER: later: quiescing=%s, state=%r: %s", later._quiescing,
-              later._state, later
-          )
-          sleep(2)
-
-      ping = Thread(target=pinger, args=(later,))
-      ping.daemon = True
-      ping.start()
-    P.later = later
-    # construct the pipeline
-    pipe = pipeline(
-        pipe_funcs,
-        name="MAIN",
-        outQ=NullQueue(name="MAIN_PIPELINE_END_NQ", blocking=True).open(),
+    asyncio.run(
+        print_from(
+            pipespec.run_pipeline(
+                async_iter(sys.stdin if url == '-' else [url])
+            )
+        )
     )
-    with pipe:
-      for U in urls(url, stdin=sys.stdin, cmd=self.cmd):
-        pipe.put(P.copy_with_vars(_=U))
-    # wait for main pipeline to drain
-    later.state("drain main pipeline")
-    for item in pipe.outQ:
-      warning("main pipeline output: escaped: %r", item)
-    # At this point everything has been dispatched from the input queue
-    # and the only remaining activity is in actions in the diversions.
-    # As long as there are such actions, the Later will be busy.
-    # In fact, even after the Later first quiesces there may
-    # be stalled diversions waiting for EOF in order to process
-    # their "func_final" actions. Releasing these may pass
-    # tasks to other diversions.
-    # Therefore we iterate:
-    #  - wait for the Later to quiesce
-    #  - TODO: topologically sort the diversions
-    #  - pick the [most-ancestor-like] diversion that is busy
-    #    or exit loop if they are all idle
-    #  - close the div
-    #  - wait for that div to drain
-    #  - repeat
-    # drain all the diversions, choosing the busy ones first
-    divnames = P.open_diversion_names
-    while divnames:
-      busy_name = None
-      for divname in divnames:
-        div = P.diversion(divname)
-        if div._busy:
-          busy_name = divname
-          break
-      # nothing busy? pick the first one arbitrarily
-      if not busy_name:
-        busy_name = divnames[0]
-      busy_div = P.diversion(busy_name)
-      later.state("CLOSE DIV %s", busy_div)
-      busy_div.close(enforce_final_close=True)
-      outQ = busy_div.outQ
-      later.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
-      for item in outQ:
-        # diversions are supposed to discard their outputs
-        error("%s: RECEIVED %r", busy_div, item)
-      later.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
-      divnames = P.open_diversion_names
-    later.state("quiescing")
-    later.wait_outstanding(until_idle=True)
-    # Now the diversions should have completed and closed.
-    # out of the context manager, the Later should be shut down
-    later.state("WAIT...")
-    later.wait()
-    later.state("WAITED")
 
   @staticmethod
   def get_argv_pipespec(argv, argv_offset=0):
     ''' Parse a pipeline specification from the argument list `argv`.
-        Return `(PipeSpec,new_argv_offset)`.
+        Return `(PipeLineSpec,new_argv_offset)`.
 
         A pipeline specification is specified by a leading argument of the
         form `'pipe_name:{'`, followed by arguments defining functions for the
@@ -301,7 +232,7 @@ class PilferCommand(BaseCommand):
       spec_offset = argv_offset
       while argv[argv_offset] != '}':
         argv_offset += 1
-      spec = PipeSpec(pipe_name, argv[spec_offset:argv_offset])
+      spec = PipeLineSpec(pipe_name, argv[spec_offset:argv_offset])
       argv_offset += 1
       return spec, argv_offset
 
