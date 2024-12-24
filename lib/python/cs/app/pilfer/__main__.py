@@ -149,13 +149,14 @@ class PilferCommand(BaseCommand):
       later = Later(self.options.jobs)
       with later:
         pilfer = Pilfer(later=later)
-        pilfer.rcs.extend(options.configpaths)
-        with stackattrs(
-            self.options,
-            later=later,
-            pilfer=pilfer,
-        ):
-          yield
+        pilfer.rcs.extend(map(PilferRC, options.configpaths))
+        with pilfer:
+          with stackattrs(
+              self.options,
+              later=later,
+              pilfer=pilfer,
+          ):
+            yield
 
   @staticmethod
   def hack_postopts_argv(argv, options):
@@ -178,11 +179,9 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing URL")
     url = argv.pop(0)
-
     # prepare a blank PilferRC and supply as first in chain for this Pilfer
     rc = PilferRC(None)
     P.rcs.insert(0, rc)
-
     # Load any named pipeline definitions on the command line.
     argv_offset = 0
     while argv and argv[argv_offset].endswith(':{'):
@@ -191,7 +190,6 @@ class PilferCommand(BaseCommand):
         rc.add_pipespec(spec)
       except KeyError as e:
         raise GetoptError("add pipe: %s", e)
-
     # now load the main pipeline
     if not argv:
       raise GetoptError("missing main pipeline")
