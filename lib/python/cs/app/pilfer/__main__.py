@@ -107,7 +107,7 @@ class PilferCommand(BaseCommand):
   class Options(BaseCommand.Options):
     configpath: str = ''
     jobs: int = DEFAULT_JOBS
-    flagnames: str = DEFAULT_FLAGS_CONJUNCTION
+    flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
 
     @cached_property
     @trace(retval=True)
