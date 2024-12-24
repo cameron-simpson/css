@@ -112,7 +112,10 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     self.flush()
 
   def __str__(self):
-    return f'{self.__class__.__name__}({self.url_s})'
+    return self.url_s
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self.url_s!r}'
 
   def flush(self):
     ''' Forget all cached content.
