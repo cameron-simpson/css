@@ -98,19 +98,18 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   )
 
   @classmethod
-  def _singleton_key(cls, url_s: str):
+  def _singleton_key(cls, url_s: str, referer=None):
     return url_s
 
-  @promote
   @typechecked
-  def __init__(self, url_s: str):
+  def __init__(self, url_s: str, referer=None):
     ''' Initialise the `URL` from the URL string `url_s`.
     '''
     if hasattr(self, 'url_s'):
       assert url_s == self.url_s
       return
     self.url_s = url_s
-    self._lock = trace_func(RLock)()
+    self._lock = RLock()
     self._parts = None
     self._info = None
     self.flush()
