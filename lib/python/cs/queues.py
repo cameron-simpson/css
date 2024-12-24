@@ -303,7 +303,6 @@ class PushQueue(MultiOpenMixin, RunStateMixin):
   '''
 
   @uses_runstate
-  @promote
   @typechecked
   def __init__(
       self,
