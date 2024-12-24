@@ -83,57 +83,6 @@ def urls(url, stdin=None, cmd=None) -> Iterable[str]:
             continue
           yield url
 
-# TODO: recursion protection in action_map expansion
-def argv_pipefuncs(argv, action_map, do_trace):
-  ''' Process command line strings and return a corresponding list
-      of actions to construct a Later.pipeline.
-  '''
-  # we reverse the list to make action expansion easier
-  argv = list(argv)
-  errors = []
-  pipe_funcs = []
-  while argv:
-    action = argv.pop(0)
-    # support commenting-out of individual actions
-    if action.startswith('#'):
-      continue
-    # macro - prepend new actions
-    func_name, offset = get_identifier(action)
-    if func_name and func_name in action_map:
-      expando = action_map[func_name]
-      argv[:0] = expando
-      continue
-    if action == "per":
-      # fork a new pipeline instance per item
-      # terminate this pipeline with a function to spawn subpipelines
-      # using the tail of the action list from this point
-      if not argv:
-        errors.append("no actions after %r" % (action,))
-      else:
-        tail_argv = list(argv)
-        name = "%s:[%s]" % (action, ','.join(argv))
-        pipespec = PipeSpec(name, argv)
-
-        def per(P):
-          with P:
-            pipe = pipeline(
-                pipespec.actions, inputs=(P,), name="%s(%s)" % (name, P)
-            )
-            with P.later.release():
-              for P2 in pipe.outQ:
-                yield P2
-
-        pipe_funcs.append((StageType.ONE_TO_MANY, per))
-      argv = []
-      continue
-    try:
-      A = Action(action, do_trace)
-    except ValueError as e:
-      errors.append("bad action %r: %s" % (action, e))
-    else:
-      pipe_funcs.append(A)
-  return pipe_funcs, errors
-
 class PilferCommand(BaseCommand):
 
   GETOPT_SPEC = 'c:F:j:qux'
