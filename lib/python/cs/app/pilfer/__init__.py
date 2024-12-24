@@ -14,7 +14,7 @@ from threading import Lock, RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
 
 from cs.app.flag import PolledFlags
-from cs.deco import promote
+from cs.deco import default_params, promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.later import Later, uses_later
@@ -28,13 +28,13 @@ from cs.py.modules import import_module_name
 from cs.queues import NullQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
-from cs.threads import locked
+from cs.threads import locked, HasThreadState, ThreadState
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
-from .format import FormatMapping
-from .pipelines import PipeSpec
+from .pilfer import Pilfer
+from .pipelines import PipeLineSpec
 
-from cs.x import X
+from cs.debug import trace, X, r, s
 
 # parallelism of jobs
 DEFAULT_JOBS = 4
