@@ -35,6 +35,7 @@ import os
 import os.path
 import sys
 import time
+from typing import Iterable
 
 from netrc import netrc
 import socket
@@ -448,7 +449,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       U = URL(normURL, referer=self.referer)
     return U
 
-  def hrefs(self, absolute=False):
+  def hrefs(self, absolute=False) -> Iterable["URL"]:
     ''' All 'href=' values from the content HTML 'A' tags.
         If `absolute`, resolve the sources with respect to our URL.
     '''
