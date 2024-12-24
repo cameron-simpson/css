@@ -2106,6 +2106,12 @@ class BaseToken(Promotable):
     return self.source_text[self.offset:self.end_offset]
 
   @classmethod
+  def token_classes(cls):
+    ''' Return the `baseToken` subclasses to consider when parsing a token stream.
+    '''
+    return public_subclasses(cls, extras=cls.EXTRAS)
+
+  @classmethod
   @pfx_method
   def parse(cls,
             text: str,
@@ -2132,9 +2138,9 @@ class BaseToken(Promotable):
       offset = skipwhite(text, offset)
     if offset >= len(text):
       raise EOFError(f'end of text encountered at offset {offset}')
-    token_classes = public_subclasses(cls, extras=cls.EXTRAS)
+    token_classes = cls.token_classes()
     if not token_classes:
-      raise RuntimeError("no public subclasses")
+      raise RuntimeError("no token classes")
     for subcls in token_classes:
       if subcls is cls:
         continue
