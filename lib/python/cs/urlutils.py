@@ -43,7 +43,7 @@ from threading import RLock
 from urllib.request import Request, HTTPError, URLError, \
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
-from urllib.parse import urlparse, urljoin, quote as urlquote
+from urllib.parse import urlparse, urljoin as up_urljoin, quote as urlquote
 
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 try:
@@ -80,6 +80,9 @@ from cs.threads import locked, ThreadState, HasThreadState
 ##    X("HTTPConnection.putheader(%r): value=%r", header, v)
 ##  return putheader0(self, header, *values)
 ##HTTPConnection.putheader = my_putheader
+
+def urljoin(url, other_url):
+  return up_urljoin(str(url), str(other_url))
 
 class URL(SingletonMixin, HasThreadState, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
