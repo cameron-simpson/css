@@ -47,6 +47,7 @@ class Action(BaseToken):
       offset = skipwhite(text, offset)
     offset1 = offset
     with Pfx("%s.parse: %d:%r", cls.__name__, offset1, text[offset1:]):
+
       # pipe:shlex(argv)
       if text.startswith('pipe:', offset1):
         offset += 5
@@ -68,6 +69,7 @@ class Action(BaseToken):
             end_offset=offset,
             name=name,
         )
+
       # | shcmd
       if text.startswith('|', offset1):
         # pipe through shell command
@@ -81,7 +83,50 @@ class Action(BaseToken):
             end_offset=len(text),
             argv=['/bin/sh', '-c', shcmd],
         )
-      raise SyntaxError(f'no action recognised')
+
+      # /regexp or -/regexp
+      if text.startswith(('/', '-/'), offset):
+        if text.startswith('/', offset):
+          offset += 1
+          invert = False
+        else:
+          assert text.startswith('-/', offset)
+          offset += 2
+          invert = True
+        if text.endswith('/'):
+          regexp_s = text[offset:-1]
+        else:
+          regexp_s = text[offset:]
+        regexp = pfx_call(re.compile, regexp_s)
+        if regexp.groupindex:
+          # a regexp with named groups
+          @uses_pilfer
+          def re_match(item, *, P: Pilfer):
+            ''' Match `item` against `regexp`, update the `Pilfer` vars if matched.
+            '''
+            m = regexp.search(str(item))
+            if not m:
+              return False
+            varmap = m.groupdict()
+            if varmap:
+              P = P.copy_with_vars(**varmap)
+            yield m
+        else:
+
+          def re_match(item):
+            ''' Just test `otem` against `regexp`.
+            '''
+            return regexp.search(str(item))
+
+        return ActionSelect(
+            offset=offset1,
+            source_text=text,
+            end_offset=len(text),
+            select_func=re_match,
+            invert=invert,
+        )
+
+      raise SyntaxError('no action recognised')
 
 @dataclass
 class ActionByName(Action):
@@ -141,200 +186,28 @@ class ActionSubProcess(Action):
     if xit != 0:
       warning("exit %d from subprocess %r", xit, self.argv)
 
-class ShellProcCommand(MultiOpenMixin):
-  ''' An iterable queue-like interface to a shell command subprocess.
-  '''
+# TODO: this gathers it all, need to open pipe and stream, how?
+@dataclass
+class ActionSelect(Action):
 
-  def __init__(self, shcmd, outQ):
-    ''' Set up a subprocess running `shcmd`.
-        `discard`: discard .put items, close subprocess stdin immediately after startup.
+  select_func: Callable[Any, bool]
+  invert: bool = False
+
+  @property
+  def stage_spec(self):
+    ''' Our stage specification streams items through the subprocess.
     '''
-    self.shcmd = shcmd
-    self.shproc = None
-    self.outQ = outQ
-    outQ.open()
-
-  def _startproc(self, shcmd):
-    self.shproc = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
-    self.shproc.stdin.close()
-
-    def copy_out(fp, outQ):
-      ''' Copy lines from the shell output, put new Pilfers onto the outQ.
-      '''
-      for line in fp:
-        if not line.endswith('\n'):
-          raise ValueError('premature EOF (missing newline): %r' % (line,))
-        outQ.put(P.copy_with_vars(_=line[:-1]))
-      outQ.close()
-
-    self.copier = Thread(
-        name="%s.copy_out" % (self,),
-        target=copy_out,
-        args=(self.shproc.stdout, self.outQ)
-    ).start()
-
-  def put(self, P):
-    with self._lock:
-      if self.shproc is None:
-        self._startproc()
-    self.shproc.stdin.write(P._)
-    self.shproc.stdin.write('\n')
-    if not self.no_flush:
-      self.shproc.stdin.flush()
-
-  def shutdown(self):
-    if self.shproc is None:
-      self.outQ.close()
-    else:
-      self.shproc.wait()
-      xit = self.shproc.returncode
-      if xit != 0:
-        error("exit %d from: %r", xit, self.shcmd)
-
-def action_shcmd(shcmd):
-  ''' Return (function, func_sig) for a shell command.
-  '''
-  shcmd = shcmd.strip()
+    return self.stage_func
 
   @typechecked
-  def function(P) -> Iterable[str]:
-    U = P._
-    uv = P.user_vars
-    try:
-      v = P.format_string(shcmd, U)
-    except KeyError as e:
-      warning("shcmd.format(%r): KeyError: %s", uv, e)
-    else:
-      with Pfx(v):
-        with open('/dev/null') as fp0:
-          fd0 = fp0.fileno()
-          try:
-            # TODO: use cs.psutils.run
-            subp = Popen(
-                ['/bin/sh', '-c', 'sh -uex; ' + v],
-                stdin=fd0,
-                stdout=PIPE,
-                close_fds=True
-            )
-          except Exception as e:
-            exception("Popen: %r", e)
-            return
-        for line in subp.stdout:
-          if line.endswith('\n'):
-            yield line[:-1]
-          else:
-            yield line
-        subp.wait()
-        xit = subp.returncode
-        if xit != 0:
-          warning("exit code = %d", xit)
+  async def stage_func(self, item: Any):
+    ''' Select `item` based on `self.select_func` and `self.invert`.
 
-  return function, StageType.ONE_TO_MANY
-
-def action_pipecmd(shcmd):
-  ''' Return (function, func_sig) for pipeline through a shell command.
-  '''
-  shcmd = shcmd.strip()
-
-  @typechecked
-  def function(items) -> Iterable[str]:
-    if not isinstance(items, list):
-      items = list(items)
-    if not items:
-      return
-    P = items[0]
-    uv = P.user_vars
-    try:
-      v = P.format_string(shcmd, P._)
-    except KeyError as e:
-      warning("pipecmd.format(%r): KeyError: %s", uv, e)
-    else:
-      with Pfx(v):
-        # spawn the shell command
-        try:
-          subp = Popen(
-              ['/bin/sh', '-c', 'sh -uex; ' + v],
-              stdin=PIPE,
-              stdout=PIPE,
-              close_fds=True
-          )
-        except Exception as e:
-          exception("Popen: %r", e)
-          return
-
-        # spawn a daemon thread to feed items to the pipe
-        def feedin():
-          for P in items:
-            print(P._, file=subp.stdin)
-          subp.stdin.close()
-
-        T = Thread(target=feedin, name='feedin to %r' % (v,))
-        T.daemon = True
-        T.start()
-        # read lines from the pipe, trim trailing newlines and yield
-        for line in subp.stdout:
-          if line.endswith('\n'):
-            yield line[:-1]
-          else:
-            yield line
-        subp.wait()
-        xit = subp.returncode
-        if xit != 0:
-          warning("exit code = %d", xit)
-
-  return function, StageType.MANY_TO_MANY
-
-def new_dir(dirpath):
-  ''' Create the directory `dirpath` or `dirpath-n` if `dirpath` exists.
-      Return the path of the directory created.
-  '''
-  try:
-    os.makedirs(dirpath)
-  except OSError as e:
-    if e.errno != errno.EEXIST:
-      exception("os.makedirs(%r): %s", dirpath, e)
-      raise
-    dirpath = mkdirn(dirpath, '-')
-  return dirpath
-
-def url_delay(U, delay, *a):
-  sleep(float(delay))
-  return U
-
-@promote
-def url_query(U: URL, *a):
-  if not a:
-    return U.query
-  qsmap = dict(
-      [
-          (qsp.split('=', 1) if '=' in qsp else (qsp, ''))
-          for qsp in U.query.split('&')
-      ]
-  )
-  return ','.join([unquote(qsmap.get(qparam, '')) for qparam in a])
-
-def url_io(func, onerror, *a, **kw):
-  ''' Call `func` and return its result.
-      If it raises URLError or HTTPError, report the error and return `onerror`.
-  '''
-  debug("url_io(%s, %s, %s, %s)...", func, onerror, a, kw)
-  try:
-    return func(*a, **kw)
-  except (URLError, HTTPError) as e:
-    warning("%s", e)
-    return onerror
-
-def retriable(func):
-  ''' A decorator for a function to probe the `Pilfer` flags
-      and raise `RetryError` if unsatisfied.
-  '''
-
-  def retry_func(P, *a, **kw):
-    ''' Call `func` after testing `P.test_flags()`.
+        Send `str(item).replace('\n',r'\n')` for each item.
+        Read lines from the subprocess and yield each lines without its trailing newline.
     '''
-    if not P.test_flags():
-      raise RetryError('flag conjunction fails: %s' % (' '.join(P.flagnames)))
-    return func(P, *a, **kw)
-
-  retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
-  return retry_func
+    if await afunc(self.select_func)(item):
+      if not self.invert:
+        yield item
+    elif self.invert:
+      yield item
