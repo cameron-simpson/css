@@ -22,7 +22,7 @@ from cs.urlutils import URL
 re_GROK = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
 def parse_action(action, do_trace):
-  ''' Accept a string `action` and return an BaseAction subclass
+  ''' Accept a string `action` and return a `BaseAction` subclass
       instance or a `(sig,function)` tuple.
 
       This is used primarily by `action_func` below, but also called
