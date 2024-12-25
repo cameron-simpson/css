@@ -26,7 +26,7 @@ from cs.threads import locked, HasThreadState, ThreadState
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
 from .format import FormatMapping
-from .urls import hrefs
+from .urls import hrefs, srcs
 
 from cs.debug import trace, X, r, s
 
@@ -43,6 +43,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
 
   DEFAULT_ACTION_MAP = {
       'hrefs': hrefs,
+      'srcs': srcs,
   }
 
   @uses_later
