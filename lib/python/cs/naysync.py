@@ -472,7 +472,7 @@ class AsyncPipeLine:
     else:
       if batchsize is StageMode.STREAM:
         raise ValueError(
-            f'cannot use StageMode.STREAM with a nongenerator function'
+            f'cannot use StageMode.STREAM with a nongenerator function {stage_func}'
         )
       # a callable, turn it into a single result generator
       if not iscoroutinefunction(stage_func):
