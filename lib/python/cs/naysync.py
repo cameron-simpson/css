@@ -89,10 +89,13 @@ def agen(genfunc):
   return agen
 
 @decorator
-def afunc(func):
+def afunc(func, fast=False):
   ''' A decorator for a synchronous function which turns it into
       an asynchronous function.
       If `func` is already an asynchronous function it is returned unchanged.
+      If `fast` is true (default `False`) then `func` is presumed to consume
+      negligible time and it is simply wrapped in an asynchronous function.
+      Otherwise it is wrapped in `asyncio.to_thread`.
 
       Example:
 
@@ -102,9 +105,19 @@ def afunc(func):
               return count
 
           slept = await func(5)
+
+          @afunc(fast=True)
+          def asqrt(n):
+              return math.sqrt(n)
   '''
   if iscoroutinefunction(func):
     return func
+  if fast:
+
+    async def fast_func(*a, **kw):
+      return func(*a, **kw)
+
+    return fast_func
   return partial(to_thread, func)
 
 async def async_iter(it: AnyIterable, fast=None):
