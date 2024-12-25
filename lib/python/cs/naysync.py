@@ -16,6 +16,8 @@
     - `@agen`: a decorator to make a synchronous generator asynchronous
     - `amap(func,iterable)`: asynchronous mapping of `func` over an iterable
     - `async_iter(iterable)`: return an asynchronous iterator of an iterable
+    - `IterableAsyncQueue`: an iterable flavour of `asyncio.Queue` with no `get` methods`
+    - `AsyncPipeLine`: a pipeline of functions connected together with `IterableAsyncQueue`s
 '''
 
 from asyncio import create_task, run, to_thread, Queue as AQueue, Task
