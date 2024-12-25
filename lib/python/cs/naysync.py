@@ -20,6 +20,7 @@
 
 from asyncio import create_task, run, to_thread, Queue as AQueue, Task
 from dataclasses import dataclass
+from enum import auto, StrEnum
 from functools import partial
 from heapq import heappush, heappop
 from inspect import (
@@ -297,6 +298,11 @@ class IterableAsyncQueue(AQueue):
       raise ClosedError
     return super().put_nowait(item)
 
+class StageMode(StrEnum):
+  ''' Special modes for `AsyncPipeLine` pipeline stages.
+  '''
+  STREAM = auto()  # stream items to the stage_func
+
 @dataclass
 class AsyncPipeLine:
   ''' An `AsyncPipeLine` is an asynchronous iterable with a `put` method
@@ -409,7 +415,7 @@ class AsyncPipeLine:
         stage_func = stage_spec
         batchsize = None
       else:
-        assert batchsize >= 0
+        assert isinstance(batchsize, StageMode) or batchsize >= 0
       assert callable(stage_func)
       tasks.append(
           create_task(
@@ -424,7 +430,7 @@ class AsyncPipeLine:
       inq: IterableAsyncQueue,
       stage_func,
       outq: IterableAsyncQueue,
-      batchsize: Optional[Union[int, None]] = None,
+      batchsize: Optional[Union[int, None, StageMode]] = None,
   ):
     ''' Run a pipeline stage, copying items from `inq` to the `stage_func`
         and putting results onto `outq`. After processing, `outq` is
@@ -451,6 +457,10 @@ class AsyncPipeLine:
     elif isgeneratorfunction(stage_func):
       stage_func = agen(stage_func)
     else:
+      if batchsize is StageMode.STREAM:
+        raise ValueError(
+            f'cannot use StageMode.STREAM with a nongenerator function'
+        )
       # a callable, turn it into a single result generator
       if not iscoroutinefunction(stage_func):
         stage_func = afunc(stage_func)
@@ -459,34 +469,40 @@ class AsyncPipeLine:
       async def stage_func(item):
         yield await stage_func0(item)
 
-    if batchsize is None:
-      batch = None
-    elif batchsize < 0:
-      raise ValueError(
-          f'batchsize must be None or a nonnegative integer, got {type(batchsize)}:{batchsize!r}'
-      )
-    else:
-      batch = []
-      first_batch = True
-
     try:
-      async for item in inq:
-        if batchsize is None:
-          # process each ite in turn
-          async for result in stage_func(item):
-            await outq.put(result)
-        else:
-          # gather items into a batch and process the batch
-          batch.append(item)
-          if batchsize != 0 and len(batch) >= batchsize:
-            async for result in stage_func(batch):
-              await outq.put(result)
-            batch = []
-            first_batch = False
-
-      if batch is not None and (first_batch or batch):
-        async for result in stage_func(batch):
+      if batchsize is StageMode.STREAM:
+        # stream inq through the stage_func
+        async for result in stage_func(inq):
           await outq.put(result)
+      else:
+        # not streaming
+        if batchsize is None:
+          batch = None
+        elif batchsize < 0:
+          raise ValueError(
+              f'batchsize must be None or a nonnegative integer, got {type(batchsize)}:{batchsize!r}'
+          )
+        else:
+          batch = []
+          first_batch = True
+
+        async for item in inq:
+          if batchsize is None:
+            # process each ite in turn
+            async for result in stage_func(item):
+              await outq.put(result)
+          else:
+            # gather items into a batch and process the batch
+            batch.append(item)
+            if batchsize != 0 and len(batch) >= batchsize:
+              async for result in stage_func(batch):
+                await outq.put(result)
+              batch = []
+              first_batch = False
+
+        if batch is not None and (first_batch or batch):
+          async for result in stage_func(batch):
+            await outq.put(result)
 
     finally:
       await outq.close()
