@@ -112,7 +112,6 @@ class PilferCommand(BaseCommand):
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
 
     @cached_property
-    @trace(retval=True)
     def configpaths(self):
       ''' A list of the config filesystem paths.
       '''
