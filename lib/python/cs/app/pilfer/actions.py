@@ -27,7 +27,7 @@ from cs.fileutils import mkdirn
 from cs.later import RetryError
 from cs.lex import BaseToken, get_identifier, skipwhite
 from cs.logutils import (debug, error, warning, exception)
-from cs.naysync import agen, afunc, async_iter
+from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
 from cs.pfx import Pfx
 from cs.pipeline import StageType
 from cs.py.func import funcname
@@ -100,27 +100,30 @@ class ActionSubProcess(Action):
 
   @property
   def stage_spec(self):
-    ''' Our statge specification consumes all input items.
+    ''' Our stage specification streams items through the subprocess.
     '''
-    return self.stage_func, 0
+    return self.stage_func, StageMode.STREAM
 
   @typechecked
-  async def stage_func(self, items: List[Any]):
+  async def stage_func(self, items: AnyIterable):
     ''' Pipe a list of items through a subprocess.
 
         Send `str(item).replace('\n',r'\n')` for each item.
         Read lines from the subprocess and yield each lines without its trailing newline.
     '''
 
-    @afunc
-    def send_items(items: List[Any]):
+    async def send_items(items: AnyIterable):
       ''' Send items to the subprocess and then close its stdin.
       '''
-      for item in items:
+
+      def send_item(item):
         popen.stdin.write(str(item).replace('\n', r'\n').encode('utf-8'))
         popen.stdin.write(b'\n')
         popen.stdin.flush()
-      popen.stdin.close()
+
+      async for item in async_iter(items):
+        await to_thread(send_item, item)
+      await to_thread(popen.stdin.close)
 
     @agen
     def read_results():
