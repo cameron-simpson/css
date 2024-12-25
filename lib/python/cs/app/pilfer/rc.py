@@ -10,10 +10,11 @@ try:
 except ImportError:
   pass
 
-
 from cs.logutils import (debug, warning, trace)
 from cs.pfx import Pfx
 from cs.threads import locked
+
+from .pipelines import PipeLineSpec
 
 def load_pilferrcs(pathname):
   ''' Load `PilferRC` instances from the supplied `pathname`,
@@ -62,14 +63,14 @@ class PilferRC:
 
   @locked
   def add_pipespec(self, spec, pipe_name=None):
-    ''' Add a `PipeSpec` to this `Pilfer`'s collection,
+    ''' Add a `PipeLineSpec` to this `Pilfer`'s collection,
         optionally with a different `pipe_name`.
     '''
     if pipe_name is None:
       pipe_name = spec.name
     specs = self.pipe_specs
     if pipe_name in specs:
-      raise KeyError("pipe %r already defined" % (pipe_name,))
+      raise KeyError(f'pipe {pipe_name!r} already defined')
     specs[pipe_name] = spec
 
   def loadrc(self, filename):
@@ -91,8 +92,10 @@ class PilferRC:
         for pipe_name in cfg.options('pipes'):
           with Pfx('[pipes].%s', pipe_name):
             pipe_spec = cfg.get('pipes', pipe_name)
+            pipe = PipeLineSpec.from_str(pipe_spec)
+            pipe.name = pipe_name
             debug("loadrc: pipe = %s", pipe_spec)
-            self.add_pipespec(PipeSpec(pipe_name, shlex.split(pipe_spec)))
+            self.add_pipespec(pipe)
       # load [seen] name=>backing_path mapping
       # NB: not yet envsub()ed
       if cfg.has_section('seen'):
@@ -100,8 +103,8 @@ class PilferRC:
           backing_path = cfg.get('seen', setname).strip()
           self.seen_backing_paths[setname] = backing_path
 
-  def __getitem__(self, pipename):
-    ''' Fetch PipeSpec by name.
+  def __getitem__(self, pipename) -> PipeLineSpec:
+    ''' Fetch PipeLineSpec by name.
     '''
     return self.pipe_specs[pipename]
 
