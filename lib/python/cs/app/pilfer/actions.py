@@ -88,7 +88,6 @@ class ActionByName(Action):
 
   @property
   @uses_pilfer
-  @trace
   def stage_spec(self, P: Pilfer):
     return P.action_map[self.name]
 
@@ -131,7 +130,7 @@ class ActionSubProcess(Action):
       '''
       yield from popen.stdout
 
-    popen = await trace(to_thread)(Popen, self.argv, stdin=PIPE, stdout=PIPE)
+    popen = await to_thread(Popen, self.argv, stdin=PIPE, stdout=PIPE)
     create_task(send_items(items))
     # yield lines from the subprocess with their trailing newline removed
     async for result in read_results():
