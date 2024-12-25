@@ -205,7 +205,10 @@ class PilferCommand(BaseCommand):
     asyncio.run(
         print_from(
             pipespec.run_pipeline(
-                async_iter(sys.stdin if url == '-' else [url])
+                async_iter(
+                    (line.rstrip('\n')
+                     for line in sys.stdin) if url == '-' else [url]
+                )
             )
         )
     )
