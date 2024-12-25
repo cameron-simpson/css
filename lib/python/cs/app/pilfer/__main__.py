@@ -171,9 +171,9 @@ class PilferCommand(BaseCommand):
         argv.insert(0, 'url')
     return argv
 
-  def cmd_url(self, argv):
-    ''' Usage: {cmd} URL [pipeline-defns..]
-          URL may be "-" to read URLs from standard input.
+  def cmd_from(self, argv):
+    ''' Usage: {cmd} source [pipeline-defns..]
+          Source may be a URL or "-" to read URLs from standard input.
     '''
     options = self.options
     later = options.later
