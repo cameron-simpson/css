@@ -5,16 +5,10 @@
 
 from asyncio import to_thread, create_task
 from dataclasses import dataclass
-import errno
-import os
-import os.path
+import re
 import shlex
 from subprocess import Popen, PIPE
-from threading import Thread
-from time import sleep
-from typing import Any, Iterable, List, Tuple, Union
-from urllib.parse import unquote
-from urllib.error import HTTPError, URLError
+from typing import Any, Callable, List, Union
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -22,17 +16,10 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.deco import promote
-from cs.fileutils import mkdirn
-from cs.later import RetryError
 from cs.lex import BaseToken, get_identifier, skipwhite
-from cs.logutils import (debug, error, warning, exception)
+from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
-from cs.pfx import Pfx
-from cs.pipeline import StageType
-from cs.py.func import funcname
-from cs.resources import MultiOpenMixin
-from cs.urlutils import URL
+from cs.pfx import Pfx, pfx_call
 
 from .pilfer import Pilfer, uses_pilfer
 
@@ -114,7 +101,7 @@ class Action(BaseToken):
         else:
 
           def re_match(item):
-            ''' Just test `otem` against `regexp`.
+            ''' Just test `item` against `regexp`.
             '''
             return regexp.search(str(item))
 
@@ -135,7 +122,7 @@ class ActionByName(Action):
 
   @property
   @uses_pilfer
-  def stage_spec(self, P: Pilfer):
+  def stage_spec(self, *, P: Pilfer):
     return P.action_map[self.name]
 
 # TODO: this gathers it all, need to open pipe and stream, how?
