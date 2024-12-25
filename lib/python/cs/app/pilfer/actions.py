@@ -47,19 +47,6 @@ class Action(BaseToken):
       offset = skipwhite(text, offset)
     offset1 = offset
     with Pfx("%s.parse: %d:%r", cls.__name__, offset1, text[offset1:]):
-      # | shcmd
-      if text.startswith('|', offset1):
-        # pipe through shell command
-        offset = skipwhite(text, offset + 1)
-        if offset == len(text):
-          raise SyntaxError("empty shell command")
-        shcmd = text[offset:]
-        return ActionSubProcess(
-            offset=offset1,
-            source_text=text,
-            end_offset=len(text),
-            argv=['/bin/sh', '-c', shcmd],
-        )
       # pipe:shlex(argv)
       if text.startswith('pipe:', offset1):
         offset += 5
@@ -73,11 +60,26 @@ class Action(BaseToken):
         )
       name, offset = get_identifier(text, offset)
       if name:
+        # TODO: options parameters?
+        # parse.parse_action_args?
         return ActionByName(
             offset=offset1,
             source_text=text,
             end_offset=offset,
             name=name,
+        )
+      # | shcmd
+      if text.startswith('|', offset1):
+        # pipe through shell command
+        offset = skipwhite(text, offset + 1)
+        if offset == len(text):
+          raise SyntaxError("empty shell command")
+        shcmd = text[offset:]
+        return ActionSubProcess(
+            offset=offset1,
+            source_text=text,
+            end_offset=len(text),
+            argv=['/bin/sh', '-c', shcmd],
         )
       raise SyntaxError(f'no action recognised')
 
