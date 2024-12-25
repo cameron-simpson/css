@@ -62,7 +62,7 @@ class PipeLineSpec(Promotable):
           stage_funcs.append(partial(per, pipespec=subpipelinespec))
           specs = []
           continue
-        action = trace(Action.from_str, retval=True)(spec)
+        action = Action.from_str(spec)
         stage_funcs.append(action.stage_spec)
     return AsyncPipeLine.from_stages(*stage_funcs)
 
@@ -71,7 +71,6 @@ class PipeLineSpec(Promotable):
     '''
     pipeline = self.make_pipeline()
     async for item in pipeline(input_items):
-      X("run_pipeline: pipeline(input_items) -> %s", r(item))
       yield item
 
 if __name__ == '__main__':
