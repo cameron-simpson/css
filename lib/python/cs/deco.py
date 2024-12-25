@@ -779,7 +779,7 @@ def default_params(func, _strict=False, **param_defaults):
     raise ValueError("@default_params(%s): no defaults?" % (func,))
 
   def update_kw(kw):
-    ''' Update keyword paramaters `kw` from the `param_defaults`.
+    ''' Update keyword parameters `kw` from the `param_defaults`.
     '''
     for param_name, param_default in param_defaults.items():
       try:
