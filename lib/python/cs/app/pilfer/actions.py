@@ -3,13 +3,16 @@
 ''' Implementations of actions.
 '''
 
+from asyncio import to_thread, create_task
+from dataclasses import dataclass
+import errno
 import os
 import os.path
-import errno
+import shlex
 from subprocess import Popen, PIPE
 from threading import Thread
 from time import sleep
-from typing import Iterable
+from typing import Any, Iterable, List, Tuple, Union
 from urllib.parse import unquote
 from urllib.error import HTTPError, URLError
 try:
@@ -22,180 +25,117 @@ from typeguard import typechecked
 from cs.deco import promote
 from cs.fileutils import mkdirn
 from cs.later import RetryError
+from cs.lex import BaseToken, get_identifier, skipwhite
 from cs.logutils import (debug, error, warning, exception)
+from cs.naysync import agen, afunc, async_iter
 from cs.pfx import Pfx
 from cs.pipeline import StageType
 from cs.py.func import funcname
 from cs.resources import MultiOpenMixin
 from cs.urlutils import URL
-from cs.x import X
 
-def Action(action_text, do_trace):
-  ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an BaseAction.
-  '''
-  parsed = parse_action(action_text, do_trace)
-  try:
-    sig, function = parsed
-  except TypeError:
-    action = parsed
-  else:
-    action = ActionFunction(action_text, sig, function)
-  return action
+from .pilfer import Pilfer, uses_pilfer
 
-class BaseAction:
-  ''' The base class for all actions.
+class Action(BaseToken):
 
-      Each instance has the following attributes:
-      * `srctext`: the text defining the action
-      * `sig`: the action's function signature
-  '''
+  batchsize: Union[int, None] = None
+
+  @classmethod
+  @typechecked
+  def parse(cls, text, offset: int = 0, *, skip=True) -> "Action":
+    if skip:
+      offset = skipwhite(text, offset)
+    offset1 = offset
+    with Pfx("%s.parse: %d:%r", cls.__name__, offset1, text[offset1:]):
+      # | shcmd
+      if text.startswith('|', offset1):
+        # pipe through shell command
+        offset = skipwhite(text, offset + 1)
+        if offset == len(text):
+          raise SyntaxError("empty shell command")
+        shcmd = text[offset:]
+        return ActionSubProcess(
+            offset=offset1,
+            source_text=text,
+            end_offset=len(text),
+            argv=['/bin/sh', '-c', shcmd],
+        )
+      # pipe:shlex(argv)
+      if text.startswith('pipe:', offset1):
+        offset += 5
+        argv = shlex.split(text[offset:])
+        return ActionSubProcess(
+            offset=offset1,
+            source_text=text,
+            end_offset=len(text),
+            batchsize=0,
+            argv=argv,
+        )
+      name, offset = get_identifier(text, offset)
+      if name:
+        return ActionByName(
+            offset=offset1,
+            source_text=text,
+            end_offset=offset,
+            name=name,
+        )
+      raise SyntaxError(f'no action recognised')
+
+@dataclass
+class ActionByName(Action):
+
+  name: str
+
+  @property
+  @uses_pilfer
+  @trace
+  def stage_spec(self, P: Pilfer):
+    return P.action_map[self.name]
+
+# TODO: this gathers it all, need to open pipe and stream, how?
+@dataclass
+class ActionSubProcess(Action):
+
+  argv: List[str]
+
+  @property
+  def stage_spec(self):
+    ''' Our statge specification consumes all input items.
+    '''
+    return self.stage_func, 0
 
   @typechecked
-  def __init__(self, srctext: str, sig: StageType):
-    self.srctext = srctext
-    self.sig = sig
+  async def stage_func(self, items: List[Any]):
+    ''' Pipe a list of items through a subprocess.
 
-  def __str__(self):
-    s = "%s(%s:%r" % (self.__class__.__name__, self.sig, self.srctext)
-    if self.args:
-      s += ",args=%r" % (self.args,)
-    if self.kwargs:
-      s += ",kwargs=%r" % (self.kwargs,)
-    s += ")"
-    return s
-
-  def __call__(self, P):
-    ''' Calling an BaseAction with an item creates a functor and passes the item to it.
+        Send `str(item).replace('\n',r'\n')` for each item.
+        Read lines from the subprocess and yield each lines without its trailing newline.
     '''
-    return self.functor()(P, *self.args, **self.kwargs)
 
-class ActionFunction(BaseAction):
-
-  def __init__(self, action0, sig, func):
-    super().__init__(action0, sig)
-    # stash a retriable version of the function
-    func0 = func
-    self.func = retriable(func)
-    self.func.__name__ = "%s(%r,func=%s)" % (
-        type(self).__name__, action0, funcname(func0)
-    )
-
-  def functor(self, L):
-    return self.func
-
-class ActionPipeTo(BaseAction):
-
-  def __init__(self, action0, pipespec):
-    super().__init__(action0, StageType.PIPELINE)
-    self.pipespec = pipespec
-
-  class _OnDemandPipeline(MultiOpenMixin):
-
-    def __init__(self, pipespec, L):
-      self.pipespec = pipespec
-      self.later = L
-      self._Q = None
-
-    @property
-    def outQ(self):
-      X("GET _OnDemandPipeline.outQ")
-      return self._Q.outQ
-
-    def put(self, P):
-      with self._lock:
-        Q = self._Q
-        if Q is None:
-          X(
-              "ActionPipeTo._OnDemandPipeline: create pipeline from %s",
-              self.pipespec
-          )
-          Q = self._Q = P.pipe_from_spec(self.pipespec)
-      self._pipeline.put(P)
-
-  def functor(self, L):
-    ''' Return an _OnDemandPipeline to process piped items.
-    '''
-    X("ActionPipeTo: create _OnDemandPipeline(%s)", self.pipespec)
-    return self._OnDemandPipeline(self.pipespec, L)
-
-class ActionShellFilter(BaseAction):
-
-  def __init__(self, action0, shcmd, args, kwargs):
-    super().__init__(action0, StageType.PIPELINE, args, kwargs)
-    self.shcmd = shcmd
-
-  # TODO: substitute parameters into shcmd
-  def functor(self):
-    ''' Return an iterable queue interface to a shell pipeline.
-    '''
-    return self.ShellProcFilter(self.shcmd)
-
-class ShellProcFilter(MultiOpenMixin):
-  ''' An iterable queue-like interface to a filter subprocess.
-  '''
-
-  def __init__(self, shcmd, outQ):
-    ''' Set up a subprocess running `shcmd`.
-
-        Parameters:
-        * `no_flush`: do not flush input lines for the subprocess,
-          block buffer instead
-        * `discard`: discard .put items, close subprocess stdin
-          immediately after startup
-    '''
-    self.shcmd = shcmd
-    self.shproc = None
-    self.outQ = outQ
-    outQ.open()
-
-  def _startproc(self, shcmd):
-    self.shproc = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
-
-    def copy_out(fp, outQ):
-      ''' Copy lines from the shell output, put new `Pilfer`s onto the `outQ`.
+    @afunc
+    def send_items(items: List[Any]):
+      ''' Send items to the subprocess and then close its stdin.
       '''
-      for line in fp:
-        if not line.endswith('\n'):
-          raise ValueError('premature EOF (missing newline): %r' % (line,))
-        outQ.put(P.copy_with_vars(_=line[:-1]))
-      outQ.close()
+      for item in items:
+        popen.stdin.write(str(item).replace('\n', r'\n').encode('utf-8'))
+        popen.stdin.write(b'\n')
+        popen.stdin.flush()
+      popen.stdin.close()
 
-    self.copier = Thread(
-        name="%s.copy_out" % (self,),
-        target=copy_out,
-        args=(shproc.stdout, self.outQ)
-    ).start()
+    @agen
+    def read_results():
+      ''' Yield lines from the subprocess standard output, newline included.
+      '''
+      yield from popen.stdout
 
-  def put(self, P):
-    with self._lock:
-      if self.shproc is None:
-        self._startproc()
-    self.shproc.stdin.write(P._)
-    self.shproc.stdin.write('\n')
-    if not self.no_flush:
-      self.shproc.stdin.flush()
-
-  def shutdown(self):
-    if self.shproc is None:
-      outQ.close()
-    else:
-      self.shproc.wait()
-      xit = self.shproc.returncode
-      if xit != 0:
-        error("exit %d from: %r", xit, self.shcmd)
-    self.shproc.stdin.close()
-
-class ActionShellCommand(BaseAction):
-
-  def __init__(self, action0, shcmd, args, kwargs):
-    super().__init__(action0, StageType.PIPELINE, args, kwargs)
-    self.shcmd = shcmd
-
-  # TODO: substitute parameters into shcmd
-  def functor(self):
-    ''' Return an iterable queue interface to a shell pipeline.
-    '''
-    return self.ShellProcCommand(self.shcmd, self.outQ)
+    popen = await trace(to_thread)(Popen, self.argv, stdin=PIPE, stdout=PIPE)
+    create_task(send_items(items))
+    # yield lines from the subprocess with their trailing newline removed
+    async for result in read_results():
+      yield result.rstrip(b'\n').decode('utf-8', errors='replace')
+    xit = await to_thread(popen.wait)
+    if xit != 0:
+      warning("exit %d from subprocess %r", xit, self.argv)
 
 class ShellProcCommand(MultiOpenMixin):
   ''' An iterable queue-like interface to a shell command subprocess.
@@ -317,6 +257,7 @@ def action_pipecmd(shcmd):
         except Exception as e:
           exception("Popen: %r", e)
           return
+
         # spawn a daemon thread to feed items to the pipe
         def feedin():
           for P in items:
