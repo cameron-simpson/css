@@ -13,8 +13,15 @@
       providing better quality of service
     - `BaseCommand`: a base class for creating command line programmes
       with easier setup and usage than libraries like `optparse` or `argparse`
-    - `@popopts`: a decorator whcih works with `BaseCommand` command
+    - `@popopts`: a decorator which works with `BaseCommand` command
       methods to parse their command line options
+
+    Editorial: why not arparse?
+    I find the whole argparse `add_argument` thing very cumbersome
+    and hard to use and remember.
+    Also, when incorrectly invoked an argparse command line prints
+    the help/usage messgae and aborts the whole programme with
+    `SystemExit`.
 '''
 
 from cmd import Cmd
@@ -1176,6 +1183,7 @@ class BaseCommand:
       Returning to methods, if there is a paragraph in the method docstring
       commencing with `Usage:` then that paragraph is incorporated
       into the main usage message automatically.
+
       Example:
 
           @popopts(l='long_mode')
@@ -1200,14 +1208,8 @@ class BaseCommand:
         will be called where `subcmd_argv` contains the command line arguments
         following *subcmd*.
       * `main(argv)`:
-        if there are no `cmd_`*subcmd*` methods then method `main(argv)`
+        if there are no `cmd_`*subcmd* methods then method `main(argv)`
         will be called where `argv` contains the command line arguments.
-
-      Editorial: why not arparse?
-      Primarily because when incorrectly invoked
-      an argparse command line prints the help/usage messgae
-      and aborts the whole programme with `SystemExit`.
-      But also, I find the whole argparse `add_argument` thing very cumbersome.
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
