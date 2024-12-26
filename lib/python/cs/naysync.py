@@ -4,7 +4,7 @@
 # - Cameron Simpson <cs@cskk.id.au> 14dec2024
 #
 
-''' An attempt at comingling async-code and nonasync-code-in-a-thread in an argonomic way.
+''' An attempt at comingling async-code and nonasync-code in an ergonomic way.
 
     One of the difficulties in adapting non-async code for use in
     an async world is that anything asynchronous needs to be turtles
@@ -16,7 +16,7 @@
     - `@agen`: a decorator to make a synchronous generator asynchronous
     - `amap(func,iterable)`: asynchronous mapping of `func` over an iterable
     - `async_iter(iterable)`: return an asynchronous iterator of an iterable
-    - `IterableAsyncQueue`: an iterable flavour of `asyncio.Queue` with no `get` methods`
+    - `IterableAsyncQueue`: an iterable flavour of `asyncio.Queue` with no `get` methods
     - `AsyncPipeLine`: a pipeline of functions connected together with `IterableAsyncQueue`s
 '''
 
