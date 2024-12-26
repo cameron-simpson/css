@@ -285,7 +285,6 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   def pipes(self):
     return MappingChain(get_mappings=self._rc_pipespecs)
 
-  @trace
   def _rc_action_maps(self):
     X("self.rcs = %r", self.rcs)
     for rc in self.rcs:
