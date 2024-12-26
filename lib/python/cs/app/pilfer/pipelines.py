@@ -46,7 +46,7 @@ class PipeLineSpec(Promotable):
           # terminate this pipeline with a function to spawn subpipelines
           # using the tail of the action list from this point
           if not specs:
-            raise ValueError('no actions after')
+            raise ValueError('no actions after *')
 
           async def per(item, pipespec):
             ''' Process a single `item` through its own pipeline.
@@ -66,12 +66,12 @@ class PipeLineSpec(Promotable):
         stage_funcs.append(action.stage_spec)
     return AsyncPipeLine.from_stages(*stage_funcs)
 
-  async def run_pipeline(self, input_items: AnyIterable):
+  async def run_pipeline(self, input_item_Ps: AnyIterable):
     ''' Asynchronous generator to make an `AsyncPipeLine` and run it with `input_items`.
     '''
     pipeline = self.make_pipeline()
-    async for item in pipeline(input_items):
-      yield item
+    async for result_P in pipeline(input_item_Ps):
+      yield result_P
 
 if __name__ == '__main__':
 
