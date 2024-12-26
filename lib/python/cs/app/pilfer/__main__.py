@@ -197,16 +197,20 @@ class PilferCommand(BaseCommand):
     # gather up the remaining definition as the running pipeline
     pipespec = PipeLineSpec(name="CLI", stage_specs=argv)
 
-    async def print_from(items):
-      async for item in items:
+    async def print_from(item_Ps):
+      async for item, P in item_Ps:
         print(item)
 
     asyncio.run(
         print_from(
             pipespec.run_pipeline(
                 async_iter(
-                    (line.rstrip('\n')
-                     for line in sys.stdin) if url == '-' else [url]
+                    (
+                        (item, P) for item in (
+                            (line.rstrip('\n')
+                             for line in sys.stdin) if url == '-' else [url]
+                        )
+                    )
                 )
             )
         )
