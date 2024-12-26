@@ -128,6 +128,11 @@ class ActionByName(Action):
 # TODO: this gathers it all, need to open pipe and stream, how?
 @dataclass
 class ActionSubProcess(Action):
+  ''' A action which passes items through a subprocess
+      with `str(item)` on each input line
+      and yielding the subprocess output lines
+      with their trailing newlines removed.
+  '''
 
   argv: List[str]
 
@@ -138,14 +143,17 @@ class ActionSubProcess(Action):
     return self.stage_func, StageMode.STREAM
 
   @typechecked
-  async def stage_func(self, items: AnyIterable):
+  async def stage_func(self, item_Ps: AnyIterable):
     ''' Pipe a list of items through a subprocess.
 
         Send `str(item).replace('\n',r'\n')` for each item.
         Read lines from the subprocess and yield each lines without its trailing newline.
     '''
 
-    async def send_items(items: AnyIterable):
+    # this will be filled in with the first Pilfer from the first (item,Pilfer) 2-tuple
+    result_P = None
+
+    async def send_items(item_Ps: AnyIterable):
       ''' Send items to the subprocess and then close its stdin.
       '''
 
@@ -154,7 +162,9 @@ class ActionSubProcess(Action):
         popen.stdin.write(b'\n')
         popen.stdin.flush()
 
-      async for item in async_iter(items):
+      async for item, P in async_iter(items):
+        if result_P is None:
+          result_P = P
         await to_thread(send_item, item)
       await to_thread(popen.stdin.close)
 
@@ -168,7 +178,7 @@ class ActionSubProcess(Action):
     create_task(send_items(items))
     # yield lines from the subprocess with their trailing newline removed
     async for result in read_results():
-      yield result.rstrip(b'\n').decode('utf-8', errors='replace')
+      yield result.rstrip(b'\n').decode('utf-8', errors='replace'), result_P
     xit = await to_thread(popen.wait)
     if xit != 0:
       warning("exit %d from subprocess %r", xit, self.argv)
@@ -187,14 +197,17 @@ class ActionSelect(Action):
     return self.stage_func
 
   @typechecked
-  async def stage_func(self, item: Any):
+  async def stage_func(self, item_P: Any):
     ''' Select `item` based on `self.select_func` and `self.invert`.
 
         Send `str(item).replace('\n',r'\n')` for each item.
         Read lines from the subprocess and yield each lines without its trailing newline.
     '''
-    if await afunc(self.select_func)(item):
-      if not self.invert:
-        yield item
-    elif self.invert:
-      yield item
+    item, P = item_P
+    P = P.copy()
+    with P:
+      if await afunc(self.select_func)(item):
+        if not self.invert:
+          yield item, P
+      elif self.invert:
+        yield item, P
