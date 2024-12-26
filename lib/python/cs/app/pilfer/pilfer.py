@@ -15,6 +15,7 @@ from cs.later import Later, uses_later
 from cs.lex import r
 from cs.logutils import (debug, error, warning, exception, D)
 from cs.mappings import MappingChain, SeenSet
+from cs.naysync import afunc
 from cs.obj import copy as obj_copy
 from cs.pfx import Pfx
 from cs.pipeline import pipeline
@@ -30,6 +31,18 @@ from .urls import hrefs, srcs
 
 from cs.debug import trace, X, r, s
 
+async def hrefs_sfunc(item_P):
+  item, P = item_P
+  urls = await afunc(lambda url: list(hrefs(url)))(item)
+  for url in urls:
+    yield url, P
+
+async def srcs_sfunc(item_P):
+  item, P = item_P
+  urls = await afunc(lambda url: list(srcs(url)))(item)
+  for url in urls:
+    yield url, P
+
 class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
 
@@ -42,8 +55,8 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   perthread_state = ThreadState()
 
   DEFAULT_ACTION_MAP = {
-      'hrefs': hrefs,
-      'srcs': srcs,
+      'hrefs': hrefs_sfunc,
+      'srcs': srcs_sfunc,
   }
 
   @uses_later
