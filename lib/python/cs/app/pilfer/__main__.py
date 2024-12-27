@@ -139,6 +139,7 @@ class PilferCommand(BaseCommand):
     ''' Apply the `options.runstate` to the main `Pilfer`.
     '''
     options = self.options
+    badopts = False
     # sanity check the flagnames
     for raw_flagname in options.flagnames:
       with Pfx(raw_flagname):
@@ -146,6 +147,8 @@ class PilferCommand(BaseCommand):
         if not is_identifier(flagname):
           error('invalid flag specifier')
           badopts = True
+    if badopts:
+      raise GetoptError(f'invalid flags: {options.flagnames!r}')
     with super().run_context():
       later = Later(self.options.jobs)
       with later:
