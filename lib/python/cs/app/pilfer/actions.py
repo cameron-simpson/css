@@ -20,6 +20,7 @@ from cs.lex import BaseToken, is_identifier, skipwhite
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
 from cs.pfx import Pfx, pfx_call
+from cs.urlutils import URL
 
 from .pilfer import Pilfer, uses_pilfer
 
@@ -105,6 +106,15 @@ class Action(BaseToken):
             end_offset=len(text),
             select_func=re_match,
             invert=invert,
+        )
+
+      if text == '..':
+        return ActionModify(
+            offset=0,
+            source_text=text,
+            end_offset=len(text),
+            modify_func=lambda item: URL.promote(item).parent,
+            fast=True,
         )
 
       raise SyntaxError('no action recognised')
@@ -205,3 +215,20 @@ class ActionSelect(Action):
           yield item, P
       elif self.invert:
         yield item, P
+
+@dataclass
+class ActionModify(Action):
+
+  modify_func: Callable
+  fast: bool = None
+
+  def __post_init__(self):
+    # make an instance stage_func
+    func = lambda item_P: (self.modify_func(item_P[0]), item_P[1])
+    self.stage_func = afunc(func, fast=self.fast)
+
+  @property
+  def stage_spec(self):
+    ''' Our stage specification streams items through the subprocess.
+    '''
+    return self.stage_func
