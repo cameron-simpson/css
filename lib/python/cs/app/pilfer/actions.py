@@ -16,7 +16,7 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.lex import BaseToken, get_identifier, skipwhite
+from cs.lex import BaseToken, is_identifier, skipwhite
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
 from cs.pfx import Pfx, pfx_call
@@ -29,56 +29,50 @@ class Action(BaseToken):
 
   @classmethod
   @typechecked
-  def parse(cls, text, offset: int = 0, *, skip=True) -> "Action":
-    if skip:
-      offset = skipwhite(text, offset)
-    offset1 = offset
-    with Pfx("%s.parse: %d:%r", cls.__name__, offset1, text[offset1:]):
+  def from_str(cls, text) -> "Action":
+    with Pfx("%s.from_str(%r)", cls.__name__, text):
 
       # pipe:shlex(argv)
-      if text.startswith('pipe:', offset1):
-        offset += 5
-        argv = shlex.split(text[offset:])
+      if text.startswith('pipe:'):
+        argv = shlex.split(text[5:])
         return ActionSubProcess(
-            offset=offset1,
+            offset=0,
             source_text=text,
             end_offset=len(text),
             batchsize=0,
             argv=argv,
         )
-      name, offset = get_identifier(text, offset)
-      if name:
+      if is_identifier(text):
         # TODO: options parameters?
         # parse.parse_action_args?
         return ActionByName(
-            offset=offset1,
+            offset=0,
             source_text=text,
-            end_offset=offset,
-            name=name,
+            end_offset=len(text),
+            name=text,
         )
 
       # | shcmd
-      if text.startswith('|', offset1):
+      if text.startswith('|'):
         # pipe through shell command
-        offset = skipwhite(text, offset + 1)
-        if offset == len(text):
+        shcmd = text[1:].strip()
+        if not shcmd:
           raise SyntaxError("empty shell command")
-        shcmd = text[offset:]
         return ActionSubProcess(
-            offset=offset1,
+            offset=0,
             source_text=text,
             end_offset=len(text),
             argv=['/bin/sh', '-c', shcmd],
         )
 
       # /regexp or -/regexp
-      if text.startswith(('/', '-/'), offset):
-        if text.startswith('/', offset):
-          offset += 1
+      if text.startswith(('/', '-/')):
+        if text.startswith('/'):
+          offset = 1
           invert = False
         else:
           assert text.startswith('-/', offset)
-          offset += 2
+          offset = 2
           invert = True
         if text.endswith('/'):
           regexp_s = text[offset:-1]
@@ -106,7 +100,7 @@ class Action(BaseToken):
             return regexp.search(str(item))
 
         return ActionSelect(
-            offset=offset1,
+            offset=0,
             source_text=text,
             end_offset=len(text),
             select_func=re_match,
