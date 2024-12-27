@@ -175,7 +175,6 @@ class PilferCommand(BaseCommand):
           Source may be a URL or "-" to read URLs from standard input.
     '''
     options = self.options
-    later = options.later
     P = options.pilfer
     if not argv:
       raise GetoptError("missing URL")
@@ -191,30 +190,23 @@ class PilferCommand(BaseCommand):
         rc.add_pipespec(spec)
       except KeyError as e:
         raise GetoptError("add pipe: %s", e)
-    # now load the main pipeline
+    # prepare the main pipeline specification from the remaining argv
     if not argv:
       raise GetoptError("missing main pipeline")
-    # gather up the remaining definition as the running pipeline
     pipespec = PipeLineSpec(name="CLI", stage_specs=argv)
+    # prepare an input containing URLs
+    if url == '-':
+      urls = (line.rstrip('\n') for line in sys.stdin)
+    else:
+      urls = [url]
 
     async def print_from(item_Ps):
-      async for item, P in item_Ps:
-        print(item)
+      ''' Consume `(result,Pilfer)` 2-tuples from the pipeline and print the results.
+      '''
+      async for result, _ in item_Ps:
+        print(result)
 
-    asyncio.run(
-        print_from(
-            pipespec.run_pipeline(
-                async_iter(
-                    (
-                        (item, P) for item in (
-                            (line.rstrip('\n')
-                             for line in sys.stdin) if url == '-' else [url]
-                        )
-                    )
-                )
-            )
-        )
-    )
+    asyncio.run(print_from(pipespec.run_pipeline(urls)))
 
   @staticmethod
   def get_argv_pipespec(argv, argv_offset=0):
