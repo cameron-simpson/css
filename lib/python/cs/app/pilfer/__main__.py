@@ -162,17 +162,6 @@ class PilferCommand(BaseCommand):
           ):
             yield
 
-  @staticmethod
-  def hack_postopts_argv(argv, options):
-    ''' Infer "url" subcommand if the first argument looks like an URL.
-    '''
-    if argv:
-      op = argv[0]
-      if op.startswith('http://') or op.startswith('https://'):
-        # push the URL back and infer missing "url" op word
-        argv.insert(0, 'url')
-    return argv
-
   def cmd_from(self, argv):
     ''' Usage: {cmd} source [pipeline-defns..]
           Source may be a URL or "-" to read URLs from standard input.
