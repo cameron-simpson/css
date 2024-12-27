@@ -65,7 +65,7 @@ import requests
 from typeguard import typechecked
 
 from cs.deco import cachedmethod, promote, Promotable
-from cs.excutils import logexc, safe_property
+from cs.excutils import logexc, unattributable
 from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
 from cs.obj import SingletonMixin
@@ -186,19 +186,22 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       raise
     return True
 
-  @safe_property
+  @property
+  @unattributable
   def content(self):
     ''' The URL content as a string.
     '''
     return self.GET().content
 
-  @safe_property
+  @property
+  @unattributable
   def text(self):
     ''' The URL content as a string.
     '''
     return self.GET().text
 
-  @safe_property
+  @property
+  @unattributable
   @locked
   def headers(self):
     ''' A `requests.Response` headers mapping.
@@ -206,13 +209,15 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     r = self.HEAD()
     return r.headers
 
-  @safe_property
+  @property
+  @unattributable
   def content_type(self):
     ''' The URL content MIME type.
     '''
     return self.headers['content-type']
 
-  @safe_property
+  @property
+  @unattributable
   def content_length(self):
     ''' The value of the Content-Length: header or `None`.
     '''
@@ -222,7 +227,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       return None
     return int(length_s)
 
-  @safe_property
+  @property
+  @unattributable
   def last_modified(self):
     ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
     '''
@@ -235,7 +241,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       value = dt_last_modified.timestamp()
     return value
 
-  @safe_property
+  @property
+  @unattributable
   @locked
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
@@ -244,7 +251,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       self.HEAD()
     return self._info.getencoding()
 
-  @safe_property
+  @property
+  @unattributable
   def domain(self):
     ''' The URL domain - the hostname with the first dotted component removed.
     '''
@@ -254,7 +262,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       return ''
     return hostname.split('.', 1)[1]
 
-  @safe_property
+  @property
+  @unattributable
   @locked
   @cachedmethod
   def parsed(self):
@@ -286,96 +295,112 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     import feedparser
     return feedparser.parse(self.content)
 
-  @safe_property
+  @property
+  @unattributable
   @locked
   def xml(self):
     ''' An `ElementTree` of the URL content.
     '''
     return etree.XML(self.content.decode('utf-8', 'replace'))
 
-  @safe_property
+  @property
+  @unattributable
   def parts(self):
     ''' The URL parsed into parts by urlparse.urlparse.
     '''
     if self._parts is None:
-      self._parts = urlparse(self)
+      self._parts = urlparse(self.url_s)
     return self._parts
 
-  @safe_property
+  @property
+  @unattributable
   def scheme(self):
     ''' The URL scheme as returned by urlparse.urlparse.
     '''
     return self.parts.scheme
 
-  @safe_property
+  @property
+  @unattributable
   def netloc(self):
     ''' The URL netloc as returned by urlparse.urlparse.
     '''
     return self.parts.netloc
 
-  @safe_property
+  @property
+  @unattributable
   def path(self):
     ''' The URL path as returned by urlparse.urlparse.
     '''
     return self.parts.path
 
-  @safe_property
+  @property
+  @unattributable
   def path_elements(self):
     ''' Return the non-empty path components; NB: a new list every time.
     '''
     return [w for w in self.path.strip('/').split('/') if w]
 
-  @safe_property
+  @property
+  @unattributable
   def params(self):
     ''' The URL params as returned by urlparse.urlparse.
     '''
     return self.parts.params
 
-  @safe_property
+  @property
+  @unattributable
   def query(self):
     ''' The URL query as returned by urlparse.urlparse.
     '''
     return self.parts.query
 
-  @safe_property
+  @property
+  @unattributable
   def fragment(self):
     ''' The URL fragment as returned by urlparse.urlparse.
     '''
     return self.parts.fragment
 
-  @safe_property
+  @property
+  @unattributable
   def username(self):
     ''' The URL username as returned by urlparse.urlparse.
     '''
     return self.parts.username
 
-  @safe_property
+  @property
+  @unattributable
   def password(self):
     ''' The URL password as returned by urlparse.urlparse.
     '''
     return self.parts.password
 
-  @safe_property
+  @property
+  @unattributable
   def hostname(self):
     ''' The URL hostname as returned by urlparse.urlparse.
     '''
     return self.parts.hostname
 
-  @safe_property
+  @property
+  @unattributable
   def port(self):
     ''' The URL port as returned by urlparse.urlparse.
     '''
     return self.parts.port
 
-  @safe_property
+  @property
+  @unattributable
   def dirname(self, absolute=False):
     return os.path.dirname(self.path)
 
-  @safe_property
+  @property
+  @unattributable
   def parent(self):
     return URL(urljoin(self, self.dirname), referer=self)
 
-  @safe_property
+  @property
+  @unattributable
   def basename(self):
     return os.path.basename(self.path)
 
@@ -393,7 +418,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     '''
     return self.xml.findall(match)
 
-  @safe_property
+  @property
+  @unattributable
   def baseurl(self):
     for B in self.BASEs:
       try:
@@ -405,7 +431,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
           return URL(base, referer=self)
     return self
 
-  @safe_property
+  @property
+  @unattributable
   def page_title(self):
     t = self.parsed.title
     if t is None:
@@ -669,7 +696,8 @@ class URLs(object):
   def __setitem__(self, key, value):
     self.context[key] = value
 
-  @safe_property
+  @property
+  @unattributable
   def multi(self):
     ''' Prepare this URLs object for reuse by converting its urls
         iterable to a list if not already a list or tuple.
