@@ -1,18 +1,17 @@
 #!/usr/bin/env puython3
 
 from asyncio import run
-from collections import namedtuple
 from dataclasses import dataclass
 from functools import partial
 import shlex
-from typing import Callable, List, Mapping, Union
+from typing import List, Union
 
 from cs.deco import Promotable
-from cs.lex import get_identifier
-from cs.naysync import AsyncPipeLine, AnyIterable
+from cs.naysync import AsyncPipeLine, AnyIterable, async_iter
 from cs.pfx import Pfx, pfx_method
 
 from .actions import Action
+from .pilfer import Pilfer, uses_pilfer
 
 @dataclass
 class PipeLineSpec(Promotable):
@@ -66,11 +65,56 @@ class PipeLineSpec(Promotable):
         stage_funcs.append(action.stage_spec)
     return AsyncPipeLine.from_stages(*stage_funcs)
 
-  async def run_pipeline(self, input_item_Ps: AnyIterable):
-    ''' Asynchronous generator to make an `AsyncPipeLine` and run it with `input_items`.
+  @uses_pilfer
+  async def run_pipeline(
+      self,
+      input_item_Ps: AnyIterable,
+      *,
+      P: Pilfer = None,
+      has_pilfer=False,
+      fast=None,
+  ):
+    ''' An asynchronous generator to make an `AsyncPipeLine` and run it with `input_items`.
+        It yields `(result,Pilfer)` 2-tuples.
+
+        Parameters:
+        * `input_item_Ps`: an iterable of input items
+        * `P`: an optional `Pilfer` context; the default comes from the ambient instance
+        * `has_pilfer`: if true then `input_item_Ps` consists of `(item,Pilfer)` 2-tuples,
+          otherwise it consists of just `item`s, and `run_pipeline`
+          will produce 2-tuples for the pipeline using the `P` parameter
+        * `fast`: optional `fast` parameter passed to `async_iter` and `AsyncPipeLine.__call__`
+
+        Example: this is the pipeline dispatch from `PilferCommand.cmd_from`:
+
+            # prepare the main pipeline specification from the remaining argv
+            pipespec = PipeLineSpec(name="CLI", stage_specs=argv)
+            # prepare an input containing URLs
+            if url == '-':
+              urls = (line.rstrip('\n') for line in sys.stdin)
+            else:
+              urls = [url]
+
+            async def print_from(item_Ps):
+              """ Consume `(result,Pilfer)` 2-tuples from the pipeline and print the results.
+              """
+              async for result, _ in item_Ps:
+                print(result)
+
+            asyncio.run(print_from(pipespec.run_pipeline(urls)))
+
     '''
+    if not has_pilfer:
+      # add the Pilfer to each item
+      async def add_pilfer(input_items: AnyIterable):
+        ''' Transmute the iterable of items to an iterable of `(item,Pilfer)` 2-tuples.
+        '''
+        async for item in async_iter(input_items, fast=fast):
+          yield item, P
+
+      input_item_Ps = add_pilfer(input_item_Ps)
     pipeline = self.make_pipeline()
-    async for result_P in pipeline(input_item_Ps):
+    async for result_P in pipeline(input_item_Ps, fast=fast):
       yield result_P
 
 if __name__ == '__main__':
