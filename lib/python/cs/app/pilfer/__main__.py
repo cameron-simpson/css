@@ -9,8 +9,6 @@ import os.path
 from os.path import expanduser
 from getopt import GetoptError
 import sys
-from threading import Thread
-from time import sleep
 from typing import Iterable
 try:
   import xml.etree.cElementTree as ElementTree
@@ -21,23 +19,18 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.debug import ifdebug
-from cs.env import envsub
-from cs.later import Later, uses_later
-from cs.lex import (cutprefix, cutsuffix, get_identifier, is_identifier)
+from cs.later import Later
+from cs.lex import (cutprefix, cutsuffix, is_identifier)
 import cs.logutils
-from cs.logutils import (debug, error, warning, D)
-from cs.naysync import async_iter
+from cs.logutils import (debug, error)
 import cs.pfx
 from cs.pfx import Pfx
-from cs.pipeline import pipeline, StageType
-from cs.queues import NullQueue
 from cs.resources import uses_runstate
 
 from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, Pilfer
-from .actions import Action
 from .pipelines import PipeLineSpec
-from .rc import load_pilferrcs, PilferRC
+from .rc import PilferRC
+
 
 def main(argv=None):
   ''' Pilfer command line function.
