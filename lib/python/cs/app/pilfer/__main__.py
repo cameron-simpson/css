@@ -31,7 +31,6 @@ from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, Pilfer
 from .pipelines import PipeLineSpec
 from .rc import PilferRC
 
-
 def main(argv=None):
   ''' Pilfer command line function.
   '''
@@ -80,24 +79,6 @@ def urls(url, stdin=None, cmd=None) -> Iterable[str]:
 
 class PilferCommand(BaseCommand):
 
-  GETOPT_SPEC = 'c:F:j:qux'
-
-  USAGE_FORMAT = '''Usage: {cmd} [options...] op [args...]
-    Options:
-      -c config
-          Load rc file.
-      -F flag-conjunction
-          Space separated list of flag or !flag to satisfy as a conjunction.
-      -j jobs
-      How many jobs (actions: URL fetches, minor computations)
-      to run at a time.
-          Default: ''' + str(
-      DEFAULT_JOBS
-  ) + '''
-      -q  Quiet. Don't recite surviving URLs at the end.
-      -u  Unbuffered. Flush print actions as they occur.
-      -x  Trace execution.'''
-
   @dataclass
   class Options(BaseCommand.Options):
     configpath: str = ''
@@ -116,7 +97,13 @@ class PilferCommand(BaseCommand):
     COMMON_OPT_SPECS = dict(
         **BaseCommand.Options.COMMON_OPT_SPECS,
         c_=('configpath', 'Colon separated list of config paths.'),
-        j_=('jobs', int),
+        j_=(
+            'jobs',
+            ''' How many jobs (actions: URL fetches, minor computations)
+                to run at a time. Default: {DEFAULT_JOBS}
+            ''',
+            int,
+        ),
         F_=(
             'flagnames',
             'Flags which must be true for operation to continue.',
