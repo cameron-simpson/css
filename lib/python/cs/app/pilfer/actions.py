@@ -148,10 +148,11 @@ class ActionSubProcess(Action):
 
   @typechecked
   async def stage_func(self, item_Ps: AnyIterable):
-    ''' Pipe a list of items through a subprocess.
+    r'''Pipe a list of items through a subprocess.
 
-        Send `str(item).replace('\n',r'\n')` for each item.
-        Read lines from the subprocess and yield each lines without its trailing newline.
+        Send `str(item)` for each item, with sloshes doubled and
+        newlines eplaced by `\\n`.  Read lines from the subprocess
+        and yield each line without its trailing newline.
     '''
 
     # this will be filled in with the first Pilfer from the first (item,Pilfer) 2-tuple
@@ -160,13 +161,14 @@ class ActionSubProcess(Action):
     async def send_items(item_Ps: AnyIterable):
       ''' Send items to the subprocess and then close its stdin.
       '''
+      nonlocal result_P
 
       def send_item(item):
-        popen.stdin.write(str(item).replace('\n', r'\n').encode('utf-8'))
-        popen.stdin.write(b'\n')
+        popen.stdin.write(str(item).replace('\\', r'\\').replace('\n', r'\n'))
+        popen.stdin.write('\n')
         popen.stdin.flush()
 
-      async for item, P in async_iter(items):
+      async for item, P in async_iter(item_Ps):
         if result_P is None:
           result_P = P
         await to_thread(send_item, item)
@@ -178,11 +180,20 @@ class ActionSubProcess(Action):
       '''
       yield from popen.stdout
 
-    popen = await to_thread(Popen, self.argv, stdin=PIPE, stdout=PIPE)
-    create_task(send_items(items))
+    # UTF-8 encoded text mode pipe to/from a subprocess
+    popen = await to_thread(
+        Popen,
+        self.argv,
+        stdin=PIPE,
+        stdout=PIPE,
+        text=True,
+        encoding='utf-8',
+        errors='replace',
+    )
+    create_task(send_items(item_Ps))
     # yield lines from the subprocess with their trailing newline removed
     async for result in read_results():
-      yield result.rstrip(b'\n').decode('utf-8', errors='replace'), result_P
+      yield result.rstrip('\n'), result_P
     xit = await to_thread(popen.wait)
     if xit != 0:
       warning("exit %d from subprocess %r", xit, self.argv)
