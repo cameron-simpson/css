@@ -113,7 +113,7 @@ class Action(BaseToken):
             offset=0,
             source_text=text,
             end_offset=len(text),
-            modify_func=lambda item: URL.promote(item).parent,
+            modify_func=lambda item, P: (URL.promote(item).parent, P),
             fast=True,
         )
 
@@ -255,16 +255,21 @@ class ActionSelect(Action):
 @dataclass
 class ActionModify(Action):
 
-  modify_func: Callable
-  fast: bool = None
+  modify_func: Callable[Tuple[Any, Pilfer], Tuple[Any, Pilfer]]
+  fast: bool = False
 
   def __post_init__(self):
     # make an instance stage_func
-    func = lambda item_P: (self.modify_func(item_P[0]), item_P[1])
-    self.stage_func = afunc(func, fast=self.fast)
+    af = afunc(self.modify_func, fast=self.fast)
+
+    async def stage_func(item_P):
+      item, P = item_P
+      yield await af(item, P)
+
+    self.stage_func = stage_func
 
   @property
   def stage_spec(self):
-    ''' Our stage specification streams items through the subprocess.
+    ''' Our stage function uses the usual process one item style.
     '''
     return self.stage_func
