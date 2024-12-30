@@ -201,13 +201,54 @@ class ActionSubProcess(Action):
 # TODO: this gathers it all, need to open pipe and stream, how?
 @dataclass
 class ActionSelect(Action):
+  ''' This action's `stage_func` yields the input item or not
+      depending on the truthiness of `select_func`.
 
-  select_func: Callable[Any, bool]
+      While the pipelines passes `(item,Pilfer)` 2-tuples,
+      the signature of `select_func` depends on `affects_context`.
+      If false, the stage function calls `select_func(item)`.
+      If true, the stage function calls `select_func(item,Pilfer)`
+      and expects back a `(bool,Pilfer)` 2-tuple, where the `Pilfer`
+      potentially a new `Pilfer` with modifications applied.
+  '''
+
+  select_func: (
+      Callable[[Any], bool] | Callable[[Any, Pilfer], Tuple[bool, Pilfer]]
+  )
   invert: bool = False
+  affects_context: bool = False
+  fast: bool = False
+
+  def __post_init__(self):
+    af = afunc(self.select_func, fast=self.fast)
+    if self.affects_context:
+
+      async def stage_func(item_P):
+        ''' Receive the `item_P` 2-tuple, pass as `self.select_func(item,P)`.
+        '''
+        item, P = item_P
+        selected, new_P = await af(item, P)
+        if self.invert:
+          selected = not selected
+        if selected:
+          yield item, new_P
+    else:
+
+      async def stage_func(item_P):
+        ''' Receive the `item_P` 2-tuple, pass as `self.select_func(item)`.
+        '''
+        item, P = item_P
+        selected = await af(item)
+        if self.invert:
+          selected = not selected
+        if selected:
+          yield item, P
+
+    self.stage_func = stage_func
 
   @property
   def stage_spec(self):
-    ''' Our stage specification streams items through the subprocess.
+    ''' Our stage function uses the usual process one item style.
     '''
     return self.stage_func
 
