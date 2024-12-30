@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import re
 import shlex
 from subprocess import Popen, PIPE
-from typing import Any, Callable, List, Union
+from typing import Any, Callable, List, Tuple, Union
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -16,7 +16,7 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.lex import BaseToken, is_identifier, skipwhite
+from cs.lex import BaseToken, is_identifier
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
 from cs.pfx import Pfx, pfx_call
