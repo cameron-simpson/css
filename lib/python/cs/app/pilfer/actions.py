@@ -31,18 +31,17 @@ class Action(BaseToken):
   @classmethod
   @typechecked
   def from_str(cls, text) -> "Action":
-    with Pfx("%s.from_str(%r)", cls.__name__, text):
+    ''' Convert an action specification into an `Action`.
 
-      # pipe:shlex(argv)
-      if text.startswith('pipe:'):
-        argv = shlex.split(text[5:])
-        return ActionSubProcess(
-            offset=0,
-            source_text=text,
-            end_offset=len(text),
-            batchsize=0,
-            argv=argv,
-        )
+        The following specifications are recognised:
+        - *name*: filter the input via the named stage function
+        - "! shcmd": pipe all the input items through a single Bourne shell command
+        - "| shlex": pipe all the input items through a command parsed with shlex.split
+        - "/regexp": filter items to those matching regexp
+        - "-/regexp": filter items to those not matching regexp
+        - "..": treat items as URLs and produce their parent URL
+    '''
+    with Pfx("%s.from_str(%r)", cls.__name__, text):
       if is_identifier(text):
         # TODO: options parameters?
         # parse.parse_action_args?
