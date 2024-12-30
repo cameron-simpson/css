@@ -252,22 +252,6 @@ class ActionSelect(Action):
     '''
     return self.stage_func
 
-  @typechecked
-  async def stage_func(self, item_P: Any):
-    ''' Select `item` based on `self.select_func` and `self.invert`.
-
-        Send `str(item).replace('\n',r'\n')` for each item.
-        Read lines from the subprocess and yield each lines without its trailing newline.
-    '''
-    item, P = item_P
-    P = P.copy()
-    with P:
-      if await afunc(self.select_func)(item):
-        if not self.invert:
-          yield item, P
-      elif self.invert:
-        yield item, P
-
 @dataclass
 class ActionModify(Action):
 
