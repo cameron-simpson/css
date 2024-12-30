@@ -15,6 +15,7 @@ raising `ValueError` on failed tokenisation.
 # pylint: disable=too-many-lines
 
 import binascii
+from dataclasses import dataclass
 from functools import partial
 from json import JSONEncoder
 import os
@@ -31,15 +32,16 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
-from typing import Tuple, Union
+from typing import Any, Iterable, Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import fmtdoc, decorator
+from cs.deco import fmtdoc, decorator, Promotable
 from cs.gimmicks import warning
+from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
@@ -57,6 +59,7 @@ DISTINFO = {
         'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
+        'cs.obj',
         'cs.pfx',
         'cs.py.func',
         'cs.seq>=20200914',
@@ -913,6 +916,11 @@ def get_sloshed_text(
       offset += 1
     chunks.append(s[offset0:offset])
   return ''.join(chunks), offset
+
+def slosh_quote(raw_s: str, q: str):
+  ''' Quote a string `raw_s` with quote character `q`.
+  '''
+  return q + raw_s.replace('\\', '\\\\').replace(q, '\\' + q)
 
 # pylint: disable=redefined-outer-name
 def get_envvar(s, offset=0, environ=None, default=None, specials=None):
@@ -2073,6 +2081,210 @@ class FFloat(FNumericMixin, float):
 class FInt(FNumericMixin, int):
   ''' Formattable `int`.
   '''
+
+@dataclass
+class BaseToken(Promotable):
+  ''' A mixin for token dataclasses.
+
+      Presently I use this in `cs.app.tagger.rules` and `cs.app.pilfer.parse`.
+  '''
+
+  # additional token classes to consider during the parse
+  EXTRAS = ()
+
+  source_text: str
+  offset: int
+  end_offset: int
+
+  def __str__(self):
+    return self.matched_text
+
+  @property
+  def matched_text(self):
+    ''' The text from `self.source_text` which matches this token.
+    '''
+    return self.source_text[self.offset:self.end_offset]
+
+  @classmethod
+  def token_classes(cls):
+    ''' Return the `baseToken` subclasses to consider when parsing a token stream.
+    '''
+    return public_subclasses(cls, extras=cls.EXTRAS)
+
+  @classmethod
+  @pfx_method
+  def parse(cls,
+            text: str,
+            offset: int = 0,
+            *,
+            skip=False) -> Tuple["BaseToken", int]:
+    ''' Parse a token from `test` at `offset` (default `0`).
+        Return a `BaseToken` subclass instance.
+        Raise `SyntaxError` if no subclass parses it.
+        Raise `EOFError` if at the end of the `text`,
+        checked after any whitespace if `skip` is true.
+        The returned token's `.end_offset` is the next parse point.
+
+        This base class method attempts the `.parse` method of all
+        the public subclasses.
+
+        Parameters:
+        * `text`: the text being parsed
+        * `offset`: the offset within the `text` of the the parse cursor
+        * `skip`: if true (default `False`), skip any leading
+          whitespace before matching
+    '''
+    if skip:
+      offset = skipwhite(text, offset)
+    if offset >= len(text):
+      raise EOFError(f'end of text encountered at offset {offset}')
+    token_classes = cls.token_classes()
+    if not token_classes:
+      raise RuntimeError("no token classes")
+    for subcls in token_classes:
+      if subcls is cls:
+        continue
+      try:
+        return subcls.parse(text, offset=offset)
+      except SyntaxError:
+        pass
+    raise SyntaxError(
+        'no subclass.parse succeeded,'
+        f'tried {",".join(subcls.__name__ for subcls in token_classes)}'
+    )
+
+  @classmethod
+  @pfx_method
+  @typechecked
+  def from_str(cls, text: str) -> "BaseToken":
+    ''' Parse `test` as a token of type `cls`, return the token.
+        Raises `SyntaxError` on a parse failure.
+        This is a wrapper for the `parse` class method.
+    '''
+    token = cls.parse(text)
+    if token.end_offset != len(text):
+      raise SyntaxError(
+          f'unparsed text at offset {token.end_offset}:'
+          f' {text[token.end_offset:]!r}'
+      )
+    return token
+
+  @classmethod
+  def scan(cls,
+           text: str,
+           offset: int = 0,
+           *,
+           skip=True) -> Iterable["BaseToken"]:
+    ''' Scan `text`, parsing tokens using `BaseToken.parse` and yielding them.
+        Parameters are as for `BaseToken.parse` except as follows:
+        - encountering end of text end the iteration instead of raising `EOFError`
+        - `skip` defaults to `True` to allow whitespace between tokens
+    '''
+    while True:
+      try:
+        token = cls.parse(text, offset, skip=skip)
+      except EOFError:
+        break
+      yield token
+      offset = token.end_offset
+
+class CoreTokens(BaseToken):
+  ''' A mixin for token dataclasses whose subclasses include `Identifier`,
+      'NumericValue` and `QuotedString`.
+  '''
+
+@dataclass
+class Identifier(CoreTokens, BaseToken):
+  ''' A dotted identifier.
+  '''
+
+  name: str
+
+  @classmethod
+  def parse(cls,
+            text: str,
+            offset: int = 0,
+            *,
+            skip=False) -> Tuple[str, CoreTokens, int]:
+    ''' Parse a dotted identifier from `test`.
+    '''
+    if skip:
+      offset = skipwhite(text, offset)
+    name, end_offset = get_dotted_identifier(text, offset)
+    if not name:
+      raise SyntaxError(
+          f'{offset}: expected dotted identifier, found {text[offset:offset+3]!r}...'
+      )
+    return cls(
+        source_text=text, offset=offset, end_offset=end_offset, name=name
+    )
+
+class _LiteralValue(CoreTokens):
+  value: Any
+
+@dataclass
+class NumericValue(_LiteralValue, BaseToken):
+  ''' An `int` or `float` literal.
+  '''
+
+  value: Union[int, float]
+
+  # anything this matches should be a valid Python int/float
+  _token_re = re.compile(r'[-+]?\d+(\.\d*([eE]-?\d+)?)?')
+
+  def __str__(self):
+    return str(self.value)
+
+  @classmethod
+  def parse(cls, text: str, offset: int = 0, *, skip=False) -> "NumericValue":
+    ''' Parse a Python style `int` or `float`.
+    '''
+    if skip:
+      offset = skipwhite(text, offset)
+    start_offset = skipwhite(text, offset)
+    m = cls._token_re.match(text, start_offset)
+    if not m:
+      raise SyntaxError(
+          f'{start_offset}: expected int or float, found {text[start_offset:start_offset+16]!r}'
+      )
+    try:
+      value = int(m.group())
+    except ValueError:
+      value = float(m.group())
+    return cls(
+        source_text=text, offset=offset, end_offset=m.end(), value=value
+    )
+
+@dataclass
+class QuotedString(_LiteralValue, BaseToken):
+  ''' A double quoted string.
+  '''
+
+  value: str
+  quote: str = '"'
+
+  def __str__(self):
+    return slosh_quote(self.value, self.quote)
+
+  @classmethod
+  def parse(cls, text: str, offset: int = 0, *, skip=False) -> "QuotedString":
+    ''' Parse a double quoted string from `text`.
+    '''
+    if skip:
+      offset = skipwhite(text, offset)
+    if not text.startswith('"', offset):
+      raise SyntaxError(
+          f'{offset}: expected ", found {text[offset:offset+1]!r}'
+      )
+    q = text[offset]
+    value, end_offset = get_qstr(text, offset)
+    return cls(
+        source_text=text,
+        offset=offset,
+        end_offset=end_offset,
+        value=value,
+        quote=q,
+    )
 
 if __name__ == '__main__':
   import cs.lex_tests

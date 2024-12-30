@@ -7,6 +7,21 @@
 ''' Convenience functions for working with the cmd stdlib module,
     the BaseCommand class for constructing command line programmes,
     and other command line related stuff.
+
+    This module provides the following main items:
+    - `@docmd`: a decorator for command methods of a `cmd.Cmd` class
+      providing better quality of service
+    - `BaseCommand`: a base class for creating command line programmes
+      with easier setup and usage than libraries like `optparse` or `argparse`
+    - `@popopts`: a decorator which works with `BaseCommand` command
+      methods to parse their command line options
+
+    Editorial: why not arparse?
+    I find the whole argparse `add_argument` thing very cumbersome
+    and hard to use and remember.
+    Also, when incorrectly invoked an argparse command line prints
+    the help/usage messgae and aborts the whole programme with
+    `SystemExit`.
 '''
 
 from cmd import Cmd
@@ -1101,17 +1116,10 @@ class BaseCommand:
 
       This class provides the basic parse and dispatch mechanisms
       for command lines.
-      To implement a command line
-      one instantiates a subclass of `BaseCommand`:
+      To implement a command line one instantiates a subclass of `BaseCommand`:
 
           class MyCommand(BaseCommand):
-              GETOPT_SPEC = 'ab:c'
-              USAGE_FORMAT = r"""Usage: {cmd} [-a] [-b bvalue] [-c] [--] arguments...
-                -a    Do it all.
-                -b    But using bvalue.
-                -c    The 'c' option!
-              """
-              ...
+              """ My command to do something. """
 
       and provides either a `main` method if the command has no subcommands
       or a suite of `cmd_`*subcommand* methods, one per subcommand.
@@ -1134,8 +1142,32 @@ class BaseCommand:
               sys.exit(main(sys.argv))
 
       Instances have a `self.options` attribute on which optional
-      modes are set,
-      avoiding conflict with the attributes of `self`.
+      modes are set, avoiding conflict with the attributes of `self`.
+
+      The `self.options` object is an instance of the class' `Options` class.
+      The default comes from `BaseCommand.Options` (aka `BaseCommandOptions`)
+      but classes with additional command line options will usually
+      provide their own subclass:
+
+          class MyCommand(BaseCommand):
+
+              @dataclass
+              class Options(BaseCommandOptions):
+                  extra_mode : str = None
+                  some_flag : bool = False
+
+                  # extend the common options for the new fields
+                  COMMON_OPT_SPECS = dict(
+                      **BaseCommandOptions.COMMON_OPT_SPECS,
+                      mode_=('extra_mode', 'The extra mode to do something.'),
+                      flag='some_flag',
+                  )
+
+      This adds an additional `--mode` *mode* and a `--flag` command line option
+      which affects the fields of `self.options` and updates the
+      automaticly generated usage messages accordingly.
+      See the documentation for `BaseCommandOptions.popopts` for
+      explaination of the `COMMON_OPT_SPECS` values.
 
       Subclasses with no subcommands
       generally just implement a `main(argv)` method.
@@ -1151,25 +1183,20 @@ class BaseCommand:
       Returning to methods, if there is a paragraph in the method docstring
       commencing with `Usage:` then that paragraph is incorporated
       into the main usage message automatically.
+
       Example:
 
+          @popopts(l='long_mode')
           def cmd_ls(self, argv):
-              """ Usage: {cmd} [paths...]
+              """ Usage: {cmd} [-l] [paths...]
                     Emit a listing for the named paths.
 
                   Further docstring non-usage information here.
               """
               ... do the "ls" subcommand ...
+              ... with use of self.options.long_mode as needed ...
 
       The subclass is customised by overriding the following methods:
-      * `apply_opt(opt,val)`:
-        apply an individual getopt global command line option
-        to `self.options`.
-      * `apply_opts(opts)`:
-        apply the `opts` to `self.options`.
-        `opts` is an `(option,value)` sequence
-        as returned by `getopot.getopt`.
-        The default implementation iterates over these and calls `apply_opt`.
       * `run_context()`:
         a context manager to provide setup or teardown actions
         to occur before and after the command implementation respectively,
@@ -1181,14 +1208,8 @@ class BaseCommand:
         will be called where `subcmd_argv` contains the command line arguments
         following *subcmd*.
       * `main(argv)`:
-        if there are no `cmd_`*subcmd*` methods then method `main(argv)`
+        if there are no `cmd_`*subcmd* methods then method `main(argv)`
         will be called where `argv` contains the command line arguments.
-
-      Editorial: why not arparse?
-      Primarily because when incorrectly invoked
-      an argparse command line prints the help/usage messgae
-      and aborts the whole programme with `SystemExit`.
-      But also, I find the whole argparse `add_argument` thing cumbersome.
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'

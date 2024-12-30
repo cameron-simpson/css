@@ -1,4 +1,8 @@
-default: use @popopts in the cs.cmdutils and cs.djutils examples
+setvar: not expanding leading $MANPATH etc
+bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
+cs.jsonutils: merge the various JSON utility functions?
+merge the variable jsonable functions?
+cs.cmdutils: use @popopts in the cs.cmdutils and cs.djutils examples
 cs.distinfo: insert script metadata
 default: cs.cmdutils: usage_format_parts: return (usage,full_desc), provide usage_desc_split to get line1 and trailing lines, provide usage_format_desc for full desc, use in the tabulated listing
 √ cs.cmdutils: help -r but no -l - single tabulate call from the top level if subcommands?
