@@ -42,7 +42,7 @@ from cs.threads import ThreadState
 ##  from cs.py.stack import caller
 ##  X("CHECK from %r", caller())
 
-__version__ = '20241005-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'description':
@@ -364,7 +364,7 @@ class ORM(MultiOpenMixin, ABC):
         bool(self.db_fspath),
         lockfile,
         self.db_fspath,
-        poll_interval=0.2,
+        poll_interval=2,
     ):
       # make sure that the db tables are up to date
       if self.__first_use:

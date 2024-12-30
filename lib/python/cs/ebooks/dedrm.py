@@ -35,7 +35,7 @@ from zipfile import ZipFile
 
 from typeguard import typechecked
 
-from cs.cmdutils import qvprint
+from cs.cmdutils import popopts, qvprint
 from cs.context import contextif, stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
@@ -59,18 +59,7 @@ def main(argv=None):
   return DeDRMCommand(argv).run()
 
 class DeDRMCommand(EBooksCommonBaseCommand):
-  ''' cs.dedrm command line implementation.
-  '''
-
-  USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand [args...]
-    Operations using the DeDRM/NoDRM package.
-    Options:
-      -D  Specify the filesystem path to the DeDRM/noDRM plugin.
-          This can be a checkout of the git@github.com:noDRM/DeDRM_tools.git
-          repository or the path to the {DeDRMWrapper.DEDRM_PLUGIN_ZIPFILE_NAME} file
-          as would be installed in a Calibre plugin directory.
-          The default comes from the ${DEDRM_PACKAGE_PATH_ENVVAR} environment variable
-          or the plugin zip file in the local Calibre plugins directory.
+  ''' Perform operations using the DeDRM/NoDRM package.
   '''
 
   @contextmanager
@@ -79,13 +68,15 @@ class DeDRMCommand(EBooksCommonBaseCommand):
       with contextif(self.options.dedrm):
         yield
 
+  @popopts(
+      inplace=('Replace the original with the decrypted version.'),
+      O='output_dirpath',
+  )
   def cmd_decrypt(self, argv):
     ''' Usage: {cmd} [--inplace] filenames...
           Remove DRM from the specified filenames.
           Write the decrypted contents of path/to/book.ext
           to the file book-decrypted.ext.
-          Options:
-            --inplace   Replace the original with the decrypted version.
     '''
     dedrm = self.options.dedrm
     options = self.options
@@ -95,6 +86,8 @@ class DeDRMCommand(EBooksCommonBaseCommand):
         O_='output_dirpath',
         inplace=bool,
     )
+    if options.output_dirpath is None:
+      options.output_dirpath = '.'
     if not argv:
       raise GetoptError("missing filenames")
     for filename in argv:

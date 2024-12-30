@@ -106,8 +106,7 @@ _venv:
     set -uex \
     [ -d $(venv_dir) ] || { \
         $(base_python) -m ensurepip \
-        $(base_pip) install -U pip \
-        $(base_pip) install -U uv \
+        $(base_pip) install -U pip wheel build ruff uv \
         $(uv) venv --python $(base_python) --seed $(venv_dir) \
     }
     uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
@@ -246,7 +245,7 @@ _publish_git:
         for repo in $(git_repos) \
         do  pfx "$$repo" hg-gitup -a -f -x "$$repo" \
         done
-        @echo 'changes visible at $(www_bitbucket)'
+        @echo 'changes visible at $(www_bitbucket)/branch/'"$$(vcs branch)"
         @echo 'code visible at $(www_github)'
 
 _publish_hg:

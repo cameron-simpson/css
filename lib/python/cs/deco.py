@@ -18,7 +18,7 @@ import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20241109-post'
+__version__ = '20241206-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -778,7 +778,9 @@ def default_params(func, _strict=False, **param_defaults):
   if not param_defaults:
     raise ValueError("@default_params(%s): no defaults?" % (func,))
 
-  def defaulted_func(*a, **kw):
+  def update_kw(kw):
+    ''' Update keyword parameters `kw` from the `param_defaults`.
+    '''
     for param_name, param_default in param_defaults.items():
       try:
         v = kw[param_name]
@@ -787,7 +789,17 @@ def default_params(func, _strict=False, **param_defaults):
       else:
         if v is None and not _strict:
           kw[param_name] = param_default()
-    return func(*a, **kw)
+
+  if isgeneratorfunction(func):
+
+    def defaulted_func(*a, **kw):
+      update_kw(kw)
+      yield from func(*a, **kw)
+  else:
+
+    def defaulted_func(*a, **kw):
+      update_kw(kw)
+      return func(*a, **kw)
 
   defaulted_func.__name__ = func.__name__
   # TODO: get the indent from some aspect of stripped_dedent
@@ -877,7 +889,10 @@ def uses_cmd_options(
     except ImportError:
       # missing cs.cmdutils or cs.context,
       # make an options with no attributes
-      options = object()
+      class Options:
+        '''Dummy options object for accruing attributes.'''
+
+      options = Options()
     else:
       options_class = BaseCommand.Options
       options = options_class.default() or options_class()
@@ -1060,7 +1075,9 @@ def promote(func, params=None, types=None):
     warning("@promote(%s): no promotable parameters", func)
     return func
 
-  def promoting_func(*a, **kw):
+  def promote_args(a, kw):
+    ''' Promote the position and keyword arguments.
+    '''
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
     # we don't import cs.pfx (many dependencies!)
@@ -1119,7 +1136,19 @@ def promote(func, params=None, types=None):
       else:
         arg_value = promoted_value
       arg_mapping[param_name] = arg_value
-    return func(*bound_args.args, **bound_args.kwargs)
+    return bound_args.args, bound_args.kwargs
+
+  if isgeneratorfunction(func):
+
+    def promoting_func(*a, **kw):
+      a, kw = promote_args(a, kw)
+      yield from func(*a, **kw)
+
+  else:
+
+    def promoting_func(*a, **kw):
+      a, kw = promote_args(a, kw)
+      return func(*a, **kw)
 
   return promoting_func
 

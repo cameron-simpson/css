@@ -1,4 +1,7 @@
+calibre and dedrm, display calibre plugins paths in usage
 obok prints to be monkeypatchs with qvprint as with dedrm
+cs.ebooks.dedrm: option to use the plugin.zip directly instead of an unpacked source tree?
+cs.ebooks.cbz: ABCF metadata? https://acbf.fandom.com/wiki/ACBF_Specifications
 common EBookLibrarytree abstract class presenting a mapping of book key to Book, asin for kindle, volumeid for kobo etc
 modern kindle db support
 test update of dedrm from 7.2.1 to 10., see if we can support both

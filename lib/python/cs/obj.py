@@ -11,10 +11,11 @@ from __future__ import print_function
 from collections import defaultdict
 from copy import copy as copy0
 import sys
+from threading import Lock
 import traceback
 from types import SimpleNamespace
-from threading import Lock
 from weakref import WeakValueDictionary
+
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
@@ -529,24 +530,28 @@ class Sentinel:
   def __eq__(self, other):
     return self is other
 
-def public_subclasses(cls):
-  ''' Return a list of the subclasses of `cls` which has public names.
+def public_subclasses(cls, extras=()):
+  ''' Return a set of the subclasses of `cls` which have public names.
   '''
-  classes = []
+  classes = set()
   q = list(cls.__subclasses__())
+  q.extend(extras)
   while q:
     subcls = q.pop(0)
-    if not issubclass(subcls, cls):
+    if subcls in classes:
+      # seen this one
       continue
     if not subcls.__name__.startswith('_'):
-      classes.append(subcls)
+      # public name, include it
+      classes.add(subcls)
+    # append the further subclasses for consideration
     try:
       subclasses = subcls.__subclasses__()
     except TypeError:
       # type is a subclass of object, but its __subclasses__ is just a function
       pass
     else:
-      q.extend(subcls.__subclasses__())
+      q.extend(subclasses)
   return classes
 
 if __name__ == '__main__':

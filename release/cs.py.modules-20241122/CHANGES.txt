@@ -1,0 +1,5 @@
+lib/python/cs/py/modules.py: cs.py.modules: import_module_name: use contextif for the lock
+lib/python/cs/py/modules.py: cs.py.modules: import_module_name: rename the `path` parameter to `sys_path` to match import_module_from_file
+lib/python/cs/py/modules.py: cs.py.modules: import_module_name: use contextif(stackattrs) to push sys_path is supplied
+lib/python/cs/py/modules.py: cs.py.modules: import_module_name: default sys_path to sys.path, just use stackattrs
+lib/python/cs/py/modules.py: cs.py.modules: import_module_name: docstring update

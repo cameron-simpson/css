@@ -63,7 +63,7 @@
         a=1 b=3 c=[1,2,3] d=dee
         >>> # since you can print a TagSet to a file as a line of text
         >>> # you can get it back from a line of text
-        >>> TagSet.from_line('a=1 b=3 c=[1,2,3] d=dee')
+        >>> TagSet.from_str('a=1 b=3 c=[1,2,3] d=dee')
         TagSet:{'a': 1, 'b': 3, 'c': [1, 2, 3], 'd': 'dee'}
         >>> # because TagSets are dicts you can format strings with them
         >>> print('topic:{topic} subtopic:{subtopic}'.format_map(tags))
@@ -215,7 +215,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator, fmtdoc, Promotable
+from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.fs import FSPathBasedSingleton
@@ -405,11 +405,11 @@ def jsonable(obj, converted: dict):
     try:
       it = iter(obj)
     except TypeError:
-      raise TypeError(f'jsoanble({t.__name__}): cannot convert for JSON')
+      raise TypeError(f'jsoanble({r(obj)}): cannot convert for JSON')
     else:
       if it is obj:
         raise TypeError(
-            f'jsoanble(t.__name__): refusing to convert an iterator for JSON because it would consume it'
+            f'jsoanble({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
         )
       # convert to list
       converted[id(obj)] = convobj = []
@@ -450,7 +450,8 @@ class _FormatStringTagProxy:
     return getattr(self.__proxied, attr)
 
 @has_format_attributes
-class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
+class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
+             Promotable):
   ''' A setlike class associating a set of tag names with values.
 
       This actually subclasses `dict`, so a `TagSet` is a direct
@@ -526,6 +527,27 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  @classmethod
+  def from_str(cls, tags_s, *, ontology=None, extra_types=None, verbose=None):
+    ''' Create a new `TagSet` from some text, a whitespace separated list of `Tag`s.
+    '''
+    tags = cls(_ontology=ontology)
+    offset = skipwhite(tags_s)
+    while offset < len(tags_s):
+      tag, offset = Tag.from_str2(
+          tags_s, offset, ontology=ontology, extra_types=extra_types
+      )
+      tags.add(tag, verbose=verbose)
+      offset = skipwhite(tags_s, offset)
+    return tags
+
+  @classmethod
+  @OBSOLETE("TagSet.from_str")
+  def from_line(cls, s, offset: int, **from_str_kw):
+    ''' Obsolete form of `TagSet.from_str`.
+    '''
+    return cls.from_str(s[offset:], **from_str_kw)
 
   def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
     ''' Dump a `TagSet` in multiline format.
@@ -777,22 +799,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       self.__dict__[attr] = value
     else:
       self[attr] = value
-
-  @classmethod
-  def from_line(
-      cls, line, offset=0, *, ontology=None, extra_types=None, verbose=None
-  ):
-    ''' Create a new `TagSet` from a line of text.
-    '''
-    tags = cls(_ontology=ontology)
-    offset = skipwhite(line, offset)
-    while offset < len(line):
-      tag, offset = Tag.from_str2(
-          line, offset, ontology=ontology, extra_types=extra_types
-      )
-      tags.add(tag, verbose=verbose)
-      offset = skipwhite(line, offset)
-    return tags
 
   def __contains__(self, tag):
     ''' Test for a tag being in this `TagSet`.
@@ -1152,7 +1158,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(line, offset, ontology=ontology)
+    tags = TagSet.from_str(line[offset:], ontology=ontology)
     if 'name' in tags:
       warning("discard explicit tag name=%r", tags.name)
       tags.discard('name')
@@ -3489,9 +3495,8 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(
-        line,
-        offset,
+    tags = TagSet.from_str(
+        line[offset:],
         extra_types=extra_types,
         ontology=ontology,
         verbose=verbose

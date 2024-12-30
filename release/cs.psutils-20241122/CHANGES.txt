@@ -1,0 +1,2 @@
+lib/python/cs/psutils.py: cs.psutil: print_argv: new print= parameter to provide a print() function, refactor to use print instead of file.write; run: new optional print parameter, plumb to print_argv
+lib/python/cs/psutils.py: cs.psutils: use @uses_doit and @uses_quiet to provide the default quiet and doit states

@@ -14,7 +14,7 @@ import errno
 from functools import partial
 import gzip
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read, rename
+from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read
 try:
   from os import pread
 except ImportError:
@@ -38,7 +38,7 @@ import time
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import cachedmethod, decorator, fmtdoc, strable
+from cs.deco import cachedmethod, decorator, fmtdoc, OBSOLETE, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
 from cs.gimmicks import TimeoutError  # pylint: disable=redefined-builtin
@@ -53,7 +53,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20241007.1-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -103,6 +103,15 @@ def seekable(fp):
     test = lambda: stat.S_ISREG(os.fstat(getfd()).st_mode)
   return test()
 
+def rename_excl(oldpath, newpath):
+  ''' Safely rRename `oldpath` to `newpath`.
+      Raise `FileExistsError` if `newpath` already exists.
+  '''
+  with pfx_call(open, newpath, 'xb'):
+    pass
+  pfx_call(os.rename, oldpath, newpath)
+
+@OBSOLETE("rename_excl")
 def saferename(oldpath, newpath):
   ''' Rename a path using `os.rename()`,
       but raise an exception if the target path already exists.
@@ -144,9 +153,9 @@ def compare(f1, f2, mode="rb"):
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 @contextmanager
-def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
+def NamedTemporaryCopy(f, progress=False, progress_label=None, **nt_kw):
   ''' A context manager yielding a temporary copy of `filename`
-      as returned by `NamedTemporaryFile(**kw)`.
+      as returned by `NamedTemporaryFile(**nt_kw)`.
 
       Parameters:
       * `f`: the name of the file to copy, or an open binary file,
@@ -174,7 +183,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
         S = os.stat(filename)
       fast_mode = stat.S_ISREG(S.st_mode)
     if fast_mode:
-      with NamedTemporaryFile(**kw) as T:
+      with NamedTemporaryFile(**nt_kw) as T:
         with Pfx("shutil.copy(%r,%r)", filename, T.name):
           shutil.copy(filename, T.name)
         yield T
@@ -182,10 +191,10 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
       with Pfx("open(%r)", filename):
         with open(filename, 'rb') as f2:
           with NamedTemporaryCopy(f2, progress=progress,
-                                  progress_label=progress_label, **kw) as T:
+                                  progress_label=progress_label, **nt_kw) as T:
             yield T
     return
-  prefix = kw.pop('prefix', None)
+  prefix = nt_kw.pop('prefix', None)
   if prefix is None:
     prefix = 'NamedTemporaryCopy'
   # prepare the buffer and try to infer the length
@@ -217,7 +226,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   else:
     need_bar = False
     assert isinstance(progress, Progress)
-  with NamedTemporaryFile(prefix=prefix, **kw) as T:
+  with NamedTemporaryFile(prefix=prefix, **nt_kw) as T:
     it = (
         bfr if need_bar else progressbar(
             bfr,
@@ -688,11 +697,10 @@ def makelockfile(
           start = now
           complaint_last = start
           complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
-        else:
-          if now - complaint_last >= complaint_interval:
-            warning("pid %d waited %ds", os.getpid(), now - start)
-            complaint_last = now
-            complaint_interval = min(complaint_interval * 2, max_interval)
+        elif now - complaint_last >= complaint_interval:
+          warning("pid %d waited %ds", os.getpid(), now - start)
+          complaint_last = now
+          complaint_interval = min(complaint_interval * 2, max_interval)
         # post: start is set
         if timeout is None:
           sleep_for = poll_interval
@@ -1649,7 +1657,7 @@ def atomic_filename(
     dir=None,
     prefix=None,
     suffix=None,
-    rename_func=rename,
+    rename_func=None,
     **tempfile_kw
 ):
   ''' A context manager to create `filename` atomicly on completion.
@@ -1676,8 +1684,9 @@ def atomic_filename(
         from `splitext(basename(filename))`
       * `rename_func`: a callable accepting `(tempname,filename)`
         used to rename the temporary file to the final name; the
-        default is `os.rename` and this parametr exists to accept
-        something such as `FSTags.move`
+        default is `os.rename` if `exists_ok` or `placeholder`,
+        otherwise `rename_excl`.
+        This parametr exists to accept something such as `FSTags.move`.
       Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
 
       Example:
@@ -1701,6 +1710,11 @@ def atomic_filename(
     prefix = '.' + fprefix + '-'
   if suffix is None:
     suffix = fsuffix
+  if rename_func is None:
+    if exists_ok or placeholder:
+      rename_func = os.rename
+    else:
+      rename_func = rename_excl
   if not exists_ok and existspath(filename):
     raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), filename)
   with NamedTemporaryFile(
@@ -1742,6 +1756,20 @@ def atomic_filename(
     # recreate the temp file so that it can be cleaned up by NamedTemporaryFile
     with pfx_call(open, T.name, 'xb'):
       pass
+
+def atomic_copy2(srcpath, dstpath, *, follow_symlinks=True, **af_kw):
+  ''' Call `shutil.copy2` to copy `srcpath` to `dstpath` via a
+      temporary file using `atomic_filename`.
+      This differs from `shutil.copy2` in 2 ways:
+      - it is an error if `dstpath` already exists unless you supply
+        `exists_ok=True`
+      - the new copy appears atomicly when the copy is complete
+        instead of be visible partially complete during the copy
+      The `follow_symlinks=True` parameter is passed to `shutil.copy2`.
+      Other keyword parameters are passed to `atomic_filename`.
+  '''
+  with atomic_filename(dstpath, **af_kw) as af:
+    return shutil.copy2(srcpath, af.name, follow_symlinks=follow_symlinks)
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.

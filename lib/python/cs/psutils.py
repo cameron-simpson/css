@@ -21,11 +21,11 @@ from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subpro
 import sys
 import time
 
-from cs.deco import fmtdoc, uses_doit, uses_quiet
+from cs.deco import fmtdoc, uses_cmd_options
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
-__version__ = '20240316-post'
+__version__ = '20241206-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -198,42 +198,50 @@ def PidFileManager(path, pid=None):
   finally:
     remove_pidfile(path)
 
-@uses_doit
-@uses_quiet
+@uses_cmd_options(doit=True, quiet=False)
 def run(
     argv,
     *,
+    check=True,
     doit: bool,
-    logger=None,
-    quiet: bool,
     input=None,
-    stdin=None,
+    logger=None,
     print=None,
+    quiet: bool,
+    remote=None,
+    ssh_exe=None,
+    stdin=None,
     **subp_options,
 ):
   ''' Run a command via `subprocess.run`.
       Return the `CompletedProcess` result or `None` if `doit` is false.
 
-      Parameters:
+      Positional parameter:
       * `argv`: the command line to run
+
+      Note that `argv` is passed through `prep_argv(argv,remote=remote,ssh_exe=ssh_exe)`
+      before use, allowing direct invocation with conditional parts.
+      See the `prep_argv` function for details.
+
+      Keyword parameters:
+      * `check`: passed to `subprocess.run`, default `True`;
+        NB: _unlike_ the `subprocess.run` default, which is `False`
       * `doit`: optional flag, default `True`;
         if false do not run the command and return `None`
+      * `input`: default `None`: alternative to `stdin`;
+        passed to `subprocess.run`
       * `logger`: optional logger, default `None`;
         if `True`, use `logging.getLogger()`;
         if not `None` or `False` trace using `print_argv`
-      * `quiet`: default `True`; if false, print the command and its output
-      * `input`: default `None`: alternative to `stdin`;
-        passed to `subprocess.run`
+      * `quiet`: default `False`; if false, print the command and its output
+      * `remote`: optional remote target on which to run `argv`
+      * `ssh_exe`: optional command string for the remote shell
       * `stdin`: standard input for the subprocess, default `subprocess.DEVNULL`;
         passed to `subprocess.run`
-      * `subp_options`: optional mapping of keyword arguments
-        to pass to `subprocess.run`
 
-      Note that `argv` is passed through `prep_argv` before use,
-      allowing direct invocation with conditional parts.
-      See the `prep_argv` function for details.
+      Other keyword parameters are passed to `subprocess.run`.
   '''
-  argv = prep_argv(*argv)
+  argv = prep_argv(*argv, remote=remote, ssh_exe=ssh_exe)
   if logger is True:
     logger = logging.getLogger()
   if not doit:
@@ -253,8 +261,16 @@ def run(
       stdin = subprocess_DEVNULL
   elif stdin is not None:
     raise ValueError("you may not specify both input and stdin")
-  cp = pfx_call(subprocess_run, argv, input=input, stdin=stdin, **subp_options)
+  cp = pfx_call(
+      subprocess_run,
+      argv,
+      check=check,
+      input=input,
+      stdin=stdin,
+      **subp_options,
+  )
   if cp.stderr:
+    # TODO: is this a good thing? I have my doubts
     print(" stderr:")
     print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
   if cp.returncode != 0:
@@ -265,8 +281,17 @@ def run(
     )
   return cp
 
-@uses_quiet
-def pipefrom(argv, *, quiet: bool, text=True, stdin=DEVNULL, **popen_kw):
+@uses_cmd_options(quiet=False, ssh_exe='ssh')
+def pipefrom(
+    argv,
+    *,
+    quiet: bool,
+    remote=None,
+    ssh_exe,
+    text=True,
+    stdin=DEVNULL,
+    **popen_kw
+):
   ''' Pipe text (usually) from a command using `subprocess.Popen`.
       Return the `Popen` object with `.stdout` as a pipe.
 
@@ -282,13 +307,14 @@ def pipefrom(argv, *, quiet: bool, text=True, stdin=DEVNULL, **popen_kw):
       allowing direct invocation with conditional parts.
       See the `prep_argv` function for details.
   '''
-  argv = prep_argv(*argv)
+  argv = prep_argv(*argv, remote=remote, ssh_exe=ssh_exe)
   if not quiet:
     print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
-@uses_quiet
-def pipeto(argv, *, quiet: bool, **kw):
+# TODO: text= parameter?
+@uses_cmd_options(quiet=False, ssh_exe='ssh')
+def pipeto(argv, *, quiet: bool, remote=None, ssh_exe, **kw):
   ''' Pipe text to a command.
       Optionally trace invocation.
       Return the Popen object with .stdin encoded as text.
@@ -379,7 +405,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
     argvs.append(pre_argv + per + post_argv)
   return argvs
 
-def prep_argv(*argv):
+@uses_cmd_options(ssh_exe='ssh')
+def prep_argv(*argv, ssh_exe, remote=None):
   ''' A trite list comprehension to reduce an argument list `*argv`
       to the entries which are not `None` or `False`
       and to flatten other entries which are not strings.
@@ -402,8 +429,21 @@ def prep_argv(*argv):
       where `verbose` is a `bool` governing the `-v` option
       and `hashname` is either `str` to be passed with `-h hashname`
       or `None` to omit the option.
+
+      If `remote` is not `None` it is taken to be a remote host on
+      which to run `argv`. This is done via the `ssh_exe` argument,
+      which defaults to the string `'ssh'`. The value of `ssh_exe`
+      is a command string parsed with `shlex.split`. A new `argv`
+      is computed as:
+
+          [
+              *shlex.split(ssh_exe),
+              remote,
+              '--',
+              shlex.join(argv),
+          ]
   '''
-  return list(
+  argv = list(
       chain(
           *[
               ((arg,) if isinstance(arg, str) else arg)
@@ -412,6 +452,14 @@ def prep_argv(*argv):
           ]
       )
   )
+  if remote is not None:
+    argv = [
+        *shlex.split(ssh_exe),
+        remote,
+        '--',
+        shlex.join(argv),
+    ]
+  return argv
 
 def print_argv(
     *argv,
@@ -428,30 +476,30 @@ def print_argv(
     file = sys.stdout
   if print is None:
     print = builtins.print
-  print_argv = []
+  pr_argv = []
   was_opt = False
   for i, arg in enumerate(argv):
     if i == 0:
-      print_argv.append(indent)
+      pr_argv.append(indent)
       was_opt = False
     elif len(arg) >= 2 and arg.startswith('-'):
       if fold:
         # options get a new line
-        print_argv.append(" \\\n" + indent + subindent)
+        pr_argv.append(" \\\n" + indent + subindent)
       else:
-        print_argv.append(" ")
+        pr_argv.append(" ")
       was_opt = True
     else:
       if was_opt:
-        print_argv.append(" ")
+        pr_argv.append(" ")
       elif fold:
         # nonoptions get a new line
-        print_argv.append(" \\\n" + indent + subindent)
+        pr_argv.append(" \\\n" + indent + subindent)
       else:
-        print_argv.append(" ")
+        pr_argv.append(" ")
       was_opt = False
-    print_argv.append(shlex.quote(arg))
-  print(*print_argv, sep='', end=end, file=file)
+    pr_argv.append(shlex.quote(arg))
+  print(*pr_argv, sep='', end=end, file=file)
 
 if __name__ == '__main__':
   for test_max_argv in 64, 20, 16, 8:

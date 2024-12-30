@@ -6,29 +6,25 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-from getopt import GetoptError, getopt
+from getopt import GetoptError
 import json
 import os
 from os.path import (
     basename,
     dirname,
-    exists as existspath,
     isdir as isdirpath,
-    isfile as isfilepath,
     join as joinpath,
     realpath,
 )
 from pprint import pprint
-from stat import S_ISDIR, S_ISREG
 import sys
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import contextif, stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fs import HasFSPath
 from cs.fstags import FSTags, uses_fstags
-from cs.gui_tk import BaseTkCommand
 from cs.hashindex import HASHNAME_DEFAULT
 from cs.lex import r
 from cs.logutils import warning
@@ -50,15 +46,6 @@ class TaggerCommand(BaseCommand):
   ''' Tagger command line implementation.
   '''
 
-  GETOPT_SPEC = 'd:nqv'
-
-  USAGE_FORMAT = '''Usage: {cmd} [-d dirpath] [-nqv] subcommand [subargs...]
-    -d dirpath  Specify the reference directory, default '.'.
-    -h hashname Specify the content hash algorithm name, default: {HASHNAME_DEFAULT}.
-    -n          No action, dry run.
-    -q          Quiet.
-    -v          Verbose.'''
-
   USAGE_KEYWORDS = {
       'HASHNAME_DEFAULT': HASHNAME_DEFAULT,
       'RULE_MODES': RULE_MODES,
@@ -69,21 +56,12 @@ class TaggerCommand(BaseCommand):
     fspath: str = '.'
     hashname: str = HASHNAME_DEFAULT
 
-  # pylint: disable=no-self-use
-  def apply_opt(self, opt, val):
-    options = self.options
-    if opt == '-d':
-      options.fspath = val
-    if opt == '-h':
-      options.hashname = val
-    elif opt == '-n':
-      options.dry_run = True
-    elif opt == '-q':
-      options.quiet = True
-    elif opt == '-v':
-      options.verbose = True
-    else:
-      raise NotImplementedError(f'unsupported option: {opt!r}')
+    # pylint: disable=use-dict-literal
+    COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+        d_=('fspath', "The reference directory, default '.'."),
+        h_=('hashname', 'The file content hash algorithm name.'),
+    )
 
   @contextmanager
   @uses_fstags
@@ -105,50 +83,37 @@ class TaggerCommand(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals
   @uses_runstate
+  @popopts(
+      _1='once',
+      d=(
+          'direct',
+          'Treat directory paths like files - file the directory, not its contents.'
+      ),
+      f='force',
+      M_=(
+          'modes',
+          ''' Only apply actions in modes, a comma separated list of modes
+              from {RULE_MODES!r}.
+          ''',
+      ),
+      r=('recurse', 'Recurse. Required to autofile a directory tree.'),
+      y=('doit', 'Yes: link files to destinations.'),
+  )
   def cmd_autofile(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-dnry] paths...
           Link paths to destinations based on their tags.
-          -d    Treat directory paths like files - file the
-                directory, not its contents.
-                (TODO: we file by linking - this needs a rename.)
-          -h hashname
-                Specify the content hash algorithm name, default: {HASHNAME_DEFAULT}.
-          -M modes
-                Only apply actions in modes, a comma separated list of modes
-                from {RULE_MODES!r}.
-          -n    No action (default). Just print filing actions.
-          -q    Quiet.
-          -r    Recurse. Required to autofile a directory tree.
-          -y    Link files to destinations.
     '''
-    options = self.options
-    options.direct = False
-    options.force = False
-    options.modes = ",".join(RULE_MODES)
-    options.once = False
-    options.recurse = False
-    options.popopts(
-        argv,
-        _1='once',
-        d='direct',
-        f='force',
-        h='hashname',
-        n='dry_run',  # no action
-        M_=('modes', str),
-        q='quiet',
-        r='recurse',
-        y='doit',  # inverse of -n
-        v='verbose',
-    )
     if not argv:
       raise GetoptError("missing paths")
-    doit = options.doit
-    direct = options.direct
-    force = options.force
-    hashname = options.hashname
-    modes = options.modes.split(',')
+    options = self.options
+    modes = options.modes
+    if modes is None:
+      modes = RULE_MODES
+    else:
+      modes = modes.split(',')
     if not all([mode in RULE_MODES for mode in modes]):
       raise GetoptError(f'invalid modes not in {RULE_MODES!r}: {modes!r}')
+    direct = options.direct
     once = options.once
     recurse = options.recurse
     quiet = options.quiet
@@ -176,13 +141,7 @@ class TaggerCommand(BaseCommand):
             continue
           tagger = Tagger(dirname(path))
           taggers.add(tagger)  # remember for reuse
-          matches = tagger.process(
-              basename(path),
-              hashname=hashname,
-              modes=modes,
-              doit=doit,
-              force=force,
-          )
+          matches = tagger.process(basename(path))
           if matches:
             for match in matches:
               if match.filed_to:
@@ -200,24 +159,15 @@ class TaggerCommand(BaseCommand):
           continue
     return xit
 
+  @popopts(f=('force', 'Force. Overwrite existing tags.'))
   def cmd_autotag(self, argv):
-    ''' Usage: {cmd} [-fn] paths...
+    ''' Usage: {cmd} paths...
           Apply the inference rules to each path.
-          -f  Force. Overwrite existing tags.
-          -n  No action. Recite inferred tags.
     '''
-    infer_mode = 'infill'
-    opts, argv = getopt(argv, 'fn')
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-f':
-          infill_mode = 'overwrite'
-        elif opt == '-n':
-          infill_mode = 'infer'
-        else:
-          raise NotImplementedError("unhandled option")
     if not argv:
       raise GetoptError("missing paths")
+    options = self.options
+    infer_mode = 'overwrite' if options.force else 'infill'
     for path in argv:
       with Pfx(path):
         print(path)
@@ -337,9 +287,13 @@ class TaggerCommand(BaseCommand):
           'rules',
       ]
     tagger = Tagger(dirpath)
-    print(shortpath(tagger.rcfile))
-    for n, rule in enumerate(tagger.rules, 1):
-      print(n, rule)
+    rcfile = tagger.rcfile
+    if rcfile is None:
+      warning("no rcfile for %s", tagger)
+    else:
+      print(shortpath(rcfile))
+      for n, rule in enumerate(tagger.rules, 1):
+        print(n, rule)
 
   @uses_fstags
   def cmd_test(self, argv, *, fstags: FSTags):
