@@ -52,17 +52,25 @@ class Action(BaseToken):
             name=text,
         )
 
-      # | shcmd
-      if text.startswith('|'):
-        # pipe through shell command
-        shcmd = text[1:].strip()
-        if not shcmd:
-          raise SyntaxError("empty shell command")
+      # "! shcmd" or "| shlex-split"
+      if text.startswith(('!', '|')):
+        # pipe through shell command or shlex-argv
+        cmdtext = text[1:].strip()
+        if not cmdtext:
+          raise SyntaxError("empty command")
+        if text.startswith('!'):
+          # shell command
+          argv = ['/bin/sh', '-c', cmdtext]
+        elif text.startswith('!'):
+          # shlex.split()
+          argv = shlex.split(cmdtext)
+        else:
+          raise RuntimeError('unhandled shcmd/shlex subprocess')
         return ActionSubProcess(
             offset=0,
             source_text=text,
             end_offset=len(text),
-            argv=['/bin/sh', '-c', shcmd],
+            argv=argv,
         )
 
       # /regexp or -/regexp
