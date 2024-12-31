@@ -461,11 +461,11 @@ class PacketConnection(MultiOpenMixin):
               self._sendQ.close(enforce_final_close=True)
               self._send_thread.join()
             if not self._sendQ.empty():
-              warning(
-                  "%s: EXTRA unsent items in _sentQ %s:", self, self._sendQ
-              )
               n_extra = 0
               for item in self._sendQ:
+                if item in (PacketConnection.EOF_Packet,
+                            PacketConnection.ERQ_Packet):
+                  continue
                 n_extra += 1
                 warning(
                     "  EXTRA %s:%s %s",
@@ -477,7 +477,11 @@ class PacketConnection(MultiOpenMixin):
                         if item == PacketConnection.ERQ_Packet else ""
                     ),
                 )
-              assert n_extra > 0
+              if n_extra > 0:
+                warning(
+                    "%s: %d EXTRA unsent items in _sentQ %s", self, n_extra,
+                    self._sendQ
+                )
             with run_task(
                 "%s: wait for _recv_thread %s" % (
                     self,
