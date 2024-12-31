@@ -62,7 +62,7 @@ export ENV_DEV_DIR PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
 [ ! -f "$devdir/.env.sh" ] || . "$devdir/.env.sh"
 
 # hackery for uv
-[ -n "$VIRTUAL_ENV" -a -d "$VIRTUAL_ENV" ] || {
+[ -n "${VIRTUAL_ENV:-''}" -a -d "${VIRTUAL_ENV:-''}" ] || {
   uv=$( which uv ) && {
     VIRTUAL_ENV=$( dirname $( dirname "$uv" ) )
     export VIRTUAL_ENV
