@@ -806,6 +806,7 @@ class BaseCommandOptions(HasThreadState):
               ... optional extra fields etc ...
   '''
 
+  INFO_SKIP_NAMES = ('runstate', 'runstate_signals')
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
   COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
@@ -1860,10 +1861,8 @@ class BaseCommand:
           `dry_run`
     '''
     if skip_names is None:
-      skip_names = tuple(
-          F.name
-          for F in fields(BaseCommandOptions)
-          if F.name not in ('cmd', 'dry_run')
+      skip_names = getattr(
+          self.options, 'INFO_SKIP_NAMES', ('runstate', 'runstate_signals')
       )
     self.options.popopts(argv)
     xit = 0
