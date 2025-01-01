@@ -74,7 +74,7 @@ def pathsof(path: str) -> Iterable[str]:
   ''' Yield the file pathnames derived from `path`, which might be a directory.
   '''
   if path == '-' or isfile(path):
-    # yield "stdin" and file paths unchanges
+    # yield "stdin" and file paths unchanged
     yield path
   elif isdir(path):
     for dirpath, dirnames, filenames in os.walk(path):
