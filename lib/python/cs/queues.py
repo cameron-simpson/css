@@ -12,14 +12,26 @@ from functools import partial
 import sys
 from threading import Timer, Lock, RLock, Thread
 import time
+from typing import Any, Callable, Iterable
 
+from typeguard import typechecked
+
+from cs.deco import promote
 from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
 from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
-from cs.resources import MultiOpenMixin, not_closed, ClosedError
+from cs.resources import (
+    MultiOpenMixin,
+    RunState,
+    RunStateMixin,
+    uses_runstate,
+    not_closed,
+    ClosedError,
+)
+from cs.result import CancellationError
 from cs.seq import seq, unrepeated
 
 __version__ = '20240412-post'
@@ -275,7 +287,7 @@ class Channel(object):
     else:
       self.closed = True
 
-class PushQueue(MultiOpenMixin):
+class PushQueue(MultiOpenMixin, RunStateMixin):
   ''' A puttable object which looks like an iterable `Queue`.
 
       In this base class,
@@ -290,8 +302,16 @@ class PushQueue(MultiOpenMixin):
       as resource controlled concurrency.
   '''
 
-  def __init__(self, name, functor, outQ):
-    ''' Initialise the PushQueue with the callable `functor`
+  @uses_runstate
+  @typechecked
+  def __init__(
+      self,
+      name: str,
+      functor: Callable[Any, Iterable],
+      outQ,
+      runstate: RunState,
+  ):
+    ''' Initialise the `PushQueue` with the callable `functor`
         and the output queue `outQ`.
 
         Parameters:
@@ -329,10 +349,15 @@ class PushQueue(MultiOpenMixin):
         the result of `functor` differently, or to queue the call
         to `functor(item)` via some taks system.
     '''
+    runstate = self.runstate
+    if runstate.cancelled:
+      raise CancellationError(f'{runstate}.cancelled')
     outQ = self.outQ
     functor = self.functor
     with outQ:
       for computed in functor(item):
+        if runstate.cancelled:
+          raise CancellationError(f'{runstate}.cancelled')
         outQ.put(computed)
 
 class NullQueue(MultiOpenMixin):

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Resourcing related classes and functions.
 # - Cameron Simpson <cs@cskk.id.au> 11sep2014
@@ -29,6 +29,7 @@ from cs.psutils import signal_handlers
 from cs.py.func import funccite
 from cs.py.stack import caller, frames as stack_frames, StackSummary
 from cs.result import CancellationError
+from cs.semantics import ClosedError, not_closed
 from cs.threads import ThreadState, HasThreadState, NRLock
 
 __version__ = '20241005-post'
@@ -54,27 +55,6 @@ DISTINFO = {
         'typeguard',
     ],
 }
-
-class ClosedError(Exception):
-  ''' Exception for operations which are invalid when something is closed.
-  '''
-
-@decorator
-def not_closed(func):
-  ''' A decorator to wrap methods of objects with a `.closed` property
-      which should raise when `self.closed`.
-  '''
-
-  def not_closed_wrapper(self, *a, **kw):
-    ''' Wrapper function to check that this instance is not closed.
-    '''
-    if self.closed:
-      raise ClosedError(
-          "%s: %s: already closed" % (not_closed_wrapper.__name__, self)
-      )
-    return func(self, *a, **kw)
-
-  return not_closed_wrapper
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
 if sys.version_info >= (3, 10):
@@ -788,6 +768,23 @@ class RunState(FSM, HasThreadState):
         msg = "%s.cancelled" % (self,)
       elif a:
         msg = msg % a
+      raise CancellationError(msg)
+
+  def raiseif(self, msg=None, *a):
+    ''' Raise `CancellationError` is cancelled.
+
+        Example:
+
+            for item in items:
+                runstate.raiseif()
+                ... process item ...
+    '''
+    if self.cancelled:
+      if msg is None:
+        msg = "%s.cancelled" % (self,)
+      else:
+        if a:
+          msg = msg % a
       raise CancellationError(msg)
 
   @property

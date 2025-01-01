@@ -58,9 +58,9 @@ class TaggerCommand(BaseCommand):
 
     # pylint: disable=use-dict-literal
     COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
         d_=('fspath', "The reference directory, default '.'."),
         h_=('hashname', 'The file content hash algorithm name.'),
-        **BaseCommand.Options.COMMON_OPT_SPECS,
     )
 
   @contextmanager
@@ -287,9 +287,13 @@ class TaggerCommand(BaseCommand):
           'rules',
       ]
     tagger = Tagger(dirpath)
-    print(shortpath(tagger.rcfile))
-    for n, rule in enumerate(tagger.rules, 1):
-      print(n, rule)
+    rcfile = tagger.rcfile
+    if rcfile is None:
+      warning("no rcfile for %s", tagger)
+    else:
+      print(shortpath(rcfile))
+      for n, rule in enumerate(tagger.rules, 1):
+        print(n, rule)
 
   @uses_fstags
   def cmd_test(self, argv, *, fstags: FSTags):

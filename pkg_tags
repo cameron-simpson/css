@@ -39,7 +39,7 @@ cs.calibre
 cs.cbz
 cs.cdutils
 cs.clockutils pypi.release=20190101
-cs.cmdutils pypi.release="20241218" ok_revision="1b517e78e63c289a05645c2abe0321ec43ea6658" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"],"20240630":["BaseCommandOptions__as_dict"],"20241005":["vprint"],"20241110":["vqprint"],"20241119":["BaseCommand__SubCommandClass"],"20241206":["popopts__decorator"],"20241218":["cmd_repl"]}
+cs.cmdutils pypi.release="20241222.1" ok_revision="271df8ca9bbf2f66d019342e627f91f3b9df9287" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"],"20240630":["BaseCommandOptions__as_dict"],"20241005":["vprint"],"20241110":["vqprint"],"20241119":["BaseCommand__SubCommandClass"],"20241206":["popopts__decorator"],"20241218":["cmd_repl"]}
 cs.common
 cs.configutils pypi.release="20220606" ok_revision="646d06810607e97ae0aaefbcce18806fb0ded874" features={"20220430":["HasConfigIni"],"20220606":["info_dict"]}
 cs.context pypi.release="20240630" ok_revision="365a81af90e11f74111f9cf63a365c5c65389274" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"],"20230109":["contextif"],"20230125":["ContextManagerMixin_as_contextmanager"],"20230212":["stackset"],"20240212":["reconfigure_file"],"20240412":["withall","withif"],"20240630":["closeall","with_self"]}
@@ -53,7 +53,7 @@ cs.deco pypi.release="20241206" ok_revision=d3db61c53b2d23dd1c0cd18ee3bb7488f85b
 cs.dedrm
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.distinfo
-cs.djutils ok_revision="1a4d40164e2a6fe60f2e91f01463dee4f9581eac" features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"]} pypi.release="20241119"
+cs.djutils ok_revision=ad22cf3ae5208d34bd29e2b14be8d44ede621279 features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"],"20241222":["options_settings"]} pypi.release="20241222.3"
 cs.dockerutils ok_revision=f846ece6e9f9353b443df14f81512ae6438681e6 pypi.release="20240519" features={"20240305":["DockerRun__network"]}
 cs.ebooks ok_revision="3379fcbf1eb008df3cd38e9afd40f1d0db9afbd4" pypi.release="20241007" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -94,12 +94,13 @@ cs.mediainfo ok_revision="211e1a295e5dd5beba0facbc1ba24c8ea3389440" pypi.release
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mobi
 cs.mplutils ok_revision=c3516c78f9d056d621055c19e4ad3d2f597b5c23 pypi.release="20241122" features={"20220918":["FigureSize"]}
-cs.naysync ok_revision="3e16d9e73f7e78e7e40de2d36cfbba180bde90b1" features={"20241214":["afunc","agen"]} pypi.release="20241215"
+cs.naysync ok_revision="856666b9a4b363857f10945f33994785995b51da" features={"20241214":["afunc","agen"],"20241220":["amap","async_iter"]} pypi.release="20241221.1"
 cs.ndjson ok_revision="9df558bd5a344fc076056fac0a84e1cf7f050872" pypi.release="20211208"
 cs.node
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063124469c features={"20220606":["intif"]}
 cs.obj pypi.release="20241009" ok_revision="52e932075b27dc9e21630033e2d5e2c6b61b906d" features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"],"20241005":["public_subclasses"]}
+cs.other_command
 cs.packetstream pypi.release="20240630" ok_revision="1bc8c692373663edd0678222e3a7c30fd5292116" features={"20240630":["BaseRequest","HasPacketConnection"]}
 cs.pdf
 cs.pfx pypi.release="20241208" ok_revision="6ab24ce1f823c62b68d614c7f20f63c0f1d8d0ca" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
