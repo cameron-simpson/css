@@ -119,10 +119,10 @@ DISTINFO = {
         'lmdb',
     ],
     'entry_points': {
-        'console_scripts': [
-            'vt = cs.vt.__main__:main',
-            'mount.vtfs = cs.vt.__main__:mount_vtfs',
-        ],
+        'console_scripts': {
+            'vt': 'vt.__main__:main',
+            'mount.vtfs': 'vt.__main__:mount_vtfs',
+        },
     },
     'extras_requires': {
         'FUSE': ['llfuse'],
