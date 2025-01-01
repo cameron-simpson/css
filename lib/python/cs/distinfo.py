@@ -225,7 +225,14 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
         or *module_name*{`=`,`>=`}*version*
         satisfying the versions and features in `self.requirements`.
     '''
-    pkg = self.modules[self.module_name]
+    try:
+      pkg = self.modules[self.module_name]
+    except KeyError as e:
+      warning("cannot resolve self.module_name=%r: %s", self.module_name, e)
+      print("sys.path")
+      for p in sys.path:
+        print(" ", p)
+      raise
     if self.op is None:
       pkg_pypi_version = pkg.latest_pypi_version
       return (
@@ -363,7 +370,7 @@ class Module:
     self._distinfo = None
     self._checking = False
     self._module_problems = None
-    if self.ismine and not self.paths():
+    if self.ismine() and not self.paths():
       raise ValueError(f'no file paths for Module({name!r})')
 
   def __str__(self):
@@ -389,7 +396,6 @@ class Module:
       M = None
     return M
 
-  @pfx_method(use_str=True)
   @pfx_method(use_str=True)
   def ismine(self):
     ''' Test whether this is one of my modules.
