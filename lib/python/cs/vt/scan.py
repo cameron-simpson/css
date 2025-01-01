@@ -8,7 +8,6 @@
     Fall back to the pure python one if we fail.
 '''
 
-from distutils.core import setup, Extension
 from os import chdir, getcwd
 from os.path import dirname, join as joinpath
 import sys
@@ -70,35 +69,42 @@ def py_scanbuf2(chunk, hash_value, sofar, min_block, max_block):
 try:
   from ._scan import scanbuf2
 except ImportError as import_e:
-  warning("%s: building _scan from _scan.c", import_e)
+  pkgdir = dirname(__file__)
+  scan_c_path = joinpath(pkgdir, '_scan.c')
+  warning("%s: building _scan from %r", import_e, scan_c_path)
 
-  def do_setup():
-    ''' Run distutils.core.setup from the top of the lib tree.
-        Side effect: changes directory, needs undoing.
-    '''
-    pkgdir = dirname(__file__)
-    chdir(dirname(dirname(pkgdir)))
-    return setup(
-        ext_modules=[Extension("cs.vt._scan", [joinpath(pkgdir, '_scan.c')])],
-    )
+  try:
+    ##from distutils.core import setup, Extension
+    from setuptools import setup, Extension
+  except ImportError as e:
+    error("import of setuptools.{setup,Extension} fails: %s", e)
+    scanbuf2 = py_scanbuf2
+  else:
 
-  ### delay, seemingly needed to make the C version look "new"
-  ##sleep(2)
-  owd = getcwd()
-  with stackattrs(sys, argv=[sys.argv[0], 'build_ext', '--inplace']):
-    try:
-      do_setup()
-    except SystemExit as exit_e:
-      chdir(owd)
-      error("SETUP FAILS: %s:%s", type(exit_e), exit_e)
-      scanbuf2 = py_scanbuf2
-    else:
-      chdir(owd)
+    def do_setup():
+      ''' Run distutils.core.setup from the top of the lib tree.
+          Side effect: changes directory, needs undoing.
+      '''
+      chdir(dirname(dirname(pkgdir)))
+      return setup(ext_modules=[Extension("cs.vt._scan", [scan_c_path])],)
+
+    ### delay, seemingly needed to make the C version look "new"
+    ##sleep(2)
+    owd = getcwd()
+    with stackattrs(sys, argv=[sys.argv[0], 'build_ext', '--inplace']):
       try:
-        from ._scan import scanbuf2
-      except ImportError as import_e2:
-        error("import fails after setup: %s", import_e2)
+        do_setup()
+      except SystemExit as exit_e:
+        error("SETUP FAILS: %s:%s", type(exit_e), exit_e)
         scanbuf2 = py_scanbuf2
+      else:
+        try:
+          from ._scan import scanbuf2
+        except ImportError as import_e2:
+          error("import fails after setup: %s", import_e2)
+          scanbuf2 = py_scanbuf2
+      finally:
+        chdir(owd)
 
 @fmtdoc
 def scan_offsets(
