@@ -15,6 +15,8 @@
     - `@afunc`: a decorator to make a synchronous function asynchronous
     - `@agen`: a decorator to make a synchronous generator asynchronous
     - `amap(func,iterable)`: asynchronous mapping of `func` over an iterable
+    - `aqget(q)`: asynchronous function to get an item from a `queue.Queue` or similar
+    - `aqiter(q)`: asynchronous generator to yield items from a `queue.Queue` or similar
     - `async_iter(iterable)`: return an asynchronous iterator of an iterable
     - `IterableAsyncQueue`: an iterable flavour of `asyncio.Queue` with no `get` methods
     - `AsyncPipeLine`: a pipeline of functions connected together with `IterableAsyncQueue`s
@@ -30,6 +32,7 @@ from inspect import (
     iscoroutinefunction,
     isgeneratorfunction,
 )
+from queue import Queue, Empty
 from typing import (
     Any,
     AsyncIterable,
@@ -167,6 +170,35 @@ async def async_iter(it: AnyIterable, fast=None):
     # an asynchronous iterable
     async for item in dund_aiter():
       yield item
+
+async def aqget(q: Queue):
+  ''' An asynchronous function to get an item from a `queue.Queue`like object `q`.
+      It must support the `.get()` and `.get_nowait()` methods.
+  '''
+  try:
+    return q.get_nowait()
+  except Empty:
+    return await to_thread(q.get)
+
+_aqiter_NO_SENTINEL = object()
+
+async def aqiter(q: Queue, sentinel=_aqiter_NO_SENTINEL):
+  ''' An asynchronous generator to yield items from a `queue.Queue`like object `q`.
+      It must support the `.get()` and `.get_nowait()` methods.
+
+      An optional `sentinel` object may be supplied, which ends iteration
+      if encountered. If a sentinel is specified then this must be the only
+      consumer of the queue because the sentinel is consumed.
+  '''
+  aget = afunc(q.get)
+  while True:
+    try:
+      item = q.get_nowait()
+    except Empty:
+      item = await aget()
+    if item is sentinel:
+      return
+    yield item
 
 async def amap(
     func: Callable[[Any], Any],
@@ -540,8 +572,6 @@ if __name__ == '__main__':
 
     run(demo_pipeline2(['https://www.smh.com.au/']))
 
-  else:
-
     @agen
     def gen():
       yield from range(5)
@@ -612,7 +642,7 @@ if __name__ == '__main__':
                 indexed=indexed,
             ):
               print_("", result)
-            print(f': elapsed {round(time.time()-start_time,2)}')
+            print(f': elapsed {round(time.time()-start_time, 2)}')
 
     run(test_amap())
 
@@ -645,3 +675,44 @@ if __name__ == '__main__':
         print(result)
 
     run(demo_pipeline([1, 2, 3]))
+
+  else:
+
+    async def aqget3(q):
+      for _ in range(3):
+        print_(" ->", await aqget(q))
+
+    print_("aqget [1,2,3]")
+    myq = Queue()
+    for item in [1, 2, 3]:
+      myq.put(item)
+    run(aqget3(myq))
+    print()
+
+    async def aqiter3(q):
+      n = 0
+      async for item in aqiter(q):
+        print_(" ->", item)
+        n += 1
+        if n == 3:
+          break
+
+    print_("aqiter3 [1,2,3]")
+    myq = Queue()
+    for item in [1, 2, 3]:
+      myq.put(item)
+    run(aqiter3(myq))
+    print()
+
+    async def aqiter_sent(q, sent):
+      async for item in aqiter(q, sent):
+        print_(" ->", item)
+
+    print_("aqiter_sent")
+    qsent = "SENT"
+    myq = Queue()
+    for item in [1, 2, 3]:
+      myq.put(item)
+    myq.put(qsent)
+    run(aqiter_sent(myq, qsent))
+    print()
