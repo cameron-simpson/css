@@ -612,7 +612,7 @@ if __name__ == '__main__':
                 indexed=indexed,
             ):
               print_("", result)
-            print(f': elapsed {round(time.time()-start_time,2)}')
+            print(f': elapsed {round(time.time()-start_time, 2)}')
 
     run(test_amap())
 
