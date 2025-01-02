@@ -1,3 +1,4 @@
+dequeue: async generator yielding items from a sync queue
 bg: run distinct async event loop in its own thread
 default: cs.cmdutils: usage_format_parts: return (usage,full_desc), provide usage_desc_split to get line1 and trailing lines, provide usage_format_desc for full desc, use in the tabulated listing
 √ cs.cmdutils: help -r but no -l - single tabulate call from the top level if subcommands?
