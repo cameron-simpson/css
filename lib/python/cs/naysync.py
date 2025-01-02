@@ -680,36 +680,39 @@ if __name__ == '__main__':
 
     async def aqget3(q):
       for _ in range(3):
-        print("aqget(q) ->", await aqget(q))
+        print_(" ->", await aqget(q))
 
-    print("aqget [1,2,3]")
+    print_("aqget [1,2,3]")
     myq = Queue()
     for item in [1, 2, 3]:
       myq.put(item)
     run(aqget3(myq))
+    print()
 
     async def aqiter3(q):
       n = 0
       async for item in aqiter(q):
-        print("aqiter(q) ->", item)
+        print_(" ->", item)
         n += 1
         if n == 3:
           break
 
-    print("aqiter3 [1,2,3]")
+    print_("aqiter3 [1,2,3]")
     myq = Queue()
     for item in [1, 2, 3]:
       myq.put(item)
     run(aqiter3(myq))
+    print()
 
     async def aqiter_sent(q, sent):
       async for item in aqiter(q, sent):
-        print("aqiter(q) ->", item)
+        print_(" ->", item)
 
-    print("aqiter_sent")
+    print_("aqiter_sent")
     qsent = "SENT"
     myq = Queue()
     for item in [1, 2, 3]:
       myq.put(item)
     myq.put(qsent)
     run(aqiter_sent(myq, qsent))
+    print()
