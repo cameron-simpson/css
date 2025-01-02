@@ -1,0 +1,4 @@
+lib/python/cs/fs.py: cs.fs: new scandirtree scandir based version of os.walk, yielding (is_dir,fspath); rpaths now a shim via new scandirpaths (also a shim)
+lib/python/cs/fs.py: cs.fs: bugfix scandirtree
+lib/python/cs/fs.py: cs.fs: HasFSPath.pathto: do conventional validation instead of using @require because it ddoes not handle *foo parameters
+lib/python/cs/fs.py: cs.fs: scandirtree: new recurse=True parameter to support doing a single level scan if false

@@ -1,0 +1,1 @@
+module_doc: do not insert a BaseCommand usage into the docs, the BaseCommand.__init_subclass__ will be doing that for us.

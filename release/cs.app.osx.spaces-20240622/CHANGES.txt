@@ -1,0 +1,35 @@
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: access desktop spaces information
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: add HI = apple.HIServices
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces: fix __len__
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Space: new current_uuid property with the UUID of the current space
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces: new display_id property with the display id obtained from the display UUID
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces: get_wp_config(space_index) and set_wp_config(space_index,wp_config) methods
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: new SpacesCommand with a "wp" command to report or set wallpaper configs
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: run SpacesCommand when invokes as main
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: update imports, clean lint
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: use abspath instread of realpath in wp configs
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: accept "." to indicate the current space
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: nicer wallpaper settings listing
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces: new monitor_current and monitor_wp_config to watch changes in the current space or changes to a particular space's wallpaper settings
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand: new cmd_wpm to monitor changes to the wallpaper settings on a particular space
+lib/python/cs/app/osx/spaces.py: cs.app.opsx.spaces: fix lint
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: use shortpath(realpath())
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.wpm: monitor now returns a 3-tuple and only on changes
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand: new cmd_monitor: monitor switching spaces
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_monitor: usage message
+lib/python/cs/app/osx/spaces.py: merge osx ==> default: new cs.obj.Sentinel, etc
+lib/python/cs/app/osx/spaces.py: new wpr and spaces commands, tweak cs.app.osx.spaces main programme
+lib/python/cs/app/osx/spaces.py: cs.*: update implementations of BaseCommand.run_context to use super().run_context()
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: accept "*" for all spaces, clean up the logic
+lib/python/cs/app/osx/spaces.py: merge osx -> default
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_monitor: flush each output line
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces: new popindices(argv) method to pop a spaces specification from an argument list
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand: use Spaces.popindices(argv) to get the spaces indices
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wpm: flush each output line to enable effective use in a pipeline
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces: drop debugging property
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: update imports, add DISTINFO, add docstrings, clean lint
+lib/python/cs/app/osx/spaces.py: cs.*: changes to accomodate dropping BaseCommandOptions.runstate
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: hack for Sonoma, MacOS 14.5
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: back to SizeToFit for Sonoma, like everything else
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: fix trove classifier
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: DISTINFO: update install_requires

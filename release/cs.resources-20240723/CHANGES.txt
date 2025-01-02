@@ -1,0 +1,1 @@
+lib/python/cs/resources.py: cs.resources: _MultiOpenMixinOpenCloseState: use an RLock, still to investigate the deadlock with NRLock, set self.opened=True a little earlier in .open

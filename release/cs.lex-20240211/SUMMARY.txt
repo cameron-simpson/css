@@ -1,0 +1,1 @@
+New split_remote_path() function to recognise [[user@]host]:path.

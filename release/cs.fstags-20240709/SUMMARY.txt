@@ -1,0 +1,2 @@
+New CachedValue class to manage a cached TaggedPath tag value.
+New TaggedPath.cached_value() method to return a CachedValue.

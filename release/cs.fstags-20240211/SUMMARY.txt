@@ -1,0 +1,2 @@
+TaggedPath: subclass Promotable, add from_str(fspath) class method.
+FSTags: new mv(srcpath,dstpath) method to move/link/symlink a file bringing its tags.

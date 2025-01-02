@@ -1,0 +1,7 @@
+lib/python/cs/fstags.py: cs.fstags: TaggedPath: subclass Promotable, add from_str(fspath) class method
+lib/python/cs/fstags.py: cs.fstags: FSTags: new mv(srcpath,dstpath) method to move/link/symlink a file bringing its tags
+lib/python/cs/fstags.py: cs.fstags: FSTags.mv: descriptions for the preconditions
+lib/python/cs/fstags.py: cs.fstags: attach_path: simplify the tags update on dstpath, autoformat
+lib/python/cs/fstags.py: cs.fstags: remove some runtime type checks
+lib/python/cs/fstags.py: cs.fstags: merge dupe __str__, tweak RunState use, update imports
+lib/python/cs/fstags.py: cs.fstags: update DISTINFO

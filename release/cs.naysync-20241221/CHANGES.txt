@@ -1,0 +1,7 @@
+lib/python/cs/naysync.py: cs.naysync: update module docstring
+lib/python/cs/naysync.py: cs.naysync: fix docstring typo
+lib/python/cs/naysync.py: cs.naysync: simplify implementation of `@afunc`
+lib/python/cs/naysync.py: cs.naysync: simplify @agen by using async_iter()
+lib/python/cs/naysync.py: cs.naysync: amap: clarify that func may be a synchronous or asynchronous function
+lib/python/cs/naysync.py: cs.naysync: readability improvements for the demo mode
+lib/python/cs/naysync.py: merge async ==> default: small refactors, docstring improvements

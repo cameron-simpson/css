@@ -1,0 +1,1 @@
+Placate the dataclass - upgrade BaseCommand.Options.settings to be a field() with a default_factory.

@@ -1,0 +1,2 @@
+Require `blake3` and use it as the default hash algorithm.
+Some internal improvements.

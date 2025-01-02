@@ -1,0 +1,4 @@
+BaseCommand: provide an options.runstate to allow the command to override the default (almost never happens).
+BaseCommand.popopts: fix reference to OptionSpec class.
+BaseCommand.run: put the try/except:CancellationError outside the self.run_context context manager call, as it can directly raise CancellationError.
+New vprint() function calling print() if options.verbose.

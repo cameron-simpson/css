@@ -1,0 +1,2 @@
+lib/python/cs/excutils.py: cs.excutils: @logexc: use @decorator like other civilised decorators
+lib/python/cs/excutils.py: cs.excutils: LogExceptions: new optinal `log` param for the lgging call, default exception; @logexc: pass decorator aprams to LogExceptions

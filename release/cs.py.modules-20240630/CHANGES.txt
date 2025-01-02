@@ -1,0 +1,6 @@
+lib/python/cs/py/modules.py: cs.py.modules: tweak docstring
+lib/python/cs/py/modules.py: merge timeseries ==> default
+lib/python/cs/py/modules.py: cs.py.modules: tiny formatting tweak
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: fix off-by-one resolving leading dot relative import names
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: precompute the module preparts
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: remove the precompute, introduced during debugging but not needed

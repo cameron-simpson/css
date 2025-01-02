@@ -1,0 +1,1 @@
+HTTPServiceAPI.suburl: support interruption by RunState.cancel.

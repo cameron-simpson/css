@@ -1,0 +1,2 @@
+@uses_runstate: if we make a new RunState, get the default name from the wrapped function.
+RunState: bug fixes from the recent subclassing of cs.fsm.FSM.

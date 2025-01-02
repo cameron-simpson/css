@@ -1,0 +1,2 @@
+QueueIterator: new next_batch and iter_batch methods for collecting items in batches.
+QueueIterator: bugfix put(), do not hold the lock around the internal Queue.put, can deadlock the corresponding next/get.

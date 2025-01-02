@@ -1,0 +1,10 @@
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: new module for accessing the defaults via the "defaults" command
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: add a few docstings
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: DomainDefaults.__str__
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: DomainDefaults: make as_dict() cached and provide a flush() method to forget it
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: run: accpts a quiet parameter and an encoding
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: DomainDefaults: new __getitem__ and get methods
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: DomainDefaults: new __setitem__ method
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: remove debug, update test code
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: DomainDefaults.__setitem__: fix invocation of defaults command
+lib/python/cs/app/osx/defaults.py: cs.app.osx.default: add DISTINFO, update imports

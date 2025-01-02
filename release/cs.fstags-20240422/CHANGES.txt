@@ -1,0 +1,5 @@
+lib/python/cs/fstags.py: cs.fstags: drop rpaths() and rfilepaths(); use scandirtree() and scanfilepaths() instead
+lib/python/cs/fstags.py: cs.fstags: update imports
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ls: use baseCommandOptions.update() and popopts() for the subcommand option parse, add new -r (recurse) option
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ls: update usage message
+lib/python/cs/fstags.py: cs.fstags: tweak

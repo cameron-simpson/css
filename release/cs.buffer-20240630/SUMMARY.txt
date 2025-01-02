@@ -1,0 +1,4 @@
+CornuCopyBuffer: new optional .final_offset attribute indicating the anticipated largest offset, automatcially set for regular files - aids progress bars etc.
+Drop cs.py3, get pread from os.pread, require python>=3.3.
+CornuCopyBuffer.close: set self.bufs = None to release memory and prevent accidental late use.
+_FetchIterator: provide a mutex; SeekableIteratorMixin.seek, FDIterator.read,close: take the mutex.

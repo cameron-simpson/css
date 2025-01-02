@@ -1,0 +1,2 @@
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand._refresh_sqltags_data: use RunState.bg to displatch the API queries in order to propagate the default RunState to them
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.run_context: do a cancellation check after the preliminary call to self._refresh_sqltags_data()

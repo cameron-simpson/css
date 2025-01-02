@@ -1,0 +1,1 @@
+run(): accept new remote= and ssh_exe= parameters to support remote execution, default via @uses_cmd_options(ssh_exe).

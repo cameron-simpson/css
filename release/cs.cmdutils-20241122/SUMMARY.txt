@@ -1,0 +1,5 @@
+BaseCommand.cmd_help: new -l (long), -r (recurse) and -s (short, not long) options.
+A big rework of the help/usage output; still one rough edge left.
+BaseCommandOptions.popopts: infill with False instead of None for missing boolean options.
+SubCommand: a few new methods and properties to expose various operations.
+BaseCommand._prerun_setup: revert SUBCOMMAND_ARGV_DEFAULT to None, make a missing subcommand run "help -s" when there's no SUBCOMMAND_ARGV_DEFAULT.

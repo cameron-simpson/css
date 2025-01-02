@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.short_usages: replace underscore with dash in subcommand names
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: pass short=False to self.usage_text()
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec.getopt_long: fix construction of getopt long option specifications

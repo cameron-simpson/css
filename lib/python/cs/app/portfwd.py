@@ -65,7 +65,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['portfwd = cs.app.portfwd:main'],
+        'console_scripts': {
+            'portfwd': 'cs.app.portfwd:main'
+        },
     },
 }
 
@@ -194,7 +196,7 @@ def main(argv=None, environ=None):
         elif opt == '-v':
           verbose = True
         else:
-          raise RuntimeError('unhandled option')
+          raise NotImplementedError('unsupported option')
     if not argv and not auto_mode:
       raise GetoptError(
           "missing targets; targets or -A (auto) option required"

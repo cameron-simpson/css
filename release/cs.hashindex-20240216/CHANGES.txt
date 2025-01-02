@@ -1,0 +1,10 @@
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmdlinkto,cmd_rearrange: run the link/mv stuff with sys.stdout in line buffered mode
+lib/python/cs/hashindex.py: cs.hashindex: clean lint
+lib/python/cs/hashindex.py: cs.hashindex: do not get hashcodes from symlinks
+lib/python/cs/hashindex.py: cs.hashindex: dir_filepaths: skip dot files, the fstags .fstags file and nonregular files; hashindex: use dir_filepaths() to get the files to scan
+lib/python/cs/hashindex.py: cs.hashindex: new run_remote_hashindex() and read_remote_hashindex() functions
+lib/python/cs/hashindex.py: cs.hashindex: clean some lint
+lib/python/cs/hashindex.py: cs.hashindex: fix warning message
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: ignore None hashcodes, do not set xit=1
+lib/python/cs/hashindex.py: cs.hashindex: run_remote_hashindex: withdraw the Upd while the remote command runs
+lib/python/cs/hashindex.py: cs.hashindex: improve error message

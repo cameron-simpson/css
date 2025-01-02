@@ -1,0 +1,1 @@
+lib/python/cs/ebooks/__init__.py: cs.ebooks: update package docstring

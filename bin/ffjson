@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Output information from ffprobe in JSON format.
+# - Cameron Simpson <cs@cskk.id.au> 31dec2023
+#
+
+set -x
+exec ffprobe -v 0 -print_format json -show_format -show_streams -show_programs -show_chapters -i "$@"

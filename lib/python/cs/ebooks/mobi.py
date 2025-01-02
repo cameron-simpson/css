@@ -22,10 +22,12 @@ import mobi
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.logutils import info
+from cs.fs import scandirtree
+from cs.logutils import error, info
 from cs.pfx import pfx, pfx_call
 
 from .cbz import make_cbz
+from .common import EBooksCommonBaseCommand
 
 class Mobi:
   ''' Work with an existing MOBI ebook file.
@@ -101,14 +103,14 @@ class Mobi:
         pass
     return cbzpath
 
-class MobiCommand(BaseCommand):
+class MobiCommand(EBooksCommonBaseCommand):
   ''' Command line implementation for `mobi2cbz`.
   '''
 
   def cmd_extract(self, argv):
     ''' Usage: {cmd} mobipath [outdir]
-          Extract the contents of the MOBI file mobipath
-          into the directory outdir, default based on the mobipath basename.
+          Extract the contents of the MOBI file mobipath.
+          Unpack into the directory outdir, default based on the mobipath basename.
           Prints the outdir and the name of the top file.
     '''
     outdirpath = None
@@ -151,3 +153,27 @@ class MobiCommand(BaseCommand):
     MB = Mobi(mobipath)
     outcbzpath = MB.make_cbz(cbzpath)
     print(outcbzpath)
+
+  def cmd_toc(self, argv):
+    ''' Usage: {cmd} mobipath
+          List the contents of the MOBI file mobipath.
+    '''
+    outdirpath = None
+    mobipath = self.poparg(argv, "mobipath")
+    if argv:
+      raise GetoptError("extra arguments after outdir: %r" % (argv,))
+    if not existspath(mobipath):
+      raise GetoptError("mobipath does not exist: %r" % (mobipath,))
+    if outdirpath is None:
+      outdirpath, _ = splitext(basename(mobipath))
+    print(mobipath)
+    MB = Mobi(mobipath)
+    try:
+      with MB.extracted() as df:
+        dirpath, _ = df
+        for is_dir, subpath in scandirtree(dirpath, sort_names=True):
+          if not is_dir:
+            print(" ", relpath(subpath, dirpath))
+    except mobi.kindleunpack.unpackException as e:
+      error("cannot unpack: %s", e)
+      return 1

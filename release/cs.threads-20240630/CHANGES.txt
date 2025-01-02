@@ -1,0 +1,6 @@
+lib/python/cs/threads.py: cs.threads: fix docstring typo and improve exception message
+lib/python/cs/threads.py: cs.threads: bg: use closeall instead of twostep/withall
+lib/python/cs/threads.py: cs.threads: NRLock: new optional name to aid debugging
+lib/python/cs/threads.py: cs.threads: fix docstring typo
+lib/python/cs/threads.py: cs.threads: HasThreadState.bg: drop pre_enter_objects (unused), gets plumbed by the **bg_kw
+lib/python/cs/threads.py: cs.threads: add missing docstring

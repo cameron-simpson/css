@@ -1,0 +1,5 @@
+flatten: do not yield empty str-as-ascii-bytes - we want to ensure that flatten never yields an empty bytes instance.
+New AbstractBinary.write(f) method to write the binary form of this object to a file.
+New BinarySingleValue.value_from_bytes(bytes) class method to return the value from a bytes instance.
+Drop BinaryMixin, now folded directly into AbstractBinary.
+AbstractBinary.scan: pass extra keyword arguments to AbstractBinary.parse, supporting plumbing eg a logging parameter through.

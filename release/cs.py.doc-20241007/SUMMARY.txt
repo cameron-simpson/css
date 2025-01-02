@@ -1,0 +1,3 @@
+module_doc: for subclasses of cs.fsm.FSM embed an SVG state transition diagram.
+module_doc: put HTML named anchors on the headings.
+module_doc: use BaseCommand.extract_usage() with BaseCOmmand subclasses.

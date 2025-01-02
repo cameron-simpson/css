@@ -1,0 +1,4 @@
+@uses_runstate: now accepts an optional name= parameter which defaults to the name of the function being decorated, supplied to the RunState factory.
+RunState.FSM_TRANSITIONS: allow IDLE->cancel->IDLE.
+@not_closed: wrap in @decorator to set the wrapper name etc.
+RunState: allow STOPPED->cancel->STOPPED transition.

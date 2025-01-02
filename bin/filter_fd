@@ -1,7 +1,10 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Filter an output file descriptor through an arbitrary shell command.
-#	- Cameron Simpson <cs@cskk.id.au> 06may1999
+# The primary command is directly execed from this script after
+# attaching filter pipes so timeouts and signals should work as
+# expected.
+# - Cameron Simpson <cs@cskk.id.au> 06may1999
 #
 # Multiple fds. - cameron, 23may1999
 #
@@ -54,7 +57,7 @@ esac
 
 case $fd in
   [0-9]) ;;
-  *)	echo "$cmd: bad fd - should be numeric: $fd" >&2
+  *)  echo "$cmd: bad fd - should be numeric: $fd" >&2
       badopts=1
       ;;
 esac

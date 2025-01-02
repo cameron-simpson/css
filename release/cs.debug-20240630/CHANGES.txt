@@ -1,0 +1,12 @@
+lib/python/cs/debug.py: cs.debug: new trace_DEBUG() function applying tracing to modules or functions, code moved in from cs.logutils, autoapplied on import
+lib/python/cs/debug.py: cs.debug: explanatory comment
+lib/python/cs/debug.py: cs.debug: @trace: document the decorator parameters
+lib/python/cs/debug.py: cs.debug: @trace: make the trace indent a thread local value
+lib/python/cs/debug.py: cs.debug: @trace: just cite the function name, not its code location - it was too wordy
+lib/python/cs/debug.py: merge default ==> vt
+lib/python/cs/debug.py: cs.debug: @trace: report raised exceptions in red if xlog is the X() function
+lib/python/cs/debug.py: cs.debug: @trace: trace the iteration of generator functions
+lib/python/cs/debug.py: cs.debug: @trace: tracing generator: report exceptions from the generator
+lib/python/cs/debug.py: c.debug: thread_dump: even more detail
+lib/python/cs/debug.py: cs.debug: @trace: add missed "if retval" guard on tracing the return value
+lib/python/cs/debug.py: cs.debug: docstring tweak

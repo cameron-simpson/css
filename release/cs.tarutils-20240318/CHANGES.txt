@@ -1,0 +1,17 @@
+lib/python/cs/tarutils.py: cs.tarutils: some basic tar utility functions
+lib/python/cs/tarutils.py: cs.tarutils: traced_cpdir: use chdirpath=srcdirpath for the tar end to get relative pathnames for the untar
+lib/python/cs/tarutils.py: cs.tarutils: traced_untar: ignore non-regular files
+lib/python/cs/tarutils.py: cs.tarutils: traced_untar: use BINARY_BYTES_SCALE for the progress report
+lib/python/cs/tarutils.py: cs.tarutils: update imports
+lib/python/cs/tarutils.py: cs.tarutils: traced_untar: accept a filesystem path
+lib/python/cs/tarutils.py: cs.tarutils: traced_untar: explicit plain .tar filenames get stat()ed for a total size for the progress bar
+lib/python/cs/tarutils.py: cs.tarutils: fix docstring typos
+lib/python/cs/tarutils.py: cs.tarutils: refactor the filename scanning loop to poll the current filename regularly between updates from tar so that the progress bar does not stall
+lib/python/cs/tarutils.py: cs.tarutils: _watch_filenames: handle StopIteration from the filenames queue iterator
+lib/python/cs/tarutils.py: cs.tarutils: add missing @fmtdoc decorators, clean lint
+lib/python/cs/tarutils.py: cs.tarutils: _watch_filenames: rename filenames to filenames_qit for clarity
+lib/python/cs/tarutils.py: cs.tarutils: emit warnings within Upd.above() so that they do not mangle the progress bar
+lib/python/cs/tarutils.py: cs.tarutils: _stat_diff: do not warn about missing files
+lib/python/cs/tarutils.py: cs.tarutils: fix docstring typo, some formatting changes
+lib/python/cs/tarutils.py: cs.tarutils: update module docstring
+lib/python/cs/tarutils.py: cs.tarutils: add DISTINFO

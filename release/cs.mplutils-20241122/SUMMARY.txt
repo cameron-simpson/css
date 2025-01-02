@@ -1,0 +1,2 @@
+FigureSize: fix field factories.
+print_figure: wire a .png extension for the temp image.

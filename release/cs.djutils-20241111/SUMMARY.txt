@@ -1,0 +1,1 @@
+Rename DjangoBaseCommand to just BaseCommand so that we go `from cs.djutils import BaseCommand`. Less confusing.

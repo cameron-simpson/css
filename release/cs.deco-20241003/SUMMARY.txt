@@ -1,0 +1,1 @@
+New @uses_cmd_option and @uses_doit, @uses_quiet and @uses_verbose based on it.

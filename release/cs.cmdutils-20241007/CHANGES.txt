@@ -1,0 +1,6 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: drop __init_subclass__, was doing too much to early, exposed an extract_usage classmethod
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: no cmd and argv[0] ends with ".py" infer cmd from the class name
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: better error message for unknown subcommand name
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: subcommands push their name onto the Pfx stack when run
+lib/python/cs/cmdutils.py: cs.cmdutils: fix comment typo
+lib/python/cs/cmdutils.py: merge ebooks ==> default

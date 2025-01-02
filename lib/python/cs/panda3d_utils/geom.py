@@ -98,8 +98,8 @@ def sphere_coords(longitude: float,
   )
   return xyz
 
-@typechecked
 @require(lambda radius: radius > 0)
+@typechecked
 def sphere(radius: float = 1.0, steps: int = 8, **poly_attrs) -> Surface:
   ''' Create a spherical `Surface`.
       Any texture is used as a Mercator projection.
@@ -163,9 +163,9 @@ def torus_coords(
   z = long_sin * (radius1 + radius2 * lat_cos)
   return x, y, z
 
-@typechecked
 @require(lambda radius1: radius1 > 0)
 @require(lambda radius2: radius2 > 0)
+@typechecked
 def torus(
     radius1: float = 1.0,
     radius2: float = 1.0,
@@ -204,10 +204,10 @@ def torus(
       )
   return surface
 
-@typechecked
 @require(lambda sides: sides >= 3)
 @require(lambda base_length: base_length > 0.0)
 @require(lambda aspect: aspect > 0.0)
+@typechecked
 def pyramid(
     sides: int,
     base_length: float = 1.0,
@@ -250,9 +250,9 @@ def pyramid(
   surface.add_polygon(*base_vs, **poly_attrs)
   return surface
 
-@typechecked
 @require(lambda sides: sides >= 3)
 @require(lambda base_length: base_length > 0.0)
+@typechecked
 def equilateral_pyramid(sides: int, base_length: float = 1.0, **poly_attrs):
   ''' A pyramid with `sides` faces (excepting the base)
       whose faces are equilateral triangles.

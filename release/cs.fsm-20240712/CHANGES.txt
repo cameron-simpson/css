@@ -1,0 +1,3 @@
+lib/python/cs/fsm.py: cs.fsm: FSM.fsm_transitions_as_dot,FSM.fsm_print are now class methods and take an optional obj:FSM parameter if state highlighting is needed
+lib/python/cs/fsm.py: cs.fsm: undo the change to class methods, instead I should make new class methods to underlie the instance methods
+lib/python/cs/fsm.py: cs.fsm: FSM: make fsm_transitions_as_dot a shim for new fsm_state_diagram_as_dot class method

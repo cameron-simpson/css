@@ -1,0 +1,8 @@
+BaseProgress.status: fixes for the arrow_width computation.
+BaseProgress.bar: drop existing UpdProxy support, drop deferred, implement update_period using a ticker Thread.
+BaseProgress.bar: set update_period=DEFAULT_UPDATE_PERIOD by default.
+Progress.iterbar: drop preexisting UpdProxy support, update_frequency and update_min_size support.
+Progress: new advance_total(delta) method so that we have a callable for this.
+BaseProgress.bar: new optional poll parameter accepting a callable accepting a BaseProgress to update the state before updating the bar display.
+BaseProgress.bar: new stalled='stalled' parameter to specify the term for no recent throughput, workers might prefer 'idle'.
+progressbar() updated to match.

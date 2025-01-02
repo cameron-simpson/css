@@ -1,0 +1,3 @@
+Simpler implementation of @afunc.
+Simplify implementation of @agen by using async_iter.
+Docstring improvements.

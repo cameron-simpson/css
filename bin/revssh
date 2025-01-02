@@ -1,0 +1,148 @@
+#!/bin/sh
+#
+# Ssh to a remote host and provide a reverse ssh service.
+# This is useful for tasks which involve an ssh connection back to here
+# such as rhistbackup (which runs histbackup there, sshing back to here)
+# or inmnt (which can run a command there, using an sshfs mount back to here).
+# - Cameron Simpson <cs@cskk.id.au> 17aug2024
+#
+
+set -ue
+
+: "${HOST:=$( hostname -s )}"
+: "${USER:=$( id -un )}"
+: "${TMPDIR:=/tmp}"
+
+trace=
+sshopts=
+[ -t 1 ] && sshopts="$sshopts -t"
+
+rtmp=/tmp
+rsetx=      # set -x
+ssh_exe=${SSH_EXE:-"sshto -E"}
+rssh_exe=${RSSH_EXE:-$ssh_exe}
+rssh_host=reverse-$HOST
+origin_ssh_endpoint=127.0.0.1:22
+rsetenv=
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [options...] remote [remote-command [args...]]
+  Ssh to remote with a reverse ssh available back to the origin (here).
+  Without a remote-command this recites the remote envionment.
+  Options:
+    -e ssh_exe      Ssh executable.
+    -E envvar=value Set envvar=value in the remote environment.
+    -x              Trace execution of the remote command.
+  Note that _unlike_ ssh, the remote-command is passed to the far
+  end as a correctly quoted command instead of being collapsed into
+  a command string for the remote shell. The mechanism involved
+  assumes the remote shell uses Bourne shell quoting syntax.
+
+  The following environment variables are provided in the remote environment:
+
+    REVSSH_SRCHOST  The name of an ssh config clause which connects
+                    to the origin host.
+    REVSSH_SRCUSER  The origin username. This is informational, as
+                    it is wired into the ssh clause named by \$REVSSH_SRCHOST.
+    REVSSH_SSHCFG   The pathname of an ssh config file containing
+                    the clause named by \$REVSSH_SRCHOST, which
+                    will ssh back to the origin host.
+    REVSSH_SSHSOCK  The pathname of the socket presenting the origin ssh service.
+
+  The basic reverse ssh command from the remote is:
+
+    ssh -F \"\$REVSSH_SSHCFG\" \$REVSSH_SRCHOST\""
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -e) ssh_exe=$2; shift ;;
+    -E) renvvar=$(   expr "x$2" : 'x\([A-Za-z_][A-Za-z_0-9]*\)=.*' )
+        renvvalue=$( expr "x$2" : 'x[A-Za-z_][A-Za-z_0-9]*=\(.*\)' || : )
+        shift
+        rsetenv="$rsetenv
+          $renvvar=$( shqstr "$renvvalue" )
+          export $renvvar"
+        ;;
+    -x) rsetx='set -x'
+        ##trace=set-x
+        ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing remote" >&2
+  badopts=1
+else
+  remote=$1
+  shift
+  [ $# -gt 0 ] || \
+    set -- sh -c 'set -ue
+                  echo "Remote host:    $( hostname )"
+                  echo "Remote id:      $( id )"
+                  echo "Remote path:    $( pwd )"
+                  echo "Reverse host:   REVSSH_SRCHOST=$REVSSH_SRCHOST"
+                  echo "Reverse user:   REVSSH_SRCUSER=$REVSSH_SRCUSER"
+                  echo "Reverse socket: REVSSH_SSHSOCK=$REVSSH_SSHSOCK"
+                  echo "Reverse cfg:    REVSSH_SSHCFG=$REVSSH_SSHCFG"
+                  sed "s/^/  /" "$REVSSH_SSHCFG"
+                  echo "Forwarded agent:"
+                  ssh-add -l | sed "s/^/  /"
+                  ##echo "Environment:"
+                  ##env | sort | sed "s/^/  /"
+                 '
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+origindir=$( pwd )
+
+reverse_host=reverse-$HOST
+reverse_cfg=$rtmp/revssh-$HOST-$$.cfg
+reverse_sock=$rtmp/revssh-$HOST-$$
+
+# shell commands to set up the remote environment
+rsetenv="$rsetenv
+REVSSH_SRCHOST=$( shqstr "$reverse_host" )
+REVSSH_SRCUSER=$USER
+REVSSH_SSHCFG=$(  shqstr "$reverse_cfg"  )
+REVSSH_SSHSOCK=$(  shqstr "$reverse_sock"  )
+export REVSSH_SRCHOST REVSSH_SRCUSER REVSSH_SSHCFG REVSSH_SSHSOCK
+"
+
+rqcmd=$( shqstr "$@" )
+
+$trace $ssh_exe $sshopts \
+  -o ControlPath=none \
+  -o ExitOnForwardFailure=yes \
+  -o ForwardAgent=yes \
+  -R "$reverse_sock:$origin_ssh_endpoint" \
+  "$remote" \
+  '
+    umask 077
+    '"$rsetenv"'
+    (
+      echo "Host $REVSSH_SRCHOST"
+      echo "  User $REVSSH_SRCUSER"
+      echo "  CheckHostIP no"
+      echo "  StrictHostkeyChecking no"
+      echo "  ForwardAgent yes"
+      echo "  ProxyCommand nc -U $REVSSH_SSHSOCK"
+      echo "  Compression no"
+    ) >"$REVSSH_SSHCFG"
+    ( '"$rsetx
+        $rqcmd"'
+    )
+    xit=$?
+    rm -f -- "$REVSSH_SSHCFG" "$REVSSH_SSHSOCK"
+    exit $xit
+  '

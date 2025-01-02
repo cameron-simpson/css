@@ -1,0 +1,3 @@
+New jsonable(obj) function to return a deep copy of `obj` which can be transcribed as JSON.
+Tag.transcribe_value: pass jsonable(value) to the JSON encoder, drop special checks now done by jsonable().
+Tag.__str__: do not catch TypeError any more, was embedding Python repr()s in .fstags files - now Tag.transcribe_value() does the correct thing where that is possible.

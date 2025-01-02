@@ -1,0 +1,1 @@
+makelockfile: cap the retry poll interval at 37s, just issue a warning if the lock file is already gone on exit (eg manual removal).

@@ -1,0 +1,1 @@
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: insert the class usage message for subclasses ov BaseCommand

@@ -1,0 +1,2 @@
+Bugfix for some temporary file logic.
+Several minor features.

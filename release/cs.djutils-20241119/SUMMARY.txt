@@ -1,0 +1,1 @@
+New DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass) to include support for pure Django BaseCommands.

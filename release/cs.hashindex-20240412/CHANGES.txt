@@ -1,0 +1,7 @@
+lib/python/cs/hashindex.py: cs.hashindex: tweak module docstring
+lib/python/cs/hashindex.py: cs.hashindex: file_checksum: skip any nonregular file, only use run_task when checksumming more than 1MiB
+lib/python/cs/hashindex.py: cs.hashindex: file_checksum: tweak decorators
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: via undefined variable reference
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.options.COMMON_OPT_SPECS: -e expects an ssh_cmd argument
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: run the refdir index in relative mode
+lib/python/cs/hashindex.py: cs.*: changes to accomodate dropping BaseCommandOptions.runstate

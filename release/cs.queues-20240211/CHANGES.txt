@@ -1,0 +1,5 @@
+lib/python/cs/queues.py: cs.queues: ListQueue: new unique parameter which uses cs.seq.unrepeated in iteration
+lib/python/cs/queues.py: cs.queues: tweak comment
+lib/python/cs/queues.py: merge default ==> tagger
+lib/python/cs/queues.py: cs.queues: ListQueue: catch noncallable unique=
+lib/python/cs/queues.py: cs.queues: minor tidyup

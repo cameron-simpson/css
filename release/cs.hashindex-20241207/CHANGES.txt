@@ -1,0 +1,14 @@
+lib/python/cs/hashindex.py: cs.ebooks: replace uses_cmd_option with uses_cmd_options
+lib/python/cs/hashindex.py: merge ebooks ==> default: many updates, mostly for the cs.cmdutils updates
+lib/python/cs/hashindex.py: cs.hashindex: fix docstring typo
+lib/python/cs/hashindex.py: merge default ==> vt
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: improve common options help text, trim subcommand usage text of the common options
+lib/python/cs/hashindex.py: cs.hashindex: the "-e ssh-command" option moved into cs.cmdutils
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.run_context: sanity check the hashname before running any subcommand
+lib/python/cs/hashindex.py: cs.hashindex: unplumn ssh_exe, now a common base option, get via @uses_cmd_options and often via cs.psutils.run
+lib/python/cs/hashindex.py: cs.hashindex: umplumb hashname and hashindex_exe mostly, get via @uses_cmd_options
+lib/python/cs/hashindex.py: cs.hashindex: umplumb doit mostly, get via @uses_cmd_options; no need to pass check=True, now the default in cs.psutils.run; read_remote_hashindex: add a quiet=True default parameter
+lib/python/cs/hashindex.py: cs.hashindex: clean some lint
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_comm: include -r in the usage message
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_comm: use @popopts
+lib/python/cs/hashindex.py: cs.hashindex: use @popopts throughout for the options specifications

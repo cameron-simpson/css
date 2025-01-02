@@ -1,0 +1,2 @@
+shortpath(foldsymlinks=True): only examine symlinks which have clean subpaths in their link text - this avoids junk and also avoids stat()ing links which might be symlinks to mount points which might be offline.
+scandirtree: clean up the logic, possibly fix repeated mention of directories.

@@ -1,0 +1,1 @@
+FSPathBasedSingleton.__init__: use an NRLock for the default lock, using a late import with fallback to Lock.

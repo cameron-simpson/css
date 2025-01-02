@@ -1,0 +1,3 @@
+New LoggingState class for the computed log state, split out setup_logging() as a little stub.
+Drop func_wrap and _ftrace, superceded by cs.debug.trace.
+infer_logging_level: ignore the module.name and module:function_name $DEBUG values, now done by importing cs.debug.

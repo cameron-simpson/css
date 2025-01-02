@@ -1,0 +1,1 @@
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new .from_str so that we can inherit Promotable.promote

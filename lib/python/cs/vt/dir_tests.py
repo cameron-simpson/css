@@ -10,10 +10,18 @@
 from random import shuffle
 import sys
 import unittest
+
+from cs.binary_tests import BaseTestBinaryClasses
 from cs.randutils import randbool
+
+from . import dir as dir_module
 from .dir import FileDirent, Dir, _Dirent
 from .store import MappingStore
-from .transcribe import parse
+
+class TestDirBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
+  ''' Hook to test the `AbstractBinary` subclasses..
+  '''
+  test_module = dir_module
 
 class TestAll(unittest.TestCase):
   ''' Tests for _Dirent and subclasses.
@@ -38,7 +46,7 @@ class TestAll(unittest.TestCase):
     self.assertEqual(offset, len(encoded))
     self.assertEqual(D, D2)
     Ds = str(D)
-    D2, offset = parse(Ds)
+    D2, offset = _Dirent.parse(Ds)
     self.assertEqual(offset, len(Ds))
     self.assertEqual(D, D2, "%s != %s" % (str(D), str(D2)))
 

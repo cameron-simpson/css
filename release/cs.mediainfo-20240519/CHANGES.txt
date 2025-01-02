@@ -1,0 +1,20 @@
+lib/python/cs/mediainfo.py: cs.mediainfo: new module with simple media information facilities; initially just the EpisodeInfo class
+lib/python/cs/mediainfo.py: cs.mediainfo: generalise the marker syntax a little
+lib/python/cs/mediainfo.py: cs.mediainfo: EpisodeDatumDefn: fix object construction
+lib/python/cs/mediainfo.py: cs.mediainfo: EpisodeInfo.parse_filename_part: avoid using uninitialised value
+lib/python/cs/mediainfo.py: cs.mediainfo: add title_to_part and part_to_title functions, bugfix some of the filename parsing, add parse_name() and pathname_info() functions; update some docstrings
+lib/python/cs/mediainfo.py: cs.mediainfo: recognise exN as alternative marker for an "extra"
+lib/python/cs/mediainfo.py: cs.mediainfo: recognise year markers
+lib/python/cs/mediainfo.py: cs.mediainfo: use Python 3 print function; drop 2 debugging prints
+lib/python/cs/mediainfo.py: cs.*: fix bad slosh escapes in strings
+lib/python/cs/mediainfo.py: cs.mediainfo: EpisodeInfo: new .as_dict and .as_tags methods for use by the beyonwiz conversion code
+lib/python/cs/mediainfo.py: cs.mediainfo: clean lint, autoformat
+lib/python/cs/mediainfo.py: cs.mediainfo: EpisodeInfo.as_tags: plumb the prefix parameter
+lib/python/cs/mediainfo.py: cs.tagset: drop Tag.with_prefix, now folded into the constructor; adjust calls elsewhere
+lib/python/cs/mediainfo.py: cs.*: fix a common typo
+lib/python/cs/mediainfo.py: cs.mediainfo: modernisation
+lib/python/cs/mediainfo.py: cs.app.plex,cs.app.playon,cs.mediainfo: move scrub_title() into cs.mediainfo, update uses
+lib/python/cs/mediainfo.py: cs.mediainfo: update docstrings and DISTINFO
+lib/python/cs/mediainfo.py: cs.mediainfo: add missing import
+lib/python/cs/mediainfo.py: cs.mediainfo: pull most of SeriesEpisodeInfo in from cs.app.playon, make from_str(episode_title) factory function from the non-Playon bits
+lib/python/cs/mediainfo.py: cs.mediainfo: clean lint

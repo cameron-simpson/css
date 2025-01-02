@@ -1,0 +1,2 @@
+convof, ConvCache.convof: new options force=False parameter to bypass existing cache entries.
+ConvCache.convof: check the conv_subpath using cs.fs.validate_rpath.

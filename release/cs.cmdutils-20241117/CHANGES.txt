@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: _COMMON_OPT_SPECS: include a --dry-run option, alter for -n
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: one line listing for common subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.poparg: additional type annotation and type checking

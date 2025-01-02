@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Process Beyonwiz files in the current directory and convert to MP4.
+# - Cameron Simpson <cs@cskk.id.au> 29oct2024
+#
+# Convert the .ts file to itself - this cleans up some encoding/recording
+# noise. This _should_ work inside ffmpeg itself, but doesn't - some
+# errors abort the transcode. But cleaning things up as a separate
+# leading step does work.
+#
+
+[ $# -gt 0 ] || set -- *.ts
+
+for ts
+do
+  date
+  ls -ld "$ts"
+  noisy=$ts.noisy
+  ls -ld "$noisy" && continue  # already done
+  time set-x ffmpeg -i "$ts" ff.ts \
+  && set-x fstags mv -v "$ts" "$noisy" \
+  && set-x fstags mv -v ff.ts "$ts" \
+  && echo YES \
+  || exit 1
+  time set-x beyonwiz convert --rm "$ts" \
+  && echo "OK $ts" \
+  || exit 1
+done

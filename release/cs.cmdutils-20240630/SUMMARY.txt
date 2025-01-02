@@ -1,0 +1,4 @@
+BaseCommand: make SUBCOMMAND_ARGV_DEFAULT be 'shell' for an interactive prompt, still a little unsure how sensible this is, aiming at the very cool submode stuff from the Cisco switch config command line.
+BaseCommandOptions: new as_dict() method.
+New SubCommand.usage_text() to compose the full usage text for this SubCommand.
+Many small improvements and internal refactors.

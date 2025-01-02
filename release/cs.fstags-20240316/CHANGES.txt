@@ -1,0 +1,4 @@
+lib/python/cs/fstags.py: cs.fstags: docstring updates
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.infer_tags: add _dt, _date, _f conversions, skip conversions which raise TypeError or ValueError
+lib/python/cs/fstags.py: cs.fstags: rpaths: fix to yield relative paths
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.infer_tags: skip tags with no value, pfx context for conversion function calls

@@ -57,9 +57,10 @@ done \
 (
   while read ip etc
   do
+    now=`date +'%s %Y-%m-%d %H:%M:%S'`
     if ping -c 3 -q "$ip" >/dev/null
-    then echo $ip GOOD ping $etc
-    else echo $ip BAD ping $etc
+    then echo "$now $ip GOOD ping $etc"
+    else echo "$now $ip BAD ping $etc"
     fi &
   done
   wait

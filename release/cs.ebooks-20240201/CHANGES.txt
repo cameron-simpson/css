@@ -1,0 +1,68 @@
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: fix value for KINDLE_APP_OSX_DEFAULTS_DOMAIN
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper: provide .DeDRMError being the underlying dedrm.DeDRMError exception class
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_export: catch DeDRMError in addition to ValueError
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: autoformat
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleTree.export_to_calibre: start on supporting KCR in addition to AZW, logic change to try multiple formats
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: saner kindle content path lookups
+lib/python/cs/ebooks/kobo.py: cs.books.kobo: initial sketch for Kobo support
+lib/python/cs/ebooks/__main__.py: cs.ebooks: hook up the "kobo" subcommand
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: shuffle @typechecked decorator
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper.remove: accept optional booktype parameter, recognise Kobo kepub file pathnames, fix typo
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: new import_obok() function to import the Obok plugin module, new decrypt_obok to decrypt a kepub EPUB file
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: new KoboBook class to wrap an obok book instance, update Kobottree to work with these
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: new by_kobo_volumeid shim for CalibreTree.by_identifier
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.by_kobo_volumeid: docstring fix
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.add: new optional add_args parameter
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: docstring typo fix
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: KindleCommand.cmd_export: catch and report unexpected exceptions, then reraise
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: fix comparison, fix docstring
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboTree: iterate in UUID sorted order
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboTree: index by UUID or str(UUID) (aka Kobo volumeid)
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboBook: subclass HasFSPaths, add FSTags based .tags property
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboBook: new .volumeid property being str(self.uuid)
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboBook: new decrypted() context manager yielding a temporary filesystem path of the decrypted form of the book
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboBook: new export_to_calibre() method to export the book to Calibre
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboCommand.Options: new calibre_path field; KoboCommand.run_context: provide options.calibre
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboCommand: new "export" and "ls" subcommands
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: update imports
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboCommand: usage messages for the "export" and "ls" subcommands
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: clean lint
+lib/python/cs/ebooks/kindle.py: cs/ebooks.kindle: clean some lint
+lib/python/cs/ebooks/__init__.py: cs.ebooks.__init__: update the big usage message
+lib/python/cs/ebooks/kindle.py: cs.ebooks.kindle: replace FSPATH_DEFAULT with FSPATH_FACTORY to defer the library lookup
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboTree: replace FSPATH_DEFAULT with FSPATH_FACTORY to defer the library lookup
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboTree: open/close the obok KoboLibrary in startup_shutdown
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: remove: refactor and update the kepub decryption code
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: clean some lint
+lib/python/cs/ebooks/cbz.py: cs.ebooks.cbz: CBZ support, initially a make_cbz context manager for constructing a CBZ archive
+lib/python/cs/ebooks/cbz.py: cs.books.cbz: make_cbz: fix use of atomic_filename, support use before Python 3.11
+lib/python/cs/ebooks/cbz.py: cs.ebooks.cbz: add TODO for ABCF metadata
+lib/python/cs/ebooks/pdf.py: cs.pdf: move to cs.ebooks.pdf
+lib/python/cs/ebooks/pdf.py: cs.ebooks.pdf: PDFDocument.make_cbz: infer image base; update imports
+lib/python/cs/ebooks/mobi.py: cs.ebook.mobi: Mobi.make_cbz: use cs.ebooks.cbz.make_cbz
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.make_cbz: make a CBZ from a PDF if present and no MOBI format
+lib/python/cs/ebooks/__main__.py: cs.ebooks.__main__: EBooksCommand: add pdf subcommand
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: new pdfpath property
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper.remove: handle unencrypted files
+lib/python/cs/ebooks/pdf.py: cs.pebooks.pdf: PDFPage.render: accept 2 as a valid line_cap value
+lib/python/cs/ebooks/pdf.py: cs.ebooks.pdf: autoformat
+lib/python/cs/ebooks/pdf.py: cs.ebooks.pdf: remove some debugging
+lib/python/cs/ebooks/kobo.py: KoboTree.startup_shutdown: forget the .books cache on shutdown (it hooks into the library we also close)
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: put most of the Calibre defaults up the top, make CalibreTree.FSPATH_DEFAULT a callable, provide new CalibreTree.{bin_dirpath,prefs_dirpath,plugins_dirpath}
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: minor style tweak
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboTree: rename FSPATH_FACTORY to FSPATH_DEFAULT which may now be a callable
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: command line __main__ mode
+lib/python/cs/ebooks/dedrm.py lib/python/cs/ebooks/kobo.py: cs.ebooks.{dedrm,kobo}: move import_obok and decrypt_obok from .dedrm to .kobo, add support for importing as a calibre plugin zipfile
+lib/python/cs/ebooks/kobo.py: cs.ebooks.kobo: KoboTree.startup_shutdown: copy with .books not yet being defined
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: honour $CALIBRE_CONFIG_DIRECTORY and $CALIBRE_OVERRIDE_DATABASE_PATH as described in https://manual.calibre-ebook.com/customize.html
+lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/dedrm.py: merge default ==> ebooks: cs.ebooks: some PDF and CBZ support
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: spelling fix
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calbre: CalibreTree.make_cbz: small refactor, improve warning message
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.db: use functools.cached_property
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: open the Calibre db in immutable mode by default - this prevents the calibre tools from complaining that the db use locked
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.run_context: do not bother making a b session, not required
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.startup_shutdown: open/close a db session
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.startup_shutdown: drop the db_session, we will make one at need
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_add: new --cbz option to add a CBZ format in addition to the base file
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand.cmd_ls: hold a db session across the whole listing and always do a preload
+lib/python/cs/ebooks/__init__.py: cs.ebooks: update module docstring and DISTINFO

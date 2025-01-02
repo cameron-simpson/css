@@ -1,0 +1,1 @@
+BaseCommand: add cmd_repl to the default subcomands.

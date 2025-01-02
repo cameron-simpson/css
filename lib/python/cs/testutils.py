@@ -8,10 +8,13 @@
 '''
 
 from itertools import product
+import threading
+
 from cs.context import push_cmgr, pop_cmgr
+from cs.debug import thread_dump
 from cs.deco import decorator
 
-__version__ = '20230109-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -99,3 +102,31 @@ class SetupTeardownMixin:
     '''
     pop_cmgr(self, '_SetupTeardownMixin__tearDown')
     super().tearDown()
+
+def assertSingleThread(include_daemon=False, exclude=None):
+  ''' Test that there is only one `Thread` still running.
+
+      Parameters:
+      * `include_daemon`: also count daemon `Thread`s, normally skipped
+      * `exclude`: optional `Callable[Thread]` to test for other `Thread`s to exclude
+  '''
+  mainT = threading.main_thread()
+  Ts = [
+      T for T in threading.enumerate() if (
+          (exclude is None or not exclude(T)) and T is not mainT and
+          (include_daemon or not T.daemon)
+      )
+  ]
+  if not Ts:
+    return True
+  with open('/dev/tty', 'w') as tty:
+    thread_dump(Ts, fp=tty)
+  raise AssertionError(
+      "%d excess %s Threads: %s" % (
+          len(Ts),
+          'nonmain' if include_daemon else 'nonmain nondaemon',
+          ", ".join(
+              f'{T.name}:{T.ident}' for T in sorted(Ts, key=lambda T: T.name)
+          ),
+      )
+  )

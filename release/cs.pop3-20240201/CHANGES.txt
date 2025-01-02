@@ -1,0 +1,2 @@
+lib/python/cs/pop3.py: cs.pop3: explainatory comment
+lib/python/cs/pop3.py: cs.pop3: update DISTINFO

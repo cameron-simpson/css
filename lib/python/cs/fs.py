@@ -8,6 +8,7 @@ from fnmatch import filter as fnfilter
 from functools import partial
 import os
 from os.path import (
+    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -19,18 +20,20 @@ from os.path import (
     normpath,
     realpath,
     relpath,
+    splitext,
 )
+from pathlib import Path
+from pwd import getpwuid
 from tempfile import TemporaryDirectory
 from threading import Lock
-from typing import Optional
+from typing import Any, Callable, Optional, Union
 
-from icontract import require
-
-from cs.deco import decorator
+from cs.deco import decorator, fmtdoc, Promotable
+from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20231129-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -42,7 +45,6 @@ DISTINFO = {
         'cs.deco',
         'cs.obj',
         'cs.pfx',
-        'icontract',
     ],
 }
 
@@ -52,8 +54,9 @@ pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
-def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
+def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None) -> bool:
   ''' Create the directory `dirpath` if missing.
+      Return `True` if the directory was made, `False` otherwise.
 
       Parameters:
       * `dirpath`: the required directory path
@@ -62,15 +65,17 @@ def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None):
       * `use_makedirs`: optional creation mode, default `False`;
         if true, use `os.makedirs`, otherwise `os.mkdir`
   '''
-  if not isdirpath(dirpath):
-    if use_makedirs:
-      if log is not None:
-        log("makedirs(%r,0o%3o)", dirpath, mode)
-      pfx_makedirs(dirpath, mode)
-    else:
-      if log is not None:
-        log("mkdir(%r,0o%3o)", dirpath, mode)
-      pfx_mkdir(dirpath, mode)
+  if isdirpath(dirpath):
+    return False
+  if use_makedirs:
+    if log is not None:
+      log("makedirs(%r,0o%3o)", dirpath, mode)
+    pfx_makedirs(dirpath, mode)
+  else:
+    if log is not None:
+      log("mkdir(%r,0o%3o)", dirpath, mode)
+    pfx_mkdir(dirpath, mode)
+  return True
 
 @decorator
 def atomic_directory(infill_func, make_placeholder=False):
@@ -94,9 +99,8 @@ def atomic_directory(infill_func, make_placeholder=False):
       # prevent other users from using this directory
       pfx_mkdir(dirpath, 0o000)
       remove_placeholder = True
-    else:
-      if existspath(dirpath):
-        raise ValueError("directory already exists: %r" % (dirpath,))
+    elif existspath(dirpath):
+      raise ValueError("directory already exists: %r" % (dirpath,))
     work_dirpath = dirname(dirpath)
     try:
       with TemporaryDirectory(
@@ -120,34 +124,89 @@ def atomic_directory(infill_func, make_placeholder=False):
 
   return atomic_directory_wrapper
 
-def rpaths(
-    dirpath='.', *, only_suffixes=None, skip_suffixes=None, sort_paths=False
+@pfx
+def scandirtree(
+    dirpath='.',
+    *,
+    include_dirs=False,
+    name_selector=None,
+    only_suffixes=None,
+    skip_suffixes=None,
+    sort_names=False,
+    follow_symlinks=False,
+    recurse=True,
 ):
-  ''' Yield relative file paths from a directory.
+  ''' Generator to recurse over `dirpath`, yielding `(is_dir,subpath)`
+      for all selected subpaths.
+
+      Parameters:
+      * `dirpath`: the directory to scan, default `'.'`
+      * `include_dirs`: if true yield directories; default `False`
+      * `name_selector`: optional callable to select particular names;
+        the default is to select names not starting with a dot (`'.'`)
+      * `only_suffixes`: if supplied, skip entries whose extension
+        is not in `only_suffixes`
+      * `skip_suffixes`: if supplied, skip entries whose extension
+        is in `skip_suffixes`
+      * `sort_names`: option flag, default `False`; yield entires
+        in lexical order if true
+      * `follow_symlinks`: optional flag, default `False`; passed to `scandir`
+      * `recurse`: optional flag, default `True`; if true, recurse into subdrectories
+  '''
+  if name_selector is None:
+    name_selector = lambda name: name and not name.startswith('.')
+  pending = [dirpath]
+  while pending:
+    path = pending.pop(0)
+    try:
+      dirents = pfx_call(os.scandir, path)
+    except NotADirectoryError:
+      yield False, path
+      continue
+    if not recurse and include_dirs:
+      yield True, path
+    if sort_names:
+      dirents = sorted(dirents, key=lambda entry: entry.name)
+    for entry in dirents:
+      name = entry.name
+      if not name_selector(name):
+        continue
+      if only_suffixes or skip_suffixes:
+        _, ext = splitext(name)
+        if only_suffixes and ext[1:] not in only_suffixes:
+          continue
+        if skip_suffixes and ext[1:] in skip_suffixes:
+          continue
+      is_dir = entry.is_dir(follow_symlinks=follow_symlinks)
+      if is_dir:
+        if recurse:
+          pending.append(entry.path)
+        if include_dirs:
+          yield True, entry.path
+      else:
+        yield False, entry.path
+
+def scandirpaths(dirpath='.', **scan_kw):
+  ''' A shim for `scandirtree` to yield filesystem paths from a directory.
 
       Parameters:
       * `dirpath`: optional top directory, default `'.'`
-      * `only_suffixes`: optional iterable of suffixes of interest;
-        if provided only files ending in these suffixes will be yielded
-      * `skip_suffixes`: optional iterable if suffixes to ignore;
-        if provided files ending in these suffixes will not be yielded
-      * `sort_paths`: optional flag specifying that filenames should be sorted,
-        default `False`
+
+      Other keyword arguments are passed to `scandirtree`.
   '''
-  if only_suffixes is not None:
-    only_suffixes = tuple(only_suffixes)
-  if skip_suffixes is not None:
-    skip_suffixes = tuple(skip_suffixes)
-  for subpath, subdirnames, filenames in os.walk(dirpath):
-    if sort_paths:
-      subdirnames[:] = sorted(subdirnames)
-      filenames = sorted(filenames)
-    for filename in filenames:
-      if skip_suffixes is not None and filename.endswith(skip_suffixes):
-        continue
-      if only_suffixes is not None and not filename.endswith(only_suffixes):
-        continue
-      yield relpath(joinpath(subpath, filename), dirpath)
+  for _, fspath in scandirtree(dirpath, **scan_kw):
+    yield fspath
+
+def rpaths(dirpath='.', **scan_kw):
+  ''' A shim for `scandirtree` to yield relative file paths from a directory.
+
+      Parameters:
+      * `dirpath`: optional top directory, default `'.'`
+
+      Other keyword arguments are passed to `scandirtree`.
+  '''
+  for fspath in scandirpaths(dirpath, **scan_kw):
+    yield relpath(fspath, dirpath)
 
 def fnmatchdir(dirpath, fnglob):
   ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
@@ -156,7 +215,10 @@ def fnmatchdir(dirpath, fnglob):
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
-  ''' An object with a `.fspath` attribute representing a filesystem location.
+  ''' A mixin for an object with a `.fspath` attribute representing a filesystem location.
+
+      The `__init__` method just sets the `.fspath` attribute, and
+      need not be called if the main class takes care of that itself.
   '''
 
   def __init__(self, fspath):
@@ -174,14 +236,16 @@ class HasFSPath:
     except AttributeError:
       return "<no-fspath>"
 
-  @require(lambda subpaths: len(subpaths) > 0)
-  @require(lambda subpaths: not any(map(isabspath, subpaths)))
   def pathto(self, *subpaths):
     ''' The full path to `subpaths`, comprising a relative path
         below `self.fspath`.
         This is a shim for `os.path.join` which requires that all
         the `subpaths` be relative paths.
     '''
+    if not subpaths:
+      raise ValueError('missing subpaths')
+    if any(map(isabspath, subpaths)):
+      raise ValueError('all subpaths must be relative paths')
     return joinpath(self.fspath, *subpaths)
 
   def fnmatch(self, fnglob):
@@ -193,7 +257,7 @@ class HasFSPath:
     ''' Return `os.listdir(self.fspath)`. '''
     return os.listdir(self.fspath)
 
-class FSPathBasedSingleton(SingletonMixin, HasFSPath):
+class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
   '''
 
@@ -205,6 +269,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
       default_attr: str = 'FSPATH_DEFAULT'
   ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
+        This key is used to identify instances in the singleton registry.
 
         Parameters:
         * `fspath`: the filesystem path to resolve;
@@ -231,7 +296,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
       if envvar is not None:
         fspath = os.environ.get(envvar)
         if fspath is not None:
-          return realpath(fspath)
+          return cls.fspath_normalised(fspath)
       default = getattr(cls, default_attr, None)
       if default is not None:
         if callable(default):
@@ -239,7 +304,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
         else:
           fspath = expanduser(default)
         if fspath is not None:
-          return realpath(fspath)
+          return cls.fspath_normalised(fspath)
       raise ValueError(
           "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
               (
@@ -250,7 +315,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
               default_attr,
           )
       )
-    return realpath(fspath)
+    return cls.fspath_normalised(fspath)
 
   @classmethod
   def _singleton_key(cls, fspath=None, **_):
@@ -258,52 +323,184 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
     '''
     return cls._resolve_fspath(fspath)
 
+  # pylint: disable=return-in-init
   ##@typechecked
   def __init__(self, fspath: Optional[str] = None, lock=None):
     ''' Initialise the singleton:
 
         On the first call:
         - set `.fspath` to `self._resolve_fspath(fspath)`
-        - set `._lock` to `lock` (or `threading.Lock()` if not specified)
-        - return `True`
-        On subsequent calls return `False`.
-
+        - set `._lock` to `lock` (or `cs.threads.NRLock()` if not specified)
     '''
     if '_lock' in self.__dict__:
-      return False
+      return
     fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
     if lock is None:
-      lock = Lock()
+      try:
+        from cs.threads import NRLock  # pylint: disable=import-outside-toplevel
+      except ImportError:
+        lock = Lock()
+      else:
+        lock = NRLock()
     self._lock = lock
-    return True
 
-DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
+  @classmethod
+  def fspath_normalised(cls, fspath: str):
+    ''' Return the normalised form of the filesystem path `fspath`,
+        used as the key for the singleton registry.
 
-def shortpath(path, prefixes=None):
-  ''' Return `path` with the first matching leading prefix replaced.
+        This default returns `realpath(fspath)`.
+
+        As a contracting example, the `cs.ebooks.kindle.classic.KindleTree`
+        class tries to locate the directory containing the book
+        database, and returns its realpath, allowing some imprecision.
+    '''
+    return realpath(fspath)
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `None` or `str` to a `CalibreTree`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    # TODO: or Pathlike?
+    if obj is None or isinstance(obj, str):
+      return cls(obj)
+    raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
+
+SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
+
+@fmtdoc
+def shortpath(
+    fspath, prefixes=None, *, collapseuser=False, foldsymlinks=False
+):
+  ''' Return `fspath` with the first matching leading prefix replaced.
 
       Parameters:
-      * `environ`: environment mapping if not os.environ
-      * `prefixes`: optional iterable of `(prefix,subst)` to consider for replacement;
-        each `prefix` is subject to environment variable
-        substitution before consideration
-        The default considers "$HOME/" for replacement by "~/".
+      * `prefixes`: optional list of `(prefix,subst)` pairs
+      * `collapseuser`: optional flag to enable detection of user
+        home directory paths; default `False`
+      * `foldsymlinks`: optional flag to enable detection of
+        convenience symlinks which point deeper into the path;
+        default `False`
+
+      The `prefixes` is an optional iterable of `(prefix,subst)`
+      to consider for replacement.  Each `prefix` is subject to
+      environment variable substitution before consideration.
+      The default `prefixes` is from `SHORTPATH_PREFIXES_DEFAULT`:
+      `{SHORTPATH_PREFIXES_DEFAULT!r}`.
   '''
   if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
+    prefixes = SHORTPATH_PREFIXES_DEFAULT
+  if collapseuser or foldsymlinks:
+    # our resolved path
+    leaf = Path(fspath).resolve()
+    assert leaf.is_absolute()
+    # Paths from leaf-parent to root
+    parents = list(leaf.parents)
+    paths = [leaf] + parents
+
+    def statkey(S):
+      ''' A 2-tuple of `(S.st_dev,Sst_info)`.
+      '''
+      return S.st_dev, S.st_ino
+
+    def pathkey(P):
+      ''' A 2-tuple of `(st_dev,st_info)` from `P.stat()`
+          or `None` if the `stat` fails.
+      '''
+      try:
+        S = P.stat()
+      except OSError:
+        return None
+      return statkey(S)
+
+    base_s = None
+    if collapseuser:
+      # scan for the lowest homedir in the path
+      pws = {}
+      for i, path in enumerate(paths):
+        try:
+          st = path.stat()
+        except OSError:
+          continue
+        try:
+          pw = pws[st.st_uid]
+        except KeyError:
+          pw = pws[st.st_uid] = getpwuid(st.st_uid)
+        if path.samefile(pw.pw_dir):
+          base_s = '~' if pw.pw_uid == os.geteuid() else f'~{pw.pw_name}'
+          paths = paths[:i + 1]
+          break
+    # a list of (Path,display) from base to leaf
+    paths_as = [[path, None] for path in reversed(paths)]
+    # note the display for the base Path
+    paths_as[0][1] = base_s
+    if not foldsymlinks:
+      keep_as = paths_as
+    else:
+      # look for symlinks which point deeper into the path
+      # map path keys to (i,path)
+      pathindex_by_key = {
+          sk: i
+          for sk, i in
+          ((pathkey(path_as[0]), i) for i, path_as in enumerate(paths_as))
+          if sk is not None
+      }
+      # scan from the base towards the leaf, excluding the leaf
+      i = 0
+      keep_as = []
+      while i < len(paths_as) - 1:
+        path_as = paths_as[i]
+        keep_as.append(path_as)
+        path = path_as[0]
+        skip_to_i = None
+        try:
+          for entry in os.scandir(path):
+            if not entry.name.isalpha():
+              continue
+            try:
+              if not entry.is_symlink():
+                continue
+              sympath = os.readlink(entry.path)
+            except OSError:
+              continue
+            # only consider clean subpaths
+            if not is_valid_rpath(sympath):
+              continue
+            # see the the symlink resolves to a path entry
+            try:
+              pathndx = pathindex_by_key[statkey(entry.stat())]
+            except KeyError:
+              continue
+            if skip_to_i is None or pathndx > skip_to_i:
+              # we will advance to skip_to_i
+              skip_to_i = pathndx
+              # note the symlink name for this component
+              paths_as[skip_to_i][1] = entry.name
+          i = i + 1 if skip_to_i is None else skip_to_i
+        except OSError:
+          i += 1
+    parts = list(
+        (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
+        for i, path_as in enumerate(keep_as)
+    )
+    parts.append(paths_as[-1][1] or leaf.name)
+    fspath = os.sep.join(parts)
+  # replace leading prefix
   for prefix, subst in prefixes:
     prefix = expandvars(prefix)
-    if path.startswith(prefix):
-      return subst + path[len(prefix):]
-  return path
+    if fspath.startswith(prefix):
+      return subst + fspath[len(prefix):]
+  return fspath
 
 def longpath(path, prefixes=None):
   ''' Return `path` with prefixes and environment variables substituted.
       The converse of `shortpath()`.
   '''
   if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
+    prefixes = SHORTPATH_PREFIXES_DEFAULT
   for prefix, subst in prefixes:
     if path.startswith(subst):
       path = prefix + path[len(subst):]
@@ -351,3 +548,47 @@ def is_valid_rpath(rpath, log=None) -> bool:
       log("invalid: %s", e)
     return False
   return True
+
+def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
+  ''' Walk up the filesystem tree looking for a directory where
+      `criterion(fspath)` is not `None`, where `fspath` starts at `dirpath`.
+      Return the result of `criterion(fspath)`.
+      Return `None` if no such path is found.
+
+      Parameters:
+      * `dirpath`: the starting directory
+      * `criterion`: a `str` or a callable accepting a `str`
+
+      If `criterion` is a `str`, use look for the existence of `os.path.join(fspath,criterion)`
+
+      Example:
+
+          # find a directory containing a `.envrc` file
+          envrc_path = findup('.', '.envrc')
+
+          # find a Tagger rules file for the Downloads directory
+          rules_path = findup(expanduser('~/Downloads', '.taggerrc')
+  '''
+  if isinstance(criterion, str):
+    # passing a name looks for that name (usually a basename) with
+    # respect to each directory path
+    find_name = criterion
+
+    def test_subpath(dirpath):
+      testpath = joinpath(dirpath, find_name)
+      if pfx_call(existspath, testpath):
+        return testpath
+      return None
+
+    criterion = test_subpath
+  if not isabspath(dirpath):
+    dirpath = abspath(dirpath)
+  while True:
+    found = pfx_call(criterion, dirpath)
+    if found is not None:
+      return found
+    new_dirpath = dirname(dirpath)
+    if new_dirpath == dirpath:
+      break
+    dirpath = new_dirpath
+  return None

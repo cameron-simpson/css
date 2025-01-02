@@ -24,6 +24,7 @@ from os.path import (
 from threading import Lock
 from types import SimpleNamespace as NS
 
+from cs.context import contextif
 from cs.deco import strable
 from cs.ffmpegutils import (
     MetaData as FFmpegMetaData,
@@ -336,13 +337,15 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     if not doit:
       print(srcpath)
       print("  =>", dstpath)
-    with atomic_filename(
+    with contextif(
+        doit,
+        atomic_filename,
         dstpath,
         exists_ok=overwrite,
         dir=dirname(dstpath),
         suffix=f'.{dstfmt}',
         rename_func=fstags.move,
-    ) if doit else nullcontext() as T:
+    ) as T:
       if doit:
         os.remove(T.name)
       ffconvert(

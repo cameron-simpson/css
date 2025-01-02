@@ -1,0 +1,1 @@
+shortpath: new collapseuser=False, foldsymlinks=False parameters, rename DEFAULT_SHORTEN_PREFIXES to SHORTPATH_PREFIXES_DEFAULT.

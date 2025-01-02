@@ -1,0 +1,1 @@
+lib/python/cs/hashindex.py: cs.hashindex: hashindex: plumb hashname to file_checksum

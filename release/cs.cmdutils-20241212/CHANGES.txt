@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: pass shortshort to subusages, not short=not recurse
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.short_subusages: use a single tabluate() table for the entire recursive listing

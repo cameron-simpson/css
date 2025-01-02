@@ -9,8 +9,9 @@
 
 set -ue
 
-: ${SSHTO_OPTCSS:=/opt/css}
+: "${SSHTO_OPTCSS:=/opt/css}}"
 
+ssh_exe=${SSH_EXE:-"sshto -E"}
 needoptcss=
 pfxstderr=
 dotrace=
@@ -39,7 +40,7 @@ case "$bangpath" in
     do
       if [ -n "$previous" ]
       then
-        proxy_command="${proxy_command} ssh -A -T -x -e none -o batchmode=yes -o compression=no $previous"
+        proxy_command="${proxy_command} $ssh_exe -A -T -x -e none -o batchmode=yes -o compression=no $previous"
         if [ $needoptcss ]; then proxy_command="${proxy_command} $SSHTO_OPTCSS/bin/with-opt-css"; fi
         if [ $pfxstderr ];  then proxy_command="${proxy_command} tag_fd 2 $hop"; fi
         if [ $dotrace ];    then proxy_command="${proxy_command} $trace"; fi

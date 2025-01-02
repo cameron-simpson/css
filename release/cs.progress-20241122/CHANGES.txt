@@ -1,0 +1,3 @@
+lib/python/cs/progress.py: cs.progress: Progress.__str__: do not include the positions, too verbose
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: always print the final report if report_print
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: default for report_print now comes from not BaseCommand.Options.quiet

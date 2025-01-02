@@ -1,0 +1,15 @@
+lib/python/cs/hashindex.py: cs.hashindex: new localpath(fspath) function, use it in read_remote_hashindex
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: support rhost:rpath paths
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: honour intterupts in the remote mode
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: update usage
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_linkto: better context prefix
+lib/python/cs/hashindex.py: cs.hashindex: merge: symlink_mode: leave identical symlinks alone, just merge tags
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: new optional dstdirpath parameter, default srcdirpath
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: new optional dstdir command line argument, passed to rearrange
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: fix dstdir logic
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: plumb dstdir to rearrange()
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: if merge() raises FileExistsError, issue warning and do not add the merge source to to_remove
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.HashIndexCommand.cmd_rearrange: drop run_task() if doing remote work, gets mixed up
+lib/python/cs/hashindex.py: cs.hashindex: do not report subprocess commands trace to stderr
+lib/python/cs/hashindex.py: cs.hashindex: cmd_rearrange, rearrange, merge: apply "doit" at the place of action instead of short circuiting, allows us to display planned actions precisely
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: report planned removals

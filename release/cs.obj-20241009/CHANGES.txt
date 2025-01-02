@@ -1,0 +1,1 @@
+lib/python/cs/obj.py: cs.obj: public_subclasses: catch TypeError from "type.__subclasses__", which is just a function

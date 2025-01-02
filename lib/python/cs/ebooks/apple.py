@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+from functools import cached_property
 from dataclasses import dataclass
 from getopt import GetoptError
 from glob import glob
@@ -22,18 +23,17 @@ from sqlalchemy import (
 from typeguard import typechecked
 
 from cs.app.osx.plist import ingest_plist
-from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import strable
-from cs.fs import FSPathBasedSingleton
 from cs.logutils import warning
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import run
-from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import ORM, BasicTableMixin
-from cs.threads import locked_property
+from cs.threads import locked
 
-class AppleBooksTree(FSPathBasedSingleton, MultiOpenMixin):
+from .common import AbstractEbooksTree, EBooksCommonBaseCommand, EBooksCommonOptions
+
+class AppleBooksTree(AbstractEbooksTree):
   ''' Work with an Apple Books tree.
   '''
 
@@ -46,7 +46,8 @@ class AppleBooksTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     yield
 
-  @locked_property
+  @cached_property
+  @locked
   def db(self):
     ''' The associated `AppleBooksDB` ORM,
         instantiated on demand.
@@ -58,15 +59,16 @@ class AppleBooksTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return self.db.shell()
 
-  def __iter__(self):
-    ''' Generator yielding Apple Book db entries.
-    '''
+  def get_library_books_mapping(self):
     db = self.db
     with db.db_session() as session:
-      yield from sorted(
-          db.books.lookup(session=session),
-          key=lambda book: (book.sort_author, book.sort_title)
-      )
+      return {
+          book.pk: book
+          for book in sorted(
+              db.books.lookup(session=session),
+              key=lambda book: (book.sort_author, book.sort_title)
+          )
+      }
 
 class AppleBooksDB(ORM):
   ''' An ORM to access the Apple Books SQLite database.
@@ -208,12 +210,12 @@ class AppleBooksDB(ORM):
     self.collections = Collection
     self.collection_members = CollectionMember
 
-class AppleBooksCommand(BaseCommand):
+class AppleBooksCommand(EBooksCommonBaseCommand):
   ''' Command line access to Apple Books.
   '''
 
   @dataclass
-  class Options(BaseCommand.Options):
+  class Options(EBooksCommonOptions):
     apple_path: Optional[str] = None
 
   @contextmanager
@@ -245,7 +247,7 @@ class AppleBooksCommand(BaseCommand):
       argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    for book in options.apple:
+    for book in options.apple.books():
       print(f"{book.title}, {book.author} ({book.asset_id})")
       if long_mode:
         if book.cover_url:

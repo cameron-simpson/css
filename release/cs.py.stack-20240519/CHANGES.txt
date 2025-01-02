@@ -1,0 +1,1 @@
+lib/python/cs/py/stack.py: cs.py.stack: drop Frame.funcname property

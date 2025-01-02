@@ -1,0 +1,3 @@
+lib/python/cs/hashindex.py: cs.hashindex: merge: use new @uses_quiet decorator
+lib/python/cs/hashindex.py: cs.hashindex: drop most uses of the quiet parameter, use vprint et al
+lib/python/cs/hashindex.py: cs.hashindex: merge: use @uses_verbose, pass to vprint() explicitly

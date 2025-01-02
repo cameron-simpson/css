@@ -1,0 +1,1 @@
+Initial PyPI release: "hashindex" command and utility functions for listing file hashcodes and rearranging trees based on a hash index.

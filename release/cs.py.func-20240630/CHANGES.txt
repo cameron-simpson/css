@@ -1,0 +1,2 @@
+lib/python/cs/py/func.py: cs.py.func: funcname: include the module name
+lib/python/cs/py/func.py: cs.py.func: funcname: handle functions with no __module__

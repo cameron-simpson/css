@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: if run as main programme, run a demo command
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_info: use pformat instead of str
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_repl: enumerate the options as top level names in the banner

@@ -141,14 +141,26 @@ exec 3<&0       # save stdin
 # this lets us use the same file for input and output
 
 ( [ $filter_mode ] || exec <"$target"
-  sed -n "1,/$from/w $front
-          /$from/,/$to/{
-            /$from/b next
-            /$to/b next
-            w $middle
-          }
-          :next
-          /$to/,\$w $back"
+  sed -n "
+      :front
+      /$from/!{
+        w $front
+        n
+        b front
+      }
+      w $front
+      n
+      :middle
+      /$to/!{
+        w $middle
+        n
+        b middle
+      }
+      :back
+      w $back
+      n
+      b back
+  "
 ) || ok=
 
 if [ $ok ]

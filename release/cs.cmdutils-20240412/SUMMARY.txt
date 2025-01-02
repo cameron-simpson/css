@@ -1,0 +1,2 @@
+BaseCommand.run_context: do not store .upd and .runstate on the options (it confuses options in subcommands and we have @uses_runstate and @uses_upd forthis anyway these days).
+BaseCommand.run_context: catch SIGQUIT, present the default handler as BaseCommand.handle_signal.

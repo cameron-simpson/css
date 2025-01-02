@@ -165,7 +165,7 @@ class CloudBackupCommand(BaseCommand):
         elif opt == '-k':
           options.key_name = val
         else:
-          raise RuntimeError("unimplemented option")
+          raise NotImplementedError("unimplemented option")
     try:
       options.cloud_area
     except ValueError as e:
@@ -196,7 +196,7 @@ class CloudBackupCommand(BaseCommand):
         if opt == '-R':
           use_realpath = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       warning("missing backup_root")
       badopts = True
@@ -340,7 +340,7 @@ class CloudBackupCommand(BaseCommand):
         elif opt == '-l':
           long_mode = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     cloud_backup = options.cloud_backup
     if not argv:
       for backup_name in cloud_backup.keys():
@@ -469,7 +469,7 @@ class CloudBackupCommand(BaseCommand):
         elif opt == '-U':
           backup_uuid = val
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if restore_dirpath is None:
       warning("missing mandatory -o outputdir option")
       badopts = True
@@ -1573,7 +1573,6 @@ class NamedBackup(SingletonMixin):
               entries,
               label="scan",
               proxy=proxy,
-              update_frequency=16,
           )
         else:
           proxy("scan %d entries", len(entries))
@@ -1642,8 +1641,8 @@ class NamedBackup(SingletonMixin):
                     )
                     changed = (
                         prev_backup_record is None
-                        or backup_record.content_path !=
-                        prev_backup_record.content_path
+                        or backup_record.content_path
+                        != prev_backup_record.content_path
                     )
                     if changed:
                       ##print(

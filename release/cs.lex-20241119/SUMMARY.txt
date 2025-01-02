@@ -1,0 +1,1 @@
+stripped_dedent: new optional sub_indent parameter for indenting the second and following lines, handy for usage messages.

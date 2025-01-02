@@ -16,7 +16,7 @@ from cs.py.stack import caller
 from cs.py3 import raise_from
 from cs.x import X
 
-__version__ = '20230331-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -38,14 +38,16 @@ def funcname(func):
       Several objects do not have a __name__ attribute, such as partials.
   '''
   try:
-    return func.__qualname__
+    name = func.__qualname__
   except AttributeError:
     try:
-      return func.__name__
+      name = func.__name__
     except AttributeError:
       if isinstance(func, partial):
-        return "partial(%s)" % (funcname(func.func),)
-      return str(func)
+        name = "partial(%s)" % (funcname(func.func),)
+      else:
+        name = str(func)
+  return "%s:%s" % (getattr(func, '__module__', '?'), name)
 
 def funccite(func):
   ''' Return a citation for a function (name and code location).
@@ -105,23 +107,22 @@ def callif(doit, func, *a, **kw):
     func = a.pop(0)
   else:
     modes = {}
-  modes.setdefault('print', print)
   if doit:
     return func(*a, **kw)
-  fmt, av = func_a_kw_fmt(func, *a, **kw)
-  modes['print'](fmt % tuple(av))
+  # just recite the function
+  modes.get('print', print)(func_a_kw(func, *a, **kw))
   return None
 
-def callmethod_if(o, method, default=None, a=None, kw=None):
-  ''' Call the named `method` on the object `o` if it exists.
+def callmethod_if(obj, method, default=None, a=None, kw=None):
+  ''' Call the named `method` on the object `obj` if it exists.
 
       If it does not exist, return `default` (which defaults to None).
-      Otherwise call getattr(o, method)(*a, **kw).
+      Otherwise call getattr(obj, method)(*a, **kw).
       `a` defaults to ().
       `kw` defaults to {}.
   '''
   try:
-    m = getattr(o, method)
+    m = getattr(obj, method)
   except AttributeError:
     return default
   if a is None:

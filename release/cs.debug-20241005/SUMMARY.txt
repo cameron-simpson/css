@@ -1,0 +1,3 @@
+New log_via_print(msg, *args[, file=stdout]) function to use cs.upd.print as a logging call.
+@trace: new $CS_DEBUG_TRACE envvar which may be "print" or "warning" or "X".
+New @abrk decorator to intercept AssertionError, NameError and RuntimeError and call breakpoint.

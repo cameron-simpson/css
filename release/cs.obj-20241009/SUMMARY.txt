@@ -1,0 +1,1 @@
+public_subclasses: catch TypeError from "type.__subclasses__", which is just a function.

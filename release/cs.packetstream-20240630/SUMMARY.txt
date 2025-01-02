@@ -1,0 +1,10 @@
+New ERQ_Packet to indicate end of client requests.
+PacketConnection.startup_shutdown: send ERQ_Packet at stream shutdown.
+New PacketConnection.end_requests() method to queue an ERQ_Packet to the send queue.
+PacketConnection: send the EOF_Packet from the send worker instead of from startup_shutdown.
+Rename PacketConnection.do to PacketConnection.__call__.
+PacketStream: BREAKING: replace the recv and send parameters with a singe recv_send parameter.
+PacketStream: do not close supplied connection handles - this allows reuse of an underlying binary connection.
+Many many logic fixes for clean and orderly shutdown.
+Rename PacketConnection.request to PacketConnection.submit.
+New BaseRequest and HasPacketConnection helper classes to make it easy to use a PacketConnection for a protocol.

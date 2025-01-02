@@ -1,0 +1,2 @@
+stack_dump: new select parameter to pick interesting frames for the listing.
+Provide StackSummary and FrameSummary if Python too old.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Utilities for working with newline delimited JSON (NDJSON) files.
+''' Utilities for working with newline delimited JSON (NDJSON) files, aka JSON Lines.
 '''
 
 import json

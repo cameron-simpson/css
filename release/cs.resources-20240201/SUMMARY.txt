@@ -1,0 +1,1 @@
+MultiOpenMixin: new .is_open() method to test for opens > 0.

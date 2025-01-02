@@ -1,0 +1,2 @@
+SubCommand.usage_format_parts: backport type annotation for older Pythons.
+BaseCommand.extract_usage: update parameters for usage_text().

@@ -1,0 +1,7 @@
+lib/python/cs/dockerutils.py: cs.dockerutils: mount_escape: strip trailing carriage return also
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun: new output_map attribute much like input_map; modify add_input() to take just the host fspath and return the container fspath; add add_output() much like add_input()
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun.popopts: drop the -I option, no longer sensible
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun.run: update input mount variables for clarity, add mounts for existing output paths
+lib/python/cs/dockerutils.py: cs.dockerutils: update imports and DISTINFO, add pfx context for DockerRun.run
+lib/python/cs/dockerutils.py: cs.dockerutils: update DISTINFO
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerUtilCommand.cmd_run: -I option no longer supported

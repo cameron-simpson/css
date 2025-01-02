@@ -1,0 +1,3 @@
+Add @uses_force to @uses_doit, @uses_quiet, @uses_verbose decorator set.
+Fold @uses_cmd_option into @uses_cmd_options, provide "options" if no option_defaults.
+@promote: accept optional keyword arguments, plumb to the from_typename factory method.

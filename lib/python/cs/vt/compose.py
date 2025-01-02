@@ -151,6 +151,10 @@ def get_store_spec(s, offset=0):
     params = {'shcmd': s[offset + 1:].strip()}
     offset = len(s)
   else:
+    # store_type[(params)
+    # OR
+    # store_type:flat-store-params
+    # eg tcp:127.0.0.1:9876
     store_type, offset = get_identifier(s, offset)
     if not store_type:
       raise ValueError(
@@ -199,14 +203,16 @@ def get_params(s, offset):
           "rejecting empty parameter name at position %d" % (offset,)
       )
     if not s.startswith('=', offset):
-      raise ValueError("missing '=' at poition %d" % (offset,))
+      raise ValueError("missing '=' at position %d" % (offset,))
+    offset += 1
     value, offset = get_token(s, offset)
     params[param] = value
     if s.startswith(')', offset):
+      offset += 1
       break
     if s.startswith(',', offset):
       offset += 1
-  return params, offset + 1
+  return params, offset
 
 def get_token(s, offset=0):
   ''' Parse an integer value, an identifier or a quoted string.

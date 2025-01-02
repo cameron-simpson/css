@@ -1,0 +1,3 @@
+lib/python/cs/djutils.py: cs.djutils: now package to support working with Django
+lib/python/cs/djutils.py: cs.djutils: DjangoBaseCommand.add_arguments: docstring tweak
+lib/python/cs/djutils.py: cs.djutils: DISTINFO

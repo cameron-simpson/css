@@ -1,0 +1,1 @@
+Promotable: no longer abstract, provide a default promote() method which tries cls.from_str for str.

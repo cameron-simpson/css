@@ -1,0 +1,5 @@
+lib/python/cs/fileutils.py: cs.fileutils: remove debugging
+lib/python/cs/fileutils.py: merge ebooks ==> default: many updates, mostly for the cs.cmdutils updates
+lib/python/cs/fileutils.py: cs.fileutils: NamedTemporaryCopy: rename keyword params to remind me where they go; atomic_filename: fix comment typos
+lib/python/cs/fileutils.py: cs.fileutils: new atomic_copy2 function which is an atomic version of shutil.copy2
+lib/python/cs/fileutils.py: merge main => fstags

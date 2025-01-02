@@ -6,7 +6,6 @@
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 import errno
-import getopt
 from itertools import zip_longest
 import logging
 import os
@@ -19,6 +18,8 @@ import time
 from types import SimpleNamespace as NS
 from typing import Any, Optional
 
+from typeguard import typechecked
+
 from cs.cmdutils import BaseCommandOptions
 from cs.excutils import logexc
 from cs.inttypes import Flags
@@ -26,7 +27,7 @@ from cs.later import Later
 from cs.lex import get_identifier, get_white
 from cs.logutils import debug, info, error, exception, D
 import cs.pfx
-from cs.pfx import pfx, Pfx
+from cs.pfx import pfx, Pfx, pfx_method
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.result import Result
@@ -89,6 +90,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   # there's no Lock type I can name
   activity_lock: Any = field(default_factory=Lock)
   basic_namespaces: list = field(default_factory=list)
+  cmd_ns: dict = field(default_factory=dict)
 
   def __str__(self):
     return (
@@ -112,9 +114,11 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
     ''' Set up the `Later` work queue.
     '''
     self._makeQ = Later(self.parallel, self.name)
-    with self._makeQ:
-      yield
-    self._makeQ.wait()
+    try:
+      with self._makeQ:
+        yield
+    finally:
+      self._makeQ.wait()
 
   def report(self, fp=None):
     ''' Report the make queue status.
@@ -461,10 +465,10 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
             yield Target(
                 self,
                 target,
-                context,
+                context=context,
                 prereqs=prereqs_mexpr,
                 postprereqs=postprereqs_mexpr,
-                actions=action_list
+                actions=action_list,
             )
           continue
 
@@ -517,7 +521,14 @@ class TargetMap(NS):
   ):
     ''' Construct a new Target.
     '''
-    return Target(maker, name, context, prereqs, postprereqs, actions)
+    return Target(
+        maker,
+        name,
+        context=context,
+        prereqs=prereqs,
+        postprereqs=postprereqs,
+        actions=actions,
+    )
 
   def __setitem__(self, name, target):
     ''' Record new target in map.
@@ -541,23 +552,37 @@ class Target(Result):
   ''' A make target.
   '''
 
-  def __init__(self, maker, name, context, prereqs, postprereqs, actions):
+  @typechecked
+  def __init__(
+      self,
+      maker: Maker,
+      name: str,
+      *,
+      context,
+      prereqs,
+      postprereqs,
+      actions,
+  ):
     ''' Initialise a new target.
-          `maker`: the Maker with which this Target is associated.
-          `context`: the file context, for citations.
-          `name`: the name of the target.
-          `prereqs`: macro expression to produce prereqs.
-          `postprereqs`: macro expression to produce post-inference prereqs.
-          `actions`: a list of actions to build this Target
-          The same actions list is shared amongst all Targets defined
-          by a common clause in the Mykefile, and extends during the
-          Mykefile parse _after_ defining those Targets. So we do not
-          modify it the class; instead we extend .pending_actions
-          when .require() is called the first time, just as we do for a
-          :make directive.
-    '''
 
-    Result.__init__(self, name=name, lock=RLock())
+        Parameters:
+        * `maker`: the Maker with which this Target is associated.
+        * `context`: the file context, for citations.
+        * `name`: the name of the target.
+        * `prereqs`: macro expression to produce prereqs.
+        * `postprereqs`: macro expression to produce post-inference prereqs.
+        * `actions`: a list of actions to build this Target
+
+        The same actions list is shared amongst all `Target`s defined
+        by a common clause in the Mykefile, and extends during the
+        Mykefile parse _after_ defining those Targets. So we do not
+        modify it the class; instead we extend .pending_actions
+        when .require() is called the first time, just as we do for a
+        :make directive.
+  '''
+
+    self._lock = RLock()
+    Result.__init__(self, name=name, lock=self._lock)
     self.maker = maker
     self.context = context
     self.shell = SHELL
@@ -694,37 +719,37 @@ class Target(Result):
     self.maker.debug_make("%s: CANCEL", self)
     Result.cancel(self)
 
+  @pfx_method
   def require(self):
     ''' Require this Target to be made.
     '''
-    with Pfx("%r.require()", self.name):
-      with self._lock:
-        if self.is_pending:
-          # commence make of this Target
-          self.maker.target_active(self)
-          self.notify(self.maker.target_inactive)
-          self.dispatch()
-          self.was_missing = self.mtime is None
-          self.pending_actions = list(self.actions)
-          Ts = []
-          for Pname in self.prereqs:
-            T = self.maker[Pname]
-            Ts.append(T)
-            T.require()
+    with self._lock:
+      if self.is_pending:
+        # commence make of this Target
+        self.maker.target_active(self)
+        self.notify(self.maker.target_inactive)
+        self.dispatch()
+        self.was_missing = self.mtime is None
+        self.pending_actions = list(self.actions)
+        Ts = []
+        for Pname in self.prereqs:
+          T = self.maker[Pname]
+          Ts.append(T)
+          T.require()
 
-            # fire fail action immediately
-            def f(T):
-              if T.result:
-                pass
-              else:
-                self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
+          # fire fail action immediately
+          def f(T):
+            if T.result:
+              pass
+            else:
+              self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
 
-            T.notify(f)
-          # queue the first unit of work
-          if Ts:
-            self.maker.after(Ts, self._make_after_prereqs, Ts)
-          else:
-            self._make_after_prereqs(Ts)
+          T.notify(f)
+        # queue the first unit of work
+        if Ts:
+          self.maker.after(Ts, self._make_after_prereqs, Ts)
+        else:
+          self._make_after_prereqs(Ts)
 
   @logexc
   def _make_after_prereqs(self, Ts):
@@ -755,6 +780,7 @@ class Target(Result):
     ''' Apply the consequences of the completed prereq T.
     '''
     with Pfx("%s._apply_prereqs(T=%s)", self, T):
+      assert isinstance(self.maker, Maker)
       mdebug = self.maker.debug_make
       if not T.ready:
         raise RuntimeError("not ready")

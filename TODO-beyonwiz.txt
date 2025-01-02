@@ -1,3 +1,4 @@
+convert: write result to different directory
 tvwiz: use cs.binary
 if the supplied acodec or vcodec matches all the associated streams, use copy - avoids eg h642 to h264 recoding
 cs.ffmpegutils: convert: use atomic_filename

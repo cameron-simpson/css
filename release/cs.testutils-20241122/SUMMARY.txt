@@ -1,0 +1,1 @@
+assertSingleThread: new optional exclude parameter which is a callable to test where a Thread should be ignored.

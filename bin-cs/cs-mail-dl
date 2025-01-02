@@ -12,7 +12,10 @@ trace=
 # run "pop3 dl"
 while read account spool <&3
 do
-  $trace timeout 1800 pop3 dl "$account" "$spool" </dev/null 3<&-
+  case "$account" in
+    '' | \#*) ;;
+    *)  $trace timeout 1800 pop3 dl "$account" "$spool" </dev/null 3<&- ;;
+  esac
 done 3<$HOME/rc-local/pop3_dl
 
 ### run "getmail"

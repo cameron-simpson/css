@@ -1,0 +1,9 @@
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: new $FFMPEG_EXE envvar, use in convert, have convert return the ffmpeg argv
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: convert: include the media type in DEFAULT_CONVERSIONS, refactor the choice of codec conversion
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: tweak the metadata handling
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: small tidyups
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: MetaData: comment out sanity checks on metadata field names
+lib/python/cs/ffmpegutils.py: cs.fmpegutils: convert: supply dummy results if doit is false - could do with some finesse
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: ffmpeg_docker: use DockerRun.{add_input,add_output}
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: new main_ffmpeg_docker to support the ffmpeg-docker command
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: DISTINFO: add ffmpeg-docker script

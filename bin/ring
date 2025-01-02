@@ -4,55 +4,58 @@
 # - Cameron Simpson <cs@cskk.id.au> 16apr2018
 #
 
+from itertools import chain
 import os
 from os.path import expanduser, basename, isdir, isfile, join as joinpath
 import re
 from subprocess import Popen, PIPE
 import sys
+from typing import Iterable, List
+
 from cs.ansi_colour import colourise_patterns
 
 CMD = basename(__file__)
 USAGE = 'Usage: %s [-f {-|pathname}] regexps...'
 
 def main(argv=None):
+  global CMD, USAGE
   if argv is None:
-    argv = sys.argv
+    argv = list(sys.argv)
   cmd = argv.pop(0)
   CMD = cmd
   usage = USAGE % (cmd,)
   do_colour = sys.stdout.isatty()
-  pathses = None
+  paths = None
   badopts = False
   if argv and argv[0] == '-f':
-    pathses = [['-']]
-    argv = argv[2:]
+    argv.pop(0)
+    paths = [argv.pop(0)]
   if not argv:
-    print("%s: missing paterrns" % (cmd,), file=sys.stderr)
+    print("%s: missing regexps" % (cmd,), file=sys.stderr)
     badopts = True
   else:
     patterns = argv
     ptns = []
     for pattern in patterns:
       ptns.append(re.compile(pattern, re.I))
-  if pathses is None:
-    pathses = [
-        pathsof(path) for path in
-        os.environ.get('TELNOS', expanduser('~/rc/telnos')).split(':') if path
-    ]
-  paths = []
-  for pathses0 in pathses:
-    paths.extend(pathses0)
+  if paths is None:
+    paths = os.environ.get('TELNOS', expanduser('~/rc/telnos')).split(':')
+  paths = list(chain(*map(pathsof, paths)))
   if badopts:
     print(usage, file=sys.stderr)
     return 2
   for path in paths:
+    if not path:
+      continue
     if path == '-':
       lines = txtfrom(sys.stdin)
     elif path.endswith('.gpg'):
       lines = gpgfrom(path)
     else:
       lines = txtfrom(path)
-    for clause in clausesof(lines):
+    found = False
+    for clause_lines in clausesof(lines):
+      clause = "\n".join(clause_lines).rstrip()
       matched = True
       for ptn in ptns:
         if not ptn.search(clause):
@@ -60,15 +63,18 @@ def main(argv=None):
           break
       if not matched:
         continue
+      found = True
       clause = clause.rstrip()
       if do_colour:
-        clause0 = clause
         clause = colourise_patterns(clause, ptns)
       print(clause)
-  return 0
+  return 0 if found else 1
 
-def pathsof(path):
+def pathsof(path: str) -> Iterable[str]:
+  ''' Yield the file pathnames derived from `path`, which might be a directory.
+  '''
   if path == '-' or isfile(path):
+    # yield "stdin" and file paths unchanged
     yield path
   elif isdir(path):
     for dirpath, dirnames, filenames in os.walk(path):
@@ -84,21 +90,25 @@ def pathsof(path):
           yield filepath
   else:
     print(
-        "%s: warning: not a file or directory: %s" % (CMD, path),
+        "%s: warning: not a file or directory: %r" % (CMD, path),
         file=sys.stderr
     )
 
-def clausesof(lines):
+def clausesof(lines: Iterable[str]) -> Iterable[List[str]]:
+  ''' Scan `lines`, an iterable of text lines, for paragraphs whose
+      leading line starts with a nonwhitespace character.
+      Yield paragraphs, each a list of `rstrip()`ed lines.
+  '''
   clause_lines = []
   for line in lines:
     line = line.rstrip()
     if line and not line[0].isspace():
       if clause_lines:
-        yield '\n'.join(clause_lines)
-      clause_lines = []
+        yield clause_lines
+        clause_lines = []
     clause_lines.append(line)
   if clause_lines:
-    yield '\n'.join(clause_lines)
+    yield clause_lines
 
 def txtfrom(fp):
   if isinstance(fp, str):
