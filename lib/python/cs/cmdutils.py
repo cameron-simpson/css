@@ -7,6 +7,21 @@
 ''' Convenience functions for working with the cmd stdlib module,
     the BaseCommand class for constructing command line programmes,
     and other command line related stuff.
+
+    This module provides the following main items:
+    - `@docmd`: a decorator for command methods of a `cmd.Cmd` class
+      providing better quality of service
+    - `BaseCommand`: a base class for creating command line programmes
+      with easier setup and usage than libraries like `optparse` or `argparse`
+    - `@popopts`: a decorator which works with `BaseCommand` command
+      methods to parse their command line options
+
+    Editorial: why not arparse?
+    I find the whole argparse `add_argument` thing very cumbersome
+    and hard to use and remember.
+    Also, when incorrectly invoked an argparse command line prints
+    the help/usage messgae and aborts the whole programme with
+    `SystemExit`.
 '''
 
 from cmd import Cmd
@@ -28,6 +43,7 @@ from getopt import getopt, GetoptError
 from inspect import isclass
 import os
 from os.path import basename
+from pprint import pformat
 # this enables readline support in the docmd stuff
 try:
   import readline  # pylint: disable=unused-import
@@ -61,7 +77,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20241212-post'
+__version__ = '20241222.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -712,8 +728,11 @@ class SubCommand:
       # the longer descriptions
       subusages = []
       for subcmd in show_subcmds:
-        subcommand = subcommands[subcmd]
-        if True:  ##recurse:
+        try:
+          subcommand = subcommands[subcmd]
+        except KeyError:
+          warning("unknown subcommand %r", subcmd)
+        else:
           # recursive long listing
           subusages.append(
               subcommand.usage_text(
@@ -722,8 +741,6 @@ class SubCommand:
                   seen_subcommands=sub_seen_subcommands,
               )
           )
-        else:
-          subusages.extend(self.short_subusages(show_subcmds))
     subusage_listing = []
     if common_subcmds:
       common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
@@ -789,6 +806,7 @@ class BaseCommandOptions(HasThreadState):
               ... optional extra fields etc ...
   '''
 
+  INFO_SKIP_NAMES = ('runstate', 'runstate_signals')
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
   COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
@@ -1099,17 +1117,10 @@ class BaseCommand:
 
       This class provides the basic parse and dispatch mechanisms
       for command lines.
-      To implement a command line
-      one instantiates a subclass of `BaseCommand`:
+      To implement a command line one instantiates a subclass of `BaseCommand`:
 
           class MyCommand(BaseCommand):
-              GETOPT_SPEC = 'ab:c'
-              USAGE_FORMAT = r"""Usage: {cmd} [-a] [-b bvalue] [-c] [--] arguments...
-                -a    Do it all.
-                -b    But using bvalue.
-                -c    The 'c' option!
-              """
-              ...
+              """ My command to do something. """
 
       and provides either a `main` method if the command has no subcommands
       or a suite of `cmd_`*subcommand* methods, one per subcommand.
@@ -1132,8 +1143,32 @@ class BaseCommand:
               sys.exit(main(sys.argv))
 
       Instances have a `self.options` attribute on which optional
-      modes are set,
-      avoiding conflict with the attributes of `self`.
+      modes are set, avoiding conflict with the attributes of `self`.
+
+      The `self.options` object is an instance of the class' `Options` class.
+      The default comes from `BaseCommand.Options` (aka `BaseCommandOptions`)
+      but classes with additional command line options will usually
+      provide their own subclass:
+
+          class MyCommand(BaseCommand):
+
+              @dataclass
+              class Options(BaseCommandOptions):
+                  extra_mode : str = None
+                  some_flag : bool = False
+
+                  # extend the common options for the new fields
+                  COMMON_OPT_SPECS = dict(
+                      **BaseCommandOptions.COMMON_OPT_SPECS,
+                      mode_=('extra_mode', 'The extra mode to do something.'),
+                      flag='some_flag',
+                  )
+
+      This adds an additional `--mode` *mode* and a `--flag` command line option
+      which affects the fields of `self.options` and updates the
+      automaticly generated usage messages accordingly.
+      See the documentation for `BaseCommandOptions.popopts` for
+      explaination of the `COMMON_OPT_SPECS` values.
 
       Subclasses with no subcommands
       generally just implement a `main(argv)` method.
@@ -1149,25 +1184,20 @@ class BaseCommand:
       Returning to methods, if there is a paragraph in the method docstring
       commencing with `Usage:` then that paragraph is incorporated
       into the main usage message automatically.
+
       Example:
 
+          @popopts(l='long_mode')
           def cmd_ls(self, argv):
-              """ Usage: {cmd} [paths...]
+              """ Usage: {cmd} [-l] [paths...]
                     Emit a listing for the named paths.
 
                   Further docstring non-usage information here.
               """
               ... do the "ls" subcommand ...
+              ... with use of self.options.long_mode as needed ...
 
       The subclass is customised by overriding the following methods:
-      * `apply_opt(opt,val)`:
-        apply an individual getopt global command line option
-        to `self.options`.
-      * `apply_opts(opts)`:
-        apply the `opts` to `self.options`.
-        `opts` is an `(option,value)` sequence
-        as returned by `getopot.getopt`.
-        The default implementation iterates over these and calls `apply_opt`.
       * `run_context()`:
         a context manager to provide setup or teardown actions
         to occur before and after the command implementation respectively,
@@ -1179,14 +1209,8 @@ class BaseCommand:
         will be called where `subcmd_argv` contains the command line arguments
         following *subcmd*.
       * `main(argv)`:
-        if there are no `cmd_`*subcmd*` methods then method `main(argv)`
+        if there are no `cmd_`*subcmd* methods then method `main(argv)`
         will be called where `argv` contains the command line arguments.
-
-      Editorial: why not arparse?
-      Primarily because when incorrectly invoked
-      an argparse command line prints the help/usage messgae
-      and aborts the whole programme with `SystemExit`.
-      But also, I find the whole argparse `add_argument` thing cumbersome.
   '''
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
@@ -1837,10 +1861,8 @@ class BaseCommand:
           `dry_run`
     '''
     if skip_names is None:
-      skip_names = tuple(
-          F.name
-          for F in fields(BaseCommandOptions)
-          if F.name not in ('cmd', 'dry_run')
+      skip_names = getattr(
+          self.options, 'INFO_SKIP_NAMES', ('runstate', 'runstate_signals')
       )
     self.options.popopts(argv)
     xit = 0
@@ -1858,21 +1880,12 @@ class BaseCommand:
           field_name for field_name in options.as_dict().keys()
           if field_name not in skip_names
       )
-    for line in tabulate(*((f'{field_name}:',
-                            str(getattr(options, field_name)))
-                           for field_name in field_names)):
+    for line in tabulate(
+        *((f'{field_name}:',
+           pformat(getattr(options, field_name), compact=True))
+          for field_name in field_names)):
       print(line)
     return xit
-
-  @uses_upd
-  def cmd_shell(self, argv, *, upd: Upd):
-    ''' Usage: {cmd}
-          Run a command prompt via cmd.Cmd using this command's subcommands.
-    '''
-    if argv:
-      raise GetoptError("extra arguments")
-    with upd.without():
-      self.cmdloop()
 
   def repl(self, *argv, banner=None, local=None):
     ''' Run an interactive Python prompt with some predefined local names.
@@ -1889,30 +1902,36 @@ class BaseCommand:
         * `self`: from `self`
         * the attributes of `options`
         * the attributes of `self`
-
-        This is not presented automatically as a subcommand, but
-        commands wishing such a command should provide something
-        like this:
-
-            def cmd_repl(self, argv):
-                """ Usage: {cmd}
-                      Run an interactive Python prompt with some predefined local names.
-                """
-                return self.repl(*argv)
     '''
     options = self.options
-    if banner is None:
-      banner = self.cmd
-      try:
-        sqltags = options.sqltags
-      except AttributeError:
-        pass
-      else:
-        banner += f': {sqltags}'
     if local is None:
-      local = dict(self.__dict__)
-      local.update(options.__dict__)
-      local.update(argv=argv, cmd=self.cmd, options=options, self=self)
+      pub_mapping = lambda d: {
+          k: v
+          for k, v in d.items()
+          if k and not k.startswith('_')
+      }
+      local = pub_mapping(self.__dict__)
+      del local['options']
+      local.update(
+          {
+              f'options.{k}': v
+              for k, v in sorted(pub_mapping(options.__dict__).items())
+          }
+      )
+      local.update(argv=argv, cmd=self.cmd, self=self)
+    if banner is None:
+      vars_banner = indent(
+          "\n".join(
+              tabulate(
+                  *(
+                      [k, pformat(v, compact=True)]
+                      for k, v in sorted(local.items())
+                      if k and not k.startswith('_')
+                  )
+              )
+          )
+      )
+      banner = f'{self.cmd}\n\n{vars_banner}\n'
     try:
       # pylint: disable=import-outside-toplevel
       from bpython import embed
@@ -1925,6 +1944,28 @@ class BaseCommand:
         banner=banner,
         locals_=local,
     )
+
+  @popopts(banner_=None)
+  def cmd_repl(self, argv):
+    ''' Usage: {cmd}
+          Run a REPL (Read Evaluate Print Loop), an interactive Python prompt.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    banner = options.banner
+    del options.banner
+    return self.repl(*argv, banner=banner)
+
+  @uses_upd
+  def cmd_shell(self, argv, *, upd: Upd):
+    ''' Usage: {cmd}
+          Run a command prompt via cmd.Cmd using this command's subcommands.
+    '''
+    if argv:
+      raise GetoptError("extra arguments")
+    with upd.without():
+      self.cmdloop()
 
   @OBSOLETE("self.options.popopts")
   def popopts(self, argv, options, **opt_specs):
@@ -1998,3 +2039,14 @@ def vprint(*print_a, **qvprint_kw):
       This is a compatibility shim for `qvprint()` with `quiet=False`.
   '''
   return qvprint(*print_a, quiet=False, **qvprint_kw)
+
+if __name__ == '__main__':
+
+  class DemoCommand(BaseCommand):
+
+    @popopts
+    def cmd_demo(self, argv):
+      print("This is a demo.")
+      print("argv =", argv)
+
+  sys.exit(DemoCommand(sys.argv).run())

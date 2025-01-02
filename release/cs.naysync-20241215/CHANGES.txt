@@ -1,0 +1,5 @@
+lib/python/cs/naysync.py: cs.naysync: fix spelling error in docstring
+lib/python/cs/naysync.py: cs.naysync: another docstring fix
+lib/python/cs/naysync.py: cs.naysync: @afunc: now a thin shim of asyncio.to_thread
+lib/python/cs/naysync.py: cs.naysync: @agen: use asyncio.to_thread to run next(genfunc), avoids polling
+lib/python/cs/naysync.py: cs.naysync: update imports, docstring
