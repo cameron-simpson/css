@@ -51,7 +51,9 @@ DISTINFO = {
         'cs.py.func',
         'cs.py.stack',
         'cs.result',
+        'cs.semantics',
         'cs.threads',
+        'icontract',
         'typeguard',
     ],
 }
