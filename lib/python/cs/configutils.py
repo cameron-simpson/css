@@ -12,7 +12,8 @@ import os.path
 import sys
 from collections.abc import Mapping
 from threading import RLock
-from cs.deco import cachedmethod
+
+from cs.cache import cachedmethod
 from cs.fileutils import file_property
 from cs.py3 import ConfigParser, StringTypes
 from cs.tagset import TagSet
@@ -28,7 +29,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.deco',
+        'cs.cache',
         'cs.fileutils',
         'cs.py3',
         'cs.tagset',

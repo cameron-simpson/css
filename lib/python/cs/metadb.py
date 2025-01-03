@@ -6,8 +6,9 @@ from collections import namedtuple
 from functools import lru_cache
 import sqlite3
 from threading import RLock
+
+from cs.cache import cachedmethod
 from cs.dbutils import TableSpace, Table, Row
-from cs.deco import cachedmethod
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.py.func import prop

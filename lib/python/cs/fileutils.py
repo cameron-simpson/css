@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Assorted convenience functions for files and filenames/pathnames.
 # - Cameron Simpson <cs@cskk.id.au>
@@ -37,8 +37,9 @@ from threading import Lock, RLock
 import time
 
 from cs.buffer import CornuCopyBuffer
+from cs.cache import cachedmethod
 from cs.context import stackattrs
-from cs.deco import cachedmethod, decorator, fmtdoc, OBSOLETE, strable
+from cs.deco import decorator, fmtdoc, OBSOLETE, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
 from cs.gimmicks import TimeoutError  # pylint: disable=redefined-builtin
@@ -64,6 +65,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.buffer',
+        'cs.cache',
         'cs.context',
         'cs.deco',
         'cs.filestate',
