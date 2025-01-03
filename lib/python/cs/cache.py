@@ -30,7 +30,7 @@ from cs.fileutils import atomic_filename, DEFAULT_POLL_INTERVAL, FileState
 from cs.fs import needdir, HasFSPath, validate_rpath
 from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.lex import r, s
-from cslogutils import warning
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
