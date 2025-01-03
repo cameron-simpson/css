@@ -19,32 +19,32 @@ DEFAULT_TAG_SEP = '.'
 class MetadataDB(TableSpace):
 
   SCHEMAE = {
-    # tags exist in a concrete taxonomy hierarchy, with potentially different
-    # names in different domains
-    'tag': {
-        'INDEX': ('normalised_name',),
-        'UNIQUE': ('parent_id normalised_name',),
-        'name': str,              # short name
-        'normalised_name': str,   # short name in canonical form (lc, ws->sp)
-        'description': str,       # descriptive text
-        'parent_id': int,         # parent tag, NULL if domain root tag
-        'root_id': int,           # root tag id, aka domain id
-        'caninical_id': int,      # link to tag in canonical domain, if mapped
-    },
-    # media come from various spaces
-    # perhaps associated with storage areas or confidentiality
-    'mediaspace': {
-        'name': str,
-        'description': str,
-        'path': str,
-    },
-    # individual mediaitems
-    # the path is unique within the mediaspace
-    'media': {
-        'name': str,
-        'path': str,
-        'mediaspace_id': int,
-    },
+      # tags exist in a concrete taxonomy hierarchy, with potentially different
+      # names in different domains
+      'tag': {
+          'INDEX': ('normalised_name',),
+          'UNIQUE': ('parent_id normalised_name',),
+          'name': str,  # short name
+          'normalised_name': str,  # short name in canonical form (lc, ws->sp)
+          'description': str,  # descriptive text
+          'parent_id': int,  # parent tag, NULL if domain root tag
+          'root_id': int,  # root tag id, aka domain id
+          'caninical_id': int,  # link to tag in canonical domain, if mapped
+      },
+      # media come from various spaces
+      # perhaps associated with storage areas or confidentiality
+      'mediaspace': {
+          'name': str,
+          'description': str,
+          'path': str,
+      },
+      # individual mediaitems
+      # the path is unique within the mediaspace
+      'media': {
+          'name': str,
+          'path': str,
+          'mediaspace_id': int,
+      },
   }
 
   def __init__(self, dbpath, **kw):
@@ -67,10 +67,11 @@ class MetadataDB(TableSpace):
           column_map[column_name] = pytype
         else:
           raise ValueError(
-              "invalid column spec %r (pytype=%r)"
-              % (column_name, pytype))
+              "invalid column spec %r (pytype=%r)" % (column_name, pytype)
+          )
       schemae[table_name] = TableSchema(
-          table_name, column_map, indices, unique)
+          table_name, column_map, indices, unique
+      )
     for name, schema in self.schemae.items():
       print(schema.create_statement)
 
@@ -120,7 +121,8 @@ class MetadataDB(TableSpace):
         raise
     return domain
 
-_TableSchema = namedtuple('TableSchema', 'name columns indices unique');
+_TableSchema = namedtuple('TableSchema', 'name columns indices unique')
+
 class TableSchema(_TableSchema):
 
   @property
@@ -141,29 +143,30 @@ class TableSchema(_TableSchema):
     if pytype is str:
       return 'text'
     raise ValueError(
-        "cannot turn (%r,%r) into an SQLite column type"
-        % (column_name, pytype))
+        "cannot turn (%r,%r) into an SQLite column type" %
+        (column_name, pytype)
+    )
 
   @property
   def create_statement(self):
     ''' Table creation statement.
     '''
     return (
-        'create table `%s` (%s)'
-        % (
-            self.name,
-            ",\n  ".join(
-                [ '`id` integer primary key' ]
-                + [
+        'create table `%s` (%s)' % (
+            self.name, ",\n  ".join(
+                ['`id` integer primary key'] + [
                     '`%s` %s' % (name, self.column_type(name, pytype))
                     for name, pytype in self.columns.items()
                 ] + [
-                  ('constraint `%s` unique (%s)'
-                  % (
-                      '_'.join(['unique'] + unique),
-                      ', '.join(
-                          '`%s`' % (column_name,) for column_name in unique)
-                  )) for unique in self.unique
+                    (
+                        'constraint `%s` unique (%s)' % (
+                            '_'.join(['unique'] + unique), ', '.join(
+                                '`%s`' % (column_name,)
+                                for column_name in unique
+                            )
+                        )
+                    )
+                    for unique in self.unique
                 ]
             )
         )
@@ -177,12 +180,14 @@ class MetadataTable(Table):
       row_class = MetadataRow
     schema = self.schema = db.schemae[table_name]
     super().__init__(
-        db, table_name,
+        db,
+        table_name,
         row_class=row_class,
         column_names=schema.column_names,
         id_column='id',
         name_column='name',
-        **kw)
+        **kw
+    )
 
   def create(self):
     ''' Create this table, prefill any required entries.
@@ -193,8 +198,9 @@ class MetadataTable(Table):
     for index in self.schema.indices:
       assert isinstance(index, str)
       conn.execute(
-          'CREATE INDEX `%s__%s_idx` on `%s`(`%s`)'
-          % (self.table_name, index, self.table_name, index))
+          'CREATE INDEX `%s__%s_idx` on `%s`(`%s`)' %
+          (self.table_name, index, self.table_name, index)
+      )
 
   def autoname(self, name, tagdomain=None):
     ''' Return the row named `name`, creating it if necessary.
@@ -235,10 +241,10 @@ class MetadataRow(Row):
         my_column_name = self.table.name + '_id'
         other_column_name = base + '_id'
         oids = [
-            values[0]
-            for values in link_table.select(
+            values[0] for values in link_table.select(
                 column_names=(other_column_name,),
-                where='`%s` = %d' % (my_column_name, self.id))
+                where='`%s` = %d' % (my_column_name, self.id)
+            )
         ]
         # return the matching rows
         return otable[oids]
@@ -288,7 +294,9 @@ class TagTable(MetadataTable):
     ''' Create and return a new tag domain.
     '''
     normname = self.normalise(domain_name)
-    row_id = self.insert1(name=domain_name, normalised_name=normname, parent_id=None)
+    row_id = self.insert1(
+        name=domain_name, normalised_name=normname, parent_id=None
+    )
     return self[row_id]
 
 class TagRow(MetadataRow):
@@ -321,7 +329,8 @@ class TagRow(MetadataRow):
     '''
     normname = self.normalise(name)
     child = self._table.unique_row_where(
-        parent_id=self.id, normalised_name=normname)
+        parent_id=self.id, normalised_name=normname
+    )
     if child:
       return child
     if do_create:
@@ -338,7 +347,8 @@ class TagRow(MetadataRow):
         name=name,
         normalised_name=normname,
         parent_id=self.id,
-        root_id=self.domain_id)
+        root_id=self.domain_id
+    )
     return self._table[row_id]
 
   def path(self):
