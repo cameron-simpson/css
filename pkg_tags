@@ -117,7 +117,7 @@ cs.py.modules pypi.release="20241122" ok_revision="494204872267e1baa6abbc034af40
 cs.py.stack pypi.release="20240630" ok_revision="3f7db25a6e686983598ec71936a9c1e8995ba543" features={"20240412":["stack_dump__select"]}
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
 cs.pystack
-cs.queues pypi.release="20240412" ok_revision="260bf39286db64ec89bdae2a4e57058ba6228ea0" features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"],"20240211":["ListQueue__unique"],"20240305":["get_batch"],"20240412":["QueueIterator__iter_batch","QueueIterator__next_batch"]}
+cs.queues pypi.release="20250103" ok_revision="260bf39286db64ec89bdae2a4e57058ba6228ea0" features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"],"20240211":["ListQueue__unique"],"20240305":["get_batch"],"20240412":["QueueIterator__iter_batch","QueueIterator__next_batch"]}
 cs.range pypi.release="20230701" ok_revision=e733b04f48fcd613a257210411883fe0522ea424 features={"20230518":["as_list"]}
 cs.resources pypi.release="20250103" ok_revision="401925ddcbb9798fd7b70d9619402922f97c24ae" features={"20220429":["catch_signal"],"20220918":["openif"],"20230503":["RunState_poll_cancel"],"20231221":["Runstate_raiseif"],"20240201":["MultiOpenMixin_is_open"],"20240412":["RunState__iter"],"20250103":["RunState__raiseif"]}
 cs.result pypi.release="20250103" ok_revision="46da4a62b9cfe1664dd0b8c22220d3f590749f69" features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"],"20250103":["not_cancelled"]}
