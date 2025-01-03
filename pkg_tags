@@ -35,7 +35,7 @@ cs.apple
 cs.backend
 cs.binary pypi.release="20240630" ok_revision="66f18265a8db3bc69e7eb97716af302983f117ca" features={"20230212":["BinaryMixin_load","BinaryMixin_save"],"20240630":["AbstractBinary__write","BinarySingleValue__value_from_bytes"]}
 cs.buffer pypi.release="20240630" ok_revision=d96fe57b31e11584e172240a8f1c8d574a29c3ad features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"],"20240630":["CornuCopyBuffer__final_offset"]}
-cs.cache pypi.release="20241122" ok_revision=a6b4c55ba22f5162aa347b7f0c14b7b38b78ec01 features={"20240412":["CachingMapping"],"20240422":["ConvCache","convof"],"20250103":["cachedmethod","file_based","file_property"]}
+cs.cache pypi.release="20250103" ok_revision=a6b4c55ba22f5162aa347b7f0c14b7b38b78ec01 features={"20240412":["CachingMapping"],"20240422":["ConvCache","convof"],"20250103":["cachedmethod","file_based","file_property"]}
 cs.calibre
 cs.cbz
 cs.cdutils
