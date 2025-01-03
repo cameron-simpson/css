@@ -100,7 +100,7 @@ cs.ndjson ok_revision="9df558bd5a344fc076056fac0a84e1cf7f050872" pypi.release="2
 cs.node
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063124469c features={"20220606":["intif"]}
-cs.obj pypi.release="20241009" ok_revision=ecef476c0e46f7e801e12c8ed7a6f0e6de52b1e5 features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"],"20241005":["public_subclasses"]}
+cs.obj pypi.release="20250103" ok_revision=ecef476c0e46f7e801e12c8ed7a6f0e6de52b1e5 features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"],"20241005":["public_subclasses"]}
 cs.other_command
 cs.packetstream pypi.release="20240630" ok_revision="1bc8c692373663edd0678222e3a7c30fd5292116" features={"20240630":["BaseRequest","HasPacketConnection"]}
 cs.pdf
