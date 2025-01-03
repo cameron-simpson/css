@@ -6,6 +6,7 @@
 from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
+import errno
 from functools import partial
 from itertools import chain
 import os
@@ -24,11 +25,12 @@ import time
 from typing import Any, Callable, Mapping, Optional
 
 from cs.context import stackattrs, withif
-from cs.deco import fmtdoc
-from cs.fileutils import atomic_filename
+from cs.deco import decorator, fmtdoc
+from cs.fileutils import atomic_filename, DEFAULT_POLL_INTERVAL, FileState
 from cs.fs import needdir, HasFSPath, validate_rpath
 from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.lex import r, s
+from cslogutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
@@ -556,7 +558,7 @@ class ConvCache(HasFSPath):
         with atomic_filename(
             dstpath,
             prefix=
-            f'.{self.__class__.__name__}.convof--{conv_subpath.replace(os.sep,"--")}--',
+            f'.{self.__class__.__name__}.convof--{conv_subpath.replace(os.sep, "--")}--',
             suffix=suffix,
             exists_ok=force,
         ) as T:
