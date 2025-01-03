@@ -16,7 +16,6 @@ from typing import Any, Callable, Iterable
 
 from typeguard import typechecked
 
-from cs.deco import promote
 from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
@@ -50,7 +49,9 @@ DISTINFO = {
         'cs.pfx',
         'cs.py3',
         'cs.resources',
+        'cs.result',
         'cs.seq',
+        'typeguard',
     ],
 }
 
