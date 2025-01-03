@@ -565,10 +565,14 @@ if __name__ == '__main__':
 
     async def demo_pipeline2(it: AnyIterable):
       print("pipeline(hrefs)www.smh.com.au...")
-      from cs.app.pilfer.urls import hrefs
-      pipeline = AsyncPipeLine.from_stages(hrefs)
-      async for result in pipeline(it):
-        print(result)
+      try:
+        from cs.app.pilfer.urls import hrefs
+      except ImportError as e:
+        print("no cs.app.pilfer.urls, skipping pipeline demo:", e)
+      else:
+        pipeline = AsyncPipeLine.from_stages(hrefs)
+        async for result in pipeline(it):
+          print(result)
 
     run(demo_pipeline2(['https://www.smh.com.au/']))
 
