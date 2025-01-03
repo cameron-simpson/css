@@ -85,7 +85,7 @@ cs.kindle
 cs.kobo
 cs.kyotocab
 cs.later pypi.release="20240630" ok_revision="819a6782e492719c8ec508be77bebd84117e8cfc" features={"20240305":["Later__thread_states"]}
-cs.lex pypi.release="20241207" ok_revision=bc336653de54fe181b45fb3c055f0f71bd01b27a features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"],"20241109":["tabulate"],"20241119":["stripped_dedent__sub_indent"],"20241207":["tabulate__newlines"],"20250103":["Identifier","NumericValue","QuotedString"]}
+cs.lex pypi.release="20241207" ok_revision=bc336653de54fe181b45fb3c055f0f71bd01b27a features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"],"20241109":["tabulate"],"20241119":["stripped_dedent__sub_indent"],"20241207":["tabulate__newlines"],"20250103":["BaseToken__token_classes","Identifier","NumericValue","QuotedString"]}
 cs.logutils pypi.release="20241109" ok_revision="53988cea8841d820cb179d2d88ba2490e8e030c2" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"],"20240630":["LoggingState"]}
 cs.mailfiler
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
