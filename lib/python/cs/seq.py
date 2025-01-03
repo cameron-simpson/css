@@ -19,7 +19,7 @@ from threading import Lock, Condition, Thread
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20250103'
+__version__ = '20250103-post'
 
 DISTINFO = {
     'description':
