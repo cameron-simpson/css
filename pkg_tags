@@ -63,7 +63,7 @@ cs.excutils pypi.release="20240630" ok_revision="467f248b10aa6109713d48374153093
 cs.export
 cs.ffmpegutils ok_revision="67dd2032154d8a0aeb4d80e51edecf6198ecc95d" pypi.release="20241122" features={"20241122":["FFMPEG_DOCKER_IMAGE"]}
 cs.filestate pypi.release=20181107
-cs.fileutils pypi.release="20241122" ok_revision=b44b316352a44d8c59feaf82f7da285feab29688 features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"],"20241122":["atomic_copy2"],"20250103":["rename_excl"]}
+cs.fileutils pypi.release="20250103" ok_revision=b44b316352a44d8c59feaf82f7da285feab29688 features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"],"20241122":["atomic_copy2"],"20250103":["rename_excl"]}
 cs.fs ok_revision="222f108051ad1872174253eee1148b62bf59fd6a" pypi.release="20241122" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"],"20240422":["scandirpaths","scandirtree"]}
 cs.fsm ok_revision="5e52de3116a9ca6d83e2ee7942a0e6484159cf0f" pypi.release="20240721.1" features={"20231018":["fsm_transitions_as_dot__history_style"],"20240630":["CancellationError"],"20240721":["FSM__fsm_print_state_diagram"]}
 cs.fsrelease
