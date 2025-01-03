@@ -37,7 +37,6 @@ from threading import Lock, RLock
 import time
 
 from cs.buffer import CornuCopyBuffer
-from cs.cache import cachedmethod
 from cs.context import stackattrs
 from cs.deco import decorator, fmtdoc, OBSOLETE, strable
 from cs.filestate import FileState
@@ -65,7 +64,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.buffer',
-        'cs.cache',
         'cs.context',
         'cs.deco',
         'cs.filestate',
