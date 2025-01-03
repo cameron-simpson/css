@@ -7,6 +7,8 @@ from inspect import iscoroutinefunction
 
 from cs.deco import decorator
 
+__version__ = '20250103'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
