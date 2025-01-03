@@ -12,7 +12,6 @@ from collections import defaultdict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
 import sys
-import time
 import traceback
 import typing
 
