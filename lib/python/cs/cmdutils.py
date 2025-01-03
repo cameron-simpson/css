@@ -1849,16 +1849,13 @@ class BaseCommand:
           Explicit field names may be provided to override the default listing.
 
         This default method recites the values from `self.options`,
-        excluding the basic fields from `BaseCommandOptions` other
-        than `cmd` and `dry_run`.
+        excluding those enumerated by `self.options.INFO_SKIP_NAMES`.
 
         This base method provides two optional parameters to allow
         subclasses to tune its behaviour:
         - `field_namees`: an explicit list of options attributes to print
-        - `skip_names`: a list of option attributes to not print
-          if `field_names` is not specified; the default is the
-          field names of `BaseCommandOptions` excepting `cmd` and
-          `dry_run`
+        - `skip_names`: a list of option attributes to not print,
+          default from `self.options.INFO_SKIP_NAMES`
     '''
     if skip_names is None:
       skip_names = getattr(
