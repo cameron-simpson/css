@@ -23,6 +23,7 @@ cs.app.osx.spaces ok_revision=b88bef0ca653008cad8b0a2f3836629d49259674 features=
 cs.app.osx.spaces.misc
 cs.app.osx.spaces.objc
 cs.app.parse
+cs.app.pilfer.urls
 cs.app.playon ok_revision="6d46bd98f407fc8ff2326ce12af36517bd7a8483" pypi.release="20241007" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
@@ -122,6 +123,7 @@ cs.resources pypi.release="20241005" ok_revision="999dfa17be3c7f59b08babe715b948
 cs.result pypi.release="20241119" ok_revision="790ea1f3ed17a7896e6305f10b0d0ae7aaa6ba63" features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
+cs.semantics ok_revision="5bdebc5efd5ac356c34aeba3b0ba7f58042e3001"
 cs.seq pypi.release="20221118" ok_revision="0b895fb08ed74535e05ce79de16146170209e41b" featu
 cs.service_api ok_revision=d682ce35a261867118ef07bd49e2c0808c740ff9 pypi.release="20241007"
 cs.sh ok_revision="3af3cf2c5da8cc18eafa8a65437eaf1e7b7f1db3"
