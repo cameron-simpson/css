@@ -28,9 +28,9 @@ from cs.context import stackattrs, withif
 from cs.deco import decorator, fmtdoc
 from cs.fileutils import atomic_filename, DEFAULT_POLL_INTERVAL, FileState
 from cs.fs import needdir, HasFSPath, validate_rpath
+from cs.gimmicks import warning
 from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.lex import r, s
-from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
@@ -52,6 +52,7 @@ DISTINFO = {
         'cs.deco',
         'cs.fileutils',
         'cs.fs',
+        'cs.gimmicks',
         'cs.hashindex',
         'cs.lex',
         'cs.pfx',
