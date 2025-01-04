@@ -286,7 +286,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
     return MappingChain(get_mappings=self._rc_pipespecs)
 
   def _rc_action_maps(self):
-    X("self.rcs = %r", self.rcs)
+    ##X("self.rcs = %r", self.rcs)
     for rc in self.rcs:
       yield rc.action_map
     yield self.DEFAULT_ACTION_MAP
