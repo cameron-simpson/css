@@ -15,7 +15,7 @@ from cs.later import Later, uses_later
 from cs.lex import r
 from cs.logutils import (debug, error, warning, exception, D)
 from cs.mappings import MappingChain, SeenSet
-from cs.naysync import afunc
+from cs.naysync import afunc, async_iter, StageMode
 from cs.obj import copy as obj_copy
 from cs.pfx import Pfx
 from cs.pipeline import pipeline
@@ -32,16 +32,34 @@ from .urls import hrefs, srcs
 from cs.debug import trace, X, r, s
 
 async def hrefs_sfunc(item_P):
+  ''' Asynchronous generator yields `href`s from source URLs.
+  '''
   item, P = item_P
   urls = await afunc(lambda url: list(hrefs(url)))(item)
   for url in urls:
     yield url, P
 
 async def srcs_sfunc(item_P):
+  ''' Asynchronous generator yields `src`s from source URLs.
+  '''
   item, P = item_P
   urls = await afunc(lambda url: list(srcs(url)))(item)
   for url in urls:
     yield url, P
+
+async def unseen_sfunc(item_Ps, *, sig=None, seen=None):
+  ''' Asynchronous generator yielding unseen items from a stream
+      of `(item,Pilfer)` 2-tuples.
+  '''
+  if sig is None:
+    sig = lambda item: item
+  if seen is None:
+    seen = set()
+  async for item, P in async_iter(item_Ps):
+    item_sig = sig(item)
+    if item_sig not in seen:
+      seen.add(item_sig)
+      yield item, P
 
 class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
@@ -57,6 +75,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   DEFAULT_ACTION_MAP = {
       'hrefs': hrefs_sfunc,
       'srcs': srcs_sfunc,
+      'unseen': (unseen_sfunc, StageMode.STREAM),
   }
 
   @uses_later
