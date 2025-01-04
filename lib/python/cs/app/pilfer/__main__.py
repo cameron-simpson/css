@@ -174,7 +174,7 @@ class PilferCommand(BaseCommand):
 
     # sanity check the pipeline spec
     try:
-      pipeline = pipespec.make_pipeline()
+      pipeline = pipespec.make_stage_funcs()
     except ValueError as e:
       raise GetoptError(
           f'invalid pipeline spec {pipespec.stage_specs}: {e}'
