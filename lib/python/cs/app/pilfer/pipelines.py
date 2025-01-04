@@ -40,78 +40,94 @@ class PipeLineSpec(Promotable):
         # support commenting-out of individual actions
         if spec.startswith('#'):
           continue
-        if spec in ("*", "**"):
+
+        if spec == "*":
           # fork a new pipeline instance per item
           # terminate this pipeline with a function to spawn subpipelines
           # using the tail of the action list from this point
+          # this runs each subpipeline in sequence per item
           if not specs:
             raise ValueError(f'no actions after {spec!r}')
           subpipelinespec = type(self)(
               name=f'{spec!r} {" ".join(map(shlex.quote, specs))}',
               stage_specs=specs,
           )
-          if spec == "*":
-            # a stage func to stream items to subpipelines in series
 
-            async def per(item, pipespec):
-              ''' Process a single `item` through its own pipeline,
-                  yield the results from the pipeline.
-              '''
+          # a stage func to stream items to subpipelines in series
+          async def per(item, pipespec):
+
+            ''' Process a single `item` through its own pipeline,
+                yield the results from the pipeline.
+            '''
+            subpipe = pipespec.make_pipeline()
+            async for result in subpipe([item]):
+              yield result
+
+          stage_funcs.append(partial(per, pipespec=subpipelinespec))
+          spec = []
+          continue
+
+        if spec == "**":
+          # fork a new pipeline instance per item
+          # terminate this pipeline with a function to spawn subpipelines
+          # using the tail of the action list from this point
+          # this runs each subpipeline concurrently as items arrive
+          if not specs:
+            raise ValueError(f'no actions after {spec!r}')
+          subpipelinespec = type(self)(
+              name=f'{spec!r} {" ".join(map(shlex.quote, specs))}',
+              stage_specs=specs,
+          )
+
+          # a stage func to stream items to subpipelines concurrently
+          async def collect_for(
+              subitem,
+              ait: AsyncIterable,
+              outaq: AQueue,
+              sentinel: object,
+          ):
+
+            ''' Collect results from feeding `subitem` to `subpipe`.
+                Put `(subitem,result)` 2-tuples onto a shared `outq`.
+                Put a final `(subitem,sentinel)` 2-tuple onto `outq`.
+            '''
+            try:
+              async for result in ait:
+                await outaq.put((subitem, result))
+            finally:
+              await outaq.put((subitem, sentinel))
+
+          async def per(inq, pipespec):
+            ''' Process a single `item` through its own pipeline.
+                Run all the subpipelines concurrently.
+            '''
+            aq = AQueue()  # async queue producing `(item,result)` 2-tuples
+            nsubpipes = 0  # number of dispatched subpipelines
+            sentinel = object()  # marker for end of pipeline output
+            async for item in inq:
+              # construct a pipeline to process item
               subpipe = pipespec.make_pipeline()
-              async for result in subpipe([item]):
+              # dispatch the pipeline worker
+              create_task(collect_for(item, subpipe([item]), aq, sentinel))
+              nsubpipes += 1
+            while nsubpipes > 0:
+              subitem, result = await aq.get()
+              if result is sentinel:
+                nsubpipes -= 1
+              else:
+                # TODO: various modes: with-subitem, batched-by-subitem
                 yield result
 
-            stage_funcs.append(partial(per, pipespec=subpipelinespec))
-          elif spec == "**":
-            # a stage func to stream items to subpipelines concurrently
-
-            async def collect_for(
-                subitem,
-                ait: AsyncIterable,
-                outaq: AQueue,
-                sentinel: object,
-            ):
-              ''' Collect results from feeding `subitem` to `subpipe`.
-                  Put `(subitem,result)` 2-tuples onto a shared `outq`.
-                  Put a final `(subitem,sentinel)` 2-tuple onto `outq`.
-              '''
-              try:
-                async for result in ait:
-                  await outaq.put((subitem, result))
-              finally:
-                await outaq.put((subitem, sentinel))
-
-            async def per(inq, pipespec):
-              ''' Process a single `item` through its own pipeline.
-                  Run all the subpipelines concurrently.
-              '''
-              aq = AQueue()  # async queue producing `(item,result)` 2-tuples
-              nsubpipes = 0  # number of dispatched subpipelines
-              sentinel = object()  # marker for end of pipeline output
-              async for item in inq:
-                # construct a pipeline to process item
-                subpipe = pipespec.make_pipeline()
-                # dispatch the pipeline worker
-                create_task(collect_for(item, subpipe([item]), aq, sentinel))
-                nsubpipes += 1
-              while nsubpipes > 0:
-                subitem, result = await aq.get()
-                if result is sentinel:
-                  nsubpipes -= 1
-                else:
-                  # TODO: various modes: with-subitem, batched-by-subitem
-                  yield result
-
-            stage_funcs.append(
-                (
-                    partial(per, pipespec=subpipelinespec),
-                    StageMode.STREAM,
-                )
-            )
-          else:
-            raise RuntimeError(f'unhandled spec {spec!r}')
+          stage_funcs.append(
+              (
+                  partial(per, pipespec=subpipelinespec),
+                  StageMode.STREAM,
+              )
+          )
           specs = []
           continue
+
+        # regular Action
         action = Action.from_str(spec)
         stage_funcs.append(action.stage_spec)
     return AsyncPipeLine.from_stages(*stage_funcs)
