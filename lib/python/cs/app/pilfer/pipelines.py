@@ -29,9 +29,10 @@ class PipeLineSpec(Promotable):
     return cls(name=name, stage_specs=shlex.split(pipe_spec_s))
 
   @pfx_method
-  def make_pipeline(self) -> AsyncPipeLine:
-    ''' Construct an `AsyncPipeLine` from an iterable of pipeline
-        stage specification strings and an action mapping.
+  def make_stage_funcs(self) -> AsyncPipeLine:
+    ''' Construct a list of stage functions for use in an `AsyncPipeLine`
+        from an iterable of pipeline stage specification strings
+        and an action mapping.
     '''
     specs = list(self.stage_specs)
     stage_funcs = []
@@ -54,7 +55,7 @@ class PipeLineSpec(Promotable):
               stage_specs=specs,
           )
           try:
-            testsubpipe = subpipelinespec.make_pipeline()
+            testsubpipe = subpipelinespec.make_stage_funcs()
           except ValueError as e:
             warning("invalid subpipeline %r: %s", subpipelinespec, e)
             raise
@@ -85,7 +86,7 @@ class PipeLineSpec(Promotable):
           )
           # sanity check the subpipeline
           try:
-            testsubpipe = subpipelinespec.make_pipeline()
+            testsubpipe = subpipelinespec.make_stage_funcs()
           except ValueError as e:
             ##warning("invalid subpipeline %r: %s", subpipelinespec, e)
             raise
@@ -140,7 +141,13 @@ class PipeLineSpec(Promotable):
         # regular Action
         action = Action.from_str(spec)
         stage_funcs.append(action.stage_spec)
-    return AsyncPipeLine.from_stages(*stage_funcs)
+    return stage_funcs
+
+  def make_pipeline(self) -> AsyncPipeLine:
+    ''' Construct an `AsyncPipeLine` from an iterable of pipeline
+        stage specification strings and an action mapping.
+    '''
+    return AsyncPipeLine.from_stages(*self.make_stage_funcs())
 
   @uses_pilfer
   async def run_pipeline(
