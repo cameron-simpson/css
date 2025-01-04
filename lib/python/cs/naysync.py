@@ -242,7 +242,7 @@ async def amap(
   '''
   # promote a synchronous function to an asynchronous function
   func = afunc(func)
-  # promote it to an asynchronous iterator
+  # promote the iterable to an asynchronous iterator
   ait = async_iter(it)
   if not concurrent:
     # serial operation
@@ -392,18 +392,22 @@ class AsyncPipeLine:
   async def __anext__(self):
     return await next(self.outq)
 
-  async def __call__(self, it: AnyIterable, fast=None):
+  def __call__(self, it: AnyIterable, fast=None):
     ''' Call the pipeline with an iterable.
+        Close `self.inq` after submitting items from `it`.
+        Return an asynchronous iterable (`self.outq`)
+        yielding results.
     '''
 
     # submit the items from `it` to the pipeline and close `it`
     async def submitter():
-      await self.submit(it, fast=fast)
-      await self.close()
+      try:
+        await self.submit(it, fast=fast)
+      finally:
+        await self.close()
 
     create_task(submitter())
-    async for result in self.outq:
-      yield result
+    return self.outq
 
   async def put(self, item):
     ''' Put `item` onto the input queue.
@@ -561,7 +565,7 @@ if __name__ == '__main__':
 
   print_ = partial(print, end='', flush=True)
 
-  if False:  # debugging
+  if True:  # debugging
 
     async def demo_pipeline2(it: AnyIterable):
       print("pipeline(hrefs)www.smh.com.au...")
@@ -679,8 +683,6 @@ if __name__ == '__main__':
         print(result)
 
     run(demo_pipeline([1, 2, 3]))
-
-  else:
 
     async def aqget3(q):
       for _ in range(3):
