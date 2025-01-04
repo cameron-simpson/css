@@ -392,18 +392,22 @@ class AsyncPipeLine:
   async def __anext__(self):
     return await next(self.outq)
 
-  async def __call__(self, it: AnyIterable, fast=None):
+  def __call__(self, it: AnyIterable, fast=None):
     ''' Call the pipeline with an iterable.
+        Close `self.inq` after submitting items from `it`.
+        Return an asynchronous iterable (`self.outq`)
+        yielding results.
     '''
 
     # submit the items from `it` to the pipeline and close `it`
     async def submitter():
-      await self.submit(it, fast=fast)
-      await self.close()
+      try:
+        await self.submit(it, fast=fast)
+      finally:
+        await self.close()
 
     create_task(submitter())
-    async for result in self.outq:
-      yield result
+    return self.outq
 
   async def put(self, item):
     ''' Put `item` onto the input queue.
