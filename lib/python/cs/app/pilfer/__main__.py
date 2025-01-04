@@ -172,6 +172,14 @@ class PilferCommand(BaseCommand):
     else:
       urls = [url]
 
+    # sanity check the pipeline spec
+    try:
+      pipeline = pipespec.make_pipeline()
+    except ValueError as e:
+      raise GetoptError(
+          f'invalid pipeline spec {pipespec.stage_specs}: {e}'
+      ) from e
+
     async def print_from(item_Ps):
       ''' Consume `(result,Pilfer)` 2-tuples from the pipeline and print the results.
       '''
