@@ -242,7 +242,7 @@ async def amap(
   '''
   # promote a synchronous function to an asynchronous function
   func = afunc(func)
-  # promote it to an asynchronous iterator
+  # promote the iterable to an asynchronous iterator
   ait = async_iter(it)
   if not concurrent:
     # serial operation
@@ -565,7 +565,7 @@ if __name__ == '__main__':
 
   print_ = partial(print, end='', flush=True)
 
-  if False:  # debugging
+  if True:  # debugging
 
     async def demo_pipeline2(it: AnyIterable):
       print("pipeline(hrefs)www.smh.com.au...")
@@ -679,8 +679,6 @@ if __name__ == '__main__':
         print(result)
 
     run(demo_pipeline([1, 2, 3]))
-
-  else:
 
     async def aqget3(q):
       for _ in range(3):
