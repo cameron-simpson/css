@@ -260,6 +260,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   def pipe_from_spec(self, pipe_name, name=None):
     ''' Create a new pipeline from the specification named `pipe_name`.
     '''
+    from .pipelines import PipeLineSpec
     if isinstance(pipe_name, PipeLineSpec):
       spec = pipe_name
       pipe_name = str(spec)
