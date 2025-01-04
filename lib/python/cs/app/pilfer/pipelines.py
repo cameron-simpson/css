@@ -7,6 +7,7 @@ import shlex
 from typing import AsyncIterable, List, Union
 
 from cs.deco import Promotable
+from cs.logutils import warning
 from cs.naysync import async_iter, AnyIterable, AsyncPipeLine, StageMode
 from cs.pfx import Pfx, pfx_method
 
@@ -52,10 +53,14 @@ class PipeLineSpec(Promotable):
               name=f'{spec!r} {" ".join(map(shlex.quote, specs))}',
               stage_specs=specs,
           )
+          try:
+            testsubpipe = subpipelinespec.make_pipeline()
+          except ValueError as e:
+            warning("invalid subpipeline %r: %s", subpipelinespec, e)
+            raise
 
           # a stage func to stream items to subpipelines in series
           async def per(item, pipespec):
-
             ''' Process a single `item` through its own pipeline,
                 yield the results from the pipeline.
             '''
@@ -78,6 +83,11 @@ class PipeLineSpec(Promotable):
               name=f'{spec!r} {" ".join(map(shlex.quote, specs))}',
               stage_specs=specs,
           )
+          try:
+            testsubpipe = subpipelinespec.make_pipeline()
+          except ValueError as e:
+            warning("invalid subpipeline %r: %s", subpipelinespec, e)
+            raise
 
           # a stage func to stream items to subpipelines concurrently
           async def collect_for(
@@ -86,7 +96,6 @@ class PipeLineSpec(Promotable):
               outaq: AQueue,
               sentinel: object,
           ):
-
             ''' Collect results from feeding `subitem` to `subpipe`.
                 Put `(subitem,result)` 2-tuples onto a shared `outq`.
                 Put a final `(subitem,sentinel)` 2-tuple onto `outq`.
