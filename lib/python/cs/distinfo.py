@@ -40,10 +40,10 @@ import tomli_w
 from typeguard import typechecked
 
 from cs.ansi_colour import colourise
+from cs.cache import cachedmethod
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import isodate
-from cs.deco import cachedmethod
 from cs.fs import atomic_directory, scandirpaths
 from cs.fstags import FSTags
 from cs.lex import (

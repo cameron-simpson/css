@@ -6,7 +6,7 @@
 from subprocess import PIPE
 
 from cs.app.osx.plist import ingest_plist
-from cs.deco import cachedmethod
+from cs.cache import cachedmethod
 from cs.lex import r
 from cs.psutils import run
 

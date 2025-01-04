@@ -64,7 +64,8 @@ except ImportError:
 import requests
 from typeguard import typechecked
 
-from cs.deco import cachedmethod, promote, Promotable
+from cs.cache import cachedmethod
+from cs.deco import promote, Promotable
 from cs.excutils import logexc, unattributable
 from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception

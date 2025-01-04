@@ -1,0 +1,5 @@
+lib/python/cs/resources.py: cs.resources: RunState: new raiseif() method to raise CancellationError if cancelled
+lib/python/cs/resources.py: merge default -> pilfer
+lib/python/cs/resources.py: merge default -> pilfer
+lib/python/cs/resources.py: cs.semantics: new module holding ClosedError and @not_closed, pulled from cs.resources
+lib/python/cs/resources.py: cs.resources: update DISTINFO

@@ -16,7 +16,6 @@ from typing import Any, Callable, Iterable
 
 from typeguard import typechecked
 
-from cs.deco import promote
 from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
@@ -34,7 +33,7 @@ from cs.resources import (
 from cs.result import CancellationError
 from cs.seq import seq, unrepeated
 
-__version__ = '20240412-post'
+__version__ = '20250103-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -50,7 +49,9 @@ DISTINFO = {
         'cs.pfx',
         'cs.py3',
         'cs.resources',
+        'cs.result',
         'cs.seq',
+        'typeguard',
     ],
 }
 

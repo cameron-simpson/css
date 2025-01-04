@@ -77,7 +77,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20241222.1-post'
+__version__ = '20250103-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -806,6 +806,7 @@ class BaseCommandOptions(HasThreadState):
               ... optional extra fields etc ...
   '''
 
+  INFO_SKIP_NAMES = ('runstate', 'runstate_signals')
   DEFAULT_SIGNALS = SIGHUP, SIGINT, SIGQUIT, SIGTERM
   COMMON_OPT_SPECS = _COMMON_OPT_SPECS
 
@@ -1848,22 +1849,17 @@ class BaseCommand:
           Explicit field names may be provided to override the default listing.
 
         This default method recites the values from `self.options`,
-        excluding the basic fields from `BaseCommandOptions` other
-        than `cmd` and `dry_run`.
+        excluding those enumerated by `self.options.INFO_SKIP_NAMES`.
 
         This base method provides two optional parameters to allow
         subclasses to tune its behaviour:
         - `field_namees`: an explicit list of options attributes to print
-        - `skip_names`: a list of option attributes to not print
-          if `field_names` is not specified; the default is the
-          field names of `BaseCommandOptions` excepting `cmd` and
-          `dry_run`
+        - `skip_names`: a list of option attributes to not print,
+          default from `self.options.INFO_SKIP_NAMES`
     '''
     if skip_names is None:
-      skip_names = tuple(
-          F.name
-          for F in fields(BaseCommandOptions)
-          if F.name not in ('cmd', 'dry_run')
+      skip_names = getattr(
+          self.options, 'INFO_SKIP_NAMES', ('runstate', 'runstate_signals')
       )
     self.options.popopts(argv)
     xit = 0
