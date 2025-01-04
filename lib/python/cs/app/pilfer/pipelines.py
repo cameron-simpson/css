@@ -83,10 +83,11 @@ class PipeLineSpec(Promotable):
               name=f'{spec!r} {" ".join(map(shlex.quote, specs))}',
               stage_specs=specs,
           )
+          # sanity check the subpipeline
           try:
             testsubpipe = subpipelinespec.make_pipeline()
           except ValueError as e:
-            warning("invalid subpipeline %r: %s", subpipelinespec, e)
+            ##warning("invalid subpipeline %r: %s", subpipelinespec, e)
             raise
 
           # a stage func to stream items to subpipelines concurrently
