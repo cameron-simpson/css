@@ -48,6 +48,16 @@ do
   shift
 done
 
+if [ "$*" = RENEW ]
+then
+  lastvalue \
+  | sed -n 's/^wp_\([1-9][0-9]*\): *\(.*[^ ]\)/\1 \2/p' \
+  | while read -r space words
+    do  $trace "$0" "-$nwp" -- "$space" $words
+    done
+  exit 0
+fi
+
 if [ $# -gt 0 ]
 then
   case "$1" in
