@@ -4,11 +4,11 @@
 # - Cameron Simpson <cs@cskk.id.au> 02dec2002
 #
 
-: ${LOGDIR:=$HOME/var/log}
+: "${LASTVALUEDIR:-${LOGDIR:=$HOME/var/log}}"
 
 ##echo "[$0 $*]" >&2
 
-dir=$LOGDIR/lastvalue
+dir=$LASTVALUEDIR
 append=1
 pop=
 
