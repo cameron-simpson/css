@@ -11,7 +11,7 @@ set -ue
 : "${WPLINKDIR:=$HOME/var/im/wp}"
 : "${WPPATH:=$WPDIR:$SSV_DIR}"
 
-nwp=128
+nwp=16
 spaces=.
 trace=
 [ -t 2 ] && trace=set-x
