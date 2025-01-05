@@ -7,7 +7,6 @@ r'''
 Convenience facilities for objects.
 '''
 
-from __future__ import print_function
 from collections import defaultdict
 from copy import copy as copy0
 import sys
@@ -17,7 +16,6 @@ from types import SimpleNamespace
 from weakref import WeakValueDictionary
 
 from cs.deco import OBSOLETE
-from cs.py3 import StringTypes
 
 __version__ = '20250103-post'
 
@@ -25,10 +23,9 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.py3'],
+    'install_requires': ['cs.deco'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -139,7 +136,7 @@ def O_str(o, no_recurse=False, seen=None):
   if seen is None:
     seen = set()
   obj_type = type(o)
-  if obj_type in StringTypes:
+  if obj_type in (str,):
     return repr(o)
   if obj_type in (tuple, int, float, bool, list):
     return str(o)
