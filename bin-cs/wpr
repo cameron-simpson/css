@@ -30,7 +30,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -[1-9]*)
-        _nwp=$1; shift
+        _nwp=$1
         nwp=$( expr "x$_nwp" : 'x-\([1-9][0-9]*\)' ) || {
           echo "$cmd: -nwp \"$1\": invalid number" >&2
           badopts=1
