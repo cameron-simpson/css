@@ -4,7 +4,9 @@
 # - Cameron Simpson <cs@cskk.id.au> 02dec2002
 #
 
-: "${LASTVALUEDIR:-${LOGDIR:=$HOME/var/log}}"
+set -ue
+
+: "${LASTVALUEDIR:=${LOGDIR:=$HOME/var/log}/lastvalue}"
 
 ##echo "[$0 $*]" >&2
 
@@ -20,7 +22,7 @@ usage="Usage: $cmd [-a] [-d dir] [param [value|-]]
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
     -d) dir=$2; shift ;;
