@@ -13,7 +13,8 @@ set -ue
 
 nwp=128
 spaces=.
-trace= ## set-x
+trace=
+[ -t 2 ] && trace=set-x
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-nwp] [-x] [--] [spaces] words...
