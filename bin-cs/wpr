@@ -83,7 +83,7 @@ cd "$rd"
 (
   for wpsrcdir in $( echo "$WPPATH" | tr : ' ' )
   do
-    $trace find -L "$wpsrcdir"/* -type f \( -name \*.png -o -name \*.jpg \) || :
+    $trace find -L "$wpsrcdir"/ \( -name '.*' -prune \) -o -type f \( -name \*.png -o -name \*.jpg \) || :
   done \
   | $trace grepall -- "$@" \
   | shuffle \
