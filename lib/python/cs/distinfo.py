@@ -657,9 +657,8 @@ class Module:
       release_entry = clean_release_entry(release_entry)
       preamble_md = f'*Latest release {release_tag.version}*:\n{release_entry}'
       for release_tag, release_entry in releases:
-        release_entry = clean_release_entry(release_entry)
         postamble_parts.append(
-            f'*Release {release_tag.version}*:\n{release_entry}'
+            f'*Release {release_tag.version}*:\n{clean_release_entry(release_entry)}'
         )
     full_doc = module_doc(
         self.module,
@@ -923,9 +922,9 @@ class Module:
       *,
       pypi_package_name=None,
       pypi_package_version=None,
-  ):
-    ''' Compute the contents for `setup.cfg`,
-        return a filled in `ConfigParser` instance.
+  ) -> ConfigParser:
+    ''' Compute the contents for `setup.cfg`, used by `setuptools`.
+        Return a filled in `ConfigParser` instance.
     '''
     if dinfo is None:
       dinfo = self.compute_distinfo(
@@ -1770,8 +1769,12 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
-    with pkg.release_dir(vcs, vcstag, bare=bare,
-                         persist=True) as (pkgpath, rpaths):
+    with pkg.release_dir(
+        vcs,
+        vcstag,
+        bare=bare,
+        persist=True,
+    ) as (pkgpath, rpaths):
       print(pkgpath)
       for artifact, rpath in sorted(rpaths.items()):
         print(" ", artifact, rpath)
