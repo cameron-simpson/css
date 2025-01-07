@@ -142,6 +142,32 @@ class PilferCommand(BaseCommand):
           ):
             yield
 
+  @staticmethod
+  def get_argv_pipespec(argv, argv_offset=0):
+    ''' Parse a pipeline specification from the argument list `argv`.
+        Return `(PipeLineSpec,new_argv_offset)`.
+
+        A pipeline specification is specified by a leading argument of the
+        form `'pipe_name:{'`, followed by arguments defining functions for the
+        pipeline, and a terminating argument of the form `'}'`.
+
+        Note: this syntax works well with traditional Bourne shells.
+        Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
+        sensible behaviour. Bash users may be out of luck.
+    '''
+    start_arg = argv[argv_offset]
+    pipe_name = cutsuffix(start_arg, ':{')
+    if pipe_name is start_arg:
+      raise ValueError('expected "pipe_name:{", got: %r' % (start_arg,))
+    with Pfx(start_arg):
+      argv_offset += 1
+      spec_offset = argv_offset
+      while argv[argv_offset] != '}':
+        argv_offset += 1
+      spec = PipeLineSpec(pipe_name, argv[spec_offset:argv_offset])
+      argv_offset += 1
+      return spec, argv_offset
+
   def cmd_from(self, argv):
     ''' Usage: {cmd} source [pipeline-defns..]
           Source may be a URL or "-" to read URLs from standard input.
@@ -187,31 +213,5 @@ class PilferCommand(BaseCommand):
         print(result)
 
     asyncio.run(print_from(pipespec.run_pipeline(urls)))
-
-  @staticmethod
-  def get_argv_pipespec(argv, argv_offset=0):
-    ''' Parse a pipeline specification from the argument list `argv`.
-        Return `(PipeLineSpec,new_argv_offset)`.
-
-        A pipeline specification is specified by a leading argument of the
-        form `'pipe_name:{'`, followed by arguments defining functions for the
-        pipeline, and a terminating argument of the form `'}'`.
-
-        Note: this syntax works well with traditional Bourne shells.
-        Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
-        sensible behaviour. Bash users may be out of luck.
-    '''
-    start_arg = argv[argv_offset]
-    pipe_name = cutsuffix(start_arg, ':{')
-    if pipe_name is start_arg:
-      raise ValueError('expected "pipe_name:{", got: %r' % (start_arg,))
-    with Pfx(start_arg):
-      argv_offset += 1
-      spec_offset = argv_offset
-      while argv[argv_offset] != '}':
-        argv_offset += 1
-      spec = PipeLineSpec(pipe_name, argv[spec_offset:argv_offset])
-      argv_offset += 1
-      return spec, argv_offset
 
 sys.exit(main(sys.argv))
