@@ -1466,16 +1466,14 @@ class Module:
     distdirpath = joinpath(pkg_dir, 'dist')
     if isdirpath(distdirpath):
       rmtree(distdirpath)
-    sdist_rpath = f'dist/{path_name}-{path_version}.tar.gz'
-    wheel_rpath = f'dist/{path_name}-{path_version}-py3-none-any.whl'
     run(
         [
-            ('python3', '-m', 'build'),
-            ('--outdir', 'dist'),
+            ('python3', '-m', 'uv', 'build'),
+            ('--out-dir', 'dist'),
             ('--sdist', '--wheel'),
             (
-                '--skip-dependency-check',
-                '--no-isolation',
+                #'--skip-dependency-check',
+                #'--no-isolation',
             ),
             '.',
         ],
