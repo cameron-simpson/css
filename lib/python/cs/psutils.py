@@ -207,7 +207,6 @@ def run(
     input=None,
     logger=None,
     print=None,
-    fold=None,
     quiet: bool,
     remote=None,
     ssh_exe=None,
@@ -229,7 +228,6 @@ def run(
         NB: _unlike_ the `subprocess.run` default, which is `False`
       * `doit`: optional flag, default `True`;
         if false do not run the command and return `None`
-      * `fold`: optional flag, passed to `print_argv`
       * `input`: default `None`: alternative to `stdin`;
         passed to `subprocess.run`
       * `logger`: optional logger, default `None`;
@@ -251,17 +249,13 @@ def run(
       if logger:
         trace("skip: %s", shlex.join(argv))
       else:
-        if fold is None:
-          fold = True
-        print_argv(*argv, fold=fold, print=print)
+        print_argv(*argv, fold=True)
     return None
   if not quiet:
     if logger:
       trace("+ %s", shlex.join(argv))
     else:
-      if fold is None:
-        fold = False
-      print_argv(*argv, indent="+ ", file=sys.stderr, fold=fold, print=print)
+      print_argv(*argv, indent="+ ", file=sys.stderr, print=print)
   if input is None:
     if stdin is None:
       stdin = subprocess_DEVNULL

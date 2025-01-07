@@ -50,7 +50,7 @@ class VCS(ABC):
 
   def _cmd(self, *vcscmd_args):
     argv = [self.COMMAND_NAME, *vcscmd_args]
-    run(argv, check=True, doit=True, fold=True, quiet=False)
+    run(argv, check=True, doit=True, quiet=False)
 
   @pfx_method
   def get_topdir(self, path=None):

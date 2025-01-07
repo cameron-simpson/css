@@ -81,10 +81,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: System :: Filesystems",
     ],
-    'ext-modules': [{
-        'name': 'cs.vt._scan',
-        'sources': ['_scan.c']
-    }],
     'install_requires': [
         'cs.buffer',
         'cs.app.flag',

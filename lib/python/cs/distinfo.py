@@ -36,7 +36,7 @@ import sys
 from types import SimpleNamespace
 from typing import Iterable, List, Optional, Tuple
 
-from icontract import ensure, require
+from icontract import ensure
 import tomli_w
 from typeguard import typechecked
 
@@ -65,8 +65,6 @@ from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd, print, uses_upd
 from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
-
-from cs.debug import trace, X, r, s
 
 def main(argv=None):
   ''' Main command line.
@@ -475,12 +473,6 @@ class Module:
     return pkg_name is not None and pkg_name == self.name
 
   @property
-  def needs_setuptools(self):
-    ''' Do we require `setuptools` (to compile C extensions)?
-    '''
-    return bool(self.compute_distinfo().get('ext-modules'))
-
-  @property
   def pkg_tags(self):
     ''' The `TagSet` for this package.
     '''
@@ -621,7 +613,6 @@ class Module:
     '''
     tags = self.release_tags()
     if not tags:
-      breakpoint()
       return None
     return max(tags)
 
@@ -660,8 +651,9 @@ class Module:
       release_entry = clean_release_entry(release_entry)
       preamble_md = f'*Latest release {release_tag.version}*:\n{release_entry}'
       for release_tag, release_entry in releases:
+        release_entry = clean_release_entry(release_entry)
         postamble_parts.append(
-            f'*Release {release_tag.version}*:\n{clean_release_entry(release_entry)}'
+            f'*Release {release_tag.version}*:\n{release_entry}'
         )
     full_doc = module_doc(
         self.module,
@@ -725,7 +717,7 @@ class Module:
     # prepare core distinfo
     dinfo = dict(DISTINFO_DEFAULTS)
     docs = self.compute_doc(all_class_names=True)
-    dinfo.update(description=docs.description, extnesions=[])
+    dinfo.update(description=docs.description)
     dinfo.update(self.module.DISTINFO)
 
     # resolve install_requires
@@ -813,20 +805,6 @@ class Module:
 
     return dinfo
 
-  @require(lambda self: self.is_package)
-  def setuptools_ext_modules(self, specs):
-    ''' A copy of `specs` with the sources prepended with `package_dir`.
-    '''
-    full_specs = []
-    for ext_mod in specs:
-      full_spec = dict(ext_mod)
-      full_spec['sources'] = [
-          joinpath(self.basepath, srcrpath)
-          for srcrpath in full_spec['sources']
-      ]
-      full_specs.append(full_spec)
-    return full_specs
-
   @pfx_method
   def compute_pyproject(
       self,
@@ -848,8 +826,8 @@ class Module:
         raise ValueError(
             "cannot supply both dinfo and either pypi_package_name or pypi_package_version"
         )
-    # we will be consuming the dict so make a copy of the presupplied mapping
-    dinfo = dict(dinfo)
+      # we will be consuming the dict so make a copy of the presupplied mapping
+      dinfo = dict(dinfo)
     projspec = dict(
         name=dinfo.pop('name').replace('.', '-'),
         description=dinfo.pop('description'),
@@ -876,37 +854,29 @@ class Module:
       gui_scripts = dinfo_entry_points.pop('gui_scripts', [])
       if gui_scripts:
         projspec['gui-scripts'] = gui_scripts
+    setuptools_cfg = {
+        "package-dir": {
+            "": package_dir,
+        },
+    }
+    if self.is_package:
+      setuptools_cfg["packages"] = [self.name]
+    else:
+      setuptools_cfg["py-modules"] = [self.name]
     pyproject = {
         "project": projspec,
+        "build-system": {
+            "build-backend": "setuptools.build_meta",
+            "requires": [
+                "setuptools >= 61.2",
+                "trove-classifiers",
+                "wheel",
+            ],
+        },
+        "tool": {
+            "setuptools": setuptools_cfg,
+        },
     }
-    if self.needs_setuptools:
-      pyproject["build-system"] = {
-          "build-backend": "setuptools.build_meta",
-          "requires": [
-              "setuptools >= 61.2",
-              "trove-classifiers",
-              "wheel",
-          ],
-      }
-      setuptools_cfg = {
-          "package-dir": {
-              "": package_dir,
-          },
-          "ext-modules":
-          self.setuptools_ext_modules(dinfo.pop("ext-modules", [])),
-      }
-      if self.is_package:
-        setuptools_cfg["packages"] = [self.name]
-      else:
-        setuptools_cfg["py-modules"] = [self.name]
-      pyproject["tool"] = {
-          "setuptools": setuptools_cfg,
-      }
-    else:
-      pyproject["build-system"] = {
-          "build-backend": "flit_core.buildapi",
-          "requires": ["flit_core >=3.2,<4"],
-      }
     docs = self.compute_doc()
     projspec["readme"] = {
         "text": docs.long_description,
@@ -925,9 +895,9 @@ class Module:
       *,
       pypi_package_name=None,
       pypi_package_version=None,
-  ) -> ConfigParser:
-    ''' Compute the contents for `setup.cfg`, used by `setuptools`.
-        Return a filled in `ConfigParser` instance.
+  ):
+    ''' Compute the contents for `setup.cfg`,
+        return a filled in `ConfigParser` instance.
     '''
     if dinfo is None:
       dinfo = self.compute_distinfo(
@@ -1465,45 +1435,27 @@ class Module:
     '''
     path_name, path_version = vcs_version.split('-')
     path_name = path_name.replace('.', '_')
-    distdirpath = joinpath(pkg_dir, 'dist')
-    if isdirpath(distdirpath):
-      rmtree(distdirpath)
     sdist_rpath = f'dist/{path_name}-{path_version}.tar.gz'
-    ##wheel_rpath = f'dist/{path_name}-{path_version}-py3-none-any.whl'
+    wheel_rpath = f'dist/{path_name}-{path_version}-py3-none-any.whl'
     run(
         [
-            # ('python3', '-m', 'build'),
-            ('python3', '-m', 'uv', 'build'),
-            # ('--outdir', 'dist'),
-            ('--out-dir', 'dist'),
+            ('python3', '-m', 'build'),
+            ('--outdir', 'dist'),
             ('--sdist', '--wheel'),
             (
-                #'--skip-dependency-check',
-                #'--no-isolation',
+                '--skip-dependency-check',
+                '--no-isolation',
             ),
             '.',
         ],
         cwd=pkg_dir,
     )
-    sdist_rpath = None
-    wheel_rpath = None
-    for ext in 'tar.gz', 'whl':
-      for distpath in glob(f'{pkg_dir}/dist/*.{ext}'):
-        assert existspath(distpath)
-        basepath = basename(distpath)
-        assert basepath.startswith(f'{path_name}-{path_version}')
-        if distpath.endswith('.tar.gz'):
-          run(['tar', 'tvzf', distpath])
-          assert sdist_rpath is None
-          sdist_rpath = f'dist/{basepath}'
-        elif distpath.endswith('.whl'):
-          run(['unzip', '-l', distpath])
-          assert wheel_rpath is None
-          wheel_rpath = f'dist/{basepath}'
-        else:
-          raise RuntimeError(f'unexpected dist file extension: {distpath!r}')
-    assert sdist_rpath is not None
-    assert wheel_rpath is not None
+    print()
+    os.system(f'ls -ld {pkg_dir}/{sdist_rpath!r}')
+    os.system(f'set -x; tar tvzf {pkg_dir}/{sdist_rpath!r}')
+    print()
+    os.system(f'ls -ld {pkg_dir}/{wheel_rpath!r}')
+    os.system(f'set -x; unzip -l {pkg_dir}/{wheel_rpath!r}')
     return dict(sdist=sdist_rpath, wheel=wheel_rpath)
 
 class CSReleaseCommand(BaseCommand):
@@ -1771,18 +1723,13 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       version = argv.pop(0)
     else:
-      if pkg.latest is None: breakpoint()
       version = pkg.latest.version
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
-    with pkg.release_dir(
-        vcs,
-        vcstag,
-        bare=bare,
-        persist=True,
-    ) as (pkgpath, rpaths):
+    with pkg.release_dir(vcs, vcstag, bare=bare,
+                         persist=True) as (pkgpath, rpaths):
       print(pkgpath)
       for artifact, rpath in sorted(rpaths.items()):
         print(" ", artifact, rpath)
