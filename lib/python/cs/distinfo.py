@@ -904,6 +904,7 @@ class Module:
           "build-backend": "flit_core.buildapi",
           "requires": ["flit_core >=3.2,<4"],
       }
+      pyproject["tool"] = {"flit": {"module": {"name": self.name}}}
     docs = self.compute_doc()
     projspec["readme"] = {
         "text": docs.long_description,
@@ -1399,6 +1400,8 @@ class Module:
         '--',
         release_dirpath,
     )
+    # flit has src/ hardwired
+    os.symlink(PYLIBTOP, joinpath(release_dirpath, 'src'))
     if bare:
       dist_rpaths = {}
     else:
