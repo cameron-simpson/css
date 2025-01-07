@@ -845,8 +845,8 @@ class Module:
         raise ValueError(
             "cannot supply both dinfo and either pypi_package_name or pypi_package_version"
         )
-      # we will be consuming the dict so make a copy of the presupplied mapping
-      dinfo = dict(dinfo)
+    # we will be consuming the dict so make a copy of the presupplied mapping
+    dinfo = dict(dinfo)
     projspec = dict(
         name=dinfo.pop('name').replace('.', '-'),
         description=dinfo.pop('description'),
