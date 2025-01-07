@@ -36,7 +36,7 @@ import sys
 from types import SimpleNamespace
 from typing import Iterable, List, Optional, Tuple
 
-from icontract import ensure
+from icontract import ensure, require
 import tomli_w
 from typeguard import typechecked
 
@@ -473,6 +473,12 @@ class Module:
     return pkg_name is not None and pkg_name == self.name
 
   @property
+  def needs_setuptools(self):
+    ''' Do we require `setuptools` (to compile C extensions)?
+    '''
+    return bool(self.compute_distinfo().get('ext-modules'))
+
+  @property
   def pkg_tags(self):
     ''' The `TagSet` for this package.
     '''
@@ -805,6 +811,20 @@ class Module:
 
     return dinfo
 
+  @require(lambda self: self.is_package)
+  def setuptools_ext_modules(self, specs):
+    ''' A copy of `specs` with the sources prepended with `package_dir`.
+    '''
+    full_specs = []
+    for ext_mod in specs:
+      full_spec = dict(ext_mod)
+      full_spec['sources'] = [
+          joinpath(self.basepath, srcrpath)
+          for srcrpath in full_spec['sources']
+      ]
+      full_specs.append(full_spec)
+    return full_specs
+
   @pfx_method
   def compute_pyproject(
       self,
@@ -854,29 +874,37 @@ class Module:
       gui_scripts = dinfo_entry_points.pop('gui_scripts', [])
       if gui_scripts:
         projspec['gui-scripts'] = gui_scripts
-    setuptools_cfg = {
-        "package-dir": {
-            "": package_dir,
-        },
-    }
-    if self.is_package:
-      setuptools_cfg["packages"] = [self.name]
-    else:
-      setuptools_cfg["py-modules"] = [self.name]
     pyproject = {
         "project": projspec,
-        "build-system": {
-            "build-backend": "setuptools.build_meta",
-            "requires": [
-                "setuptools >= 61.2",
-                "trove-classifiers",
-                "wheel",
-            ],
-        },
-        "tool": {
-            "setuptools": setuptools_cfg,
-        },
     }
+    if self.needs_setuptools:
+      pyproject["build-system"] = {
+          "build-backend": "setuptools.build_meta",
+          "requires": [
+              "setuptools >= 61.2",
+              "trove-classifiers",
+              "wheel",
+          ],
+      }
+      setuptools_cfg = {
+          "package-dir": {
+              "": package_dir,
+          },
+          "ext-modules":
+          self.setuptools_ext_modules(dinfo.pop("ext-modules", [])),
+      }
+      if self.is_package:
+        setuptools_cfg["packages"] = [self.name]
+      else:
+        setuptools_cfg["py-modules"] = [self.name]
+      pyproject["tool"] = {
+          "setuptools": setuptools_cfg,
+      }
+    else:
+      pyproject["build-system"] = {
+          "build-backend": "flit_core.buildapi",
+          "requires": ["flit_core >=3.2,<4"],
+      }
     docs = self.compute_doc()
     projspec["readme"] = {
         "text": docs.long_description,
@@ -1435,6 +1463,9 @@ class Module:
     '''
     path_name, path_version = vcs_version.split('-')
     path_name = path_name.replace('.', '_')
+    distdirpath = joinpath(pkg_dir, 'dist')
+    if isdirpath(distdirpath):
+      rmtree(distdirpath)
     sdist_rpath = f'dist/{path_name}-{path_version}.tar.gz'
     wheel_rpath = f'dist/{path_name}-{path_version}-py3-none-any.whl'
     run(
@@ -1450,12 +1481,25 @@ class Module:
         ],
         cwd=pkg_dir,
     )
-    print()
-    os.system(f'ls -ld {pkg_dir}/{sdist_rpath!r}')
-    os.system(f'set -x; tar tvzf {pkg_dir}/{sdist_rpath!r}')
-    print()
-    os.system(f'ls -ld {pkg_dir}/{wheel_rpath!r}')
-    os.system(f'set -x; unzip -l {pkg_dir}/{wheel_rpath!r}')
+    sdist_rpath = None
+    wheel_rpath = None
+    for ext in 'tar.gz', 'whl':
+      for distpath in glob(f'{pkg_dir}/dist/*.{ext}'):
+        assert existspath(distpath)
+        basepath = basename(distpath)
+        assert basepath.startswith(f'{path_name}-{path_version}')
+        if distpath.endswith('.tar.gz'):
+          run(['tar', 'tvzf', distpath])
+          assert sdist_rpath is None
+          sdist_rpath = f'dist/{basepath}'
+        elif distpath.endswith('.whl'):
+          run(['unzip', '-l', distpath])
+          assert wheel_rpath is None
+          wheel_rpath = f'dist/{basepath}'
+        else:
+          raise RuntimeError(f'unexpected dist file extension: {distpath!r}')
+    assert sdist_rpath is not None
+    assert wheel_rpath is not None
     return dict(sdist=sdist_rpath, wheel=wheel_rpath)
 
 class CSReleaseCommand(BaseCommand):
