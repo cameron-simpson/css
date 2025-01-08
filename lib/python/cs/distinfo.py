@@ -1412,7 +1412,7 @@ class Module:
 
         Currently this prepares the man files from `*.[1-9].md` files.
     '''
-    for rpath in self.paths(pkg_dir):
+    for rpath in self.paths():
       with Pfx(rpath):
         path = normpath(joinpath(pkg_dir, rpath))
         if fnmatch(path, '*.[1-9].md'):
@@ -1440,7 +1440,7 @@ class Module:
     with pfx_call(open, manifest_path, "x") as mf:
       # TODO: support extra files
       print('include', 'README.md', file=mf)
-      subpaths = self.paths(pkg_dir)
+      subpaths = self.paths()
       for subpath in subpaths:
         with Pfx(subpath):
           if any(
