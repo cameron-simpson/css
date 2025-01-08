@@ -5,7 +5,7 @@ r'''
 Assorted process and subprocess management functions.
 
 Not to be confused with the excellent
-(psutil)[https://pypi.org/project/psutil/] package.
+[psutil package](https://pypi.org/project/psutil/).
 '''
 
 import builtins
