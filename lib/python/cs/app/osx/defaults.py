@@ -22,7 +22,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.osx.plist',
-        'cs.deco',
+        'cs.cache',
         'cs.lex',
         'cs.psutils',
         'typeguard',
