@@ -17,7 +17,7 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.later import Later
 from cs.lex import (cutprefix, cutsuffix, is_identifier)
@@ -168,6 +168,7 @@ class PilferCommand(BaseCommand):
       argv_offset += 1
       return spec, argv_offset
 
+  @popopts
   def cmd_from(self, argv):
     ''' Usage: {cmd} source [pipeline-defns..]
           Source may be a URL or "-" to read URLs from standard input.
@@ -213,5 +214,27 @@ class PilferCommand(BaseCommand):
         print(result)
 
     asyncio.run(print_from(pipespec.run_pipeline(urls)))
+
+  @popopts
+  def cmd_mitm(self, argv):
+    ''' Usage: {cmd} [[address]:port]
+          Run a mitmproxy for traffic filtering.
+    '''
+    from .mitm import run_proxy, DEFAULT_LISTEN_HOST, DEFAULT_LISTEN_PORT
+    listen_host = DEFAULT_LISTEN_HOST
+    listen_port = DEFAULT_LISTEN_PORT
+    if argv:
+      ip_port = argv.pop(0)
+      with Pfx("[address]:port %r", ip_port):
+        try:
+          host, port = ip_port.rsplit(':', 1)
+          if host:
+            listen_host = host
+          listen_port = int(port)
+        except ValueError as e:
+          raise GetoptError(f'invalid [address]:port: {e}') from e
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    asyncio.run(run_proxy(listen_host, listen_port))
 
 sys.exit(main(sys.argv))
