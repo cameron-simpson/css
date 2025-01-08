@@ -30,7 +30,7 @@ from cs.pfx import Pfx, pfx_call
 from .misc import macos_version
 from .objc import apple, cg
 
-__version__ = '20240622-post'
+__version__ = '20250108'
 
 DISTINFO = {
     'keywords': ["python3"],
