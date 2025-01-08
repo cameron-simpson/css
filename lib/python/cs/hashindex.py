@@ -168,13 +168,13 @@ class HashIndexCommand(BaseCommand):
 
     # pylint: disable=use-dict-literal
     COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
         h_=('hashname', 'The file content hash algorithm name.'),
         H_=('hashindex_exe', 'The remote hashindex executable.'),
         o_=(
             'output_format',
             'Output format, default: {OUTPUT_FORMAT_DEFAULT!r}'
         ),
-        **BaseCommand.Options.COMMON_OPT_SPECS,
     )
 
   # pylint: disable=arguments-differ
