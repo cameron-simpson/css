@@ -372,7 +372,7 @@ class Module:
     self._checking = False
     self._module_problems = None
     if self.ismine() and not self.paths():
-      raise ValueError(f'no file paths for Module({name!r})')
+      warning("no file paths for Module(%r)", name)
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.name)
