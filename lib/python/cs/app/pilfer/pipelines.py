@@ -33,6 +33,10 @@ class PipeLineSpec(Promotable):
     ''' Construct a list of stage functions for use in an `AsyncPipeLine`
         from an iterable of pipeline stage specification strings
         and an action mapping.
+
+        This scans `self.stage_specs` and handles the spacial
+        specifications `"*"` and `"**"`, which spawn subpipelines.
+        Other specifications are passed through to `Action.from_str`.
     '''
     specs = list(self.stage_specs)
     stage_funcs = []
