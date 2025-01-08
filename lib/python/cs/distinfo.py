@@ -1241,9 +1241,13 @@ class Module:
       return problems
     import_names = []
     for fspath in self.paths():
-      if not fspath.endswith('.py'):
+      rfspath = relpath(fspath, PYLIBTOP)
+      module_name = cutsuffix(rfspath, '.py')
+      if module_name == fspath:
+        warning("skip non-.py path %r", fspath)
         continue
-      for import_name in direct_imports(fspath, self.name):
+      module_name = module_name.replace('/', '.')
+      for import_name in direct_imports(fspath, module_name):
         if self.modules[import_name].isstdlib():
           continue
         if import_name.endswith('_tests'):
