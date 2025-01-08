@@ -261,7 +261,14 @@ def run(
     else:
       if fold is None:
         fold = False
-      print_argv(*argv, indent="+ ", file=sys.stderr, fold=fold, print=print)
+      print_argv(
+          *argv,
+          indent0="+ ",
+          indent="  ",
+          file=sys.stderr,
+          fold=fold,
+          print=print
+      )
   if input is None:
     if stdin is None:
       stdin = subprocess_DEVNULL
@@ -469,6 +476,7 @@ def prep_argv(*argv, ssh_exe, remote=None):
 
 def print_argv(
     *argv,
+    indent0=None,
     indent="",
     subindent="  ",
     end="\n",
@@ -478,6 +486,8 @@ def print_argv(
 ):
   ''' Print an indented possibly folded command line.
   '''
+  if indent0 is None:
+    indent0 = indent
   if file is None:
     file = sys.stdout
   if print is None:
@@ -486,7 +496,7 @@ def print_argv(
   was_opt = False
   for i, arg in enumerate(argv):
     if i == 0:
-      pr_argv.append(indent)
+      pr_argv.append(indent0)
       was_opt = False
     elif len(arg) >= 2 and arg.startswith('-'):
       if fold:
