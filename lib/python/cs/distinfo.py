@@ -1015,7 +1015,7 @@ class Module:
 
   @cache
   @pfx_method(use_str=True)
-  def paths(self, top_dirpath='.'):
+  def paths(self):
     ''' Return a list of the paths associated with this package
         relative to `top_dirpath` (default `'.'`).
 
@@ -1025,8 +1025,6 @@ class Module:
     '''
     skip_suffixes = 'pyc', 'o', 'orig', 'so'
     basepath = self.basepath
-    if top_dirpath:
-      basepath = normpath(joinpath(top_dirpath, basepath))
     if isdirpath(basepath):
       pathlist = list(
           scandirpaths(
@@ -1047,8 +1045,7 @@ class Module:
           )
       )
     if not pathlist:
-      raise ValueError("no paths for %s" % (self,))
-    pathlist = [relpath(path, top_dirpath) for path in pathlist]
+      warning("no paths for %s", self)
     return pathlist
 
   def resolve_requirements(self, requirement_specs):
