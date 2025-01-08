@@ -31,17 +31,14 @@ from os.path import (
 from pprint import pprint
 import re
 from shutil import rmtree
-from subprocess import DEVNULL
 import sys
 from types import SimpleNamespace
-from typing import Iterable, List, Optional, Tuple
 
 from icontract import ensure, require
 import tomli_w
 from typeguard import typechecked
 
 from cs.ansi_colour import colourise
-from cs.cache import cachedmethod
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import isodate
@@ -788,12 +785,11 @@ class Module:
       with Pfx(kw):
         if value is None:
           warning("no value")
+        elif kw in dinfo:
+          if dinfo[kw] != value:
+            info("publishing %s instead of %s", value, dinfo[kw])
         else:
-          if kw in dinfo:
-            if dinfo[kw] != value:
-              info("publishing %s instead of %s", value, dinfo[kw])
-          else:
-            dinfo[kw] = value
+          dinfo[kw] = value
 
     # check for required fields
     for kw in (
@@ -841,11 +837,10 @@ class Module:
           pypi_package_name=pypi_package_name,
           pypi_package_version=pypi_package_version
       )
-    else:
-      if pypi_package_name or pypi_package_version:
-        raise ValueError(
-            "cannot supply both dinfo and either pypi_package_name or pypi_package_version"
-        )
+    elif pypi_package_name or pypi_package_version:
+      raise ValueError(
+          "cannot supply both dinfo and either pypi_package_name or pypi_package_version"
+      )
     # we will be consuming the dict so make a copy of the presupplied mapping
     dinfo = dict(dinfo)
     projspec = dict(
