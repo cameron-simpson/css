@@ -306,6 +306,11 @@ class FSM(DOTNodeMixin):
             ANY FSM:state1 FSMTransitionEvent(old_state='state2', new_state='state1', event='ev_b', when=..., extra={'foo': 4})
             'state1'
     '''
+    if state not in self.FSM_TRANSITIONS:
+      raise ValueError(
+          "%s.fsm_callback: state %r not in self.FSM_TRANSITIONS %r" %
+          (self, state, sorted(self.FSM_TRANSITIONS))
+      )
     with self.__lock:
       self.__callbacks[state].append(callback)
 
