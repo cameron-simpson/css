@@ -25,6 +25,7 @@ from cs.queues import NullQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
 from cs.threads import locked, HasThreadState, ThreadState
+from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
 from .format import FormatMapping
@@ -95,6 +96,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
 
   DEFAULT_ACTION_MAP = {
       'hrefs': one_to_many(hrefs),
+      'print': one_to_many(lambda item: (print(item), item)[-1:]),
       'srcs': one_to_many(srcs),
       'unseen': (unseen_sfunc, StageMode.STREAM),
   }
