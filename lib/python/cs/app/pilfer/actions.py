@@ -50,15 +50,27 @@ class Action(BaseToken):
         stage functions.
     '''
     with Pfx("%s.from_str(%r)", cls.__name__, text):
-      if is_identifier(text):
-        # TODO: options parameters?
-        # parse.parse_action_args?
+      # dotted_name[:param=,...]
+      name, offset = get_dotted_identifier(text)
+      if name:
+        if text.startswith(':', offset):
+          offset += 1
+          args, kwargs, offset = trace(
+              get_action_args, retval=True
+          )(text, offset)
+          if offset < len(text):
+            raise ValueError(f'unparsed text after params: {text[offset:]!r}')
+        else:
+          args = []
+          kwargs = {}
         return ActionByName(
             pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
-            name=text,
+            name=name,
+            args=args,
+            kwargs=kwargs,
         )
 
       # "! shcmd" or "| shlex-split"
@@ -142,6 +154,8 @@ class Action(BaseToken):
 class ActionByName(Action):
 
   name: str
+  args: list = field(default_factory=list)
+  kwargs: dict = field(default_factory=dict)
 
   @property
   def stage_spec(self):
