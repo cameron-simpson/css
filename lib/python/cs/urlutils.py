@@ -4,28 +4,6 @@
 # - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
-__version__ = '20231129-post'
-
-DISTINFO = {
-    'description':
-    "convenience functions for working with URLs",
-    'keywords': ["python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 3",
-    ],
-    'install_requires': [
-        'html5lib',
-        'lxml',
-        'beautifulsoup4',
-        'cs.lex',
-        'cs.logutils',
-        'cs.rfc2616',
-        'cs.threads',
-        'cs.obj',
-    ],
-}
-
 from collections import namedtuple
 from contextlib import contextmanager
 from functools import cached_property
@@ -75,6 +53,28 @@ from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
 from cs.seq import skip_map
 from cs.threads import locked, ThreadState, HasThreadState
+
+__version__ = '20231129-post'
+
+DISTINFO = {
+    'description':
+    "convenience functions for working with URLs",
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'html5lib',
+        'lxml',
+        'beautifulsoup4',
+        'cs.lex',
+        'cs.logutils',
+        'cs.rfc2616',
+        'cs.threads',
+        'cs.obj',
+    ],
+}
 
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader
