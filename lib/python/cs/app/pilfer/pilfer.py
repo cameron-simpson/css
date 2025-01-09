@@ -52,7 +52,6 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
   else:
     wrapper = agen(lambda item, _: func(item), fast=fast)
 
-async def unseen_sfunc(item_Ps, *, sig=None, seen=None):
   async def one_to_many_wrapper(item_P):
     item, P = item_P
     async for result in wrapper(item, P):
@@ -63,6 +62,13 @@ async def unseen_sfunc(item_Ps, *, sig=None, seen=None):
         yield result, P
 
   return one_to_many_wrapper
+
+async def unseen_sfunc(
+    item_Ps: Iterable[Tuple[Any, "Pilfer"]],
+    *,
+    sig: Optional[Callable[Any, Any]] = None,
+    seen=None
+):
   ''' Asynchronous generator yielding unseen items from a stream
       of `(item,Pilfer)` 2-tuples.
   '''
