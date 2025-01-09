@@ -29,7 +29,7 @@ class PipeLineSpec(Promotable):
     return cls(name=name, stage_specs=shlex.split(pipe_spec_s))
 
   @pfx_method
-  def make_stage_funcs(self) -> AsyncPipeLine:
+  def make_stage_funcs(self, *, P: Pilfer) -> AsyncPipeLine:
     ''' Construct a list of stage functions for use in an `AsyncPipeLine`
         from an iterable of pipeline stage specification strings
         and an action mapping.
@@ -37,6 +37,9 @@ class PipeLineSpec(Promotable):
         This scans `self.stage_specs` and handles the spacial
         specifications `"*"` and `"**"`, which spawn subpipelines.
         Other specifications are passed through to `Action.from_str`.
+
+        The parameter `P` is a `Pilfer` instance used to translate
+        action names to stage functions.
     '''
     specs = list(self.stage_specs)
     stage_funcs = []
@@ -59,7 +62,7 @@ class PipeLineSpec(Promotable):
               stage_specs=specs,
           )
           try:
-            testsubpipe = subpipelinespec.make_stage_funcs()
+            testsubpipe = subpipelinespec.make_stage_funcs(P=P)
           except ValueError as e:
             warning("invalid subpipeline %r: %s", subpipelinespec, e)
             raise
@@ -69,7 +72,7 @@ class PipeLineSpec(Promotable):
             ''' Process a single `item` through its own pipeline,
                 yield the results from the pipeline.
             '''
-            subpipe = pipespec.make_pipeline()
+            subpipe = pipespec.make_pipeline(P=P)
             async for result in subpipe([item]):
               yield result
 
@@ -90,7 +93,7 @@ class PipeLineSpec(Promotable):
           )
           # sanity check the subpipeline
           try:
-            testsubpipe = subpipelinespec.make_stage_funcs()
+            testsubpipe = subpipelinespec.make_stage_funcs(P=P)
           except ValueError as e:
             ##warning("invalid subpipeline %r: %s", subpipelinespec, e)
             raise
@@ -121,7 +124,7 @@ class PipeLineSpec(Promotable):
             sentinel = object()  # marker for end of pipeline output
             async for item in inq:
               # construct a pipeline to process item
-              subpipe = pipespec.make_pipeline()
+              subpipe = pipespec.make_pipeline(P=P)
               # dispatch the pipeline worker
               create_task(collect_for(item, subpipe([item]), aq, sentinel))
               nsubpipes += 1
@@ -143,15 +146,15 @@ class PipeLineSpec(Promotable):
           continue
 
         # regular Action
-        action = Action.from_str(spec)
+        action = Action.from_str(spec, P=P)
         stage_funcs.append(action.stage_spec)
     return stage_funcs
 
-  def make_pipeline(self) -> AsyncPipeLine:
+  def make_pipeline(self, *, P: Pilfer) -> AsyncPipeLine:
     ''' Construct an `AsyncPipeLine` from an iterable of pipeline
         stage specification strings and an action mapping.
     '''
-    return AsyncPipeLine.from_stages(*self.make_stage_funcs())
+    return AsyncPipeLine.from_stages(*self.make_stage_funcs(P=P))
 
   @uses_pilfer
   async def run_pipeline(
@@ -167,7 +170,8 @@ class PipeLineSpec(Promotable):
 
         Parameters:
         * `input_item_Ps`: an iterable of input items
-        * `P`: an optional `Pilfer` context; the default comes from the ambient instance
+        * `P`: an optional `Pilfer` context; the default comes from the ambient instance;
+          this is used when resolving stage specifications to stage functions
         * `has_pilfer`: if true then `input_item_Ps` consists of `(item,Pilfer)` 2-tuples,
           otherwise it consists of just `item`s, and `run_pipeline`
           will produce 2-tuples for the pipeline using the `P` parameter
@@ -201,7 +205,7 @@ class PipeLineSpec(Promotable):
           yield item, P
 
       input_item_Ps = add_pilfer(input_item_Ps)
-    pipeline = self.make_pipeline()
+    pipeline = self.make_pipeline(P=P)
     async for result_P in pipeline(input_item_Ps, fast=fast):
       yield result_P
 

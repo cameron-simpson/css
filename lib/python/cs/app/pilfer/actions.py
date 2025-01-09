@@ -30,7 +30,7 @@ class Action(BaseToken):
 
   @classmethod
   @typechecked
-  def from_str(cls, text) -> "Action":
+  def from_str(cls, text, *, P: Pilfer) -> "Action":
     ''' Convert an action specification into an `Action`.
 
         The following specifications are recognised:
@@ -40,12 +40,18 @@ class Action(BaseToken):
         - "/regexp": filter items to those matching regexp
         - "-/regexp": filter items to those not matching regexp
         - "..": treat items as URLs and produce their parent URL
+
+        Named stage functions are converted to `Action`s which keep
+        a reference to the supplied `Pilfer` instance, and the
+        `Pilfer` is used when converting the actions into pipeline
+        stage functions.
     '''
     with Pfx("%s.from_str(%r)", cls.__name__, text):
       if is_identifier(text):
         # TODO: options parameters?
         # parse.parse_action_args?
         return ActionByName(
+            pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
@@ -67,6 +73,7 @@ class Action(BaseToken):
         else:
           raise RuntimeError('unhandled shcmd/shlex subprocess')
         return ActionSubProcess(
+            pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
@@ -108,6 +115,7 @@ class Action(BaseToken):
             return regexp.search(str(item))
 
         return ActionSelect(
+            pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
@@ -117,6 +125,7 @@ class Action(BaseToken):
 
       if text == '..':
         return ActionModify(
+            pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
@@ -132,9 +141,20 @@ class ActionByName(Action):
   name: str
 
   @property
-  @uses_pilfer
-  def stage_spec(self, *, P: Pilfer):
-    return P.action_map[self.name]
+  def stage_spec(self):
+    ''' Produce the stage specification for this action.
+    '''
+    P = self.pilfer
+    try:
+      return P.action_map[self.name]
+    except KeyError:
+      try:
+        module_name, func_name = self.name.rsplit('.', 1)
+      except ValueError:
+        # bare name with no dot
+        raise NameError(f'{self}: unknown name {self.name}')
+      func = import_module_name(module_name, func_name)
+      return func
 
 # TODO: this gathers it all, need to open pipe and stream, how?
 @dataclass
