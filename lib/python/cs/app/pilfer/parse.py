@@ -585,7 +585,7 @@ def parse_action(action, do_trace):
     func = func_args
   return sig, func
 
-def parse_action_args(action, offset, delim=None):
+def get_action_args(action, offset, delim=None):
   ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
      return `(args,kwargs,offset)`.
 
