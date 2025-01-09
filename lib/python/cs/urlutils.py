@@ -28,6 +28,7 @@ DISTINFO = {
 
 from collections import namedtuple
 from contextlib import contextmanager
+from functools import cached_property
 from heapq import heappush, heappop
 from itertools import chain
 import errno
@@ -124,9 +125,9 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def flush(self):
     ''' Forget all cached content.
     '''
-    for val_attr in ['_' + attr for attr in 'GET HEAD parsed'.split()]:
+    for attr in 'GET_response', 'HEAD_response', 'parsed':
       try:
-        delattr(self, val_attr)
+        delattr(self, attr)
       except AttributeError:
         pass
 
@@ -160,27 +161,25 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       with self.context(session=session):
         yield session
 
+  @cached_property
   @locked
-  @cachedmethod
-  def GET(self):
-    ''' Return the `requests.Response` object from a `GET` of this URL.
-        This may be a cached response.
+  def GET_response(self):
+    ''' The `requests.Response` object from a `GET` of this URL.
     '''
     return requests.get(self.url_s)
 
+  @cached_property
   @locked
-  @cachedmethod
-  def HEAD(self):
-    ''' Return the `requests.Response` object from a `HEAD` of this URL.
-        This may be a cached response.
+  def HEAD_response(self):
+    ''' The `requests.Response` object from a `HEAD` of this URL.
     '''
-    return requests.get(self.url_s)
+    return requests.head(self.url_s)
 
   def exists(self) -> bool:
-    ''' Test if this URL exists.
+    ''' Test if this URL exists via a `HEAD` request.
     '''
     try:
-      self.HEAD()
+      self.HEAD_response
     except HTTPError as e:
       if e.code == 404:
         return False
@@ -192,14 +191,14 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def content(self):
     ''' The URL content as a string.
     '''
-    return self.GET().content
+    return self.GET_response.content
 
   @property
   @unattributable
   def text(self):
     ''' The URL content as a string.
     '''
-    return self.GET().text
+    return self.GET_response.text
 
   @property
   @unattributable
@@ -207,7 +206,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def headers(self):
     ''' A `requests.Response` headers mapping.
     '''
-    r = self.HEAD()
+    r = self.HEAD_response
     return r.headers
 
   @property
@@ -234,7 +233,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
     '''
     if self._info is None:
-      self.HEAD()
+      self.HEAD_response
     value = self._info['Last-Modified']
     if value is not None:
       # parse HTTP-date into datetime object
@@ -244,12 +243,11 @@ class URL(SingletonMixin, HasThreadState, Promotable):
 
   @property
   @unattributable
-  @locked
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
     '''
     if self._content is None:
-      self.HEAD()
+      self.HEAD_response
     return self._info.getencoding()
 
   @property
@@ -263,10 +261,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       return ''
     return hostname.split('.', 1)[1]
 
-  @property
+  @cached_property
   @unattributable
-  @locked
-  @cachedmethod
   def parsed(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
@@ -296,9 +292,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     import feedparser
     return feedparser.parse(self.content)
 
-  @property
+  @cached_property
   @unattributable
-  @locked
   def xml(self):
     ''' An `ElementTree` of the URL content.
     '''
