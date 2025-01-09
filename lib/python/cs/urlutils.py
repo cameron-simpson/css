@@ -8,24 +8,20 @@ from collections import namedtuple
 from contextlib import contextmanager
 from functools import cached_property
 from heapq import heappush, heappop
-from itertools import chain
-import errno
 import os
 import os.path
 import sys
-import time
 from typing import Iterable
 
 from netrc import netrc
-import socket
 from string import whitespace
 from threading import RLock
-from urllib.request import Request, HTTPError, URLError, \
-            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
-            build_opener
-from urllib.parse import urlparse, urljoin as up_urljoin, quote as urlquote
+from urllib.request import (
+    HTTPError, URLError, HTTPPasswordMgrWithDefaultRealm
+)
+from urllib.parse import urlparse, urljoin as up_urljoin
 
-from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
+from bs4 import BeautifulSoup
 try:
   try:
     from lxml import etree
@@ -43,12 +39,11 @@ except ImportError:
 import requests
 from typeguard import typechecked
 
-from cs.cache import cachedmethod
 from cs.deco import promote, Promotable
-from cs.excutils import logexc, unattributable
+from cs.excutils import unattributable
 from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
-from cs.pfx import Pfx, pfx_iter
+from cs.pfx import Pfx
 from cs.rfc2616 import datetime_from_http_date
 from cs.seq import skip_map
 from cs.threads import locked, ThreadState, HasThreadState
