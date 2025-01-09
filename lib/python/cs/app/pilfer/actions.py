@@ -24,11 +24,14 @@ from cs.urlutils import URL
 
 from .pilfer import Pilfer, uses_pilfer
 
+@dataclass
 class Action(BaseToken):
 
+  pilfer: Pilfer
   batchsize: Union[int, None] = None
 
   @classmethod
+  @uses_pilfer
   @typechecked
   def from_str(cls, text, *, P: Pilfer) -> "Action":
     ''' Convert an action specification into an `Action`.
@@ -135,7 +138,7 @@ class Action(BaseToken):
 
       raise SyntaxError('no action recognised')
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionByName(Action):
 
   name: str
@@ -157,7 +160,7 @@ class ActionByName(Action):
       return func
 
 # TODO: this gathers it all, need to open pipe and stream, how?
-@dataclass
+@dataclass(kw_only=True)
 class ActionSubProcess(Action):
   ''' A action which passes items through a subprocess
       with `str(item)` on each input line
@@ -226,7 +229,7 @@ class ActionSubProcess(Action):
       warning("exit %d from subprocess %r", xit, self.argv)
 
 # TODO: this gathers it all, need to open pipe and stream, how?
-@dataclass
+@dataclass(kw_only=True)
 class ActionSelect(Action):
   ''' This action's `stage_func` yields the input item or not
       depending on the truthiness of `select_func`.
@@ -279,7 +282,7 @@ class ActionSelect(Action):
     '''
     return self.stage_func
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionModify(Action):
 
   modify_func: Callable[Tuple[Any, Pilfer], Tuple[Any, Pilfer]]
