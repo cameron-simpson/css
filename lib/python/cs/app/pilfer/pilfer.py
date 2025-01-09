@@ -6,16 +6,17 @@ import os.path
 import sys
 from threading import Lock, RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
+from typing import Any, Callable, Iterable, Optional, Tuple
 
 from cs.app.flag import PolledFlags
-from cs.deco import default_params, promote
+from cs.deco import decorator, default_params, promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.later import Later, uses_later
 from cs.lex import r
 from cs.logutils import (debug, error, warning, exception, D)
 from cs.mappings import MappingChain, SeenSet
-from cs.naysync import afunc, async_iter, StageMode
+from cs.naysync import afunc, agen, async_iter, StageMode
 from cs.obj import copy as obj_copy
 from cs.pfx import Pfx
 from cs.pipeline import pipeline
@@ -31,23 +32,37 @@ from .urls import hrefs, srcs
 
 from cs.debug import trace, X, r, s
 
-async def hrefs_sfunc(item_P):
-  ''' Asynchronous generator yields `href`s from source URLs.
-  '''
-  item, P = item_P
-  urls = await afunc(lambda url: list(hrefs(url)))(item)
-  for url in urls:
-    yield url, P
+@decorator
+def one_to_many(func, fast=None, with_P=False, new_P=False):
+  ''' A decorator for one-to-many core functions for use as a stage function.
+      This produces an asynchronous generator which yields
+      `(result,Pilfer)` 2-tuples from a function expecting a single
+      item and producing an iterable of results.
 
-async def srcs_sfunc(item_P):
-  ''' Asynchronous generator yields `src`s from source URLs.
+      Decorator parameters:
+      * `fast`: optional flag, passed to `@agen` when wrapping the function
+      * `with_P`: optional flag, default `False`: if true, pass
+        `item,Pilfer` to thefunction instead of just `item`
+      * `new_P`: optional glag, default `False`; if true then the
+        function yields `result,Pilfer` 2-tuples instead of just `result`
   '''
-  item, P = item_P
-  urls = await afunc(lambda url: list(srcs(url)))(item)
-  for url in urls:
-    yield url, P
+  ##func = trace(func)
+  if with_P:
+    wrapper = agen(lambda item, P: func(item, P), fast=fast)
+  else:
+    wrapper = agen(lambda item, _: func(item), fast=fast)
 
 async def unseen_sfunc(item_Ps, *, sig=None, seen=None):
+  async def one_to_many_wrapper(item_P):
+    item, P = item_P
+    async for result in wrapper(item, P):
+      if new_P:
+        result, result_P = result
+        yield result, result_P
+      else:
+        yield result, P
+
+  return one_to_many_wrapper
   ''' Asynchronous generator yielding unseen items from a stream
       of `(item,Pilfer)` 2-tuples.
   '''
@@ -73,8 +88,8 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   perthread_state = ThreadState()
 
   DEFAULT_ACTION_MAP = {
-      'hrefs': hrefs_sfunc,
-      'srcs': srcs_sfunc,
+      'hrefs': one_to_many(hrefs),
+      'srcs': one_to_many(srcs),
       'unseen': (unseen_sfunc, StageMode.STREAM),
   }
 
