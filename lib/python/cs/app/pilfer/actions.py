@@ -4,7 +4,7 @@
 '''
 
 from asyncio import to_thread, create_task
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 import shlex
 from subprocess import Popen, PIPE
@@ -16,13 +16,17 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.lex import BaseToken, is_identifier
+from cs.lex import BaseToken, get_dotted_identifier
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
 from cs.pfx import Pfx, pfx_call
+from cs.py.modules import import_module_name
 from cs.urlutils import URL
 
+from .parse import get_action_args
 from .pilfer import Pilfer, uses_pilfer
+
+from cs.debug import trace
 
 @dataclass
 class Action(BaseToken):
