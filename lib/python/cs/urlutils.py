@@ -48,7 +48,6 @@ from cs.deco import promote, Promotable
 from cs.excutils import logexc, unattributable
 from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
-from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_iter
 from cs.rfc2616 import datetime_from_http_date
 from cs.seq import skip_map
@@ -87,7 +86,7 @@ DISTINFO = {
 def urljoin(url, other_url):
   return up_urljoin(str(url), str(other_url))
 
-class URL(SingletonMixin, HasThreadState, Promotable):
+class URL(HasThreadState, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
@@ -99,17 +98,10 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       retry_delay=3,
   )
 
-  @classmethod
-  def _singleton_key(cls, url_s: str, referer=None):
-    return url_s
-
   @typechecked
   def __init__(self, url_s: str, referer=None):
     ''' Initialise the `URL` from the URL string `url_s`.
     '''
-    if hasattr(self, 'url_s'):
-      assert url_s == self.url_s
-      return
     self.url_s = url_s
     self._lock = RLock()
     self._parts = None
