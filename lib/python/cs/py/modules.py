@@ -13,7 +13,7 @@ import sys
 
 from cs.context import contextif, stackattrs
 from cs.gimmicks import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx
 
 __version__ = '20241122-post'
 
@@ -21,12 +21,12 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.context', 'cs.gimmicks', 'cs.pfx'],
 }
 
+@pfx
 def import_module_name(module_name, name=None, sys_path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
 
@@ -46,8 +46,8 @@ def import_module_name(module_name, name=None, sys_path=None, lock=None):
       except ImportError as e:
         # pylint: disable=raise-missing-from
         raise ImportError(
-            "no module named %r: %s: %s" % (module_name, type(e), e)
-        )
+            f'no module named {module_name!r}: {e.__class__.__name__}:{e}'
+        ) from e
     if M is not None:
       if name is None:
         return M
@@ -56,8 +56,8 @@ def import_module_name(module_name, name=None, sys_path=None, lock=None):
       except AttributeError as e:
         # pylint: disable=raise-missing-from
         raise ImportError(
-            "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
-        )
+            f'module {module_name!r}: no entry named {name!r}: {e.__class__.__name__}:{e}'
+        ) from e
     return None
 
 def import_module_from_file(module_name, source_file, sys_path=None):
