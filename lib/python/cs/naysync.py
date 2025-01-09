@@ -64,12 +64,14 @@ DISTINFO = {
 AnyIterable = Union[Iterable, AsyncIterable]
 
 @decorator
-def agen(genfunc):
+def agen(genfunc, *, fast=None):
   ''' A decorator for a synchronous generator which turns it into
       an asynchronous generator.
       If `genfunc` already an asynchronous generator it is returned unchanged.
       Exceptions in the synchronous generator are reraised in the asynchronous
       generator.
+
+      The optional parameter `fast` is passed through to `async_iter`.
 
       Example:
 
@@ -86,12 +88,12 @@ def agen(genfunc):
   if isasyncgenfunction(genfunc):
     return genfunc
 
-  def agen(*a, **kw):
+  def agenerator(*a, **kw):
     ''' Return an async iterator yielding items from `genfunc`.
     '''
-    return async_iter(genfunc(*a, **kw))
+    return async_iter(genfunc(*a, **kw), fast=fast)
 
-  return agen
+  return agenerator
 
 @decorator
 def afunc(func, fast=False):
