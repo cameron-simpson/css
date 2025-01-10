@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 
 ''' My collection of things for working with Django.
+
+    Presently this provides:
+    * `BaseCommand`: a drop in replacement for `django.core.management.base.BaseCommand`
+      which uses a `cs.cmdutils.BaseCommand` style of implementation
+    * `model_batches_qs`: a generator yielding `QuerySet`s for batches of a `Model`
 '''
 
 from dataclasses import dataclass, field
@@ -100,13 +105,17 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
       But from that point on the style is as for `cs.cmdutils.BaseCommand`:
       - no `aegparse` setup
       - direct support for subcommands as methods
-      - succinct option parsing, if you want command line options
+      - succinct option parsing, if you want additional command line options
+      - usage text in the subcommand method docstring
 
       A simple command looks like this:
 
           class Command(BaseCommand):
 
               def main(self, argv):
+                  """ Usage: {cmd} .......
+                        Do the main thing.
+                  """
                   ... do stuff based on the CLI args `argv` ...
 
       A command with subcommands looks like this:
@@ -114,9 +123,15 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
           class Command(BaseCommand):
 
               def cmd_this(self, argv):
+                  """ Usage: {cmd} ......
+                        Do this.
+                  """
                   ... do the "this" subcommand ...
 
               def cmd_that(self, argv):
+                  """ Usage: {cmd} ......
+                        Do that.
+                  """
                   ... do the "that" subcommand ...
 
       If want some kind of app/client specific "overcommand" composed
@@ -134,29 +149,29 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
       presupplied with a `.options` attribute which is an instance
       of `cs.cmdutils.BaseCommandOptions` (or some subclass).
 
-      Parsing options is simple:
+      Parsing options is light weight.
+      This example adds command line switches to the default switches:
+      - `-x`: a Boolean, setting `self.options.x`
+      - `--thing-limit` *n*: an `int`, setting `self.options.thing_limit=`*n*
+      - `--mode` *blah*: a string, setting `self.options.mode=`*blah*
+      The automatic usage text is suitably updated.
+
+      Code sketch:
+
+          from cs.cmdutils import popopts
 
           class Command(BaseCommand):
 
+              @popopts(
+                  x=None,
+                  thing_limit_=int,
+                  mode_='The run mode.',
+              )
               def cmd_this(self, argv):
+                  """ Usage: {cmd}
+                        Do this thing.
+                  """
                   options = self.options
-                  # parsing options:
-                  #
-                  # boolean -x option, makes options.x
-                  #
-                  # --thing-limit n option taking an int
-                  # makes options.thing_limit
-                  # help text is "Thing limit."
-                  #
-                  # a --mode foo option taking a string
-                  # makes options.mode
-                  # help text is "The run mode."
-                  options.popopts(
-                      argv,
-                      x=None,
-                      thing_limit_=int,
-                      mode_='The run mode.',
-                  )
                   ... now consult options.x or whatever
                   ... argv is now the remaining arguments after the options
   '''
@@ -231,7 +246,7 @@ def model_batches_qs(
       * `field_name`: default `'pk'`, the name of the field on which
         to order the batches
       * `chunk_size`: the maximum size of each chunk
-      * `desc`: default `False`; if true the order the batches in
+      * `desc`: default `False`; if true then order the batches in
         descending order instead of ascending order
 
       Example iteration of a `Model` would look like:
