@@ -30,7 +30,7 @@ fi
 : "$DEDRM_PACKAGE_PATH"
 
 set -x
-exec ebooks kindle -K "${KINDLE_LIBRARY_PULL:-${KINDLE_LIBRARY:-''}}" export "$@"
+exec ebooks kindle --kindle-path "${KINDLE_LIBRARY_PULL:-${KINDLE_LIBRARY:-''}}" export "$@"
 
 ##  cmd=$( basename "$0" )
 ##  usage="Usage: $cmd

@@ -12,13 +12,12 @@ from collections import defaultdict
 from contextlib import contextmanager
 from inspect import isgeneratorfunction, ismethod, signature, Parameter
 import sys
-import time
 import traceback
 import typing
 
 from cs.gimmicks import warning
 
-__version__ = '20241109-post'
+__version__ = '20250103-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -361,143 +360,6 @@ def logging_wrapper(log_call, stacklevel_increment=1):
   return log_func_wrapper
 
 @decorator
-def cachedmethod(
-    method, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
-):
-  ''' Decorator to cache the result of an instance or class method
-      and keep a revision counter for changes.
-
-      The cached values are stored on the instance (`self`).
-      The revision counter supports the `@revised` decorator.
-
-      This decorator may be used in 2 modes.
-      Directly:
-
-          @cachedmethod
-          def method(self, ...)
-
-      or indirectly:
-
-          @cachedmethod(poll_delay=0.25)
-          def method(self, ...)
-
-      Optional keyword arguments:
-      * `attr_name`: the basis name for the supporting attributes.
-        Default: the name of the method.
-      * `poll_delay`: minimum time between polls; after the first
-        access, subsequent accesses before the `poll_delay` has elapsed
-        will return the cached value.
-        Default: `None`, meaning the value never becomes stale.
-      * `sig_func`: a signature function, which should be significantly
-        cheaper than the method. If the signature is unchanged, the
-        cached value will be returned. The signature function
-        expects the instance (`self`) as its first parameter.
-        Default: `None`, meaning no signature function;
-        the first computed value will be kept and never updated.
-      * `unset_value`: the value to return before the method has been
-        called successfully.
-        Default: `None`.
-
-      If the method raises an exception, this will be logged and
-      the method will return the previously cached value,
-      unless there is not yet a cached value
-      in which case the exception will be reraised.
-
-      If the signature function raises an exception
-      then a log message is issued and the signature is considered unchanged.
-
-      An example use of this decorator might be to keep a "live"
-      configuration data structure, parsed from a configuration
-      file which might be modified after the program starts. One
-      might provide a signature function which called `os.stat()` on
-      the file to check for changes before invoking a full read and
-      parse of the file.
-
-      *Note*: use of this decorator requires the `cs.pfx` module.
-  '''
-  from cs.pfx import Pfx  # pylint: disable=import-outside-toplevel
-  if poll_delay is not None and poll_delay <= 0:
-    raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
-  if poll_delay is not None and poll_delay <= 0:
-    raise ValueError(
-        "invalid poll_delay, should be >0, got: %r" % (poll_delay,)
-    )
-
-  attr = attr_name if attr_name else method.__name__
-  val_attr = '_' + attr
-  sig_attr = val_attr + '__signature'
-  rev_attr = val_attr + '__revision'
-  lastpoll_attr = val_attr + '__lastpoll'
-
-  # pylint: disable=too-many-branches
-  def cachedmethod_wrapper(self, *a, **kw):
-    with Pfx("%s.%s", self, attr):
-      now = None
-      value0 = getattr(self, val_attr, unset_value)
-      sig0 = getattr(self, sig_attr, None)
-      sig = getattr(self, sig_attr, None)
-      if value0 is unset_value:
-        # value unknown, needs compute
-        pass
-      # we have a cached value for return in the following logic
-      elif poll_delay is None:
-        # no repoll time, the cache is always good
-        return value0
-      # see if the value is stale
-      lastpoll = getattr(self, lastpoll_attr, None)
-      now = time.time()
-      if (poll_delay is not None and lastpoll is not None
-          and now - lastpoll < poll_delay):
-        # reuse cache
-        return value0
-      # never polled or the cached value is stale, poll now
-      # update the poll time
-      setattr(self, lastpoll_attr, now)
-      # check the signature if provided
-      # see if the signature is unchanged
-      if sig_func is not None:
-        try:
-          sig = sig_func(self)
-        except Exception as e:  # pylint: disable=broad-except
-          # signature function fails, use the cache
-          warning("sig func %s(self): %s", sig_func, e, exc_info=True)
-          return value0
-        if sig0 is not None and sig0 == sig:
-          # signature unchanged
-          return value0
-        # update signature
-        setattr(self, sig_attr, sig)
-      # compute the current value
-      try:
-        value = method(self, *a, **kw)
-      except Exception as e:  # pylint: disable=broad-except
-        # computation fails, return cached value
-        if value0 is unset_value:
-          # no cached value
-          raise
-        warning("exception calling %s(self): %s", method, e, exc_info=True)
-        return value0
-      # update the cache
-      setattr(self, val_attr, value)
-      # bump revision if the value changes
-      # noncomparable values are always presumed changed
-      changed = value0 is unset_value or value0 is not value
-      if not changed:
-        try:
-          changed = value0 != value
-        except TypeError:
-          changed = True
-      if changed:
-        setattr(self, rev_attr, (getattr(self, rev_attr, 0) or 0) + 1)
-      return value
-
-  ##  Doesn't work, has no access to self. :-(
-  ##  TODO: provide a .flush() function to clear the cached value
-  ##  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
-
-  return cachedmethod_wrapper
-
-@decorator
 def OBSOLETE(func, suggestion=None):
   ''' A decorator for obsolete functions or classes.
 
@@ -545,10 +407,18 @@ def OBSOLETE(func, suggestion=None):
   OBSOLETE_func_wrapper.__name__ = '@OBSOLETE(%s)' % (funcname,)
   return OBSOLETE_func_wrapper
 
-@OBSOLETE(suggestion='cachedmethod')
+@OBSOLETE(suggestion='cs.cache.cachedmethod')
 def cached(*a, **kw):
   ''' Former name for @cachedmethod.
   '''
+  from cs.cache import cachedmethod
+  return cachedmethod(*a, **kw)
+
+@OBSOLETE(suggestion='cs.cache.cachedmethod')
+def cachedmethod(*a, **kw):
+  ''' @cachedmethod is now in cs.cache.
+  '''
+  from cs.cache import cachedmethod
   return cachedmethod(*a, **kw)
 
 def contextual(func):
@@ -778,7 +648,9 @@ def default_params(func, _strict=False, **param_defaults):
   if not param_defaults:
     raise ValueError("@default_params(%s): no defaults?" % (func,))
 
-  def defaulted_func(*a, **kw):
+  def update_kw(kw):
+    ''' Update keyword parameters `kw` from the `param_defaults`.
+    '''
     for param_name, param_default in param_defaults.items():
       try:
         v = kw[param_name]
@@ -787,7 +659,17 @@ def default_params(func, _strict=False, **param_defaults):
       else:
         if v is None and not _strict:
           kw[param_name] = param_default()
-    return func(*a, **kw)
+
+  if isgeneratorfunction(func):
+
+    def defaulted_func(*a, **kw):
+      update_kw(kw)
+      yield from func(*a, **kw)
+  else:
+
+    def defaulted_func(*a, **kw):
+      update_kw(kw)
+      return func(*a, **kw)
 
   defaulted_func.__name__ = func.__name__
   # TODO: get the indent from some aspect of stripped_dedent
@@ -877,7 +759,10 @@ def uses_cmd_options(
     except ImportError:
       # missing cs.cmdutils or cs.context,
       # make an options with no attributes
-      options = object()
+      class Options:
+        '''Dummy options object for accruing attributes.'''
+
+      options = Options()
     else:
       options_class = BaseCommand.Options
       options = options_class.default() or options_class()
@@ -1060,7 +945,9 @@ def promote(func, params=None, types=None):
     warning("@promote(%s): no promotable parameters", func)
     return func
 
-  def promoting_func(*a, **kw):
+  def promote_args(a, kw):
+    ''' Promote the position and keyword arguments.
+    '''
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
     # we don't import cs.pfx (many dependencies!)
@@ -1119,7 +1006,19 @@ def promote(func, params=None, types=None):
       else:
         arg_value = promoted_value
       arg_mapping[param_name] = arg_value
-    return func(*bound_args.args, **bound_args.kwargs)
+    return bound_args.args, bound_args.kwargs
+
+  if isgeneratorfunction(func):
+
+    def promoting_func(*a, **kw):
+      a, kw = promote_args(a, kw)
+      yield from func(*a, **kw)
+
+  else:
+
+    def promoting_func(*a, **kw):
+      a, kw = promote_args(a, kw)
+      return func(*a, **kw)
 
   return promoting_func
 

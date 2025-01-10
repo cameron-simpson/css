@@ -24,7 +24,7 @@ from typing import Optional, Union
 from uuid import UUID
 from zipfile import ZipFile, ZIP_DEFLATED
 
-from cs.cmdutils import BaseCommand, qvprint
+from cs.cmdutils import BaseCommand, popopts, qvprint
 from cs.context import stackattrs
 from cs.deco import fmtdoc, uses_cmd_options
 from cs.fileutils import atomic_filename
@@ -123,9 +123,19 @@ class KoboTree(AbstractEbooksTree):
   @contextmanager
   def startup_shutdown(self):
     ''' Open/closethe obok library. '''
-    obok = self.import_obok(self.fspath)
+    try:
+      obok = self.import_obok(self.fspath)
+    except ModuleNotFoundError as e:
+      warning(
+          'cannot import the "obok" module from obok_package_path=%r: %s',
+          self.fspath, e
+      )
+      obok = None
     assert self.lib is None
-    with stackattrs(self, lib=obok.KoboLibrary(desktopkobodir=self.fspath)):
+    with stackattrs(
+        self,
+        lib=obok and obok.KoboLibrary(desktopkobodir=self.fspath),
+    ):
       try:
         yield
       finally:
@@ -134,7 +144,8 @@ class KoboTree(AbstractEbooksTree):
           del self.books
         except AttributeError:
           pass
-        self.lib.close()
+        if self.lib is not None:
+          self.lib.close()
 
   @cached_property
   def kobo_lib_books(self):
@@ -347,18 +358,17 @@ class KoboCommand(EBooksCommonBaseCommand):
           yield
 
   # pylint: disable=too-many-locals
+  @popopts(f=('force', 'Force: replace the EPUB format if already present.'))
   @uses_runstate
   def cmd_export(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [-f] [volumeids...]
           Export Kobo books to Calibre library.
-          -f    Force: replace the EPUB format if already present.
           volumeids
                 Optional Kobo volumeid identifiers to export.
                 The default is to export all books.
                 (TODO: just those with no "calibre.dbid" fstag.)
     '''
     options = self.options
-    options.popopts(argv, f='force')
     doit = options.doit
     force = options.force
     quiet = options.quiet

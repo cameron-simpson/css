@@ -131,7 +131,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20241005-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -1848,7 +1848,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       prefix: str,
       name: str,
       *,
-      state_func: Optional[Callable[str, Mapping[str, Any]]] = None,
+      state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ) -> "CachedValue":
     ''' Return `CachedValue` managing the  `prefix.name` tag.
     '''
@@ -2031,7 +2031,7 @@ class CachedValue:
       prefix: str,
       name: str,
       *,
-      state_func: Optional[Callable[str, Mapping[str, Any]]] = None,
+      state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ):
     ''' Initialise a cached value reference.
 

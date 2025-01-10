@@ -1,0 +1,2 @@
+BaseProgress.bar: default for report_print now comes from not BaseCommand.Options.quiet.
+BaseProgress.bar: always print the final report if report_print.

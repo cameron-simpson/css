@@ -1,0 +1,1 @@
+lib/python/cs/naysync.py: cs.naysync: fix up the @afunc docstring

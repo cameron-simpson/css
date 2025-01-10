@@ -1,0 +1,4 @@
+lib/python/cs/deco.py: cs.deco: @default_params, @promote: return regular function or generator depending on the nature of func
+lib/python/cs/deco.py: cs.deco: fix docstring typo
+lib/python/cs/deco.py: cs.deco: @cachedmethod moved to cs.cache
+lib/python/cs/deco.py: cs.deco: import imports

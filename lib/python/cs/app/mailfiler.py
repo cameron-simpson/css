@@ -53,9 +53,10 @@ from types import SimpleNamespace as NS
 from typing import Any, Optional
 
 from cs.app.maildb import MailDB
+from cs.cache import cachedmethod
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
-from cs.deco import cachedmethod, fmtdoc
+from cs.deco import fmtdoc
 import cs.env
 from cs.env import envsub
 from cs.excutils import LogExceptions

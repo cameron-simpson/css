@@ -1,24 +1,34 @@
 #!/usr/bin/env python3
 
 ''' My collection of things for working with Django.
+
+    Presently this provides:
+    * `BaseCommand`: a drop in replacement for `django.core.management.base.BaseCommand`
+      which uses a `cs.cmdutils.BaseCommand` style of implementation
+    * `model_batches_qs`: a generator yielding `QuerySet`s for batches of a `Model`
 '''
 
+from dataclasses import dataclass, field
 from inspect import isclass
+import os
 import sys
 from typing import Iterable, List
 
+from django.conf import settings
 from django.core.management.base import (
     BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
 from django.db.models.query import QuerySet
+from django.utils.functional import empty as djf_empty
 
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand as CSBaseCommand
+from cs.gimmicks import warning
 from cs.lex import cutprefix, stripped_dedent
 
-__version__ = '20241111-post'
+__version__ = '20250111-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -28,9 +38,16 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils',
+        'cs.gimmicks',
+        'cs.lex',
         'django',
+        'typeguard',
     ],
 }
+if (settings._wrapped is djf_empty
+    and not os.environ.get('DJANGO_SETTINGS_MODULE')):
+  warning("%s: calling settings.configure()", __name__)
+  settings.configure()
 
 class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
   ''' A subclass of `cs.cmdutils.SubCOmmand` with additional support
@@ -88,13 +105,17 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
       But from that point on the style is as for `cs.cmdutils.BaseCommand`:
       - no `aegparse` setup
       - direct support for subcommands as methods
-      - succinct option parsing, if you want command line options
+      - succinct option parsing, if you want additional command line options
+      - usage text in the subcommand method docstring
 
       A simple command looks like this:
 
           class Command(BaseCommand):
 
               def main(self, argv):
+                  """ Usage: {cmd} .......
+                        Do the main thing.
+                  """
                   ... do stuff based on the CLI args `argv` ...
 
       A command with subcommands looks like this:
@@ -102,9 +123,15 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
           class Command(BaseCommand):
 
               def cmd_this(self, argv):
+                  """ Usage: {cmd} ......
+                        Do this.
+                  """
                   ... do the "this" subcommand ...
 
               def cmd_that(self, argv):
+                  """ Usage: {cmd} ......
+                        Do that.
+                  """
                   ... do the "that" subcommand ...
 
       If want some kind of app/client specific "overcommand" composed
@@ -122,35 +149,44 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
       presupplied with a `.options` attribute which is an instance
       of `cs.cmdutils.BaseCommandOptions` (or some subclass).
 
-      Parsing options is simple:
+      Parsing options is light weight.
+      This example adds command line switches to the default switches:
+      - `-x`: a Boolean, setting `self.options.x`
+      - `--thing-limit` *n*: an `int`, setting `self.options.thing_limit=`*n*
+      - `--mode` *blah*: a string, setting `self.options.mode=`*blah*
+      The automatic usage text is suitably updated.
+
+      Code sketch:
+
+          from cs.cmdutils import popopts
 
           class Command(BaseCommand):
 
+              @popopts(
+                  x=None,
+                  thing_limit_=int,
+                  mode_='The run mode.',
+              )
               def cmd_this(self, argv):
+                  """ Usage: {cmd}
+                        Do this thing.
+                  """
                   options = self.options
-                  # parsing options:
-                  #
-                  # boolean -x option, makes options.x
-                  #
-                  # --thing-limit n option taking an int
-                  # makes options.thing_limit
-                  # help text is "Thing limit."
-                  #
-                  # a --mode foo option taking a string
-                  # makes options.mode
-                  # help text is "The run mode."
-                  options.popopts(
-                      argv,
-                      x=None,
-                      thing_limit_=int,
-                      mode_='The run mode.',
-                  )
                   ... now consult options.x or whatever
                   ... argv is now the remaining arguments after the options
   '''
 
   # use our Django specific subclass of CSBaseCommand.SubCommandClass
   SubCommandClass = DjangoSpecificSubCommand
+
+  @dataclass
+  class Options(CSBaseCommand.Options):
+    settings: type(settings) = field(
+        default_factory=lambda: dict(
+            (k, getattr(settings, k, None)) for k in sorted(dir(settings)) if k
+            and not k.startswith('_') and k not in ('SECRET_KEY',)
+        )
+    )
 
   @classmethod
   def run_from_argv(cls, argv):
@@ -210,7 +246,7 @@ def model_batches_qs(
       * `field_name`: default `'pk'`, the name of the field on which
         to order the batches
       * `chunk_size`: the maximum size of each chunk
-      * `desc`: default `False`; if true the order the batches in
+      * `desc`: default `False`; if true then order the batches in
         descending order instead of ascending order
 
       Example iteration of a `Model` would look like:

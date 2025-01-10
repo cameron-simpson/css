@@ -8,6 +8,7 @@ build
 discid
 enum34
 ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git@master
+html5lib
 icontract
 lmdb
 lxml
@@ -24,7 +25,7 @@ pycryptodome
 pyflakes
 pyicontract-lint
 pylint
-pylzma
+##pylzma - seems to be stale, what was I using this for? - cameron 30nov2024
 ##pyobjc[allbindings]  ## macos only
 pytest
 python-dateutil

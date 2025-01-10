@@ -38,6 +38,10 @@ from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashindex import merge
 from cs.lex import (
+    BaseToken,
+    CoreTokens,
+    Identifier,
+    QuotedString,
     cutsuffix,
     get_dotted_identifier,
     get_qstr,
@@ -53,10 +57,11 @@ from cs.tagset import Tag, TagSet
 
 RULE_MODES = 'move', 'tag'
 
-def slosh_quote(raw_s: str, q: str):
-  ''' Quote a string `raw_s` with quote character `q`.
+class RuleToken(BaseToken):
+  ''' The base class for `Rule` tokens.
   '''
-  return q + raw_s.replace('\\', '\\\\').replace(q, '\\' + q)
+
+  EXTRAS = (CoreTokens,)
 
 @decorator
 def pops_tokens(func):
@@ -65,7 +70,7 @@ def pops_tokens(func):
   '''
 
   @typechecked
-  def pops_token_wrapper(tokens: List["_Token"]):
+  def pops_token_wrapper(tokens: List[Union[RuleToken, CoreTokens]]):
     tokens0 = tokens[:]
     try:
       return func(tokens)
@@ -99,155 +104,7 @@ class RuleResult:
   failed: List[Exception] = field(default_factory=list)
 
 @dataclass
-class _Token(Promotable):
-  ''' Base class for tokens.
-  '''
-
-  source_text: str
-  offset: int
-  end_offset: int
-
-  def __str__(self):
-    return self.matched_text
-
-  @property
-  def matched_text(self):
-    ''' The text from `self.source_text` which matches this token.
-    '''
-    return self.source_text[self.offset:self.end_offset]
-
-  @classmethod
-  @pfx_method
-  def parse(cls, text: str, offset: int = 0) -> Tuple["_Token", int]:
-    ''' Parse a token from `test` at `offset` (default `0`).
-        Return a `_Token` subclass instance.
-        Raise `SyntaxError` if no subclass parses it.
-
-        This base class method attempts the `.parse` method of all
-        the public subclasses.
-    '''
-    token_classes = public_subclasses(cls)
-    if not token_classes:
-      raise RuntimeError("no public subclasses")
-    for subcls in token_classes:
-      try:
-        return subcls.parse(text, offset=offset)
-      except SyntaxError:
-        pass
-    raise SyntaxError(
-        'no subclass.parse succeeded,'
-        f'tried {",".join(subcls.__name__ for subcls in token_classes)}'
-    )
-
-  @classmethod
-  def pop(cls, text: str, offset: int = 0) -> "_Token":
-    ''' Pop a token from `text` at `offset` (default `0`).
-        This method skips any leading whitespace on `text` at `offset`.
-    '''
-    start_offset = skipwhite(text, offset)
-    return cls.parse(text, start_offset)
-
-  @classmethod
-  @pfx_method
-  @typechecked
-  def from_str(cls, text: str) -> "_Token":
-    ''' Parse `test` as a token of type `cls`, return the token.
-        Raises `SyntaxError` on a parse failure.
-        This is a wrapper for the `parse` class method.
-    '''
-    token = cls.parse(text)
-    if token.end_offset != len(text):
-      raise SyntaxError(
-          f'unparsed text at offset {token.end_offset}:'
-          f' {text[token.end_offset:]!r}'
-      )
-    return token
-
-@dataclass
-class Identifier(_Token):
-  ''' A dotted identifier.
-  '''
-
-  name: str
-
-  @classmethod
-  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    ''' Parse a dotted identifier from `test`.
-    '''
-    name, end_offset = get_dotted_identifier(text, offset)
-    if not name:
-      raise SyntaxError(
-          f'{offset}: expected dotted identifier, found {text[offset:offset+3]!r}...'
-      )
-    return cls(
-        source_text=text, offset=offset, end_offset=end_offset, name=name
-    )
-
-class _LiteralValue(_Token):
-  value: Any
-
-@dataclass
-class NumericValue(_LiteralValue):
-  ''' An `int` or `float` literal.
-  '''
-
-  value: Union[int, float]
-
-  # anything this matches should be a valid Python int/float
-  _token_re = re.compile(r'[-+]?\d+(\.\d*([eE]-?\d+)?)?')
-
-  def __str__(self):
-    return str(self.value)
-
-  @classmethod
-  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
-    ''' Parse a Python style `int` or `float`.
-    '''
-    start_offset = skipwhite(text, offset)
-    m = cls._token_re.match(text, start_offset)
-    if not m:
-      raise SyntaxError(
-          f'{start_offset}: expected int or float, found {text[start_offset:start_offset+16]!r}'
-      )
-    try:
-      value = int(m.group())
-    except ValueError:
-      value = float(m.group())
-    return cls(
-        source_text=text, offset=offset, end_offset=m.end(), value=value
-    )
-
-@dataclass
-class QuotedString(_LiteralValue):
-  ''' A double quoted string.
-  '''
-
-  value: str
-  quote: str = '"'
-
-  def __str__(self):
-    return slosh_quote(self.value, self.quote)
-
-  @classmethod
-  def parse(cls, text: str, offset: int = 0) -> "_Token":
-    ''' Parse a double quoted string from `text`.
-    '''
-    if not text.startswith('"', offset):
-      raise SyntaxError(
-          f'{offset}: expected ", found {text[offset:offset+1]!r}'
-      )
-    q = text[offset]
-    value, end_offset = get_qstr(text, offset)
-    return cls(
-        source_text=text,
-        offset=offset,
-        end_offset=end_offset,
-        value=value,
-        quote=q,
-    )
-
-@dataclass
-class TagAddRemove(_Token):
+class TagAddRemove(RuleToken):
   ''' An action to add or remove a `Tag`.
   '''
 
@@ -256,7 +113,7 @@ class TagAddRemove(_Token):
   add_remove: bool = True
 
   @classmethod
-  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "_Token", int]:
+  def parse(cls, text: str, offset: int = 0) -> Tuple[str, "RuleToken", int]:
     offset0 = offset
     # leading + or -
     if text.startswith('-', offset):
@@ -294,7 +151,7 @@ class TagAddRemove(_Token):
         add_remove=add_remove,
     )
 
-class _Comparison(_Token, ABC):
+class _Comparison(RuleToken, ABC):
   ''' Abstract base class for comparisons.
   '''
 
@@ -313,14 +170,14 @@ class EqualityComparison(_Comparison):
 
   @classmethod
   @typechecked
-  def parse(cls, text: str, offset: int = 0) -> "_Token":
+  def parse(cls, text: str, offset: int = 0) -> "RuleToken":
     ''' Match a string or numeric value in `text` at `offset`.
     '''
     if not text.startswith('==', offset):
       raise SyntaxError(
           f'{offset}: expected "==", found {text[offset:offset+2]!r}'
       )
-    qs = QuotedString.pop(text, offset + 2)
+    qs = QuotedString.parse(text, offset + 2, skip=True)
     return cls(
         source_text=text,
         offset=offset,
@@ -380,7 +237,7 @@ class RegexpComparison(_Comparison):
   REGEXP_DELIMS = '/:!|'
 
   @classmethod
-  def parse(cls, text: str, offset: int = 0) -> "_Token":
+  def parse(cls, text: str, offset: int = 0) -> "RuleToken":
     offset0 = offset
     if not text.startswith('~', offset):
       raise SyntaxError(
@@ -427,7 +284,7 @@ class _Action:
 
   @classmethod
   @typechecked
-  def parse(cls, tokens: List[_Token]):
+  def parse(cls, tokens: List[Union[RuleToken, CoreTokens]]):
     if not tokens:
       raise SyntaxError('tokens is empty')
     for subcls in public_subclasses(cls):
@@ -466,7 +323,7 @@ class MoveAction(_Action):
 
   @classmethod
   @typechecked
-  def parse(cls, tokens: List[_Token]) -> "MoveAction":
+  def parse(cls, tokens: List[Union[RuleToken, CoreTokens]]) -> "MoveAction":
     ''' Parse a `mv` action from a list of tokens.
     '''
     token0 = tokens.pop(0)
@@ -532,7 +389,7 @@ class TagAction(_Action):
 
   @classmethod
   @typechecked
-  def parse(cls, tokens: List[_Token]) -> "TagAction":
+  def parse(cls, tokens: List[Union[RuleToken, CoreTokens]]) -> "TagAction":
     ''' Parse a `tag` action from a list of tokens.
     '''
     token0 = tokens.pop(0)
@@ -751,10 +608,10 @@ class Rule(Promotable):
       return tags.get(attribute_name)
     return func()
 
-  # TODO: should be class method of _Token
+  # TODO: should be class method of RuleToken
   @classmethod
   @typechecked
-  def get_token(cls, rule_s: str, offset: int = 0) -> _Token:
+  def get_token(cls, rule_s: str, offset: int = 0) -> RuleToken:
     ''' Parse a token from `rule_s` at `offset`.
         This skips any leading whitespace.
         Raise `EOFError` at the end of the string or at a comment.
@@ -765,21 +622,15 @@ class Rule(Promotable):
       # end of string or comment -> end of tokens
       raise EOFError
     try:
-      return _Token.parse(rule_s, offset)
+      return RuleToken.parse(rule_s, offset)
     except SyntaxError as e:
       raise SyntaxError(f'no token recognised at: {rule_s[offset:]!r}') from e
 
   @classmethod
   def tokenise(cls, rule_s: str, offset: int = 0):
-    ''' Generator yielding `_Token`s.
+    ''' Generator yielding `RuleToken`s.
     '''
-    while True:
-      try:
-        token = cls.get_token(rule_s, offset)
-      except EOFError:
-        return
-      offset = token.end_offset
-      yield token
+    yield from RuleToken.scan(rule_s, offset)
 
   @classmethod
   def from_str(
@@ -845,14 +696,16 @@ class Rule(Promotable):
       f'action.modes not in RULE_MODES:f{RULE_MODES!r}'
   )
   @typechecked
-  def pop_action(tokens: List[_Token]) -> _Action:
+  def pop_action(tokens: List[Union[RuleToken, CoreTokens]]) -> _Action:
     ''' Pop an action from `tokens`.
     '''
     return _Action.parse(tokens)
 
   @staticmethod
   @pops_tokens
-  def pop_match_test(tokens: List[_Token]) -> Tuple[Callable, str]:
+  def pop_match_test(
+      tokens: List[Union[RuleToken, CoreTokens]]
+  ) -> Tuple[Callable, str]:
     ''' Pop a match-test from `tokens`.
     '''
     # [match-name] match-op
@@ -876,7 +729,7 @@ class Rule(Promotable):
     raise ValueError("invalid match-test")
 
   @staticmethod
-  def pop_quick(tokens: List[_Token]) -> bool:
+  def pop_quick(tokens: List[Union[RuleToken, CoreTokens]]) -> bool:
     ''' Check if the next token is `Identifier(name="quick")`.
         If so, pop it and return `True`, otherwise `False`.
     '''
@@ -911,7 +764,11 @@ class Rule(Promotable):
     rules = []
     for lineno, line in enumerate(lines, start_lineno):
       with Pfx(lineno):
-        R = cls.from_str(line.rstrip(), filename=filename, lineno=lineno)
+        line_ = line.rstrip()
+        _line_ = line_.lstrip()
+        if not _line_ or _line_.startswith('#'):
+          continue
+        R = cls.from_str(line_, filename=filename, lineno=lineno)
         if R is not None:
           rules.append(R)
     return rules

@@ -11,9 +11,10 @@ set -ue
 : "${WPLINKDIR:=$HOME/var/im/wp}"
 : "${WPPATH:=$WPDIR:$SSV_DIR}"
 
-nwp=128
+nwp=16
 spaces=.
-trace= ## set-x
+trace=
+[ -t 2 ] && trace=set-x
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-nwp] [-x] [--] [spaces] words...
@@ -30,7 +31,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -[1-9]*)
-        _nwp=$1; shift
+        _nwp=$1
         nwp=$( expr "x$_nwp" : 'x-\([1-9][0-9]*\)' ) || {
           echo "$cmd: -nwp \"$1\": invalid number" >&2
           badopts=1
@@ -46,6 +47,16 @@ do
   esac
   shift
 done
+
+if [ "$*" = RENEW ]
+then
+  lastvalue \
+  | sed -n 's/^wp_\([1-9][0-9]*\): *\(.*[^ ]\)/\1 \2/p' \
+  | while read -r space words
+    do  $trace "$0" "-$nwp" -- "$space" $words
+    done
+  exit 0
+fi
 
 if [ $# -gt 0 ]
 then
@@ -72,7 +83,7 @@ cd "$rd"
 (
   for wpsrcdir in $( echo "$WPPATH" | tr : ' ' )
   do
-    $trace find -L "$wpsrcdir"/* -type f \( -name \*.png -o -name \*.jpg \) || :
+    $trace find -L "$wpsrcdir"/ \( -name '.*' -prune \) -o -type f \( -name \*.png -o -name \*.jpg \) || :
   done \
   | $trace grepall -- "$@" \
   | shuffle \
@@ -89,4 +100,12 @@ cd "$rd"
   [ -t 1 ] && $trace ls "$rd/"
   [ $first ] && { echo "$cmd: nothing found" >&2; exit 1; }
   $trace spaces wp "$spaces" "$rd"
+  case "$spaces" in
+    .)  spaces=$( spaces current ) ;;
+    \*) spaces=$( spaces wp | sed -n 's/^Space //p' ) ;;
+    *)  spaces=$( echo "$spaces" | tr , ' ' ) ;;
+  esac
+  for space in $spaces
+  do  $trace lastvalue "wp_$space" "$*"
+  done
 }

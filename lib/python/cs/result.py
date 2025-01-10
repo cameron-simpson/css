@@ -58,7 +58,7 @@ import sys
 from threading import Lock, RLock, Thread
 from typing import Callable, Optional
 
-from cs.deco import OBSOLETE
+from cs.deco import OBSOLETE, decorator
 from cs.fsm import FSM, CancellationError
 from cs.gimmicks import exception, warning
 from cs.mappings import AttrableMapping
@@ -67,7 +67,7 @@ from cs.py.func import funcname, func_a_kw_fmt
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20240630-post'
+__version__ = '20250103-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -86,6 +86,20 @@ DISTINFO = {
         'cs.threads',
     ],
 }
+
+@decorator
+def not_cancelled(method):
+  ''' A decorator for methods to raise `CancellationError` if `self.cancelled`.
+  '''
+
+  def if_not_cancelled(self, *a, **kw):
+    if self.cancelled:
+      raise CancellationError(
+          f'{self}.cancelled, not calling {funcname(method)}'
+      )
+    return method(self, *a, **kw)
+
+  return if_not_cancelled
 
 # pylint: disable=too-many-instance-attributes
 class Result(FSM):

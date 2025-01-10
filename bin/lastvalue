@@ -1,35 +1,37 @@
 #!/bin/sh
 #
 # Stash or report the last value of some parameter.
-#	- Cameron Simpson <cs@cskk.id.au> 02dec2002
+# - Cameron Simpson <cs@cskk.id.au> 02dec2002
 #
 
-: ${LOGDIR:=$HOME/var/log}
+set -ue
+
+: "${LASTVALUEDIR:=${LOGDIR:=$HOME/var/log}/lastvalue}"
 
 ##echo "[$0 $*]" >&2
 
-dir=$LOGDIR/lastvalue
+dir=$LASTVALUEDIR
 append=1
 pop=
 
 cmd=$0
 usage="Usage: $cmd [-a] [-d dir] [param [value|-]]
-	-a	Append (push) the value.
-	-p	Pop the value.
-	-d	Directory holding value files."
+    -a  Append (push) the value.
+    -p  Pop the value.
+    -d  Directory holding value files."
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
-    -d)	dir=$2; shift ;;
-    -a)	append=1 ;;
-    +a)	append= ;;
-    -p)	pop=1 ;;
-    --)	shift; break ;;
+    -d) dir=$2; shift ;;
+    -a) append=1 ;;
+    +a) append= ;;
+    -p) pop=1 ;;
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" &>2; badopts=1 ;;
-    *)	break ;;
+    *)  break ;;
   esac
   shift
 done
@@ -51,7 +53,11 @@ case "$param" in
     badopts=1
     ;;
 esac
-[ $# -gt 1 ] && { echo "$cmd: $param=$value: extra arguments after value: $*" >&2; badopts=1; }
+
+[ $# -gt 1 ] && {
+  echo "$cmd: $param=$value: extra arguments after value: $*" >&2
+  badopts=1
+}
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
