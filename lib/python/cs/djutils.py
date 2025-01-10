@@ -5,12 +5,14 @@
 
 from inspect import isclass
 import sys
-from typing import List
+from typing import Iterable, List
 
 from django.core.management.base import (
     BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
+from django.db.models.query import QuerySet
+
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand as CSBaseCommand
@@ -189,3 +191,70 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
         continue
       opt_spec.add_argument(parser, options=options)
     parser.add_argument('argv', nargs='*')
+
+def model_batches_qs(
+    model,
+    field_name='pk',
+    *,
+    chunk_size=1024,
+    desc=False,
+) -> Iterable[QuerySet]:
+  ''' A generator yielding `QuerySet`s which produce nonoverlapping
+      batches of model instances.
+
+      Efficient behaviour requires the field to be indexed.
+      Correct behaviour requires the field values to be unique.
+
+      Parameters:
+      * `model`: the `Model` to query
+      * `field_name`: default `'pk'`, the name of the field on which
+        to order the batches
+      * `chunk_size`: the maximum size of each chunk
+      * `desc`: default `False`; if true the order the batches in
+        descending order instead of ascending order
+
+      Example iteration of a `Model` would look like:
+
+          from itertools import chain
+          from cs.djutils import model_batches_qs
+          for instance in chain.from_iterable(model_batches_qs(MyModel)):
+              ... work with instance ...
+
+      By returning `QuerySet`s it is possible to further alter each query:
+
+          from cs.djutils import model_batches_qs
+          for batch_qs in model_batches_qs(MyModel):
+              for result in batch_qs.filter(
+                  some_field__gt=10
+              ).select_related(.......):
+                  ... work with each result in the batch ...
+
+      or:
+
+          from itertools import chain
+          from cs.djutils import model_batches_qs
+          for result in chain.from_iterable(
+              batch_qs.filter(
+                  some_field__gt=10
+              ).select_related(.......)
+              for batch_qs in model_batches_qs(MyModel)
+          ):
+                  ... work with each result ...
+  '''
+  if chunk_size <= 0:
+    raise ValueError(f'{chunk_size=} must be > 0')
+  ordering = f'-{field_name}' if desc else field_name
+  after_condition = f'{field_name}__lt' if desc else f'{field_name}__gt'
+  mgr = model.objects
+  # initial batch
+  qs = mgr.all().order_by(ordering)[:chunk_size]
+  while True:
+    print("qs sql =", qs.query)
+    key_list = list(qs.values_list(field_name, flat=True))
+    if not key_list:
+      break
+    end_key = key_list[-1]
+    yield qs
+    qs = mgr.filter(**{
+        after_condition: end_key
+    }).order_by(ordering)[:chunk_size]
