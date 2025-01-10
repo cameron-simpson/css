@@ -149,12 +149,11 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
       presupplied with a `.options` attribute which is an instance
       of `cs.cmdutils.BaseCommandOptions` (or some subclass).
 
-      Parsing options is light weight.
+      Parsing options is light weight and automatically updates the usage text.
       This example adds command line switches to the default switches:
       - `-x`: a Boolean, setting `self.options.x`
       - `--thing-limit` *n*: an `int`, setting `self.options.thing_limit=`*n*
       - `--mode` *blah*: a string, setting `self.options.mode=`*blah*
-      The automatic usage text is suitably updated.
 
       Code sketch:
 
