@@ -1,3 +1,4 @@
+default: wpr RENEW, fast mode
 RunState.__enter__exit__: also set runstate.cancel to the asyncio event loop SIGINT handler?
 cs.binary: genberate .5 manpage entries from classes? maybe just those built from struct formats initially
 setvar: not expanding leading $MANPATH etc
