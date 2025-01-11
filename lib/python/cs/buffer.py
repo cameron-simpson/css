@@ -22,7 +22,7 @@ from threading import Lock, Thread
 from cs.deco import Promotable
 from cs.gimmicks import r
 
-__version__ = '20240630-post'
+__version__ = '20250111'
 
 DISTINFO = {
     'keywords': ["python3"],
