@@ -566,12 +566,16 @@ class ConvCache(HasFSPath):
           pfx_call(conv_func, srcpath, T.name)
     return dstpath
 
-_default_conv_cache = ConvCache()
+@cache
+def get_default_conv_cache():
+  ''' Return the default instance of `ConvCache`.
+  '''
+  return ConvCache()
 
 def convof(srcpath, conv_subpath, conv_func, *, ext=None, force=False):
   ''' `ConvCache.convof` using the default cache.
   '''
-  return _default_conv_cache.convof(
+  return get_default_conv_cache().convof(
       srcpath, conv_subpath, conv_func, ext=ext, force=force
   )
 
