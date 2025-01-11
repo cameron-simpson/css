@@ -39,7 +39,7 @@ from cs.seq import splitoff, unrepeated
 
 from icontract import require
 
-__version__ = '20250103-post'
+__version__ = '20250111'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
