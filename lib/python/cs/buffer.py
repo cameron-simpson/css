@@ -31,10 +31,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
+    'markers': [
+        'python_version>=3.3',  # for os.pread
+    ],
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
-        'python_version>=3.3',  # for os.pread
     ],
 }
 
