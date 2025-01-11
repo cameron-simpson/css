@@ -7,7 +7,7 @@ from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 import errno
-from functools import partial
+from functools import cache, partial
 from itertools import chain
 import os
 from os.path import (
