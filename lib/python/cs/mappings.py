@@ -24,7 +24,7 @@ import re
 from threading import RLock
 from uuid import UUID, uuid4
 
-from cs.deco import strable
+from cs.deco import OBSOLETE, strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
@@ -671,8 +671,11 @@ class FallbackDict(defaultdict):
       return self.__otherdict[key]
     raise KeyError(key)
 
+@OBSOLETE('collections.ChainMap')
 class MappingChain(object):
   ''' A mapping interface to a sequence of mappings.
+
+      OBSOLETE: use collections.ChainMap instead.
 
       It does not support `__setitem__` at present;
       that is expected to be managed via the backing mappings.
