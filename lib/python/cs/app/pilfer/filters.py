@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Filter functions and appings of names to such functions.
+''' Filter functions and mappings of names to such functions.
 '''
 
 import os
