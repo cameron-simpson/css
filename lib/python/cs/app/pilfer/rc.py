@@ -12,6 +12,9 @@ try:
 except ImportError:
   pass
 
+from typeguard import typechecked
+
+from cs.fs import shortpath
 from cs.logutils import (debug, warning, trace)
 from cs.pfx import Pfx
 from cs.threads import locked
