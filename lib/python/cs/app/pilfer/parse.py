@@ -11,10 +11,14 @@ except ImportError:
 from typeguard import typechecked
 
 from cs.lex import (
-    get_dotted_identifier, get_identifier, get_other_chars, get_qstr
+    get_decimal_or_float_value,
+    get_dotted_identifier,
+    get_identifier,
+    get_other_chars,
+    get_qstr,
 )
 from cs.logutils import (debug, error, exception)
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.pipeline import StageType
 from cs.urlutils import URL
 
@@ -613,6 +617,33 @@ def get_action_args(action, offset, delim=None):
         offset = offset1 + 1
       if ch1 == '"' or ch1 == "'":
         arg, offset = get_qstr(action, offset, q=ch1)
+      elif ch1.isdigit():
+        arg, offset = get_decimal_or_float_value(action, offset)
       else:
         arg, offset = get_other_chars(action, offset, other_chars)
+      if kw is None:
+        args.append(arg)
+      else:
+        kwargs[kw] = arg
   return args, kwargs, offset
+
+def get_name_and_args(text: str,
+                      offset: int = 0
+                      ) -> tuple[str, list | None, list | None, int]:
+  ''' Match a dotted identifier optionally followed by a colon
+          and position and keyword arguments.
+          Return `('',None,None,offset)` on no match.
+          Return `(name,args,kwargs,offset)` on a match.
+      '''
+  name, offset = get_dotted_identifier(text, offset)
+  if not name:
+    return name, None, None, offset
+  if text.startswith(':', offset):
+    offset += 1
+    args, kwargs, offset = trace(get_action_args, retval=True)(text, offset)
+    if offset < len(text):
+      raise ValueError(f'unparsed text after params: {text[offset:]!r}')
+  else:
+    args = []
+    kwargs = {}
+  return name, args, kwargs, offset
