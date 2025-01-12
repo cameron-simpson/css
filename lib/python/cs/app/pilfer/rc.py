@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 from configparser import ConfigParser
+from dataclasses import dataclass, field
 import os
 import os.path
 import shlex
 from threading import Lock
+from typing import Mapping, Optional
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -43,26 +45,31 @@ def load_pilferrcs(pathname):
       warning("neither a file nor a directory, ignoring")
   return rcs
 
+@dataclass
 class PilferRC:
+  ''' A `.piflerrc` file representation.
+  '''
 
-  def __init__(self, filename):
-    ''' Initialise the `PilferRC` instance.
-        Load values from `filename` if not `None`.
+  filename: Optional[str] = None
+  defaults: Mapping = field(default_factory=dict)
+  pipe_specs: Mapping[str, PipeLineSpec] = field(default_factory=dict)
+  action_map: Mapping = field(default_factory=dict)
+  seen_backing_paths: Mapping[str, str] = field(default_factory=dict)
+  _lock: Lock = field(default_factory=Lock)
+
+  def __post_init__(self):
+    ''' Load values from `filename` if not `None`.
     '''
-    self.filename = filename
-    self._lock = Lock()
-    self.defaults = {}
-    self.pipe_specs = {}
-    self.action_map = {}
-    self.seen_backing_paths = {}
-    if filename is not None:
-      self.loadrc(filename)
+    if self.filename is not None:
+      self.loadrc(self.filename)
 
   def __str__(self):
-    return type(self).__name__ + '(' + repr(self.filename) + ')'
+    path = "None" if self.filename is None else shortpath(self.filename)
+    return f'{self.__class__.__name__}({path})'
 
   @locked
-  def add_pipespec(self, spec, pipe_name=None):
+  @typechecked
+  def add_pipespec(self, spec: PipeLineSpec, pipe_name=None):
     ''' Add a `PipeLineSpec` to this `Pilfer`'s collection,
         optionally with a different `pipe_name`.
     '''
