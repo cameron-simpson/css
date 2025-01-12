@@ -165,7 +165,7 @@ class PipeLineSpec(Promotable):
       has_pilfer=False,
       fast=None,
   ):
-    ''' An asynchronous generator to make an `AsyncPipeLine` and run it with `input_items`.
+    r'''An asynchronous generator to make an `AsyncPipeLine` and run it with `input_items`.
         It yields `(result,Pilfer)` 2-tuples.
 
         Parameters:
