@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
+from collections import ChainMap
 from contextlib import contextmanager
+from functools import cached_property
 import os
 import os.path
 import sys
@@ -43,7 +45,7 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
       Decorator parameters:
       * `fast`: optional flag, passed to `@agen` when wrapping the function
       * `with_P`: optional flag, default `False`: if true, pass
-        `item,Pilfer` to thefunction instead of just `item`
+        `item,Pilfer` to the function instead of just `item`
       * `new_P`: optional glag, default `False`; if true then the
         function yields `result,Pilfer` 2-tuples instead of just `result`
   '''
@@ -150,8 +152,6 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
 
   @_.setter
   def _(self, value):
-    if value is not None and not isinstance(value, str):
-      raise TypeError(f'Pilfer._: expected string, received: {r(value)}')
     self.user_vars['_'] = value
 
   @property
@@ -326,17 +326,19 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
 
   @property
   def pipes(self):
-    return MappingChain(get_mappings=self._rc_pipespecs)
+    ''' A mapping of pipe specification names to pipe specifications.
+    '''
+    return ChainMap(*(rc.pipe_specs for rc in self.rcs))
 
-  def _rc_action_maps(self):
-    ##X("self.rcs = %r", self.rcs)
-    for rc in self.rcs:
-      yield rc.action_map
-    yield self.DEFAULT_ACTION_MAP
-
-  @property
+  @cached_property
   def action_map(self):
-    return MappingChain(get_mappings=self._rc_action_maps)
+    ''' A mapping of action names to stage function specifications.
+        Derived from `self.rcs`.
+    '''
+    return ChainMap(
+        *(rc.action_map for rc in self.rcs),
+        self.DEFAULT_ACTION_MAP,
+    )
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
