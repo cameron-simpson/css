@@ -497,7 +497,7 @@ class AsyncPipeLine:
 
         If `batchsize` is `StageMode.STREAM` then `stage_func`
         should be a synchronous or asynchronous generator function
-        which received `inq` as its sole parameter and yields
+        which receives `inq` as its sole parameter and yields
         results.
 
         If `batchsize` is an `int`, items from `inq` are collected
