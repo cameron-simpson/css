@@ -23,7 +23,7 @@ from cs.pfx import Pfx, pfx_call
 from cs.py.modules import import_module_name
 from cs.urlutils import URL
 
-from .parse import get_action_args
+from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 
 from cs.debug import trace
@@ -55,18 +55,10 @@ class Action(BaseToken):
     '''
     with Pfx("%s.from_str(%r)", cls.__name__, text):
       # dotted_name[:param=,...]
-      name, offset = get_dotted_identifier(text)
+      name, args, kwargs, offset = get_name_and_params(text)
       if name:
-        if text.startswith(':', offset):
-          offset += 1
-          args, kwargs, offset = trace(
-              get_action_args, retval=True
-          )(text, offset)
-          if offset < len(text):
-            raise ValueError(f'unparsed text after params: {text[offset:]!r}')
-        else:
-          args = []
-          kwargs = {}
+        if offset < len(text):
+          raise ValueError(f'unparsed text after params: {text[offset:]!r}')
         return ActionByName(
             pilfer=P,
             offset=0,
