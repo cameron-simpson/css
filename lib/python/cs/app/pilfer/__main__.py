@@ -24,7 +24,7 @@ from cs.lex import (cutprefix, cutsuffix, is_identifier)
 import cs.logutils
 from cs.logutils import (debug, error)
 import cs.pfx
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.resources import uses_runstate
 
 from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, Pilfer
@@ -217,15 +217,17 @@ class PilferCommand(BaseCommand):
 
   @popopts
   def cmd_mitm(self, argv):
-    ''' Usage: {cmd} [[address]:port]
+    ''' Usage: {cmd} [@[address]:port] hook:action...
           Run a mitmproxy for traffic filtering.
     '''
-    from .mitm import run_proxy, DEFAULT_LISTEN_HOST, DEFAULT_LISTEN_PORT
+    from .mitm import (
+        DEFAULT_LISTEN_HOST, DEFAULT_LISTEN_PORT, MITMAddon, run_proxy
+    )
     listen_host = DEFAULT_LISTEN_HOST
     listen_port = DEFAULT_LISTEN_PORT
-    if argv:
-      ip_port = argv.pop(0)
-      with Pfx("[address]:port %r", ip_port):
+    if argv and argv[0].startswith('@'):
+      ip_port = argv.pop(0)[1:]
+      with Pfx("@[address]:port %r", ip_port):
         try:
           host, port = ip_port.rsplit(':', 1)
           if host:
@@ -233,8 +235,16 @@ class PilferCommand(BaseCommand):
           listen_port = int(port)
         except ValueError as e:
           raise GetoptError(f'invalid [address]:port: {e}') from e
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    asyncio.run(run_proxy(listen_host, listen_port))
+    if not argv:
+      raise GetoptError('missing hooks')
+    mitm_addon = MITMAddon()
+    for hook in argv:
+      with Pfx("hook %r", hook):
+        try:
+          hook_name, action = hook.split(':', 1)
+        except ValueError:
+          raise GetoptError("missing colon")
+        pfx_call(mitm_addon.add_hook, hook_name, action)
+    asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
 
 sys.exit(main(sys.argv))
