@@ -103,7 +103,7 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
 
       and `manage.py` will find it and run it as normal.
       But from that point on the style is as for `cs.cmdutils.BaseCommand`:
-      - no `aegparse` setup
+      - no `argparse` setup
       - direct support for subcommands as methods
       - succinct option parsing, if you want additional command line options
       - usage text in the subcommand method docstring
@@ -285,7 +285,7 @@ def model_batches_qs(
   qs = mgr.all().order_by(ordering)[:chunk_size]
   while True:
     print("qs sql =", qs.query)
-    key_list = list(qs.values_list(field_name, flat=True))
+    key_list = list(qs.only(field_name).values_list(field_name, flat=True))
     if not key_list:
       break
     end_key = key_list[-1]
