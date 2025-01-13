@@ -74,7 +74,7 @@ class MITMHookAction(Promotable):
       raise ValueError(f'expected dotted identifier: {hook_spec!r}')
     if offset < len(hook_spec):
       raise ValueError(f'unparsed text after params: {hook_spec[offset:]!r}')
-    return trace(cls)(action=cls.HOOK_SPEC_MAP[name], args=args, kwargs=kwargs)
+    return cls(action=cls.HOOK_SPEC_MAP[name], args=args, kwargs=kwargs)
 
   def __call__(self, *a, **kw):
     return trace(self.action)(*self.args, *a, **self.kwargs, **kw)
@@ -99,7 +99,9 @@ class MITMAddon:
     '''
     prefix = f'{self.__class__.__name__}.{hook_name}'
     with Pfx(prefix):
-      if hook_name in ('addons', 'add_log', 'serverdisconnect'):
+      if hook_name in ('addons', 'add_log', 'clientconnect',
+                       'clientdisconnect', 'serverconnect',
+                       'serverdisconnect'):
         raise AttributeError(f'missing .{hook_name}')
       try:
         hook_actions = self.hook_map[hook_name]
@@ -119,7 +121,7 @@ class MITMAddon:
           except Exception as e:
             warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
             last_e = e
-        if last_e is None:
+        if last_e is not None:
           raise last_e
 
       return call_hooks
