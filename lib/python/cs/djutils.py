@@ -233,6 +233,8 @@ def model_batches_qs(
     *,
     chunk_size=1024,
     desc=False,
+    exclude=None,
+    filter=None,
 ) -> Iterable[QuerySet]:
   ''' A generator yielding `QuerySet`s which produce nonoverlapping
       batches of model instances.
@@ -247,6 +249,8 @@ def model_batches_qs(
       * `chunk_size`: the maximum size of each chunk
       * `desc`: default `False`; if true then order the batches in
         descending order instead of ascending order
+      * `exclude`: optional mapping of Django query terms to exclude by
+      * `filter`: optional mapping of Django query terms to filter by
 
       Example iteration of a `Model` would look like:
 
@@ -282,7 +286,12 @@ def model_batches_qs(
   after_condition = f'{field_name}__lt' if desc else f'{field_name}__gt'
   mgr = model.objects
   # initial batch
-  qs = mgr.all().order_by(ordering)[:chunk_size]
+  qs = mgr.all()
+  if exclude:
+    qs = qs.exclude(**exclude)
+  if filter:
+    qs = qs.filter(**filter)
+  qs = qs.order_by(ordering)[:chunk_size]
   while True:
     key_list = list(qs.only(field_name).values_list(field_name, flat=True))
     if not key_list:
