@@ -175,15 +175,15 @@ class URL(HasThreadState, Promotable):
 
   @property
   @unattributable
-  def content(self):
-    ''' The URL content as a string.
+  def content(self) -> bytes:
+    ''' The URL decoded content as a `bytes`..
     '''
     return self.GET_response.content
 
   @property
   @unattributable
-  def text(self):
-    ''' The URL content as a string.
+  def text(self) -> str:
+    ''' The URL decoded content as a string.
     '''
     return self.GET_response.text
 
@@ -286,35 +286,33 @@ class URL(HasThreadState, Promotable):
     '''
     return etree.XML(self.content.decode('utf-8', 'replace'))
 
-  @property
-  @unattributable
-  def parts(self):
-    ''' The URL parsed into parts by urlparse.urlparse.
+  @cached_property
+  def url_parsed(self):
+    ''' The URL parsed by `urlparse.urlparse`.
+        This is a `(scheme,netloc,path,params,query,fragment)` namedtuple.
     '''
-    if self._parts is None:
-      self._parts = urlparse(self.url_s)
-    return self._parts
+    return urlparse(self.url_s)
 
   @property
   @unattributable
   def scheme(self):
     ''' The URL scheme as returned by urlparse.urlparse.
     '''
-    return self.parts.scheme
+    return self.url_parsed.scheme
 
   @property
   @unattributable
   def netloc(self):
     ''' The URL netloc as returned by urlparse.urlparse.
     '''
-    return self.parts.netloc
+    return self.url_parsed.netloc
 
   @property
   @unattributable
   def path(self):
     ''' The URL path as returned by urlparse.urlparse.
     '''
-    return self.parts.path
+    return self.url_parsed.path
 
   @property
   @unattributable
@@ -328,49 +326,49 @@ class URL(HasThreadState, Promotable):
   def params(self):
     ''' The URL params as returned by urlparse.urlparse.
     '''
-    return self.parts.params
+    return self.url_parsed.params
 
   @property
   @unattributable
   def query(self):
     ''' The URL query as returned by urlparse.urlparse.
     '''
-    return self.parts.query
+    return self.url_parsed.query
 
   @property
   @unattributable
   def fragment(self):
     ''' The URL fragment as returned by urlparse.urlparse.
     '''
-    return self.parts.fragment
+    return self.url_parsed.fragment
 
   @property
   @unattributable
   def username(self):
     ''' The URL username as returned by urlparse.urlparse.
     '''
-    return self.parts.username
+    return self.url_parsed.username
 
   @property
   @unattributable
   def password(self):
     ''' The URL password as returned by urlparse.urlparse.
     '''
-    return self.parts.password
+    return self.url_parsed.password
 
   @property
   @unattributable
   def hostname(self):
     ''' The URL hostname as returned by urlparse.urlparse.
     '''
-    return self.parts.hostname
+    return self.url_parsed.hostname
 
   @property
   @unattributable
   def port(self):
     ''' The URL port as returned by urlparse.urlparse.
     '''
-    return self.parts.port
+    return self.url_parsed.port
 
   @property
   @unattributable
