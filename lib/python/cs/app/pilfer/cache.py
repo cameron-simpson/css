@@ -2,16 +2,20 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+import dbm.sqlite3
 import json
+import mimetypes
 import os
-from os.path import splitext
+from os.path import basename, join as joinpath, splitext
 import time
 
+from cs.context import stackattrs
 from cs.fs import HasFSPath, needdir, validate_rpath
 from cs.fileutils import atomic_filename
 from cs.hashutils import BaseHashCode
 from cs.logutils import warning
 from cs.resources import MultiOpenMixin
+from cs.urlutils import URL
 
 from typeguard import typechecked
 
@@ -68,31 +72,47 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   def __setitem__(self, key: str, metadata: dict):
     self.cache_map[self.dbmkey(key)] = json.dumps(metadata).encode('utf-8')
 
+  def cache_response(self, flow, sitemap: SiteMap):
+    ''' Cache the contents of `flow.response` if the request URL cache key is not `None`.
+    '''
+    rq = flow.request
+    url = rq.url
     cache_key = sitemap.url_cache_key(url)
     if cache_key is None:
       warning("no URL cache key for %r", url)
       return None
+    site_prefix = sitemap.name.replace("/", "__")
+    cache_key = f'{site_prefix}/{cache_key}' if cache_key else site_prefix
     validate_rpath(cache_key)
-    content = flow.response.content
+    rsp = flow.response
+    content = rsp.content
     assert isinstance(content, bytes)
     h = self.hashclass.from_data(content)
-    _, ext = splitext(url)
-    basedir = f'{self.cached_path}/{cache_key}'
-    needdir(basedir, use_makedirs=True)
-    mdpath = f'{basedir}/{h}--metadata.json'
-    contentpath = f'{basedir}/{h}--contents.{ext}'
+    U = URL(url)
+    urlbase, urlext = splitext(basename(U.path))
+    content_type = rsp.headers.get('content-type').split(';')[0].strip()
+    if content_type:
+      ctext = mimetypes.guess_extension(content_type) or ''
+    else:
+      warning("no request Content-Type")
+      ctext = ''
+    baserpath = cache_key
+    contentrpath = f'{baserpath}/{urlbase or "index"}--{h}{urlext or ctext}'
     md = {
         'url': url,
         'unixtime': time.time(),
-        'request_headers': dict(flow.request.headers),
-        'response_headers': dict(flow.response.headers),
+        'contentpath': contentrpath,
+        'request_headers': dict(rq.headers),
+        'response_headers': dict(rsp.headers),
     }
-    with atomic_filename(mdpath, mode='xt', encoding='utf-8') as f:
-      json.dump(md, f, indent=2)
-      f.flush()
-      with atomic_filename(contentpath, mode='xb') as cf:
-        cf.write(content)
-    os.system(f"ls -la '{basedir}'/")
+    basedir = joinpath(self.cached_path, baserpath)
+    contentpath = joinpath(self.cached_path, contentrpath)
+    # only make filesystem items if all the required compute succeeds
+    needdir(basedir, use_makedirs=True)
+    with atomic_filename(contentpath, mode='xb') as cf:
+      cf.write(content)
+    self[cache_key] = md
+    os.system(f'ls -ld {contentpath!r}')
 
 if __name__ == '__main__':
   sitemap = SiteMap()
