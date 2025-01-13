@@ -25,18 +25,34 @@ from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.upd import print
 
+from .cache import ContentCache
 from .parse import get_name_and_args
+from .sitemap import SiteMap
 
 from cs.debug import trace, X, r, s
 
 DEFAULT_LISTEN_HOST = '127.0.0.1'
 DEFAULT_LISTEN_PORT = 3131
 
+
+def cache_url(flow):
+  # TODO: map URL hostname to sitemap
+  from cs.urlutils import URL
+  sitemap = SiteMap('*')
+  sitemap.url_cache_key = trace(
+      lambda url:
+      (URL(url).netloc.rstrip('/') + '/' + URL(url).path).strip('/'),
+      retval=True,
+  )
+  cache = ContentCache(fspath='content')
+  with cache:
+    cache.cache_response(flow, sitemap)
 @dataclass
 class MITMHookAction(Promotable):
 
   HOOK_SPEC_MAP = {
       'print': print,
+      'cache': cache_url,
   }
 
   action: Callable
