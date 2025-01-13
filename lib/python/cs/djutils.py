@@ -286,18 +286,18 @@ def model_batches_qs(
   after_condition = f'{field_name}__lt' if desc else f'{field_name}__gt'
   mgr = model.objects
   # initial batch
-  qs = mgr.all()
+  qs0 = mgr.all()
   if exclude:
-    qs = qs.exclude(**exclude)
+    qs0 = qs0.exclude(**exclude)
   if filter:
-    qs = qs.filter(**filter)
-  qs = qs.order_by(ordering)[:chunk_size]
+    qs0 = qs0.filter(**filter)
+  qs = qs0.order_by(ordering)[:chunk_size]
   while True:
     key_list = list(qs.only(field_name).values_list(field_name, flat=True))
     if not key_list:
       break
     end_key = key_list[-1]
     yield qs
-    qs = mgr.filter(**{
+    qs = qs0.filter(**{
         after_condition: end_key
     }).order_by(ordering)[:chunk_size]
