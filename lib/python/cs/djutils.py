@@ -284,7 +284,6 @@ def model_batches_qs(
   # initial batch
   qs = mgr.all().order_by(ordering)[:chunk_size]
   while True:
-    print("qs sql =", qs.query)
     key_list = list(qs.only(field_name).values_list(field_name, flat=True))
     if not key_list:
       break
