@@ -33,7 +33,9 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   def startup_shutdown(self):
     needdir(self.fspath)
     needdir(self.cached_path)
-    yield
+    with dbm.sqlite3.open(self.dbmpath, 'c') as cache_map:
+      with stackattrs(self, cache_map=cache_map):
+        yield
 
   @property
   def cached_path(self):
@@ -47,8 +49,25 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     return self.pathto('cache_map.sqlite')
 
-  def cache_response(self, flow, sitemap):
-    url = flow.request.url
+  def dbmkey(self, key: str) -> bytes:
+    ''' The binary key for the string `key`; just the UTF-8 encoding.
+    '''
+    return key.encode('utf-8')
+
+  @typechecked
+  def __getitem__(self, key: str) -> dict:
+    return json.loads(self.cache_map[self.dbmkey(key)].decode('utf-8'))
+
+  def get(self, key: str, default=None):
+    try:
+      return self[key]
+    except KeyError:
+      return default
+
+  @typechecked
+  def __setitem__(self, key: str, metadata: dict):
+    self.cache_map[self.dbmkey(key)] = json.dumps(metadata).encode('utf-8')
+
     cache_key = sitemap.url_cache_key(url)
     if cache_key is None:
       warning("no URL cache key for %r", url)
