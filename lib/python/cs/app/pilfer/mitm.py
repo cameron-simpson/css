@@ -34,6 +34,9 @@ from cs.debug import trace, X, r, s
 DEFAULT_LISTEN_HOST = '127.0.0.1'
 DEFAULT_LISTEN_PORT = 3131
 
+def print_rq(flow):
+  rq = flow.request
+  print("RQ:", rq.host, rq.port, rq.url)
 
 def cache_url(flow):
   # TODO: map URL hostname to sitemap
@@ -47,12 +50,13 @@ def cache_url(flow):
   cache = ContentCache(fspath='content')
   with cache:
     cache.cache_response(flow, sitemap)
+
 @dataclass
 class MITMHookAction(Promotable):
 
   HOOK_SPEC_MAP = {
-      'print': print,
       'cache': cache_url,
+      'print': print_rq,
   }
 
   action: Callable
