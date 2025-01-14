@@ -1,3 +1,4 @@
+man pages in ronn format
 a vt package via pyoxidizer T v
 replace run_modes with @uses_verbose etc
 Dir and File objects to subclass importlib.resources.abc.Traversable
