@@ -1,3 +1,4 @@
+graphviz view of pipelines?
 pilfer mitm redirector mode for plugging in the adzapper
 mitm mode: feed Flow to pipes triggered on Addon.request (full request received) ?
 subcommand to dump HTML tags and classes to aid in writing scrapers and recipe decoders etc
