@@ -165,21 +165,15 @@ def O_str(o, no_recurse=False, seen=None):
   seen.remove(id(o))
   return s
 
-def copy(obj, *a, **kw):
+def copy(obj, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.
 
-       Performs a shallow copy of `self` using copy.copy.
+       Performs a shallow copy of `self` using `copy.copy`.
 
-       Treat all positional parameters as attribute names, and
-       replace those attributes with shallow copies of the original
-       attribute.
-
-       Treat all keyword arguments as (attribute,value) tuples and
+       Treat all keyword arguments as `(attribute,value)` 2-tuples and
        replace those attributes with the supplied values.
   '''
   obj2 = copy0(obj)
-  for attr in a:
-    setattr(obj2, attr, copy(getattr(obj, attr)))
   for attr, value in kw.items():
     setattr(obj2, attr, value)
   return obj2
