@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 
-from collections import ChainMap
+from collections import ChainMap, defaultdict
+from collections.abc import MutableMapping
+from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from functools import cached_property
+from itertools import chain
 import os
 import os.path
+import shlex
 import sys
 from threading import Lock, RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Iterable, Optional, Tuple
+from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
+
+import requests
 
 from cs.app.flag import PolledFlags
 from cs.deco import decorator, default_params, promote
@@ -17,10 +24,10 @@ from cs.excutils import logexc, LogExceptions
 from cs.later import Later, uses_later
 from cs.lex import r
 from cs.logutils import (debug, error, warning, exception, D)
-from cs.mappings import MappingChain, SeenSet
+from cs.mappings import mapped_property, SeenSet
 from cs.naysync import afunc, agen, async_iter, StageMode
 from cs.obj import copy as obj_copy
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
 from cs.queues import NullQueue
@@ -31,6 +38,7 @@ from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
 from .format import FormatMapping
+from .sitemap import SiteMap
 from .urls import hrefs, srcs
 
 from cs.debug import trace, X, r, s
