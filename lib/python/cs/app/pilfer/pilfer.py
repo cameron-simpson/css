@@ -327,7 +327,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
       spec = pipe_name
       pipe_name = str(spec)
     else:
-      spec = self.pipes.get(pipe_name)
+      spec = self.pipe_specs.get(pipe_name)
       if spec is None:
         raise ValueError(f'no pipe specification named {pipe_name!r}')
     if name is None:
@@ -340,16 +340,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
         raise ValueError('invalid pipe specification')
     return pipeline(self.later, pipe_funcs, name=name, inputs=inputs)
 
-  def _rc_pipespecs(self):
-    for rc in self.rcs:
-      yield rc.pipe_specs
-
   @property
-  def pipes(self):
-    ''' A mapping of pipe specification names to pipe specifications.
-    '''
-    return ChainMap(*(rc.pipe_specs for rc in self.rcs))
-
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
