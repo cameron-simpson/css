@@ -131,6 +131,7 @@ class Diversions:
     for task in self._tasks:
       await task
 
+@dataclass
 class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
 
@@ -139,6 +140,18 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
       * `user_agent`: specify user-agent string, default `None`.
       * `user_vars`: mapping of user variables for arbitrary use.
   '''
+
+  name: str = field(default_factory=lambda: f'Pilfer-{seq()}')
+  user_vars: Mapping[str, Any] = field(
+      default_factory=lambda: dict(_=None, save_dir='.')
+  )
+  flush_print: bool = False
+  do_trace: bool = False
+  flags: Mapping = field(default_factory=PolledFlags)
+  user_agent: str = 'Pilfer'
+  rcpaths: list[str] = field(default_factory=list)
+  url_opener: Any = field(default_factory=build_opener)
+  later: Later = field(default_factory=Later)
 
   perthread_state = ThreadState()
 
@@ -150,24 +163,12 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   }
 
   @uses_later
-  def __init__(self, item=None, later: Later = None):
-    self._name = 'Pilfer-%d' % (seq(),)
-    self.user_vars = {'_': item, 'save_dir': '.'}
-    self.flush_print = False
-    self.do_trace = False
-    self.flags = PolledFlags()
-    self._print_to = None
-    self._print_lock = Lock()
-    self.user_agent = None
+  def __post_init__(self, item=None, later: Later = None):
+    self.diversions = Diversions(specs=self.rc_map['pipes'], pilfer=self)
+    self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    self.url_opener.add_handler(HTTPCookieProcessor())
     ##self._lock = Lock()
     self._lock = RLock()
-    self.rcs = []  # chain of PilferRC libraries
-    self.seensets = {}
-    self.diversions_map = {}  # global mapping of names to divert: pipelines
-    self.opener = build_opener()
-    self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
-    self.opener.add_handler(HTTPCookieProcessor())
-    self.later = later
 
   def __str__(self):
     return "%s[%s]" % (self._name, self._)
