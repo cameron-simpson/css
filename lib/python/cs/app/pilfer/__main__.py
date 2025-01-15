@@ -27,7 +27,8 @@ import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.resources import uses_runstate
 
-from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, Pilfer
+from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION
+from .pilfer import Diversions, Pilfer
 from .pipelines import PipeLineSpec
 from .rc import PilferRC
 
@@ -181,7 +182,7 @@ class PilferCommand(BaseCommand):
     argv_offset = 0
     while argv and argv[argv_offset].endswith(':{'):
       spec, argv_offset = self.get_argv_pipespec(argv, argv_offset)
-      P['pipes'][spec.name] = spec
+      P.pipe_specs[spec.name] = spec
     # prepare the main pipeline specification from the remaining argv
     if not argv:
       raise GetoptError("missing main pipeline")
