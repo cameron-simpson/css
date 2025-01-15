@@ -132,8 +132,7 @@ class PilferCommand(BaseCommand):
     with super().run_context():
       later = Later(self.options.jobs)
       with later:
-        pilfer = Pilfer(later=later)
-        pilfer.rcs.extend(map(PilferRC, options.configpaths))
+        pilfer = Pilfer(later=later, rcpaths=options.configpaths)
         with pilfer:
           with stackattrs(
               self.options,
@@ -157,7 +156,7 @@ class PilferCommand(BaseCommand):
     '''
     start_arg = argv[argv_offset]
     pipe_name = cutsuffix(start_arg, ':{')
-    if pipe_name is start_arg:
+    if pipe_name is start_arg or not pipe_name:
       raise ValueError('expected "pipe_name:{", got: %r' % (start_arg,))
     with Pfx(start_arg):
       argv_offset += 1
@@ -178,17 +177,11 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing URL")
     url = argv.pop(0)
-    # prepare a blank PilferRC and supply as first in chain for this Pilfer
-    rc = PilferRC(None)
-    P.rcs.insert(0, rc)
     # Load any named pipeline definitions on the command line.
     argv_offset = 0
     while argv and argv[argv_offset].endswith(':{'):
       spec, argv_offset = self.get_argv_pipespec(argv, argv_offset)
-      try:
-        rc.add_pipespec(spec)
-      except KeyError as e:
-        raise GetoptError("add pipe: %s", e)
+      P['pipes'][spec.name] = spec
     # prepare the main pipeline specification from the remaining argv
     if not argv:
       raise GetoptError("missing main pipeline")
@@ -213,7 +206,13 @@ class PilferCommand(BaseCommand):
       async for result, _ in item_Ps:
         print(result)
 
-    asyncio.run(print_from(pipespec.run_pipeline(urls)))
+    async def run():
+      # consume everything from the main pipeline
+      await print_from(pipespec.run_pipeline(urls))
+      # close and join any running diversions
+      await P.diversions.join()
+
+    asyncio.run(run())
 
   @popopts
   def cmd_mitm(self, argv):
