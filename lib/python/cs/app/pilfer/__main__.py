@@ -28,9 +28,8 @@ from cs.pfx import Pfx, pfx_call
 from cs.resources import uses_runstate
 
 from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION
-from .pilfer import Diversions, Pilfer
+from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .rc import PilferRC
 
 def main(argv=None):
   ''' Pilfer command line function.
