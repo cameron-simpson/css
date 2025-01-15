@@ -16,7 +16,7 @@ class SiteMap:
   name: str
 
   @promote
-  def url_key(self, url: str | URL) -> str | None:
+  def url_key(self, url: URL) -> str | None:
     ''' Return a string which is a persistent cache key for the
         supplied `url` within the content of this sitemap, or `None`
         for URLs which shoul not be cached persistently.
