@@ -301,34 +301,6 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
     '''
     self.seensets[seenset].add(item)
 
-
-  @locked
-    '''
-    diversions = self.diversions_map
-    if pipe_name not in diversions:
-      spec = self.pipes.get(pipe_name)
-      if spec is None:
-        raise KeyError(
-            "no diversion named %r and no pipe specification found" %
-            (pipe_name,)
-        )
-      pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
-      if errors:
-        for err in errors:
-          error(err)
-        raise KeyError(
-            "invalid pipe specification for diversion named %r" % (pipe_name,)
-        )
-      name = "DIVERSION:%s" % (pipe_name,)
-      outQ = NullQueue(name=name, blocking=True)
-      outQ.open()  # open outQ so it can be closed at the end of the pipeline
-      div = pipeline(self.later, pipe_funcs, name=name, outQ=outQ)
-      div.open()  # will be closed in main program shutdown
-      diversions[pipe_name] = div
-    return diversions[pipe_name]
-    pipe_spec = self.pipes[pipe_name]
-    return pipe_spec.make_pipeline(P=self)
-
   @logexc
   def pipe_through(self, pipe_name, inputs):
     ''' Create a new pipeline from the specification named `pipe_name`.
