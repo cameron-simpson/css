@@ -655,6 +655,23 @@ class MethodicalList(AttributableList):
           submethods.append(submethod)
     return MethodicalList(method() for method in submethods)
 
+class missingdict(dict):
+  ''' A little like `collections.defaultdict` but the factory
+      function accepts the key of the missing item.
+  '''
+
+  def __init__(self, missing: Callable[[Any], Any]):
+    ''' Initialise the dict. `missing` is a callable accepting a
+        key and returning the corresponding key, which is also stored
+        in the dict.
+    '''
+    self.__missing = missing
+
+  def __missing__(self, key):
+    value = self.__missing[key]
+    self[key] = value
+    return value
+
 class FallbackDict(defaultdict):
   ''' A dictlike object that inherits from another dictlike object;
       this is a convenience subclass of `defaultdict`.
