@@ -189,7 +189,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   def defaults(self):
     ''' Mapping for default values formed by cascading PilferRCs.
     '''
-    return MappingChain(mappings=[rc.defaults for rc in self.rcs])
+    return self.rc_map[None]
 
   @property
   def _(self):
@@ -206,6 +206,70 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
     ''' `self._` as a `URL` object.
     '''
     return URL.promote(self._)
+
+  @cached_property
+  def rc_map(self) -> Mapping[str | None, Mapping[str, str]]:
+    ''' A `defaultdict` containing the merged sections from
+        `self.rcpaths`, assembled in reverse order so that later
+        rc files are overridden by earlier rc files.
+
+        The unnamed sections are merged into the entry with key `None`.
+    '''
+    mapping = defaultdict(lambda: defaultdict(str))
+    for rcpath in reversed(self.rcpaths):
+      print("Pilfer.rc_map:", rcpath)
+      cfg = ConfigParser(allow_unnamed_section=True)
+      try:
+        pfx_call(cfg.read, rcpath)
+      except (FileNotFoundError, PermissionError) as e:
+        warning("ConfigParser.read(%r): %s", rcpath, e)
+        continue
+      msection = mapping[None]
+      for field_name, value in cfg[UNNAMED_SECTION].items():
+        msection[field_name] = value
+      for section_name, section in cfg.items():
+        msection = mapping[section_name]
+        for field_name, value in section.items():
+          msection[field_name] = value
+    return mapping
+
+  @cached_property
+  def action_map(self) -> Mapping[str, list[str]]:
+    ''' The mapping of action names to action specifications.
+    '''
+    actions = dict(self.DEFAULT_ACTION_MAP)
+    for action_name, action_spec in self.rc_map['actions'].items():
+      with Pfx("[actions] %s = %s", action_name, action_spec):
+        actions[action_name] = pfx_call(shlex.split, action_spec)
+    return actions
+
+  @mapped_property
+  def pipe_specs(self, pipe_name):
+    ''' An on demand mapping of `pipe_name` to `PipeLineSpec`s
+        derived from `self.rc_map['pipes']`.
+    '''
+    pipe_spec = self.rc_map['pipes'][pipe_name]
+    return PipeLineSpec.from_str(pipe_spec)
+
+  @cached_property
+  def seen_backing_paths(self):
+    ''' The mapping of seenset names to the text files holding their contents.
+    '''
+    return self.rc_map['seen']
+
+  @mapped_property
+  def seensets(self, name):
+    ''' An on demand mapping of seen set `name` to a `SeenSet`
+        derived from `self.rc_map['seen']`.
+    '''
+    backing_path = self.rc_map['seen'].get(name)
+    if backing_path is not None:
+      backing_path = envsub(backing_path)
+      if (not isabspath(backing_path) and not backing_path.startswith(
+          ('./', '../'))):
+        backing_basedir = envsub(self.defaults.get('seen_dir', '.'))
+        backing_path = joinpath(backing_basedir, backing_path)
+    return SeenSet(name, backing_path)
 
   def test_flags(self):
     ''' Evaluate the flags conjunction.
@@ -225,93 +289,20 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
         all_status = False
     return all_status
 
-  @locked
-  def seenset(self, name):
-    ''' Return the SeenSet implementing the named "seen" set.
-    '''
-    seen = self.seensets
-    if name not in seen:
-      backing_path = MappingChain(
-          mappings=[rc.seen_backing_paths for rc in self.rcs]
-      ).get(name)
-      if backing_path is not None:
-        backing_path = envsub(backing_path)
-        if (not os.path.isabs(backing_path)
-            and not backing_path.startswith('./')
-            and not backing_path.startswith('../')):
-          backing_basedir = self.defaults.get('seen_dir')
-          if backing_basedir is not None:
-            backing_basedir = envsub(backing_basedir)
-            backing_path = os.path.join(backing_basedir, backing_path)
-      seen[name] = SeenSet(name, backing_path)
-    return seen[name]
-
-  def seen(self, url, seenset='_'):
-    ''' Test if the named `url` has been seen.
+  def seen(self, item, seenset='_'):
+    ''' Test if `item` has been seen.
         The default seenset is named `'_'`.
     '''
-    return url in self.seenset(seenset)
+    return item in self.seensets[seenset]
 
-  def see(self, url, seenset='_'):
-    ''' Mark a `url` as seen.
+  def see(self, item, seenset='_'):
+    ''' Mark an `item` as seen.
         The default seenset is named `'_'`.
     '''
-    self.seenset(seenset).add(url)
+    self.seensets[seenset].add(item)
 
-  @property
-  @locked
-  def diversions(self):
-    ''' The current list of named diversions.
-    '''
-    return list(self.diversions_map.values())
-
-  @property
-  @locked
-  def diversion_names(self):
-    ''' The current list of diversion names.
-    '''
-    return list(self.diversions_map.keys())
-
-  @property
-  @locked
-  @logexc
-  def open_diversion_names(self):
-    ''' The current list of open named diversions.
-    '''
-    names = []
-    for divname in self.diversion_names:
-      div = self.diversion(divname)
-      if not div.closed:
-        names.append(divname)
-    return names
-
-  @logexc
-  def quiesce_diversions(self):
-    D("%s.quiesce_diversions...", self)
-    while True:
-      D("%s.quiesce_diversions: LOOP: pass over diversions...", self)
-      for div in self.diversions:
-        D("%s.quiesce_diversions: check %s ...", self, div)
-        div.counter.check()
-        D("%s.quiesce_diversions: quiesce %s ...", self, div)
-        div.quiesce()
-      D("%s.quiesce_diversions: now check that they are all quiet...", self)
-      quiet = True
-      for div in self.diversions:
-        if div.counter:
-          D("%s.quiesce_diversions: NOT QUIET: %s", self, div)
-          quiet = False
-          break
-      if quiet:
-        D("%s.quiesce_diversions: all quiet!", self)
-        return
 
   @locked
-  def diversion(self, pipe_name):
-    ''' Return the diversion named `pipe_name`.
-        A diversion embodies a pipeline of the specified name.
-        There is only one of a given name in the shared state.
-        They are instantiated at need.
     '''
     diversions = self.diversions_map
     if pipe_name not in diversions:
@@ -335,6 +326,8 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
       div.open()  # will be closed in main program shutdown
       diversions[pipe_name] = div
     return diversions[pipe_name]
+    pipe_spec = self.pipes[pipe_name]
+    return pipe_spec.make_pipeline(P=self)
 
   @logexc
   def pipe_through(self, pipe_name, inputs):
@@ -377,15 +370,6 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
     '''
     return ChainMap(*(rc.pipe_specs for rc in self.rcs))
 
-  @cached_property
-  def action_map(self):
-    ''' A mapping of action names to stage function specifications.
-        Derived from `self.rcs`.
-    '''
-    return ChainMap(
-        *(rc.action_map for rc in self.rcs),
-        self.DEFAULT_ACTION_MAP,
-    )
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
