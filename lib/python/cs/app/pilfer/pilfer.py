@@ -85,6 +85,15 @@ async def unseen_sfunc(
       seen.add(item_sig)
       yield item, P
 
+@dataclass
+class PseudoFlow:
+  ''' A class resembling `mitmproxy`'s `http.Flow` class in basic ways
+      so that I can use it with the pilfer.cache.ContentCache` class.
+  '''
+
+  request: requests.Request = None
+  response: requests.Response = None
+
 class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
 
