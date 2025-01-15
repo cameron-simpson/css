@@ -55,7 +55,7 @@ class Action(BaseToken):
     '''
     with Pfx("%s.from_str(%r)", cls.__name__, text):
       # dotted_name[:param=,...]
-      name, args, kwargs, offset = get_name_and_params(text)
+      name, args, kwargs, offset = get_name_and_args(text)
       if name:
         if offset < len(text):
           raise ValueError(f'unparsed text after params: {text[offset:]!r}')
