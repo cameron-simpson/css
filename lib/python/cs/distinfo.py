@@ -859,6 +859,9 @@ class Module:
         urls=dinfo.pop('urls'),
         classifiers=dinfo.pop('classifiers'),
     )
+    python_version = dinfo.pop('requires_python', None)
+    if python_version is not None:
+      projspec['requires_python'] = python_version
     version = dinfo.pop('version', None)
     if version:
       projspec['version'] = version
