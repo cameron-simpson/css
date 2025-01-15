@@ -16,15 +16,17 @@
 
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
+from collections.abc import MutableMapping
 from contextlib import contextmanager
-from functools import partial
+from functools import cached_property, partial
 from inspect import isclass
 import json
 import re
 from threading import RLock
+from typing import Any, Callable
 from uuid import UUID, uuid4
 
-from cs.deco import OBSOLETE, strable
+from cs.deco import decorator, OBSOLETE, strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
@@ -1584,3 +1586,82 @@ StrKeyedDefaultDict = TypedKeyClass(
 UUIDKeyedDefaultDict = TypedKeyClass(
     UUID, defaultdict, name='UUIDKeyedDefaultDict'
 )
+
+@decorator
+def mapped_property(method, cached=True):
+  ''' A decorator for methods which present a mapping derived from `func`.
+
+      The optional decorator parameter `cached=True` causes computed
+      values to be cached if true.
+      If false then the mapping methods other than `__getitem__` and `get`
+      raise `NotImplementedError`.
+
+      Example:
+
+          class Piper:
+
+              def __init__(self, pipe_specs):
+                  self.pipe_specs = pipe_specs
+
+              def makepipe(self, pipe_spec):
+                  return a pipeline ...
+
+              @mapped_property
+              def pipes(self, pipe_name):
+                  return self.makepipe(pipe_name)
+
+          P = Piper({'pipe1': 'specification'})
+          pipe = P.pipes[pipe_name]
+
+  '''
+
+  class MappedProperty(MutableMapping):
+    ''' A mapping of keys to computed values.
+    '''
+
+    def __init__(self, myself):
+      self.myself = myself
+      self.cache = {} if cached else None
+
+    def __iter__(self):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      return iter(cache)
+
+    def __len__(self):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      return len(cache)
+
+    def __getitem__(self, key):
+      cache = self.cache
+      if cache is None:
+        return method(self, key)
+      try:
+        return cache[key]
+      except KeyError:
+        value = method(self, key)
+        cache[key] = value
+        return value
+
+    def __setitem__(self, key, value):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      cache[key] = value
+
+    def __delitem__(self, key):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      del cache[key]
+
+    def keys(self):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      return cache.keys()
+
+  return cached_property(lambda self: MappedProperty(self))
