@@ -94,6 +94,43 @@ class PseudoFlow:
   request: requests.Request = None
   response: requests.Response = None
 
+@dataclass(kw_only=True)
+class Diversions:
+  ''' A collection of diversion pipelines.
+  '''
+  specs: Mapping[str, str] = field(default_factory=dict)
+  pilfer: "Pilfer"
+
+  def __post_init__(self):
+    self._tasks = []
+
+  @mapped_property
+  def pipes(self, pipe_name):
+    pipeline = PipeLineSpec.from_str(self.specs[pipe_name]
+                                     ).make_pipeline(self.pilfer)
+
+    async def discard():
+      ''' Discard the output of the diversion pipeline.
+      '''
+      async for _ in pipeline.outq:
+        pass
+
+    self._tasks.append(asyncio.create_task(discard()))
+    return pipeline
+
+  def close(self):
+    ''' Close the input queues of the existing pipelines.
+    '''
+    for pipeline in self.pipes.values():
+      pipeline.close()
+
+  async def join(self):
+    ''' Close all the pipelines and wait for their discard atasks to complete.
+    '''
+    self.close()
+    for task in self._tasks:
+      await task
+
 class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
 
