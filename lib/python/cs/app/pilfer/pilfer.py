@@ -1,33 +1,44 @@
 #!/usr/bin/env python3
 
+import asyncio
 from collections import ChainMap, defaultdict
 from collections.abc import MutableMapping
 from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from functools import cached_property
 from itertools import chain
 import os
 import os.path
+from os.path import (
+    abspath,
+    exists as existspath,
+    expanduser,
+    isabs as isabspath,
+    join as joinpath,
+)
 import shlex
 import sys
 from threading import Lock, RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 
 import requests
 
 from cs.app.flag import PolledFlags
+from cs.cmdutils import vprint
 from cs.deco import decorator, default_params, promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
+from cs.fs import HasFSPath, needdir
 from cs.later import Later, uses_later
 from cs.lex import r
 from cs.logutils import (debug, error, warning, exception, D)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import afunc, agen, async_iter, StageMode
 from cs.obj import copy as obj_copy
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
 from cs.queues import NullQueue
@@ -37,11 +48,13 @@ from cs.threads import locked, HasThreadState, ThreadState
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
+from .cache import ContentCache
 from .format import FormatMapping
+from .parse import import_name
 from .sitemap import SiteMap
 from .urls import hrefs, srcs
 
-from cs.debug import trace, X, r, s
+from cs.debug import pprint, trace, X, r, s
 
 @decorator
 def one_to_many(func, fast=None, with_P=False, new_P=False):
@@ -130,8 +143,8 @@ class Diversions:
   def close(self):
     ''' Close the input queues of the existing pipelines.
     '''
-    for pipeline in self.pipes.values():
-      pipeline.close()
+    for pipe in self.pipes.values():
+      pipe.close()
 
   async def join(self):
     ''' Close all the pipelines and wait for their discard atasks to complete.
@@ -197,7 +210,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     self._lock = RLock()
 
   def __str__(self):
-    return "%s[%s]" % (self._name, self._)
+    return "%s[%s]" % (self.name, self._)
 
   __repr__ = __str__
 
@@ -274,6 +287,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     ''' An on demand mapping of `pipe_name` to `PipeLineSpec`s
         derived from `self.rc_map['pipes']`.
     '''
+    from .pipelines import PipeLineSpec
     pipe_spec = self.rc_map['pipes'][pipe_name]
     return PipeLineSpec.from_str(pipe_spec)
 
@@ -437,7 +451,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     with Pfx("save_url(%s)", U):
       save_dir = self.save_dir
       if saveas is None:
-        saveas = os.path.join(save_dir, U.basename)
+        saveas = joinpath(save_dir, U.basename)
         if saveas.endswith('/'):
           saveas += 'index.html'
       if saveas == '-':
@@ -447,8 +461,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           with os.fdopen(outfd, 'wb') as outfp:
             outfp.write(content)
       else:
+        # TODO: use atomic_filename
         with Pfx(saveas):
-          if not overwrite and os.path.exists(saveas):
+          if not overwrite and existspath(saveas):
             warning("file exists, not saving")
           else:
             content = U.content
