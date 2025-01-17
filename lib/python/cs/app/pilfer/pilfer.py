@@ -141,7 +141,7 @@ class Diversions:
       await task
 
 @dataclass
-class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
+class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
 
       Notable attributes include:
@@ -157,6 +157,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   flush_print: bool = False
   do_trace: bool = False
   flags: Mapping = field(default_factory=PolledFlags)
+  fspath: str = None
   user_agent: str = 'Pilfer'
   rcpaths: list[str] = field(default_factory=list)
   url_opener: Any = field(default_factory=build_opener)
@@ -170,12 +171,25 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
       'srcs': one_to_many(srcs),
       'unseen': (unseen_sfunc, StageMode.STREAM),
   }
+  content_cache: ContentCache = None
 
   @uses_later
   def __post_init__(self, item=None, later: Later = None):
     self.diversions = Diversions(specs=self.rc_map['pipes'], pilfer=self)
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     self.url_opener.add_handler(HTTPCookieProcessor())
+    if self.fspath is None:
+      self.fspath = abspath(
+          expanduser(
+              self.rc_map[None]['var'] or os.environ.get('PILFERDIR')
+              or '~/var/pilfer'
+          )
+      )
+      needdir(self.fspath) and vprint("made", self.shortpath)
+    if self.content_cache is None:
+      self.content_cache = ContentCache(
+          expanduser(self.rc_map[None]['cache'] or self.pathto('cache'))
+      )
     ##self._lock = Lock()
     self._lock = RLock()
 
