@@ -94,47 +94,84 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   def __setitem__(self, key: str, metadata: dict):
     self.cache_map[self.dbmkey(key)] = json.dumps(metadata).encode('utf-8')
 
-  def cache_response(self, flow, sitemap: SiteMap):
+  # TODO: if-modified-since mode of some kind
+  @promote
+  @require(lambda mode: mode in ('missing', 'modified', 'force'))
+  def cache_url(self, url: URL, sitemap: SiteMap, mode='missing'):
     ''' Cache the contents of `flow.response` if the request URL cache key is not `None`.
     '''
-    rq = flow.request
-    url = rq.url
-    cache_key = sitemap.url_key(url)
-    if cache_key is None:
+    url_key = sitemap.url_key(url)
+    if url_key is None:
       warning("no URL cache key for %r", url)
       return None
     site_prefix = sitemap.name.replace("/", "__")
-    cache_key = f'{site_prefix}/{cache_key}' if cache_key else site_prefix
+    cache_key = f'{site_prefix}/{url_key}' if url_key else site_prefix
     validate_rpath(cache_key)
-    rsp = flow.response
+    old_md = self.get(cache_key, {}, mode=mode)
+    if old_md:
+      # perform checks against the previous state
+      # since mode!="metadata", this implies the old content_rpath exists
+      if mode == 'missing':
+        return old_md
+      if mode == 'modified':
+        # check the etag if we have the old one
+        etag = old_md.get('response_headers', {}).get('etag', '').strip()
+        if etag:
+          head_rsp = URL.HEAD_response
+          if etag == head_rsp.headers.get('etag', '').strip():
+            return old_md
+    # fetch the current content
+    rsp = url.GET_response
     content = rsp.content
     assert isinstance(content, bytes)
     h = self.hashclass.from_data(content)
-    U = URL(url)
-    urlbase, urlext = splitext(basename(U.path))
+    # new content file path
+    urlbase, urlext = splitext(basename(url.path))
     content_type = rsp.headers.get('content-type').split(';')[0].strip()
     if content_type:
       ctext = mimetypes.guess_extension(content_type) or ''
     else:
       warning("no request Content-Type")
       ctext = ''
-    baserpath = cache_key
-    contentrpath = f'{baserpath}/{urlbase or "index"}--{h}{urlext or ctext}'
+    base_rpath = cache_key
+    content_rpath = f'{base_rpath}/{urlbase or "index"}--{h}{urlext or ctext}'
+    contentpath = self.cached_pathto(content_rpath)
+    # the new metadata
     md = {
-        'url': url,
+        'url': str(url),
         'unixtime': time.time(),
-        'contentpath': contentrpath,
-        'request_headers': dict(rq.headers),
+        'hash': str(h),
+        'content_rpath': content_rpath,
+        'request_headers': dict(rsp.request.headers),
         'response_headers': dict(rsp.headers),
     }
-    basedir = joinpath(self.cached_path, baserpath)
-    contentpath = joinpath(self.cached_path, contentrpath)
-    # only make filesystem items if all the required compute succeeds
-    needdir(basedir, use_makedirs=True)
-    with atomic_filename(contentpath, mode='xb') as cf:
-      cf.write(content)
+    if mode == 'modified':
+      hs = str(h)
+      old_hs = old_md.get('contenthash', '')
+      if hs == old_hs:
+        vprint("CACHE: same checksum", hs)
+        # update the metadata but do not replace the content file
+        self[cache_key] = md
+        return old_md
+    old_content_rpath = old_md.get('content_rpath', '')
+    if mode == 'force' or content_rpath != old_content_rpath:
+      # write the content file
+      basedir = joinpath(self.cached_path, base_rpath)
+      # only make filesystem items if all the required compute succeeds
+      needdir(
+          basedir, use_makedirs=True
+      ) and vprint("made", shortpath(basedir))
+      with trace(atomic_filename)(
+          contentpath,
+          mode='xb',
+          exists_ok=(content_rpath == old_content_rpath),
+      ) as cf:
+        cf.write(content)
     self[cache_key] = md
+    if old_content_rpath and old_content_rpath != content_rpath:
+      pfx_call(os.remove, self.cached_pathto(old_content_rpath))
     os.system(f'ls -ld {contentpath!r}')
+    return md
 
 if __name__ == '__main__':
   sitemap = SiteMap()
