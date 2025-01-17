@@ -59,7 +59,7 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
   '''
   ##func = trace(func)
   if with_P:
-    wrapper = agen(lambda item, P: func(item, P), fast=fast)
+    wrapper = agen(lambda item, P: func(item, P=P), fast=fast)
   else:
     wrapper = agen(lambda item, _: func(item), fast=fast)
 
