@@ -83,7 +83,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     rq = flow.request
     url = rq.url
-    cache_key = sitemap.url_cache_key(url)
+    cache_key = sitemap.url_key(url)
     if cache_key is None:
       warning("no URL cache key for %r", url)
       return None
@@ -122,7 +122,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
 
 if __name__ == '__main__':
   sitemap = SiteMap()
-  sitemap.url_cache_key = trace(
+  sitemap.url_key = trace(
       lambda self, url: url.replace('/', '_'),
       retval=True,
   )
