@@ -2,7 +2,7 @@
 
 import asyncio
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 import os
 import os.path
@@ -81,18 +81,18 @@ class PilferCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
-    configpath: str = ''
+    configpath: str = field(
+        default_factory=lambda: os.environ.get('PILFERRC') or
+        expanduser('~/.pilferrc')
+    )
     jobs: int = DEFAULT_JOBS
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
 
-    @cached_property
+    @property
     def configpaths(self):
       ''' A list of the config filesystem paths.
       '''
-      configpath = self.configpath
-      if not configpath:
-        configpath = os.environ.get('PILFERRC') or expanduser('~/.pilferrc')
-      return [fspath for fspath in configpath.split(':') if fspath]
+      return [fspath for fspath in self.configpath.split(':') if fspath]
 
     COMMON_OPT_SPECS = dict(
         **BaseCommand.Options.COMMON_OPT_SPECS,
