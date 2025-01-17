@@ -491,3 +491,22 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return P
 
 uses_pilfer = default_params(P=Pilfer.default)
+
+@promote
+@uses_pilfer
+def cache(url: URL, *, sitemap: SiteMap = None, P: Pilfer):
+  if sitemap is None:
+    sitemap = P.sitemap_for(url)
+    if sitemap is not None:
+      print("cache: sitemap", sitemap, "for", url)
+      url_key = sitemap.url_key(url)
+      if url_key is not None:
+        print("cache", sitemap, "->", url_key)
+        rsp = url.GET_response
+        flow = PseudoFlow(request=rsp.request, response=rsp)
+        trace(P.content_cache.cache_response)(flow, sitemap)
+      else:
+        print("cache", sitemap, "no key for", url)
+    else:
+      print("cache: no sitemap for", url)
+  yield url
