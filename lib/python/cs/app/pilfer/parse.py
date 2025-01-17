@@ -18,8 +18,9 @@ from cs.lex import (
     get_qstr,
 )
 from cs.logutils import (debug, error, exception)
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.pipeline import StageType
+from cs.py.modules import import_module_name
 from cs.urlutils import URL
 
 # regular expressions used when parsing actions
@@ -401,6 +402,7 @@ def parse_action(action, do_trace):
         if not isinstance(Ps, list):
           Ps = list(Ps)
         if Ps:
+          # TODO: use import_name()
           mfunc = pfx_call(
               Ps[0].import_module_func, grok_module, grok_funcname
           )
@@ -647,3 +649,19 @@ def get_name_and_args(text: str,
     args = []
     kwargs = {}
   return name, args, kwargs, offset
+
+@pfx
+def import_name(module_subname: str):
+  ''' Parse a reference to an object from a module, return the object.
+      Raise `ImportError` for a module which does not import.
+      Raise `NameError` for a name which does not resolve.
+
+      `module_subname` takes the form `*dotted_identifier:dotted_identifier`,
+      being the module name and the name within the modue respectively.
+  '''
+  module_name, sub_name = module_subname.split(':', 1)
+  name, *sub_names = sub_name.split('.')
+  obj = import_module_name(module_name, name)
+  for attr in sub_names:
+    obj = getattr(obj, attr)
+  return obj
