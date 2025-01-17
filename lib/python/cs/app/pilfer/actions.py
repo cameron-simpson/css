@@ -23,7 +23,7 @@ from cs.pfx import Pfx, pfx_call
 from cs.py.modules import import_module_name
 from cs.urlutils import URL
 
-from .parse import get_name_and_args
+from .parse import get_name_and_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 
 from cs.debug import trace
@@ -161,13 +161,7 @@ class ActionByName(Action):
     try:
       return P.action_map[self.name]
     except KeyError:
-      try:
-        module_name, func_name = self.name.rsplit('.', 1)
-      except ValueError:
-        # bare name with no dot
-        raise NameError(f'{self}: unknown name {self.name}')
-      func = import_module_name(module_name, func_name)
-      return func
+      return import_name(self.name)
 
 # TODO: this gathers it all, need to open pipe and stream, how?
 @dataclass(kw_only=True)
