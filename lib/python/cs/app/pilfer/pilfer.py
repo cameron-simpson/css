@@ -114,6 +114,7 @@ class Diversions:
 
   @mapped_property
   def pipes(self, pipe_name):
+    from .pipelines import PipeLineSpec
     pipeline = PipeLineSpec.from_str(self.specs[pipe_name]
                                      ).make_pipeline(self.pilfer)
 
