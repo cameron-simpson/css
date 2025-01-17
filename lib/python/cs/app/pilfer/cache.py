@@ -68,11 +68,21 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   def __getitem__(self, key: str) -> dict:
     return json.loads(self.cache_map[self.dbmkey(key)].decode('utf-8'))
 
-  def get(self, key: str, default=None):
+  def get(self, key: str, default=None, *, mode='metadata'):
+    ''' Get the metadata for for `key`, or `default` if it is missing or not valid.
+        If `mode=="metadata"` then it is enough for the metadata to be present
+        Otherwise the `contentrpath` must also resolve to a regular file.
+    '''
     try:
-      return self[key]
+      md = self[key]
     except KeyError:
       return default
+    if mode == 'metadata':
+      return md
+    content_rpath = md.get('content_rpath', '')
+    if not content_rpath or not isfilepath(self.cached_pathto(content_rpath)):
+      return default
+    return md
 
   @typechecked
   def __setitem__(self, key: str, metadata: dict):
