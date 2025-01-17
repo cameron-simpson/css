@@ -20,7 +20,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.later import Later
-from cs.lex import (cutprefix, cutsuffix, is_identifier)
+from cs.lex import (cutprefix, cutsuffix, is_identifier, tabulate)
 import cs.logutils
 from cs.logutils import (debug, error)
 import cs.pfx
@@ -245,5 +245,14 @@ class PilferCommand(BaseCommand):
           raise GetoptError("missing colon")
         pfx_call(mitm_addon.add_hook, hook_name, action)
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
+
+  def cmd_sitemaps(self, argv):
+    ''' Usage: {cmd}
+          List the site maps from the config.
+    '''
+    for line in tabulate(
+        *[[pattern, str(sitemap)]
+          for pattern, sitemap in self.options.pilfer.sitemaps]):
+      print(line)
 
 sys.exit(main(sys.argv))
