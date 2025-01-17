@@ -355,7 +355,33 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         raise ValueError('invalid pipe specification')
     return pipeline(self.later, pipe_funcs, name=name, inputs=inputs)
 
-  @property
+  @cached_property
+  @pfx_method
+  def sitemaps(self) -> List[Tuple[str, SiteMap]]:
+    ''' A list of `(pattern,SiteMap)` 2-tuples for matching URLs to `SiteMap`s.
+    '''
+    pprint(self.rc_map['sitemaps'])
+    map_list = []
+    for pattern, sitemap_spec in self.rc_map['sitemaps'].items():
+      with Pfx("%s = %s", pattern, sitemap_spec):
+        try:
+          map_name, map_spec = sitemap_spec.split(':', 1)
+        except ValueError:
+          warning("no colon in sitemap_spec %r", sitemap_spec)
+          continue
+        map_class = import_name(map_spec)
+        sitemap = map_class(name=map_name)
+        # TODO: compile glob style pattern to regexp?
+        map_list.append((pattern, sitemap))
+    return map_list
+
+  @promote
+  def sitemap_for(self, url: URL):
+    hostname = url.hostname
+    for pattern, sitemap in self.sitemaps:
+      if fnmatch(hostname, pattern):
+        return sitemap
+    return None
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
