@@ -6,14 +6,25 @@ import dbm.sqlite3
 import json
 import mimetypes
 import os
-from os.path import basename, join as joinpath, splitext
+from os.path import (
+    basename,
+    exists as existspath,
+    isfile as isfilepath,
+    join as joinpath,
+    splitext,
+)
 import time
 
+from icontract import require
+
+from cs.cmdutils import vprint
 from cs.context import stackattrs
-from cs.fs import HasFSPath, needdir, validate_rpath
+from cs.deco import promote
+from cs.fs import HasFSPath, needdir, shortpath, validate_rpath
 from cs.fileutils import atomic_filename
 from cs.hashutils import BaseHashCode
 from cs.logutils import warning
+from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin
 from cs.urlutils import URL
 
@@ -35,8 +46,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    needdir(self.fspath)
-    needdir(self.cached_path)
+    needdir(self.fspath) and vprint("made", self.shortpath)
+    needdir(self.cached_path) and vprint("made", shortpath(self.cached_path))
     with dbm.sqlite3.open(self.dbmpath, 'c') as cache_map:
       with stackattrs(self, cache_map=cache_map):
         yield
