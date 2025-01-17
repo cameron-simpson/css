@@ -520,9 +520,8 @@ def cache(url: URL, *, sitemap: SiteMap = None, P: Pilfer):
       url_key = sitemap.url_key(url)
       if url_key is not None:
         print("cache", sitemap, "->", url_key)
-        rsp = url.GET_response
-        flow = PseudoFlow(request=rsp.request, response=rsp)
-        trace(P.content_cache.cache_response)(flow, sitemap)
+        with P.content_cache:
+          P.content_cache.cache_url(url, sitemap)
       else:
         print("cache", sitemap, "no key for", url)
     else:
