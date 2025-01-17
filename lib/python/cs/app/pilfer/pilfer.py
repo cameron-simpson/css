@@ -150,6 +150,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       * `user_vars`: mapping of user variables for arbitrary use.
   '''
 
+  # class attribute holding the per-thread state stack
+  perthread_state = ThreadState()
+
   name: str = field(default_factory=lambda: f'Pilfer-{seq()}')
   user_vars: Mapping[str, Any] = field(
       default_factory=lambda: dict(_=None, save_dir='.')
@@ -162,15 +165,15 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   rcpaths: list[str] = field(default_factory=list)
   url_opener: Any = field(default_factory=build_opener)
   later: Later = field(default_factory=Later)
-
-  perthread_state = ThreadState()
-
-  DEFAULT_ACTION_MAP = {
-      'hrefs': one_to_many(hrefs),
-      'print': one_to_many(lambda item: (print(item), item)[-1:]),
-      'srcs': one_to_many(srcs),
-      'unseen': (unseen_sfunc, StageMode.STREAM),
-  }
+  base_actions: Mapping[str, Any] = field(
+      default_factory=lambda: dict(
+          cache=one_to_many(cache, with_P=True),
+          hrefs=one_to_many(hrefs),
+          print=one_to_many(lambda item: (print(item), item)[-1:]),
+          srcs=one_to_many(srcs),
+          unseen=(unseen_sfunc, StageMode.STREAM),
+      )
+  )
   content_cache: ContentCache = None
 
   @uses_later
@@ -260,7 +263,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   def action_map(self) -> Mapping[str, list[str]]:
     ''' The mapping of action names to action specifications.
     '''
-    actions = dict(self.DEFAULT_ACTION_MAP)
+    actions = dict(self.base_actions)
     for action_name, action_spec in self.rc_map['actions'].items():
       with Pfx("[actions] %s = %s", action_name, action_spec):
         actions[action_name] = pfx_call(shlex.split, action_spec)
