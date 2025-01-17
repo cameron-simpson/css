@@ -47,6 +47,12 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     return self.pathto('cached')
 
+  def cached_pathto(self, cache_rpath):
+    ''' Return the filesystem path of `cache_rpath` within the `self.cached_path`.
+    '''
+    validate_rpath(cache_rpath)
+    return joinpath(self.cached_path, cache_rpath)
+
   @property
   def dbmpath(self):
     ''' The filesystem path of the SQLite DBM file mapping URL cache keys to cache locations.
