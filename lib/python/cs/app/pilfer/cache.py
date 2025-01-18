@@ -14,6 +14,7 @@ from os.path import (
     splitext,
 )
 import time
+from typing import Optional
 
 from icontract import require
 
@@ -155,15 +156,25 @@ class ContentCache(HasFSPath, MultiOpenMixin):
             return old_md
     # fetch the current content
     rsp = url.GET_response
-    return self.cache_response(url, rsp, cache_key, old_md, mode=mode)
+    return self.cache_response(
+        url,
+        cache_key,
+        rsp.content,
+        rsp.request.headers,
+        rsp.headers,
+        old_md=old_md,
+        mode=mode,
+    )
 
   @promote
   @typechecked
   def cache_response(
       self,
       url: URL,
-      rsp,
       cache_key: str,
+      content: bytes,
+      rq_headers,
+      rsp_headers,
       *,
       old_md: Optional[dict] = None,
       mode: str = 'modified',
@@ -171,14 +182,18 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     ''' Cache the contents of the response `rsp` against `cache_key`.
         Return the resulting cache metadata for the response.
     '''
+    # we're saving the decoded content, strip this header
+    # (also, it makes mitmproxy unwantedly encode a cached response)
+    if 'content-encoding' in rsp_headers:
+      rsp_headers = dict(rsp_headers)
+      del rsp_headers['content-encoding']
     if old_md is None:
       old_md = self.get(cache_key, {}, mode=mode)
-    content = rsp.content
     assert isinstance(content, bytes)
     h = self.hashclass.from_data(content)
     # new content file path
     urlbase, urlext = splitext(basename(url.path))
-    content_type = rsp.headers.get('content-type').split(';')[0].strip()
+    content_type = rsp_headers.get('content-type').split(';')[0].strip()
     if content_type:
       ctext = mimetypes.guess_extension(content_type) or ''
     else:
@@ -193,8 +208,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         'unixtime': time.time(),
         'content_hash': str(h),
         'content_rpath': content_rpath,
-        'request_headers': dict(rsp.request.headers),
-        'response_headers': dict(rsp.headers),
+        'request_headers': dict(rq_headers),
+        'response_headers': dict(rsp_headers),
     }
     if mode == 'modified':
       hs = str(h)
