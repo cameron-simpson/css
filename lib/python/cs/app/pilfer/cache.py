@@ -106,6 +106,14 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       return default
     return md
 
+  def get_content(self, cache_key: str) -> bytes:
+    md = self[cache_key]
+    content_rpath = md.get('content_rpath', '')
+    if not content_rpath:
+      raise KeyError(f'{cache_key!r}: no content file, {md=}')
+    with pfx_call(open, self.cached_pathto(content_rpath), 'rb') as f:
+      return f.read()
+
   @typechecked
   def __setitem__(self, key: str, metadata: dict):
     self.cache_map[self.dbmkey(key)] = json.dumps(metadata).encode('utf-8')
