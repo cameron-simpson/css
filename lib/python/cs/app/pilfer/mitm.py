@@ -50,6 +50,9 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
   assert P is not None
   PR = lambda *a: print('CACHED_FLOW:', flow.request, *a)
   rq = flow.request
+  if rq.method not in ('GET', 'HEAD'):
+    PR("not GET or HEAD")
+    return
   url = URL(rq.url)
   sitemap = P.sitemap_for(url)
   if sitemap is None:
