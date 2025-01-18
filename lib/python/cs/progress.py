@@ -1021,7 +1021,7 @@ def progressbar(
 ):
   ''' Convenience function to construct and run a `Progress.iterbar`
       wrapping the iterable `it`,
-      issuing and withdrawning a progress bar during the iteration.
+      issuing and withdrawing a progress bar during the iteration.
 
       Parameters:
       * `it`: the iterable to consume
