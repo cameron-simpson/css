@@ -97,7 +97,7 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
       rsp_hdrs = md.get('response_headers', {})
       flow.response = http.Response.make(
           200,  # HTTP status code
-          content,
+          b'' if flow.request.method == 'HEAD' else content,
           rsp_hdrs,
       )
       flow.from_cache = True
