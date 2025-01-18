@@ -167,6 +167,28 @@ class PilferCommand(BaseCommand):
       argv_offset += 1
       return spec, argv_offset
 
+  @popopts(md=('show_md', 'Show metadata.'))
+  def cmd_cache(self, argv):
+    ''' Usage: {cmd} [cache-keys...]
+          List the URLs associated with the cache keys.
+    '''
+    options = self.options
+    show_md = options.show_md
+    cache = options.pilfer.content_cache
+    with cache:
+      cache_keys = argv or sorted(cache.keys())
+      if show_md:
+        for cache_key in cache_keys:
+          print(cache_key)
+          md = cache.get(cache_key, {})
+          for line in tabulate(*((f'  {mdk}', pformat(mdv))
+                                 for mdk, mdv in sorted(md.items()))):
+            print(line)
+      else:
+        for line in tabulate(*((cache_key, cache.get(cache_key, {}).get('url'))
+                               for cache_key in cache_keys)):
+          print(line)
+
   @popopts
   def cmd_from(self, argv):
     ''' Usage: {cmd} source [pipeline-defns..]
