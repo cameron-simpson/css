@@ -61,10 +61,16 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
   cache_key = cache.cache_key_for(sitemap, url_key)
   with cache:
     if flow.response:
-      # update the cache
-      trace(
-          cache.cache_response, retval=True
-      )(url, flow.response, cache_key, mode=mode)
+      if not getattr(flow, 'from_cache', False):
+        # response from upstream, update the cache
+        md = cache.cache_response(
+            url,
+            cache_key,
+            flow.response.content,
+            flow.request.headers,
+            flow.response.headers,
+            mode=mode,
+        )
     else:
       # probe the cache
       md = trace(cache.get, retval=True)(cache_key, {}, mode=mode)
@@ -77,10 +83,11 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
         warning("cached_flow: %s %s: %s", rq.method, rq.pretty_url, e)
         return
       # set the response, hopefully preempty the upstream fetch entirely
+      rsp_hdrs = md.get('response_headers', {})
       flow.response = http.Response.make(
           200,  # HTTP status code
           content,
-          md.get('response_headers', {}),
+          rsp_hdrs,
       )
 
 @dataclass
