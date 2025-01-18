@@ -118,6 +118,15 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   def __setitem__(self, key: str, metadata: dict):
     self.cache_map[self.dbmkey(key)] = json.dumps(metadata).encode('utf-8')
 
+  @staticmethod
+  def cache_key_for(sitemap: SiteMap, url_key: str):
+    ''' Compute the cache key from a `SiteMap` and a URL key.
+    '''
+    site_prefix = sitemap.name.replace("/", "__")
+    cache_key = f'{site_prefix}/{url_key}' if url_key else site_prefix
+    validate_rpath(cache_key)
+    return cache_key
+
   # TODO: if-modified-since mode of some kind
   @promote
   @require(lambda mode: mode in ('missing', 'modified', 'force'))
@@ -128,9 +137,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     if url_key is None:
       warning("no URL cache key for %r", url)
       return None
-    site_prefix = sitemap.name.replace("/", "__")
-    cache_key = f'{site_prefix}/{url_key}' if url_key else site_prefix
-    validate_rpath(cache_key)
+    cache_key = self.cache_key_for(sitemap, url_key)
     old_md = self.get(cache_key, {}, mode=mode)
     if old_md:
       # perform checks against the previous state
