@@ -3,11 +3,11 @@
 import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import cached_property
 import os
 import os.path
 from os.path import expanduser
 from getopt import GetoptError
+from pprint import pformat
 import sys
 from typing import Iterable
 try:
