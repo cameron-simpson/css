@@ -24,9 +24,11 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.upd import print
+from cs.urlutils import URL
 
 from .cache import ContentCache
 from .parse import get_name_and_args
+from .pilfer import Pilfer, uses_pilfer
 from .sitemap import SiteMap
 
 from cs.debug import trace, X, r, s
@@ -38,24 +40,54 @@ def print_rq(flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
 
-def cache_url(flow):
-  # TODO: map URL hostname to sitemap
-  from cs.urlutils import URL
-  sitemap = SiteMap('*')
-  sitemap.url_cache_key = trace(
-      lambda url:
-      (URL(url).netloc.rstrip('/') + '/' + URL(url).path).strip('/'),
-      retval=True,
-  )
-  cache = ContentCache(fspath='content')
+@trace
+@uses_pilfer
+def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
+  ''' Insert at `"requestheaders"` and `"response"` callbacks
+      to intercept a flow using the cache.
+      If there is no `flow.response`, consult the cache.
+      If there is a `flow.response`, update the cache.
+  '''
+  assert P is not None
+  rq = flow.request
+  url = URL(rq.url)
+  sitemap = P.sitemap_for(url)
+  if sitemap is None:
+    return
+  url_key = sitemap.url_key(url)
+  if url_key is None:
+    return
+  cache = P.content_cache
+  cache_key = cache.cache_key_for(sitemap, url_key)
   with cache:
-    cache.cache_response(flow, sitemap)
+    if flow.response:
+      # update the cache
+      trace(
+          cache.cache_response, retval=True
+      )(url, flow.response, cache_key, mode=mode)
+    else:
+      # probe the cache
+      md = trace(cache.get, retval=True)(cache_key, {}, mode=mode)
+      if not md:
+        # nothing cached
+        return
+      try:
+        content = cache.get_content(cache_key)
+      except KeyError as e:
+        warning("cached_flow: %s %s: %s", rq.method, rq.pretty_url, e)
+        return
+      # set the response, hopefully preempty the upstream fetch entirely
+      flow.response = http.Response.make(
+          200,  # HTTP status code
+          content,
+          md.get('response_headers', {}),
+      )
 
 @dataclass
 class MITMHookAction(Promotable):
 
   HOOK_SPEC_MAP = {
-      'cache': cache_url,
+      'cache': cached_flow,
       'print': print_rq,
   }
 
