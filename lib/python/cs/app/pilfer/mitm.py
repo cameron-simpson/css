@@ -88,16 +88,19 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
         # nothing cached
         PR("not cached, pass through")
         return
-      try:
-        content = cache.get_content(cache_key)
-      except KeyError as e:
-        warning("cached_flow: %s %s: %s", rq.method, rq.pretty_url, e)
-        return
-      # set the response, hopefully preempty the upstream fetch entirely
+      if flow.request.method == 'HEAD':
+        content = b''
+      else:
+        try:
+          content = cache.get_content(cache_key)
+        except KeyError as e:
+          warning("cached_flow: %s %s: %s", rq.method, rq.pretty_url, e)
+          return
+      # set the response, should preempt the upstream fetch
       rsp_hdrs = md.get('response_headers', {})
       flow.response = http.Response.make(
           200,  # HTTP status code
-          b'' if flow.request.method == 'HEAD' else content,
+          content,
           rsp_hdrs,
       )
       flow.from_cache = True
