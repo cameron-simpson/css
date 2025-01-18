@@ -184,8 +184,8 @@ class MITMAddon:
     """This method is called for every HTTP request."""
     print(f"Intercepted request to: {flow.request.url}")
 
-@typechecked
 @uses_runstate
+@typechecked
 async def run_proxy(
     listen_host=DEFAULT_LISTEN_HOST,
     listen_port=DEFAULT_LISTEN_PORT,
