@@ -2,12 +2,12 @@
 
 import asyncio
 from contextlib import contextmanager
-from dataclasses import dataclass
-from functools import cached_property
+from dataclasses import dataclass, field
 import os
 import os.path
 from os.path import expanduser
 from getopt import GetoptError
+from pprint import pformat
 import sys
 from typing import Iterable
 try:
@@ -17,19 +17,19 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.later import Later
-from cs.lex import (cutprefix, cutsuffix, is_identifier)
+from cs.lex import (cutprefix, cutsuffix, is_identifier, tabulate)
 import cs.logutils
 from cs.logutils import (debug, error)
 import cs.pfx
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.resources import uses_runstate
 
-from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, Pilfer
+from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION
+from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .rc import PilferRC
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -81,18 +81,18 @@ class PilferCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
-    configpath: str = ''
+    configpath: str = field(
+        default_factory=lambda: os.environ.get('PILFERRC') or
+        expanduser('~/.pilferrc')
+    )
     jobs: int = DEFAULT_JOBS
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
 
-    @cached_property
+    @property
     def configpaths(self):
       ''' A list of the config filesystem paths.
       '''
-      configpath = self.configpath
-      if not configpath:
-        configpath = os.environ.get('PILFERRC') or expanduser('~/.pilferrc')
-      return [fspath for fspath in configpath.split(':') if fspath]
+      return [fspath for fspath in self.configpath.split(':') if fspath]
 
     COMMON_OPT_SPECS = dict(
         **BaseCommand.Options.COMMON_OPT_SPECS,
@@ -132,8 +132,7 @@ class PilferCommand(BaseCommand):
     with super().run_context():
       later = Later(self.options.jobs)
       with later:
-        pilfer = Pilfer(later=later)
-        pilfer.rcs.extend(map(PilferRC, options.configpaths))
+        pilfer = Pilfer(later=later, rcpaths=options.configpaths)
         with pilfer:
           with stackattrs(
               self.options,
@@ -141,44 +140,6 @@ class PilferCommand(BaseCommand):
               pilfer=pilfer,
           ):
             yield
-
-  def cmd_from(self, argv):
-    ''' Usage: {cmd} source [pipeline-defns..]
-          Source may be a URL or "-" to read URLs from standard input.
-    '''
-    options = self.options
-    P = options.pilfer
-    if not argv:
-      raise GetoptError("missing URL")
-    url = argv.pop(0)
-    # prepare a blank PilferRC and supply as first in chain for this Pilfer
-    rc = PilferRC(None)
-    P.rcs.insert(0, rc)
-    # Load any named pipeline definitions on the command line.
-    argv_offset = 0
-    while argv and argv[argv_offset].endswith(':{'):
-      spec, argv_offset = self.get_argv_pipespec(argv, argv_offset)
-      try:
-        rc.add_pipespec(spec)
-      except KeyError as e:
-        raise GetoptError("add pipe: %s", e)
-    # prepare the main pipeline specification from the remaining argv
-    if not argv:
-      raise GetoptError("missing main pipeline")
-    pipespec = PipeLineSpec(name="CLI", stage_specs=argv)
-    # prepare an input containing URLs
-    if url == '-':
-      urls = (line.rstrip('\n') for line in sys.stdin)
-    else:
-      urls = [url]
-
-    async def print_from(item_Ps):
-      ''' Consume `(result,Pilfer)` 2-tuples from the pipeline and print the results.
-      '''
-      async for result, _ in item_Ps:
-        print(result)
-
-    asyncio.run(print_from(pipespec.run_pipeline(urls)))
 
   @staticmethod
   def get_argv_pipespec(argv, argv_offset=0):
@@ -195,7 +156,7 @@ class PilferCommand(BaseCommand):
     '''
     start_arg = argv[argv_offset]
     pipe_name = cutsuffix(start_arg, ':{')
-    if pipe_name is start_arg:
+    if pipe_name is start_arg or not pipe_name:
       raise ValueError('expected "pipe_name:{", got: %r' % (start_arg,))
     with Pfx(start_arg):
       argv_offset += 1
@@ -205,5 +166,116 @@ class PilferCommand(BaseCommand):
       spec = PipeLineSpec(pipe_name, argv[spec_offset:argv_offset])
       argv_offset += 1
       return spec, argv_offset
+
+  @popopts(md=('show_md', 'Show metadata.'))
+  def cmd_cache(self, argv):
+    ''' Usage: {cmd} [cache-keys...]
+          List the URLs associated with the cache keys.
+    '''
+    options = self.options
+    show_md = options.show_md
+    cache = options.pilfer.content_cache
+    with cache:
+      cache_keys = argv or sorted(cache.keys())
+      if show_md:
+        for cache_key in cache_keys:
+          print(cache_key)
+          md = cache.get(cache_key, {})
+          for line in tabulate(*((f'  {mdk}', pformat(mdv))
+                                 for mdk, mdv in sorted(md.items()))):
+            print(line)
+      else:
+        for line in tabulate(*((cache_key, cache.get(cache_key, {}).get('url'))
+                               for cache_key in cache_keys)):
+          print(line)
+
+  @popopts
+  def cmd_from(self, argv):
+    ''' Usage: {cmd} source [pipeline-defns..]
+          Source may be a URL or "-" to read URLs from standard input.
+    '''
+    options = self.options
+    P = options.pilfer
+    if not argv:
+      raise GetoptError("missing URL")
+    url = argv.pop(0)
+    # Load any named pipeline definitions on the command line.
+    argv_offset = 0
+    while argv and argv[argv_offset].endswith(':{'):
+      spec, argv_offset = self.get_argv_pipespec(argv, argv_offset)
+      P.pipe_specs[spec.name] = spec
+    # prepare the main pipeline specification from the remaining argv
+    if not argv:
+      raise GetoptError("missing main pipeline")
+    pipespec = PipeLineSpec(name="CLI", stage_specs=argv)
+    # prepare an input containing URLs
+    if url == '-':
+      urls = (line.rstrip('\n') for line in sys.stdin)
+    else:
+      urls = [url]
+
+    # sanity check the pipeline spec
+    try:
+      pipeline = pipespec.make_stage_funcs(P=P)
+    except ValueError as e:
+      raise GetoptError(
+          f'invalid pipeline spec {pipespec.stage_specs}: {e}'
+      ) from e
+
+    async def print_from(item_Ps):
+      ''' Consume `(result,Pilfer)` 2-tuples from the pipeline and print the results.
+      '''
+      async for result, _ in item_Ps:
+        print(result)
+
+    async def run():
+      # consume everything from the main pipeline
+      await print_from(pipespec.run_pipeline(urls))
+      # close and join any running diversions
+      await P.diversions.join()
+
+    asyncio.run(run())
+
+  @popopts
+  def cmd_mitm(self, argv):
+    ''' Usage: {cmd} [@[address]:port] hook:action...
+          Run a mitmproxy for traffic filtering.
+    '''
+    from .mitm import (
+        DEFAULT_LISTEN_HOST, DEFAULT_LISTEN_PORT, MITMAddon, run_proxy
+    )
+    listen_host = DEFAULT_LISTEN_HOST
+    listen_port = DEFAULT_LISTEN_PORT
+    if argv and argv[0].startswith('@'):
+      ip_port = argv.pop(0)[1:]
+      with Pfx("@[address]:port %r", ip_port):
+        try:
+          host, port = ip_port.rsplit(':', 1)
+          if host:
+            listen_host = host
+          listen_port = int(port)
+        except ValueError as e:
+          raise GetoptError(f'invalid [address]:port: {e}') from e
+    if not argv:
+      raise GetoptError('missing hooks')
+    mitm_addon = MITMAddon()
+    for hook in argv:
+      with Pfx("hook %r", hook):
+        try:
+          hook_names, action = hook.split(':', 1)
+        except ValueError:
+          raise GetoptError("missing colon")
+        for hook_name in hook_names.split(','):
+          pfx_call(mitm_addon.add_hook, hook_name, action)
+    asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
+
+  def cmd_sitemaps(self, argv):
+    ''' Usage: {cmd}
+          List the site maps from the config.
+    '''
+    for line in tabulate(
+        *[[pattern, str(sitemap)]
+          for pattern, sitemap in self.options.pilfer.sitemaps]):
+      print(line)
 
 sys.exit(main(sys.argv))

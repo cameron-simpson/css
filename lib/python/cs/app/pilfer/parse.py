@@ -11,11 +11,16 @@ except ImportError:
 from typeguard import typechecked
 
 from cs.lex import (
-    get_dotted_identifier, get_identifier, get_other_chars, get_qstr
+    get_decimal_or_float_value,
+    get_dotted_identifier,
+    get_identifier,
+    get_other_chars,
+    get_qstr,
 )
 from cs.logutils import (debug, error, exception)
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.pipeline import StageType
+from cs.py.modules import import_module_name
 from cs.urlutils import URL
 
 # regular expressions used when parsing actions
@@ -397,6 +402,7 @@ def parse_action(action, do_trace):
         if not isinstance(Ps, list):
           Ps = list(Ps)
         if Ps:
+          # TODO: use import_name()
           mfunc = pfx_call(
               Ps[0].import_module_func, grok_module, grok_funcname
           )
@@ -585,7 +591,7 @@ def parse_action(action, do_trace):
     func = func_args
   return sig, func
 
-def parse_action_args(action, offset, delim=None):
+def get_action_args(action, offset, delim=None):
   ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
      return `(args,kwargs,offset)`.
 
@@ -613,6 +619,49 @@ def parse_action_args(action, offset, delim=None):
         offset = offset1 + 1
       if ch1 == '"' or ch1 == "'":
         arg, offset = get_qstr(action, offset, q=ch1)
+      elif ch1.isdigit():
+        arg, offset = get_decimal_or_float_value(action, offset)
       else:
         arg, offset = get_other_chars(action, offset, other_chars)
+      if kw is None:
+        args.append(arg)
+      else:
+        kwargs[kw] = arg
   return args, kwargs, offset
+
+def get_name_and_args(text: str,
+                      offset: int = 0
+                      ) -> tuple[str, list | None, list | None, int]:
+  ''' Match a dotted identifier optionally followed by a colon
+          and position and keyword arguments.
+          Return `('',None,None,offset)` on no match.
+          Return `(name,args,kwargs,offset)` on a match.
+      '''
+  name, offset = get_dotted_identifier(text, offset)
+  if not name:
+    return name, None, None, offset
+  if text.startswith(':', offset):
+    offset += 1
+    args, kwargs, offset = get_action_args(text, offset)
+    if offset < len(text):
+      raise ValueError(f'unparsed text after params: {text[offset:]!r}')
+  else:
+    args = []
+    kwargs = {}
+  return name, args, kwargs, offset
+
+@pfx
+def import_name(module_subname: str):
+  ''' Parse a reference to an object from a module, return the object.
+      Raise `ImportError` for a module which does not import.
+      Raise `NameError` for a name which does not resolve.
+
+      `module_subname` takes the form `*dotted_identifier:dotted_identifier`,
+      being the module name and the name within the modue respectively.
+  '''
+  module_name, sub_name = module_subname.split(':', 1)
+  name, *sub_names = sub_name.split('.')
+  obj = import_module_name(module_name, name)
+  for attr in sub_names:
+    obj = getattr(obj, attr)
+  return obj

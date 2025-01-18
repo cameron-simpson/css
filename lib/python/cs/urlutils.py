@@ -4,6 +4,50 @@
 # - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
+from collections import namedtuple
+from contextlib import contextmanager
+from functools import cached_property
+from heapq import heappush, heappop
+import os
+import os.path
+import sys
+from typing import Iterable
+
+from netrc import netrc
+from string import whitespace
+from threading import RLock
+from urllib.request import (
+    HTTPError, URLError, HTTPPasswordMgrWithDefaultRealm
+)
+from urllib.parse import urlparse, urljoin as up_urljoin
+
+from bs4 import BeautifulSoup
+try:
+  try:
+    from lxml import etree
+  except ImportError:
+    import xml.etree.ElementTree as etree
+except ImportError:
+  try:
+    if sys.stderr.isatty():
+      print(
+          "%s: warning: cannot import lxml for use with bs4" % (__file__,),
+          file=sys.stderr
+      )
+  except AttributeError:
+    pass
+import requests
+from typeguard import typechecked
+
+from cs.deco import promote, Promotable
+from cs.excutils import unattributable
+from cs.lex import parseUC_sAttr, r
+from cs.logutils import debug, error, warning, exception
+from cs.pfx import Pfx
+from cs.rfc2616 import datetime_from_http_date
+from cs.seq import skip_map
+from cs.threads import locked, ThreadState, HasThreadState
+
 __version__ = '20231129-post'
 
 DISTINFO = {
@@ -26,55 +70,6 @@ DISTINFO = {
     ],
 }
 
-from collections import namedtuple
-from contextlib import contextmanager
-from heapq import heappush, heappop
-from itertools import chain
-import errno
-import os
-import os.path
-import sys
-import time
-from typing import Iterable
-
-from netrc import netrc
-import socket
-from string import whitespace
-from threading import RLock
-from urllib.request import Request, HTTPError, URLError, \
-            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
-            build_opener
-from urllib.parse import urlparse, urljoin as up_urljoin, quote as urlquote
-
-from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
-try:
-  try:
-    from lxml import etree
-  except ImportError:
-    import xml.etree.ElementTree as etree
-except ImportError:
-  try:
-    if sys.stderr.isatty():
-      print(
-          "%s: warning: cannot import lxml for use with bs4" % (__file__,),
-          file=sys.stderr
-      )
-  except AttributeError:
-    pass
-import requests
-from typeguard import typechecked
-
-from cs.cache import cachedmethod
-from cs.deco import promote, Promotable
-from cs.excutils import logexc, unattributable
-from cs.lex import parseUC_sAttr, r
-from cs.logutils import debug, error, warning, exception
-from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_iter
-from cs.rfc2616 import datetime_from_http_date
-from cs.seq import skip_map
-from cs.threads import locked, ThreadState, HasThreadState
-
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader
 ##def my_putheader(self, header, *values):
@@ -86,7 +81,7 @@ from cs.threads import locked, ThreadState, HasThreadState
 def urljoin(url, other_url):
   return up_urljoin(str(url), str(other_url))
 
-class URL(SingletonMixin, HasThreadState, Promotable):
+class URL(HasThreadState, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
@@ -98,17 +93,10 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       retry_delay=3,
   )
 
-  @classmethod
-  def _singleton_key(cls, url_s: str, referer=None):
-    return url_s
-
   @typechecked
   def __init__(self, url_s: str, referer=None):
     ''' Initialise the `URL` from the URL string `url_s`.
     '''
-    if hasattr(self, 'url_s'):
-      assert url_s == self.url_s
-      return
     self.url_s = url_s
     self._lock = RLock()
     self._parts = None
@@ -124,9 +112,9 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def flush(self):
     ''' Forget all cached content.
     '''
-    for val_attr in ['_' + attr for attr in 'GET HEAD parsed'.split()]:
+    for attr in 'GET_response', 'HEAD_response', 'parsed':
       try:
-        delattr(self, val_attr)
+        delattr(self, attr)
       except AttributeError:
         pass
 
@@ -160,27 +148,25 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       with self.context(session=session):
         yield session
 
+  @cached_property
   @locked
-  @cachedmethod
-  def GET(self):
-    ''' Return the `requests.Response` object from a `GET` of this URL.
-        This may be a cached response.
+  def GET_response(self):
+    ''' The `requests.Response` object from a `GET` of this URL.
     '''
     return requests.get(self.url_s)
 
+  @cached_property
   @locked
-  @cachedmethod
-  def HEAD(self):
-    ''' Return the `requests.Response` object from a `HEAD` of this URL.
-        This may be a cached response.
+  def HEAD_response(self):
+    ''' The `requests.Response` object from a `HEAD` of this URL.
     '''
-    return requests.get(self.url_s)
+    return requests.head(self.url_s)
 
   def exists(self) -> bool:
-    ''' Test if this URL exists.
+    ''' Test if this URL exists via a `HEAD` request.
     '''
     try:
-      self.HEAD()
+      self.HEAD_response
     except HTTPError as e:
       if e.code == 404:
         return False
@@ -189,17 +175,17 @@ class URL(SingletonMixin, HasThreadState, Promotable):
 
   @property
   @unattributable
-  def content(self):
-    ''' The URL content as a string.
+  def content(self) -> bytes:
+    ''' The URL decoded content as a `bytes`..
     '''
-    return self.GET().content
+    return self.GET_response.content
 
   @property
   @unattributable
-  def text(self):
-    ''' The URL content as a string.
+  def text(self) -> str:
+    ''' The URL decoded content as a string.
     '''
-    return self.GET().text
+    return self.GET_response.text
 
   @property
   @unattributable
@@ -207,7 +193,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def headers(self):
     ''' A `requests.Response` headers mapping.
     '''
-    r = self.HEAD()
+    r = self.HEAD_response
     return r.headers
 
   @property
@@ -234,7 +220,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
     '''
     if self._info is None:
-      self.HEAD()
+      self.HEAD_response
     value = self._info['Last-Modified']
     if value is not None:
       # parse HTTP-date into datetime object
@@ -244,12 +230,11 @@ class URL(SingletonMixin, HasThreadState, Promotable):
 
   @property
   @unattributable
-  @locked
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
     '''
     if self._content is None:
-      self.HEAD()
+      self.HEAD_response
     return self._info.getencoding()
 
   @property
@@ -263,10 +248,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       return ''
     return hostname.split('.', 1)[1]
 
-  @property
+  @cached_property
   @unattributable
-  @locked
-  @cachedmethod
   def parsed(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
@@ -296,43 +279,40 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     import feedparser
     return feedparser.parse(self.content)
 
-  @property
+  @cached_property
   @unattributable
-  @locked
   def xml(self):
     ''' An `ElementTree` of the URL content.
     '''
     return etree.XML(self.content.decode('utf-8', 'replace'))
 
-  @property
-  @unattributable
-  def parts(self):
-    ''' The URL parsed into parts by urlparse.urlparse.
+  @cached_property
+  def url_parsed(self):
+    ''' The URL parsed by `urlparse.urlparse`.
+        This is a `(scheme,netloc,path,params,query,fragment)` namedtuple.
     '''
-    if self._parts is None:
-      self._parts = urlparse(self.url_s)
-    return self._parts
+    return urlparse(self.url_s)
 
   @property
   @unattributable
   def scheme(self):
     ''' The URL scheme as returned by urlparse.urlparse.
     '''
-    return self.parts.scheme
+    return self.url_parsed.scheme
 
   @property
   @unattributable
   def netloc(self):
     ''' The URL netloc as returned by urlparse.urlparse.
     '''
-    return self.parts.netloc
+    return self.url_parsed.netloc
 
   @property
   @unattributable
   def path(self):
     ''' The URL path as returned by urlparse.urlparse.
     '''
-    return self.parts.path
+    return self.url_parsed.path
 
   @property
   @unattributable
@@ -346,49 +326,49 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def params(self):
     ''' The URL params as returned by urlparse.urlparse.
     '''
-    return self.parts.params
+    return self.url_parsed.params
 
   @property
   @unattributable
   def query(self):
     ''' The URL query as returned by urlparse.urlparse.
     '''
-    return self.parts.query
+    return self.url_parsed.query
 
   @property
   @unattributable
   def fragment(self):
     ''' The URL fragment as returned by urlparse.urlparse.
     '''
-    return self.parts.fragment
+    return self.url_parsed.fragment
 
   @property
   @unattributable
   def username(self):
     ''' The URL username as returned by urlparse.urlparse.
     '''
-    return self.parts.username
+    return self.url_parsed.username
 
   @property
   @unattributable
   def password(self):
     ''' The URL password as returned by urlparse.urlparse.
     '''
-    return self.parts.password
+    return self.url_parsed.password
 
   @property
   @unattributable
   def hostname(self):
     ''' The URL hostname as returned by urlparse.urlparse.
     '''
-    return self.parts.hostname
+    return self.url_parsed.hostname
 
   @property
   @unattributable
   def port(self):
     ''' The URL port as returned by urlparse.urlparse.
     '''
-    return self.parts.port
+    return self.url_parsed.port
 
   @property
   @unattributable

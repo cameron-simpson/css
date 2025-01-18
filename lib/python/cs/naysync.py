@@ -64,12 +64,14 @@ DISTINFO = {
 AnyIterable = Union[Iterable, AsyncIterable]
 
 @decorator
-def agen(genfunc):
+def agen(genfunc, *, fast=None):
   ''' A decorator for a synchronous generator which turns it into
       an asynchronous generator.
       If `genfunc` already an asynchronous generator it is returned unchanged.
       Exceptions in the synchronous generator are reraised in the asynchronous
       generator.
+
+      The optional parameter `fast` is passed through to `async_iter`.
 
       Example:
 
@@ -86,12 +88,12 @@ def agen(genfunc):
   if isasyncgenfunction(genfunc):
     return genfunc
 
-  def agen(*a, **kw):
+  def agenerator(*a, **kw):
     ''' Return an async iterator yielding items from `genfunc`.
     '''
-    return async_iter(genfunc(*a, **kw))
+    return async_iter(genfunc(*a, **kw), fast=fast)
 
-  return agen
+  return agenerator
 
 @decorator
 def afunc(func, fast=False):
@@ -117,12 +119,14 @@ def afunc(func, fast=False):
   '''
   if iscoroutinefunction(func):
     return func
+
   if fast:
 
     async def fast_func(*a, **kw):
       return func(*a, **kw)
 
     return fast_func
+
   return partial(to_thread, func)
 
 async def async_iter(it: AnyIterable, fast=None):
@@ -439,17 +443,13 @@ class AsyncPipeLine:
         are the same queue.
 
         Each stage specification is either:
-        - an stage function suitable for `run_stage`
+        - a stage function, implying a `batchsize` of `None`
         - a 2-tuple of `(stage_func,batchsize)`
-        In the latter case:
-        - `stage_func` is an stage function suitable for `run_stage`
-        - `batchsize` is an `int`, where `0` means to gather all the
-          items from `inq` and supply them as a single batch to
-          `stage_func` and where a value `>0` collects items up to a limit
-          of `batchsize` and supplies each batch to `stage_func`
-        If the `batchsize` is `0` the `stage_func` is called exactly
-        once with all the input items, even if there are no input
-        items.
+        The `stage_func` and `batchsize` are as for the `run_stage` method.
+        In particular the `batchsize` should be:
+        - `None`, for a `stage_func` accepting a single item
+        - an `int` >=0, for a `stage_func` accepting a list of items
+        - `StageMode.STREAM`, for a `stage_func` accepting an `AsyncIterableQueue`
     '''
     inq = IterableAsyncQueue(maxsize)
     inq0, outq = inq, inq
@@ -494,6 +494,11 @@ class AsyncPipeLine:
         If `batchsize` is `None`, the default, each input item is
         passed to `stage_func(item)`, which yields the results from the
         single item.
+
+        If `batchsize` is `StageMode.STREAM` then `stage_func`
+        should be a synchronous or asynchronous generator function
+        which receives `inq` as its sole parameter and yields
+        results.
 
         If `batchsize` is an `int`, items from `inq` are collected
         into batches up to a limit of `batchsize` (no limit if
