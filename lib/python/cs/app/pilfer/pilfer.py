@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
 import asyncio
-from collections import ChainMap, defaultdict
-from collections.abc import MutableMapping
+from collections import defaultdict
 from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
-from itertools import chain
 import os
 import os.path
 from os.path import (
@@ -20,7 +18,7 @@ from os.path import (
 )
 import shlex
 import sys
-from threading import Lock, RLock
+from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 
@@ -33,18 +31,16 @@ from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.fs import HasFSPath, needdir
 from cs.later import Later, uses_later
-from cs.lex import r
-from cs.logutils import (debug, error, warning, exception, D)
+from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
-from cs.naysync import afunc, agen, async_iter, StageMode
+from cs.naysync import agen, async_iter, StageMode
 from cs.obj import copy as obj_copy
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
-from cs.queues import NullQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
-from cs.threads import locked, HasThreadState, ThreadState
+from cs.threads import HasThreadState, ThreadState
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
@@ -53,8 +49,6 @@ from .format import FormatMapping
 from .parse import import_name
 from .sitemap import SiteMap
 from .urls import hrefs, srcs
-
-from cs.debug import pprint, trace, X, r, s
 
 @decorator
 def one_to_many(func, fast=None, with_P=False, new_P=False):
@@ -392,7 +386,6 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
             docs.mitmproxy.org = docs
             *.readthedocs.io = docs
     '''
-    pprint(self.rc_map['sitemaps'])
     named = {}
     map_list = []
     for pattern, sitemap_spec in self.rc_map['sitemaps'].items():
