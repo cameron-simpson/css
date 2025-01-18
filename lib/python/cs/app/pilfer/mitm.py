@@ -26,12 +26,8 @@ from cs.resources import RunState, uses_runstate
 from cs.upd import print
 from cs.urlutils import URL
 
-from .cache import ContentCache
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
-from .sitemap import SiteMap
-
-from cs.debug import trace, X, r, s
 
 DEFAULT_LISTEN_HOST = '127.0.0.1'
 DEFAULT_LISTEN_PORT = 3131
@@ -131,7 +127,7 @@ class MITMHookAction(Promotable):
     return cls(action=cls.HOOK_SPEC_MAP[name], args=args, kwargs=kwargs)
 
   def __call__(self, *a, **kw):
-    return trace(self.action)(*self.args, *a, **self.kwargs, **kw)
+    return self.action(*self.args, *a, **self.kwargs, **kw)
     return pfx_call(self.action, *self.args, *a, **self.kwargs, **kw)
 
 @dataclass
@@ -162,11 +158,8 @@ class MITMAddon:
       except KeyError as e:
         raise AttributeError(f'unknown hook name {hook_name=}') from e
 
-      print(prefix, '...')
-
       def call_hooks(*a, **kw):
         if not hook_actions:
-          print(f'{prefix}(*{a!r}, **{kw!r}')
           return
         last_e = None
         for i, hook_action in enumerate(hook_actions):
@@ -179,10 +172,6 @@ class MITMAddon:
           raise last_e
 
       return call_hooks
-
-  def request(self, flow: http.HTTPFlow):
-    """This method is called for every HTTP request."""
-    print(f"Intercepted request to: {flow.request.url}")
 
 @uses_runstate
 @typechecked
