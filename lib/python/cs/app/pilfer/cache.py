@@ -130,8 +130,10 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   # TODO: if-modified-since mode of some kind
   @promote
   @require(lambda mode: mode in ('missing', 'modified', 'force'))
-  def cache_url(self, url: URL, sitemap: SiteMap, mode='missing'):
+  @typechecked
+  def cache_url(self, url: URL, sitemap: SiteMap, mode='missing') -> dict:
     ''' Cache the contents of `flow.response` if the request URL cache key is not `None`.
+        Return the resulting cache metadata for the URL.
     '''
     url_key = sitemap.url_key(url)
     if url_key is None:
@@ -153,6 +155,24 @@ class ContentCache(HasFSPath, MultiOpenMixin):
             return old_md
     # fetch the current content
     rsp = url.GET_response
+    return self.cache_response(url, rsp, cache_key, old_md, mode=mode)
+
+  @promote
+  @typechecked
+  def cache_response(
+      self,
+      url: URL,
+      rsp,
+      cache_key: str,
+      *,
+      old_md: Optional[dict] = None,
+      mode: str = 'modified',
+  ) -> dict:
+    ''' Cache the contents of the response `rsp` against `cache_key`.
+        Return the resulting cache metadata for the response.
+    '''
+    if old_md is None:
+      old_md = self.get(cache_key, {}, mode=mode)
     content = rsp.content
     assert isinstance(content, bytes)
     h = self.hashclass.from_data(content)
@@ -171,14 +191,14 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     md = {
         'url': str(url),
         'unixtime': time.time(),
-        'hash': str(h),
+        'content_hash': str(h),
         'content_rpath': content_rpath,
         'request_headers': dict(rsp.request.headers),
         'response_headers': dict(rsp.headers),
     }
     if mode == 'modified':
       hs = str(h)
-      old_hs = old_md.get('contenthash', '')
+      old_hs = old_md.get('content_hash', '')
       if hs == old_hs:
         vprint("CACHE: same checksum", hs)
         # update the metadata but do not replace the content file
