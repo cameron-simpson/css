@@ -22,6 +22,8 @@ from cs.py.func import funcname
 from cs.resources import uses_runstate
 from cs.urlutils import URL
 
+from .pilfer import Pilfer
+
 def notNone(v, name="value"):
   ''' Test whether `v` is `None`, raise a `ValueError` if so, return `True` if not.
   '''
