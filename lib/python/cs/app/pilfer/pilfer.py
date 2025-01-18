@@ -74,8 +74,8 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
     item, P = item_P
     async for result in wrapper(item, P):
       if new_P:
-        result, result_P = result
-        yield result, result_P
+        result_item, result_P = result
+        yield result_item, result_P
       else:
         yield result, P
 
