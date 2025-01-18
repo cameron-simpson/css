@@ -94,7 +94,7 @@ class PipeLineSpec(Promotable):
           # sanity check the subpipeline
           try:
             testsubpipe = subpipelinespec.make_stage_funcs(P=P)
-          except ValueError as e:
+          except ValueError:
             ##warning("invalid subpipeline %r: %s", subpipelinespec, e)
             raise
 
