@@ -516,14 +516,14 @@ def cache(url: URL, *, sitemap: SiteMap = None, P: Pilfer):
   if sitemap is None:
     sitemap = P.sitemap_for(url)
     if sitemap is not None:
-      print("cache: sitemap", sitemap, "for", url)
+      vprint("cache: sitemap", sitemap, "for", url)
       url_key = sitemap.url_key(url)
       if url_key is not None:
-        print("cache", sitemap, "->", url_key)
+        vprint("cache", sitemap, "->", url_key)
         with P.content_cache:
           P.content_cache.cache_url(url, sitemap)
       else:
-        print("cache", sitemap, "no key for", url)
+        vprint("cache", sitemap, "no key for", url)
     else:
-      print("cache: no sitemap for", url)
+      vprint("cache: no sitemap for", url)
   yield url
