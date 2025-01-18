@@ -48,13 +48,16 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
       If there is a `flow.response`, update the cache.
   '''
   assert P is not None
+  PR = lambda *a: print('CACHED_FLOW:', flow.request, *a)
   rq = flow.request
   url = URL(rq.url)
   sitemap = P.sitemap_for(url)
   if sitemap is None:
+    PR("no site map")
     return
   url_key = sitemap.url_key(url)
   if url_key is None:
+    PR("no URL key")
     return
   cache = P.content_cache
   cache_key = cache.cache_key_for(sitemap, url_key)
@@ -62,6 +65,7 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
     if flow.response:
       if not getattr(flow, 'from_cache', False):
         # response from upstream, update the cache
+        PR("to cache, cache_key", cache_key)
         md = cache.cache_response(
             url,
             cache_key,
@@ -75,6 +79,7 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
       md = cache.get(cache_key, {}, mode=mode)
       if not md:
         # nothing cached
+        PR("not cached, pass through")
         return
       try:
         content = cache.get_content(cache_key)
@@ -88,6 +93,7 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
           content,
           rsp_hdrs,
       )
+      PR("from cache, cache_key", cache_key)
 
 @dataclass
 class MITMHookAction(Promotable):
