@@ -68,6 +68,8 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
     if flow.response:
       if getattr(flow, 'from_cache', False):
         pass
+      elif flow.request.method != 'GET':
+        PR("response is not from a GET, do not cache")
       else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
