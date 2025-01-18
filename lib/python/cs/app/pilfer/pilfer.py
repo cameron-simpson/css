@@ -376,19 +376,44 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   @pfx_method
   def sitemaps(self) -> List[Tuple[str, SiteMap]]:
     ''' A list of `(pattern,SiteMap)` 2-tuples for matching URLs to `SiteMap`s.
+
+        The entries take the form:
+
+            host-pattern = name:module:class
+
+        The `host-pattern` is a glob style pattern as for `fnmatch`.
+        Site maps matching multiple hosts should generally include
+        the URL hostname in the URL key.
+        An additional pattern for the same `module:class` can just be `name`.
+
+        Example:
+
+            docs.python.org = docs:cs.app.pilfer.sitemap:DocSite
+            docs.mitmproxy.org = docs
+            *.readthedocs.io = docs
     '''
     pprint(self.rc_map['sitemaps'])
+    named = {}
     map_list = []
     for pattern, sitemap_spec in self.rc_map['sitemaps'].items():
       with Pfx("%s = %s", pattern, sitemap_spec):
         try:
           map_name, map_spec = sitemap_spec.split(':', 1)
         except ValueError:
-          warning("no colon in sitemap_spec %r", sitemap_spec)
-          continue
-        map_class = import_name(map_spec)
-        sitemap = map_class(name=map_name)
-        # TODO: compile glob style pattern to regexp?
+          # no colon - plain map name
+          try:
+            sitemap = named[sitemap_spec]
+          except KeyError:
+            warning("ignore unknown bare sitwemap name: %r", sitemap_spec)
+            continue
+        else:
+          if map_name in named:
+            warning("ignore previously seen map name: %r", map_name)
+            continue
+          map_class = import_name(map_spec)
+          sitemap = map_class(name=map_name)
+          named[map_name] = sitemap
+        # TODO: precompile glob style pattern to regexp?
         map_list.append((pattern, sitemap))
     return map_list
 
