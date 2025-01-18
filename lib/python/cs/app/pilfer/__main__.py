@@ -262,10 +262,11 @@ class PilferCommand(BaseCommand):
     for hook in argv:
       with Pfx("hook %r", hook):
         try:
-          hook_name, action = hook.split(':', 1)
+          hook_names, action = hook.split(':', 1)
         except ValueError:
           raise GetoptError("missing colon")
-        pfx_call(mitm_addon.add_hook, hook_name, action)
+        for hook_name in hook_names.split(','):
+          pfx_call(mitm_addon.add_hook, hook_name, action)
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
 
   def cmd_sitemaps(self, argv):
