@@ -16,17 +16,14 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.lex import BaseToken, get_dotted_identifier
+from cs.lex import BaseToken
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
 from cs.pfx import Pfx, pfx_call
-from cs.py.modules import import_module_name
 from cs.urlutils import URL
 
 from .parse import get_name_and_args, import_name
 from .pilfer import Pilfer, uses_pilfer
-
-from cs.debug import trace
 
 @dataclass
 class Action(BaseToken):
