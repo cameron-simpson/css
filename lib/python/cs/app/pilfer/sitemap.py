@@ -41,3 +41,20 @@ class SiteMap(ABC):
         associated with the same entity.
     '''
     return None
+
+# Some presupplied site maps.
+
+@dataclass
+class DocSite(SiteMap):
+  ''' A general purpose doc site map with keys for `.html` and `.js` URLs.
+  '''
+
+  @promote
+  def url_key(self, url: URL) -> str | None:
+    ''' Return a key for `.html` and `.js` and `..../` URLs.
+    '''
+    if url.path.endswith(('/', '.html', '.js')):
+      key = url.path.lstrip('/')
+      if key.endswith('/'):
+        key += 'index.html'
+      return f'{url.hostname}/{key}'
