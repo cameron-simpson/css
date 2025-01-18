@@ -40,7 +40,6 @@ def print_rq(flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
 
-@trace
 @uses_pilfer
 def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
   ''' Insert at `"requestheaders"` and `"response"` callbacks
@@ -73,7 +72,7 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
         )
     else:
       # probe the cache
-      md = trace(cache.get, retval=True)(cache_key, {}, mode=mode)
+      md = cache.get(cache_key, {}, mode=mode)
       if not md:
         # nothing cached
         return
@@ -108,7 +107,6 @@ class MITMHookAction(Promotable):
     ''' Promote `hook_spec` to a callable from `cls.HOOK_SPEC_MAP`.
     '''
     name, args, kwargs, offset = get_name_and_args(hook_spec)
-    breakpoint()
     if not name:
       raise ValueError(f'expected dotted identifier: {hook_spec!r}')
     if offset < len(hook_spec):
