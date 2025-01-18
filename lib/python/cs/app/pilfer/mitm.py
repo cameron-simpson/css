@@ -66,7 +66,9 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
   cache_key = cache.cache_key_for(sitemap, url_key)
   with cache:
     if flow.response:
-      if not getattr(flow, 'from_cache', False):
+      if getattr(flow, 'from_cache', False):
+        pass
+      else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
         md = cache.cache_response(
@@ -96,6 +98,7 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
           content,
           rsp_hdrs,
       )
+      flow.from_cache = True
       PR("from cache, cache_key", cache_key)
 
 @dataclass
