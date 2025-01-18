@@ -642,7 +642,7 @@ def get_name_and_args(text: str,
     return name, None, None, offset
   if text.startswith(':', offset):
     offset += 1
-    args, kwargs, offset = trace(get_action_args, retval=True)(text, offset)
+    args, kwargs, offset = get_action_args(text, offset)
     if offset < len(text):
       raise ValueError(f'unparsed text after params: {text[offset:]!r}')
   else:
