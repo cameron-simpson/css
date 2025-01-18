@@ -81,6 +81,11 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     for dbmkey in self.cache_map:
       yield dbmkey.decode('utf-8')
 
+  def keys(self):
+    ''' Get the keys by iteration.
+    '''
+    return iter(self)
+
   @typechecked
   def __getitem__(self, key: str) -> dict:
     return json.loads(self.cache_map[self.dbmkey(key)].decode('utf-8'))
