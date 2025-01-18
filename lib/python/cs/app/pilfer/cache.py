@@ -8,7 +8,6 @@ import mimetypes
 import os
 from os.path import (
     basename,
-    exists as existspath,
     isfile as isfilepath,
     join as joinpath,
     splitext,
@@ -32,8 +31,6 @@ from cs.urlutils import URL
 from typeguard import typechecked
 
 from .sitemap import SiteMap
-
-from cs.debug import trace, X, r, s
 
 @dataclass
 class ContentCache(HasFSPath, MultiOpenMixin):
@@ -227,7 +224,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       needdir(
           basedir, use_makedirs=True
       ) and vprint("made", shortpath(basedir))
-      with trace(atomic_filename)(
+      with atomic_filename(
           contentpath,
           mode='xb',
           exists_ok=(content_rpath == old_content_rpath),
@@ -241,9 +238,6 @@ class ContentCache(HasFSPath, MultiOpenMixin):
 
 if __name__ == '__main__':
   sitemap = SiteMap()
-  sitemap.url_key = trace(
-      lambda self, url: url.replace('/', '_'),
-      retval=True,
-  )
+  sitemap.url_key = lambda self, url: url.replace('/', '_')
   cache = ContentCache(fspath='content')
   cache.cache_response('foo', sitemap)
