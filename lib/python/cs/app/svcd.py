@@ -387,6 +387,7 @@ class SvcD(FlaggedMixin, object):
       self,
       *argv,
       name=None,
+      pre_argv=(),
       environ=None,
       flags=None,
       group_name=None,
@@ -443,6 +444,7 @@ class SvcD(FlaggedMixin, object):
       restart_delay = self.RESTART_DELAY
     FlaggedMixin.__init__(self, flags=flags)
     self.argv = argv
+    self.pre_argv = pre_argv
     self.name = name
     self.group_name = group_name
     self.test_flags = test_flags
@@ -535,7 +537,7 @@ class SvcD(FlaggedMixin, object):
     if self.subp is not None:
       raise RuntimeError("already running")
     self.dbg("%s: spawn %r", self.name, self.argv)
-    self.subp = LockedPopen(self.argv, stdin=DEVNULL)
+    self.subp = LockedPopen([*self.pre_argv, *self.argv], stdin=DEVNULL)
     self.flag_running = True
     self.alert('STARTED')
     if self.pidfile is not None:

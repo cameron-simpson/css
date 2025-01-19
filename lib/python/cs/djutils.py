@@ -1,27 +1,34 @@
 #!/usr/bin/env python3
 
 ''' My collection of things for working with Django.
+
+    Presently this provides:
+    * `BaseCommand`: a drop in replacement for `django.core.management.base.BaseCommand`
+      which uses a `cs.cmdutils.BaseCommand` style of implementation
+    * `model_batches_qs`: a generator yielding `QuerySet`s for batches of a `Model`
 '''
 
 from dataclasses import dataclass, field
 from inspect import isclass
 import os
 import sys
-from typing import List
+from typing import Iterable, List
 
 from django.conf import settings
 from django.core.management.base import (
     BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
+from django.db.models.query import QuerySet
 from django.utils.functional import empty as djf_empty
+
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand as CSBaseCommand
 from cs.gimmicks import warning
 from cs.lex import cutprefix, stripped_dedent
 
-__version__ = '20241222.3-post'
+__version__ = '20250113.2-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -96,15 +103,19 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
 
       and `manage.py` will find it and run it as normal.
       But from that point on the style is as for `cs.cmdutils.BaseCommand`:
-      - no `aegparse` setup
+      - no `argparse` setup
       - direct support for subcommands as methods
-      - succinct option parsing, if you want command line options
+      - succinct option parsing, if you want additional command line options
+      - usage text in the subcommand method docstring
 
       A simple command looks like this:
 
           class Command(BaseCommand):
 
               def main(self, argv):
+                  """ Usage: {cmd} .......
+                        Do the main thing.
+                  """
                   ... do stuff based on the CLI args `argv` ...
 
       A command with subcommands looks like this:
@@ -112,9 +123,15 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
           class Command(BaseCommand):
 
               def cmd_this(self, argv):
+                  """ Usage: {cmd} ......
+                        Do this.
+                  """
                   ... do the "this" subcommand ...
 
               def cmd_that(self, argv):
+                  """ Usage: {cmd} ......
+                        Do that.
+                  """
                   ... do the "that" subcommand ...
 
       If want some kind of app/client specific "overcommand" composed
@@ -132,29 +149,28 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
       presupplied with a `.options` attribute which is an instance
       of `cs.cmdutils.BaseCommandOptions` (or some subclass).
 
-      Parsing options is simple:
+      Parsing options is light weight and automatically updates the usage text.
+      This example adds command line switches to the default switches:
+      - `-x`: a Boolean, setting `self.options.x`
+      - `--thing-limit` *n*: an `int`, setting `self.options.thing_limit=`*n*
+      - `--mode` *blah*: a string, setting `self.options.mode=`*blah*
+
+      Code sketch:
+
+          from cs.cmdutils import popopts
 
           class Command(BaseCommand):
 
+              @popopts(
+                  x=None,
+                  thing_limit_=int,
+                  mode_='The run mode.',
+              )
               def cmd_this(self, argv):
+                  """ Usage: {cmd}
+                        Do this thing.
+                  """
                   options = self.options
-                  # parsing options:
-                  #
-                  # boolean -x option, makes options.x
-                  #
-                  # --thing-limit n option taking an int
-                  # makes options.thing_limit
-                  # help text is "Thing limit."
-                  #
-                  # a --mode foo option taking a string
-                  # makes options.mode
-                  # help text is "The run mode."
-                  options.popopts(
-                      argv,
-                      x=None,
-                      thing_limit_=int,
-                      mode_='The run mode.',
-                  )
                   ... now consult options.x or whatever
                   ... argv is now the remaining arguments after the options
   '''
@@ -210,3 +226,78 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
         continue
       opt_spec.add_argument(parser, options=options)
     parser.add_argument('argv', nargs='*')
+
+def model_batches_qs(
+    model,
+    field_name='pk',
+    *,
+    chunk_size=1024,
+    desc=False,
+    exclude=None,
+    filter=None,
+) -> Iterable[QuerySet]:
+  ''' A generator yielding `QuerySet`s which produce nonoverlapping
+      batches of model instances.
+
+      Efficient behaviour requires the field to be indexed.
+      Correct behaviour requires the field values to be unique.
+
+      Parameters:
+      * `model`: the `Model` to query
+      * `field_name`: default `'pk'`, the name of the field on which
+        to order the batches
+      * `chunk_size`: the maximum size of each chunk
+      * `desc`: default `False`; if true then order the batches in
+        descending order instead of ascending order
+      * `exclude`: optional mapping of Django query terms to exclude by
+      * `filter`: optional mapping of Django query terms to filter by
+
+      Example iteration of a `Model` would look like:
+
+          from itertools import chain
+          from cs.djutils import model_batches_qs
+          for instance in chain.from_iterable(model_batches_qs(MyModel)):
+              ... work with instance ...
+
+      By returning `QuerySet`s it is possible to further alter each query:
+
+          from cs.djutils import model_batches_qs
+          for batch_qs in model_batches_qs(MyModel):
+              for result in batch_qs.filter(
+                  some_field__gt=10
+              ).select_related(.......):
+                  ... work with each result in the batch ...
+
+      or:
+
+          from itertools import chain
+          from cs.djutils import model_batches_qs
+          for result in chain.from_iterable(
+              batch_qs.filter(
+                  some_field__gt=10
+              ).select_related(.......)
+              for batch_qs in model_batches_qs(MyModel)
+          ):
+                  ... work with each result ...
+  '''
+  if chunk_size <= 0:
+    raise ValueError(f'{chunk_size=} must be > 0')
+  ordering = f'-{field_name}' if desc else field_name
+  after_condition = f'{field_name}__lt' if desc else f'{field_name}__gt'
+  mgr = model.objects
+  # initial batch
+  qs0 = mgr.all()
+  if exclude:
+    qs0 = qs0.exclude(**exclude)
+  if filter:
+    qs0 = qs0.filter(**filter)
+  qs = qs0.order_by(ordering)[:chunk_size]
+  while True:
+    key_list = list(qs.only(field_name).values_list(field_name, flat=True))
+    if not key_list:
+      break
+    end_key = key_list[-1]
+    yield qs
+    qs = qs0.filter(**{
+        after_condition: end_key
+    }).order_by(ordering)[:chunk_size]

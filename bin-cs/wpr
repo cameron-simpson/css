@@ -11,32 +11,47 @@ set -ue
 : "${WPLINKDIR:=$HOME/var/im/wp}"
 : "${WPPATH:=$WPDIR:$SSV_DIR}"
 
-nwp=128
+nwp=16
 spaces=.
-trace= ## set-x
+update_spaces=1
+trace=
+[ -t 2 ] && trace=set-x
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-nwp] [-x] [--] [spaces] words...
-    Select up to nwp (${nwp}) wallpapers from the directories in \$WPPATH,
-    default from \$WPDIR:\$SSV_DIR: $WPPATH
+usage="Usage: $cmd [-nwp] [-N] [-P wppath] [-x] [--] [spaces] words...
+    Select wallpapers from the directories in \$WPPATH
     at random matching the sed-regexps \"words\".
     Construct a scratch directoy in \$WPLINKDIR: $WPLINKDIR
     and symlink the selected images into it, then set that directory
-    as the wallpaper directory for the current (or specified) space."
+    as the wallpaper directory for the current (or specified) space.
+    -nwp        Limit the number of wallpapers to nwp (${nwp}).
+    -N          Do not update the OSX Spaces wallpaper settings.
+    -W wppath   Use the supplied wallpaper path, default from
+                \$WPPATH, which defaults to \$WPDIR:\$SSV_DIR: $WPPATH
+    -x          Trace command execution."
 
 badopts=
+wpropts=
 
 while [ $# -gt 0 ]
 do
   case "$1" in
     -[1-9]*)
-        _nwp=$1; shift
+        wpropts="$wpropts $1"
+        _nwp=$1
         nwp=$( expr "x$_nwp" : 'x-\([1-9][0-9]*\)' ) || {
           echo "$cmd: -nwp \"$1\": invalid number" >&2
           badopts=1
         }
         ;;
-    -x) trace=set-x
+    -N) wpropts="$wpropts $1"
+        update_spaces=
+        ;;
+    -P) wpropts="$wpropts $1 $2"
+        WPPATH=$2; export WPPATH
+        ;;
+    -x) wpropts="$wpropts $1"
+        trace=set-x
         ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -46,6 +61,16 @@ do
   esac
   shift
 done
+
+if [ "$*" = RENEW ]
+then
+  lastvalue \
+  | sed -n 's/^wp_\([1-9][0-9]*\): *\(.*[^ ]\)/\1 \2/p' \
+  | while read -r space words
+    do  $trace "$0" $wpropts -- "$space" $words
+    done
+  exit 0
+fi
 
 if [ $# -gt 0 ]
 then
@@ -72,7 +97,7 @@ cd "$rd"
 (
   for wpsrcdir in $( echo "$WPPATH" | tr : ' ' )
   do
-    $trace find -L "$wpsrcdir"/* -type f \( -name \*.png -o -name \*.jpg \) || :
+    $trace find -L "$wpsrcdir"/ \( -name '.*' -prune \) -o -type f \( -name \*.png -o -name \*.jpg \) || :
   done \
   | $trace grepall -- "$@" \
   | shuffle \
@@ -88,5 +113,13 @@ cd "$rd"
   done
   [ -t 1 ] && $trace ls "$rd/"
   [ $first ] && { echo "$cmd: nothing found" >&2; exit 1; }
-  $trace spaces wp "$spaces" "$rd"
+  [ -z "$update_spaces" ] || $trace spaces wp "$spaces" "$rd"
+  case "$spaces" in
+    .)  spaces=$( spaces current ) ;;
+    \*) spaces=$( spaces wp | sed -n 's/^Space //p' ) ;;
+    *)  spaces=$( echo "$spaces" | tr , ' ' ) ;;
+  esac
+  for space in $spaces
+  do  $trace lastvalue "wp_$space" "$*"
+  done
 }

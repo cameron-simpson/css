@@ -115,13 +115,11 @@ def module_names(M):
 
 # TODO: use the AST module to do a real parse?
 # pylint: disable=too-many-branches
-def direct_imports(src_filename, module_name=None):
+def direct_imports(src_filename, module_name):
   ''' Crudely parse `src_filename` for `import` statements.
       Return the set of directly imported module names.
 
-      If `module_name` is not `None`,
-      resolve relative imports against it.
-      Otherwise, relative import names are returned unresolved.
+      Resolve relative imports against `module_name`.
 
       This is a very simple minded source parse.
   '''
@@ -129,8 +127,8 @@ def direct_imports(src_filename, module_name=None):
   with Pfx(src_filename):
     with open(src_filename, encoding='utf-8') as codefp:
       for lineno, line in enumerate(codefp, 1):
-        with Pfx(lineno):
-          line = line.strip()
+        line = line.strip()
+        with Pfx("%d: %s", lineno, line):
           if line.startswith('import ') or line.startswith('from '):
             # quick hack to strip trailing "; second-statement"
             try:
@@ -149,19 +147,20 @@ def direct_imports(src_filename, module_name=None):
               continue
             subimport = words[1]
             if subimport.startswith('.'):
-              # relative import, must be in a package
-              if not module_name:
-                # can't be in a package, just ignore it
-                continue
+              # relative import, resolve against module_name
+              subimport0 = subimport
               module_parts = module_name.split('.')
               while subimport.startswith('.'):
                 module_parts = module_parts[:-1]
                 subimport = subimport[1:]
               if not module_parts:
                 # walked off the top of the path
+                warning(
+                    "import %r walked out of the module %r", subimport0,
+                    module_name
+                )
                 continue
-              if subimport:
-                module_parts.append(subimport)
+              module_parts.append(subimport or '__init__')
               subimport = '.'.join(module_parts)
             if subimport == module_name:
               # HACK: simplistic parse finding ourself in a docstring

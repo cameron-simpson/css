@@ -12,7 +12,7 @@ from cs.psutils import run
 
 from typeguard import typechecked
 
-__version__ = '20241122-post'
+__version__ = '20250108-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -22,7 +22,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.osx.plist',
-        'cs.deco',
+        'cs.cache',
         'cs.lex',
         'cs.psutils',
         'typeguard',
