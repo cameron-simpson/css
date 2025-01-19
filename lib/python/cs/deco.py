@@ -158,6 +158,28 @@ def decorator(deco):
   return metadeco
 
 @decorator
+def attr(func, **attrs):
+  ''' A decorator to set attributes on a function.
+      Example:
+
+          @attr(hook_names=('hook1', 'hook2'))
+          def func():
+              .....
+
+      This is just a more overt and clear form of:
+
+          def func():
+              .....
+
+          func.hook_names=('hook1', 'hook2')
+  '''
+  if not attrs:
+    raise ValueError('@attr: no attributes upplied')
+  for attr, value in attrs.items():
+    setattr(func, attr, value)
+  return func
+
+@decorator
 def contextdecorator(cmgrfunc):
   ''' A decorator for a context manager function `cmgrfunc`
       which turns it into a decorator for other functions.
