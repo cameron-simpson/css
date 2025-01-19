@@ -31,8 +31,6 @@ from cs.urlutils import URL
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 
-DEFAULT_LISTEN_HOST = '127.0.0.1'
-DEFAULT_LISTEN_PORT = 3131
 
 def print_rq(flow):
   rq = flow.request
@@ -227,8 +225,8 @@ class MITMAddon:
 @uses_runstate
 @typechecked
 async def run_proxy(
-    listen_host=DEFAULT_LISTEN_HOST,
-    listen_port=DEFAULT_LISTEN_PORT,
+    listen_host=DEFAULT_MITM_LISTEN_HOST,
+    listen_port=DEFAULT_MITM_LISTEN_PORT,
     *,
     addon: MITMAddon,
     runstate: RunState,

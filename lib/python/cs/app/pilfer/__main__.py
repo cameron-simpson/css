@@ -27,7 +27,10 @@ import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.resources import uses_runstate
 
-from . import DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION
+from . import (
+    DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
+    DEFAULT_MITM_LISTEN_PORT
+)
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 
@@ -241,11 +244,9 @@ class PilferCommand(BaseCommand):
     ''' Usage: {cmd} [@[address]:port] hook:action...
           Run a mitmproxy for traffic filtering.
     '''
-    from .mitm import (
-        DEFAULT_LISTEN_HOST, DEFAULT_LISTEN_PORT, MITMAddon, run_proxy
-    )
-    listen_host = DEFAULT_LISTEN_HOST
-    listen_port = DEFAULT_LISTEN_PORT
+    from .mitm import (MITMAddon, run_proxy)
+    listen_host = DEFAULT_MITM_LISTEN_HOST
+    listen_port = DEFAULT_MITM_LISTEN_PORT
     if argv and argv[0].startswith('@'):
       ip_port = argv.pop(0)[1:]
       with Pfx("@[address]:port %r", ip_port):
