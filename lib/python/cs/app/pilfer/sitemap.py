@@ -3,7 +3,6 @@
 ''' Base class for site maps.
 '''
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
