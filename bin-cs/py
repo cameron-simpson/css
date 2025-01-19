@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# My own "py" Python launcher.
+# - Cameron Simpson <cs@cskk.id.au> 20jan2025
+#
+
+set -ue
+
+pyopts=
+pyver=${PY_PYTHON:-3}
+trace=
+[ -t 2 ] && trace=set-x
+venvsdir=$HOME/var/venv
+
+cmd=$0
+usage="Usage: $( basename "$0" ) [-pyver] [-n] [-q] [-x] [python-args...]
+  Invoke the preferred Python.
+  -pyver    Specify the Python version (as a name inside $venvsdir).
+            The default comes from \$PY_PYTHON, default 3.
+  -n        No action; print python command.
+  -q        Quiet; do not trace.
+  -x        Trace execution."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -0)     exec $trace ls -l "$venvsdir/"
+            ;;
+    -[23]*) pyver=$( expr "x$1" : 'x-\(.*\)' )
+            PYTHON_EXE=
+            ;;
+    -[bBdEhiIOPSuvV] | --[a-z]* )
+            pyopts="$pyopts $1"
+            ;;
+    -[WX])  pyopts="$pyopts $1 $2"
+            shift
+            ;;
+    -c)     break ;;
+    -m)     break ;;
+    -n)     trace=echo ;;
+    -q)     pyopts="$pyopts $1" trace= ;;
+    -x)     trace=set-x ;;
+    --)     shift; break ;;
+    -?*)    echo "$cmd: unrecognised option: $1" >&2
+            badopts=1
+            ;;
+    *)      break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+: "${PYTHON_EXE:="$venvsdir/$pyver/bin/python"}"
+
+exec $trace "$PYTHON_EXE" $pyopts ${1+"$@"}
