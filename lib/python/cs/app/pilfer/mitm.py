@@ -112,11 +112,43 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
       flow.from_cache = True
       PR("from cache, cache_key", cache_key)
 
+@typechecked
+@uses_pilfer
+def dump_flow(flow, *, P: Pilfer = None):
+  assert P is not None
+  PR = lambda *a: print('DUMP_FLOW:', flow.request, *a)
+  rq = flow.request
+  url = URL(rq.url)
+  sitemap = P.sitemap_for(url)
+  if sitemap is None:
+    PR("no site map")
+    return
+  PR(rq)
+  print("  Headers:")
+  for line in tabulate(*[(key, value)
+                         for key, value in sorted(rq.headers.items())]):
+    print("   ", line)
+  if rq.method == "GET":
+    q = url.query_dict()
+    if False and q:
+      print("  Query:")
+      for line in tabulate(*[(param, repr(value))
+                             for param, value in sorted(q.items())]):
+        print("   ", line)
+  elif rq.method == "POST":
+    if False and rq.urlencoded_form:
+      print("  Query:")
+      for line in tabulate(
+          *[(param, repr(value))
+            for param, value in sorted(rq.urlencoded_form.items())]):
+        print("   ", line)
+
 @dataclass
 class MITMHookAction(Promotable):
 
   HOOK_SPEC_MAP = {
       'cache': cached_flow,
+      'dump': dump_flow,
       'print': print_rq,
   }
 
