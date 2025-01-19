@@ -5,12 +5,45 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from fnmatch import fnmatch
+from functools import cached_property
+import re
 
-from cs.deco import promote
+from cs.deco import promote, Promotable
 from cs.urlutils import URL
 
 @dataclass
 class SiteMap(ABC):
+class URLMatcher(Promotable):
+  hostname_fnmatch: str | None
+  url_regexp: str
+
+  SITE_PATTERNS = ()
+
+  @classmethod
+  def from_str(cls, url_regexp):
+    return cls(hostname_fnmatch=None, url_regexp=url_regexp)
+
+  @classmethod
+  def from_tuple(cls, spec):
+    hostname_fnmatch, url_regexp = spec
+    return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
+
+  @cached_property
+  def url_re(self):
+    return re.compile(self.url_regexp)
+
+  @promote
+  def __call__(self, url: URL):
+    if self.hostname_fnmatch is not None and not fnmatch(
+        url.hostname, self.hostname_fnmatch):
+      return None
+    m = self.url_re.match(url.path)
+    if m is None:
+      return None
+    return m.groupdict(), url.query_dict()
+
+@dataclass
   ''' A base class for site maps.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
