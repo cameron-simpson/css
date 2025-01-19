@@ -378,7 +378,7 @@ class URL(HasThreadState, Promotable):
 
   @property
   @unattributable
-  def dirname(self, absolute=False):
+  def dirname(self):
     return os.path.dirname(self.path)
 
   @property
