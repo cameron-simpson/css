@@ -11,7 +11,7 @@ import os
 from signal import SIGINT
 from typing import Callable, Mapping
 
-from mitmproxy import http
+from mitmproxy import ctx, http
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
@@ -21,6 +21,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import vprint
 from cs.deco import Promotable, promote
+from cs.lex import tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
@@ -48,7 +49,7 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
   PR = lambda *a: print('CACHED_FLOW:', flow.request, *a)
   rq = flow.request
   if rq.method not in ('GET', 'HEAD'):
-    PR("not GET or HEAD")
+    PR(rq.method, "is not GET or HEAD")
     return
   url = URL(rq.url)
   sitemap = P.sitemap_for(url)
@@ -232,13 +233,16 @@ async def run_proxy(
     addon: MITMAddon,
     runstate: RunState,
 ):
-  opts = Options(listen_host=listen_host, listen_port=listen_port)
+  opts = Options(
+      listen_host=listen_host,
+      listen_port=listen_port,
+  )
   https_proxy = os.environ.get('https_proxy')
   if https_proxy:
     opts.mode = (f'upstream:{https_proxy}',)
   proxy = DumpMaster(opts)
   proxy.addons.add(addon)
-  vprint("Starting mitmproxy listening on {listen_host}:{listen_port}.")
+  vprint(f'Starting mitmproxy listening on {listen_host}:{listen_port}.')
   on_cancel = lambda rs, transition: proxy.should_exit.set()
   runstate.fsm_callback('STOPPING', on_cancel)
   loop = asyncio.get_running_loop()
