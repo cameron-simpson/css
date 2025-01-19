@@ -7,6 +7,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import partial
+import os
 from signal import SIGINT
 from typing import Callable, Mapping
 
@@ -183,6 +184,9 @@ async def run_proxy(
     runstate: RunState,
 ):
   opts = Options(listen_host=listen_host, listen_port=listen_port)
+  https_proxy = os.environ.get('https_proxy')
+  if https_proxy:
+    opts.mode = (f'upstream:{https_proxy}',)
   proxy = DumpMaster(opts)
   proxy.addons.add(addon)
   vprint("Starting mitmproxy listening on {listen_host}:{listen_port}.")
