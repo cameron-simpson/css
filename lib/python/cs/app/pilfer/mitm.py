@@ -20,7 +20,7 @@ from mitmproxy.tools.dump import DumpMaster
 from typeguard import typechecked
 
 from cs.cmdutils import vprint
-from cs.deco import Promotable, promote
+from cs.deco import attr, Promotable, promote
 from cs.lex import tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
@@ -36,6 +36,7 @@ def print_rq(flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
 
+@attr(default_hooks=('requestheaders', 'response'))
 @uses_pilfer
 def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
   ''' Insert at `"requestheaders"` and `"response"` callbacks
@@ -111,6 +112,7 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
       flow.from_cache = True
       PR("from cache, cache_key", cache_key)
 
+@attr(default_hooks=('requestheaders',))
 @typechecked
 @uses_pilfer
 def dump_flow(flow, *, P: Pilfer = None):
