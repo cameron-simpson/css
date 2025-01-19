@@ -13,7 +13,6 @@ from cs.deco import promote, Promotable
 from cs.urlutils import URL
 
 @dataclass
-class SiteMap(ABC):
 class URLMatcher(Promotable):
   hostname_fnmatch: str | None
   url_regexp: str
@@ -44,6 +43,7 @@ class URLMatcher(Promotable):
     return m.groupdict(), url.query_dict()
 
 @dataclass
+class SiteMap:
   ''' A base class for site maps.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
@@ -59,21 +59,27 @@ class URLMatcher(Promotable):
 
   name: str
 
-  @abstractmethod
   @promote
   def url_key(self, url: URL) -> str | None:
     ''' Return a string which is a persistent cache key for the
         supplied `url` within the content of this sitemap, or `None`
         for URLs which shoul not be cached persistently.
 
-        This default implementation always returns `None`.
-
         A site with semantic URLs might have keys like
         *entity_type*`/`*id*`/`*aspect* where the *aspect* was
         something like `html` or `icon` etc for different URLs
         associated with the same entity.
+
+        This base implementation matches the patterns in `SITE_PATTERNS`
+        class attribute which is `()` for the base class.
     '''
-    return None
+    for matcher, keyfn in self.SITE_PATTERNS:
+      matcher = URLMatcher.promote(matcher)
+      if mq := matcher(url):
+        m, q = mq
+        fd = dict(q)
+        fd.update(m)
+        return keyfn.format_map(fd)
 
 # Some presupplied site maps.
 
