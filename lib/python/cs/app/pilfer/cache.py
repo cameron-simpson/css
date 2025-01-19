@@ -8,6 +8,7 @@ import mimetypes
 import os
 from os.path import (
     basename,
+    dirname,
     isfile as isfilepath,
     join as joinpath,
     splitext,
@@ -196,8 +197,18 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     else:
       warning("no request Content-Type")
       ctext = ''
-    base_rpath = cache_key
-    content_rpath = f'{base_rpath}/{urlbase or "index"}--{h}{urlext or ctext}'
+    try:
+      ckdir, ckbase = cache_key.rsplit('/', 1)
+    except ValueError:
+      ckdir = None
+      ckbase = cache_key
+    content_base = (
+        f'{ckbase}--{urlbase or "index"}'[:128] + f'--{h}{urlext or ctext}'
+    )
+    if ckdir is None:
+      content_rpath = content_base
+    else:
+      content_rpath = joinpath(ckdir, content_base)
     contentpath = self.cached_pathto(content_rpath)
     # the new metadata
     md = {
@@ -219,11 +230,11 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     old_content_rpath = old_md.get('content_rpath', '')
     if mode == 'force' or content_rpath != old_content_rpath:
       # write the content file
-      basedir = joinpath(self.cached_path, base_rpath)
       # only make filesystem items if all the required compute succeeds
+      contentdir = dirname(contentpath)
       needdir(
-          basedir, use_makedirs=True
-      ) and vprint("made", shortpath(basedir))
+          contentdir, use_makedirs=True
+      ) and vprint("made", shortpath(contentdir))
       with atomic_filename(
           contentpath,
           mode='xb',
