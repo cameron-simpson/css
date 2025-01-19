@@ -14,9 +14,10 @@ venvsdir=$HOME/var/venv
 
 cmd=$0
 usage="Usage: $( basename "$0" ) [-pyver] [-n] [-q] [-x] [python-args...]
-  Invoke the preferred Python.
+  Invoke the preferred Python, from \$PYTHON_EXE if set.
   -pyver    Specify the Python version (as a name inside $venvsdir).
             The default comes from \$PY_PYTHON, default 3.
+            This option overrides \$PYTHON_EXE.
   -n        No action; print python command.
   -q        Quiet; do not trace.
   -x        Trace execution."
