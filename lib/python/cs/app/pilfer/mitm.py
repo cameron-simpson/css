@@ -89,6 +89,10 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
       if not md:
         # nothing cached
         PR("not cached, pass through")
+        # we want to cache this, remove headers which can return a 304 Not Modified
+        for hdr in 'if-modified-since', 'if-none-match':
+          if hdr in rq.headers:
+            del rq.headers[hdr]
         return
       if flow.request.method == 'HEAD':
         content = b''
