@@ -92,7 +92,8 @@ class DocSite(SiteMap):
   def url_key(self, url: URL) -> str | None:
     ''' Return a key for `.html` and `.js` and `..../` URLs.
     '''
-    if url.path.endswith(('/', '.html', '.js')):
+    if url.path.endswith(tuple(
+        '/ .css .gif .html .ico .jpg .js .png .webp'.split())):
       key = url.path.lstrip('/')
       if key.endswith('/'):
         key += 'index.html'
