@@ -183,6 +183,14 @@ class MITMAddon:
 
       return call_hooks
 
+  def load(self, loader):
+    loader.add_option(
+        name="tls_version_client_min",
+        typespec=str,
+        default="TLS1",
+        help="Set the tls_version_client_min option.",
+    )
+
 @uses_runstate
 @typechecked
 async def run_proxy(
