@@ -28,6 +28,7 @@ from cs.resources import RunState, uses_runstate
 from cs.upd import print
 from cs.urlutils import URL
 
+from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 
