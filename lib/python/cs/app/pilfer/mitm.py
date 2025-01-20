@@ -157,6 +157,10 @@ class MITMHookAction(Promotable):
   args: list = field(default_factory=list)
   kwargs: dict = field(default_factory=dict)
 
+  @property
+  def default_hooks(self):
+    return self.action.default_hooks
+
   # TODO: proper parse of hook_spec
   @classmethod
   def from_str(cls, hook_spec: str):
@@ -182,10 +186,19 @@ class MITMAddon:
 
   @promote
   @typechecked
-  def add_hook(self, hook_name: str, hook_action: MITMHookAction):
+  def add_action(
+      self,
+      hook_names: list[str] | tuple[str, ...] | None,
+      hook_action: MITMHookAction,
+      args,
+      kwargs,
+  ):
     ''' Add a `MITMHookAction` to a list of hooks for `hook_name`.
     '''
-    self.hook_map[hook_name].append(hook_action)
+    if hook_names is None:
+      hook_names = hook_action.default_hooks
+    for hook_name in hook_names:
+      self.hook_map[hook_name].append((hook_action, args, kwargs))
 
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
@@ -205,9 +218,9 @@ class MITMAddon:
         if not hook_actions:
           return
         last_e = None
-        for i, hook_action in enumerate(hook_actions):
+        for i, (action, args, kwargs) in enumerate(hook_actions):
           try:
-            pfx_call(hook_action, *a, **kw)
+            pfx_call(action, *args, *a, **kwargs, **kw)
           except Exception as e:
             warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
             last_e = e
