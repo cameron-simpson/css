@@ -20,7 +20,9 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.later import Later
-from cs.lex import (cutprefix, cutsuffix, is_identifier, tabulate)
+from cs.lex import (
+    cutprefix, cutsuffix, get_identifier, is_identifier, tabulate
+)
 import cs.logutils
 from cs.logutils import (debug, error)
 import cs.pfx
@@ -31,6 +33,7 @@ from . import (
     DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
     DEFAULT_MITM_LISTEN_PORT
 )
+from .parse import get_action_args
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 
@@ -241,8 +244,19 @@ class PilferCommand(BaseCommand):
 
   @popopts
   def cmd_mitm(self, argv):
-    ''' Usage: {cmd} [@[address]:port] hook:action...
+    ''' Usage: {cmd} [@[address]:port] action[@hook,...][:params...]...
           Run a mitmproxy for traffic filtering.
+          @[address]:port   Specify the listen address and port.
+                            Default: {DEFAULT_MITM_LISTEN_HOST}:{DEFAULT_MITM_LISTEN_PORT}
+          Actions take the form of an action name, optionally
+          followed by @hook,... to specify which mitmproy hooks
+          should call it, optionally followed by :params to specify
+          parameters to prepend to calls.
+          If hook names are not specified they are obtained from
+          the action function's .default_hooks attribute.
+          Predefined actions:
+            cache   Cache URL content according to the pilfer sitemaps.
+            dump    Dump request information accorind to the pilfer sitemaps.
     '''
     from .mitm import (MITMAddon, run_proxy)
     listen_host = DEFAULT_MITM_LISTEN_HOST
@@ -258,16 +272,42 @@ class PilferCommand(BaseCommand):
         except ValueError as e:
           raise GetoptError(f'invalid [address]:port: {e}') from e
     if not argv:
-      raise GetoptError('missing hooks')
+      raise GetoptError('missing actions')
+    bad_actions = False
     mitm_addon = MITMAddon()
-    for hook in argv:
-      with Pfx("hook %r", hook):
-        try:
-          hook_names, action = hook.split(':', 1)
-        except ValueError:
-          raise GetoptError("missing colon")
-        for hook_name in hook_names.split(','):
-          pfx_call(mitm_addon.add_hook, hook_name, action)
+    for action in argv:
+      with Pfx("action %r", action):
+        name, offset = get_identifier(action)
+        if not name:
+          warning("no action name")
+          bad_actions = True
+          continue
+        # @hook,...
+        if action.startswith('@', offset):
+          offset += 1
+          end_hooks = action.find(':', offset)
+          if end_hooks == -1:
+            hook_names = action[offset:].split(',')
+            offset = len(action)
+          else:
+            hook_names = action[offset:end_hooks].split(',')
+            offset = end_hooks
+        else:
+          hook_names = None
+        # :params
+        if action.startswith(':', offset):
+          offset += 1
+          args, kwargs, offset = get_action_args(action, offset)
+          if offset < len(action):
+            raise ValueError(
+                f'unparsed text after params: {action[offset:]!r}'
+            )
+        else:
+          args = []
+          kwargs = {}
+        pfx_call(mitm_addon.add_action, hook_names, name, args, kwargs)
+    if bad_actions:
+      raise GetoptError("invalid action specifications")
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
 
   def cmd_sitemaps(self, argv):
