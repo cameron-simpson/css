@@ -111,7 +111,7 @@ class BaseTask(FSM, RunStateMixin):
   '''
 
   @uses_runstate
-  def __init__(self, *, state=None, runstate: RunState):
+  def __init__(self, state=None, *, runstate: RunState):
     FSM.__init__(self, state)
     RunStateMixin.__init__(self, runstate=runstate)
 
