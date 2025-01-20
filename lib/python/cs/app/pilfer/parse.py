@@ -657,7 +657,7 @@ def import_name(module_subname: str):
       Raise `NameError` for a name which does not resolve.
 
       `module_subname` takes the form `*dotted_identifier:dotted_identifier`,
-      being the module name and the name within the modue respectively.
+      being the module name and the name within the module respectively.
   '''
   module_name, sub_name = module_subname.split(':', 1)
   name, *sub_names = sub_name.split('.')
