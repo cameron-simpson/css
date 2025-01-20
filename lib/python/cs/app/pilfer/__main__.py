@@ -24,7 +24,7 @@ from cs.lex import (
     cutprefix, cutsuffix, get_identifier, is_identifier, tabulate
 )
 import cs.logutils
-from cs.logutils import (debug, error)
+from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.resources import uses_runstate
@@ -256,7 +256,7 @@ class PilferCommand(BaseCommand):
           the action function's .default_hooks attribute.
           Predefined actions:
             cache   Cache URL content according to the pilfer sitemaps.
-            dump    Dump request information accorind to the pilfer sitemaps.
+            dump    Dump request information according to the pilfer sitemaps.
     '''
     from .mitm import (MITMAddon, run_proxy)
     listen_host = DEFAULT_MITM_LISTEN_HOST
