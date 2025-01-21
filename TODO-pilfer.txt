@@ -1,3 +1,4 @@
+enclose params in brackets instead of using the : prefix ?
 drop Set-Cookie from cached headers along with content-encoding?
 graphviz view of pipelines?
 pilfer mitm redirector mode for plugging in the adzapper

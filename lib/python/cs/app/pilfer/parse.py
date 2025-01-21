@@ -595,8 +595,8 @@ def get_action_args(action, offset, delim=None):
   ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
      return `(args,kwargs,offset)`.
 
-     An `arg` is a quoted string or a sequence of nonwhitespace
-     excluding `delim` and comma.
+     An `arg` is a number or a quoted string or a sequence of
+     nonwhitespace excluding `delim` and comma.
   '''
   other_chars = ',' + whitespace
   if delim is not None:
@@ -629,20 +629,22 @@ def get_action_args(action, offset, delim=None):
         kwargs[kw] = arg
   return args, kwargs, offset
 
-def get_name_and_args(text: str,
-                      offset: int = 0
-                      ) -> tuple[str, list | None, list | None, int]:
+def get_name_and_args(
+    text: str,
+    offset: int = 0,
+    delim=None,
+) -> tuple[str, list | None, list | None, int]:
   ''' Match a dotted identifier optionally followed by a colon
-          and position and keyword arguments.
-          Return `('',None,None,offset)` on no match.
-          Return `(name,args,kwargs,offset)` on a match.
+      and position and keyword arguments.
+      Return `('',None,None,offset)` on no match.
+      Return `(name,args,kwargs,offset)` on a match.
       '''
   name, offset = get_dotted_identifier(text, offset)
   if not name:
     return name, None, None, offset
   if text.startswith(':', offset):
     offset += 1
-    args, kwargs, offset = get_action_args(text, offset)
+    args, kwargs, offset = get_action_args(text, offset, delim)
     if offset < len(text):
       raise ValueError(f'unparsed text after params: {text[offset:]!r}')
   else:
@@ -657,7 +659,7 @@ def import_name(module_subname: str):
       Raise `NameError` for a name which does not resolve.
 
       `module_subname` takes the form `*dotted_identifier:dotted_identifier`,
-      being the module name and the name within the modue respectively.
+      being the module name and the name within the module respectively.
   '''
   module_name, sub_name = module_subname.split(':', 1)
   name, *sub_names = sub_name.split('.')

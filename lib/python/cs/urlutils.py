@@ -19,7 +19,7 @@ from threading import RLock
 from urllib.request import (
     HTTPError, URLError, HTTPPasswordMgrWithDefaultRealm
 )
-from urllib.parse import urlparse, urljoin as up_urljoin
+from urllib.parse import parse_qs, urlparse, urljoin as up_urljoin
 
 from bs4 import BeautifulSoup
 try:
@@ -335,6 +335,12 @@ class URL(HasThreadState, Promotable):
     '''
     return self.url_parsed.query
 
+  @unattributable
+  def query_dict(self):
+    ''' Return a `dict` containing the parsed param=value pairs from `self.query`.
+    '''
+    return parse_qs(self.query)
+
   @property
   @unattributable
   def fragment(self):
@@ -372,7 +378,7 @@ class URL(HasThreadState, Promotable):
 
   @property
   @unattributable
-  def dirname(self, absolute=False):
+  def dirname(self):
     return os.path.dirname(self.path)
 
   @property

@@ -56,7 +56,7 @@ def import_module_name(module_name, name=None, sys_path=None, lock=None):
       except AttributeError as e:
         # pylint: disable=raise-missing-from
         raise ImportError(
-            f'module {module_name!r}: no entry named {name!r}: {e.__class__.__name__}:{e}'
+            f'module {module_name!r}: no entry named {name!r} ({e.__class__.__name__}:{e})'
         ) from e
     return None
 
