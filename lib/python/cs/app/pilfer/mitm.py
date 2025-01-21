@@ -33,7 +33,6 @@ from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 
-
 def print_rq(hook_name, flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
@@ -118,6 +117,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
 @uses_pilfer
 @typechecked
 def dump_flow(hook_name, flow, *, P: Pilfer = None):
+  ''' Dump request information: headers and query parameters.
+  '''
   assert P is not None
   PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
   rq = flow.request
