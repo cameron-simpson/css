@@ -21,9 +21,10 @@ from typeguard import typechecked
 
 from cs.cmdutils import vprint
 from cs.deco import attr, Promotable, promote
-from cs.lex import tabulate
+from cs.lex import r, tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
+from cs.progress import Progress
 from cs.resources import RunState, uses_runstate
 from cs.upd import print
 from cs.urlutils import URL
@@ -144,6 +145,41 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
           *[(param, repr(value))
             for param, value in sorted(rq.urlencoded_form.items())]):
         print("   ", line)
+
+@attr(default_hooks=('responseheaders',))
+@uses_pilfer
+@typechecked
+def watch_flow(hook_name, flow, *, P: Pilfer = None):
+  ''' Watch data chunks from a stream flow.
+  '''
+  rq = flow.request
+  rsp = flow.response
+  PR = lambda *a: print('WATCH_FLOW', hook_name, rq, *a)
+  PR("response.stream was", r(rsp.stream))
+
+  print("  Response Headers:")
+  for line in tabulate(*[(key, value)
+                         for key, value in sorted(rsp.headers.items())]):
+    print("   ", line)
+
+  content_length = rsp.headers.get('content-length')
+  progress_Q = Progress(
+      str(rq),
+      total=None if content_length is None else int(content_length),
+  ).qbar(
+      itemlenfunc=len,
+      incfirst=True,
+      report_print=print,
+  )
+
+  def watch(bs: bytes) -> bytes:
+    if len(bs) == 0:
+      progress_Q.close()
+    else:
+      progress_Q.put(bs)
+    return bs
+
+  rsp.stream = watch
 
 @dataclass
 class MITMHookAction(Promotable):
