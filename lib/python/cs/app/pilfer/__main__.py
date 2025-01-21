@@ -21,7 +21,11 @@ from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.later import Later
 from cs.lex import (
-    cutprefix, cutsuffix, get_identifier, is_identifier, tabulate
+    cutprefix,
+    cutsuffix,
+    get_dotted_identifier,
+    is_identifier,
+    tabulate,
 )
 import cs.logutils
 from cs.logutils import debug, error, warning
@@ -33,7 +37,7 @@ from . import (
     DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
     DEFAULT_MITM_LISTEN_PORT
 )
-from .parse import get_action_args
+from .parse import get_action_args, import_name
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 
@@ -244,23 +248,40 @@ class PilferCommand(BaseCommand):
 
   @popopts
   def cmd_mitm(self, argv):
-    ''' Usage: {cmd} [@[address]:port] action[@hook,...][:params...]...
+    ''' Usage: {cmd} [@[address]:port] action[:params...][@hook,...]...
           Run a mitmproxy for traffic filtering.
           @[address]:port   Specify the listen address and port.
                             Default: {DEFAULT_MITM_LISTEN_HOST}:{DEFAULT_MITM_LISTEN_PORT}
           Actions take the form of an action name, optionally
-          followed by @hook,... to specify which mitmproy hooks
-          should call it, optionally followed by :params to specify
-          parameters to prepend to calls.
+          followed by :params to specify parameters to prepend to
+          calls, optionally followed by @hook,... to specify which
+          mitmproy hooks should call the action.
+          The function for an action is called with 2 positional
+          parameters, the hook name and the mitmproxy Flow instance.
+          If additional parameters are specified they are prepaended
+          to the positional and keyword arguments to the function.
           If hook names are not specified they are obtained from
           the action function's .default_hooks attribute.
           Predefined actions:
             cache   Cache URL content according to the pilfer sitemaps.
             dump    Dump request information according to the pilfer sitemaps.
+            print   Print the request URL.
+          The action name can actually take 2 forms:
+          - a identifier, which must be a predefined action name
+          - a dotted name followed by a colon and another dotted subname,
+            which specifies a callable object from an importable module
+          Examples:
+            cache   The predefined "cache" action on its default hooks.
+            dump@requestheaders
+                    The predefined "dump" action on the "requestheaders" hook.
+            my.module:handler:3@requestheaders
+                    Call handler(3,hook_name,flow) from module my.module
+                    on the "requestheaders" hook.
     '''
     from .mitm import (MITMAddon, run_proxy)
     listen_host = DEFAULT_MITM_LISTEN_HOST
     listen_port = DEFAULT_MITM_LISTEN_PORT
+    # leading optional @[host:]port
     if argv and argv[0].startswith('@'):
       ip_port = argv.pop(0)[1:]
       with Pfx("@[address]:port %r", ip_port):
@@ -277,11 +298,41 @@ class PilferCommand(BaseCommand):
     mitm_addon = MITMAddon()
     for action in argv:
       with Pfx("action %r", action):
-        name, offset = get_identifier(action)
+        name, offset = get_dotted_identifier(action)
         if not name:
           warning("no action name")
           bad_actions = True
           continue
+        if '.' not in name:
+          # a built in name
+          mitm_action = name
+        else:
+          # a callable imported from a module
+          if not action.startswith(':', offset):
+            warning('missing module ":subname" after module %r', name)
+            bad_actions = True
+            continue
+          offset += 1
+          subname, offset = get_dotted_identifier(action, offset)
+          if not subname:
+            warning('missing module "subname" after module "%s:"', name)
+            bad_actions = True
+            continue
+          try:
+            mitm_action = pfx_call(import_name, action[:offset])
+          except ImportError as e:
+            warning(
+                "cannot import %r: %s", action[:offset], e.msg_without_prefix
+            )
+            bad_actions = True
+            continue
+        # :params
+        if action.startswith(':', offset):
+          offset += 1
+          args, kwargs, offset = get_action_args(action, offset, '@')
+        else:
+          args = []
+          kwargs = {}
         # @hook,...
         if action.startswith('@', offset):
           offset += 1
@@ -294,18 +345,11 @@ class PilferCommand(BaseCommand):
             offset = end_hooks
         else:
           hook_names = None
-        # :params
-        if action.startswith(':', offset):
-          offset += 1
-          args, kwargs, offset = get_action_args(action, offset)
-          if offset < len(action):
-            raise ValueError(
-                f'unparsed text after params: {action[offset:]!r}'
-            )
-        else:
-          args = []
-          kwargs = {}
-        pfx_call(mitm_addon.add_action, hook_names, name, args, kwargs)
+        if offset < len(action):
+          warning("unparsed text: %r", action[offset:])
+          bad_actions = True
+          continue
+        pfx_call(mitm_addon.add_action, hook_names, mitm_action, args, kwargs)
     if bad_actions:
       raise GetoptError("invalid action specifications")
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
