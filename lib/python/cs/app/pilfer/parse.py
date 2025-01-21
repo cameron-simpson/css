@@ -595,8 +595,8 @@ def get_action_args(action, offset, delim=None):
   ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
      return `(args,kwargs,offset)`.
 
-     An `arg` is a quoted string or a sequence of nonwhitespace
-     excluding `delim` and comma.
+     An `arg` is a number or a quoted string or a sequence of
+     nonwhitespace excluding `delim` and comma.
   '''
   other_chars = ',' + whitespace
   if delim is not None:
@@ -635,9 +635,9 @@ def get_name_and_args(
     delim=None,
 ) -> tuple[str, list | None, list | None, int]:
   ''' Match a dotted identifier optionally followed by a colon
-          and position and keyword arguments.
-          Return `('',None,None,offset)` on no match.
-          Return `(name,args,kwargs,offset)` on a match.
+      and position and keyword arguments.
+      Return `('',None,None,offset)` on no match.
+      Return `(name,args,kwargs,offset)` on a match.
       '''
   name, offset = get_dotted_identifier(text, offset)
   if not name:
