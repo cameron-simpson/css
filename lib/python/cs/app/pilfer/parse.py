@@ -629,9 +629,11 @@ def get_action_args(action, offset, delim=None):
         kwargs[kw] = arg
   return args, kwargs, offset
 
-def get_name_and_args(text: str,
-                      offset: int = 0
-                      ) -> tuple[str, list | None, list | None, int]:
+def get_name_and_args(
+    text: str,
+    offset: int = 0,
+    delim=None,
+) -> tuple[str, list | None, list | None, int]:
   ''' Match a dotted identifier optionally followed by a colon
           and position and keyword arguments.
           Return `('',None,None,offset)` on no match.
@@ -642,7 +644,7 @@ def get_name_and_args(text: str,
     return name, None, None, offset
   if text.startswith(':', offset):
     offset += 1
-    args, kwargs, offset = get_action_args(text, offset)
+    args, kwargs, offset = get_action_args(text, offset, delim)
     if offset < len(text):
       raise ValueError(f'unparsed text after params: {text[offset:]!r}')
   else:
