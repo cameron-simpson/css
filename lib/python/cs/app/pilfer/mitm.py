@@ -33,20 +33,20 @@ from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 
 
-def print_rq(flow):
+def print_rq(hook_name, flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
 
 @attr(default_hooks=('requestheaders', 'response'))
 @uses_pilfer
-def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
+def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   ''' Insert at `"requestheaders"` and `"response"` callbacks
       to intercept a flow using the cache.
       If there is no `flow.response`, consult the cache.
       If there is a `flow.response`, update the cache.
   '''
   assert P is not None
-  PR = lambda *a: print('CACHED_FLOW:', flow.request, *a)
+  PR = lambda *a: print('CACHED_FLOW', hook_name, flow.request, *a)
   rq = flow.request
   if rq.method not in ('GET', 'HEAD'):
     PR(rq.method, "is not GET or HEAD")
@@ -116,9 +116,9 @@ def cached_flow(flow, *, P: Pilfer = None, mode='missing'):
 @attr(default_hooks=('requestheaders',))
 @typechecked
 @uses_pilfer
-def dump_flow(flow, *, P: Pilfer = None):
+def dump_flow(hook_name, flow, *, P: Pilfer = None):
   assert P is not None
-  PR = lambda *a: print('DUMP_FLOW:', flow.request, *a)
+  PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
   rq = flow.request
   url = URL(rq.url)
   sitemap = P.sitemap_for(url)
@@ -229,7 +229,7 @@ class MITMAddon:
         last_e = None
         for i, (action, args, kwargs) in enumerate(hook_actions):
           try:
-            pfx_call(action, *args, *a, **kwargs, **kw)
+            pfx_call(action, hook_name, *args, *a, **kwargs, **kw)
           except Exception as e:
             warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
             last_e = e
