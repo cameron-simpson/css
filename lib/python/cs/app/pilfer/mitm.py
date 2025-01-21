@@ -114,8 +114,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       PR("from cache, cache_key", cache_key)
 
 @attr(default_hooks=('requestheaders',))
-@typechecked
 @uses_pilfer
+@typechecked
 def dump_flow(hook_name, flow, *, P: Pilfer = None):
   assert P is not None
   PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
