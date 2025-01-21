@@ -1072,7 +1072,7 @@ def progressbar(
 def auto_progressbar(func, label=None, report_print=False):
   ''' Decorator for a function accepting an optional `progress`
       keyword parameter.
-      If `progress` is `None` and the default `Upd` is not disabled,
+      If `progress` is not `None` and the default `Upd` is not disabled,
       run the function with a progress bar.
   '''
 
