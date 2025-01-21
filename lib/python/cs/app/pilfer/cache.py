@@ -244,7 +244,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     self[cache_key] = md
     if old_content_rpath and old_content_rpath != content_rpath:
       pfx_call(os.remove, self.cached_pathto(old_content_rpath))
-    os.system(f'ls -ld {contentpath!r}')
+    ##os.system(f'ls -ld {contentpath!r}')
     return md
 
 if __name__ == '__main__':
