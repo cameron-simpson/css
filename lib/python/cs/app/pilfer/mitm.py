@@ -188,6 +188,7 @@ class MITMHookAction(Promotable):
       'cache': cached_flow,
       'dump': dump_flow,
       'print': print_rq,
+      'watch': watch_flow,
   }
 
   action: Callable
