@@ -178,6 +178,14 @@ class MITMHookAction(Promotable):
     return self.action(*self.args, *a, **self.kwargs, **kw)
     return pfx_call(self.action, *self.args, *a, **self.kwargs, **kw)
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote a callable as the direct action.
+    '''
+    if callable(obj):
+      return cls(action=obj)
+    return super().promote(obj)
+
 @dataclass
 class MITMAddon:
 
