@@ -26,6 +26,7 @@ from cs.lex import r, tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress
+from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
 from cs.upd import print
 from cs.urlutils import URL
@@ -91,11 +92,15 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               report_print=print,
           )
 
+          cache_Q = IterableQueue()
+
           def cache_stream_chunk(bs: bytes) -> bytes:
             if len(bs) == 0:
               progress_Q.close()
+              cache_Q.close()
             else:
               progress_Q.put(bs)
+              cache_Q.put(bs)
             return bs
 
           # dispatch cache.cache_response in a Thread to collect the stream data
@@ -105,7 +110,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               args=(
                   url,
                   cache_key,
-                  progress_Q,
+                  cache_Q,
                   flow.request.headers,
                   flow.response.headers,
               ),
