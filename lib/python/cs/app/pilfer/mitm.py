@@ -82,24 +82,12 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           # we are at the response headers
           # and will stream the content to the cache file
           assert hook_name == "responseheaders"
-          content_length = flow.response.headers.get('content-length')
-          progress_Q = Progress(
-              str(rq),
-              total=None if content_length is None else int(content_length),
-          ).qbar(
-              itemlenfunc=len,
-              incfirst=True,
-              report_print=print,
-          )
-
           cache_Q = IterableQueue()
 
           def cache_stream_chunk(bs: bytes) -> bytes:
             if len(bs) == 0:
-              progress_Q.close()
               cache_Q.close()
             else:
-              progress_Q.put(bs)
               cache_Q.put(bs)
             return bs
 
