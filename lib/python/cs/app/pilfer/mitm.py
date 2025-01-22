@@ -76,6 +76,44 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
+        if flow.response.content is None:
+          # we are at the response headers
+          # and will stream the content to the cache file
+          assert hook_name == "responseheaders"
+          content_length = rsp.headers.get('content-length')
+          progress_Q = Progress(
+              str(rq),
+              total=None if content_length is None else int(content_length),
+          ).qbar(
+              itemlenfunc=len,
+              incfirst=True,
+              report_print=print,
+          )
+
+          def cache_stream_chunk(bs: bytes) -> bytes:
+            if len(bs) == 0:
+              progress_Q.close()
+            else:
+              progress_Q.put(bs)
+            return bs
+
+          # dispatch cache.cache_response in a Thread to collect the stream data
+          Thread(
+              name=f'cache_flow({rq})',
+              target=cache.cache_response,
+              args=(
+                  url,
+                  cache_key,
+                  Q,
+                  flow.request.headers,
+                  flow.response.headers,
+              ),
+              kwargs=dict(mode=mode),
+          ).start()
+          rsp.stream = cache_stream_chunk
+
+        else:
+          assert hook_name == "response"
         md = cache.cache_response(
             url,
             cache_key,
