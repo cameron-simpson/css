@@ -115,14 +115,14 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
 
         else:
           assert hook_name == "response"
-        md = cache.cache_response(
-            url,
-            cache_key,
-            flow.response.content,
-            flow.request.headers,
-            flow.response.headers,
-            mode=mode,
-        )
+          md = cache.cache_response(
+              url,
+              cache_key,
+              flow.response.content,
+              flow.request.headers,
+              flow.response.headers,
+              mode=mode,
+          )
     else:
       # probe the cache
       md = cache.get(cache_key, {}, mode=mode)
