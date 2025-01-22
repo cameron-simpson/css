@@ -102,7 +102,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   flow.request.headers,
                   flow.response.headers,
               ),
-              kwargs=dict(mode=mode),
+              kwargs=dict(mode=mode, decoded=False),
           ).start()
           flow.response.stream = cache_stream_chunk
 
@@ -115,6 +115,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               flow.request.headers,
               flow.response.headers,
               mode=mode,
+              decoded=True,
           )
     else:
       # probe the cache
