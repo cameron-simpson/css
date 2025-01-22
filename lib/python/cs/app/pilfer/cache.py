@@ -232,6 +232,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       *,
       old_md: Optional[dict] = None,
       mode: str = 'modified',
+      decoded=False,
   ) -> dict:
     ''' Cache the contents of the response `rsp` against `cache_key`.
         Return the resulting cache metadata for the response.
@@ -239,11 +240,11 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     if isinstance(content, bytes):
       content = [content]
     content = iter(content)
-    # we're saving the decoded content, strip this header
-    # (also, it makes mitmproxy unwantedly encode a cached response)
-    if 'content-encoding' in rsp_headers:
-      rsp_headers = dict(rsp_headers)
-      del rsp_headers['content-encoding']
+    if decoded:
+      # we're saving the decoded content, strip this header
+      if 'content-encoding' in rsp_headers:
+        rsp_headers = dict(rsp_headers)
+        del rsp_headers['content-encoding']
     with self:
       if old_md is None:
         old_md = self.get(cache_key, {}, mode=mode)
