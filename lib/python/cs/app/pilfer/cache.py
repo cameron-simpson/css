@@ -28,6 +28,7 @@ from cs.fs import HasFSPath, needdir, shortpath, validate_rpath
 from cs.hashutils import BaseHashCode
 from cs.logutils import warning
 from cs.pfx import pfx_call
+from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.urlutils import URL
@@ -38,6 +39,9 @@ from .sitemap import SiteMap
 
 @dataclass
 class ContentCache(HasFSPath, MultiOpenMixin):
+
+  # present a progress bar for objects of 200KiB or more
+  PROGRESS_THRESHOLD = 204800
 
   fspath: str
   hashname: str = 'blake3'
@@ -267,13 +271,26 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       # write the content file
       # only make filesystem items if all the required compute succeeds
       ext = urlext or ctext
+      content_length = rq_headers.get('content-length')
+      # present a progress bar for longer content
+      bss = (
+          content if content_length is None
+          or content_length < self.PROGRESS_THRESHOLD else progressbar(
+              content,
+              f'{url.hostname}:{url.path[-20]}',
+              total=content_length,
+              itemlenfunc=len,
+              incfirst=True,
+              report_print=print,
+          )
+      )
       with NamedTemporaryFile(
           dir=contentdir,
           prefix='.cache_response--',
           suffix=ext,
       ) as T:
         hasher = self.hashclass.hashfunc()
-        for bs in content:
+        for bs in bss:
           T.write(bs)
           hasher.update(bs)
         T.flush()
