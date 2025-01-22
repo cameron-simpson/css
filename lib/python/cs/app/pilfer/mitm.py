@@ -136,13 +136,19 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         except KeyError as e:
           warning("cached_flow: %s %s: %s", rq.method, rq.pretty_url, e)
           return
-      # set the response, should preempt the upstream fetch
-      rsp_hdrs = md.get('response_headers', {})
+      # set the response, preempting the upstream fetch
+      rsp_hdrs = dict(md.get('response_headers', {}))
+      # The http.Response.make factory accepts the supplied content
+      # and _encodes_ it according to the Content-Encoding header, if any.
+      # But we cached the encoded content. So we pull off the Content-Encoding header
+      # (keeping a note of it), make the Response, then put the header back.
+      ce = rsp_hdrs.pop('content-encoding', 'identity')
       flow.response = http.Response.make(
           200,  # HTTP status code
           content,
           rsp_hdrs,
       )
+      flow.response.headers['content-encoding'] = ce
       flow.from_cache = True
       PR("from cache, cache_key", cache_key)
 
