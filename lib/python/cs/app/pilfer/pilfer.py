@@ -211,7 +211,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   @contextmanager
   def startup_shutdown(self):
     with self.later:
-      yield
+      with self.content_cache:
+        yield
 
   def copy(self, *a, **kw):
     ''' Convenience function to shallow copy this `Pilfer` with modifications.
