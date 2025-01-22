@@ -8,13 +8,16 @@ import mimetypes
 import os
 from os.path import (
     basename,
-    dirname,
+    exists as existspath,
     isfile as isfilepath,
     join as joinpath,
     splitext,
 )
+from queue import Queue
+from tempfile import NamedTemporaryFile
+from threading import Lock, Thread
 import time
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple
 
 from icontract import require
 
@@ -22,10 +25,10 @@ from cs.cmdutils import vprint
 from cs.context import stackattrs
 from cs.deco import promote
 from cs.fs import HasFSPath, needdir, shortpath, validate_rpath
-from cs.fileutils import atomic_filename
 from cs.hashutils import BaseHashCode
 from cs.logutils import warning
 from cs.pfx import pfx_call
+from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.urlutils import URL
 
@@ -42,14 +45,60 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   @typechecked
   def __post_init__(self):
     self.hashclass = BaseHashCode.hashclass(self.hashname)
+    self._query_lock = Lock()
+
+  def _worker(self, dbmpath, inq, outq):
+    ''' Worker thread to do db access, since SQLite requires all
+        this to happen in the same thread.
+    '''
+    with dbm.sqlite3.open(dbmpath, 'c') as cache_map:
+      for token, rq in inq:
+        result = None
+        try:
+          if isinstance(rq, tuple):
+            key, value = rq
+            assert isinstance(key, str)
+            assert isinstance(value, dict)
+            cache_map[self.dbmkey(key)] = json.dumps(value).encode('utf-8')
+          else:
+            key = rq
+            assert isinstance(key, str)
+            result = cache_map.get(self.dbmkey(key), None)
+            if result is not None:
+              result = json.loads(result.decode('utf-8'))
+        finally:
+          outq.put((token, result))
+
+  @typechecked
+  def _query(self, rq: Tuple[str, dict] | str):
+    token = object()
+    with self._query_lock:
+      self._to_worker.put((token, rq))
+      token2, result = self._from_worker.get()
+    assert token2 is token
+    return result
 
   @contextmanager
   def startup_shutdown(self):
     needdir(self.fspath) and vprint("made", self.shortpath)
     needdir(self.cached_path) and vprint("made", shortpath(self.cached_path))
-    with dbm.sqlite3.open(self.dbmpath, 'c') as cache_map:
-      with stackattrs(self, cache_map=cache_map):
+    to_worker = IterableQueue()
+    try:
+      from_worker = Queue()
+      worker = Thread(
+          name=f'{self}.worker',
+          target=self._worker,
+          args=(self.dbmpath, to_worker, from_worker),
+      )
+      worker.start()
+      with stackattrs(
+          self,
+          _to_worker=to_worker,
+          _from_worker=from_worker,
+      ):
         yield
+    finally:
+      to_worker.close()
 
   @property
   def cached_path(self):
@@ -77,6 +126,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   def __iter__(self):
     ''' Return an iterator of the cache keys.
     '''
+    raise RuntimeError
     for dbmkey in self.cache_map:
       yield dbmkey.decode('utf-8')
 
@@ -87,12 +137,15 @@ class ContentCache(HasFSPath, MultiOpenMixin):
 
   @typechecked
   def __getitem__(self, key: str) -> dict:
-    return json.loads(self.cache_map[self.dbmkey(key)].decode('utf-8'))
+    value = self._query(key)
+    if value is None:
+      raise KeyError(key)
+    return value
 
   def get(self, key: str, default=None, *, mode='metadata'):
     ''' Get the metadata for for `key`, or `default` if it is missing or not valid.
         If `mode=="metadata"` then it is enough for the metadata to be present
-        Otherwise the `contentrpath` must also resolve to a regular file.
+        Otherwise the `content_rpath` must also resolve to a regular file.
     '''
     try:
       md = self[key]
@@ -115,7 +168,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
 
   @typechecked
   def __setitem__(self, key: str, metadata: dict):
-    self.cache_map[self.dbmkey(key)] = json.dumps(metadata).encode('utf-8')
+    self._query((key, metadata))
 
   @staticmethod
   def cache_key_for(sitemap: SiteMap, url_key: str):
@@ -165,7 +218,6 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     )
 
   @promote
-  @typechecked
   def cache_response(
       self,
       url: URL,
@@ -182,73 +234,79 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     if isinstance(content, bytes):
       content = [content]
+    content = iter(content)
     # we're saving the decoded content, strip this header
     # (also, it makes mitmproxy unwantedly encode a cached response)
     if 'content-encoding' in rsp_headers:
       rsp_headers = dict(rsp_headers)
       del rsp_headers['content-encoding']
-    if old_md is None:
-      old_md = self.get(cache_key, {}, mode=mode)
-    assert isinstance(content, bytes)
-    h = self.hashclass.from_data(content)
-    # new content file path
-    urlbase, urlext = splitext(basename(url.path))
-    content_type = rsp_headers.get('content-type').split(';')[0].strip()
-    if content_type:
-      ctext = mimetypes.guess_extension(content_type) or ''
-    else:
-      warning("no request Content-Type")
-      ctext = ''
-    try:
-      ckdir, ckbase = cache_key.rsplit('/', 1)
-    except ValueError:
-      ckdir = None
-      ckbase = cache_key
-    content_base = (
-        f'{ckbase}--{urlbase or "index"}'[:128] + f'--{h}{urlext or ctext}'
-    )
-    if ckdir is None:
-      content_rpath = content_base
-    else:
-      content_rpath = joinpath(ckdir, content_base)
-    contentpath = self.cached_pathto(content_rpath)
-    # the new metadata
-    md = {
-        'url': str(url),
-        'unixtime': time.time(),
-        'content_hash': str(h),
-        'content_rpath': content_rpath,
-        'request_headers': dict(rq_headers),
-        'response_headers': dict(rsp_headers),
-    }
-    if mode == 'modified':
-      hs = str(h)
-      old_hs = old_md.get('content_hash', '')
-      if hs == old_hs:
-        vprint("CACHE: same checksum", hs)
-        # update the metadata but do not replace the content file
-        self[cache_key] = md
-        return old_md
-    old_content_rpath = old_md.get('content_rpath', '')
-    if mode == 'force' or content_rpath != old_content_rpath:
+    with self:
+      if old_md is None:
+        old_md = self.get(cache_key, {}, mode=mode)
+      # new content file path
+      urlbase, urlext = splitext(basename(url.path))
+      content_type = rsp_headers.get('content-type').split(';')[0].strip()
+      if content_type:
+        ctext = mimetypes.guess_extension(content_type) or ''
+      else:
+        warning("no request Content-Type")
+        ctext = ''
+      # partition thekey into a directory part and the final component
+      # used as the basis for the cache filename
+      try:
+        ckdir, ckbase = cache_key.rsplit('/', 1)
+      except ValueError:
+        ckdir = None
+        ckbase = cache_key
+        contentdir = self.cached_path
+      else:
+        contentdir = self.cached_pathto(ckdir)
+        needdir(
+            contentdir, use_makedirs=True
+        ) and vprint("made", shortpath(contentdir))
       # write the content file
       # only make filesystem items if all the required compute succeeds
-      contentdir = dirname(contentpath)
-      needdir(
-          contentdir, use_makedirs=True
-      ) and vprint("made", shortpath(contentdir))
-      with atomic_filename(
-          contentpath,
-          mode='xb',
-          exists_ok=(content_rpath == old_content_rpath),
-      ) as cf:
+      ext = urlext or ctext
+      with NamedTemporaryFile(
+          dir=contentdir,
+          prefix='.cache_response--',
+          suffix=ext,
+      ) as T:
+        hasher = self.hashclass.hashfunc()
         for bs in content:
-          cf.write(bs)
-    self[cache_key] = md
-    if old_content_rpath and old_content_rpath != content_rpath:
-      pfx_call(os.remove, self.cached_pathto(old_content_rpath))
-    ##os.system(f'ls -ld {contentpath!r}')
-    return md
+          T.write(bs)
+          hasher.update(bs)
+        T.flush()
+        h = self.hashclass(hasher.digest())
+        content_base = (
+            f'{ckbase}--{urlbase or "index"}'[:128] + f'--{h}{ext}'
+        )
+        content_path = joinpath(contentdir, content_base)
+        content_rpath = (
+            content_base if ckdir is None else joinpath(ckdir, content_base)
+        )
+        # link the temp file to the final name
+        if existspath(content_path):
+          pfx_call(os.rename, T.name, content_path)
+          with open(T.name, 'xb'):
+            pass
+        else:
+          pfx_call(os.link, T.name, content_path)
+      # the new metadata
+      md = {
+          'url': str(url),
+          'unixtime': time.time(),
+          'content_hash': str(h),
+          'content_rpath': content_rpath,
+          'request_headers': dict(rq_headers),
+          'response_headers': dict(rsp_headers),
+      }
+      self[cache_key] = md
+      # remove the old content fie if different
+      old_content_rpath = old_md.get('content_rpath', '')
+      if old_content_rpath and old_content_rpath != content_rpath:
+        pfx_call(os.remove, self.cached_pathto(old_content_rpath))
+      return md
 
 if __name__ == '__main__':
   sitemap = SiteMap()
