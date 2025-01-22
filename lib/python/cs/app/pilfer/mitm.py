@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from functools import partial
 import os
 from signal import SIGINT
+from threading import Thread
 from typing import Callable, Mapping
 
 from mitmproxy import ctx, http
@@ -37,7 +38,7 @@ def print_rq(hook_name, flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
 
-@attr(default_hooks=('requestheaders', 'response'))
+@attr(default_hooks=('requestheaders', 'responseheaders'))
 @uses_pilfer
 def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   ''' Insert at `"requestheaders"` and `"response"` callbacks
@@ -80,7 +81,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           # we are at the response headers
           # and will stream the content to the cache file
           assert hook_name == "responseheaders"
-          content_length = rsp.headers.get('content-length')
+          content_length = flow.response.headers.get('content-length')
           progress_Q = Progress(
               str(rq),
               total=None if content_length is None else int(content_length),
@@ -104,13 +105,13 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               args=(
                   url,
                   cache_key,
-                  Q,
+                  progress_Q,
                   flow.request.headers,
                   flow.response.headers,
               ),
               kwargs=dict(mode=mode),
           ).start()
-          rsp.stream = cache_stream_chunk
+          flow.response.stream = cache_stream_chunk
 
         else:
           assert hook_name == "response"
