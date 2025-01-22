@@ -85,6 +85,9 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           cache_Q = IterableQueue()
 
           def cache_stream_chunk(bs: bytes) -> bytes:
+            ''' Put received chunks onto `cache_Q`.
+                The end chunk has length 0 and closes the queue.
+            '''
             if len(bs) == 0:
               cache_Q.close()
             else:
