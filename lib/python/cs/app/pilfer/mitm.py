@@ -335,6 +335,7 @@ async def run_proxy(
   opts = Options(
       listen_host=listen_host,
       listen_port=listen_port,
+      ssl_insecure=True,
   )
   https_proxy = os.environ.get('https_proxy')
   if https_proxy:
