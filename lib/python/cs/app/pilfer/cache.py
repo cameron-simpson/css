@@ -14,7 +14,7 @@ from os.path import (
     splitext,
 )
 import time
-from typing import Optional
+from typing import Iterable, Optional
 
 from icontract import require
 
@@ -170,7 +170,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       self,
       url: URL,
       cache_key: str,
-      content: bytes,
+      content: bytes | Iterable[bytes],
       rq_headers,
       rsp_headers,
       *,
@@ -180,6 +180,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     ''' Cache the contents of the response `rsp` against `cache_key`.
         Return the resulting cache metadata for the response.
     '''
+    if isinstance(content, bytes):
+      content = [content]
     # we're saving the decoded content, strip this header
     # (also, it makes mitmproxy unwantedly encode a cached response)
     if 'content-encoding' in rsp_headers:
@@ -240,7 +242,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
           mode='xb',
           exists_ok=(content_rpath == old_content_rpath),
       ) as cf:
-        cf.write(content)
+        for bs in content:
+          cf.write(bs)
     self[cache_key] = md
     if old_content_rpath and old_content_rpath != content_rpath:
       pfx_call(os.remove, self.cached_pathto(old_content_rpath))
