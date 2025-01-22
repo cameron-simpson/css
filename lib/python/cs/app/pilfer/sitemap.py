@@ -84,7 +84,8 @@ class SiteMap:
 
 @dataclass
 class DocSite(SiteMap):
-  ''' A general purpose doc site map with keys for `.html` and `.js` URLs.
+  ''' A general purpose doc site map with keys for `.html` and `.js` URLs
+      along with several other common extensions.
   '''
 
   @promote
@@ -92,7 +93,7 @@ class DocSite(SiteMap):
     ''' Return a key for `.html` and `.js` and `..../` URLs.
     '''
     if url.path.endswith(tuple(
-        '/ .css .gif .html .ico .jpg .js .png .webp'.split())):
+        '/ .css .gif .html .ico .jpg .js .png .svg .webp'.split())):
       key = url.path.lstrip('/')
       if key.endswith('/'):
         key += 'index.html'

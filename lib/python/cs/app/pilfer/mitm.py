@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from functools import partial
 import os
 from signal import SIGINT
+from threading import Thread
 from typing import Callable, Mapping
 
 from mitmproxy import ctx, http
@@ -21,9 +22,11 @@ from typeguard import typechecked
 
 from cs.cmdutils import vprint
 from cs.deco import attr, Promotable, promote
-from cs.lex import tabulate
+from cs.lex import r, tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
+from cs.progress import Progress
+from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
 from cs.upd import print
 from cs.urlutils import URL
@@ -32,12 +35,11 @@ from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 
-
 def print_rq(hook_name, flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
 
-@attr(default_hooks=('requestheaders', 'response'))
+@attr(default_hooks=('requestheaders', 'responseheaders'))
 @uses_pilfer
 def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   ''' Insert at `"requestheaders"` and `"response"` callbacks
@@ -76,14 +78,48 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
-        md = cache.cache_response(
-            url,
-            cache_key,
-            flow.response.content,
-            flow.request.headers,
-            flow.response.headers,
-            mode=mode,
-        )
+        if flow.response.content is None:
+          # we are at the response headers
+          # and will stream the content to the cache file
+          assert hook_name == "responseheaders"
+          cache_Q = IterableQueue()
+
+          def cache_stream_chunk(bs: bytes) -> bytes:
+            ''' Put received chunks onto `cache_Q`.
+                The end chunk has length 0 and closes the queue.
+            '''
+            if len(bs) == 0:
+              cache_Q.close()
+            else:
+              cache_Q.put(bs)
+            return bs
+
+          # dispatch cache.cache_response in a Thread to collect the stream data
+          Thread(
+              name=f'cache_flow({rq})',
+              target=cache.cache_response,
+              args=(
+                  url,
+                  cache_key,
+                  cache_Q,
+                  flow.request.headers,
+                  flow.response.headers,
+              ),
+              kwargs=dict(mode=mode, decoded=False),
+          ).start()
+          flow.response.stream = cache_stream_chunk
+
+        else:
+          assert hook_name == "response"
+          md = cache.cache_response(
+              url,
+              cache_key,
+              flow.response.content,
+              flow.request.headers,
+              flow.response.headers,
+              mode=mode,
+              decoded=True,
+          )
     else:
       # probe the cache
       md = cache.get(cache_key, {}, mode=mode)
@@ -103,13 +139,19 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         except KeyError as e:
           warning("cached_flow: %s %s: %s", rq.method, rq.pretty_url, e)
           return
-      # set the response, should preempt the upstream fetch
-      rsp_hdrs = md.get('response_headers', {})
+      # set the response, preempting the upstream fetch
+      rsp_hdrs = dict(md.get('response_headers', {}))
+      # The http.Response.make factory accepts the supplied content
+      # and _encodes_ it according to the Content-Encoding header, if any.
+      # But we cached the encoded content. So we pull off the Content-Encoding header
+      # (keeping a note of it), make the Response, then put the header back.
+      ce = rsp_hdrs.pop('content-encoding', 'identity')
       flow.response = http.Response.make(
           200,  # HTTP status code
           content,
           rsp_hdrs,
       )
+      flow.response.headers['content-encoding'] = ce
       flow.from_cache = True
       PR("from cache, cache_key", cache_key)
 
@@ -117,6 +159,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
 @uses_pilfer
 @typechecked
 def dump_flow(hook_name, flow, *, P: Pilfer = None):
+  ''' Dump request information: headers and query parameters.
+  '''
   assert P is not None
   PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
   rq = flow.request
@@ -145,6 +189,41 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
             for param, value in sorted(rq.urlencoded_form.items())]):
         print("   ", line)
 
+@attr(default_hooks=('responseheaders',))
+@uses_pilfer
+@typechecked
+def watch_flow(hook_name, flow, *, P: Pilfer = None):
+  ''' Watch data chunks from a stream flow.
+  '''
+  rq = flow.request
+  rsp = flow.response
+  PR = lambda *a: print('WATCH_FLOW', hook_name, rq, *a)
+  PR("response.stream was", r(rsp.stream))
+
+  print("  Response Headers:")
+  for line in tabulate(*[(key, value)
+                         for key, value in sorted(rsp.headers.items())]):
+    print("   ", line)
+
+  content_length = rsp.headers.get('content-length')
+  progress_Q = Progress(
+      str(rq),
+      total=None if content_length is None else int(content_length),
+  ).qbar(
+      itemlenfunc=len,
+      incfirst=True,
+      report_print=print,
+  )
+
+  def watch(bs: bytes) -> bytes:
+    if len(bs) == 0:
+      progress_Q.close()
+    else:
+      progress_Q.put(bs)
+    return bs
+
+  rsp.stream = watch
+
 @dataclass
 class MITMHookAction(Promotable):
 
@@ -152,6 +231,7 @@ class MITMHookAction(Promotable):
       'cache': cached_flow,
       'dump': dump_flow,
       'print': print_rq,
+      'watch': watch_flow,
   }
 
   action: Callable
@@ -258,6 +338,7 @@ async def run_proxy(
   opts = Options(
       listen_host=listen_host,
       listen_port=listen_port,
+      ssl_insecure=True,
   )
   https_proxy = os.environ.get('https_proxy')
   if https_proxy:

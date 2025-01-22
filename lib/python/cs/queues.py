@@ -55,7 +55,7 @@ DISTINFO = {
     ],
 }
 
-class QueueIterator(MultiOpenMixin):
+class QueueIterator(MultiOpenMixin, Iterable[Any]):
   ''' A `QueueIterator` is a wrapper for a `Queue`like object
       which presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
