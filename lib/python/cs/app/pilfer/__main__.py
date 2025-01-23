@@ -242,7 +242,8 @@ class PilferCommand(BaseCommand):
       # consume everything from the main pipeline
       await print_from(pipespec.run_pipeline(urls))
       # close and join any running diversions
-      await P.diversions.join()
+      async for diversion_name in P.close_diversions():
+        print("CLOSED DIVERSION", diversion_name)
 
     asyncio.run(run())
 
