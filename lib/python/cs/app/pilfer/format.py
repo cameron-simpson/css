@@ -6,7 +6,7 @@ try:
 except ImportError:
   pass
 
-
+from cs.deco import promote
 from cs.pfx import Pfx
 from cs.urlutils import URL
 
@@ -22,20 +22,17 @@ class FormatMapping(object):
       This mapping is used with str.format to fill in {value}s.
   '''
 
-  def __init__(self, P, U=None, factory=None):
+  @promote
+  def __init__(self, P, U: URL = None):
     ''' Initialise this `FormatMapping` from a Pilfer `P`.
         The optional parameter `U` (default from `P._`) is the
         object whose attributes are exposed for format strings,
         though `P.user_vars` preempt them.
-        The optional parameter `factory` is used to promote the
-        value `U` to a useful type; it calls `URL.promote` by default.
     '''
     self.pilfer = P
-    if U is None:
-      U = P._
-    if factory is None:
-      factory = URL.promote
-    self.url = factory(U)
+    if U is None and P._ is not None:
+      U = URL.promote(P._)
+    self.url = U
 
   def _ok_attrkey(self, k):
     ''' Test for validity of `k` as a public non-callable attribute of self.url.
