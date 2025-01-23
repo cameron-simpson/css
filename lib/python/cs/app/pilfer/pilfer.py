@@ -41,7 +41,7 @@ from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
-from cs.threads import HasThreadState, ThreadState
+from cs.threads import locked, HasThreadState, ThreadState
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
@@ -110,44 +110,6 @@ class PseudoFlow:
   request: requests.Request = None
   response: requests.Response = None
 
-@dataclass(kw_only=True)
-class Diversions:
-  ''' A collection of diversion pipelines.
-  '''
-  specs: Mapping[str, str] = field(default_factory=dict)
-  pilfer: "Pilfer"
-
-  def __post_init__(self):
-    self._tasks = []
-
-  @mapped_property
-  def pipes(self, pipe_name):
-    from .pipelines import PipeLineSpec
-    pipeline = PipeLineSpec.from_str(self.specs[pipe_name]
-                                     ).make_pipeline(self.pilfer)
-
-    async def discard():
-      ''' Discard the output of the diversion pipeline.
-      '''
-      async for _ in pipeline.outq:
-        pass
-
-    self._tasks.append(asyncio.create_task(discard()))
-    return pipeline
-
-  def close(self):
-    ''' Close the input queues of the existing pipelines.
-    '''
-    for pipe in self.pipes.values():
-      pipe.close()
-
-  async def join(self):
-    ''' Close all the pipelines and wait for their discard atasks to complete.
-    '''
-    self.close()
-    for task in self._tasks:
-      await task
-
 @dataclass
 class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
@@ -183,10 +145,10 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       )
   )
   content_cache: ContentCache = None
+  _diversion_tasks: dict = field(default_factory=dict)
 
   @uses_later
   def __post_init__(self, item=None, later: Later = None):
-    self.diversions = Diversions(specs=self.rc_map['pipes'], pilfer=self)
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     self.url_opener.add_handler(HTTPCookieProcessor())
     if self.fspath is None:
@@ -281,6 +243,43 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     from .pipelines import PipeLineSpec
     pipe_spec = self.rc_map['pipes'][pipe_name]
     return PipeLineSpec.from_str(pipe_spec)
+
+  @mapped_property
+  @locked
+  def diversions(self, diversion_name):
+    pipeline = self.pipe_specs[diversion_name].make_pipeline(self.pilfer)
+
+    async def discard():
+      ''' Discard the output of the diversion pipeline.
+      '''
+      async for _ in pipeline.outq:
+        ##print("diversion[%r} -> %s", diversion_name, _)
+        pass
+
+    self._diversion_tasks[diversion_name] = asyncio.create_task(discard())
+    return pipeline
+
+  async def close_diversions(self):
+    ''' An asynchronous generator which closes all the pipeline diversions
+        and yields each diversion name as its discard `Task` completes.
+    '''
+    diversions = self.diversions
+    diversion_names = list(diversions.keys())
+
+    async def close_diversion(diversion_name):
+      pipeline = diversions.pop(diversion_name)
+      await pipeline.close()
+      task = self._diversion_tasks.pop(diversion_name)
+      await task
+      return diversion_name
+
+    async for diversion_name in amap(
+        close_diversion,
+        diversion_names,
+        concurrent=True,
+        unordered=True,
+    ):
+      yield diversion_name
 
   @cached_property
   def seen_backing_paths(self):
