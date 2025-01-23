@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict
 from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
+import copy
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
@@ -33,7 +34,7 @@ from cs.fs import HasFSPath, needdir
 from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
-from cs.naysync import agen, async_iter, StageMode
+from cs.naysync import agen, amap, async_iter, StageMode
 from cs.obj import copy as obj_copy
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
@@ -213,11 +214,6 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     with self.later:
       with self.content_cache:
         yield
-
-  def copy(self, *a, **kw):
-    ''' Convenience function to shallow copy this `Pilfer` with modifications.
-    '''
-    return obj_copy(self, *a, **kw)
 
   @property
   def defaults(self):
@@ -430,18 +426,12 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       if self.flush_print:
         file.flush()
 
-  ##@require(lambda kw: all(isinstance(v, str) for v in kw))
-  def set_user_vars(self, **kw):
-    ''' Update self.user_vars from the keyword arguments.
+  def copy_with_vars(self, **update_vars):
+    ''' Make a copy of `self` with copied `.user_vars`, update the
+        vars and return the copied `Pilfer`.
     '''
-    self.user_vars.update(kw)
-
-  def copy_with_vars(self, **kw):
-    ''' Make a copy of `self` with copied .user_vars, update the
-        vars and return the copied Pilfer.
-    '''
-    P = self.copy('user_vars')
-    P.set_user_vars(**kw)
+    P = copy.replace(self, vars=dict(self.user_vars))
+    P.user_vars.update(update_vars)
     return P
 
   def print_url_string(self, U, **kw):
