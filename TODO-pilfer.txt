@@ -1,3 +1,4 @@
+the pipelines need to use P.copy_with_vars() for every stage so that vars are inherited and not shared
 enclose params in brackets instead of using the : prefix ?
 drop Set-Cookie from cached headers along with content-encoding?
 graphviz view of pipelines?
