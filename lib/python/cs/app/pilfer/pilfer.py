@@ -502,6 +502,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return FormatMapping(self, U=U).format(s)
 
   def set_user_var(self, k, value, U, raw=False):
+    raise RuntimeError("how is this used?")
     if not raw:
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
