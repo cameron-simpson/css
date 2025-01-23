@@ -376,8 +376,9 @@ def parse_action(action, do_trace):
             with P.set_user_vars().
             Returns P (possibly copied), as this is a one-to-one function.
         '''
-        mfunc = P.import_module_func(grok_module, grok_funcname)
-        if mfunc is None:
+        # TODO: use import_name()
+        grok_func = P.import_module_func(grok_module, grok_funcname)
+        if grok_func is None:
           error("import fails")
         else:
           var_mapping = mfunc(P, *args, **kwargs)
@@ -403,14 +404,14 @@ def parse_action(action, do_trace):
           Ps = list(Ps)
         if Ps:
           # TODO: use import_name()
-          mfunc = pfx_call(
+          grok_func = pfx_call(
               Ps[0].import_module_func, grok_module, grok_funcname
           )
-          if mfunc is None:
+          if grok_func is None:
             error("import fails: %s.%s", grok_module, grok_funcname)
           else:
             try:
-              var_mapping = pfx_call(mfunc, Ps, *args, **kwargs)
+              var_mapping = pfx_call(grok_func, Ps, *args, **kwargs)
             except Exception as e:
               exception("call %s.%s: %s", grok_module, grok_funcname, e)
             else:
