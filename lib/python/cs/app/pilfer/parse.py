@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import copy
 import re
 from string import whitespace
 from typing import Iterable
@@ -373,19 +374,18 @@ def parse_action(action, do_trace):
             Call `func_name( P, *a, **kw ).
             Receive a mapping of variable names to values in return.
             If not empty, copy P and apply the mapping via which is applied
-            with P.set_user_vars().
-            Returns P (possibly copied), as this is a one-to-one function.
+            with `P.copy_with_vars()`.
+            Returns `P` (possibly copied), as this is a one-to-one function.
         '''
         # TODO: use import_name()
         grok_func = P.import_module_func(grok_module, grok_funcname)
         if grok_func is None:
           error("import fails")
         else:
-          var_mapping = mfunc(P, *args, **kwargs)
+          var_mapping = grok_func(P, *args, **kwargs)
           if var_mapping:
             debug("grok: var_mapping=%r", var_mapping)
-            P = P.copy('user_vars')
-            P.set_user_vars(**var_mapping)
+            P = P.copy_with_vars(**var_mapping)
         return P
 
       return StageType.ONE_TO_ONE, grok
@@ -397,8 +397,8 @@ def parse_action(action, do_trace):
             Import `func_name` from module `module_name`.
             Call `func_name( Ps, *a, **kw ).
             Receive a mapping of variable names to values in return,
-            which is applied to each item[0] via .set_user_vars().
-            Return the possibly copied Ps.
+            which is applied to each item[0] via .copy_with_vars().
+            Return the possibly copied `Ps`.
         '''
         if not isinstance(Ps, list):
           Ps = list(Ps)
@@ -416,9 +416,7 @@ def parse_action(action, do_trace):
               exception("call %s.%s: %s", grok_module, grok_funcname, e)
             else:
               if var_mapping:
-                Ps = [P.copy('user_vars') for P in Ps]
-                for P in Ps:
-                  P.set_user_vars(**var_mapping)
+                Ps = [P.copy_with_vars(**var_mapping) for P in Ps]
         return Ps
 
       return StageType.ONE_TO_MANY, grokall
