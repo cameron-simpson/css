@@ -300,7 +300,7 @@ class MITMAddon:
                        'serverdisconnect'):
         raise AttributeError(f'rejecting obsolete hook .{hook_name}')
 
-      def call_hooks(*mitm_hook_a, **mitm_hook_kw):
+      def call_hooks(flow, *mitm_hook_a, **mitm_hook_kw):
         # look up the actions when we're called
         hook_actions = self.hook_map[hook_name]
         if not hook_actions:
@@ -312,6 +312,7 @@ class MITMAddon:
                 action,
                 *action_args,
                 hook_name,
+                flow,
                 *mitm_hook_a,
                 **action_kwargs,
                 **mitm_hook_kw,
