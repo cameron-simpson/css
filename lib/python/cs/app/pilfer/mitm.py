@@ -156,7 +156,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       flow.from_cache = True
       PR("from cache, cache_key", cache_key)
 
-@attr(default_hooks=('requestheaders',))
+@attr(default_hooks=('requestheaders', 'responseheaders', 'response'))
 @uses_pilfer
 @typechecked
 def dump_flow(hook_name, flow, *, P: Pilfer = None):
@@ -165,30 +165,41 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   assert P is not None
   PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
   rq = flow.request
-  url = URL(rq.url)
-  sitemap = P.sitemap_for(url)
-  if sitemap is None:
-    PR("no site map")
-    return
   PR(rq)
-  print("  Headers:")
-  for line in tabulate(*[(key, value)
-                         for key, value in sorted(rq.headers.items())]):
-    print("   ", line)
-  if rq.method == "GET":
-    q = url.query_dict()
-    if False and q:
-      print("  Query:")
-      for line in tabulate(*[(param, repr(value))
-                             for param, value in sorted(q.items())]):
-        print("   ", line)
-  elif rq.method == "POST":
-    if False and rq.urlencoded_form:
-      print("  Query:")
-      for line in tabulate(
-          *[(param, repr(value))
-            for param, value in sorted(rq.urlencoded_form.items())]):
-        print("   ", line)
+  if hook_name == 'requestheaders':
+    url = URL(rq.url)
+    sitemap = P.sitemap_for(url)
+    if sitemap is None:
+      PR("no site map")
+    else:
+      PR("sitemap", sitemap)
+    print("  Request Headers:")
+    for line in tabulate(*[(key, value)
+                           for key, value in sorted(rq.headers.items())]):
+      print("   ", line)
+    if rq.method == "GET":
+      q = url.query_dict()
+      if False and q:
+        print("  Query:")
+        for line in tabulate(*[(param, repr(value))
+                               for param, value in sorted(q.items())]):
+          print("   ", line)
+    elif rq.method == "POST":
+      if False and rq.urlencoded_form:
+        print("  Query:")
+        for line in tabulate(
+            *[(param, repr(value))
+              for param, value in sorted(rq.urlencoded_form.items())]):
+          print("   ", line)
+  elif hook_name == 'responseheaders':
+    print("  Response Headers:")
+    for line in tabulate(*[(key, value)
+                           for key, value in sorted(rq.headers.items())]):
+      print("   ", line)
+  elif hook_name == 'response':
+    PR("  Content:", len(flow.response.content))
+  else:
+    PR("  no action for hook", hook_name)
 
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
