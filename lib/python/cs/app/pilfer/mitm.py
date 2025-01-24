@@ -303,13 +303,20 @@ class MITMAddon:
       except KeyError as e:
         raise AttributeError(f'unknown hook name {hook_name=}') from e
 
-      def call_hooks(*a, **kw):
+      def call_hooks(*mitm_hook_a, **mitm_hook_kw):
         if not hook_actions:
           return
         last_e = None
-        for i, (action, args, kwargs) in enumerate(hook_actions):
+        for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
           try:
-            pfx_call(action, hook_name, *args, *a, **kwargs, **kw)
+            pfx_call(
+                action,
+                *action_args,
+                hook_name,
+                *mitm_hook_a,
+                **action_kwargs,
+                **mitm_hook_kw,
+            )
           except Exception as e:
             warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
             last_e = e
