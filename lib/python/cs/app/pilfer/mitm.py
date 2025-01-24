@@ -369,6 +369,22 @@ class MITMAddon:
               flow.response.stream = stream0
         if hook_name == 'responseheaders' and stream_funcs:
 
+          if self.hook_map['response']:
+            # collate the final stream into a raw_content bytes instance
+            content_bss = []
+
+            def content_stream(bs: bytes) -> bytes:
+              nonlocal content_bss
+              if len(bs) == 0:
+                # record the consumed data as the response.content
+                flow.response.content = b''.join(content_bss)
+                content_bss = None
+              else:
+                content_bss.append(bs)
+              return bs
+
+            stream_funcs.append(content_stream)
+
           if len(stream_funcs) == 1:
 
             stream, = stream_funcs
