@@ -266,12 +266,13 @@ class MITMHookAction(Promotable):
       return cls(action=obj)
     return super().promote(obj)
 
-@dataclass
 class MITMAddon:
+  ''' A mitmproxy addon class which collects multiple actions per
+      hook and calls them all in order.
+  '''
 
-  hook_map: Mapping[str, list[MITMHookAction]] = field(
-      default_factory=partial(defaultdict, list)
-  )
+  def __init__(self):
+    self.hook_map = defaultdict(list)
 
   @promote
   @typechecked
@@ -298,10 +299,6 @@ class MITMAddon:
                        'clientdisconnect', 'serverconnect',
                        'serverdisconnect'):
         raise AttributeError(f'rejecting obsolete hook .{hook_name}')
-      try:
-        hook_actions = self.hook_map[hook_name]
-      except KeyError as e:
-        raise AttributeError(f'unknown hook name {hook_name=}') from e
 
       def call_hooks(*mitm_hook_a, **mitm_hook_kw):
         if not hook_actions:
