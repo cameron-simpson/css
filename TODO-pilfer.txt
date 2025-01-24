@@ -1,3 +1,4 @@
+recognise /foo/ in action params as a regexp and compile it?
 need to merge stream handlers, preserve .content if we have any "response" hooks
 the pipelines need to use P.copy_with_vars() for every stage so that vars are inherited and not shared
 enclose params in brackets instead of using the : prefix ?
