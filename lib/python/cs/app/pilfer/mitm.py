@@ -301,6 +301,8 @@ class MITMAddon:
         raise AttributeError(f'rejecting obsolete hook .{hook_name}')
 
       def call_hooks(*mitm_hook_a, **mitm_hook_kw):
+        # look up the actions when we're called
+        hook_actions = self.hook_map[hook_name]
         if not hook_actions:
           return
         last_e = None
