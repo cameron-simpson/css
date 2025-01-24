@@ -193,6 +193,42 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
+def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
+  rsp = flow.response
+  save_as = pfx_call(P.format_string, save_as_format, flow.request.url)
+  try:
+    save_f = open(save_as, 'xb')
+  except FileExistsError as e:
+    warning(
+        "%s: save_as_format=%r: open fails, file exists: %s", flow.request,
+        save_as_format, e
+    )
+    return
+
+  content_length = rsp.headers.get('content-length')
+  progress_Q = Progress(
+      f'{flow.request}: save {flow.response.headers["content-type"]} -> {save_as!r}',
+      total=None if content_length is None else int(content_length),
+  ).qbar(
+      itemlenfunc=len,
+      incfirst=True,
+      report_print=print,
+  )
+
+  def save_stream(bs: bytes) -> bytes:
+    if len(bs) == 0:
+      save_f.close()
+      progress_Q.close()
+    else:
+      progress_Q.put(bs)
+      save_f.write(bs)
+    return bs
+
+  rsp.stream = save_stream
+
+@attr(default_hooks=('responseheaders',))
+@uses_pilfer
+@typechecked
 def watch_flow(hook_name, flow, *, P: Pilfer = None):
   ''' Watch data chunks from a stream flow.
   '''
@@ -232,6 +268,7 @@ class MITMHookAction(Promotable):
       'cache': cached_flow,
       'dump': dump_flow,
       'print': print_rq,
+      'save_stream': save_stream,
       'watch': watch_flow,
   }
 
