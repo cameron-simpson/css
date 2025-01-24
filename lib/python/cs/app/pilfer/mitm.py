@@ -332,29 +332,36 @@ class MITMAddon:
               flow.response.stream = stream0
         if hook_name == 'responseheaders' and stream_funcs:
 
-          def stream(bs: bytes) -> bytes:
-            ''' Run each bytes instance through all the stream functions.
-            '''
-            stream_excs = []
-            for stream_func in stream_funcs:
-              try:
-                bs2 = stream_func(bs)
-              except Exception as e:
-                warning(
-                    "%s: exception calling hook_action stream_func %s: %s",
-                    prefix, funccite(stream_func), e
+          if len(stream_funcs) == 1:
+
+            stream, = stream_funcs
+
+          else:
+
+            def stream(bs: bytes) -> bytes:
+              ''' Run each bytes instance through all the stream functions.
+              '''
+              stream_excs = []
+              for stream_func in stream_funcs:
+                try:
+                  bs2 = stream_func(bs)
+                except Exception as e:
+                  warning(
+                      "%s: exception calling hook_action stream_func %s: %s",
+                      prefix, funccite(stream_func), e
+                  )
+                  stream_excs.append(e)
+                  breakpoint()
+                else:
+                  bs = bs2
+              if excs:
+                if len(excs) == 1:
+                  raise excs[0]
+                raise ExceptionGroup(
+                    f'multiple exceptions running actions for .{hook_name}',
+                    excs
                 )
-                stream_excs.append(e)
-                breakpoint()
-              else:
-                bs = bs2
-            if excs:
-              if len(excs) == 1:
-                raise excs[0]
-              raise ExceptionGroup(
-                  f'multiple exceptions running actions for .{hook_name}', excs
-              )
-            return bs
+              return bs
 
           flow.response.stream = stream
 
