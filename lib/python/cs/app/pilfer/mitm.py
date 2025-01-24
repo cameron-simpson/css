@@ -305,7 +305,7 @@ class MITMAddon:
         hook_actions = self.hook_map[hook_name]
         if not hook_actions:
           return
-        last_e = None
+        excs = []
         for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
           try:
             pfx_call(
@@ -318,9 +318,13 @@ class MITMAddon:
             )
           except Exception as e:
             warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
-            last_e = e
-        if last_e is not None:
-          raise last_e
+            excs.append(e)
+        if excs:
+          if len(excs) == 1:
+            raise excs[0]
+          raise ExceptionGroup(
+              f'multiple exceptions running actions for .{hook_name}', excs
+          )
 
       return call_hooks
 
