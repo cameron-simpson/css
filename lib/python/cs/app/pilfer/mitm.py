@@ -26,6 +26,7 @@ from cs.lex import r, tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress
+from cs.py.func import funccite
 from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
 from cs.upd import print
@@ -300,19 +301,24 @@ class MITMAddon:
                        'serverdisconnect'):
         raise AttributeError(f'rejecting obsolete hook .{hook_name}')
 
-      def call_hooks(flow, *mitm_hook_a, **mitm_hook_kw):
+      def call_hooks(*mitm_hook_a, **mitm_hook_kw):
         # look up the actions when we're called
         hook_actions = self.hook_map[hook_name]
         if not hook_actions:
           return
         excs = []
+        stream_funcs = []
         for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
+          if hook_name == 'responseheaders':
+            flow = mitm_hook_a[0]
+            stream0 = flow.response.stream
+            assert not stream0, \
+                f'expected falsey flow.response.stream, got {flow.response.stream=}'
           try:
             pfx_call(
                 action,
                 *action_args,
                 hook_name,
-                flow,
                 *mitm_hook_a,
                 **action_kwargs,
                 **mitm_hook_kw,
@@ -320,6 +326,38 @@ class MITMAddon:
           except Exception as e:
             warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
             excs.append(e)
+          if hook_name == 'responseheaders':
+            if flow.response.stream:
+              stream_funcs.append(flow.response.stream)
+              flow.response.stream = stream0
+        if hook_name == 'responseheaders' and stream_funcs:
+
+          def stream(bs: bytes) -> bytes:
+            ''' Run each bytes instance through all the stream functions.
+            '''
+            stream_excs = []
+            for stream_func in stream_funcs:
+              try:
+                bs2 = stream_func(bs)
+              except Exception as e:
+                warning(
+                    "%s: exception calling hook_action stream_func %s: %s",
+                    prefix, funccite(stream_func), e
+                )
+                stream_excs.append(e)
+                breakpoint()
+              else:
+                bs = bs2
+            if excs:
+              if len(excs) == 1:
+                raise excs[0]
+              raise ExceptionGroup(
+                  f'multiple exceptions running actions for .{hook_name}', excs
+              )
+            return bs
+
+          flow.response.stream = stream
+
         if excs:
           if len(excs) == 1:
             raise excs[0]
