@@ -297,7 +297,7 @@ class MITMAddon:
       if hook_name in ('addons', 'add_log', 'clientconnect',
                        'clientdisconnect', 'serverconnect',
                        'serverdisconnect'):
-        raise AttributeError(f'missing .{hook_name}')
+        raise AttributeError(f'rejecting obsolete hook .{hook_name}')
       try:
         hook_actions = self.hook_map[hook_name]
       except KeyError as e:
