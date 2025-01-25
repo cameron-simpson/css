@@ -25,6 +25,8 @@ from cs.pipeline import StageType
 from cs.py.modules import import_module_name
 from cs.urlutils import URL
 
+from .format import FormatMapping
+
 # regular expressions used when parsing actions
 re_GROK = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
