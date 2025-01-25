@@ -104,3 +104,26 @@ class DocSite(SiteMap):
       if key.endswith('/'):
         key += 'index.html'
       return f'{url.hostname}/{key}'
+
+@dataclass
+class Wikipedia(SiteMap):
+
+  URL_KEY_PATTERNS = [
+      # https://en.wikipedia.org/wiki/Braille
+      (
+          (
+              '*.wikipedia.org',
+              'wiki/(?P<title>[^:/]+)$',
+          ),
+          'wiki/{title}',
+      ),
+  ]
+
+  @promote
+  def url_key(self, url: URL) -> str | None:
+    ''' Include the domain name language in the URL key.
+    '''
+    key = super().url_key(url)
+    if key is not None:
+      key = f'{cutsuffix(url.hostname,".wikipedia.org")}/{key}'
+    return key
