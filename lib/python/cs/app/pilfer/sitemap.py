@@ -16,8 +16,6 @@ class URLMatcher(Promotable):
   hostname_fnmatch: str | None
   url_regexp: str
 
-  SITE_PATTERNS = ()
-
   @classmethod
   def from_str(cls, url_regexp):
     return cls(hostname_fnmatch=None, url_regexp=url_regexp)
@@ -58,6 +56,8 @@ class SiteMap:
 
   name: str
 
+  URL_KEY_PATTERNS = ()
+
   @promote
   def url_key(self, url: URL) -> str | None:
     ''' Return a string which is a persistent cache key for the
@@ -69,10 +69,10 @@ class SiteMap:
         something like `html` or `icon` etc for different URLs
         associated with the same entity.
 
-        This base implementation matches the patterns in `SITE_PATTERNS`
+        This base implementation matches the patterns in `URL_KEY_PATTERNS`
         class attribute which is `()` for the base class.
     '''
-    for matcher, keyfn in self.SITE_PATTERNS:
+    for matcher, keyfn in self.URL_KEY_PATTERNS:
       matcher = URLMatcher.promote(matcher)
       if mq := matcher(url):
         m, q = mq
