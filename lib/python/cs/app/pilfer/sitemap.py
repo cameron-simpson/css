@@ -13,6 +13,9 @@ from cs.urlutils import URL
 
 @dataclass
 class URLMatcher(Promotable):
+  ''' A class for matching a `URL` against a `(hostname_fnmatch,url_regexp)` pair.
+  '''
+
   hostname_fnmatch: str | None
   url_regexp: str
 
@@ -30,7 +33,11 @@ class URLMatcher(Promotable):
     return re.compile(self.url_regexp)
 
   @promote
-  def __call__(self, url: URL):
+  def __call__(self, url: URL) -> dict | None:
+    ''' Compare `url` against this matcher.
+        Return `None` on no match.
+        Return the regexp `groupdict()` on a match.
+    '''
     if self.hostname_fnmatch is not None and not fnmatch(
         url.hostname, self.hostname_fnmatch):
       return None
@@ -62,7 +69,7 @@ class SiteMap:
   def url_key(self, url: URL) -> str | None:
     ''' Return a string which is a persistent cache key for the
         supplied `url` within the content of this sitemap, or `None`
-        for URLs which shoul not be cached persistently.
+        for URLs which do not have a key i.e. should not be cached persistently.
 
         A site with semantic URLs might have keys like
         *entity_type*`/`*id*`/`*aspect* where the *aspect* was
