@@ -1638,11 +1638,11 @@ def mapped_property(method, cached=True):
     def __getitem__(self, key):
       cache = self.cache
       if cache is None:
-        return method(self, key)
+        return method(self.myself, key)
       try:
         return cache[key]
       except KeyError:
-        value = method(self, key)
+        value = method(self.myself, key)
         cache[key] = value
         return value
 

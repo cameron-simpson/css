@@ -13,10 +13,11 @@ from cs.urlutils import URL
 
 @dataclass
 class URLMatcher(Promotable):
+  ''' A class for matching a `URL` against a `(hostname_fnmatch,url_regexp)` pair.
+  '''
+
   hostname_fnmatch: str | None
   url_regexp: str
-
-  SITE_PATTERNS = ()
 
   @classmethod
   def from_str(cls, url_regexp):
@@ -32,14 +33,18 @@ class URLMatcher(Promotable):
     return re.compile(self.url_regexp)
 
   @promote
-  def __call__(self, url: URL):
+  def __call__(self, url: URL) -> dict | None:
+    ''' Compare `url` against this matcher.
+        Return `None` on no match.
+        Return the regexp `groupdict()` on a match.
+    '''
     if self.hostname_fnmatch is not None and not fnmatch(
         url.hostname, self.hostname_fnmatch):
       return None
     m = self.url_re.match(url.path)
     if m is None:
       return None
-    return m.groupdict(), url.query_dict()
+    return m.groupdict()
 
 @dataclass
 class SiteMap:
@@ -58,26 +63,27 @@ class SiteMap:
 
   name: str
 
+  URL_KEY_PATTERNS = ()
+
   @promote
   def url_key(self, url: URL) -> str | None:
     ''' Return a string which is a persistent cache key for the
         supplied `url` within the content of this sitemap, or `None`
-        for URLs which shoul not be cached persistently.
+        for URLs which do not have a key i.e. should not be cached persistently.
 
         A site with semantic URLs might have keys like
         *entity_type*`/`*id*`/`*aspect* where the *aspect* was
         something like `html` or `icon` etc for different URLs
         associated with the same entity.
 
-        This base implementation matches the patterns in `SITE_PATTERNS`
+        This base implementation matches the patterns in `URL_KEY_PATTERNS`
         class attribute which is `()` for the base class.
     '''
-    for matcher, keyfn in self.SITE_PATTERNS:
+    for matcher, keyfn in self.URL_KEY_PATTERNS:
       matcher = URLMatcher.promote(matcher)
-      if mq := matcher(url):
-        m, q = mq
-        fd = dict(q)
-        fd.update(m)
+      if (m := matcher(url)) is not None:
+        format_map = url.query_dict()
+        format_map.update(m)
         return keyfn.format_map(fd)
 
 # Some presupplied site maps.
@@ -98,3 +104,26 @@ class DocSite(SiteMap):
       if key.endswith('/'):
         key += 'index.html'
       return f'{url.hostname}/{key}'
+
+@dataclass
+class Wikipedia(SiteMap):
+
+  URL_KEY_PATTERNS = [
+      # https://en.wikipedia.org/wiki/Braille
+      (
+          (
+              '*.wikipedia.org',
+              'wiki/(?P<title>[^:/]+)$',
+          ),
+          'wiki/{title}',
+      ),
+  ]
+
+  @promote
+  def url_key(self, url: URL) -> str | None:
+    ''' Include the domain name language in the URL key.
+    '''
+    key = super().url_key(url)
+    if key is not None:
+      key = f'{cutsuffix(url.hostname,".wikipedia.org")}/{key}'
+    return key

@@ -777,7 +777,9 @@ class UpdHandler(StreamHandler):
     else:
       if self.ansi_mode:
         if logrec.levelno >= logging.ERROR:
-          logrec.msg = colourise(logrec.msg, 'red')
+          logrec.msg = colourise(
+              colourise(logrec.msg, 'white'), 'redbg', 'blackbg'
+          )
         elif logrec.levelno >= logging.WARNING:
           logrec.msg = colourise(logrec.msg, 'yellow')
       line = self.format(logrec)

@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict
 from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
+import copy
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
@@ -33,14 +34,14 @@ from cs.fs import HasFSPath, needdir
 from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
-from cs.naysync import agen, async_iter, StageMode
+from cs.naysync import agen, amap, async_iter, StageMode
 from cs.obj import copy as obj_copy
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
-from cs.threads import HasThreadState, ThreadState
+from cs.threads import locked, HasThreadState, ThreadState
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
@@ -109,44 +110,6 @@ class PseudoFlow:
   request: requests.Request = None
   response: requests.Response = None
 
-@dataclass(kw_only=True)
-class Diversions:
-  ''' A collection of diversion pipelines.
-  '''
-  specs: Mapping[str, str] = field(default_factory=dict)
-  pilfer: "Pilfer"
-
-  def __post_init__(self):
-    self._tasks = []
-
-  @mapped_property
-  def pipes(self, pipe_name):
-    from .pipelines import PipeLineSpec
-    pipeline = PipeLineSpec.from_str(self.specs[pipe_name]
-                                     ).make_pipeline(self.pilfer)
-
-    async def discard():
-      ''' Discard the output of the diversion pipeline.
-      '''
-      async for _ in pipeline.outq:
-        pass
-
-    self._tasks.append(asyncio.create_task(discard()))
-    return pipeline
-
-  def close(self):
-    ''' Close the input queues of the existing pipelines.
-    '''
-    for pipe in self.pipes.values():
-      pipe.close()
-
-  async def join(self):
-    ''' Close all the pipelines and wait for their discard atasks to complete.
-    '''
-    self.close()
-    for task in self._tasks:
-      await task
-
 @dataclass
 class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
@@ -182,10 +145,10 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       )
   )
   content_cache: ContentCache = None
+  _diversion_tasks: dict = field(default_factory=dict)
 
   @uses_later
   def __post_init__(self, item=None, later: Later = None):
-    self.diversions = Diversions(specs=self.rc_map['pipes'], pilfer=self)
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     self.url_opener.add_handler(HTTPCookieProcessor())
     if self.fspath is None:
@@ -213,11 +176,6 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     with self.later:
       with self.content_cache:
         yield
-
-  def copy(self, *a, **kw):
-    ''' Convenience function to shallow copy this `Pilfer` with modifications.
-    '''
-    return obj_copy(self, *a, **kw)
 
   @property
   def defaults(self):
@@ -285,6 +243,43 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     from .pipelines import PipeLineSpec
     pipe_spec = self.rc_map['pipes'][pipe_name]
     return PipeLineSpec.from_str(pipe_spec)
+
+  @mapped_property
+  @locked
+  def diversions(self, diversion_name):
+    pipeline = self.pipe_specs[diversion_name].make_pipeline(self.pilfer)
+
+    async def discard():
+      ''' Discard the output of the diversion pipeline.
+      '''
+      async for _ in pipeline.outq:
+        ##print("diversion[%r} -> %s", diversion_name, _)
+        pass
+
+    self._diversion_tasks[diversion_name] = asyncio.create_task(discard())
+    return pipeline
+
+  async def close_diversions(self):
+    ''' An asynchronous generator which closes all the pipeline diversions
+        and yields each diversion name as its discard `Task` completes.
+    '''
+    diversions = self.diversions
+    diversion_names = list(diversions.keys())
+
+    async def close_diversion(diversion_name):
+      pipeline = diversions.pop(diversion_name)
+      await pipeline.close()
+      task = self._diversion_tasks.pop(diversion_name)
+      await task
+      return diversion_name
+
+    async for diversion_name in amap(
+        close_diversion,
+        diversion_names,
+        concurrent=True,
+        unordered=True,
+    ):
+      yield diversion_name
 
   @cached_property
   def seen_backing_paths(self):
@@ -430,18 +425,12 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       if self.flush_print:
         file.flush()
 
-  ##@require(lambda kw: all(isinstance(v, str) for v in kw))
-  def set_user_vars(self, **kw):
-    ''' Update self.user_vars from the keyword arguments.
+  def copy_with_vars(self, **update_vars):
+    ''' Make a copy of `self` with copied `.user_vars`, update the
+        vars and return the copied `Pilfer`.
     '''
-    self.user_vars.update(kw)
-
-  def copy_with_vars(self, **kw):
-    ''' Make a copy of `self` with copied .user_vars, update the
-        vars and return the copied Pilfer.
-    '''
-    P = self.copy('user_vars')
-    P.set_user_vars(**kw)
+    P = copy.replace(self, vars=dict(self.user_vars))
+    P.user_vars.update(update_vars)
     return P
 
   def print_url_string(self, U, **kw):
@@ -513,6 +502,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return FormatMapping(self, U=U).format(s)
 
   def set_user_var(self, k, value, U, raw=False):
+    raise RuntimeError("how is this used?")
     if not raw:
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value

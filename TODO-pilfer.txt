@@ -1,3 +1,9 @@
+divert the mitm logging through upd.print and make into 1 line?
+pilfer from mirror action?
+mitm prefetch action
+recognise /foo/ in action params as a regexp and compile it?
+need to merge stream handlers, preserve .content if we have any "response" hooks
+the pipelines need to use P.copy_with_vars() for every stage so that vars are inherited and not shared
 enclose params in brackets instead of using the : prefix ?
 drop Set-Cookie from cached headers along with content-encoding?
 graphviz view of pipelines?
