@@ -1,3 +1,4 @@
+divert the mitm logging through upd.print and make into 1 line?
 pilfer from mirror action?
 mitm prefetch action
 recognise /foo/ in action params as a regexp and compile it?
