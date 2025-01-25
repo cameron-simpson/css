@@ -17,6 +17,7 @@ from cs.lex import (
     get_identifier,
     get_other_chars,
     get_qstr,
+    skipwhite,
 )
 from cs.logutils import (debug, error, exception)
 from cs.pfx import Pfx, pfx, pfx_call
@@ -592,10 +593,23 @@ def parse_action(action, do_trace):
 
 def get_action_args(action, offset, delim=None):
   ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
-     return `(args,kwargs,offset)`.
+      return `(args,kwargs,offset)`.
 
-     An `arg` is a number or a quoted string or a sequence of
-     nonwhitespace excluding `delim` and comma.
+      Parameters:
+      - `action`,`offset`: the action string and the parse offset
+      - `delim`: an optional character ending the parse such as a closing bracket
+
+     The following `arg` forms are recognised:
+     - a quoted string delimited with `"` or `'`
+     - a decimal or floating point number
+     - a regular expression between tilde-redelim and redelim
+     - a run of characters not including whichspace or comma or `delim`
+
+     Examples:
+     - `"foo"`, `'foo'`: quoted strings
+     - `1`, `2.3`: numeric values
+     - `~/foo/`, `~ :this|[abc/def]:`: regular expressions
+     - `blah.snort`: nonwhitespace "bare" string
   '''
   other_chars = ',' + whitespace
   if delim is not None:
@@ -604,23 +618,41 @@ def get_action_args(action, offset, delim=None):
   kwargs = {}
   while offset < len(action):
     with Pfx("parse_action_args(%r)", action[offset:]):
-      ch1 = action[offset]
-      if delim is not None and ch1 == delim:
+      if delim is not None and action.startswith(delim, offset):
         break
-      if ch1 == ',':
+      if action.startswith(',', offset):
         offset += 1
         continue
-      kw = None
       # gather leading "kw=" if present
       name, offset1 = get_identifier(action, offset)
-      if name and offset1 < len(action) and action[offset1] == '=':
+      if name and action.startswith('=', offset1):
         kw = name
         offset = offset1 + 1
-      if ch1 == '"' or ch1 == "'":
-        arg, offset = get_qstr(action, offset, q=ch1)
-      elif ch1.isdigit():
-        arg, offset = get_decimal_or_float_value(action, offset)
       else:
+        kw = None
+      # quoted string
+      if action.startswith(('"', "'")):
+        arg, offset = get_qstr(action, offset, q=action[offset])
+      # numeric value
+      elif action[offset:offset + 1].isdigit():
+        # TODO: recognise an optional sign
+        arg, offset = get_decimal_or_float_value(action, offset)
+      # ~ /regexp/
+      elif action.startswith('~', offset):
+        offset1 = skipwhite(action, offset + 1)
+        if offset1 == len(action):
+          raise SyntaxError("missing regexp delimter after tilde")
+        re_delim = action[offset1]
+        offset = offset1 + 1
+        end_offset = action.find(re_delim, offset)
+        if end_offset == -1:
+          raise SyntaxError(f'missing closing regexp delimiter {re_delim!r}')
+        assert end_offset > offset
+        regexp_s = action[offset:end_offset]
+        offset = end_offset + 1
+        arg = pfx_call(re.compile, regexp_s)
+      else:
+        # nonwhitespace etc
         arg, offset = get_other_chars(action, offset, other_chars)
       if kw is None:
         args.append(arg)
