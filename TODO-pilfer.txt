@@ -1,3 +1,4 @@
+pilfer from mirror action?
 mitm prefetch action
 recognise /foo/ in action params as a regexp and compile it?
 need to merge stream handlers, preserve .content if we have any "response" hooks
