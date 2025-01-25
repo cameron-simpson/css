@@ -44,7 +44,7 @@ class URLMatcher(Promotable):
     m = self.url_re.match(url.path)
     if m is None:
       return None
-    return m.groupdict(), url.query_dict()
+    return m.groupdict()
 
 @dataclass
 class SiteMap:
@@ -81,10 +81,9 @@ class SiteMap:
     '''
     for matcher, keyfn in self.URL_KEY_PATTERNS:
       matcher = URLMatcher.promote(matcher)
-      if mq := matcher(url):
-        m, q = mq
-        fd = dict(q)
-        fd.update(m)
+      if (m := matcher(url)) is not None:
+        format_map = url.query_dict()
+        format_map.update(m)
         return keyfn.format_map(fd)
 
 # Some presupplied site maps.
