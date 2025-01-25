@@ -130,7 +130,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       elif flow.response.status_code != 200:
         PR(
             "response status_code", flow.response.status_code,
-            " is not 200, do not cache"
+            "is not 200, do not cache"
         )
       else:
         # response from upstream, update the cache
@@ -320,7 +320,7 @@ class MITMHookAction(Promotable):
       'cache': cached_flow,
       'dump': dump_flow,
       'print': print_rq,
-      'save_stream': save_stream,
+      'save': save_stream,
       'watch': watch_flow,
   }
 
