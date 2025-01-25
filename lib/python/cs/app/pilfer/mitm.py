@@ -10,7 +10,7 @@ from functools import partial
 import os
 from signal import SIGINT
 from threading import Thread
-from typing import Callable, Mapping
+from typing import Callable, Iterable, Mapping, Optional
 
 from mitmproxy import ctx, http
 from mitmproxy.options import Options
@@ -22,7 +22,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import vprint
 from cs.deco import attr, Promotable, promote
-from cs.lex import r, tabulate
+from cs.lex import r, s, tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress
@@ -35,6 +35,61 @@ from cs.urlutils import URL
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
+
+@typechecked
+def process_stream(
+    consumer: Callable[Iterable[bytes], None],
+    progress_name: Optional[str] = None,
+    *,
+    content_length: Optional[int] = None,
+    name: Optional[str] = None,
+) -> Callable[bytes, bytes]:
+  ''' Dispatch `consumer(bsiter)` in a `Thread` to consume data from the flow.
+      Return a callable to set as the response.stream in the caller.
+
+      Parameters:
+      * `consumer`: a callable accepting an iterable of `bytes` instances
+      * `progress_name`: optional progress bar name, default `None`;
+        do not present a progress bar if `None`
+      * `content_length`: optional expected length of the data stream,
+        typically supplied from the response 'Content-Length` header
+      * `name`: an optional string to name the worker `Thread`,
+        default from `progress_name` or the name of `consumer`
+  '''
+  if name is None:
+    name = progress_name or funccite(consumer)
+  if progress_name is None:
+    progress_Q = None
+  else:
+    progress_Q = Progress(
+        progress_name,
+        total=content_length,
+    ).qbar(
+        itemlenfunc=len,
+        incfirst=True,
+        report_print=print,
+    )
+  data_Q = IterableQueue(name=name)
+  Thread(target=consumer, args=(data_Q,), name=name).start()
+
+  def copy_bs(bs: bytes) -> bytes:
+    ''' Copy `bs` to the `Data_Q` and also to the `progress_Q` if not `None`.
+        Return `bs` unchanged.
+    '''
+    try:
+      if len(bs) == 0:
+        data_Q.close()
+        if progress_Q is not None:
+          progress_Q.close()
+      else:
+        data_Q.put(bs)
+        if progress_Q is not None:
+          progress_Q.put(bs)
+    except Exception as e:
+      warning("%s: exception: %s", name, s(e))
+    return bs
+
+  return copy_bs
 
 def print_rq(hook_name, flow):
   rq = flow.request
