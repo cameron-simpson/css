@@ -221,9 +221,9 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   assert P is not None
   PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
   rq = flow.request
+  url = URL(rq.url)
   PR(rq)
   if hook_name == 'requestheaders':
-    url = URL(rq.url)
     sitemap = P.sitemap_for(url)
     if sitemap is None:
       PR("no site map")
@@ -250,7 +250,7 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   elif hook_name == 'responseheaders':
     print("  Response Headers:")
     for line in tabulate(*[(key, value)
-                           for key, value in sorted(rq.headers.items())]):
+                           for key, value in sorted(rsp.headers.items())]):
       print("   ", line)
   elif hook_name == 'response':
     PR("  Content:", len(flow.response.content))
