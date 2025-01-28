@@ -123,7 +123,9 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   cache_key = cache.cache_key_for(sitemap, url_key)
   with cache:
     if flow.response:
+      rsp = flow.response
       if getattr(flow, 'from_cache', False):
+        # ignore a response we ourselves pulled form the cache
         pass
       elif flow.request.method != 'GET':
         PR("response is not from a GET, do not cache")
@@ -135,50 +137,42 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
-        if flow.response.content is None:
+        content_length_s = rsp.headers.get('content-length')
+        content_length = None if content_length_s is None else int(
+            content_length_s
+        )
+        if rsp.content is None:
           # we are at the response headers
           # and will stream the content to the cache file
           assert hook_name == "responseheaders"
-          cache_Q = IterableQueue()
-
-          def cache_stream_chunk(bs: bytes) -> bytes:
-            ''' Put received chunks onto `cache_Q`.
-                The end chunk has length 0 and closes the queue.
-            '''
-            if len(bs) == 0:
-              cache_Q.close()
-            else:
-              cache_Q.put(bs)
-            return bs
-
-          # dispatch cache.cache_response in a Thread to collect the stream data
-          Thread(
-              name=f'cache_flow({rq})',
-              target=cache.cache_response,
-              args=(
+          rsp.stream = process_stream(
+              lambda bss: cache.cache_response(
                   url,
                   cache_key,
-                  cache_Q,
+                  bss,
                   flow.request.headers,
-                  flow.response.headers,
+                  rsp.headers,
+                  mode=mode,
+                  decoded=False,
               ),
-              kwargs=dict(mode=mode, decoded=False),
-          ).start()
-          flow.response.stream = cache_stream_chunk
+              f'cache {cache_key}',
+              content_length=content_length,
+          )
 
         else:
           assert hook_name == "response"
           md = cache.cache_response(
               url,
               cache_key,
-              flow.response.content,
+              rsp.content,
               flow.request.headers,
-              flow.response.headers,
+              rsp.headers,
               mode=mode,
               decoded=True,
           )
     else:
       # probe the cache
+      assert hook_name == 'requestheaders'
       md = cache.get(cache_key, {}, mode=mode)
       if not md:
         # nothing cached
