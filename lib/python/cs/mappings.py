@@ -670,7 +670,7 @@ class missingdict(dict):
     self.__missing = missing
 
   def __missing__(self, key):
-    value = self.__missing[key]
+    value = self.__missing(key)
     self[key] = value
     return value
 
