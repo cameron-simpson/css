@@ -429,7 +429,7 @@ class MITMAddon:
           # append a stream function which collates the final
           # output of the stream functions and computes a `.content`
           # attribute so that the "response" action has a valid
-          # `.content to access.
+          # `.content` to access.
           #
           if self.hook_map['response']:
             # collate the final stream into a raw_content bytes instance
@@ -454,7 +454,7 @@ class MITMAddon:
           else:
 
             def stream(bs: bytes) -> bytes:
-              ''' Run each bytes instance through all the stream functions.
+              ''' Run each `bytes` instance through all the stream functions.
               '''
               stream_excs = []
               for stream_func in stream_funcs:
@@ -466,7 +466,7 @@ class MITMAddon:
                       prefix, funccite(stream_func), e
                   )
                   stream_excs.append(e)
-                  breakpoint()
+                  ##breakpoint()
                 else:
                   bs = bs2
               if excs:
