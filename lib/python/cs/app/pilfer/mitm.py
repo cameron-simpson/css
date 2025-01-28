@@ -92,6 +92,7 @@ def process_stream(
 
   return copy_bs
 
+@attr(default_hooks=('requestheaders',))
 def print_rq(hook_name, flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
