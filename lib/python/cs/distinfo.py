@@ -389,8 +389,11 @@ class Module:
     '''
     try:
       M = pfx_call(importlib.import_module, self.name)
-    except (ImportError, ModuleNotFoundError, NameError, SyntaxError) as e:
+    except (ImportError, ModuleNotFoundError) as e:
       warning("import fails: %s", e.msg_without_prefix)
+      M = None
+    except (NameError, SyntaxError) as e:
+      warning("import fails: %s", e)
       M = None
     return M
 
