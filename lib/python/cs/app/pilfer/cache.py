@@ -233,6 +233,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       old_md: Optional[dict] = None,
       mode: str = 'modified',
       decoded=False,
+      progress_name=None,
   ) -> dict:
     ''' Cache the contents of the response `rsp` against `cache_key`.
         Return the resulting cache metadata for the response.
@@ -240,6 +241,18 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     if isinstance(content, bytes):
       content = [content]
     content = iter(content)
+    if progress_name is not None:
+      # present a progress bar if progress_name was supplied
+      content_length_s = rsp_headers.get('content-length')
+      content_length = None if content_length_s is None else int(
+          content_length_s
+      )
+      content = trace(progressbar)(
+          content,
+          progress_name,
+          total=content_length,
+          report_print=True,
+      )
     if decoded:
       # we're saving the decoded content, strip this header
       if 'content-encoding' in rsp_headers:
@@ -272,26 +285,13 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       # write the content file
       # only make filesystem items if all the required compute succeeds
       ext = urlext or ctext
-      content_length = rq_headers.get('content-length')
-      # present a progress bar for longer content
-      bss = (
-          content if content_length is None
-          or content_length < self.PROGRESS_THRESHOLD else progressbar(
-              content,
-              f'{url.hostname}:{url.path[-20]}',
-              total=content_length,
-              itemlenfunc=len,
-              incfirst=True,
-              report_print=print,
-          )
-      )
       with NamedTemporaryFile(
           dir=contentdir,
           prefix='.cache_response--',
           suffix=ext,
       ) as T:
         hasher = self.hashclass.hashfunc()
-        for bs in bss:
+        for bs in content:
           T.write(bs)
           hasher.update(bs)
         T.flush()

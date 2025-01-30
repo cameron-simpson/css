@@ -81,10 +81,25 @@ class SiteMap:
     '''
     for matcher, keyfn in self.URL_KEY_PATTERNS:
       matcher = URLMatcher.promote(matcher)
-      if (m := matcher(url)) is not None:
-        format_map = url.query_dict()
-        format_map.update(m)
-        return keyfn.format_map(fd)
+      if (match := matcher(url)) is not None:
+        mapping = dict(
+            (
+                (attr, getattr(url, attr)) for attr in (
+                    'basename',
+                    'dirname',
+                    'domain',
+                    'hostname',
+                    'netloc',
+                    'path',
+                    'port',
+                    'scheme',
+                )
+            )
+        )
+        mapping.update(url.query_dict())
+        mapping.update(match)
+        return keyfn.format_map(mapping)
+    return None
 
 # Some presupplied site maps.
 

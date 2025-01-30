@@ -32,6 +32,7 @@ from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.resources import uses_runstate
+from cs.urlutils import URL
 
 from . import (
     DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
@@ -355,13 +356,41 @@ class PilferCommand(BaseCommand):
       raise GetoptError("invalid action specifications")
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
 
-  def cmd_sitemaps(self, argv):
-    ''' Usage: {cmd}
-          List the site maps from the config.
+  def cmd_sitemap(self, argv):
+    ''' Usage: {cmd} [sitemap|domain [URL...]]
+          List or query the site maps from the config.
+          With no arguments, list the sitemaps.
+          With a sitemap name (eg "docs"), list the sitemap.
+          WIth additional URLs, print the key for each URL.
     '''
-    for line in tabulate(
-        *[[pattern, str(sitemap)]
-          for pattern, sitemap in self.options.pilfer.sitemaps]):
-      print(line)
+    P = self.options.pilfer
+    xit = 0
+    if not argv:
+      for line in tabulate(
+          *[[pattern, str(sitemap)]
+            for pattern, sitemap in self.options.pilfer.sitemaps]):
+        print(line)
+    else:
+      map_name = argv.pop(0)
+      print("map_name", map_name)
+      for domain_glob, sitemap in P.sitemaps:
+        if map_name == sitemap.name:
+          break
+      else:
+        warning("not sitemap named %r", map_name)
+        return 1
+      if argv:
+        for url in map(URL, argv):
+          print(url)
+          print("  key:", sitemap.url_key(url))
+      else:
+        for pattern in sitemap.URL_KEY_PATTERNS:
+          (domain_glob, path_re_s), format_s = pattern
+          for line in tabulate(
+              ('Format:', format_s),
+              ('  Domain:', domain_glob),
+              ('  Path RE:', path_re_s),
+          ):
+            print(line)
 
 sys.exit(main(sys.argv))

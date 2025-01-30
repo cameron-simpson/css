@@ -153,10 +153,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     self.url_opener.add_handler(HTTPCookieProcessor())
     if self.fspath is None:
       self.fspath = abspath(
-          expanduser(
-              self.rc_map[None]['var'] or os.environ.get('PILFERDIR')
-              or '~/var/pilfer'
-          )
+          os.environ.get('PILFERDIR')
+          or expanduser(self.rc_map[None]['var'] or '~/var/pilfer')
       )
       needdir(self.fspath) and vprint("made", self.shortpath)
     if self.content_cache is None:

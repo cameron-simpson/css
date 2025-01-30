@@ -337,7 +337,7 @@ class URL(HasThreadState, Promotable):
 
   @unattributable
   def query_dict(self):
-    ''' Return a `dict` containing the parsed param=value pairs from `self.query`.
+    ''' Return a new `dict` containing the parsed param=value pairs from `self.query`.
     '''
     return parse_qs(self.query)
 

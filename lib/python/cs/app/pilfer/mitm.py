@@ -36,6 +36,7 @@ from cs.urlutils import URL
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
+from .util import content_length
 
 @typechecked
 def process_stream(
@@ -92,6 +93,24 @@ def process_stream(
 
   return copy_bs
 
+@attr(default_hooks=('responseheaders',))
+@uses_pilfer
+@typechecked
+def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
+  ''' If the flow has no content-length or the length is at least
+      threshold, put the lfow into streaming mode.
+  '''
+  assert hook_name == 'responseheaders'
+  assert not flow.response.stream
+  length = content_length(flow.response.headers)
+  if flow.request.method in ('GET',) and (length is None
+                                          or length >= threshold):
+    # put the flow into streaming mode, changing nothing
+    flow.response.stream = process_stream(
+        lambda bss: bss, f'stream {flow.request}', content_length=length
+    )
+
+@attr(default_hooks=('requestheaders',))
 def print_rq(hook_name, flow):
   rq = flow.request
   print("RQ:", rq.host, rq.port, rq.url)
@@ -123,62 +142,49 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   cache_key = cache.cache_key_for(sitemap, url_key)
   with cache:
     if flow.response:
+      rsp = flow.response
       if getattr(flow, 'from_cache', False):
+        # ignore a response we ourselves pulled form the cache
         pass
       elif flow.request.method != 'GET':
         PR("response is not from a GET, do not cache")
-      elif flow.response.status_code != 200:
-        PR(
-            "response status_code", flow.response.status_code,
-            "is not 200, do not cache"
-        )
+      elif rsp.status_code != 200:
+        PR("response status_code", rsp.status_code, "is not 200, do not cache")
       else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
-        if flow.response.content is None:
+        if rsp.content is None:
           # we are at the response headers
           # and will stream the content to the cache file
           assert hook_name == "responseheaders"
-          cache_Q = IterableQueue()
-
-          def cache_stream_chunk(bs: bytes) -> bytes:
-            ''' Put received chunks onto `cache_Q`.
-                The end chunk has length 0 and closes the queue.
-            '''
-            if len(bs) == 0:
-              cache_Q.close()
-            else:
-              cache_Q.put(bs)
-            return bs
-
-          # dispatch cache.cache_response in a Thread to collect the stream data
-          Thread(
-              name=f'cache_flow({rq})',
-              target=cache.cache_response,
-              args=(
+          rsp.stream = process_stream(
+              lambda bss: cache.cache_response(
                   url,
                   cache_key,
-                  cache_Q,
+                  bss,
                   flow.request.headers,
-                  flow.response.headers,
+                  rsp.headers,
+                  mode=mode,
+                  decoded=False,
               ),
-              kwargs=dict(mode=mode, decoded=False),
-          ).start()
-          flow.response.stream = cache_stream_chunk
+              f'cache {cache_key}',
+              content_length=content_length(rsp.headers),
+          )
 
         else:
           assert hook_name == "response"
           md = cache.cache_response(
               url,
               cache_key,
-              flow.response.content,
+              rsp.content,
               flow.request.headers,
-              flow.response.headers,
+              rsp.headers,
               mode=mode,
               decoded=True,
           )
     else:
       # probe the cache
+      assert hook_name == 'requestheaders'
       md = cache.get(cache_key, {}, mode=mode)
       if not md:
         # nothing cached
@@ -221,9 +227,9 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   assert P is not None
   PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
   rq = flow.request
+  url = URL(rq.url)
   PR(rq)
   if hook_name == 'requestheaders':
-    url = URL(rq.url)
     sitemap = P.sitemap_for(url)
     if sitemap is None:
       PR("no site map")
@@ -250,7 +256,7 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   elif hook_name == 'responseheaders':
     print("  Response Headers:")
     for line in tabulate(*[(key, value)
-                           for key, value in sorted(rq.headers.items())]):
+                           for key, value in sorted(rsp.headers.items())]):
       print("   ", line)
   elif hook_name == 'response':
     PR("  Content:", len(flow.response.content))
@@ -262,8 +268,6 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
 @typechecked
 def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
   rsp = flow.response
-  content_length_s = rsp.headers.get('content-length')
-  content_length = None if content_length_s is None else int(content_length_s)
   save_as = pfx_call(P.format_string, save_as_format, flow.request.url)
 
   def save(bss: Iterable[bytes]):
@@ -274,9 +278,8 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
   rsp.stream = process_stream(
       save,
       f'{flow.request}: save {flow.response.headers["content-type"]} -> {save_as!r}',
-      content_length=content_length,
+      content_length=content_length(rsp.headers),
   )
-
 
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
@@ -294,10 +297,9 @@ def watch_flow(hook_name, flow, *, P: Pilfer = None):
                          for key, value in sorted(rsp.headers.items())]):
     print("   ", line)
 
-  content_length = rsp.headers.get('content-length')
   progress_Q = Progress(
       str(rq),
-      total=None if content_length is None else int(content_length),
+      total=content_length(rsp.headers),
   ).qbar(
       itemlenfunc=len,
       incfirst=True,
@@ -321,6 +323,7 @@ class MITMHookAction(Promotable):
       'dump': dump_flow,
       'print': print_rq,
       'save': save_stream,
+      'stream': stream_flow,
       'watch': watch_flow,
   }
 
@@ -389,17 +392,22 @@ class MITMAddon:
                        'clientdisconnect', 'serverconnect',
                        'serverdisconnect'):
         raise AttributeError(f'rejecting obsolete hook .{hook_name}')
+      hook_actions = self.hook_map[hook_name]
+      if not hook_actions:
+        raise AttributeError(f'no actions for {hook_name=}')
 
       def call_hooks(*mitm_hook_a, **mitm_hook_kw):
         # look up the actions when we're called
-        hook_actions = self.hook_map[hook_name]
         if not hook_actions:
           return
+        # any exceptions from the actions
         excs = []
+        # for collating any .stream functions
         stream_funcs = []
         for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
           if hook_name == 'responseheaders':
             flow = mitm_hook_a[0]
+            # note the initial state of the .steam attribute
             stream0 = flow.response.stream
             assert not stream0, \
                 f'expected falsey flow.response.stream, got {flow.response.stream=}'
@@ -416,11 +424,26 @@ class MITMAddon:
             warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
             excs.append(e)
           if hook_name == 'responseheaders':
+            # if the .stream attribute was set, append it to the
+            # stream functions and reset the .stream attribute
             if flow.response.stream:
               stream_funcs.append(flow.response.stream)
               flow.response.stream = stream0
         if hook_name == 'responseheaders' and stream_funcs:
-
+          # After the actions have run, define the stream attribute
+          # to run whatever stream functions were applied.
+          #
+          # Because the actions do not know about each other, we
+          # wrap all the stream functions in a function which chains
+          # them together. If there's only one, we pass it straight
+          # though without a wrapper.
+          #
+          # Also, if there's a action for the "response" hook we
+          # append a stream function which collates the final
+          # output of the stream functions and computes a `.content`
+          # attribute so that the "response" action has a valid
+          # `.content` to access.
+          #
           if self.hook_map['response']:
             # collate the final stream into a raw_content bytes instance
             content_bss = []
@@ -444,7 +467,7 @@ class MITMAddon:
           else:
 
             def stream(bs: bytes) -> bytes:
-              ''' Run each bytes instance through all the stream functions.
+              ''' Run each `bytes` instance through all the stream functions.
               '''
               stream_excs = []
               for stream_func in stream_funcs:
@@ -456,7 +479,7 @@ class MITMAddon:
                       prefix, funccite(stream_func), e
                   )
                   stream_excs.append(e)
-                  breakpoint()
+                  ##breakpoint()
                 else:
                   bs = bs2
               if excs:
