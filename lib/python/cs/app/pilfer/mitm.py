@@ -153,10 +153,6 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
-        content_length_s = rsp.headers.get('content-length')
-        content_length = None if content_length_s is None else int(
-            content_length_s
-        )
         if rsp.content is None:
           # we are at the response headers
           # and will stream the content to the cache file
@@ -172,7 +168,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   decoded=False,
               ),
               f'cache {cache_key}',
-              content_length=content_length,
+              content_length=content_length(rsp.headers),
           )
 
         else:
@@ -272,8 +268,6 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
 @typechecked
 def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
   rsp = flow.response
-  content_length_s = rsp.headers.get('content-length')
-  content_length = None if content_length_s is None else int(content_length_s)
   save_as = pfx_call(P.format_string, save_as_format, flow.request.url)
 
   def save(bss: Iterable[bytes]):
@@ -284,9 +278,8 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
   rsp.stream = process_stream(
       save,
       f'{flow.request}: save {flow.response.headers["content-type"]} -> {save_as!r}',
-      content_length=content_length,
+      content_length=content_length(rsp.headers),
   )
-
 
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
@@ -304,10 +297,9 @@ def watch_flow(hook_name, flow, *, P: Pilfer = None):
                          for key, value in sorted(rsp.headers.items())]):
     print("   ", line)
 
-  content_length = rsp.headers.get('content-length')
   progress_Q = Progress(
       str(rq),
-      total=None if content_length is None else int(content_length),
+      total=content_length(rsp.headers),
   ).qbar(
       itemlenfunc=len,
       incfirst=True,
