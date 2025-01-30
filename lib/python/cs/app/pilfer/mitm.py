@@ -281,40 +281,6 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
       content_length=content_length(rsp.headers),
   )
 
-@attr(default_hooks=('responseheaders',))
-@uses_pilfer
-@typechecked
-def watch_flow(hook_name, flow, *, P: Pilfer = None):
-  ''' Watch data chunks from a stream flow.
-  '''
-  rq = flow.request
-  rsp = flow.response
-  PR = lambda *a: print('WATCH_FLOW', hook_name, rq, *a)
-  PR("response.stream was", r(rsp.stream))
-
-  print("  Response Headers:")
-  for line in tabulate(*[(key, value)
-                         for key, value in sorted(rsp.headers.items())]):
-    print("   ", line)
-
-  progress_Q = Progress(
-      str(rq),
-      total=content_length(rsp.headers),
-  ).qbar(
-      itemlenfunc=len,
-      incfirst=True,
-      report_print=print,
-  )
-
-  def watch(bs: bytes) -> bytes:
-    if len(bs) == 0:
-      progress_Q.close()
-    else:
-      progress_Q.put(bs)
-    return bs
-
-  rsp.stream = watch
-
 @dataclass
 class MITMHookAction(Promotable):
 
@@ -324,7 +290,6 @@ class MITMHookAction(Promotable):
       'print': print_rq,
       'save': save_stream,
       'stream': stream_flow,
-      'watch': watch_flow,
   }
 
   action: Callable
