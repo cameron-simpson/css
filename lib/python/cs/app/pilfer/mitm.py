@@ -381,10 +381,12 @@ class MITMAddon:
                        'clientdisconnect', 'serverconnect',
                        'serverdisconnect'):
         raise AttributeError(f'rejecting obsolete hook .{hook_name}')
+      hook_actions = self.hook_map[hook_name]
+      if not hook_actions:
+        raise AttributeError(f'no actions for {hook_name=}')
 
       def call_hooks(*mitm_hook_a, **mitm_hook_kw):
         # look up the actions when we're called
-        hook_actions = self.hook_map[hook_name]
         if not hook_actions:
           return
         # any exceptions from the actions
