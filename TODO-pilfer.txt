@@ -1,3 +1,4 @@
+we should not cache incomplete byte ranges?
 mitm to stream everything if no reponse hook
 streaming save action for "pilfer from"
 divert the mitm logging through upd.print and make into 1 line?
