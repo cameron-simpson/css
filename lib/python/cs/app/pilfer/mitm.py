@@ -36,6 +36,7 @@ from cs.urlutils import URL
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
+from .util import content_length
 
 @typechecked
 def process_stream(
@@ -91,6 +92,23 @@ def process_stream(
     return bs
 
   return copy_bs
+
+@attr(default_hooks=('responseheaders',))
+@uses_pilfer
+@typechecked
+def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
+  ''' If the flow has no content-length or the length is at least
+      threshold, put the lfow into streaming mode.
+  '''
+  assert hook_name == 'responseheaders'
+  assert not flow.response.stream
+  length = content_length(flow.response.headers)
+  if flow.request.method in ('GET',) and (length is None
+                                          or length >= threshold):
+    # put the flow into streaming mode, changing nothing
+    flow.response.stream = process_stream(
+        lambda bss: bss, f'stream {flow.request}', content_length=length
+    )
 
 @attr(default_hooks=('requestheaders',))
 def print_rq(hook_name, flow):
@@ -313,6 +331,7 @@ class MITMHookAction(Promotable):
       'dump': dump_flow,
       'print': print_rq,
       'save': save_stream,
+      'stream': stream_flow,
       'watch': watch_flow,
   }
 
