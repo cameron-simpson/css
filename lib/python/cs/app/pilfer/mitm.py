@@ -45,6 +45,7 @@ def process_stream(
     *,
     content_length: Optional[int] = None,
     name: Optional[str] = None,
+    runstate: Optional[RunState] = None,
 ) -> Callable[bytes, bytes]:
   ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
       Return a callable to set as the response.stream in the caller.
@@ -94,6 +95,15 @@ def process_stream(
         incfirst=True,
         report_print=print,
     )
+  if runstate is not None:
+
+    def cancel_Qs(rs: RunState):
+      print(rs, "CANCELLED, close queues")
+      data_Q.close()
+      if progress_Q is not None:
+        progress_Q.close()
+
+    runstate.notify_cancel.add(cancel_Qs)
   data_Q = IterableQueue(name=name)
   Thread(target=consumer, args=(data_Q,), name=name).start()
 
@@ -130,7 +140,10 @@ def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
       and (length is None or length >= threshold)):
     # put the flow into streaming mode, changing nothing
     flow.response.stream = process_stream(
-        lambda bss: bss, f'stream {flow.request}', content_length=length
+        lambda bss: bss,
+        f'stream {flow.request}',
+        content_length=length,
+        runstate=flow.runstate,
     )
 
 @attr(default_hooks=('requestheaders',))
@@ -173,6 +186,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         PR("response is not from a GET, do not cache")
       elif rsp.status_code != 200:
         PR("response status_code", rsp.status_code, "is not 200, do not cache")
+      elif flow.runstate.cancelled:
+        PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
@@ -189,9 +204,11 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   rsp.headers,
                   mode=mode,
                   decoded=False,
+                  runstate=flow.runstate,
               ),
               f'cache {cache_key}',
               content_length=content_length(rsp.headers),
+              runstate=flow.runstate,
           )
 
         else:
@@ -302,6 +319,7 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
       save,
       f'{flow.request}: save {flow.response.headers["content-type"]} -> {save_as!r}',
       content_length=content_length(rsp.headers),
+      runstate=flow.runstate,
   )
 
 @dataclass
@@ -398,7 +416,7 @@ class MITMAddon:
         then call the hooks.
     '''
     assert not hasattr(flow, 'runstate')
-    flow.runstate = RunState(str(flow))
+    flow.runstate = RunState(str(flow.request))
     flow.runstate.start()
     self.call_hooks_for("responseheaders", flow)
 
