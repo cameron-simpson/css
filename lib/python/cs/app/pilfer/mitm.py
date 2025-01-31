@@ -397,6 +397,7 @@ class MITMAddon:
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
     '''
+    ##print("MITMAddon.__getattr__", repr(hook_name))
     prefix = f'{self.__class__.__name__}.{hook_name}'
     with Pfx(prefix):
       if hook_name in ('addons', 'add_log', 'clientconnect',
