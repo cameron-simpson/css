@@ -422,13 +422,13 @@ class MITMAddon:
     self.call_hooks_for("responseheaders", flow)
 
   def response(self, flow):
-    ''' On `response`, stop `flow.runstate` then call the hooks.
+    ''' On `response`, call the hooks then stop `flow.runstate`.
     '''
     self.call_hooks_for("response", flow)
     flow.runstate.stop()
 
   def error(self, flow):
-    ''' On `error`, cancel `flow.runstate`, call the hooks, then stop the `RunState`.
+    ''' On `error`, cancel `flow.runstate`, call the hooks, then stop `flow.runstate`.
     '''
     flow.runstate.cancel()
     self.call_hooks_for("error", flow)
