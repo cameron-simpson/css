@@ -393,6 +393,28 @@ class MITMAddon:
         help="Set the tls_version_client_min option.",
     )
 
+  def responseheaders(self, flow):
+    ''' On `responseheaders`, set `flow.runstate` to a `RunState` and start it
+        then call the hooks.
+    '''
+    assert not hasattr(flow, 'runstate')
+    flow.runstate = RunState(str(flow))
+    flow.runstate.start()
+    self.call_hooks_for("responseheaders", flow)
+
+  def response(self, flow):
+    ''' On `response`, stop `flow.runstate` then call the hooks.
+    '''
+    flow.runstate.stop()
+    self.call_hooks_for("response", flow)
+
+  def error(self, flow):
+    ''' On `response`, cancel `flow.runstate`, call the hooks, then stop the `RunState`.
+    '''
+    flow.runstate.cancel()
+    self.call_hooks_for("response", flow)
+    flow.runstate.stop()
+
   @pfx_method
   def call_hooks_for(self, hook_name: str, *mitm_hook_a, **mitm_hook_kw):
     ''' This calls all the actions for the specified `hook_name`.
