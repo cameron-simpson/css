@@ -67,9 +67,9 @@ def process_stream(
 
       For example, here is the stream setting from `stream_flow`,
       which inserts a pass through stream for responses above a
-      certain size (its purpose is essentially to set mitmproxy
-      from its default "consume all and produce `.content" mode to
-      a streaming mode, important if this is being used ars a real
+      certain size (its purpose is essentially to switch mitmproxy
+      from its default "consume all and produce `.content`" mode to
+      a streaming mode, important if this is being used as a real
       web browsing proxy):
 
           length = content_length(flow.response.headers)
