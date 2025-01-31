@@ -423,14 +423,14 @@ class MITMAddon:
   def response(self, flow):
     ''' On `response`, stop `flow.runstate` then call the hooks.
     '''
-    flow.runstate.stop()
     self.call_hooks_for("response", flow)
+    flow.runstate.stop()
 
   def error(self, flow):
-    ''' On `response`, cancel `flow.runstate`, call the hooks, then stop the `RunState`.
+    ''' On `error`, cancel `flow.runstate`, call the hooks, then stop the `RunState`.
     '''
     flow.runstate.cancel()
-    self.call_hooks_for("response", flow)
+    self.call_hooks_for("error", flow)
     flow.runstate.stop()
 
   @pfx_method
