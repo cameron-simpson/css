@@ -25,7 +25,7 @@ from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
 from cs.lex import r, s, tabulate
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress
 from cs.py.func import funccite
 from cs.queues import IterableQueue
@@ -383,112 +383,7 @@ class MITMAddon:
       hook_actions = self.hook_map[hook_name]
       if not hook_actions:
         raise AttributeError(f'no actions for {hook_name=}')
-
-      def call_hooks(*mitm_hook_a, **mitm_hook_kw):
-        # look up the actions when we're called
-        if not hook_actions:
-          return
-        # any exceptions from the actions
-        excs = []
-        # for collating any .stream functions
-        stream_funcs = []
-        for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
-          if hook_name == 'responseheaders':
-            flow = mitm_hook_a[0]
-            # note the initial state of the .steam attribute
-            stream0 = flow.response.stream
-            assert not stream0, \
-                f'expected falsey flow.response.stream, got {flow.response.stream=}'
-          try:
-            pfx_call(
-                action,
-                *action_args,
-                hook_name,
-                *mitm_hook_a,
-                **action_kwargs,
-                **mitm_hook_kw,
-            )
-          except Exception as e:
-            warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
-            excs.append(e)
-          if hook_name == 'responseheaders':
-            # if the .stream attribute was set, append it to the
-            # stream functions and reset the .stream attribute
-            if flow.response.stream:
-              stream_funcs.append(flow.response.stream)
-              flow.response.stream = stream0
-        if hook_name == 'responseheaders' and stream_funcs:
-          # After the actions have run, define the stream attribute
-          # to run whatever stream functions were applied.
-          #
-          # Because the actions do not know about each other, we
-          # wrap all the stream functions in a function which chains
-          # them together. If there's only one, we pass it straight
-          # though without a wrapper.
-          #
-          # Also, if there's a action for the "response" hook we
-          # append a stream function which collates the final
-          # output of the stream functions and computes a `.content`
-          # attribute so that the "response" action has a valid
-          # `.content` to access.
-          #
-          if self.hook_map['response']:
-            # collate the final stream into a raw_content bytes instance
-            content_bss = []
-
-            def content_stream(bs: bytes) -> bytes:
-              nonlocal content_bss
-              if len(bs) == 0:
-                # record the consumed data as the response.content
-                flow.response.content = b''.join(content_bss)
-                content_bss = None
-              else:
-                content_bss.append(bs)
-              return bs
-
-            stream_funcs.append(content_stream)
-
-          if len(stream_funcs) == 1:
-
-            stream, = stream_funcs
-
-          else:
-
-            def stream(bs: bytes) -> bytes:
-              ''' Run each `bytes` instance through all the stream functions.
-              '''
-              stream_excs = []
-              for stream_func in stream_funcs:
-                try:
-                  bs2 = stream_func(bs)
-                except Exception as e:
-                  warning(
-                      "%s: exception calling hook_action stream_func %s: %s",
-                      prefix, funccite(stream_func), e
-                  )
-                  stream_excs.append(e)
-                  ##breakpoint()
-                else:
-                  bs = bs2
-              if excs:
-                if len(excs) == 1:
-                  raise excs[0]
-                raise ExceptionGroup(
-                    f'multiple exceptions running actions for .{hook_name}',
-                    excs
-                )
-              return bs
-
-          flow.response.stream = stream
-
-        if excs:
-          if len(excs) == 1:
-            raise excs[0]
-          raise ExceptionGroup(
-              f'multiple exceptions running actions for .{hook_name}', excs
-          )
-
-      return call_hooks
+      return partial(self.call_hooks_for, hook_name)
 
   def load(self, loader):
     loader.add_option(
@@ -497,6 +392,113 @@ class MITMAddon:
         default="TLS1",
         help="Set the tls_version_client_min option.",
     )
+
+  @pfx_method
+  def call_hooks_for(self, hook_name: str, *mitm_hook_a, **mitm_hook_kw):
+    ''' This calls all the actions for the specified `hook_name`.
+    '''
+    # look up the actions when we're called
+    hook_actions = self.hook_map[hook_name]
+    if not hook_actions:
+      return
+    # any exceptions from the actions
+    excs = []
+    # for collating any .stream functions
+    stream_funcs = []
+    for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
+      if hook_name == 'responseheaders':
+        flow = mitm_hook_a[0]
+        # note the initial state of the .steam attribute
+        stream0 = flow.response.stream
+        assert not stream0, \
+            f'expected falsey flow.response.stream, got {flow.response.stream=}'
+      try:
+        pfx_call(
+            action,
+            *action_args,
+            hook_name,
+            *mitm_hook_a,
+            **action_kwargs,
+            **mitm_hook_kw,
+        )
+      except Exception as e:
+        warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
+        excs.append(e)
+      if hook_name == 'responseheaders':
+        # if the .stream attribute was set, append it to the
+        # stream functions and reset the .stream attribute
+        if flow.response.stream:
+          stream_funcs.append(flow.response.stream)
+          flow.response.stream = stream0
+    if hook_name == 'responseheaders' and stream_funcs:
+      # After the actions have run, define the stream attribute
+      # to run whatever stream functions were applied.
+      #
+      # Because the actions do not know about each other, we
+      # wrap all the stream functions in a function which chains
+      # them together. If there's only one, we pass it straight
+      # though without a wrapper.
+      #
+      # Also, if there's a action for the "response" hook we
+      # append a stream function which collates the final
+      # output of the stream functions and computes a `.content`
+      # attribute so that the "response" action has a valid
+      # `.content` to access.
+      #
+      if self.hook_map['response']:
+        # collate the final stream into a raw_content bytes instance
+        content_bss = []
+
+        def content_stream(bs: bytes) -> bytes:
+          nonlocal content_bss
+          if len(bs) == 0:
+            # record the consumed data as the response.content
+            flow.response.content = b''.join(content_bss)
+            content_bss = None
+          else:
+            content_bss.append(bs)
+          return bs
+
+        stream_funcs.append(content_stream)
+
+      if len(stream_funcs) == 1:
+
+        stream, = stream_funcs
+
+      else:
+
+        def stream(bs: bytes) -> bytes:
+          ''' Run each `bytes` instance through all the stream functions.
+              '''
+          stream_excs = []
+          for stream_func in stream_funcs:
+            try:
+              bs2 = stream_func(bs)
+            except Exception as e:
+              warning(
+                  "%s: exception calling hook_action stream_func %s: %s",
+                  prefix, funccite(stream_func), e
+              )
+              stream_excs.append(e)
+              ##breakpoint()
+            else:
+              bs = bs2
+          if excs:
+            if len(excs) == 1:
+              raise excs[0]
+            raise ExceptionGroup(
+                f'multiple exceptions running actions for .{hook_name}', excs
+            )
+          return bs
+
+      flow.response.stream = stream
+
+    if excs:
+      if len(excs) == 1:
+        raise excs[0]
+      raise ExceptionGroup(
+          f'multiple exceptions running actions for .{hook_name}', excs
+      )
 
 @uses_runstate
 @typechecked
