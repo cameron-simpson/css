@@ -46,8 +46,15 @@ def process_stream(
     content_length: Optional[int] = None,
     name: Optional[str] = None,
 ) -> Callable[bytes, bytes]:
-  ''' Dispatch `consumer(bsiter)` in a `Thread` to consume data from the flow.
+  ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
       Return a callable to set as the response.stream in the caller.
+
+      The `Flow.response.steam` attribute can be set to a callable
+      which accepts a `bytes` instance as its sole callable. You
+      can keep context my preparing that callable with a closure,
+      but often it is clearer to write a generator which accepts
+      an iterable of `bytes` and yields `bytes`. This function
+      enables that.
 
       Parameters:
       * `consumer`: a callable accepting an iterable of `bytes` instances
@@ -57,6 +64,22 @@ def process_stream(
         typically supplied from the response 'Content-Length` header
       * `name`: an optional string to name the worker `Thread`,
         default from `progress_name` or the name of `consumer`
+
+      For example, here is the stream setting from `stream_flow`,
+      which inserts a pass through stream for responses above a
+      certain size (its purpose is essentially to set mitmproxy
+      from its default "consume all and produce `.content" mode to
+      a streaming mode, important if this is being used ars a real
+      web browsing proxy):
+
+          length = content_length(flow.response.headers)
+          if ( flow.request.method in ('GET',)
+               and (length is None or length >= threshold)
+          ):
+              # put the flow into streaming mode, changing nothing
+              flow.response.stream = process_stream(
+                  lambda bss: bss, f'stream {flow.request}', content_length=length
+              )
   '''
   if name is None:
     name = progress_name or funccite(consumer)
@@ -103,8 +126,8 @@ def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
   assert hook_name == 'responseheaders'
   assert not flow.response.stream
   length = content_length(flow.response.headers)
-  if flow.request.method in ('GET',) and (length is None
-                                          or length >= threshold):
+  if (flow.request.method in ('GET',)
+      and (length is None or length >= threshold)):
     # put the flow into streaming mode, changing nothing
     flow.response.stream = process_stream(
         lambda bss: bss, f'stream {flow.request}', content_length=length
