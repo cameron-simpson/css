@@ -467,7 +467,7 @@ class MITMAddon:
             **mitm_hook_kw,
         )
       except Exception as e:
-        warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
+        warning("exception calling hook_action[%d]: %s", i, e)
         excs.append(e)
       if hook_name == 'responseheaders':
         # if the .stream attribute was set, append it to the
@@ -521,8 +521,8 @@ class MITMAddon:
               bs2 = stream_func(bs)
             except Exception as e:
               warning(
-                  "%s: exception calling hook_action stream_func %s: %s",
-                  prefix, funccite(stream_func), e
+                  "exception calling hook_action stream_func %s: %s",
+                  funccite(stream_func), e
               )
               stream_excs.append(e)
               ##breakpoint()
