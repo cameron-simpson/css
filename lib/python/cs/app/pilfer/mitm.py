@@ -13,6 +13,7 @@ from threading import Thread
 from typing import Callable, Iterable, Mapping, Optional
 
 from mitmproxy import ctx, http
+import mitmproxy.addons.dumper
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
@@ -25,7 +26,7 @@ from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
 from cs.lex import r, s, tabulate
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress
 from cs.py.func import funccite
 from cs.queues import IterableQueue
@@ -38,6 +39,9 @@ from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 from .util import content_length
 
+# monkey patch so that Dumper.echo calls the desired print()
+mitmproxy.addons.dumper.print = print
+
 @typechecked
 def process_stream(
     consumer: Callable[Iterable[bytes], None],
@@ -45,9 +49,18 @@ def process_stream(
     *,
     content_length: Optional[int] = None,
     name: Optional[str] = None,
+    runstate: Optional[RunState] = None,
 ) -> Callable[bytes, bytes]:
-  ''' Dispatch `consumer(bsiter)` in a `Thread` to consume data from the flow.
+  ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
       Return a callable to set as the response.stream in the caller.
+
+      The `Flow.response.stream` attribute can be set to a callable
+      which accepts a `bytes` instance as its sole callable;
+      this provides no context to the stream processor.
+      You can keep context my preparing that callable with a closure,
+      but often it is clearer to write a generator which accepts
+      an iterable of `bytes` and yields `bytes`. This function
+      enables that.
 
       Parameters:
       * `consumer`: a callable accepting an iterable of `bytes` instances
@@ -57,6 +70,22 @@ def process_stream(
         typically supplied from the response 'Content-Length` header
       * `name`: an optional string to name the worker `Thread`,
         default from `progress_name` or the name of `consumer`
+
+      For example, here is the stream setting from `stream_flow`,
+      which inserts a pass through stream for responses above a
+      certain size (its purpose is essentially to switch mitmproxy
+      from its default "consume all and produce `.content`" mode
+      to a streaming mode, important if this is being used as a real
+      web browsing proxy):
+
+          length = content_length(flow.response.headers)
+          if ( flow.request.method in ('GET',)
+               and (length is None or length >= threshold)
+          ):
+              # put the flow into streaming mode, changing nothing
+              flow.response.stream = process_stream(
+                  lambda bss: bss, f'stream {flow.request}', content_length=length
+              )
   '''
   if name is None:
     name = progress_name or funccite(consumer)
@@ -71,6 +100,15 @@ def process_stream(
         incfirst=True,
         report_print=print,
     )
+  if runstate is not None:
+
+    def cancel_Qs(rs: RunState):
+      print(rs, "CANCELLED, close queues")
+      data_Q.close()
+      if progress_Q is not None:
+        progress_Q.close()
+
+    runstate.notify_cancel.add(cancel_Qs)
   data_Q = IterableQueue(name=name)
   Thread(target=consumer, args=(data_Q,), name=name).start()
 
@@ -103,11 +141,14 @@ def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
   assert hook_name == 'responseheaders'
   assert not flow.response.stream
   length = content_length(flow.response.headers)
-  if flow.request.method in ('GET',) and (length is None
-                                          or length >= threshold):
+  if (flow.request.method in ('GET',)
+      and (length is None or length >= threshold)):
     # put the flow into streaming mode, changing nothing
     flow.response.stream = process_stream(
-        lambda bss: bss, f'stream {flow.request}', content_length=length
+        lambda bss: bss,
+        f'stream {flow.request}',
+        content_length=length,
+        runstate=flow.runstate,
     )
 
 @attr(default_hooks=('requestheaders',))
@@ -144,12 +185,14 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
     if flow.response:
       rsp = flow.response
       if getattr(flow, 'from_cache', False):
-        # ignore a response we ourselves pulled form the cache
+        # ignore a response we ourselves pulled from the cache
         pass
       elif flow.request.method != 'GET':
         PR("response is not from a GET, do not cache")
       elif rsp.status_code != 200:
         PR("response status_code", rsp.status_code, "is not 200, do not cache")
+      elif flow.runstate.cancelled:
+        PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
         # response from upstream, update the cache
         PR("to cache, cache_key", cache_key)
@@ -166,9 +209,11 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   rsp.headers,
                   mode=mode,
                   decoded=False,
+                  runstate=flow.runstate,
               ),
               f'cache {cache_key}',
               content_length=content_length(rsp.headers),
+              runstate=flow.runstate,
           )
 
         else:
@@ -228,6 +273,7 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
   rq = flow.request
   url = URL(rq.url)
+  rsp = flow.response
   PR(rq)
   if hook_name == 'requestheaders':
     sitemap = P.sitemap_for(url)
@@ -279,41 +325,8 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
       save,
       f'{flow.request}: save {flow.response.headers["content-type"]} -> {save_as!r}',
       content_length=content_length(rsp.headers),
+      runstate=flow.runstate,
   )
-
-@attr(default_hooks=('responseheaders',))
-@uses_pilfer
-@typechecked
-def watch_flow(hook_name, flow, *, P: Pilfer = None):
-  ''' Watch data chunks from a stream flow.
-  '''
-  rq = flow.request
-  rsp = flow.response
-  PR = lambda *a: print('WATCH_FLOW', hook_name, rq, *a)
-  PR("response.stream was", r(rsp.stream))
-
-  print("  Response Headers:")
-  for line in tabulate(*[(key, value)
-                         for key, value in sorted(rsp.headers.items())]):
-    print("   ", line)
-
-  progress_Q = Progress(
-      str(rq),
-      total=content_length(rsp.headers),
-  ).qbar(
-      itemlenfunc=len,
-      incfirst=True,
-      report_print=print,
-  )
-
-  def watch(bs: bytes) -> bytes:
-    if len(bs) == 0:
-      progress_Q.close()
-    else:
-      progress_Q.put(bs)
-    return bs
-
-  rsp.stream = watch
 
 @dataclass
 class MITMHookAction(Promotable):
@@ -324,7 +337,6 @@ class MITMHookAction(Promotable):
       'print': print_rq,
       'save': save_stream,
       'stream': stream_flow,
-      'watch': watch_flow,
   }
 
   action: Callable
@@ -386,6 +398,7 @@ class MITMAddon:
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
     '''
+    ##print("MITMAddon.__getattr__", repr(hook_name))
     prefix = f'{self.__class__.__name__}.{hook_name}'
     with Pfx(prefix):
       if hook_name in ('addons', 'add_log', 'clientconnect',
@@ -395,112 +408,7 @@ class MITMAddon:
       hook_actions = self.hook_map[hook_name]
       if not hook_actions:
         raise AttributeError(f'no actions for {hook_name=}')
-
-      def call_hooks(*mitm_hook_a, **mitm_hook_kw):
-        # look up the actions when we're called
-        if not hook_actions:
-          return
-        # any exceptions from the actions
-        excs = []
-        # for collating any .stream functions
-        stream_funcs = []
-        for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
-          if hook_name == 'responseheaders':
-            flow = mitm_hook_a[0]
-            # note the initial state of the .steam attribute
-            stream0 = flow.response.stream
-            assert not stream0, \
-                f'expected falsey flow.response.stream, got {flow.response.stream=}'
-          try:
-            pfx_call(
-                action,
-                *action_args,
-                hook_name,
-                *mitm_hook_a,
-                **action_kwargs,
-                **mitm_hook_kw,
-            )
-          except Exception as e:
-            warning("%s: exception calling hook_action[%d]: %s", prefix, i, e)
-            excs.append(e)
-          if hook_name == 'responseheaders':
-            # if the .stream attribute was set, append it to the
-            # stream functions and reset the .stream attribute
-            if flow.response.stream:
-              stream_funcs.append(flow.response.stream)
-              flow.response.stream = stream0
-        if hook_name == 'responseheaders' and stream_funcs:
-          # After the actions have run, define the stream attribute
-          # to run whatever stream functions were applied.
-          #
-          # Because the actions do not know about each other, we
-          # wrap all the stream functions in a function which chains
-          # them together. If there's only one, we pass it straight
-          # though without a wrapper.
-          #
-          # Also, if there's a action for the "response" hook we
-          # append a stream function which collates the final
-          # output of the stream functions and computes a `.content`
-          # attribute so that the "response" action has a valid
-          # `.content` to access.
-          #
-          if self.hook_map['response']:
-            # collate the final stream into a raw_content bytes instance
-            content_bss = []
-
-            def content_stream(bs: bytes) -> bytes:
-              nonlocal content_bss
-              if len(bs) == 0:
-                # record the consumed data as the response.content
-                flow.response.content = b''.join(content_bss)
-                content_bss = None
-              else:
-                content_bss.append(bs)
-              return bs
-
-            stream_funcs.append(content_stream)
-
-          if len(stream_funcs) == 1:
-
-            stream, = stream_funcs
-
-          else:
-
-            def stream(bs: bytes) -> bytes:
-              ''' Run each `bytes` instance through all the stream functions.
-              '''
-              stream_excs = []
-              for stream_func in stream_funcs:
-                try:
-                  bs2 = stream_func(bs)
-                except Exception as e:
-                  warning(
-                      "%s: exception calling hook_action stream_func %s: %s",
-                      prefix, funccite(stream_func), e
-                  )
-                  stream_excs.append(e)
-                  ##breakpoint()
-                else:
-                  bs = bs2
-              if excs:
-                if len(excs) == 1:
-                  raise excs[0]
-                raise ExceptionGroup(
-                    f'multiple exceptions running actions for .{hook_name}',
-                    excs
-                )
-              return bs
-
-          flow.response.stream = stream
-
-        if excs:
-          if len(excs) == 1:
-            raise excs[0]
-          raise ExceptionGroup(
-              f'multiple exceptions running actions for .{hook_name}', excs
-          )
-
-      return call_hooks
+      return partial(self.call_hooks_for, hook_name)
 
   def load(self, loader):
     loader.add_option(
@@ -509,6 +417,135 @@ class MITMAddon:
         default="TLS1",
         help="Set the tls_version_client_min option.",
     )
+
+  def responseheaders(self, flow):
+    ''' On `responseheaders`, set `flow.runstate` to a `RunState` and start it
+        then call the hooks.
+    '''
+    assert not hasattr(flow, 'runstate')
+    flow.runstate = RunState(str(flow.request))
+    flow.runstate.start()
+    self.call_hooks_for("responseheaders", flow)
+
+  def response(self, flow):
+    ''' On `response`, call the hooks then stop `flow.runstate`.
+    '''
+    self.call_hooks_for("response", flow)
+    flow.runstate.stop()
+
+  def error(self, flow):
+    ''' On `error`, cancel `flow.runstate`, call the hooks, then stop `flow.runstate`.
+    '''
+    flow.runstate.cancel()
+    self.call_hooks_for("error", flow)
+    flow.runstate.stop()
+
+  @pfx_method
+  def call_hooks_for(self, hook_name: str, *mitm_hook_a, **mitm_hook_kw):
+    ''' This calls all the actions for the specified `hook_name`.
+    '''
+    # look up the actions when we're called
+    hook_actions = self.hook_map[hook_name]
+    if not hook_actions:
+      return
+    # any exceptions from the actions
+    excs = []
+    # for collating any .stream functions
+    stream_funcs = []
+    for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
+      if hook_name == 'responseheaders':
+        flow = mitm_hook_a[0]
+        # note the initial state of the .steam attribute
+        stream0 = flow.response.stream
+        assert not stream0, \
+            f'expected falsey flow.response.stream, got {flow.response.stream=}'
+      try:
+        pfx_call(
+            action,
+            *action_args,
+            hook_name,
+            *mitm_hook_a,
+            **action_kwargs,
+            **mitm_hook_kw,
+        )
+      except Exception as e:
+        warning("exception calling hook_action[%d]: %s", i, e)
+        excs.append(e)
+      if hook_name == 'responseheaders':
+        # if the .stream attribute was set, append it to the
+        # stream functions and reset the .stream attribute
+        if flow.response.stream:
+          stream_funcs.append(flow.response.stream)
+          flow.response.stream = stream0
+    if hook_name == 'responseheaders' and stream_funcs:
+      # After the actions have run, define the stream attribute
+      # to run whatever stream functions were applied.
+      #
+      # Because the actions do not know about each other, we
+      # wrap all the stream functions in a function which chains
+      # them together. If there's only one, we pass it straight
+      # though without a wrapper.
+      #
+      # Also, if there's a action for the "response" hook we
+      # append a stream function which collates the final
+      # output of the stream functions and computes a `.content`
+      # attribute so that the "response" action has a valid
+      # `.content` to access.
+      #
+      if self.hook_map['response']:
+        # collate the final stream into a raw_content bytes instance
+        content_bss = []
+
+        def content_stream(bs: bytes) -> bytes:
+          nonlocal content_bss
+          if len(bs) == 0:
+            # record the consumed data as the response.content
+            flow.response.content = b''.join(content_bss)
+            content_bss = None
+          else:
+            content_bss.append(bs)
+          return bs
+
+        stream_funcs.append(content_stream)
+
+      if len(stream_funcs) == 1:
+
+        stream, = stream_funcs
+
+      else:
+
+        def stream(bs: bytes) -> bytes:
+          ''' Run each `bytes` instance through all the stream functions.
+              '''
+          stream_excs = []
+          for stream_func in stream_funcs:
+            try:
+              bs2 = stream_func(bs)
+            except Exception as e:
+              warning(
+                  "exception calling hook_action stream_func %s: %s",
+                  funccite(stream_func), e
+              )
+              stream_excs.append(e)
+              ##breakpoint()
+            else:
+              bs = bs2
+          if excs:
+            if len(excs) == 1:
+              raise excs[0]
+            raise ExceptionGroup(
+                f'multiple exceptions running actions for .{hook_name}', excs
+            )
+          return bs
+
+      flow.response.stream = stream
+
+    if excs:
+      if len(excs) == 1:
+        raise excs[0]
+      raise ExceptionGroup(
+          f'multiple exceptions running actions for .{hook_name}', excs
+      )
 
 @uses_runstate
 @typechecked
