@@ -50,9 +50,10 @@ def process_stream(
   ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
       Return a callable to set as the response.stream in the caller.
 
-      The `Flow.response.steam` attribute can be set to a callable
-      which accepts a `bytes` instance as its sole callable. You
-      can keep context my preparing that callable with a closure,
+      The `Flow.response.stream` attribute can be set to a callable
+      which accepts a `bytes` instance as its sole callable;
+      this provides no context to the stream processor.
+      You can keep context my preparing that callable with a closure,
       but often it is clearer to write a generator which accepts
       an iterable of `bytes` and yields `bytes`. This function
       enables that.
@@ -69,8 +70,8 @@ def process_stream(
       For example, here is the stream setting from `stream_flow`,
       which inserts a pass through stream for responses above a
       certain size (its purpose is essentially to switch mitmproxy
-      from its default "consume all and produce `.content`" mode to
-      a streaming mode, important if this is being used as a real
+      from its default "consume all and produce `.content`" mode
+      to a streaming mode, important if this is being used as a real
       web browsing proxy):
 
           length = content_length(flow.response.headers)
@@ -180,7 +181,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
     if flow.response:
       rsp = flow.response
       if getattr(flow, 'from_cache', False):
-        # ignore a response we ourselves pulled form the cache
+        # ignore a response we ourselves pulled from the cache
         pass
       elif flow.request.method != 'GET':
         PR("response is not from a GET, do not cache")
