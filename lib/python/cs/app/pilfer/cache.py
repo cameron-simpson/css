@@ -30,7 +30,7 @@ from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.progress import progressbar
 from cs.queues import IterableQueue
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.urlutils import URL
 
 from typeguard import typechecked
@@ -234,6 +234,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       mode: str = 'modified',
       decoded=False,
       progress_name=None,
+      runstate: Optional[RunState] = None,
   ) -> dict:
     ''' Cache the contents of the response `rsp` against `cache_key`.
         Return the resulting cache metadata for the response.
@@ -292,9 +293,11 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       ) as T:
         hasher = self.hashclass.hashfunc()
         for bs in content:
+          runstate.raiseif()
           T.write(bs)
           hasher.update(bs)
         T.flush()
+        runstate.raiseif()
         h = self.hashclass(hasher.digest())
         content_base = (
             f'{ckbase}--{urlbase or "index"}'[:128] + f'--{h}{ext}'
