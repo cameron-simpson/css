@@ -13,6 +13,7 @@ from threading import Thread
 from typing import Callable, Iterable, Mapping, Optional
 
 from mitmproxy import ctx, http
+import mitmproxy.addons.dumper
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
@@ -37,6 +38,9 @@ from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 from .util import content_length
+
+# monkey patch so that Dumper.echo calls the desired print()
+mitmproxy.addons.dumper.print = print
 
 @typechecked
 def process_stream(
