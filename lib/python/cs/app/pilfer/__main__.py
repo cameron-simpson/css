@@ -276,9 +276,11 @@ class PilferCommand(BaseCommand):
             cache   The predefined "cache" action on its default hooks.
             dump@requestheaders
                     The predefined "dump" action on the "requestheaders" hook.
-            my.module:handler:3@requestheaders
-                    Call handler(3,hook_name,flow) from module my.module
+            my.module:handler:3,x=4@requestheaders
+                    Call handler(3,hook_name,flow,x=4) from module my.module
                     on the "requestheaders" hook.
+          It is generally better to use named parameters in actions because
+          it is easier to give them default values in the function.
     '''
     from .mitm import (MITMAddon, run_proxy)
     listen_host = DEFAULT_MITM_LISTEN_HOST
