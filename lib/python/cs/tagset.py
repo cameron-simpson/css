@@ -217,7 +217,7 @@ from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable
 from cs.edit import edit_strings, edit as edit_lines
-from cs.fileutils import shortpath
+from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
@@ -3594,64 +3594,65 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
       # skip save if no file and nothing to save
-      if name_tags or unparsed or isfilepath(filepath):
-        try:
-          with pfx_call(open, filepath, 'w') as f:
-            for _, line in unparsed:
-              if not line.startswith('#'):
-                f.write('##  ')
-              f.write(line)
-              f.write('\n')
-            for name, tags in name_tags:
-              with Pfx(name):
-                if not tags:
-                  continue
-                if update_mapping:
-                  # mirror tags to secondary mapping eg an SQLTags
-                  # this associates a UUID with the file
+      if not isfilepath(filepath) and not name_tags and not unparsed:
+        return
+      try:
+        with atomic_filename(filepath, mode="w", exists_ok=True) as f:
+          for _, line in unparsed:
+            if not line.startswith('#'):
+              f.write('##  ')
+            f.write(line)
+            f.write('\n')
+          for name, tags in name_tags:
+            with Pfx(name):
+              if not tags:
+                continue
+              if update_mapping:
+                # mirror tags to secondary mapping eg an SQLTags
+                # this associates a UUID with the file
+                try:
+                  uuid_s = tags[update_uuid_tag_name]
+                except KeyError:
+                  uuid = uuid4()
+                  uuid_s = str(uuid)
+                  tags[update_uuid_tag_name] = uuid_s
+                else:
                   try:
-                    uuid_s = tags[update_uuid_tag_name]
-                  except KeyError:
-                    uuid = uuid4()
-                    uuid_s = str(uuid)
-                    tags[update_uuid_tag_name] = uuid_s
+                    uuid = UUID(uuid_s)
+                  except ValueError as e:
+                    warning(
+                        "invalid UUID tag %r=%s: %s", update_uuid_tag_name,
+                        uuid_s, e
+                    )
+                    uuid = None
                   else:
-                    try:
-                      uuid = UUID(uuid_s)
-                    except ValueError as e:
-                      warning(
-                          "invalid UUID tag %r=%s: %s", update_uuid_tag_name,
-                          uuid_s, e
-                      )
-                      uuid = None
-                    else:
-                      uuid_s = str(uuid)
-                  if uuid is not None:
-                    # apply the tags to the secondary mapping
-                    key = (
-                        "%s.%s" %
-                        (update_prefix, uuid_s) if update_prefix else uuid_s
+                    uuid_s = str(uuid)
+                if uuid is not None:
+                  # apply the tags to the secondary mapping
+                  key = (
+                      "%s.%s" %
+                      (update_prefix, uuid_s) if update_prefix else uuid_s
+                  )
+                  d = tags.as_dict()
+                  del d[update_uuid_tag_name]
+                  d['fspath'] = joinpath(dirname(filepath), name)
+                  try:
+                    update_mapping[key].update(d)
+                  except AttributeError:
+                    raise
+                  except Exception as e:
+                    warning(
+                        "update_mapping:%s[%r].update(%s): %s",
+                        s(update_mapping), key, cropped_repr(d), e
                     )
-                    d = tags.as_dict()
-                    del d[update_uuid_tag_name]
-                    d['fspath'] = joinpath(dirname(filepath), name)
-                    try:
-                      update_mapping[key].update(d)
-                    except AttributeError:
-                      raise
-                    except Exception as e:
-                      warning(
-                          "update_mapping:%s[%r].update(%s): %s",
-                          s(update_mapping), key, cropped_repr(d), e
-                      )
-                f.write(
-                    cls.tags_line(
-                        name, tags, extra_types=extra_types, prune=prune
-                    )
-                )
-                f.write('\n')
-        except OSError as e:
-          error("save(%r) fails: %s", filepath, e)
+              f.write(
+                  cls.tags_line(
+                      name, tags, extra_types=extra_types, prune=prune
+                  )
+              )
+              f.write('\n')
+      except OSError as e:
+        error("save_tagsets(%r) fails: %s", filepath, e)
 
   def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.
