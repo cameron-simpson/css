@@ -176,7 +176,7 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def content(self) -> bytes:
-    ''' The URL decoded content as a `bytes`..
+    ''' The decoded URL content as a `bytes`.
     '''
     return self.GET_response.content
 
