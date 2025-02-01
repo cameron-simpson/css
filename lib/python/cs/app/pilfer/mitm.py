@@ -418,12 +418,18 @@ class MITMAddon:
         help="Set the tls_version_client_min option.",
     )
 
-  def responseheaders(self, flow):
-    ''' On `responseheaders`, set `flow.runstate` to a `RunState` and start it
+  def requestheaders(self, flow):
+    ''' On `requestheaders`, set `flow.runstate` to a `RunState`
         then call the hooks.
+        The `RunState` is not started until `responseheaders`.
     '''
     assert not hasattr(flow, 'runstate')
     flow.runstate = RunState(str(flow.request))
+    self.call_hooks_for("requestheaders", flow)
+
+  def responseheaders(self, flow):
+    ''' On `responseheaders`, start `flow.runstate` then call the hooks.
+    '''
     flow.runstate.start()
     self.call_hooks_for("responseheaders", flow)
 
