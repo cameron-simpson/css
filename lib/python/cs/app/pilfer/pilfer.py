@@ -405,11 +405,19 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return map_list
 
   @promote
-  def sitemap_for(self, url: URL):
+  def sitemaps_for(self, url: URL):
+    ''' Generator yielding sitemaps which match the `url`.
+    '''
     hostname = url.hostname
     for pattern, sitemap in self.sitemaps:
       if fnmatch(hostname, pattern):
-        return sitemap
+        yield sitemap
+
+  def sitemap_for(self, url: str | URL):
+    ''' Return the first sitemap which matches the `url`, or `None`.
+    '''
+    for sitemap in self.sitemaps_for(url):
+      return sitemap
     return None
 
   def _print(self, *a, **kw):
