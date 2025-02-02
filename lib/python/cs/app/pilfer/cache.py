@@ -264,11 +264,11 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         old_md = self.get(cache_key, {}, mode=mode)
       # new content file path
       urlbase, urlext = splitext(basename(url.path))
-      content_type = rsp_headers.get('content-type').split(';')[0].strip()
+      content_type = rsp_headers.get('content-type', '').split(';')[0].strip()
       if content_type:
         ctext = mimetypes.guess_extension(content_type) or ''
       else:
-        warning("no request Content-Type")
+        warning("no response Content-Type")
         ctext = ''
       # partition thekey into a directory part and the final component
       # used as the basis for the cache filename
