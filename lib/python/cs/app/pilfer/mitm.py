@@ -157,7 +157,7 @@ def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
     # put the flow into streaming mode, changing nothing
     flow.response.stream = process_stream(
         lambda bss: bss,
-        f'stream {flow.request}',
+        ##f'stream {flow.request}',
         content_length=length,
         runstate=flow.runstate,
     )
