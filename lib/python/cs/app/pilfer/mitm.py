@@ -453,9 +453,12 @@ class MITMAddon:
   def error(self, flow):
     ''' On `error`, cancel `flow.runstate`, call the hooks, then stop `flow.runstate`.
     '''
-    flow.runstate.cancel()
+    # it is possible to have an error before responseheaders
+    if flow.runstate.running:
+      flow.runstate.cancel()
     self.call_hooks_for("error", flow)
-    flow.runstate.stop()
+    if flow.runstate.running:
+      flow.runstate.stop()
 
   @pfx_method
   def call_hooks_for(self, hook_name: str, *mitm_hook_a, **mitm_hook_kw):
