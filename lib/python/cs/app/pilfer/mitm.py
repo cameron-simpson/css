@@ -120,17 +120,24 @@ def process_stream(
     ''' Copy `bs` to the `Data_Q` and also to the `progress_Q` if not `None`.
         Return `bs` unchanged.
     '''
-    try:
-      if len(bs) == 0:
-        data_Q.close()
-        if progress_Q is not None:
-          progress_Q.close()
-      else:
-        data_Q.put(bs)
-        if progress_Q is not None:
-          progress_Q.put(bs)
-    except Exception as e:
-      warning("%s: exception: %s", name, s(e))
+    if data_Q.closed:
+      if len(bs) > 0:
+        warning(
+            "discarding %d bytes after close of data_Q:%s", len(bs),
+            data_Q.name
+        )
+    else:
+      try:
+        if len(bs) == 0:
+          data_Q.close()
+          if progress_Q is not None:
+            progress_Q.close()
+        else:
+          data_Q.put(bs)
+          if progress_Q is not None:
+            progress_Q.put(bs)
+      except Exception as e:
+        warning("%s: exception: %s", name, s(e))
     return bs
 
   return copy_bs
