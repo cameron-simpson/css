@@ -36,7 +36,7 @@ DISTINFO = {
         'cs.lex',
         'cs.logutils',
         'cs.mappings',
-        'cs.naysync',
+        'cs.naysync>=amap_progressive',
         'cs.obj',
         'cs.pfx>=pfx_call',
         'cs.pipeline',
