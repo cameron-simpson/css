@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
 import re
+from typing import Any, Iterable, Tuple
 
 from cs.deco import promote, Promotable
 from cs.urlutils import URL
@@ -65,22 +66,23 @@ class SiteMap:
 
   URL_KEY_PATTERNS = ()
 
-  @promote
-  def url_key(self, url: URL) -> str | None:
-    ''' Return a string which is a persistent cache key for the
-        supplied `url` within the content of this sitemap, or `None`
-        for URLs which do not have a key i.e. should not be cached persistently.
+  def matches(
+      self,
+      url: URL,
+      patterns: Iterable,  # [Tuple[Tuple[str, str], Any]],
+  ) -> Iterable[Tuple[str, str, dict, dict]]:
+    ''' A generator to match `url` against `patterns`, an iterable
+        of `(match_to,arg)` 2-tuples which yields
+        `(match_to,arg,match,mapping)` 4-tuples for each pattern which
+        matches `url`.
 
-        A site with semantic URLs might have keys like
-        *entity_type*`/`*id*`/`*aspect* where the *aspect* was
-        something like `html` or `icon` etc for different URLs
-        associated with the same entity.
+        Parameters:
+        * `url`: a `URL` to match
+        * `patterns`: the iterable of `(match_to,arg)` 2-tuples
 
-        This base implementation matches the patterns in `URL_KEY_PATTERNS`
-        class attribute which is `()` for the base class.
     '''
-    for matcher, keyfn in self.URL_KEY_PATTERNS:
-      matcher = URLMatcher.promote(matcher)
+    for match_to, arg in patterns:
+      matcher = URLMatcher.promote(match_to)
       if (match := matcher(url)) is not None:
         mapping = dict(
             (
@@ -98,7 +100,25 @@ class SiteMap:
         )
         mapping.update(url.query_dict())
         mapping.update(match)
-        return keyfn.format_map(mapping)
+        yield match_to, arg, match, mapping
+
+  @promote
+  def url_key(self, url: URL) -> str | None:
+    ''' Return a string which is a persistent cache key for the
+        supplied `url` within the content of this sitemap, or `None`
+        for URLs which do not have a key i.e. should not be cached persistently.
+
+        A site with semantic URLs might have keys like
+        *entity_type*`/`*id*`/`*aspect* where the *aspect* was
+        something like `html` or `icon` etc for different URLs
+        associated with the same entity.
+
+        This base implementation matches the patterns in `URL_KEY_PATTERNS`
+        class attribute which is `()` for the base class.
+    '''
+    for match_to, keyfn, match, mapping in self.matches(url,
+                                                        self.URL_KEY_PATTERNS):
+      return keyfn.format_map(mapping)
     return None
 
 # Some presupplied site maps.
