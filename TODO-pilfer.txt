@@ -1,3 +1,4 @@
+allow mitm addon classes as actions
 √ mitm error and response methods which still call the hook actions
 we should not cache incomplete byte ranges?
 √ mitm to stream everything if no reponse hook
