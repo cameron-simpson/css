@@ -604,13 +604,23 @@ async def run_proxy(
     ''' Worker to fetch URLs from `urlQ` via the mitmproxy.
     '''
 
+    @promote
     def get_url(url: URL):
+      ''' Fetch `url` in streaming mode, discarding its content.
+      '''
       try:
-        pfx_call(
-            requests.get, url.url, proxies={url.scheme: mitm_proxy_url}
+        rsp = pfx_call(
+            trace(requests.get),
+            url.url,
+            proxies={url.scheme: mitm_proxy_url},
+            stream=True,
         )
       except Exception as e:
         warning("prefetch_worker: %s", e)
+      else:
+        # consume the stream
+        for _ in rsp.iter_content(chunk_size=8192):
+          pass
 
     for _ in amap(get_url, urlQ, concurrent=True, unordered=True):
       pass
