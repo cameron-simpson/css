@@ -10,6 +10,7 @@ import re
 from typing import Any, Iterable, Tuple
 
 from cs.deco import promote, Promotable
+from cs.lex import cutsuffix
 from cs.urlutils import URL
 
 @dataclass
@@ -160,5 +161,5 @@ class Wikipedia(SiteMap):
     '''
     key = super().url_key(url)
     if key is not None:
-      key = f'{cutsuffix(url.hostname,".wikipedia.org")}/{key}'
+      key = f'{cutsuffix(url.hostname, ".wikipedia.org")}/{key}'
     return key
