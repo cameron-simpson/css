@@ -22,7 +22,14 @@
     - `AsyncPipeLine`: a pipeline of functions connected together with `IterableAsyncQueue`s
 '''
 
-from asyncio import create_task, run, to_thread, Queue as AQueue, Task
+from asyncio import (
+    CancelledError,
+    create_task,
+    run,
+    to_thread,
+    Queue as AQueue,
+    Task,
+)
 from dataclasses import dataclass
 from enum import auto, StrEnum
 from functools import partial
@@ -261,35 +268,80 @@ async def amap(
   # dispatch calls to func() as tasks
   # yield results from an asyncio.Queue
 
-  # a queue of (index, result)
-  Q = AQueue()
-
-  # run func(item) and yield its sequence number and result
-  # this allows us to yield in order from a heap
-  async def qfunc(i, item):
-    await Q.put((i, await func(item)))
-
-  # queue all the tasks with their sequence numbers
+  # flag indicating that all input items have been dispatched
+  consumed = False
+  # flag indicating that a queued function raised, terminating further dispatch or calls
+  terminated = False
+  # counter of dispatched tasks for each input item
   queued = 0
+  # counter of completed functions, used to measure end of results if consumed
+  completed = 0
+  # a queue of (result,exc), fulfilled by the consume_ait task below
+  resultQ = IterableAsyncQueue()
+
+  # Run func(item) and put (i,result,exc) onto resultQ being (i,result,None)
+  # if func completed or (i,None,exc) if func raised an exception.
+  # This allows us to dispatch funcs concurrently and yield results
+  # in the desired order.
+  async def qfunc(i, item):
+    nonlocal consumed, terminated, queued, completed
+    if terminated:
+      completed += 1
+      await resultQ.put(
+          (
+              i,
+              None,
+              CancelledError(f'amap({i}:{item}): processing terminated'),
+          )
+      )
+    try:
+      result = await func(item)
+    except Exception as exc:
+      completed += 1
+      await resultQ.put((i, None, exc))
+    else:
+      completed += 1
+      await resultQ.put((i, result, None))
+    if consumed and completed == queued:
+      # close the queue on the last function completion
+      await resultQ.close()
+
+  # Queue all the tasks with their sequence numbers.
   # Does this also need to be an async function in case there's
   # some capacity limitation on the event loop? I hope not.
-  async for item in ait:
-    create_task(qfunc(queued, item))
-    queued += 1
+  async def consume_ait():
+    nonlocal ait, queued, consumed, terminated
+    try:
+      async for item in ait:
+        if terminated:
+          break
+        create_task(qfunc(queued, item))
+        queued += 1
+    finally:
+      consumed = True
+      if queued == 0:
+        # no functions queued, so we must close the resultQ ourselves
+        await resultQ.close()
+
+  create_task(consume_ait())
   if unordered:
-    # yield results as they come in
-    for _ in range(queued):
-      i, result = await Q.get()
+    async for i, result, exc in resultQ:
+      if exc is not None:
+        terminated = True
+        raise exc
       yield (i, result) if indexed else result
   else:
     # gather results in a heap
     # yield results as their number arrives
     results = []
     unqueued = 0
-    for _ in range(queued):
-      heappush(results, await Q.get())
+    async for i_result_exc in resultQ:
+      heappush(results, i_result_exc)
       while results and results[0][0] == unqueued:
-        i, result = heappop(results)
+        i, result, exc = heappop(results)
+        if exc is not None:
+          terminated = True
+          raise exc
         yield (i, result) if indexed else result
         unqueued += 1
     # this should have cleared the heap
@@ -640,22 +692,24 @@ if __name__ == '__main__':
       for concurrent in False, True:
         for unordered in False, True:
           for indexed in False, True:
-            print_(
-                'amap',
-                f'{concurrent=}',
-                f'{unordered=}',
-                f'{indexed=}',
-            )
-            start_time = time.time()
-            async for result in amap(
-                sync_sleep,
-                [random.randint(1, 10) / 10 for _ in range(5)],
-                concurrent=concurrent,
-                unordered=unordered,
-                indexed=indexed,
-            ):
-              print_("", result)
-            print(f': elapsed {round(time.time()-start_time, 2)}')
+            for nitems in 0, 5:
+              print_(
+                  'amap',
+                  f'{concurrent=}',
+                  f'{unordered=}',
+                  f'{indexed=}',
+                  f'{nitems=}',
+              )
+              start_time = time.time()
+              async for result in amap(
+                  sync_sleep,
+                  [random.randint(1, 10) / 10 for _ in range(nitems)],
+                  concurrent=concurrent,
+                  unordered=unordered,
+                  indexed=indexed,
+              ):
+                print_("", result)
+              print(f': elapsed {round(time.time()-start_time, 2)}')
 
     run(test_amap())
 
