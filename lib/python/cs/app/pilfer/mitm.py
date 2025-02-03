@@ -20,13 +20,17 @@ from mitmproxy.options import Options
 ##from mitmproxy.proxy.server import ProxyServer
 from mitmproxy.tools.dump import DumpMaster
 
+import requests
+
 from typeguard import typechecked
 
 from cs.cmdutils import vprint
+from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
 from cs.lex import r, s, tabulate
 from cs.logutils import warning
+from cs.naysync import amap, IterableAsyncQueue
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress
 from cs.py.func import funccite
@@ -567,6 +571,7 @@ class MITMAddon:
           f'multiple exceptions running actions for .{hook_name}', excs
       )
 
+@uses_pilfer
 @uses_runstate
 @typechecked
 async def run_proxy(
@@ -575,27 +580,57 @@ async def run_proxy(
     *,
     addon: MITMAddon,
     runstate: RunState,
+    pilfer: Pilfer,
 ):
   opts = Options(
       listen_host=listen_host,
       listen_port=listen_port,
       ssl_insecure=True,
   )
+  mitm_proxy_url = f'http://{listen_host}:{listen_port}/'
   https_proxy = os.environ.get('https_proxy')
   if https_proxy:
+    upstream_proxy_url = https_proxy
     opts.mode = (f'upstream:{https_proxy}',)
+  else:
+    upstream_proxy_url = None
   proxy = DumpMaster(opts)
   proxy.addons.add(addon)
   vprint(f'Starting mitmproxy listening on {listen_host}:{listen_port}.')
   on_cancel = lambda rs, transition: proxy.should_exit.set()
   runstate.fsm_callback('STOPPING', on_cancel)
-  loop = asyncio.get_running_loop()
-  # TODO: this belongs in RunState.__enter_exit__
-  loop.add_signal_handler(SIGINT, runstate.cancel)
-  try:
-    await proxy.run()  # Run inside the event loop
-  finally:
-    loop.remove_signal_handler(SIGINT)
-    vprint("Stopping mitmproxy.")
-    proxy.shutdown()
-    runstate.fsm_callback_discard('STOPPING', on_cancel)
+
+  async def prefetch_worker(urlQ):
+    ''' Worker to fetch URLs from `urlQ` via the mitmproxy.
+    '''
+
+    def get_url(url: URL):
+      try:
+        pfx_call(
+            requests.get, url.url, proxies={url.scheme: mitm_proxy_url}
+        )
+      except Exception as e:
+        warning("prefetch_worker: %s", e)
+
+    for _ in amap(get_url, urlQ, concurrent=True, unordered=True):
+      pass
+
+  urlQ = IterableAsyncQueue()
+  with stackattrs(
+      pilfer,
+      proxy=proxy,
+      mitm_proxy_url=mitm_proxy_url,
+      upstream_proxy_url=upstream_proxy_url,
+  ):
+    loop = asyncio.get_running_loop()
+    # TODO: this belongs in RunState.__enter_exit__
+    loop.add_signal_handler(SIGINT, runstate.cancel)
+    try:
+      asyncio.create_task(prefetch_worker(urlQ))
+      await proxy.run()  # Run inside the event loop
+    finally:
+      loop.remove_signal_handler(SIGINT)
+      urlQ.close()
+      vprint("Stopping mitmproxy.")
+      proxy.shutdown()
+      runstate.fsm_callback_discard('STOPPING', on_cancel)
