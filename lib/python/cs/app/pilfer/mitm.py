@@ -631,9 +631,10 @@ async def run_proxy(
     async for _ in amap(get_url, urlQ, concurrent=True, unordered=True):
       pass
 
-  urlQ = IterableAsyncQueue()
+  prefetchQ = IterableQueue()
   with stackattrs(
       P,
+      prefetchQ=prefetchQ,
       proxy=proxy,
       mitm_proxy_url=mitm_proxy_url,
       upstream_proxy_url=upstream_proxy_url,
@@ -642,11 +643,11 @@ async def run_proxy(
     # TODO: this belongs in RunState.__enter_exit__
     loop.add_signal_handler(SIGINT, runstate.cancel)
     try:
-      asyncio.create_task(prefetch_worker(urlQ))
+      asyncio.create_task(prefetch_worker(prefetchQ))
       await proxy.run()  # Run inside the event loop
     finally:
       loop.remove_signal_handler(SIGINT)
-      urlQ.close()
+      prefetchQ.close()
       vprint("Stopping mitmproxy.")
       proxy.shutdown()
       runstate.fsm_callback_discard('STOPPING', on_cancel)
