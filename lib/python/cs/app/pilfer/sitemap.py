@@ -3,11 +3,12 @@
 ''' Base class for site maps.
 '''
 
+from collections import ChainMap
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
 import re
-from typing import Any, Iterable, Tuple
+from typing import Any, Iterable, Mapping, Optional, Tuple
 
 from cs.deco import promote, Promotable
 from cs.lex import cutsuffix
@@ -35,7 +36,11 @@ class URLMatcher(Promotable):
     return re.compile(self.url_regexp)
 
   @promote
-  def __call__(self, url: URL) -> dict | None:
+  def match(
+      self,
+      url: URL,
+      extra: Optional[Mapping] = None,
+  ) -> dict | None:
     ''' Compare `url` against this matcher.
         Return `None` on no match.
         Return the regexp `groupdict()` on a match.
@@ -71,6 +76,7 @@ class SiteMap:
       self,
       url: URL,
       patterns: Iterable,  # [Tuple[Tuple[str, str], Any]],
+      extra: Optional[Mapping] = None,
   ) -> Iterable[Tuple[str, str, dict, dict]]:
     ''' A generator to match `url` against `patterns`, an iterable
         of `(match_to,arg)` 2-tuples which yields
@@ -80,11 +86,12 @@ class SiteMap:
         Parameters:
         * `url`: a `URL` to match
         * `patterns`: the iterable of `(match_to,arg)` 2-tuples
+        * `extra`: an optional mapping to be passed to the match function
 
     '''
     for match_to, arg in patterns:
       matcher = URLMatcher.promote(match_to)
-      if (match := matcher(url)) is not None:
+      if (match := matcher.match(url, extra=extra)) is not None:
         mapping = dict(
             (
                 (attr, getattr(url, attr)) for attr in (
@@ -110,8 +117,27 @@ class SiteMap:
         mapping.update(match)
         yield match_to, arg, match, mapping
 
+  def match(
+      self,
+      url: URL,
+      patterns: Iterable,
+      extra: Optional[Mapping] = None,
+  ) -> Tuple[str, str, dict, dict] | None:
+    ''' Scan `patterns` for a match to `url`,
+        returning the first match tuple from `self.matches()`
+        or `None` if no match is found.
+    '''
+    for match_to, on_match, match, mapping in self.matches(url, patterns,
+                                                           extra=extra):
+      return match_to, on_match, match, mapping
+    return None
+
   @promote
-  def url_key(self, url: URL) -> str | None:
+  def url_key(
+      self,
+      url: URL,
+      extra: Optional[Mapping] = None,
+  ) -> str | None:
     ''' Return a string which is a persistent cache key for the
         supplied `url` within the content of this sitemap, or `None`
         for URLs which do not have a key i.e. should not be cached persistently.
@@ -124,10 +150,11 @@ class SiteMap:
         This base implementation matches the patterns in `URL_KEY_PATTERNS`
         class attribute which is `()` for the base class.
     '''
-    for match_to, keyfn, match, mapping in self.matches(url,
-                                                        self.URL_KEY_PATTERNS):
-      return keyfn.format_map(mapping)
-    return None
+    matched = self.match(url, self.URL_KEY_PATTERNS, extra=extra)
+    if not matched:
+      return None
+    match_to, keyfn, match, mapping = matched
+    return keyfn.format_map(ChainMap(mapping, extra or {}))
 
 # Some presupplied site maps.
 
@@ -163,10 +190,10 @@ class Wikipedia(SiteMap):
   ]
 
   @promote
-  def url_key(self, url: URL) -> str | None:
+  def url_key(self, url: URL, extra: Optional[Mapping] = None) -> str | None:
     ''' Include the domain name language in the URL key.
     '''
-    key = super().url_key(url)
+    key = super().url_key(url, extra=extra)
     if key is not None:
       key = f'{cutsuffix(url.hostname, ".wikipedia.org")}/{key}'
     return key
