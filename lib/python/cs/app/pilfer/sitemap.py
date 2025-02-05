@@ -89,6 +89,8 @@ class SiteMap:
             (
                 (attr, getattr(url, attr)) for attr in (
                     'basename',
+                    'cleanpath',
+                    'cleanrpath',
                     'dirname',
                     'domain',
                     'hostname',
@@ -98,6 +100,11 @@ class SiteMap:
                     'scheme',
                 )
             )
+        )
+        # set _ to the url.path, __ to histname/path
+        mapping.update(
+            _=url.cleanrpath,
+            __=f'{url.hostname}/{url.cleanrpath}',
         )
         mapping.update(url.query_dict())
         mapping.update(match)
