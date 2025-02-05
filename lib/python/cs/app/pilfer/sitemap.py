@@ -80,14 +80,37 @@ class SiteMap:
   ) -> Iterable[Tuple[str, str, dict, dict]]:
     ''' A generator to match `url` against `patterns`, an iterable
         of `(match_to,arg)` 2-tuples which yields
-        `(match_to,arg,match,mapping)` 4-tuples for each pattern which
-        matches `url`.
+        a `(match_to,arg,match,mapping)` 4-tuple for each pattern
+        which matches `url`.
 
         Parameters:
         * `url`: a `URL` to match
         * `patterns`: the iterable of `(match_to,arg)` 2-tuples
         * `extra`: an optional mapping to be passed to the match function
 
+        Each returned match is a `(match_to,arg,match,mapping)` 4-tuple
+        with the following values:
+        * `match_to`: the pattern's first component, used for matching
+        * `arg`: the pattern's second component, used by the caller to produce some result
+        * `match`: the match object returned from the match function
+        * `mapping`: a mapping of values cleaned during the match
+
+        This implementation expects all the patterns to be
+        `(match_to,arg)` 2-tuples, where `match_to` is either
+        `URLMatcher` instance or a `(domain_glob,path_re)` 2-tuple
+        which can be promoted to a `URLMatcher`.
+        The match function is the `URLMatcher`'s `.match` method.
+
+        The match is a mapping returned from the match function.
+
+        The mapping is a `dict` initialised as follows:
+        1: with the following attributes of the `url`:
+           `basename`, `cleanpath`, 'cleanrpath', `dirname`, `domain`,
+           `hostname`, `netloc`, `path`, `port`, `scheme`.
+        2: with `_=url.cleanrpath` and `__=hostname/cleanrpath`
+        3: with the entries from `url.query_dict()`
+        4: with the contents of the `match` mapping
+        Later items overwrite earlier items where they conflict.
     '''
     for match_to, arg in patterns:
       matcher = URLMatcher.promote(match_to)
