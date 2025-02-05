@@ -580,7 +580,7 @@ async def run_proxy(
     *,
     addon: MITMAddon,
     runstate: RunState,
-    pilfer: Pilfer,
+    P: Pilfer,
 ):
   opts = Options(
       listen_host=listen_host,
@@ -622,12 +622,12 @@ async def run_proxy(
         for _ in rsp.iter_content(chunk_size=8192):
           pass
 
-    for _ in amap(get_url, urlQ, concurrent=True, unordered=True):
+    async for _ in amap(get_url, urlQ, concurrent=True, unordered=True):
       pass
 
   urlQ = IterableAsyncQueue()
   with stackattrs(
-      pilfer,
+      P,
       proxy=proxy,
       mitm_proxy_url=mitm_proxy_url,
       upstream_proxy_url=upstream_proxy_url,
