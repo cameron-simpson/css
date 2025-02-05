@@ -4,7 +4,7 @@
 #
 
 import asyncio
-from collections import defaultdict
+from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
 import os
@@ -174,7 +174,7 @@ def print_rq(hook_name, flow):
 @attr(default_hooks=('requestheaders', 'responseheaders'))
 @uses_pilfer
 def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
-  ''' Insert at `"requestheaders"` and `"response"` callbacks
+  ''' Insert at `"requestheaders"` and `"responseheaders"` callbacks
       to intercept a flow using the cache.
       If there is no `flow.response`, consult the cache.
       If there is a `flow.response`, update the cache.
@@ -185,24 +185,30 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   if rq.method not in ('GET', 'HEAD'):
     PR(rq.method, "is not GET or HEAD")
     return
+  rsp = flow.response
+  if rsp:
+    rsphdrs = rsp.headers
   url = URL(rq.url)
-  sitemap = P.sitemap_for(url)
-  if sitemap is None:
-    PR("no site map")
-    return
-  url_key = sitemap.url_key(url)
-  if url_key is None:
+  rqhdrs = rq.headers
+  # scan the sitemaps for the first one offering a key for this URL
+  # extra values for use
+  extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
+  for sitemap in P.sitemaps_for(url):
+    url_key = sitemap.url_key(url, extra=extra)
+    if url_key is not None:
+      break
+  else:
     PR("no URL key")
     return
   cache = P.content_cache
   cache_key = cache.cache_key_for(sitemap, url_key)
   with cache:
-    if flow.response:
-      rsp = flow.response
+    if rsp:
+      # update the cache
       if getattr(flow, 'from_cache', False):
         # ignore a response we ourselves pulled from the cache
         pass
-      elif flow.request.method != 'GET':
+      elif rq.method != 'GET':
         PR("response is not from a GET, do not cache")
       elif rsp.status_code != 200:
         PR("response status_code", rsp.status_code, "is not 200, do not cache")
@@ -220,7 +226,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   url,
                   cache_key,
                   bss,
-                  flow.request.headers,
+                  rqhdrs,
                   rsp.headers,
                   mode=mode,
                   decoded=False,
@@ -237,8 +243,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               url,
               cache_key,
               rsp.content,
-              flow.request.headers,
-              rsp.headers,
+              rqhdrs,
+              rsphdrs,
               mode=mode,
               decoded=True,
           )
@@ -254,7 +260,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           if hdr in rq.headers:
             del rq.headers[hdr]
         return
-      if flow.request.method == 'HEAD':
+      if rq.method == 'HEAD':
         content = b''
       else:
         try:
