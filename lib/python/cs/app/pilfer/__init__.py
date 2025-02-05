@@ -4,6 +4,19 @@
 #
 
 ''' Pilfer, a web scraping tool.
+
+    Presently this has two modes, a scraper and a proxy.
+    The scraper is invoked as `pilfer from` *URL* *action-pipeline...*
+    The proxy is invoked as `pilfer mitm` [`@`*IP*`:`*port*] *actions*...
+
+    The scraper feeds URLs through a pipeline which processes the
+    URLs, or data derived from them. Where it needs the URL's content
+    (eg the `hrefs` pipeline element) it uses `requests.get`.
+
+    The proxy uses the _excellent_ `mitmproxy` package in "upstream"
+    mode to proxy requests and optionally process their content.
+    One of my initial use cases is to operate a local cache to improve
+    browser behaviour on my soggy internet link.
 '''
 
 DISTINFO = {
