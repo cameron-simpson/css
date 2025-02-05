@@ -9,7 +9,7 @@
 
 from contextlib import contextmanager
 from functools import partial
-from queue import Queue, PriorityQueue, Queue_Empty
+from queue import Queue, PriorityQueue, Empty as Queue_Empty
 import sys
 from threading import Timer, Lock, RLock, Thread
 import time
@@ -119,7 +119,7 @@ class QueueIterator(MultiOpenMixin, Iterable[Any]):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning("%s: Queue_Empty: %s", self, e)
+      warning("%s: queue.Empty: %s", self, e)
       self._put(self.sentinel)
       # pylint: disable=raise-missing-from
       raise StopIteration(f'{self}.get: queue.Empty: {e}') from e
@@ -362,7 +362,7 @@ class PushQueue(MultiOpenMixin, RunStateMixin):
 
 class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.
-      Calls to `.get()` raise `Queue_Empty`.
+      Calls to `.get()` raise `queue.Empty`.
   '''
 
   def __init__(self, blocking=False, name=None):
@@ -391,7 +391,7 @@ class NullQueue(MultiOpenMixin):
     '''
 
   def get(self):
-    ''' Get the next value. Always raises `Queue_Empty`.
+    ''' Get the next value. Always raises `queue.Empty`.
         If `.blocking,` delay until `.shutdown()`.
     '''
     if self.blocking:
@@ -702,7 +702,7 @@ class ListQueue:
 
 def get_batch(q, max_batch=128, *, poll_delay=0.01):
   ''' Get up to `max_batch` closely spaced items from the queue `q`.
-      Return the batch. Raise `Queue_Empty` if the first `q.get()` raises.
+      Return the batch. Raise `queue.Empty` if the first `q.get()` raises.
 
       Block until the first item arrives. While the batch's size is
       less that `max_batch` and there is another item available
