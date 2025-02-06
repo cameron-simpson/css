@@ -177,6 +177,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   @staticmethod
   def cache_key_for(sitemap: SiteMap, url_key: str):
     ''' Compute the cache key from a `SiteMap` and a URL key.
+        This is essentially the URL key prefixed with the sitemap name.
     '''
     site_prefix = sitemap.name.replace("/", "__")
     cache_key = f'{site_prefix}/{url_key.lstrip("/")}' if url_key else site_prefix
@@ -188,7 +189,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   @require(lambda mode: mode in ('missing', 'modified', 'force'))
   @typechecked
   def cache_url(self, url: URL, sitemap: SiteMap, mode='missing') -> dict:
-    ''' Cache the contents of `flow.response` if the request URL cache key is not `None`.
+    ''' Cache the contents of `url` if the request URL cache key is not `None`.
         Return the resulting cache metadata for the URL.
     '''
     url_key = sitemap.url_key(url)
@@ -236,7 +237,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       progress_name=None,
       runstate: Optional[RunState] = None,
   ) -> dict:
-    ''' Cache the contents of the response `rsp` against `cache_key`.
+    ''' Cache the `content` of a URL against `cache_key`.
         Return the resulting cache metadata for the response.
     '''
     if isinstance(content, bytes):
