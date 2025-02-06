@@ -182,7 +182,7 @@ class SiteMap(Promotable):
       extra: Optional[Mapping] = None,
   ) -> str | None:
     ''' Return a string which is a persistent cache key for the
-        supplied `url` within the content of this sitemap, or `None`
+        supplied `url` within the context of this sitemap, or `None`
         for URLs which do not have a key i.e. should not be cached persistently.
 
         A site with semantic URLs might have keys like
