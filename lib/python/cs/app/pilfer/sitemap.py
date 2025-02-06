@@ -213,7 +213,7 @@ class DocSite(SiteMap):
   )
 
   @promote
-  def url_key(self, url: URL) -> str | None:
+  def url_key(self, url: URL, **_) -> str | None:
     ''' Return a key for `.html` and `.js` and `..../` URLs.
     '''
     if url.path.endswith(self.CACHE_SUFFIXES):
