@@ -207,12 +207,16 @@ class DocSite(SiteMap):
       along with several other common extensions.
   '''
 
+  # the URL path suffixes which will be cached
+  CACHE_SUFFIXES = tuple(
+      '/ .css .gif .html .ico .jpg .js .png .svg .webp .woff2'.split()
+  )
+
   @promote
   def url_key(self, url: URL) -> str | None:
     ''' Return a key for `.html` and `.js` and `..../` URLs.
     '''
-    if url.path.endswith(tuple(
-        '/ .css .gif .html .ico .jpg .js .png .svg .webp'.split())):
+    if url.path.endswith(self.CACHE_SUFFIXES):
       key = url.path.lstrip('/')
       if key.endswith('/'):
         key += 'index.html'
