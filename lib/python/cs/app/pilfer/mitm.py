@@ -60,7 +60,7 @@ def process_stream(
     runstate: Optional[RunState] = None,
 ) -> Callable[bytes, bytes]:
   ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
-      Return a callable to set as the response.stream in the caller.
+      Return a callable to set as the `response.stream` in the caller.
 
       The `Flow.response.stream` attribute can be set to a callable
       which accepts a `bytes` instance as its sole callable;
