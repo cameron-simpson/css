@@ -230,9 +230,17 @@ class Wikipedia(SiteMap):
       (
           (
               '*.wikipedia.org',
-              'wiki/(?P<title>[^:/]+)$',
+              r'/wiki/(?P<title>[^:/]+)$',
           ),
           'wiki/{title}',
+      ),
+      # https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Carbonate-outcrops_world.jpg/620px-Carbonate-outcrops_world.jpg
+      (
+          (
+              'upload.wikipedia.org',
+              r'/wikipedia/commons/(?<subpath>.*\.(jpg|gif|png))$',
+          ),
+          'wiki/commons/{subpath}',
       ),
   ]
 
