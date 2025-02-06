@@ -54,7 +54,7 @@ class URLMatcher(Promotable):
     return m.groupdict()
 
 @dataclass
-class SiteMap:
+class SiteMap(Promotable):
   ''' A base class for site maps.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
@@ -71,6 +71,26 @@ class SiteMap:
   name: str
 
   URL_KEY_PATTERNS = ()
+
+  @classmethod
+  def from_str(
+      cls, sitemap_name: str, *, P: Optional["Pilfer"] = None
+  ) -> "SiteMap":
+    ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
+    '''
+    if P is None:
+      from .pilfer import Pilfer
+      P = Pilfer.default()
+      if P is None:
+        raise ValueError(
+            f'{cls.__name__}.from_str({sitemap_name!r}): no Pilfer to search for sitemaps'
+        )
+    for name, sitwmap in P.sitemaps:
+      if name == sitemap_name:
+        return sitemap
+    raise ValueError(
+        f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
+    )
 
   def matches(
       self,
