@@ -14,11 +14,12 @@ from os.path import (
     join as joinpath,
 )
 from pprint import pprint
-import random
+from random import choice as random_choice
 import sys
 from typing import Optional
 
 from CoreFoundation import CFUUIDCreateFromString
+
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
@@ -28,6 +29,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 
 from .misc import macos_version
+
 from .objc import apple, cg
 
 __version__ = '20250108-post'
@@ -211,6 +213,69 @@ class Spaces:
         space["uuid"],
     )
 
+  def set_wp_dirpath(
+      self,
+      space_index: int,
+      dirpath: str,
+      *,
+      random=True,
+      change_duration=5.0,
+      placement='SizeToFit',
+  ):
+    print("spaces set_wp_dirpath", space_index, dirpath)
+    images = [
+        filename for filename in os.listdir(dirpath)
+        if not filename.startswith('.') and '.' in filename
+    ]
+    if not images:
+      warning("no *.* files in %r", dirpath)
+      return 1
+    lastname = random_choice(images)
+    imagepath = abspath(joinpath(dirpath, lastname))
+    if macos_version < (14, 5):
+      # This worked before I upgraded to Sonoma, MacOS 14.5.
+      # pylint: disable=use-dict-literal
+      wp_config = dict(
+          BackgroundColor=(0, 0, 0),
+          Change='TimeInterval',
+          ChangePath=abspath(dirpath),
+          NewChangePath=abspath(dirpath),
+          ChangeTime=change_duration,
+          DynamicStyle=0,
+          ImageFilePath=imagepath,
+          NewImageFilePath=imagepath,
+          LastName=lastname,
+          Placement=placement,
+          Random=random,
+      )  # pylint: disable=use-dict-literal
+    else:
+      # MacOS Sonoma onward
+      # There's some hideous bug in the DesktopPictureSetDisplayForSpace
+      # library where it seems to see a leading home directory path
+      # and replace it with '/~' (instead of something plausible like '~'),
+      # perhaps intended for making paths track homedir moves.
+      # It turns out that providing a _relative_ path from '/'
+      # does The Right Thing. Ugh.
+      dirpath = abspath(dirpath)
+      dirpath = dirpath[1:]
+      ##rdirpath = relpath(dirpath, os.environ['HOME'])
+      ##if not rdirpath.startswith('../'):
+      ##  dirpath = rdirpath
+      wp_config = dict(
+          BackgroundColor=(0, 0, 0),
+          Change='TimeInterval',
+          ChangePath=dirpath,
+          NewChangePath=dirpath,
+          ChangeDuration=change_duration,
+          DynamicStyle=0,
+          ##ImageFilePath=imagepath,
+          ##NewImageFilePath=imagepath,
+          LastName=lastname,
+          Placement=placement,
+          Random=random,
+      )  # pylint: disable=use-dict-literal
+    self.set_wp_config(space_index, wp_config)
+
   def monitor_current(self, **kw):
     ''' Return a `cs.delta.monitor` generator for changes to the
         "current" space i.e. changes representing a desktop space switch.
@@ -299,57 +364,7 @@ class SpacesCommand(BaseCommand):
       for space_index in space_indices:
         with Pfx("%d <- %r", space_index + 1, wp_path):
           if isdirpath(wp_path):
-            images = [
-                filename for filename in os.listdir(wp_path)
-                if not filename.startswith('.') and '.' in filename
-            ]
-            if not images:
-              warning("no *.* files in %r", wp_path)
-              return 1
-            lastname = random.choice(images)
-            imagepath = abspath(joinpath(wp_path, lastname))
-            if macos_version < (14, 5):
-              # This worked before I upgraded to Sonoma, MacOS 14.5.
-              # pylint: disable=use-dict-literal
-              wp_config = dict(
-                  BackgroundColor=(0, 0, 0),
-                  Change='TimeInterval',
-                  ChangePath=abspath(wp_path),
-                  NewChangePath=abspath(wp_path),
-                  ChangeTime=5,
-                  DynamicStyle=0,
-                  ImageFilePath=imagepath,
-                  NewImageFilePath=imagepath,
-                  LastName=lastname,
-                  Placement='SizeToFit',
-                  Random=True,
-              )  # pylint: disable=use-dict-literal
-            else:
-              # MacOS Sonoma onward
-              # There's some hideous bug in the DesktopPictureSetDisplayForSpace
-              # library where it seems to see a leading home directory path
-              # and replace it with '/~' (instead of something plausible like '~'),
-              # perhaps intended for making paths track homedir moves.
-              # It turns out that providing a _relative_ path from '/'
-              # does The Right Thing. Ugh.
-              wp_path = abspath(wp_path)
-              wp_path = wp_path[1:]
-              ##rwp_path = relpath(wp_path, os.environ['HOME'])
-              ##if not rwp_path.startswith('../'):
-              ##  wp_path = rwp_path
-              wp_config = dict(
-                  BackgroundColor=(0, 0, 0),
-                  Change='TimeInterval',
-                  ChangePath=wp_path,
-                  NewChangePath=wp_path,
-                  ChangeDuration=5.0,
-                  DynamicStyle=0,
-                  ##ImageFilePath=imagepath,
-                  ##NewImageFilePath=imagepath,
-                  LastName=lastname,
-                  Placement='SizeToFit',
-                  Random=True,
-              )  # pylint: disable=use-dict-literal
+            spaces.set_wp_dir(wp_path)
           else:
             # pylint: disable=use-dict-literal
             wp_config = dict(ImageFilePath=abspath(wp_path),)

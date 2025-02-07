@@ -143,7 +143,7 @@ class DLog:
         Parameters:
         * `line`: the log line from which to derive the `DLog` object
         * `categories`: optional iterable of category names, which will be lowercased
-        * `multi_categories`: default `False`; if true the look for
+        * `multi_categories`: default `False`; if true, look for
           multiple leading *CAT*`,`...`:` preambles on the line to derive
           caetgory names instead of just one
 

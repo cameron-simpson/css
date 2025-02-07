@@ -65,7 +65,7 @@ from cs.psutils import (
     remove_pidfile,
     signal_handlers,
 )
-from cs.sh import quotecmd
+from cs.sh import quoteargv
 
 __version__ = '20221228-post'
 
@@ -276,7 +276,7 @@ class SvcDCommand(BaseCommand):
       def sig_func():
         argv = ['sh', ('-xc' if trace else '-c'), sig_shcmd]
         if test_uid != uid:
-          su_shcmd = 'exec ' + quotecmd(argv)
+          su_shcmd = 'exec ' + quoteargv(argv)
           if trace:
             su_shcmd = 'set -x; ' + su_shcmd
           argv = ['su', test_username, '-c', su_shcmd]
@@ -296,14 +296,14 @@ class SvcDCommand(BaseCommand):
         with Pfx("main.test_func: shcmd=%r", test_shcmd):
           argv = ['sh', '-c', test_shcmd]
           if test_uid != uid:
-            argv = ['su', test_username, 'exec ' + quotecmd(argv)]
+            argv = ['su', test_username, 'exec ' + quoteargv(argv)]
           shcmd_ok = callproc(argv, stdin=DEVNULL) == 0
           if not quiet:
             info("exit status != 0")
           return shcmd_ok
 
     if run_uid != uid:
-      argv = ['su', run_username, 'exec ' + quotecmd(argv)]
+      argv = ['su', run_username, 'exec ' + quoteargv(argv)]
     if use_lock:
       argv = ['lock', '--', 'svcd-' + name] + argv
     S = SvcD(
