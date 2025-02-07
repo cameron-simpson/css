@@ -42,7 +42,7 @@ from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.psutils import pipefrom
 from cs.py.func import prop
-from cs.sh import quotecmd as shq
+from cs.sh import quoteargv as shq
 
 __version__ = '20221228-post'
 
