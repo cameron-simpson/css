@@ -160,6 +160,7 @@ class PlayOnCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
+    INFO_SKIP_NAMES = (*BaseCommand.Options.INFO_SKIP_NAMES, 'password')
     user: Optional[str] = field(
         default_factory=lambda: environ.
         get('PLAYON_USER', environ.get('EMAIL'))
