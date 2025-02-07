@@ -30,7 +30,7 @@ from icontract import require
 import requests
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.deco import fmtdoc, promote, Promotable
 from cs.fileutils import atomic_filename
@@ -167,10 +167,13 @@ class PlayOnCommand(BaseCommand):
     password: Optional[str] = field(
         default_factory=lambda: environ.get('PLAYON_PASSWORD')
     )
+    dl_jobs: int = DEFAULT_DL_PARALLELISM
     filename_format: str = field(
         default_factory=lambda: environ.
         get('FILENAME_FORMAT_ENVVAR', DEFAULT_FILENAME_FORMAT)
     )
+    ls_format: str = LS_FORMAT
+    queue_format: str = QUEUE_FORMAT
 
   @contextmanager
   def run_context(self):
@@ -281,28 +284,14 @@ class PlayOnCommand(BaseCommand):
     return xit
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+  @popopts(j_=('dl_jobs', 'Concurrent download jobs.', int))
   def cmd_dl(self, argv):
-    ''' Usage: {cmd} [-j jobs] [-n] [recordings...]
+    ''' Usage: {cmd} [recordings...]
           Download the specified recordings, default "pending".
-          -j jobs   Run this many downloads in parallel.
-                    The default is {DEFAULT_DL_PARALLELISM}.
-          -n        No download. List the specified recordings.
     '''
     options = self.options
+    dl_jobs = options.dl_jobs
     sqltags = options.sqltags
-    dl_jobs = DEFAULT_DL_PARALLELISM
-    no_download = False
-    opts, argv = getopt(argv, 'j:n')
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-j':
-          dl_jobs = int(val)
-          if dl_jobs < 1:
-            raise GetoptError(f"invalid jobs, should be >= 1, got: {dl_jobs}")
-        elif opt == '-n':
-          no_download = True
-        else:
-          raise NotImplementedError("unhandled option")
     if not argv:
       argv = ['pending']
     api = options.api
