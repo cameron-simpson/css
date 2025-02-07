@@ -238,6 +238,7 @@ class PlayOnCommand(BaseCommand):
     result = api.cdsurl_data(suburl)
     pprint(result)
 
+  @popopts(o_='filename_format')
   @uses_fstags
   def cmd_rename(self, argv, *, fstags: FSTags):
     ''' Usage: {cmd} [-o filename_format] filenames...
@@ -246,8 +247,6 @@ class PlayOnCommand(BaseCommand):
           -o filename_format
                 Format for the new filename, default {DEFAULT_FILENAME_FORMAT!r}.
     '''
-    options = self.options
-    options.popopts(argv, n='dry_run', o_='filename_format')
     api = options.api
     doit = options.doit
     filename_format = options.filename_format
@@ -437,13 +436,12 @@ class PlayOnCommand(BaseCommand):
             recording.add("downloaded")
     return xit
 
+  @popopts(l='long_mode')
   def cmd_feature(self, argv, locale='en_US'):
     ''' Usage: {cmd} [feature_id]
           List features.
     '''
-    long_mode = False
-    opts = self.popopts(argv, l='long_mode')
-    long_mode = opts['long_mode']
+    long_mode = options.long_mode
     if argv:
       feature_id = argv.pop(0)
     else:
