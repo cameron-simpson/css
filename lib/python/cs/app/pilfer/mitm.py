@@ -4,11 +4,12 @@
 #
 
 import asyncio
-from collections import defaultdict
+from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
 import os
 from signal import SIGINT
+import sys
 from threading import Thread
 from typing import Callable, Iterable, Mapping, Optional
 
@@ -19,25 +20,32 @@ from mitmproxy.options import Options
 ##from mitmproxy.proxy.server import ProxyServer
 from mitmproxy.tools.dump import DumpMaster
 
+import requests
+
 from typeguard import typechecked
 
 from cs.cmdutils import vprint
+from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
 from cs.lex import r, s, tabulate
 from cs.logutils import warning
+from cs.naysync import amap, IterableAsyncQueue
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress
 from cs.py.func import funccite
 from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
-from cs.upd import print
+from cs.upd import print as upd_print
 from cs.urlutils import URL
 
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 from .util import content_length
+
+if sys.stdout.isatty():
+  print = upd_print
 
 # monkey patch so that Dumper.echo calls the desired print()
 mitmproxy.addons.dumper.print = print
@@ -52,7 +60,7 @@ def process_stream(
     runstate: Optional[RunState] = None,
 ) -> Callable[bytes, bytes]:
   ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
-      Return a callable to set as the response.stream in the caller.
+      Return a callable to set as the `response.stream` in the caller.
 
       The `Flow.response.stream` attribute can be set to a callable
       which accepts a `bytes` instance as its sole callable;
@@ -116,17 +124,24 @@ def process_stream(
     ''' Copy `bs` to the `Data_Q` and also to the `progress_Q` if not `None`.
         Return `bs` unchanged.
     '''
-    try:
-      if len(bs) == 0:
-        data_Q.close()
-        if progress_Q is not None:
-          progress_Q.close()
-      else:
-        data_Q.put(bs)
-        if progress_Q is not None:
-          progress_Q.put(bs)
-    except Exception as e:
-      warning("%s: exception: %s", name, s(e))
+    if data_Q.closed:
+      if len(bs) > 0:
+        warning(
+            "discarding %d bytes after close of data_Q:%s", len(bs),
+            data_Q.name
+        )
+    else:
+      try:
+        if len(bs) == 0:
+          data_Q.close()
+          if progress_Q is not None:
+            progress_Q.close()
+        else:
+          data_Q.put(bs)
+          if progress_Q is not None:
+            progress_Q.put(bs)
+      except Exception as e:
+        warning("%s: exception: %s", name, s(e))
     return bs
 
   return copy_bs
@@ -146,7 +161,7 @@ def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
     # put the flow into streaming mode, changing nothing
     flow.response.stream = process_stream(
         lambda bss: bss,
-        f'stream {flow.request}',
+        ##f'stream {flow.request}',
         content_length=length,
         runstate=flow.runstate,
     )
@@ -159,7 +174,7 @@ def print_rq(hook_name, flow):
 @attr(default_hooks=('requestheaders', 'responseheaders'))
 @uses_pilfer
 def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
-  ''' Insert at `"requestheaders"` and `"response"` callbacks
+  ''' Insert at `"requestheaders"` and `"responseheaders"` callbacks
       to intercept a flow using the cache.
       If there is no `flow.response`, consult the cache.
       If there is a `flow.response`, update the cache.
@@ -170,24 +185,30 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   if rq.method not in ('GET', 'HEAD'):
     PR(rq.method, "is not GET or HEAD")
     return
+  rsp = flow.response
+  if rsp:
+    rsphdrs = rsp.headers
   url = URL(rq.url)
-  sitemap = P.sitemap_for(url)
-  if sitemap is None:
-    PR("no site map")
-    return
-  url_key = sitemap.url_key(url)
-  if url_key is None:
+  rqhdrs = rq.headers
+  # scan the sitemaps for the first one offering a key for this URL
+  # extra values for use
+  extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
+  for sitemap in P.sitemaps_for(url):
+    url_key = sitemap.url_key(url, extra=extra)
+    if url_key is not None:
+      break
+  else:
     PR("no URL key")
     return
   cache = P.content_cache
   cache_key = cache.cache_key_for(sitemap, url_key)
   with cache:
-    if flow.response:
-      rsp = flow.response
+    if rsp:
+      # update the cache
       if getattr(flow, 'from_cache', False):
         # ignore a response we ourselves pulled from the cache
         pass
-      elif flow.request.method != 'GET':
+      elif rq.method != 'GET':
         PR("response is not from a GET, do not cache")
       elif rsp.status_code != 200:
         PR("response status_code", rsp.status_code, "is not 200, do not cache")
@@ -205,7 +226,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   url,
                   cache_key,
                   bss,
-                  flow.request.headers,
+                  rqhdrs,
                   rsp.headers,
                   mode=mode,
                   decoded=False,
@@ -222,8 +243,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               url,
               cache_key,
               rsp.content,
-              flow.request.headers,
-              rsp.headers,
+              rqhdrs,
+              rsphdrs,
               mode=mode,
               decoded=True,
           )
@@ -239,7 +260,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           if hdr in rq.headers:
             del rq.headers[hdr]
         return
-      if flow.request.method == 'HEAD':
+      if rq.method == 'HEAD':
         content = b''
       else:
         try:
@@ -418,12 +439,18 @@ class MITMAddon:
         help="Set the tls_version_client_min option.",
     )
 
-  def responseheaders(self, flow):
-    ''' On `responseheaders`, set `flow.runstate` to a `RunState` and start it
+  def requestheaders(self, flow):
+    ''' On `requestheaders`, set `flow.runstate` to a `RunState`
         then call the hooks.
+        The `RunState` is not started until `responseheaders`.
     '''
     assert not hasattr(flow, 'runstate')
     flow.runstate = RunState(str(flow.request))
+    self.call_hooks_for("requestheaders", flow)
+
+  def responseheaders(self, flow):
+    ''' On `responseheaders`, start `flow.runstate` then call the hooks.
+    '''
     flow.runstate.start()
     self.call_hooks_for("responseheaders", flow)
 
@@ -436,9 +463,12 @@ class MITMAddon:
   def error(self, flow):
     ''' On `error`, cancel `flow.runstate`, call the hooks, then stop `flow.runstate`.
     '''
-    flow.runstate.cancel()
+    # it is possible to have an error before responseheaders
+    if flow.runstate.running:
+      flow.runstate.cancel()
     self.call_hooks_for("error", flow)
-    flow.runstate.stop()
+    if flow.runstate.running:
+      flow.runstate.stop()
 
   @pfx_method
   def call_hooks_for(self, hook_name: str, *mitm_hook_a, **mitm_hook_kw):
@@ -547,6 +577,7 @@ class MITMAddon:
           f'multiple exceptions running actions for .{hook_name}', excs
       )
 
+@uses_pilfer
 @uses_runstate
 @typechecked
 async def run_proxy(
@@ -555,27 +586,68 @@ async def run_proxy(
     *,
     addon: MITMAddon,
     runstate: RunState,
+    P: Pilfer,
 ):
   opts = Options(
       listen_host=listen_host,
       listen_port=listen_port,
       ssl_insecure=True,
   )
+  mitm_proxy_url = f'http://{listen_host}:{listen_port}/'
   https_proxy = os.environ.get('https_proxy')
   if https_proxy:
+    upstream_proxy_url = https_proxy
     opts.mode = (f'upstream:{https_proxy}',)
+  else:
+    upstream_proxy_url = None
   proxy = DumpMaster(opts)
   proxy.addons.add(addon)
   vprint(f'Starting mitmproxy listening on {listen_host}:{listen_port}.')
   on_cancel = lambda rs, transition: proxy.should_exit.set()
   runstate.fsm_callback('STOPPING', on_cancel)
-  loop = asyncio.get_running_loop()
-  # TODO: this belongs in RunState.__enter_exit__
-  loop.add_signal_handler(SIGINT, runstate.cancel)
-  try:
-    await proxy.run()  # Run inside the event loop
-  finally:
-    loop.remove_signal_handler(SIGINT)
-    vprint("Stopping mitmproxy.")
-    proxy.shutdown()
-    runstate.fsm_callback_discard('STOPPING', on_cancel)
+
+  async def prefetch_worker(urlQ):
+    ''' Worker to fetch URLs from `urlQ` via the mitmproxy.
+    '''
+
+    @promote
+    def get_url(url: URL):
+      ''' Fetch `url` in streaming mode, discarding its content.
+      '''
+      try:
+        rsp = pfx_call(
+            trace(requests.get),
+            url.url,
+            proxies={url.scheme: mitm_proxy_url},
+            stream=True,
+        )
+      except Exception as e:
+        warning("prefetch_worker: %s", e)
+      else:
+        # consume the stream
+        for _ in rsp.iter_content(chunk_size=8192):
+          pass
+
+    async for _ in amap(get_url, urlQ, concurrent=True, unordered=True):
+      pass
+
+  prefetchQ = IterableQueue()
+  with stackattrs(
+      P,
+      prefetchQ=prefetchQ,
+      proxy=proxy,
+      mitm_proxy_url=mitm_proxy_url,
+      upstream_proxy_url=upstream_proxy_url,
+  ):
+    loop = asyncio.get_running_loop()
+    # TODO: this belongs in RunState.__enter_exit__
+    loop.add_signal_handler(SIGINT, runstate.cancel)
+    try:
+      asyncio.create_task(prefetch_worker(prefetchQ))
+      await proxy.run()  # Run inside the event loop
+    finally:
+      loop.remove_signal_handler(SIGINT)
+      prefetchQ.close()
+      vprint("Stopping mitmproxy.")
+      proxy.shutdown()
+      runstate.fsm_callback_discard('STOPPING', on_cancel)

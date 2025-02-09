@@ -10,6 +10,7 @@ from functools import cached_property
 from heapq import heappush, heappop
 import os
 import os.path
+import re
 import sys
 from typing import Iterable
 
@@ -176,7 +177,7 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def content(self) -> bytes:
-    ''' The URL decoded content as a `bytes`..
+    ''' The decoded URL content as a `bytes`.
     '''
     return self.GET_response.content
 
@@ -313,6 +314,27 @@ class URL(HasThreadState, Promotable):
     ''' The URL path as returned by urlparse.urlparse.
     '''
     return self.url_parsed.path
+
+  @cached_property
+  @unattributable
+  def cleanpath(self):
+    ''' The URL path as returned by urlparse.urlparse,
+        with multiple slashes (`/`) reduced to a single slash.
+        Technically this can change the meaning of the URL path,
+        but usually these are an artifact of sloppy path construction.
+    '''
+    path = self.path
+    if '///' in path:
+      path = re.sub('//+', '/', path)  # the thorough thing
+    elif '//' in path:
+      path = path.replace('//', '/')  # the fast thing
+    return path
+
+  @property
+  def cleanrpath(self):
+    ''' The `cleanpath` with its leading slash stripped.
+    '''
+    return self.cleanpath.lstrip('/')
 
   @property
   @unattributable

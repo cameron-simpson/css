@@ -88,7 +88,7 @@ class PipeLineSpec(Promotable):
           if not specs:
             raise ValueError(f'no actions after {spec!r}')
           subpipelinespec = type(self)(
-              name=f'{spec!r} {" ".join(map(shlex.quote, specs))}',
+              name=f'{spec!r} {shlex.join(specs)}',
               stage_specs=specs,
           )
           # sanity check the subpipeline
