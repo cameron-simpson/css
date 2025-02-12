@@ -34,7 +34,7 @@ cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release
 cs.debug pypi.release="20241005" ok_revision=fb49ab3bf51884d4c570c46375fe17fba3a742e9 features={"20230613":["patch_builtins"],"20241005":["CS_DEBUG_TRACE","abrk","log_via_print"]}
 cs.deco pypi.release="20250103" ok_revision="2eb65f1a9304f2443a2433cb3b376306bb12b695" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"],"20241109":["uses_doit","uses_force","uses_quiet","uses_verbose"]}
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
-cs.djutils ok_revision=b5f554963d8aec8658f6704e0f1c0f9832f3d71f features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"],"20241222":["options_settings"],"20250111":["model_batches_qs"]} pypi.release="20250113.2"
+cs.djutils ok_revision="06f3ec322923538eca46bc9e5c2827071ca864a7" features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"],"20241222":["options_settings"],"20250111":["model_batches_qs"]} pypi.release="20250113.2"
 cs.dockerutils ok_revision=f846ece6e9f9353b443df14f81512ae6438681e6 pypi.release="20240519" features={"20240305":["DockerRun__network"]}
 cs.ebooks ok_revision="3379fcbf1eb008df3cd38e9afd40f1d0db9afbd4" pypi.release="20241007" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -103,6 +103,7 @@ cs.threads ok_revision=b3fb539982274055e029975bc007ce40598dc046 pypi.release="20
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils
 cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
+cs.units
 cs.upd ok_revision="08f7d62b98d3c1b2532c4b8c9199a0c756914c6c" pypi.release="20240630" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"],"20240216":["without"],"20240412":["without"]}
 cs.urlutils ok_revision="7eeaa1d7ef5d4e82b88e9d614e8646d80a5344e7" pypi.release="20231129"
 cs.x ok_revision="68e0c6027afe808d188c53ab5ef6c9285f29067b" pypi.release="20240630" features={"20231129":["via_logger"]}
