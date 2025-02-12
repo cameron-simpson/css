@@ -10,6 +10,7 @@
 
 from dataclasses import dataclass, field
 from inspect import isclass
+from itertools import chain
 import os
 import sys
 from typing import Iterable, List
@@ -19,6 +20,7 @@ from django.core.management.base import (
     BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.utils.functional import empty as djf_empty
 
@@ -228,7 +230,7 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
     parser.add_argument('argv', nargs='*')
 
 def model_batches_qs(
-    model,
+    model: Model,
     field_name='pk',
     *,
     chunk_size=1024,
@@ -237,10 +239,14 @@ def model_batches_qs(
     filter=None,
 ) -> Iterable[QuerySet]:
   ''' A generator yielding `QuerySet`s which produce nonoverlapping
-      batches of model instances.
+      batches of `Model` instances.
 
       Efficient behaviour requires the field to be indexed.
       Correct behaviour requires the field values to be unique.
+
+      See `model_instances` for an iterable of instances wrapper
+      of this function, where you have no need to further amend the
+      `QuerySet`s or to be aware of the batches.
 
       Parameters:
       * `model`: the `Model` to query
@@ -301,3 +307,18 @@ def model_batches_qs(
     qs = qs0.filter(**{
         after_condition: end_key
     }).order_by(ordering)[:chunk_size]
+
+def model_instances(
+    model: Model,
+    field_name='pk',
+    **mbqs_kw,
+) -> Iterable[Model]:
+  ''' A generator yielding Model instances.
+      This is a wrapper for `model_batches_qs` and accepts the same arguments.
+
+      Efficient behaviour requires the field to be indexed.
+      Correct behaviour requires the field values to be unique.
+  '''
+  return chain.from_iterable(
+      model_batches_qs(model, field_name=field_name, **mbqs_kw)
+  )
