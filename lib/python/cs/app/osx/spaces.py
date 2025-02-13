@@ -160,7 +160,7 @@ class Spaces:
             if space_num < 1:
               raise GetoptError("space# counts from 1")
             if space_num > len(self):
-              raise GetoptError("only %d spaces" % (len(self),))
+              raise GetoptError(f'only {len(self)} spaces')
             space_indices = (space_num - 1,)
     return space_indices
 
@@ -317,7 +317,7 @@ class SpacesCommand(BaseCommand):
           Print the current space number.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     print(self.options.spaces.current_index + 1)
 
   def cmd_monitor(self, argv):
@@ -325,7 +325,7 @@ class SpacesCommand(BaseCommand):
           Monitor space switches.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     spaces = self.options.spaces
     for old, new, changes in monitor(
         lambda: (spaces.forget(), {'index': spaces.current_index})[-1],
@@ -349,7 +349,7 @@ class SpacesCommand(BaseCommand):
         if not existspath(wp_path):
           raise GetoptError("not a file")
     if argv:
-      raise GetoptError("extra aguments: %r" % (argv,))
+      raise GetoptError(f'extra aguments: {argv!r}')
     if wp_path is None:
       if space_indices is None:
         space_indices = list(range(len(spaces)))
@@ -386,7 +386,7 @@ class SpacesCommand(BaseCommand):
       except ValueError:
         # pylint: disable=raise-missing-from
         raise GetoptError(
-            "expected exactly one space index, got: %r" % (space_indices,)
+            f'expected exactly one space index, got: {space_indices!r}'
         )
     for old, new, changes in spaces.monitor_wp_config(
         space_index=space_index,
