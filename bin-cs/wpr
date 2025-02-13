@@ -23,12 +23,11 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.app.osx.spaces import Spaces
-from cs.cmdutils import BaseCommand
 from cs.fs import needdir, scandirtree, shortpath
 from cs.lastvalue import LastValue
 from cs.lex import cutprefix
 from cs.mappings import missingdict
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import pfx_call
 
 # cached autopopulating mapping of  to list of re.Pattern
 word_re_map = missingdict(partial(re.compile, flags=re.I))
@@ -103,13 +102,13 @@ def main(argv=None):
     for wpn, word_list in sorted(last_wp_values(lv).items()):
       word_tuple = tuple(word_list)
       if word_tuple not in seen_word_tuples:
-        wpdir,_=update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
+        wpdir, _ = update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
         seen_word_tuples.add(word_tuple)
-      spaces.set_wp_fspath(wpn-1,wpdir)
+      spaces.set_wp_fspath(wpn - 1, wpdir)
   else:
-    wpdir,_=update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
+    wpdir, _ = update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
     for wpn in space_list:
-      spaces.set_wp_fspath(wpn-1,wpdir)
+      spaces.set_wp_fspath(wpn - 1, wpdir)
 
 def last_wp_values(lv) -> dict[int, list[str]]:
   ''' Return a `dict` mapping space number to a list of words.
