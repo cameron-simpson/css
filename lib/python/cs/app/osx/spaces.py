@@ -214,7 +214,6 @@ class Spaces:
         space["uuid"],
     )
 
-  def set_wp_dirpath(
   @staticmethod
   def spaces_pathfor(fspath: str):
     ''' Return `fspath` adjusted for use in a spaces configuration.
@@ -242,67 +241,65 @@ class Spaces:
       ##    spaces_path = f'~/{cutprefix(fspath,home_prefix)}'
     return spaces_path
 
+  @pfx_method
+  def set_wp_fspath(
       self,
       space_index: int,
-      dirpath: str,
+      fspath: str,
       *,
       background_color=DEFAULT_BACKGROUND_RGB,
       random=True,
       change_duration=5.0,
       placement='SizeToFit',
   ):
-    print("spaces set_wp_dirpath", space_index, dirpath)
-    images = [
-        filename for filename in os.listdir(dirpath)
-        if not filename.startswith('.') and '.' in filename
-    ]
-    if not images:
-      warning("no *.* files in %r", dirpath)
-      return 1
-    lastname = random_choice(images)
-    imagepath = abspath(joinpath(dirpath, lastname))
-    if macos_version < (14, 5):
-      # This worked before I upgraded to Sonoma, MacOS 14.5.
+    ''' Set the Space configuration of `space_index` to use images from `fspath`.
+    '''
+    print("spaces set_wp_fspath", space_index, fspath)
+    if isfilepath(fspath):
+      # an image file
+      if not fspath.endswith(VALID_IMAGE_SUFFIXES):
+        raise ValueError(
+            f'invalid image path suffix, expected one of {VALID_IMAGE_SUFFIXES!r}'
+        )
+      space_imagepath = self.spaces_pathfor(fspath)
+      dirpath = dirname(abspath(fspath))
+      spaces_dirpath = self.spaces_pathfor(dirpath)
+      wp_config = dict(
+          BackgroundColor=background_color,
+          ChangePath=spaces_dirpath,
+          NewChangePath=spaces_dirpath,
+          ImageFilePath=space_imagepath,
+          Placement=placement,
+      )
+    elif isdirpath(fspath):
+      spaces_dirpath = self.spaces_pathfor(dirpath)
+      images = [
+          filename for filename in os.listdir(dirpath)
+          if not filename.startswith('.') and '.' in filename
+          and filename.endwith(VALID_IMAGE_SUFFIXES)
+      ]
+      if not images:
+        raise ValueError(
+            f'no *.{{{",".join(VALID_IMAGE_SUFFIXES)}}} files in {dirpath}'
+        )
+      lastname = random_choice(images)
+      spaces_imagepath = self.spaces_pathfor(joinpath(dirpath, lastname))
       # pylint: disable=use-dict-literal
       wp_config = dict(
           BackgroundColor=background_color,
           Change='TimeInterval',
-          ChangePath=abspath(dirpath),
-          NewChangePath=abspath(dirpath),
+          ChangePath=spaces_dirpath,
+          NewChangePath=spaces_dirpath,
           ChangeTime=change_duration,
           DynamicStyle=0,
-          ImageFilePath=imagepath,
-          NewImageFilePath=imagepath,
+          ImageFilePath=spaces_imagepath,
+          NewImageFilePath=spaces_imagepath,
           LastName=lastname,
           Placement=placement,
           Random=random,
       )  # pylint: disable=use-dict-literal
     else:
-      # MacOS Sonoma onward
-      # There's some hideous bug in the DesktopPictureSetDisplayForSpace
-      # library where it seems to see a leading home directory path
-      # and replace it with '/~' (instead of something plausible like '~'),
-      # perhaps intended for making paths track homedir moves.
-      # It turns out that providing a _relative_ path from '/'
-      # does The Right Thing. Ugh.
-      dirpath = abspath(dirpath)
-      dirpath = dirpath[1:]
-      ##rdirpath = relpath(dirpath, os.environ['HOME'])
-      ##if not rdirpath.startswith('../'):
-      ##  dirpath = rdirpath
-      wp_config = dict(
-          BackgroundColor=(0, 0, 0),
-          Change='TimeInterval',
-          ChangePath=dirpath,
-          NewChangePath=dirpath,
-          ChangeDuration=change_duration,
-          DynamicStyle=0,
-          ##ImageFilePath=imagepath,
-          ##NewImageFilePath=imagepath,
-          LastName=lastname,
-          Placement=placement,
-          Random=random,
-      )  # pylint: disable=use-dict-literal
+      raise ValueError('unsupported fspath, neither image file nor directory')
     self.set_wp_config(space_index, wp_config)
 
   def monitor_current(self, **kw):
@@ -391,13 +388,8 @@ class SpacesCommand(BaseCommand):
       if space_indices is None:
         space_indices = [spaces.current_index]
       for space_index in space_indices:
-        with Pfx("%d <- %r", space_index + 1, wp_path):
-          if isdirpath(wp_path):
-            spaces.set_wp_dir(wp_path)
-          else:
-            # pylint: disable=use-dict-literal
-            wp_config = dict(ImageFilePath=abspath(wp_path),)
-          spaces.set_wp_config(space_index, wp_config)
+        with Pfx("%d <- %s", space_index + 1, shortpath(wp_path)):
+          spaces.set_wp_fspath(space_index, wp_path)
     return 0
 
   def cmd_wpm(self, argv):
