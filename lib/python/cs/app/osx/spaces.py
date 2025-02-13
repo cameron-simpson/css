@@ -214,6 +214,25 @@ class Spaces:
     )
 
   def set_wp_dirpath(
+  @staticmethod
+  def spaces_pathfor(fspath: str):
+    ''' Return `fspath` adjusted for use in a spaces configuration.
+
+        Prior to MacOS Sonoma (14.5), this just returns the absolute path.
+
+        In MacOS Sonoma there's some hideous bug in the
+        DesktopPictureSetDisplayForSpace library where it seems to
+        see a leading home directory path and replace it with `/~`
+        (instead of something plausible like '~'), perhaps intended
+        for making paths track homedir moves.  It turns out that
+        providing a _relative_ path from '/' does The Right Thing.
+        Ugh.
+    '''
+    fspath = abspath(fspath)
+    if macos_version >= (14, 5):
+      fspath = fspath[1:]
+    return fspath
+
       self,
       space_index: int,
       dirpath: str,
