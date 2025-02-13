@@ -1,0 +1,21 @@
+lib/python/cs/ffmpegutils.py: cs.app.ffmpeg -> cs.ffmpegutils
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: drop reference code copied from cs.app.beyonwiz
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: new FFmpegSource class to represent an ffmpeg input source
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: new DEFAULT_CONVERSIONS and DEFAULT_MEDIAFILE_FORMAT
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: new convert() function and ffprobe function()
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: update imports and DISTINFO, clean lint
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: get the -stats and -nostdin options before the output file, helps ffmpeg-docker wrapper script
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: fix docstring typo
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: convert: accept optional extra-opts parameter for extra output options
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: convert: reduce noise
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: convert: better handling of multiple media streams of the same type eg audio/mp2
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: autoformat
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: DEFAULT_CONVERSIONS: convert aac_latm to acc, the MP4 muxers do not support aac_latm (which I gather is a container for AAC)
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: FFMPEG_EXE_DEFAULT
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: new ffmpeg_docker() function to run ffmpeg inside Docker
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: fix some type annotations
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: prefix the output with "./" to make sure they look like a filesystem path
+lib/python/cs/ffmpegutils.py: cs.fmpegutils: ffmpeg_docker: set DR.outputpath to dirname(outputpath)
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: strip leading "file:" from input/output filenames
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: update DISTINFO, add missing docstring
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: DISTINFO+typeguard

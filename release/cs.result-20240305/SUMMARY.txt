@@ -1,0 +1,1 @@
+Result.__str__: handle early use where __dict__ lacks various entries.

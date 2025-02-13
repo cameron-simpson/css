@@ -1,0 +1,4 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: new @uses_cmd_options decorator to provide an "options" parameter being the prevailing BaseCommandOptions instance
+lib/python/cs/cmdutils.py: cs.cmdutils: bugfix @uses_cmd_options
+lib/python/cs/cmdutils.py: cs.cmdutils: @uses_cmd_options: improve the docstring examples
+lib/python/cs/cmdutils.py: cs.cmdutils BaseCommandOptions.popopts: get common options from BaseCommandOptions.COMMON_OPT_SPECS

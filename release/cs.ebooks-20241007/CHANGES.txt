@@ -1,0 +1,41 @@
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper: subclass MultiOpenMixin and refactor to support creating the stub modules just once, adjust DeDRMCommand.run_context
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper: expose the package path inference as the .get_package_path([dedrm_package_path]) method
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: tweaks
+lib/python/cs/ebooks/kindle/classic.py: eb.ebooks.kindle: start breaking this up into a package, initially by moving the current implementation to cs.ebooks.kindle.classic
+lib/python/cs/ebooks/kindle/__main__.py lib/python/cs/ebooks/kindle/classic.py: cs.ebooks.kindle.{classic,__main__}: move KindleCommand from classic to __main__
+lib/python/cs/ebooks/kindle/__init__.py: cs.ebooks.kindle.__init__: start filling this out, initially with KINDLE_LIBRARY_ENVVAR
+lib/python/cs/ebooks/kindle/classic.py: cs.ebooks.kindle.cassic: adjust relative import
+lib/python/cs/ebooks/__main__.py: cs.ebooks.__main__: adjust import of KindleCommand
+lib/python/cs/ebooks/kindle/__main__.py: cs.ebooks.kindle.__main__: import fixes
+lib/python/cs/ebooks/common.py: cs.ebooks.common: new module holding common facilities, initially EBooksCommonOptions
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMCommand.Options: subclass EBooksCommonOptions
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: drop dedrm_package_path, now a common option
+lib/python/cs/ebooks/common.py: cs.ebooks.common: EBooksCommonOptions: replace field defaults with None, provide cached_proerties for calibe, dedrm, kindle
+lib/python/cs/ebooks/common.py: cs.ebooks.common: new EBooksCommonBaseCommand with Options=EBooksCommonOptions
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMCommand: subclass EBooksCommonOptions, drop internal Options class, simplify run_context
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper: subclass FSPathBasedSingleton, use .fspath instead of .dedrm_package_path, require the package path to exist
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: docstring update
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: subclass EBooksCommonBaseCommand, simplify CalibreCommand.Options
+lib/python/cs/ebooks/kindle/__main__.py: cs.ebooks.kindle.__main__: KindleCommand: subclass EBooksCommonBaseCommand, drop internal Options class, simplify run_context
+lib/python/cs/ebooks/kindle/__main__.py: cs.ebooks.kindle.__main__: still requires the __main__ boilerplate as cs.ebooks.__main__ imports us
+lib/python/cs/ebooks/kindle/__init__.py: cs.ebooks.kindle.__init__: import .classic.KindleTree, which will be replaced by a factory in the future
+lib/python/cs/ebooks/kindle/classic.py: cs.ebooks.kindle.classic: KindleBook: pass missing=lambda relp, field: None to infill for missing Kindle asset db records
+lib/python/cs/ebooks/kindle/classic.py: cs.ebooks.kindle.classic: KindleBook.__str__: changes for compactness
+lib/python/cs/ebooks/kindle/__main__.py: cs.ebooks.kindle.__main__: KindleCommand.cmd_ls: Pfx context for the loop
+lib/python/cs/ebooks/mobi.py: cs.ebooks.mobi: MobiCommand: new cmd_toc subcommand
+lib/python/cs/ebooks/calibre.py lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper: rename .remove and .removed to .decrypt and .decrypted; DeDRMCommand.cmd_remove: Add --inplace option to decrypt a book in place
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.decrm: DeDRMCommand.cmd_remove: rename to cmd_decrypt
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMCommand.decrypt: return True if decrypted, Flase is cleartext; DeDRMCommand.decrypted: return the decrypted temp file or None if cleartext; DeDRMCommand.cmd_decrypt: handle cleartext filenames
+lib/python/cs/ebooks/dedrm.py: cs.eboosk.dedrm: DeDRMWrapper.decrypted: plumb keyword arguments through to DeDRMWrapper.decrypt
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree.add: handle files which are already decrypted
+lib/python/cs/ebooks/calibre.py: cs.ebooks.CalibreCommand.cmd_ls: also print the book filename path
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: docstring update
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMCommand.cmd_decrypt: fix reference to options.inplace
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: DeDRMWrapper.decrypt: KindleMobiDecrypt does not return any indication that a file was already decrypted so compare the contents as an additional check
+lib/python/cs/ebooks/dedrm.py: cs.eboosk.dedrm: add import, remove debugging
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreTree: get the default DeDRMWrapper from the CLI option state, propagate to CalibreBook instances
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreBook: new decrypt() method to decrypt a book file of a particular format
+lib/python/cs/ebooks/calibre.py: cs.ebooks.calibre: CalibreCommand: new cmd_decrypt to decrypt book files inside the library
+lib/python/cs/ebooks/dedrm.py: cs.ebooks.dedrm: back off some warnings to debug; DeDRMWrapper.decrypt: print only if verbose; docstring update
+lib/python/cs/ebooks/kindle/__main__.py: cs.ebooks.kindle.__main__: shuffle runstate.raiseif() check
+lib/python/cs/ebooks/common.py: cs.ebooks.common: EBooksCommonOptions.dedrm: remove debug

@@ -1,0 +1,1 @@
+New reconfigure_file(f,**kw), a context manager flavour of `TextIOBase.reconfigure`.

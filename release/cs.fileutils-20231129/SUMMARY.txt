@@ -1,0 +1,2 @@
+atomic_filename: accept optional rename_func to use instead of os.rename, supports using FSTags.move.
+atomic_filename: clean up the temp file.

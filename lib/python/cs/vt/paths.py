@@ -21,7 +21,6 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 
 from . import PATHSEP
-from .transcribe import parse
 
 def path_resolve(path, do_mkdir=False):
   ''' Resolve a path with a leading Dirent transcription.

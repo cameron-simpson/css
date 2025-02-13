@@ -1,0 +1,16 @@
+lib/python/cs/dockerutils.py: cs.dockerutils: do things with Docker, initial commit
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun: new INPUTDIR_DEFAULT and OUTPUTDIR_DEFAULT cass attributes
+lib/python/cs/dockerutils.py: cs.dockerutils: move the docker command line option parse from DockerUtilCommand.cmd_run to DockerRun.popopts
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerUtilCommand.cmd_run: usage message update
+lib/python/cs/dockerutils.py: cs.dockerutils: pass command as the position arguments to DockerRun.run(), assorted other fixes and updates
+lib/python/cs/dockerutils.py: cs.dockerutils: update imports, remove debug
+lib/python/cs/dockerutils.py: cs.dockerutils: use abspath(outputpath)
+lib/python/cs/dockerutils.py: cs.dockerutils: use abspath(self.outputpath)
+lib/python/cs/dockerutils.py: cs.dockerutils: new mount_escape(*args) to escape args using CSV excel syntax, used (undocumented) by "docker run --mount"
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun: escape --mount options using the new mount_escape() function
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun: remove sanoty checks on input/output paths now that we know how to escape them
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun: use the current directory ('.') as the default outputpath
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun: class docstring, tidy a little lint
+lib/python/cs/dockerutils.py: cs.dockerutils: add DISTINFO
+lib/python/cs/dockerutils.py: cs.dockerutils: clean lint
+lib/python/cs/dockerutils.py: cs.dockerutils: DISTINFO+typeguard

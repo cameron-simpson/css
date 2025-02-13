@@ -8,31 +8,34 @@
 '''
 
 from contextlib import contextmanager
+from logging import warning
 import sys
 ##sys.setrecursionlimit(10000)
 from random import choice
 import unittest
 
-from cs.binary_tests import _TestPacketFields
+from cs.binary_tests import BaseTestBinaryClasses
 from cs.randutils import rand0, randomish_chunks
 from cs.testutils import SetupTeardownMixin
 
 from . import block as block_module
 from .block import (
-    Block, _Block, IndirectBlock, RLEBlock, LiteralBlock, SubBlock, BlockType,
-    BlockRecord
+    Block,
+    HashCodeBlock,
+    IndirectBlock,
+    RLEBlock,
+    LiteralBlock,
+    SubBlock,
+    BlockType,
+    BlockRecord,
 )
 from .store import MappingStore
 from .transcribe import hexify
 
-class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
-  ''' Hook to test the hash PacketFields.
+class TestBlockBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
+  ''' Hook to test the `AbstractBinary` subclasses..
   '''
-
-  def setUp(self):
-    ''' Test the block module PacketField classes.
-    '''
-    self.module = block_module
+  test_module = block_module
 
 class TestAll(SetupTeardownMixin, unittest.TestCase):
   ''' All Block tests.
@@ -49,7 +52,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
 
   def _verify_block(self, B, **kw):
     with self.subTest(task="_verify_block", block=B, **kw):
-      assert isinstance(B, _Block)
+      assert isinstance(B, Block)
       BR = BlockRecord(B)
       BR_bs = bytes(BR)
       BR2, offset = BlockRecord.parse_bytes(BR_bs)
@@ -79,7 +82,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
           B = IndirectBlock.from_subblocks(subblocks, force=True)
         elif block_type == BlockType.BT_HASHCODE:
           rs = next(self.random_chunk_source)
-          B = Block(data=rs)
+          B = HashCodeBlock.promote(rs)
           # we can get a literal block back - this is acceptable
           if B.type == BlockType.BT_LITERAL:
             block_type = BlockType.BT_LITERAL
@@ -103,7 +106,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
           if subspan == 0:
             block_type = BlockType.BT_LITERAL
         else:
-          raise ValueError("unknow block type")
+          raise ValueError("unknown block type")
         self.assertEqual(
             B.type, block_type, "new Block is wrong type: %r, should be %r" % (
                 B.type,
@@ -120,7 +123,7 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
       for _ in range(16):
         rs = next(self.random_chunk_source)
         size = len(rs)
-        B = Block(data=rs)
+        B = HashCodeBlock.promote(rs)
         self._verify_block(B)
         self.assertEqual(len(B), size)
         self.assertEqual(B.span, size)
@@ -221,11 +224,12 @@ class TestAll(SetupTeardownMixin, unittest.TestCase):
             elif Btype == BlockType.BT_RLE:
               self.assertEqual(B2.get_spanned_data(), B2.octet * B2.span)
             elif Btype == BlockType.BT_LITERAL:
-              raise unittest.SkipTest("no specific test for LiteralBlock")
+              # no specific test for LiteralBlock
+              continue
             elif Btype == BlockType.BT_SUBBLOCK:
               self._verify_block(B2.superblock)
             else:
-              raise unittest.SkipTest(
+              warning(
                   "no type specific tests for Block type %r" % (block_type,)
               )
 

@@ -1,0 +1,2 @@
+lib/python/cs/ebooks/__init__.py lib/python/cs/ebooks/__main__.py: cs.ebooks: "ebooks" script for DISTINFO
+lib/python/cs/ebooks/__init__.py: cs.ebooks: update DISTINFO

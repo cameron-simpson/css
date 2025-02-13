@@ -13,4 +13,4 @@ shift; shift
 
 sedstr=`shqstr "s^$pfx: "` || exit 1
 
-exec filter_fd "$fds" "exec sed $sedstr" "$@"
+exec filter_fd "$fds" "exec sed -u $sedstr" "$@"

@@ -17,14 +17,17 @@ from os.path import (
 )
 import sys
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile, ZIP_STORED
 
 import mobi
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.fs import scandirtree
 from cs.logutils import error, info
 from cs.pfx import pfx, pfx_call
+
+from .cbz import make_cbz
+from .common import EBooksCommonBaseCommand
 
 class Mobi:
   ''' Work with an existing MOBI ebook file.
@@ -65,9 +68,10 @@ class Mobi:
         MOBI into a temporary directory and yields the resulting
         `(dirpath,rfilepath)` as for `extract()`.
     '''
-    with TemporaryDirectory(prefix='%s.extracted-' % (type(self).__name__,),
-                            suffix='-%s' %
-                            (self.path.replace(os.sep, '_'),)) as T:
+    with TemporaryDirectory(
+        prefix='%s.extracted-' % (type(self).__name__,),
+        suffix='-%s' % (self.path.replace(os.sep, '_'),),
+    ) as T:
       dirpath, rfilepath = self.extract(dirpath=joinpath(T, 'extracted'))
       yield dirpath, rfilepath
 
@@ -87,33 +91,26 @@ class Mobi:
       if not imagepaths:
         imagepaths = sorted(glob(joinpath(dirpath, 'mobi7/Images/*.*')))
       if not imagepaths:
+        # list the contents and bail out
         for dirp, dirnames, filenames in os.walk(dirpath):
           dirnames[:] = sorted(dirnames)
           for f in sorted(filenames):
             print(joinpath(dirp, f))
         raise ValueError("no image paths")
       info("write %s", cbzpath)
-      try:
-        with pfx_call(ZipFile, cbzpath, 'x', compression=ZIP_STORED) as cbz:
-          for imagepath in imagepaths:
-            pfx_call(cbz.write, imagepath, arcname=basename(imagepath))
-      except FileExistsError as e:
-        error("CBZ already eixsts: %r: %s", cbzpath, e)
-        return 1
-      except Exception:
-        if existspath(cbzpath):
-          pfx_call(os.unlink, cbzpath)
-        raise
+      # TODO: metadata?
+      with make_cbz(cbzpath, images=imagepaths):
+        pass
     return cbzpath
 
-class MobiCommand(BaseCommand):
+class MobiCommand(EBooksCommonBaseCommand):
   ''' Command line implementation for `mobi2cbz`.
   '''
 
   def cmd_extract(self, argv):
     ''' Usage: {cmd} mobipath [outdir]
-          Extract the contents of the MOBI file mobipath
-          into the directory outdir, default based on the mobipath basename.
+          Extract the contents of the MOBI file mobipath.
+          Unpack into the directory outdir, default based on the mobipath basename.
           Prints the outdir and the name of the top file.
     '''
     outdirpath = None
@@ -156,3 +153,27 @@ class MobiCommand(BaseCommand):
     MB = Mobi(mobipath)
     outcbzpath = MB.make_cbz(cbzpath)
     print(outcbzpath)
+
+  def cmd_toc(self, argv):
+    ''' Usage: {cmd} mobipath
+          List the contents of the MOBI file mobipath.
+    '''
+    outdirpath = None
+    mobipath = self.poparg(argv, "mobipath")
+    if argv:
+      raise GetoptError("extra arguments after outdir: %r" % (argv,))
+    if not existspath(mobipath):
+      raise GetoptError("mobipath does not exist: %r" % (mobipath,))
+    if outdirpath is None:
+      outdirpath, _ = splitext(basename(mobipath))
+    print(mobipath)
+    MB = Mobi(mobipath)
+    try:
+      with MB.extracted() as df:
+        dirpath, _ = df
+        for is_dir, subpath in scandirtree(dirpath, sort_names=True):
+          if not is_dir:
+            print(" ", relpath(subpath, dirpath))
+    except mobi.kindleunpack.unpackException as e:
+      error("cannot unpack: %s", e)
+      return 1

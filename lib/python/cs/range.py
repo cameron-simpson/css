@@ -135,8 +135,9 @@ class Range(object):
 
         Called with `start` and `end`, these specify the initial
         `Span` of the `Range`.
-        If called with just one argument that argument instead be an iterable
-        of integer values comprising the values in the `Range`.
+        If called with just one argument that argument must instead
+        be an iterable of integer values comprising the values in
+        the `Range`.
     '''
     if debug is None:
       debug = ifdebug()

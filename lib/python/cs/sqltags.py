@@ -32,6 +32,10 @@ import csv
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from fnmatch import fnmatchcase
+try:
+  from functools import cached_property  # 3.8 onward
+except ImportError:
+  cached_property = lambda func: property(cache(func))
 from getopt import getopt, GetoptError
 import operator
 import os
@@ -78,7 +82,7 @@ from cs.tagset import (
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20230612-post'
+__version__ = '20240723-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -87,7 +91,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'entry_points': {
-        'console_scripts': ['sqltags = cs.sqltags:main'],
+        'console_scripts': {
+            'sqltags': 'cs.sqltags:main'
+        },
     },
     'install_requires': [
         'cs.cmdutils>=20210404',
@@ -665,7 +671,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         )
         constraint = constraint_fn and constraint_fn(alias, timestamp)
       else:
-        raise RuntimeError("unhandled non-tag field %r" % (tag_name,))
+        raise NotImplementedError("unhandled non-tag field %r" % (tag_name,))
       sqlp = SQLParameters(
           criterion=self,
           alias=alias,
@@ -710,31 +716,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
-class PolyValue(namedtuple('PolyValue',
-                           'float_value string_value structured_value')):
-  ''' A `namedtuple` for the polyvalues used in an `SQLTagsORM`.
-
-      We express various types in SQL as one of 3 columns:
-      * `float_value`: for `float`s and `int`s which round trip with `float`
-      * `string_value`: for `str`
-      * `structured_value`: a JSON transcription of any other type
-
-      This allows SQL indexing of basic types.
-
-      Note that because `str` gets stored in `string_value`
-      this leaves us free to use "bare string" JSON to serialise
-      various nonJSONable types.
-
-      The `SQLTagSets` class has a `to_polyvalue` factory
-      which produces a `PolyValue` suitable for the SQL rows.
-      NonJSONable types such as `datetime`
-      are converted to a `str` but stored in the `structured_value` column.
-      This should be overridden by subclasses as necessary.
-
-      On retrieval from the database
-      the tag rows are converted to Python values
-      by the `SQLTagSets.from_polyvalue` method,
-      reversing the process above.
+class PolyValued:
+  ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
   '''
 
   def is_valid(self):
@@ -749,29 +732,6 @@ class PolyValue(namedtuple('PolyValue',
     )
     return True
 
-class PolyValueColumnMixin:
-  ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
-      This is used by the `Tags` and `TagMultiValues` relations inside `SQLTagsORM`.
-  '''
-
-  float_value = Column(
-      Float,
-      nullable=True,
-      default=None,
-      index=True,
-      comment='tag value in numeric form'
-  )
-  string_value = Column(
-      String,
-      nullable=True,
-      default=None,
-      index=True,
-      comment='tag value in string form'
-  )
-  structured_value = Column(
-      JSON, nullable=True, default=None, comment='tag value in JSON form'
-  )
-
   def as_polyvalue(self):
     ''' Return this row's value as a `PolyValue`.
     '''
@@ -783,7 +743,7 @@ class PolyValueColumnMixin:
 
   @require(lambda pv: pv.is_valid())
   @typechecked
-  def set_polyvalue(self, pv: PolyValue):
+  def set_polyvalue(self, pv: "PolyValued"):
     ''' Set all the value fields.
     '''
     self.float_value = pv.float_value
@@ -815,6 +775,57 @@ class PolyValueColumnMixin:
     if isinstance(other_value, str):
       return cls.string_value, other_value
     return cls.structured_value, other_value
+
+class PolyValue(namedtuple('PolyValue',
+                           'float_value string_value structured_value'),
+                PolyValued):
+  ''' A `namedtuple` for the polyvalues used in an `SQLTagsORM`.
+
+      We express various types in SQL as one of 3 columns:
+      * `float_value`: for `float`s and `int`s which round trip with `float`
+      * `string_value`: for `str`
+      * `structured_value`: a JSON transcription of any other type
+
+      This allows SQL indexing of basic types.
+
+      Note that because `str` gets stored in `string_value`
+      this leaves us free to use "bare string" JSON to serialise
+      various nonJSONable types.
+
+      The `SQLTagSets` class has a `to_polyvalue` factory
+      which produces a `PolyValue` suitable for the SQL rows.
+      NonJSONable types such as `datetime`
+      are converted to a `str` but stored in the `structured_value` column.
+      This should be overridden by subclasses as necessary.
+
+      On retrieval from the database
+      the tag rows are converted to Python values
+      by the `SQLTagSets.from_polyvalue` method,
+      reversing the process above.
+  '''
+
+class PolyValueColumnMixin(PolyValued):
+  ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
+      This is used by the `Tags` and `TagMultiValues` relations inside `SQLTagsORM`.
+  '''
+
+  float_value = Column(
+      Float,
+      nullable=True,
+      default=None,
+      index=True,
+      comment='tag value in numeric form'
+  )
+  string_value = Column(
+      String,
+      nullable=True,
+      default=None,
+      index=True,
+      comment='tag value in string form'
+  )
+  structured_value = Column(
+      JSON, nullable=True, default=None, comment='tag value in JSON form'
+  )
 
 # pylint: disable=too-many-instance-attributes
 class SQLTagsORM(ORM, UNIXTimeMixin):
@@ -874,14 +885,18 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     if 'ECHO' in map(str.upper, os.environ.get('SQLTAGS_MODES',
                                                '').split(',')):
       self.engine_keywords.update(echo=True)
-    self.define_schema()
+    self.__first_use = True
 
-  def define_schema(self):
-    ''' Instantiate the schema and define the root metanode.
-    '''
-    with self.sqla_state.auto_session() as session:
-      self.Base.metadata.create_all(bind=self.engine)
-      self.prepare_metanode(session=session)
+  @contextmanager
+  def startup_shutdown(self):
+    with super().startup_shutdown():
+      # make sure the schema is up to date
+      # in particular, create the metanode 0 if missing
+      if self.__first_use:
+        with self.sqla_state.auto_session() as session:
+          self.prepare_metanode(session=session)
+        self.__first_use = False
+      yield
 
   def prepare_metanode(self, *, session):
     ''' Ensure row id 0, the metanode, exists.
@@ -1007,17 +1022,17 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               )
           )
 
-      def discard_tag(self, name, value=None, *, session):
+      @typechecked
+      def discard_tag(self, name, pv: Optional[PolyValue] = None, *, session):
         ''' Discard the tag matching `(name,value)`.
             Return the tag row discarded or `None` if no match.
         '''
-        tag = Tag(name, value)
         tags_table = orm.tags
         etag = tags_table.lookup1(
             session=session, entity_id=self.id, name=name
         )
         if etag is not None:
-          if tag.value is None or tag.value == etag.value:
+          if pv.value_test(None) or pv == etag.as_polyvalue():
             session.delete(etag)
         self._update_multivalues(name, (), session=session)
         return etag
@@ -1329,6 +1344,15 @@ class SQLTagSet(SingletonMixin, TagSet):
   def __hash__(self):
     return id(self)
 
+  def __lt__(self, other):
+    if self.name is None:
+      if other.name is None:
+        return self.unixtime < other.unixtime
+      return True
+    if other.name is None:
+      return False
+    return self.name < other.name
+
   def __getitem__(self, key):
     try:
       return super().__getitem__(key)
@@ -1492,7 +1516,7 @@ class SQLTagSet(SingletonMixin, TagSet):
         return PolyValue(f, None, None)
     if isinstance(tag_value, str):
       return PolyValue(None, tag_value, None)
-    if isinstance(tag_value, (list, tuple, dict)):
+    if isinstance(tag_value, (list, tuple, dict, set)):
       return PolyValue(None, None, cls.jsonable(tag_value))
     # convert to a special string
     return PolyValue(None, None, cls.to_js_str(tag_name, tag_value))
@@ -1640,17 +1664,28 @@ class SQLTags(BaseTagSets, Promotable):
     '''
     session = self.orm.sqla_state.session
     if session is None:
-      raise RuntimeError("no default db session")
+      raise AttributeError("no default db session")
     return session
 
+  @pfx_method
   def flush(self):
     ''' Flush the current session state to the database.
     '''
-    self.default_db_session.flush()
+    try:
+      sess = self.default_db_session
+    except AttributeError as e:
+      ifverbose("no session: %s", e)
+    else:
+      sess.flush()
 
   @typechecked
   def default_factory(
-      self, name: Optional[str] = None, *, unixtime=None, tags=None
+      self,
+      name: Optional[str] = None,
+      *,
+      unixtime=None,
+      tags=None,
+      skip_refresh=False,
   ):
     ''' Fetch or create an `SQLTagSet` for `name`.
         Return the `SQLTagSet`.
@@ -1670,11 +1705,13 @@ class SQLTags(BaseTagSets, Promotable):
         session.flush()
         te = self.get(entity.id)
         assert te is not None
-        entity.add_new_tags(tags, session=session)
+        if tags:
+          entity.add_new_tags(tags, session=session)
       # refresh entry from some source if there is a .refresh() method
-      refresh = getattr(type(te), 'refresh', None)
-      if refresh is not None and callable(refresh):
-        refresh(te)
+      if not skip_refresh:
+        refresh = getattr(type(te), 'refresh', None)
+        if refresh is not None and callable(refresh):
+          refresh(te)
     else:
       # update the existing SQLTagSet
       if unixtime is not None:
@@ -1754,7 +1791,7 @@ class SQLTags(BaseTagSets, Promotable):
     entities = self.orm.entities
     entities_table = entities.__table__  # pylint: disable=no-member
     name_column = entities_table.c.name
-    q = select([name_column])
+    q = select(name_column)
     if prefix is None:
       q = q.where(name_column.isnot(None))
     else:
@@ -1817,11 +1854,6 @@ class SQLTags(BaseTagSets, Promotable):
     if not db_url:
       db_url = expanduser(default_path)
     return db_url
-
-  def init(self):
-    ''' Initialise the database.
-    '''
-    self.orm.define_schema()
 
   def db_entity(self, index):
     ''' Return the `Entities` instance for `index` or `None`.
@@ -1962,21 +1994,17 @@ class SQLTags(BaseTagSets, Promotable):
           e.add_tag(tag)
 
   @classmethod
-  def promote(cls, obj):
-    if isinstance(obj, cls):
-      return obj
-    if isinstance(obj, str):
-      if obj.startswith('~') or isabspath(obj):
-        # expect filesystem path to an SQLite file
-        if not obj.endswith('.sqlite'):
-          raise ValueError("expected path to .sqlite file")
-        obj = expanduser(obj)
-        return cls(obj)
-    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
+  def from_str(cls, db_url: str):
+    ''' Create an `SQLTags` from `db_url`.
+    '''
+    if db_url.startswith('~') or isabspath(db_url):
+      # expect filesystem path to an SQLite file
+      if not db_url.endswith('.sqlite'):
+        raise ValueError("expected path to .sqlite file")
+      db_url = expanduser(db_url)
+    return cls(db_url=db_url)
 
-class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
-  ''' Common features for commands oriented around an `SQLTags` database.
-  '''
+class SQLTagsCommandsMixin(TagsCommandMixin):
 
   TAGSETS_CLASS = SQLTags
 
@@ -1985,86 +2013,6 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
   TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
   GETOPT_SPEC = 'f:'
-
-  # TODO:
-  # export_csv [criteria...] >csv_data
-  #   Export selected items to CSV data.
-  # import_csv <csv_data
-  #   Import CSV data.
-  # init
-  #   Initialise the database.
-
-  USAGE_FORMAT = '''Usage: {cmd} [-f db_url] subcommand [...]
-  -f db_url SQLAlchemy database URL or filename.
-            Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').'''
-
-  USAGE_KEYWORDS = {
-      'DBURL_DEFAULT': DBURL_DEFAULT,
-      'DBURL_ENVVAR': DBURL_ENVVAR,
-  }
-
-  @dataclass
-  class Options(BaseCommand.Options):
-    db_url: str = field(
-        default_factory=lambda: BaseSQLTagsCommand.TAGSETS_CLASS.infer_db_url()
-    )
-    sqltags: Optional[SQLTags] = None
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
-    options = self.options
-    if opt == '-f':
-      options.db_url = val
-    else:
-      super().apply_opt(opt, val)
-
-  @contextmanager
-  def run_context(self):
-    ''' Prepare the `SQLTags` around each command invocation.
-    '''
-    with super().run_context():
-      options = self.options
-      db_url = options.db_url
-      sqltags = self.TAGSETS_CLASS(db_url)
-      with sqltags:
-        with stackattrs(options, sqltags=sqltags, verbose=True):
-          yield
-
-  @classmethod
-  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
-    ''' Parse tag criteria from `argv`.
-
-        The criteria may be either:
-        * an integer specifying a `Tag` id
-        * a sequence of tag criteria
-    '''
-    # try a single int argument
-    try:
-      index = int(arg)
-    except ValueError:
-      return super().parse_tagset_criterion(
-          arg, tag_based_test_class=tag_based_test_class
-      )
-    else:
-      return SQTEntityIdTest([index])
-
-  @staticmethod
-  def parse_categories(categories):
-    ''' Extract "category" words from the `str` `categories`,
-        return a list of category names.
-
-        Splits on commas, strips leading and trailing whitespace, downcases.
-    '''
-    return list(
-        filter(
-            None,
-            map(
-                lambda category: category.strip().lower(),
-                categories.split(',')
-            )
-        )
-    )
 
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
@@ -2152,7 +2100,9 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
             )
         )
     else:
-      raise RuntimeError("unimplemented export format %r" % (export_format,))
+      raise NotImplementedError(
+          "unimplemented export format %r" % (export_format,)
+      )
 
   # pylint: disable=too-many-locals
   def cmd_find(self, argv):
@@ -2220,7 +2170,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
         if option in ('-u', '--update'):
           update_mode = True
         else:
-          raise RuntimeError("unsupported option")
+          raise NotImplementedError("unsupported option")
     if not argv:
       warning("missing srcpaths")
       badopts = True
@@ -2282,7 +2232,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
         elif opt == '-D':
           strptime_format = val
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if dt is not None and strptime_format is not None:
       warning("-d and -D are mutually exclusive")
       badopts = True
@@ -2426,20 +2376,99 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
             index = int(name)
           except ValueError:
             index = name
-          te = sqltags.get(index)
-          if te is None:
+          tags = sqltags.get(index)
+          if tags is None:
             error("missing")
             xit = 1
             continue
-          tags = te.tags
           for tag_choice in tag_choices:
             if tag_choice.choice:
               if tag_choice.tag not in tags:
-                te.set(tag_choice.tag)
+                tags.set(tag_choice.tag)
             else:
               if tag_choice.tag in tags:
-                te.discard(tag_choice.tag)
+                tags.discard(tag_choice.tag)
     return xit
+
+class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
+  ''' Common features for commands oriented around an `SQLTags` database.
+  '''
+
+  # TODO:
+  # export_csv [criteria...] >csv_data
+  #   Export selected items to CSV data.
+  # import_csv <csv_data
+  #   Import CSV data.
+  # init
+  #   Initialise the database.
+
+  USAGE_FORMAT = '''
+    Usage: {cmd} [-f db_url] subcommand [...]
+      --db db_url SQLAlchemy database URL or filename.
+                  Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').
+  '''
+
+  @dataclass
+  class Options(BaseCommand.Options):
+    db_url: str = None
+
+    COMMON_OPT_SPECS = dict(
+        db=('db_url', 'SQLTags database URL.'),
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
+
+  @cached_property
+  def sqltags(self):
+    options = self.options
+    db_url = options.db_url
+    if db_url is None:
+      db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
+    return self.TAGSETS_CLASS(db_url)
+
+  @contextmanager
+  def run_context(self):
+    ''' Prepare the `SQLTags` around each command invocation.
+    '''
+    with super().run_context():
+      options = self.options
+      with stackattrs(options, verbose=True):
+        with self.sqltags:
+          yield
+
+  @classmethod
+  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
+    ''' Parse tag criteria from `argv`.
+
+        The criteria may be either:
+        * an integer specifying a `Tag` id
+        * a sequence of tag criteria
+    '''
+    # try a single int argument
+    try:
+      index = int(arg)
+    except ValueError:
+      return super().parse_tagset_criterion(
+          arg, tag_based_test_class=tag_based_test_class
+      )
+    else:
+      return SQTEntityIdTest([index])
+
+  @staticmethod
+  def parse_categories(categories):
+    ''' Extract "category" words from the `str` `categories`,
+        return a list of category names.
+
+        Splits on commas, strips leading and trailing whitespace, downcases.
+    '''
+    return list(
+        filter(
+            None,
+            map(
+                lambda category: category.strip().lower(),
+                categories.split(',')
+            )
+        )
+    )
 
 class SQLTagsCommand(BaseSQLTagsCommand):
   ''' `sqltags` main command line utility.

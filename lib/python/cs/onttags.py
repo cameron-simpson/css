@@ -16,7 +16,7 @@ from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.deco import fmtdoc, Promotable
-from cs.fs import HasFSPath
+from cs.fs import FSPathBasedSingleton
 from cs.fstags import TagFile
 from cs.lex import cutsuffix, r
 from cs.logutils import warning
@@ -52,7 +52,7 @@ class OntCommand(TagsOntologyCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'type'
 
   @dataclass
-  class Options(OntCommand.Options):
+  class Options(TagsOntologyCommand.Options):
     ont_path: str = field(
         default_factory=lambda: os.environ.get(ONTTAGS_PATH_ENVVAR)
     )
@@ -86,13 +86,16 @@ class OntCommand(TagsOntologyCommand):
     for tn in type_names:
       print(tn)
 
-class Ont(TagsOntology, HasFSPath, Promotable):
+class Ont(FSPathBasedSingleton, TagsOntology, Promotable):
   ''' A `TagsOntology` based on a persistent store.
   '''
 
+  FSPATH_ENVVAR = ONTTAGS_PATH_ENVVAR
+  FSPATH_DEFAULT = ONTTAGS_PATH_DEFAULT
+
   @typechecked
   def __init__(self, ont_path: str):
-    self.ont_path = ont_path
+    self.fspath = ont_path
     tagsets, ont_pfx_map = self.tagsetses_from_path(ont_path)
     super().__init__(tagsets)
     # apply any prefix TagSetses
@@ -101,15 +104,6 @@ class Ont(TagsOntology, HasFSPath, Promotable):
       prefix_ = prefix + '.'
       X("add %r => %s", prefix_, subtagsets)
       self.add_tagsets(subtagsets, prefix_)
-
-  def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.ont_path)
-
-  @property
-  def fspath(self):
-    ''' The `.fspath` is `self.ont_path`.
-    '''
-    return self.ont_path
 
   @classmethod
   @typechecked

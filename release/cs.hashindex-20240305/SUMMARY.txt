@@ -1,0 +1,4 @@
+HashIndexCommand.cmd_ls: support rhost:rpath paths, honour intterupts in the remote mode.
+HashIndexCommand.cmd_rearrange: new optional dstdir command line argument, passed to rearrange.
+merge: symlink_mode: leave identical symlinks alone, just merge tags.
+rearrange: new optional dstdirpath parameter, default srcdirpath.

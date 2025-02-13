@@ -1,0 +1,17 @@
+lib/python/cs/hashindex.py: cs.hasindex: HashIndexCommand: from cmd_linkto, covered by cmd_rearrange
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: new cmd_comm: compare the contents of 2 directories
+lib/python/cs/hashindex.py: cs.hashindex: docstring/usage updates
+lib/python/cs/hashindex.py: cs.hashindex: merge: handle conflicts for symlinks
+lib/python/cs/hashindex.py: merge plex ==> default
+lib/python/cs/hashindex.py: cs.hashindex: type annotation for the return from hashindex(), read_hashindex(), read_remote_hashindex()
+lib/python/cs/hashindex.py: cs.hashindex: read_hashindex: always yield the 2-tuple even from unparsable lines, put the yield outside the Pfx context, update docstring
+lib/python/cs/hashindex.py: cs.hashindex: hashindex: accept fspath as str (local path), file (read text hashindex), (rhost, rfspath) - remote hashindex
+lib/python/cs/hashindex.py: cs.hashindex: hashindex: recognise (None,"-") to mean stdin
+lib/python/cs/hashindex.py: cs.hashindex: use the general purpose hashindex() function for local and remote indices
+lib/python/cs/hashindex.py: cs.hashindex: rename some global defaults
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: plumb hashindex_exe and ssh_exe
+lib/python/cs/hashindex.py: cs.hashindex: run_remote_hashindex: get defaults from the command options
+lib/python/cs/hashindex.py: cs.hashindex: update imports
+lib/python/cs/hashindex.py: cs.hashindex: add -e, -h, -H to HashIndexCommandOptions.COMMON_OPT_SPECS
+lib/python/cs/hashindex.py: HashIndexCommand.cmd_comm: fix usage message typo
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_comm: fix NameError

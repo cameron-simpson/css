@@ -1,0 +1,9 @@
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.to_polyvalue: treat sets like lists
+lib/python/cs/sqltags.py: merge default => cdrip
+lib/python/cs/sqltags.py: cs.sqltags: restore typing fix lost during merge
+lib/python/cs/sqltags.py: merge default ==> cdrip
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_factory: honour new skip_refresh parameter, apply any presupplied tags
+lib/python/cs/sqltags.py: cs.sqltags: autoformat
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.keys: update call to select()
+lib/python/cs/sqltags.py: cs.sqltags: pull the cmd_* methods from BaseSQLTagsCommand into new SQLTagsCommandsMixin for reuse, initially cs.cdrip.CDRipCommand
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommandsMixin.cmd_tag: the te is a TagSet, use it directly

@@ -4,54 +4,30 @@
 # - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
-DISTINFO = {
-    'description':
-    "convenience functions for working with URLs",
-    'keywords': ["python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 3",
-    ],
-    'install_requires': [
-        'beautifulsoup4',
-        'cs.excutils',
-        'cs.lex',
-        'cs.logutils',
-        'cs.rfc2616',
-        'cs.threads',
-        'cs.py3',
-        'cs.obj',
-        'cs.xml',
-    ],
-}
-
+from collections import namedtuple
+from contextlib import contextmanager
+from functools import cached_property
+from heapq import heappush, heappop
 import os
 import os.path
+import re
 import sys
-from collections import namedtuple
-import errno
-from heapq import heappush, heappop
-from itertools import chain
-import time
+from typing import Iterable
 
 from netrc import netrc
-import socket
 from string import whitespace
 from threading import RLock
-try:
-  from urllib.request import Request, HTTPError, URLError, \
-            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
-            build_opener
-  from urllib.parse import urlparse, urljoin, quote as urlquote
-except ImportError:
-  from urllib2 import Request, HTTPError, URLError, \
-      HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
-      build_opener
-  from urlparse import urlparse, urljoin
+from urllib.request import (
+    HTTPError, URLError, HTTPPasswordMgrWithDefaultRealm
+)
+from urllib.parse import parse_qs, urlparse, urljoin as up_urljoin
 
-from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
+from bs4 import BeautifulSoup
 try:
-  import lxml
+  try:
+    from lxml import etree
+  except ImportError:
+    import xml.etree.ElementTree as etree
 except ImportError:
   try:
     if sys.stderr.isatty():
@@ -61,14 +37,39 @@ except ImportError:
       )
   except AttributeError:
     pass
+import requests
+from typeguard import typechecked
 
-from cs.deco import Promotable
-from cs.lex import parseUC_sAttr
+from cs.deco import promote, Promotable
+from cs.excutils import unattributable
+from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
-from cs.pfx import Pfx, pfx_iter
+from cs.pfx import Pfx
 from cs.rfc2616 import datetime_from_http_date
-from cs.threads import locked
-from cs.xml import etree  # ElementTree
+from cs.seq import skip_map
+from cs.threads import locked, ThreadState, HasThreadState
+
+__version__ = '20231129-post'
+
+DISTINFO = {
+    'description':
+    "convenience functions for working with URLs",
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'html5lib',
+        'lxml',
+        'beautifulsoup4',
+        'cs.lex',
+        'cs.logutils',
+        'cs.rfc2616',
+        'cs.threads',
+        'cs.obj',
+    ],
+}
 
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader
@@ -78,58 +79,52 @@ from cs.xml import etree  # ElementTree
 ##  return putheader0(self, header, *values)
 ##HTTPConnection.putheader = my_putheader
 
-class URL(str, Promotable):
+def urljoin(url, other_url):
+  return up_urljoin(str(url), str(other_url))
+
+class URL(HasThreadState, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
-  def _init(self, *, referer=None, user_agent=None, opener=None):
-    ''' Initialise the `URL`.
-        `s`: the string defining the URL.
-        `referer`: the referring URL.
-        `user_agent`: User-Agent string, inherited from `referer` if unspecified,
-                  "css" if no referer.
-        `opener`: urllib2 opener object, inherited from `referer` if unspecified,
-                  made at need if no referer.
+  # Thread local stackable class state
+  context = ThreadState(
+      referer=None,
+      user_agent=None,
+      opener=None,
+      retry_delay=3,
+  )
+
+  @typechecked
+  def __init__(self, url_s: str, referer=None):
+    ''' Initialise the `URL` from the URL string `url_s`.
     '''
-    if referer is not None:
-      referer = URL(referer, None)
-    self.referer = referer
-    self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
-    self._opener = opener
+    self.url_s = url_s
+    self._lock = RLock()
     self._parts = None
     self._info = None
     self.flush()
-    self._lock = RLock()
-    self.flush()
-    self.retry_timeout = 3
 
-  @classmethod
-  def promote(cls, obj):
-    ''' Promote `obj` to an instance of `cls`.
-        Instances of `cls` are passed through unchanged.
-        `str` if promoted to `cls(obj)`.
-        `(url,referer)` is promoted to `cls(url,referer=referer)`.
+  def __str__(self):
+    return self.url_s
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self.url_s!r}'
+
+  def flush(self):
+    ''' Forget all cached content.
     '''
-    if isinstance(obj, URL):
-      return obj
-    if isinstance(obj, str):
-      return cls(obj)
-    try:
-      url, referer = obj
-    except (ValueError, TypeError):
-      raise TypeError(
-          "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
-      )
-    if isinstance(url, cls):
-      obj = url if referer is None else cls(url, referer=referer)
-    else:
-      obj = cls.promote(url) if referer is None else cls(url, referer=referer)
-    return obj
+    for attr in 'GET_response', 'HEAD_response', 'parsed':
+      try:
+        delattr(self, attr)
+      except AttributeError:
+        pass
 
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
-        Upper case attributes named "FOO" parse the text and find the (sole) node named "foo".
-        Upper case attributes named "FOOs" parse the text and find all the nodes named "foo".
+        Upper case attributes named "FOO" parse the text and find
+        the (sole) node named "foo".
+        Upper case attributes named "FOOs" parse the text and find
+        all the nodes named "foo".
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
@@ -140,183 +135,93 @@ class URL(str, Promotable):
       node, = nodes
       return node
     # look up method on equivalent Unicode string
+    raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
+  @contextmanager
+  def session(self, session=None):
+    ''' Context manager yielding a `requests.Session`.
+    '''
+    if session is None:
+      with requests.Session() as session:
+        with self.session(session=session):
+          yield session
+    else:
+      with self.context(session=session):
+        yield session
+
+  @cached_property
+  @locked
+  def GET_response(self):
+    ''' The `requests.Response` object from a `GET` of this URL.
+    '''
+    return requests.get(self.url_s)
+
+  @cached_property
+  @locked
+  def HEAD_response(self):
+    ''' The `requests.Response` object from a `HEAD` of this URL.
+    '''
+    return requests.head(self.url_s)
+
+  def exists(self) -> bool:
+    ''' Test if this URL exists via a `HEAD` request.
+    '''
     try:
-      sga = super().__getattr__
-    except AttributeError:
-      raise AttributeError(f'{self.__class__.__name__}.{attr}')
-    return sga(attr)
-
-  def flush(self):
-    ''' Forget all cached content.
-    '''
-    # Note: _content is the raw bytes returns from the URL read().
-    #       _parsed is a BeautifulSoup parse of the _content decoded as utf-8.
-    #       _xml is an Elementtree parse of the _content decoded as utf-8.
-    self._content = None
-    self._info = None
-    self._parsed = None
-    self._xml = None
-    self._fetch_exception = None
-
-  @property
-  def opener(self):
-    if self._opener is None:
-      if self.referer is not None and self.referer._opener is not None:
-        self._opener = self.referer._opener
-      else:
-        o = build_opener()
-        o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
-        self._opener = o
-    return self._opener
-
-  def _request(self, method):
-
-    class MyRequest(Request):
-
-      def get_method(self):
-        return method
-
-    hdrs = {}
-    if self.referer:
-      hdrs['Referer'] = urlquote(self.referer, encoding='utf-8', safe=':/;#')
-    hdrs['User-Agent'
-         ] = self.user_agent if self.user_agent else os.environ.get(
-             'USER_AGENT', 'css'
-         )
-    rqurl = urlquote(self, encoding='utf-8', safe=':/;#')
-    rq = MyRequest(rqurl, None, hdrs)
-    return rq
-
-  def _response(self, method):
-    rq = self._request(method)
-    opener = self.opener
-    retries = self.retry_timeout
-    with Pfx("open(%s)", rq):
-      while retries > 0:
-        now = time.time()
-        open = opener.open
-        try:
-          opened_url = open(rq)
-        except OSError as e:
-          if e.errno == errno.ETIMEDOUT:
-            elapsed = time.time() - now
-            warning("open %s: %s; elapsed=%gs", self, e, elapsed)
-            if retries > 0:
-              retries -= 1
-              continue
-          raise
-        except HTTPError as e:
-          warning("open %s: %s", self, e)
-          raise
-        else:
-          # success, exit retry loop
-          break
-    self._info = opened_url.info()
-    return opened_url
-
-  def _fetch(self):
-    ''' Fetch the URL content.
-        If there is an HTTPError, report the error, flush the
-        content, set self._fetch_exception.
-        This means that that accessing the self.content property
-        will always attempt a fetch, but return None on error.
-    '''
-    with Pfx("_fetch(%s)", self):
-      try:
-        with self._response('GET') as opened_url:
-          opened_url = self._response('GET')
-          self.opened_url = opened_url
-          # URL post redirection
-          final_url = opened_url.geturl()
-          if final_url == self:
-            final_url = self
-          else:
-            final_url = URL(final_url, referer=self)
-          self.final_url = final_url
-          self._content = opened_url.read()
-          self._parsed = None
-      except HTTPError as e:
-        error("error with GET: %s", e)
-        self.flush()
-        self._fetch_exception = e
-
-  # present GET action publicly
-  GET = _fetch
-
-  def exists(self):
-    ''' Test if this URL exists, return Boolean.
-    '''
-    if self._info is not None:
-      return True
-    try:
-      self.HEAD()
+      self.HEAD_response
     except HTTPError as e:
       if e.code == 404:
         return False
       raise
-    else:
-      return True
-
-  def HEAD(self):
-    opened_url = self._response('HEAD')
-    opened_url.read()
-    return opened_url
-
-  def get_content(self, onerror=None):
-    ''' Probe URL for content to avoid exceptions later.
-        Use, and save as .content, `onerror` in the case of HTTPError.
-    '''
-    try:
-      content = self.content
-    except (HTTPError, URLError, socket.error) as e:
-      error("%s.get_content: %s", self, e)
-      content = onerror
-    self._content = content
-    return content
+    return True
 
   @property
+  @unattributable
+  def content(self) -> bytes:
+    ''' The decoded URL content as a `bytes`.
+    '''
+    return self.GET_response.content
+
+  @property
+  @unattributable
+  def text(self) -> str:
+    ''' The URL decoded content as a string.
+    '''
+    return self.GET_response.text
+
+  @property
+  @unattributable
   @locked
-  def content(self):
-    ''' The URL content as a string.
+  def headers(self):
+    ''' A `requests.Response` headers mapping.
     '''
-    self._fetch()
-    return self._content
+    r = self.HEAD_response
+    return r.headers
 
   @property
+  @unattributable
   def content_type(self):
     ''' The URL content MIME type.
     '''
-    if self._info is None:
-      self.HEAD()
-    try:
-      ctype = self._info.get_content_type()
-    except AttributeError as e:
-      warning(
-          "%r.content_type: self._info.get_content_type() raises %s", self, e
-      )
-      ctype = None
-    return ctype
+    return self.headers['content-type']
 
   @property
+  @unattributable
   def content_length(self):
-    ''' The value of the Content-Length: header or None.
+    ''' The value of the Content-Length: header or `None`.
     '''
     try:
-      if self._info is None:
-        self.HEAD()
-      value = self._info['Content-Length']
-      if value is not None:
-        value = int(value.strip())
-      return value
-    except AttributeError as e:
-      raise RuntimeError("%s" % (e,)) from e
+      length_s = self.headers['content-length']
+    except KeyError:
+      return None
+    return int(length_s)
 
   @property
+  @unattributable
   def last_modified(self):
     ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
     '''
     if self._info is None:
-      self.HEAD()
+      self.HEAD_response
     value = self._info['Last-Modified']
     if value is not None:
       # parse HTTP-date into datetime object
@@ -325,15 +230,16 @@ class URL(str, Promotable):
     return value
 
   @property
-  @locked
+  @unattributable
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
     '''
     if self._content is None:
-      self.HEAD()
+      self.HEAD_response
     return self._info.getencoding()
 
   @property
+  @unattributable
   def domain(self):
     ''' The URL domain - the hostname with the first dotted component removed.
     '''
@@ -343,27 +249,30 @@ class URL(str, Promotable):
       return ''
     return hostname.split('.', 1)[1]
 
-  @property
-  @locked
+  @cached_property
+  @unattributable
   def parsed(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    content = self.content
-    if self.content_type == 'text/html':
-      parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
-    else:
-      parser_names = ('lxml', 'xml')
     try:
-      P = BeautifulSoup(content.decode('utf-8', 'replace'), 'html5lib')
-      ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
-    except Exception as e:
-      exception(
-          "%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e
-      )
-      with open("cs.urlutils-unparsed.html", "wb") as bs:
-        bs.write(self.content)
+      text = self.text
+      if self.content_type == 'text/html':
+        parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
+      else:
+        parser_names = ('lxml', 'xml')
+      try:
+        P = BeautifulSoup(text, 'html5lib')
+        ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
+      except Exception as e:
+        exception(
+            "%s: .parsed: BeautifulSoup(text,html5lib) fails: %s", self, e
+        )
+        with open("cs.urlutils-unparsed.html", "wb") as bs:
+          bs.write(self.content)
+        raise
+      return P
+    except:
       raise
-    return P
 
   def feedparsed(self):
     ''' A parse of the content via the feedparser module.
@@ -371,96 +280,136 @@ class URL(str, Promotable):
     import feedparser
     return feedparser.parse(self.content)
 
-  @property
-  @locked
+  @cached_property
+  @unattributable
   def xml(self):
     ''' An `ElementTree` of the URL content.
     '''
     return etree.XML(self.content.decode('utf-8', 'replace'))
 
-  @property
-  def parts(self):
-    ''' The URL parsed into parts by urlparse.urlparse.
+  @cached_property
+  def url_parsed(self):
+    ''' The URL parsed by `urlparse.urlparse`.
+        This is a `(scheme,netloc,path,params,query,fragment)` namedtuple.
     '''
-    if self._parts is None:
-      self._parts = urlparse(self)
-    return self._parts
+    return urlparse(self.url_s)
 
   @property
+  @unattributable
   def scheme(self):
     ''' The URL scheme as returned by urlparse.urlparse.
     '''
-    return self.parts.scheme
+    return self.url_parsed.scheme
 
   @property
+  @unattributable
   def netloc(self):
     ''' The URL netloc as returned by urlparse.urlparse.
     '''
-    return self.parts.netloc
+    return self.url_parsed.netloc
 
   @property
+  @unattributable
   def path(self):
     ''' The URL path as returned by urlparse.urlparse.
     '''
-    return self.parts.path
+    return self.url_parsed.path
+
+  @cached_property
+  @unattributable
+  def cleanpath(self):
+    ''' The URL path as returned by urlparse.urlparse,
+        with multiple slashes (`/`) reduced to a single slash.
+        Technically this can change the meaning of the URL path,
+        but usually these are an artifact of sloppy path construction.
+    '''
+    path = self.path
+    if '///' in path:
+      path = re.sub('//+', '/', path)  # the thorough thing
+    elif '//' in path:
+      path = path.replace('//', '/')  # the fast thing
+    return path
 
   @property
+  def cleanrpath(self):
+    ''' The `cleanpath` with its leading slash stripped.
+    '''
+    return self.cleanpath.lstrip('/')
+
+  @property
+  @unattributable
   def path_elements(self):
     ''' Return the non-empty path components; NB: a new list every time.
     '''
     return [w for w in self.path.strip('/').split('/') if w]
 
   @property
+  @unattributable
   def params(self):
     ''' The URL params as returned by urlparse.urlparse.
     '''
-    return self.parts.params
+    return self.url_parsed.params
 
   @property
+  @unattributable
   def query(self):
     ''' The URL query as returned by urlparse.urlparse.
     '''
-    return self.parts.query
+    return self.url_parsed.query
+
+  @unattributable
+  def query_dict(self):
+    ''' Return a new `dict` containing the parsed param=value pairs from `self.query`.
+    '''
+    return parse_qs(self.query)
 
   @property
+  @unattributable
   def fragment(self):
     ''' The URL fragment as returned by urlparse.urlparse.
     '''
-    return self.parts.fragment
+    return self.url_parsed.fragment
 
   @property
+  @unattributable
   def username(self):
     ''' The URL username as returned by urlparse.urlparse.
     '''
-    return self.parts.username
+    return self.url_parsed.username
 
   @property
+  @unattributable
   def password(self):
     ''' The URL password as returned by urlparse.urlparse.
     '''
-    return self.parts.password
+    return self.url_parsed.password
 
   @property
+  @unattributable
   def hostname(self):
     ''' The URL hostname as returned by urlparse.urlparse.
     '''
-    return self.parts.hostname
+    return self.url_parsed.hostname
 
   @property
+  @unattributable
   def port(self):
     ''' The URL port as returned by urlparse.urlparse.
     '''
-    return self.parts.port
+    return self.url_parsed.port
 
   @property
-  def dirname(self, absolute=False):
+  @unattributable
+  def dirname(self):
     return os.path.dirname(self.path)
 
   @property
+  @unattributable
   def parent(self):
     return URL(urljoin(self, self.dirname), referer=self)
 
   @property
+  @unattributable
   def basename(self):
     return os.path.basename(self.path)
 
@@ -479,6 +428,7 @@ class URL(str, Promotable):
     return self.xml.findall(match)
 
   @property
+  @unattributable
   def baseurl(self):
     for B in self.BASEs:
       try:
@@ -491,6 +441,7 @@ class URL(str, Promotable):
     return self
 
   @property
+  @unattributable
   def page_title(self):
     t = self.parsed.title
     if t is None:
@@ -533,7 +484,7 @@ class URL(str, Promotable):
       U = URL(normURL, referer=self.referer)
     return U
 
-  def hrefs(self, absolute=False):
+  def hrefs(self, absolute=False) -> Iterable["URL"]:
     ''' All 'href=' values from the content HTML 'A' tags.
         If `absolute`, resolve the sources with respect to our URL.
     '''
@@ -681,10 +632,33 @@ class URL(str, Promotable):
     '''
     return URLLimit(self.scheme, self.hostname, self.port, '/')
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to an instance of `cls`.
+        Instances of `cls` are passed through unchanged.
+        `str` is promoted directly to `cls(obj)`.
+        `(url,referer)` is promoted to `cls(url,referer=referer)`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, str):
+      return cls(obj)
+    try:
+      url, referer = obj
+    except (ValueError, TypeError):
+      raise TypeError(
+          "%s.promote: cannot convert to URL: %s" % (cls.__name__, r(obj))
+      )
+    if isinstance(url, cls):
+      obj = url if referer is None else cls(url, referer=referer)
+    else:
+      obj = cls.promote(url) if referer is None else cls(url, referer=referer)
+    return obj
+
 class URLLimit(namedtuple('URLLimit', 'scheme hostname port subpath')):
 
-  def ok(self, U):
-    U = URL(U)
+  @promote
+  def ok(self, U: URL):
     return (
         U.scheme == self.scheme and U.hostname == self.hostname
         and U.port == self.port and U.path.startswith(self.subpath)
@@ -695,35 +669,12 @@ def strip_whitespace(s):
   '''
   return ''.join([ch for ch in s if ch not in whitespace])
 
-def skip_errs(iterable):
-  ''' Iterate over `iterable` and yield its values.
-      If it raises URLError or HTTPError, report the error and skip the result.
+def skip_url_errs(func, *iterables, **skip_map_kw):
+  ''' A version of `cs.seq.skip_map` which skips `URLError` and `HTTPError`.
   '''
-  debug("skip_errs...")
-  I = iter(iterable)
-  while True:
-    try:
-      i = next(I)
-    except StopIteration:
-      break
-    except (URLError, HTTPError) as e:
-      warning("%s", e)
-    else:
-      debug("skip_errs: yield %r", i)
-      yield i
-
-def can_skip_url_errs(func):
-
-  def wrapped(self, *args, **kwargs):
-    mode = kwargs.pop('mode', self.mode)
-    if mode == URLs.MODE_SKIP:
-      return URLs(
-          skip_errs(func(self, *args, mode=URLs.MODE_RAISE, **kwargs)),
-          self.context, self.mode
-      )
-    return func(self, *args, mode=mode, **kwargs)
-
-  return wrapped
+  return skip_map(
+      func, *iterables, except_types=(URLError, HTTPError), **skip_map_kw
+  )
 
 class URLs(object):
 
@@ -731,7 +682,7 @@ class URLs(object):
   MODE_SKIP = 1
 
   def __init__(self, urls, context=None, mode=None):
-    ''' Set up a URLs object with the iterable `urls` and the `context`
+    ''' Set up a `URLs` object with the iterable `urls` and the `context`
         object, which implements the mapping interface to store key value
         pairs.
         The iterable `urls` is kept as is, making this object a single use
@@ -755,6 +706,7 @@ class URLs(object):
     self.context[key] = value
 
   @property
+  @unattributable
   def multi(self):
     ''' Prepare this URLs object for reuse by converting its urls
         iterable to a list if not already a list or tuple.
@@ -764,34 +716,24 @@ class URLs(object):
       self.urls = list(self.urls)
     return self
 
-  @can_skip_url_errs
-  def map(self, func, mode=None):
-    return URLS([func(url) for url in self.urls], self.context, mode)
+  def map(self, func, mode=None) -> "URLs":
+    return URLs(skip_url_errs(func, self.urls), self.context, mode)
 
-  @can_skip_url_errs
   def hrefs(self, absolute=True, mode=None):
-    ''' Return an iterable of the `hrefs=` URLs from the content.
-    '''
-    return type(self)(
-        chain(
-            *[
-                pfx_iter(url,
-                         URL(url).hrefs(absolute=absolute))
-                for url in self.urls
-            ]
+    return URLs(
+        skip_url_errs(
+            lambda url: URL(url).hrefs(absolute=absolute),
+            self.urls,
         ), self.context, mode
     )
 
-  @can_skip_url_errs
   def srcs(self, absolute=True, mode=None):
     ''' Return an iterable of the `src=` URLs from the content.
     '''
-    return type(self)(
-        chain(
-            *[
-                pfx_iter(url,
-                         URL(url).srcs(absolute=absolute)) for url in self.urls
-            ]
+    return URLs(
+        skip_url_errs(
+            lambda url: URL(url).srcs(absolute=absolute),
+            self.urls,
         ), self.context, mode
     )
 

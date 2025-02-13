@@ -1,0 +1,161 @@
+#!/bin/sh
+#
+# My to-do list: one line desciptions in TOO.txt or TODO-category.txt.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+: "${GH_REPO:=}"
+
+nl='
+'
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$( basename "$0" )
+usage="Usage:
+  TODO.txt mode:
+    $cmd [subsection:] [task-description...]
+  GitHub gh mode:
+    $cmd NEW issue title
+    $cmd [number] todo text"
+
+if [ $# = 1 ]
+then
+  case "${1:-}" in
+    help | -\? | -h | -help | --help )
+      echo "$usage"
+      exit 0
+      ;;
+  esac
+fi
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing arguments" >&2
+  echo "$usage" >&2
+  exit 2
+}
+
+# TODO files (the default) or "gh" :CLI tool
+mode=TODO   # vs GH
+[ -n "$GH_REPO" ] && mode=GH
+
+case "$mode" in
+  TODO)
+    category=
+    todo_path=$( findup TODO.txt || : )
+
+    case "$1" in
+      ?*:)
+        category=$( expr "x$1" : 'x\(.*\):' )
+        shift
+        ;;
+      *)category=$( vcs branch || :)
+        ;;
+    esac
+    if [ -n "$category" ]
+    then
+        todo_path2=$( findup "TODO-$category.txt" || : )
+        if [ -f "$todo_path2" ]
+        then  todo_path=$todo_path2
+        else  set -- "$category:" ${1+"$@"}
+        fi
+    fi
+
+    [ -f "$todo_path" ] || {
+      echo "$cmd: no TODO.txt file found: $todo_path" >&2
+      exit 1
+    }
+
+    # no args? just list the TODOs
+    [ $# -gt 0 ] || {
+        echo "$todo_path"
+        sed -n 's/./  &/p' "$todo_path"
+        exit
+    }
+
+    dlog log -c "TODO,$category" "TODO: $*"
+
+    [ -s "$todo_path" ] || echo >>"$todo_path"
+
+    if $trace bsed "1i\\
+$*" "$todo_path"
+    then
+        tododir=$( dirname "$todo_path" )
+        ( cd "$tododir"
+          vcs_type=$( vcs type 2>/dev/null ) || exit 0
+          base=$( basename "$todo_path" )
+          case "$vcs_type" in
+              hg)   $trace hg commit -m "$base: $*" -- "$todo_path" ;;
+              git)  $trace git add -- "$todo_path" && $trace git commit -m "$base: $*" ;;
+              *)    echo "TODO: not in hg or git, aborting" >&2
+                    exit 1
+                    ;;
+          esac
+        )
+    fi
+    ;;
+  GH)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing NEW or issue number" >&2
+      exit 2
+    fi
+    case "$1" in
+      # create new issue or new TODO in existing issue
+      NEW | [1-9] | [1-9]*[0-9] )
+            number=$1
+            shift
+            ;;
+      *)    branch="$( vcs branch )"
+            case "$branch" in
+              [1-9]*[0-9]-*)
+                number=$( expr "$branch" : '\([1-9][0-9]*\).*' )
+                ;;
+              *)echo "$cmd: cannot infer issue number from current VCS branch \"$branch\"" >&2
+                exit 2
+                ;;
+            esac
+            ;;
+    esac
+    case "$number" in
+      NEW ) [ $# = 0 ] && {
+              echo "$cmd NEW: missing issue title words" >&2
+              exit 2
+            }
+            body=
+            if [ -t 0 -a -t 1 ]
+            then
+              echo "Enter subtasks one per line, blank line to finish:"
+              while necho "- [ ] "; read -r subtask
+              do
+                [ -n "$subtask" ] || break
+                subtask="- [ ] $subtask"
+                if [ -n "$body" ]
+                then  body="$body$nl$subtask"
+                else  body=$subtask
+                fi
+              done
+            fi
+            ## omitted, some kind of perms issue: --project "${GH_NEW_PROJECT:-}"
+            $trace gh issue create --title "$*" --assignee "${GH_NEW_ASSIGN:-@me}" --body "$body"
+            ;;
+      [1-9] | [1-9]*[0-9] )
+            [ $# = 0 ] && {
+              echo "$cmd $number: missing issue $number TODO words" >&2
+              exit 2
+            }
+            body=$(
+                $trace gh issue list --search "$number" --json number,body \
+                | $trace jq -r ".  | map(select(.number==$number)) | .[0].body" \
+                | tr -d '\015'
+            )
+            $trace gh issue edit "$number" --body "$body$nl- [ ] $*"
+            ;;
+    esac
+    ;;
+  *)echo "$0: unsupported mode: $mode" >&2
+    exit 2
+    ;;
+esac

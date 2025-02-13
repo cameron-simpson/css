@@ -19,16 +19,16 @@ from typing import Mapping, Set
 from icontract import require
 import requests
 
-from cs.context import stackattrs
 from cs.deco import promote
-from cs.fstags import FSTags
+from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import pfx_call
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.upd import uses_upd
+from cs.urlutils import URL
 
-__version__ = '20230703-post'
+__version__ = '20241007-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -38,7 +38,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context',
         'cs.deco',
         'cs.fstags',
         'cs.logutils',
@@ -60,23 +59,20 @@ class ServiceAPI(MultiOpenMixin):
   API_RETRY_DELAY = 5  # interval between request retries
 
   @promote
-  def __init__(self, *, sqltags: SQLTags):
+  @uses_fstags
+  def __init__(self, *, fstags: FSTags, sqltags: SQLTags):
+    self.fstags = fstags
     self.sqltags = sqltags
-    self.fstags = None
     self._lock = RLock()
     self.login_state_mapping = None
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Start up: open and init the `SQLTags`, open the `FSTags`.
+    ''' Open/close the FSTags and SQLTags.
     '''
-    sqltags = self.sqltags
-    fstags = FSTags()
-    with sqltags:
-      sqltags.init()
-      with fstags:
-        with stackattrs(self, fstags=fstags):
-          yield
+    with self.sqltags:
+      with self.fstags:
+        yield
 
   def login(self) -> Mapping:
     ''' Do a login: authenticate to the service, return a mapping of related information.
@@ -99,9 +95,9 @@ class ServiceAPI(MultiOpenMixin):
     '''
     with self._lock:
       state = self.sqltags['login.state']
-      if do_refresh or not state or (
-          self.API_AUTH_GRACETIME is not None
-          and time.time() + self.API_AUTH_GRACETIME >= state.expiry):
+      if do_refresh or not state or (self.API_AUTH_GRACETIME is not None
+                                     and time.time() + self.API_AUTH_GRACETIME
+                                     >= state.expiry):
         for k, v in self.login().items():
           if k not in ('id', 'name'):
             state[k] = v
@@ -130,7 +126,7 @@ class HTTPServiceAPI(ServiceAPI):
 
   def __init__(self, api_hostname=None, *, default_headers=None, **kw):
     if api_hostname is None:
-      api_hostname = self.API_HOSTNAME
+      api_hostname = type(self).API_HOSTNAME
     else:
       self.API_HOSTNAME = api_hostname
       self.API_BASE = f'https://{api_hostname}/'
@@ -147,7 +143,11 @@ class HTTPServiceAPI(ServiceAPI):
     self.cookies = session.cookies
     self.default_headers = default_headers
 
+  def __div__(self, suburl) -> URL:
+    return self.suburl(suburl)
+
   @uses_upd
+  @uses_runstate
   @require(lambda suburl: not suburl.startswith('/'))
   def suburl(
       self,
@@ -158,9 +158,10 @@ class HTTPServiceAPI(ServiceAPI):
       _no_raise_for_status=False,
       cookies=None,
       headers=None,
+      runstate: RunState,
       upd,
       **rqkw,
-  ):
+  ) -> URL:
     ''' Request `suburl` from the service, by default using a `GET`.
         The `suburl` must be a URL subpath not commencing with `'/'`.
 
@@ -184,6 +185,7 @@ class HTTPServiceAPI(ServiceAPI):
       rq_headers.update(headers)
     with upd.run_task(f'{_method} {url}'):
       for retry in range(self.API_RETRY_COUNT, 0, -1):
+        runstate.raiseif()
         try:
           rsp = pfx_call(rqm, url, cookies=cookies, headers=rq_headers, **rqkw)
           break
@@ -192,7 +194,7 @@ class HTTPServiceAPI(ServiceAPI):
             # last retry
             raise
           warning("%s: %s, retrying in %ds", url, e, self.API_RETRY_DELAY)
-          time.sleep(self.API_RETRY_DELAY)
+          runstate.sleep(self.API_RETRY_DELAY)
     if not _no_raise_for_status:
       rsp.raise_for_status()
     return rsp

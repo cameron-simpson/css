@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: attach the runstate to the options
+lib/python/cs/cmdutils.py: cs.cmdutils: tweak parameter name for clarity
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: condense the stackattrs(self) calls

@@ -1,0 +1,1 @@
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: ffmpeg_docker: set DockerRun.output_hostdir from the output file dirname

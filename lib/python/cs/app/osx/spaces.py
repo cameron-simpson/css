@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-''' Access to the display spaces.
+''' Access to the MacOS X display spaces.
 '''
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from getopt import GetoptError
 import os
 from os.path import (
@@ -11,23 +12,54 @@ from os.path import (
     exists as existspath,
     isdir as isdirpath,
     join as joinpath,
-    realpath,
 )
 from pprint import pprint
-import random
+from random import choice as random_choice
 import sys
-
-from .objc import apple, cg
+from typing import Optional
 
 from CoreFoundation import CFUUIDCreateFromString
+
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
-from cs.fs import shortpath
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
+
+from .misc import macos_version
+
+from .objc import apple, cg
+
+__version__ = '20250108-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 4 - Beta",
+        "Environment :: MacOS X",
+        "Intended Audience :: End Users/Desktop",
+        "Programming Language :: Python :: 3",
+        "Topic :: Desktop Environment",
+    ],
+    'install_requires': [
+        'cs.app.osx.misc',
+        'cs.app.osx.objc',
+        'cs.cmdutils',
+        'cs.context',
+        'cs.delta',
+        'cs.logutils',
+        'cs.pfx',
+        'pyobjc[allbindings]',
+        'typeguard',
+    ],
+    'entry_points': {
+        'console_scripts': {
+            'spaces': 'cs.app.osx.spaces:main',
+        },
+    },
+}
 
 CG = apple.CoreGraphics
 HI = apple.HIServices
@@ -58,10 +90,6 @@ class Spaces:
         This will cause it to be obtained anew.
     '''
     self.__dict__.pop('_spaces', None)
-
-  @property
-  def x(self):
-    return "X"
 
   def __getattr__(self, attr):
     if attr == '_spaces':
@@ -100,24 +128,70 @@ class Spaces:
         return i
     return None
 
+  def popindices(self, argv):
+    ''' Pop a leading spaces specification from `argv` if present,
+        return a list of the indices it represents.
+        If there is no spaces specification, return `None`.
+
+        Note that space indices count from `0`, and space numbers count from `1`.
+
+        The following spaces specifications are recognised:
+        * `.`: the current space index
+        * `*`: all the space indices
+        * a positive integer `spn`: `spn-1`
+    '''
+    space_indices = None
+    if argv:
+      arg0 = argv[0]
+      with Pfx("space# %r:", arg0):
+        if arg0 == '.':
+          argv.pop(0)
+          space_indices = [self.current_index]
+        elif arg0 == '*':
+          argv.pop(0)
+          space_indices = list(range(len(self)))
+        else:
+          try:
+            space_num = int(arg0)
+          except ValueError:
+            pass
+          else:
+            argv.pop(0)
+            if space_num < 1:
+              raise GetoptError("space# counts from 1")
+            if space_num > len(self):
+              raise GetoptError("only %d spaces" % (len(self),))
+            space_indices = (space_num - 1,)
+    return space_indices
+
   @property
   def current(self):
+    ''' The current space.
+    '''
     return self._spaces["Current Space"]
 
   @property
   def current_uuid(self):
+    ''' The UUID of the current space.
+    '''
     return self.current["uuid"]
 
   @property
   def display_uuid(self):
+    ''' The UUID of the display.
+    '''
     return self._spaces["Display Identifier"]
 
   @property
   def display_id(self):
+    ''' The display identifier of the display.
+    '''
     cfuuid = CFUUIDCreateFromString(None, self.display_uuid)
     return CG.CGSGetDisplayForUUID(cfuuid)
 
   def get_wp_config(self, space_index: int):
+    ''' Get the desktop picture configuration of the space at `space_index`.
+    '''
     space = self[space_index]
     return HI.DesktopPictureCopyDisplayForSpace(
         self.display_id, 0, space["uuid"]
@@ -125,6 +199,9 @@ class Spaces:
 
   @typechecked
   def set_wp_config(self, space_index: int, wp_config: dict):
+    ''' Set the desktop picture configuration of the space at
+        `space_index` using the `dict` `wp_config`.
+    '''
     pprint(wp_config)
     space = self[space_index]
     pfx_call(
@@ -135,6 +212,69 @@ class Spaces:
         0,
         space["uuid"],
     )
+
+  def set_wp_dirpath(
+      self,
+      space_index: int,
+      dirpath: str,
+      *,
+      random=True,
+      change_duration=5.0,
+      placement='SizeToFit',
+  ):
+    print("spaces set_wp_dirpath", space_index, dirpath)
+    images = [
+        filename for filename in os.listdir(dirpath)
+        if not filename.startswith('.') and '.' in filename
+    ]
+    if not images:
+      warning("no *.* files in %r", dirpath)
+      return 1
+    lastname = random_choice(images)
+    imagepath = abspath(joinpath(dirpath, lastname))
+    if macos_version < (14, 5):
+      # This worked before I upgraded to Sonoma, MacOS 14.5.
+      # pylint: disable=use-dict-literal
+      wp_config = dict(
+          BackgroundColor=(0, 0, 0),
+          Change='TimeInterval',
+          ChangePath=abspath(dirpath),
+          NewChangePath=abspath(dirpath),
+          ChangeTime=change_duration,
+          DynamicStyle=0,
+          ImageFilePath=imagepath,
+          NewImageFilePath=imagepath,
+          LastName=lastname,
+          Placement=placement,
+          Random=random,
+      )  # pylint: disable=use-dict-literal
+    else:
+      # MacOS Sonoma onward
+      # There's some hideous bug in the DesktopPictureSetDisplayForSpace
+      # library where it seems to see a leading home directory path
+      # and replace it with '/~' (instead of something plausible like '~'),
+      # perhaps intended for making paths track homedir moves.
+      # It turns out that providing a _relative_ path from '/'
+      # does The Right Thing. Ugh.
+      dirpath = abspath(dirpath)
+      dirpath = dirpath[1:]
+      ##rdirpath = relpath(dirpath, os.environ['HOME'])
+      ##if not rdirpath.startswith('../'):
+      ##  dirpath = rdirpath
+      wp_config = dict(
+          BackgroundColor=(0, 0, 0),
+          Change='TimeInterval',
+          ChangePath=dirpath,
+          NewChangePath=dirpath,
+          ChangeDuration=change_duration,
+          DynamicStyle=0,
+          ##ImageFilePath=imagepath,
+          ##NewImageFilePath=imagepath,
+          LastName=lastname,
+          Placement=placement,
+          Random=random,
+      )  # pylint: disable=use-dict-literal
+    self.set_wp_config(space_index, wp_config)
 
   def monitor_current(self, **kw):
     ''' Return a `cs.delta.monitor` generator for changes to the
@@ -154,13 +294,31 @@ class Spaces:
     )
 
 class SpacesCommand(BaseCommand):
+  ''' A command line implementation for manipulating spaces.
+  '''
+
+  @dataclass
+  class Options(BaseCommand.Options):
+    ''' Options for SpacesCommand.
+    '''
+    spaces: Optional[Spaces] = None
 
   @contextmanager
-  def run_context(self):
-    with super().run_context():
+  def run_context(self, **kw):
+    ''' Set `options.spaces` to a `Spaces` instnace during a command run.
+    '''
+    with super().run_context(**kw):
       options = self.options
       with stackattrs(options, spaces=Spaces()):
         yield
+
+  def cmd_current(self, argv):
+    ''' Usage: {cmd}
+          Print the current space number.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print(self.options.spaces.current_index + 1)
 
   def cmd_monitor(self, argv):
     ''' Usage: {cmd}
@@ -168,14 +326,12 @@ class SpacesCommand(BaseCommand):
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    runstate = self.options.runstate
     spaces = self.options.spaces
     for old, new, changes in monitor(
-        lambda: (spaces.forget(), dict(index=spaces.current_index))[-1],
+        lambda: (spaces.forget(), {'index': spaces.current_index})[-1],
         interval=0.1,
-        runstate=runstate,
     ):
-      print(old['index'] + 1, '->', new['index'] + 1)
+      print(old['index'] + 1, '->', new['index'] + 1, flush=True)
 
   def cmd_wp(self, argv):
     ''' Usage: {cmd} [{{.|space#|*}} [wp-path]]
@@ -185,33 +341,13 @@ class SpacesCommand(BaseCommand):
     '''
     options = self.options
     spaces = options.spaces
-    space_indices = None
     wp_path = None
+    space_indices = spaces.popindices(argv)
     if argv:
-      with Pfx("space# %r:", argv[0]):
-        if argv[0] == '.':
-          argv.pop(0)
-          space_indices = (spaces.current_index,)
-        elif argv[0] == '*':
-          argv.pop(0)
-          space_indices = list(range(len(spaces)))
-        else:
-          try:
-            space_num = int(argv[0])
-          except ValueError:
-            pass
-          else:
-            argv.pop(0)
-            if space_num < 1:
-              raise GetoptError("space# counts from 1")
-            if space_num > len(spaces):
-              raise GetoptError("only %d spaces" % (len(spaces),))
-            space_indices = (space_num - 1,)
-      if argv:
-        with Pfx("wp-path %r", argv[0]):
-          wp_path = argv.pop(0)
-          if not existspath(wp_path):
-            raise GetoptError("not a file")
+      wp_path = argv.pop(0)
+      with Pfx("wp-path %r", wp_path):
+        if not existspath(wp_path):
+          raise GetoptError("not a file")
     if argv:
       raise GetoptError("extra aguments: %r" % (argv,))
     if wp_path is None:
@@ -222,37 +358,18 @@ class SpacesCommand(BaseCommand):
         print("Space", space_num)
         for k, v in sorted(spaces.get_wp_config(space_index).items()):
           print(" ", k, "=", str(v).replace("\n", ""))
-    elif space_indices is None:
-      raise GetoptError("setting a wallpaper requires a space specification")
     else:
+      if space_indices is None:
+        space_indices = [spaces.current_index]
       for space_index in space_indices:
         with Pfx("%d <- %r", space_index + 1, wp_path):
           if isdirpath(wp_path):
-            images = [
-                filename for filename in os.listdir(wp_path)
-                if not filename.startswith('.') and '.' in filename
-            ]
-            if not images:
-              warning("no *.* files in %r", wp_path)
-              return 1
-            lastname = random.choice(images)
-            imagepath = abspath(joinpath(wp_path, lastname))
-            wp_config = dict(
-                BackgroundColor=(0, 0, 0),
-                Change='TimeInterval',
-                ChangePath=abspath(wp_path),
-                NewChangePath=abspath(wp_path),
-                ChangeTime=5,
-                DynamicStyle=0,
-                ImageFilePath=imagepath,
-                NewImageFilePath=imagepath,
-                LastName=lastname,
-                Placement='SizeToFit',
-                Random=True,
-            )
+            spaces.set_wp_dir(wp_path)
           else:
+            # pylint: disable=use-dict-literal
             wp_config = dict(ImageFilePath=abspath(wp_path),)
           spaces.set_wp_config(space_index, wp_config)
+    return 0
 
   def cmd_wpm(self, argv):
     ''' Usage: {cmd} [{{.|space#}}]
@@ -260,20 +377,22 @@ class SpacesCommand(BaseCommand):
     '''
     options = self.options
     spaces = options.spaces
-    if not argv:
+    space_indices = spaces.popindices(argv)
+    if space_indices is None:
       space_index = spaces.current_index
     else:
-      space_spec = argv.pop(0)
-      if space_spec == '.':
-        space_index = spaces.current_index
-      else:
-        space_num = int(space_spec)
-        space_index = space_num - 1
+      try:
+        space_index, = space_indices
+      except ValueError:
+        # pylint: disable=raise-missing-from
+        raise GetoptError(
+            "expected exactly one space index, got: %r" % (space_indices,)
+        )
     for old, new, changes in spaces.monitor_wp_config(
         space_index=space_index,
         runstate=options.runstate,
     ):
-      print(changes)
+      print(changes, flush=True)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

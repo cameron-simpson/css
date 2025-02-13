@@ -1,0 +1,2 @@
+TagFile.parse_tag_line: recognise dotted_identifiers directly, avoids misparsing bare "nan" as float NaN.
+Tag.parse_value: BUGFIX parse - always to the primary types first (int, float) before trying any funny extra types.

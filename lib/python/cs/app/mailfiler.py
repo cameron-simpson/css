@@ -53,9 +53,10 @@ from types import SimpleNamespace as NS
 from typing import Any, Optional
 
 from cs.app.maildb import MailDB
+from cs.cache import cachedmethod
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
-from cs.deco import cachedmethod, fmtdoc
+from cs.deco import fmtdoc
 import cs.env
 from cs.env import envsub
 from cs.excutils import LogExceptions
@@ -77,9 +78,11 @@ from cs.mailutils import (
 from cs.obj import singleton
 from cs.pfx import Pfx
 from cs.py.modules import import_module_name
+from cs.resources import RunState, uses_runstate
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked
+from cs.upd import Upd, uses_upd
 
 __version__ = '20200719-post'
 
@@ -101,16 +104,18 @@ DISTINFO = {
         'cs.excutils',
         'cs.filestate',
         'cs.fileutils',
+        'cs.fs',
         'cs.lex',
         'cs.logutils',
         'cs.mailutils',
         'cs.obj',
         'cs.pfx',
-        'cs.py.func',
         'cs.py.modules',
+        'cs.resources',
         'cs.rfc2047',
         'cs.seq',
         'cs.threads',
+        'cs.upd',
     ],
     'entry_points': {
         'console_scripts': [
@@ -162,7 +167,7 @@ class MailFilerCommand(BaseCommand):
     if opt == '-R':
       self.options.rules_pattern = val
     else:
-      raise RuntimeError("unhandled option: %s %r" % (opt, val))
+      raise NotImplementedError("unhandled option: %s %r" % (opt, val))
 
   def cmd_monitor(self, argv):
     ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
@@ -178,12 +183,10 @@ class MailFilerCommand(BaseCommand):
     options.delay = None
     options.no_remove = False
     badopts = False
-    self.popopts(
+    options.popopts(
         argv,
-        options,
         _1='justone',
         d_=('delay', int, lambda delay: delay > 0),
-        n='justone'
     )
     if badopts:
       raise GetoptError("invalid arguments")
@@ -195,8 +198,6 @@ class MailFilerCommand(BaseCommand):
         delay=options.delay,
         justone=options.justone,
         no_remove=options.no_remove,
-        runstate=options.runstate,
-        upd=self.loginfo.upd
     )
 
   def cmd_save(self, argv):
@@ -411,6 +412,8 @@ class MailFiler(NS):
       )
     return wmdir
 
+  @uses_upd
+  @uses_runstate
   def monitor(
       self,
       folders,
@@ -418,8 +421,8 @@ class MailFiler(NS):
       delay=None,
       justone=False,
       no_remove=False,
-      runstate=None,
-      upd=None,
+      runstate: RunState,
+      upd: Upd,
   ):
     ''' Monitor the specified `folders`, a list of folder spcifications.
         If `delay` is not None, poll the folders repeatedly with a

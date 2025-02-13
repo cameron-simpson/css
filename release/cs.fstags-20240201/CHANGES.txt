@@ -1,0 +1,3 @@
+lib/python/cs/fstags.py: cs.fstags: FSTags.attach_path: calling context for the attach() call
+lib/python/cs/fstags.py: cs.fstags: FSTags.attach_path: do not save the tagfile if the FSTags is open - the final close will do it
+lib/python/cs/fstags.py: cs.fstags: FSTags: implement nicer __str__ and __repr__

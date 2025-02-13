@@ -3,13 +3,21 @@
 ''' Function pipelines mediated by queues and a Later.
 '''
 
+from contextlib import contextmanager
+from enum import Enum, auto as auto_enum, unique as unique_enum
+from functools import partial
+from typing import Iterable
+
 from icontract import require
-from cs.later import DEFAULT_RETRY_DELAY
+from typeguard import typechecked
+
+from cs.later import DEFAULT_RETRY_DELAY, Later, uses_later
 from cs.logutils import debug, error
 from cs.pfx import pfx
 from cs.py.func import funcname
 from cs.queues import IterableQueue, PushQueue
 from cs.resources import MultiOpenMixin
+from cs.result import not_cancelled
 from cs.seq import TrackingCounter
 from cs.threads import bg as bg_thread
 
@@ -32,21 +40,27 @@ DISTINFO = {
     ],
 }
 
-# function signature designators, used with Later.pipeline()
-FUNC_ONE_TO_MANY = 0  # one to many: functor returns iterable
-FUNC_ONE_TO_ONE = 1  # one to one: functor returns value
-FUNC_SELECTOR = 2  # many to many, yielding item or nothing
-FUNC_MANY_TO_MANY = 3  # functor accepts all items at once
-FUNC_PIPELINE = 4  # functor is actually a pipeline, put items to it and collect asynchronously
+@unique_enum
+class StageType(Enum):
+  # func(item) returns an iterable
+  ONE_TO_MANY = auto_enum()
+  # func(item) returns a single item
+  ONE_TO_ONE = auto_enum()
+  # func(item) returns a Boolean, item is passed on or dropped
+  SELECTOR = auto_enum()
+  # func(items) returns an iterable, consuming all the incoming items
+  MANY_TO_MANY = auto_enum()
+  # a pipeline in a pipeline, a streaming many to many
+  PIPELINE = auto_enum()
 
 @pfx
-@require(lambda later: later.submittable)
+@require(lambda later: later.is_submittable())
 def pipeline(later, actions, inputs=None, outQ=None, name=None):
   ''' Construct a function pipeline to be mediated by a `Later` queue.
 
       Return: `input, output`
       where `input`` is a closeable queue on which more data items can be put
-      and `output` is an iterable from which result can be collected.
+      and `output` is an iterable from which results can be collected.
 
       Parameters:
       * `actions`: an iterable of filter functions accepting
@@ -68,7 +82,7 @@ def pipeline(later, actions, inputs=None, outQ=None, name=None):
                   [
                     ls,
                     filter_ls,
-                    ( FUNC_MANY_TO_MANY, lambda items: sorted(list(items)) ),
+                    ( StageType.MANY_TO_MANY, lambda items: sorted(list(items)) ),
                   ],
                   ('.', '..', '../..'),
                  )
@@ -94,22 +108,22 @@ def pipeline(later, actions, inputs=None, outQ=None, name=None):
   return pipeline
 
 class _PipelineStage(PushQueue):
-  ''' A _PipelineStage subclasses cs.queues.PushQueue and mediates
-      computation via a Later; it also adds some activity tracking.
+  ''' A `_PipelineStage` subclasses `cs.queues.PushQueue` and mediates
+      computation via a `Later`; it also adds some activity tracking.
 
       This represents a single stage in a Later pipeline of functions.
       We raise the pipeline's _busy counter for every item in play,
       and also raise it while the finalisation function has not run.
       This lets us inspect a pipeline for business, which we use in the
-      cs.app.pilfer termination process.
+      `cs.app.pilfer` termination process.
   '''
 
   def __init__(self, name, pipeline, functor, outQ, retry_interval=None):
-    ''' Initialise the _PipelineStage, wrapping func_iter and
+    ''' Initialise the `_PipelineStage`, wrapping func_iter and
         func_final in code to inc/dec the main pipeline _busy counter.
 
         Parameters:
-        * `name`: namefor this pipeline stage as for PushQueue.
+        * `name`: name for this pipeline stage as for `PushQueue`
         * `pipeline`: parent pipeline for this pipeline stage
         * `functor`: callable used to process items
         * `outQ`: output queue
@@ -126,10 +140,11 @@ class _PipelineStage(PushQueue):
     '''
     return self.pipeline.later.defer(functor, *a, **kw)
 
-  def defer_iterable(self, I, outQ):
-    ''' Submit an iterable `I` for processing to `outQ`.
+  @not_cancelled
+  def defer_iterable(self, it: Iterable, outQ):
+    ''' Submit an iterable `it` for processing to `outQ`.
     '''
-    return self.pipeline.later.defer_iterable(I, outQ)
+    return self.pipeline.later.defer_iterable(it, outQ)
 
 class _PipelineStageOneToOne(_PipelineStage):
 
@@ -154,17 +169,17 @@ class _PipelineStageOneToMany(_PipelineStage):
 
   def put(self, item):
     self.outQ.open()
-    # compute the iteratable
+    # compute the iterable
     LF = self.defer(self.functor, item)
 
     def notify(LF):
-      I, exc_info = LF.join()
+      it, exc_info = LF.join()
       if exc_info:
         # report exception
         error("%s.put(%r): %r", self.name, item, exc_info, stack_info=True)
         self.outQ.close()
       else:
-        self.defer_iterable(I, self.outQ)
+        self.defer_iterable(it, self.outQ)
 
     LF.notify(notify)
 
@@ -185,13 +200,13 @@ class _PipelineStageManyToMany(_PipelineStage):
     LF = self.defer(self.functor, gathered)
 
     def notify(LF):
-      I, exc_info = LF.join()
+      it, exc_info = LF.join()
       if exc_info:
         # report exception
-        error("%s.put(%r): %r", self.name, I, exc_info, stack_info=True)
+        error("%s.put(%r): %r", self.name, it, exc_info, stack_info=True)
         self.outQ.close()
       else:
-        self.defer_iterable(I, self.outQ)
+        self.defer_iterable(it, self.outQ)
       _PipelineStage.shutdown(self)
 
     LF.notify(notify)
@@ -223,21 +238,22 @@ class _PipelineStagePipeline(_PipelineStage):
     super().shutdown()
 
 class Pipeline(MultiOpenMixin):
-  ''' A Pipeline encapsulates the chain of PushQueues created by
-      a call to Later.pipeline.
+  ''' A `Pipeline` encapsulates the chain of `PushQueue`s created by
+      a call to `Later.pipeline`.
   '''
 
-  def __init__(self, name, L, actions, outQ):
-    ''' Initialise the Pipeline from `name`, Later instance `L`,
+  @uses_later
+  @typechecked
+  def __init__(self, name: str, *, later: Later, actions: Iterable, outQ):
+    ''' Initialise the Pipeline from `name`, Later instance `later`,
         list of filter functions `actions` and output queue `outQ`.
 
-        Each action is either a 2-tuple of (sig, functor) or an
+        Each action is either a 2-tuple of `(sig,functor)` or an
         object with a .sig attribute and a .functor method returning
         a callable.
     '''
-    MultiOpenMixin.__init__(self)
     self.name = name
-    self.later = L
+    self.later = later
     self.queues = [outQ]
     # counter tracking items in play
     self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
@@ -256,22 +272,21 @@ class Pipeline(MultiOpenMixin):
               funcname(functor),
           )
       )
-      if func_sig == FUNC_ONE_TO_MANY:
+      if func_sig == StageType.ONE_TO_MANY:
         PQ = _PipelineStageOneToMany(pq_name, self, functor, RHQ)
-      elif func_sig == FUNC_ONE_TO_ONE:
+      elif func_sig == StageType.ONE_TO_ONE:
         PQ = _PipelineStageOneToOne(pq_name, self, functor, RHQ)
-      elif func_sig == FUNC_SELECTOR:
+      elif func_sig == StageType.SELECTOR:
 
-        select_by = functor
-
-        def selector(item):
+        def selector(item, *, select_by):
           if select_by(item):
             yield item
 
+        selector = partial(selector, select_by=functor)
         PQ = _PipelineStageOneToMany(pq_name, self, selector, RHQ)
-      elif func_sig == FUNC_MANY_TO_MANY:
+      elif func_sig == StageType.MANY_TO_MANY:
         PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
-      elif func_sig == FUNC_PIPELINE:
+      elif func_sig == StageType.PIPELINE:
         PQ = _PipelineStagePipeline(pq_name, self, functor, RHQ)
       else:
         raise RuntimeError(
@@ -304,13 +319,11 @@ class Pipeline(MultiOpenMixin):
     '''
     return self.queues[-1]
 
-  def startup(self):
-    ''' Startup for the Pipeline, required method of MultiOpenMixin.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Startup/shutdown for the Pipeline, required method of MultiOpenMixin.
     '''
-
-  def shutdown(self):
-    ''' Close the leftmost queue in the pipeline.
-    '''
+    yield self
     self.inQ.close(enforce_final_close=True)
 
   def join(self):

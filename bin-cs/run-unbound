@@ -88,7 +88,7 @@ do  [ -d "$d/." ] || $trace $as mkdir "$d"
 done
 
 $trace $as rewriteif -d "$cf" gen-unbound.conf -u "$username" -- ${1+"$@"}
-$trace $as unbound-checkconf "$cf"
+echo SKIP $trace $as unbound-checkconf "$cf"
 
 set -- $trace unbound -d -c "$cf"
 if [ $dosudo ]

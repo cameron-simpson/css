@@ -1,0 +1,2 @@
+FSM.fsm_transitions_as_dot: new optional history_style parameter to style transitioned edges.
+FSM.fsm_as_svg: plumb optional history_style parameter.

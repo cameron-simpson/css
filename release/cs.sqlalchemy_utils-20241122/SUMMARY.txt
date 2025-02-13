@@ -1,0 +1,2 @@
+RelationProxy: __getitem__ now raises KeyError, __getattr__ now raises AttributeError.
+RelationProxy: new optional "missing" parameter to provide a callable for field values when there is no matching record in the relation.

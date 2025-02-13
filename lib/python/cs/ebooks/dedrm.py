@@ -5,38 +5,51 @@
 
     This is an experimental module aimed at making the DeDRM/noDRM
     packages run outside Calibre's plugin environment.
-    It does not yet work.
 '''
 
 from contextlib import contextmanager, redirect_stdout
-from dataclasses import dataclass, field
 from datetime import datetime
 from getopt import GetoptError
 import importlib
 import json
 import os
 from os.path import (
+    abspath,
     basename,
+    dirname,
+    exists as existspath,
     isdir as isdirpath,
+    isfile as isfilepath,
     join as joinpath,
     normpath,
     realpath,
     splitext,
 )
+from pprint import pprint
+from shutil import copyfile
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import time
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Union
+from zipfile import ZipFile
 
-from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
-from cs.deco import fmtdoc, Promotable
+from typeguard import typechecked
+
+from cs.cmdutils import popopts, qvprint
+from cs.context import contextif, stackattrs
+from cs.deco import fmtdoc
 from cs.fileutils import atomic_filename
+from cs.fs import FSPathBasedSingleton, needdir, shortpath, validate_rpath
+from cs.fstags import FSTags, uses_fstags
+from cs.hashindex import file_checksum
 from cs.lex import r, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.upd import print  # pylint: disable=redefined-builtin
+
+from .common import EBooksCommonBaseCommand
 
 DEDRM_PACKAGE_PATH_ENVVAR = 'DEDRM_PACKAGE_PATH'
 
@@ -45,49 +58,60 @@ def main(argv=None):
   '''
   return DeDRMCommand(argv).run()
 
-class DeDRMCommand(BaseCommand):
-
-  GETOPT_SPEC = 'D:'
-  USAGE_FORMAT = r'''Usage: {cmd} [-D dedrm_package_path] subcommand [args...]
-    -D  Specify the filesystem path to the DeDRM/noDRM plugin top level.
-        For example, if you had a checkout of git@github.com:noDRM/DeDRM_tools.git
-        at /path/to/DeDRM_tools--noDRM you could supply:
-        -D /path/to/DeDRM_tools--noDRM/DeDRM_plugin
-        or place that value in the $DEDRM_PACKAGE_PATH environment variable.
+class DeDRMCommand(EBooksCommonBaseCommand):
+  ''' Perform operations using the DeDRM/NoDRM package.
   '''
-
-  @dataclass
-  class Options(BaseCommand.Options):
-    dedrm_package_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
-    )
-
-  def apply_opt(self, opt, val):
-    badopt = False
-    if opt == '-D':
-      self.options.dedrm_package_path = val
-    else:
-      raise RuntimeError("unhandled option")
-    if badopt:
-      raise GetoptError("bad option value")
 
   @contextmanager
   def run_context(self):
     with super().run_context():
-      options = self.options
-      with Pfx("dedrm_package_path"):
-        dedrm_package_path = options.dedrm_package_path
-        if dedrm_package_path is None:
-          if not os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR):
-            raise GetoptError(
-                f'no ${DEDRM_PACKAGE_PATH_ENVVAR} and no -D option'
-            )
-        try:
-          options.dedrm = pfx_call(DeDRMWrapper, dedrm_package_path)
-        except ValueError as e:
-          raise GetoptError("bad dedrm_package_path: %s" % (e,))
-        options.dedrm_package_path = options.dedrm.dedrm_package_path
-      yield
+      with contextif(self.options.dedrm):
+        yield
+
+  @popopts(
+      inplace=('Replace the original with the decrypted version.'),
+      O='output_dirpath',
+  )
+  def cmd_decrypt(self, argv):
+    ''' Usage: {cmd} [--inplace] filenames...
+          Remove DRM from the specified filenames.
+          Write the decrypted contents of path/to/book.ext
+          to the file book-decrypted.ext.
+    '''
+    dedrm = self.options.dedrm
+    options = self.options
+    options.update(output_dirpath='.', inplace=False)
+    options.popopts(
+        argv,
+        O_='output_dirpath',
+        inplace=bool,
+    )
+    if options.output_dirpath is None:
+      options.output_dirpath = '.'
+    if not argv:
+      raise GetoptError("missing filenames")
+    for filename in argv:
+      with Pfx(filename):
+        if options.inplace:
+          output_filename = filename
+          exists_ok = True
+        else:
+          base, base_ext = splitext(basename(filename))
+          output_filename = normpath(
+              joinpath(
+                  realpath(options.output_dirpath),
+                  f'{base}-decrypted{base_ext}'
+              )
+          )
+          exists_ok = False
+        if not pfx_call(dedrm.decrypt, filename, output_filename,
+                        exists_ok=exists_ok):
+          # not encrypted, copy to source file
+          if not options.inplace:
+            if existspath(output_filename):
+              warning("decrypted filename already exists: %r", output_filename)
+            else:
+              copyfile(filename, output_filename)
 
   def cmd_import(self, argv):
     ''' Usage: {cmd} module_name...
@@ -123,47 +147,88 @@ class DeDRMCommand(BaseCommand):
             print("  .%r => %s" % (name, r(value)))
     return xit
 
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          List dedrm infomation.
+    '''
+    super().cmd_info(argv)
+    # TODO: recite the actual DeDRM version
+
   def cmd_kindlekeys(self, argv):
-    ''' Usage: {cmd} [import]
-          import    Read a JSON list of key dicts and update the cached keys.
+    ''' Usage: {cmd} [base|import|json|print]
+          Dump, print or import the Kindle DRM keys.
+          Modes:
+            base [-json] [filepaths...]
+                      List the kindle keys derived from the current system.
+            import    Read a JSON list of key dicts and update the cached keys.
+            json      Write the cached list of keys as JSON.
+            print     Readable listing of the cached keys.
+          The default mode is 'json'.
+          Examples:
+            Import the base keys from this system into the local collection:
+              python3 -m cs.ebooks.dedrm kindlekeys base \
+              | python3 -m cs.ebooks dedrm kindlekeys import
+            Import the keys from another host into the local collection:
+              ssh otherhost python3 -m cs.ebooks.dedrm kindlekeys json \
+              | python3 -m cs.ebooks dedrm kindlekeys import
     '''
     dedrm = self.options.dedrm
     if not argv:
-      with redirect_stdout(sys.stderr):
-        kks = dedrm.kindlekeys
-      print(json.dumps(kks))
-      return 0
+      argv = ['json']
     op = argv.pop(0)
-    if op != 'import':
-      raise GetoptError("expected 'import', got %r" % (op,))
     with Pfx(op):
-      if argv:
-        raise GetoptError("extra arguments: %r" % (argv,))
-      new_kks = json.loads(sys.stdin.read())
-      assert all(isinstance(kk, dict) for kk in new_kks)
-      dedrm.update_kindlekeys_from_keys(new_kks)
+      if op == 'base':
+        json_mode = not sys.stdout.isatty()
+        if argv and argv[0] == '-json':
+          json_mode = True
+          argv.pop(0)
+        # fetch the base system kindle keys
+        with redirect_stdout(sys.stderr):
+          new_kks = dedrm.base_kindlekeys(argv)
+        if json_mode:
+          print(json.dumps(new_kks, indent=2))
+        else:
+          for i, kk in enumerate(new_kks):
+            print(f'{i}:')
+            for k, v in sorted(kk.items()):
+              print(" ", k, v)
+      elif op == 'import':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        if sys.stdin.isatty():
+          print("Reading JSON keys from standard input.")
+        new_kks = json.loads(sys.stdin.read())
+        assert all(isinstance(kk, dict) for kk in new_kks)
+        dedrm.update_kindlekeys_from_keys(new_kks)
+      elif op == 'json':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        with redirect_stdout(sys.stderr):
+          kks = dedrm.kindlekeys
+        print(json.dumps(kks, indent=2))
+      elif op == 'print':
+        if argv:
+          raise GetoptError("extra arguments: %r" % (argv,))
+        with redirect_stdout(sys.stderr):
+          kks = dedrm.kindlekeys
+        for kk in kks:
+          pprint(kk)
+      else:
+        raise GetoptError("expected 'import' or 'print', got %r" % (op,))
 
-  def cmd_remove(self, argv):
-    ''' Usage: {cmd} filenames...
-          Remove DRM from the specified filenames.
-    '''
-    dedrm = self.options.dedrm
-    exists_ok = False
-    output_dirpath = '.'
-    # TODO: -f exists_ok -O output_dirpath
-    if not argv:
-      raise GetoptError("missing filenames")
-    for filename in argv:
-      with Pfx(filename):
-        output_filename = normpath(
-            joinpath(
-                realpath(output_dirpath), 'decrypted-' + basename(filename)
-            )
-        )
-        pfx_call(dedrm.remove, filename, output_filename, exists_ok=exists_ok)
-
-class DeDRMWrapper(Promotable):
+@fmtdoc
+class DeDRMWrapper(FSPathBasedSingleton, MultiOpenMixin):
   ''' Class embodying the DeDRM/noDRM package actions.
+
+      This accepts the path to a checkout of the
+      git@github.com:noDRM/DeDRM_tools.git source repositiory or
+      the path to a DeDRM plugins zipfile as would be installed in
+      a Calibre plugin directory.
+
+      If not specified, the environment variable
+      `${DEDRM_PACKAGE_PATH_ENVVAR}` is consulted.
+      If absent, this looks for the plugin zipfile in the local
+      Calibre install.
   '''
 
   # The package name to use for the DeDRM/noDRM package.
@@ -173,12 +238,25 @@ class DeDRMWrapper(Promotable):
   DEDRM_PLUGIN_NAME = 'DeDRM'
   DEDRM_PLUGIN_VERSION = '7.2.1'
 
+  # used to locate the plugin zip fil inside a CalibreTree
+  DEDRM_PLUGIN_ZIPFILE_NAME = 'DeDRM_plugin.zip'
+
+  @classmethod
+  @fmtdoc
+  def FSPATH_DEFAULT(cls):
+    ''' Called for the default `DeDRMWrapper` filesystem path
+        if unspecified and no `${DEDRM_PACKAGE_PATH_ENVVAR}` environment
+        variable.
+    '''
+    return cls.get_package_path()
+
   @pfx_method
   @fmtdoc
+  @typechecked
   def __init__(
       self,
-      dedrm_package_path: Optional[str] = None,
-      sqltags: Optional[SQLTags] = None
+      dedrm_package_path: str,
+      sqltags: Optional[SQLTags] = None,
   ):
     ''' Initialise the DeDRM package.
 
@@ -190,64 +268,113 @@ class DeDRMWrapper(Promotable):
           under the `self.DEDRM_PACKAGE_NAME.` prefix;
           default from `SQLTags()`
     '''
-    with Pfx("dedrm_package_path %r", dedrm_package_path):
+    if hasattr(self, 'fspath'):
+      # we're already set up
+      return
+    if not existspath(dedrm_package_path):
+      raise ValueError(
+          f'dedrm_package_path does not exist: {dedrm_package_path!r}'
+      )
+    self.fspath = dedrm_package_path
+    self.sqltags = sqltags or SQLTags()
+
+  @classmethod
+  @fmtdoc
+  def get_package_path(
+      cls,
+      dedrm_package_path: str = None,
+      calibre: Optional[Union[str, "CalibreTree"]] = None,
+  ) -> str:
+    ''' Return the filesystem path of the DeDRM/noDRM package to use.
+        If the supplied `dedrm_package_path` is `None`,
+        obtain the path from ${DEDRM_PACKAGE_PATH_ENVVAR}.
+    '''
+    if dedrm_package_path is None:
+      dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
       if dedrm_package_path is None:
-        dedrm_package_path = os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
-        if dedrm_package_path is None:
+        from .calibre import CalibreTree
+        calibre = CalibreTree.promote(calibre)
+        dedrm_package_path = joinpath(
+            calibre.plugins_dirpath, cls.DEDRM_PLUGIN_ZIPFILE_NAME
+        )
+        if not isfilepath(dedrm_package_path):
           raise ValueError(
-              f'no dedrm_package_path and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
+              'no dedrm_package_path'
+              f' and no ${DEDRM_PACKAGE_PATH_ENVVAR}'
+              f' and no {shortpath(dedrm_package_path)!r}'
           )
-        with Pfx('$%s=%r', DEDRM_PACKAGE_PATH_ENVVAR, dedrm_package_path):
-          self.__init__(dedrm_package_path, sqltags=sqltags)
-          return
-      if not isdirpath(dedrm_package_path):
-        raise ValueError("not a directory")
-      if not isdirpath(joinpath(dedrm_package_path, 'standalone')):
-        raise ValueError("no \"standalone\" subdirectory")
-      self.dedrm_package_path = dedrm_package_path
-      dedrm_DeDRM = self.import_name(self.DEDRM_PACKAGE_NAME, 'DeDRM')
-
-      class CSEBookDeDRM(DeDRMOverride, dedrm_DeDRM):
-        ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
-            using overrides from `DeDRMOverride`.
-        '''
-        alfdir = dedrm_package_path
-
-      self.dedrm = CSEBookDeDRM()
-    with self.dedrm_imports():
-      kindlekey = self.import_name('kindlekey')
-      # monkey patch the kindlekey.kindlekeys function
-      self.base_kindlekeys = kindlekey.kindlekeys
-      kindlekey.kindlekeys = self.cached_kindlekeys
-      # monkey patch the kindlekey.CryptUnprotectData class
-      BaseCryptUnprotectData = kindlekey.CryptUnprotectData
-      LibCrypto = getLibCrypto()
-
-      class CryptUnprotectData(BaseCryptUnprotectData):
-
-        def __init__(self, *args):
-          self.crp = LibCrypto()
-          super().__init__(*args)
-
-      kindlekey.CryptUnprotectData = CryptUnprotectData
-    if sqltags is None:
-      sqltags = SQLTags()
-    self.tags = sqltags.subdomain(f'{self.DEDRM_PACKAGE_NAME}')
+      qvprint(f'${DEDRM_PACKAGE_PATH_ENVVAR} -> {dedrm_package_path!r}')
+    else:
+      dedrm_package_path = abspath(dedrm_package_path)
+    if not existspath(dedrm_package_path):
+      raise ValueError(
+          f'dedrm_package_path:{dedrm_package_path!r} does not exist'
+      )
+    return dedrm_package_path
 
   @contextmanager
-  def dedrm_imports(self):
-    ''' Context manager to run some code with `self.dedrm_package_path`
-        prepended to `sys.path` for import purposes.
+  def startup_shutdown(self):
+    # prepare the shim modules
+    with TemporaryDirectory(prefix='dedrm_shim_lib--') as shimlib_dirpath:
+      self.prepare_dedrm_shims(shimlib_dirpath)
+      with stackattrs(self, shimlib_dirpath=shimlib_dirpath):
+        dedrm_DeDRM = self.import_name(self.DEDRM_PACKAGE_NAME, 'DeDRM')
+        dedrm_DeDRMError = self.import_name(
+            self.DEDRM_PACKAGE_NAME, 'DeDRMError'
+        )
 
-        This also crafts some stub modules to convince the plugin
-        to run by providing some things normally provided by the
-        Calibre plugin environment.
+        class CSEBookDeDRM(DeDRMOverride, dedrm_DeDRM):
+          ''' Our wrapper for the DeDRM/noDRM `DeDRM` class
+              using overrides from `DeDRMOverride`.
+          '''
+          alfdir = self.fspath
+
+        with stackattrs(
+            self,
+            dedrm=CSEBookDeDRM(),
+            DeDRMError=dedrm_DeDRMError,
+        ):
+          with self.dedrm_imports():
+            kindlekey = self.import_name('kindlekey')
+            ##kindlekey = self.import_name('kindlekey', package=__package__)
+            # monkey patch the kindlekey.kindlekeys function
+            if not hasattr(self, 'base_kindlekeys'):
+              # we only do this once!
+              self.base_kindlekeys = kindlekey.kindlekeys
+              kindlekey.kindlekeys = self.cached_kindlekeys
+              # monkey patch the kindlekey.CryptUnprotectData class
+              BaseCryptUnprotectData = kindlekey.CryptUnprotectData
+              LibCrypto = getLibCrypto()
+
+              class CryptUnprotectData(BaseCryptUnprotectData):
+
+                def __init__(self, *args):
+                  self.crp = LibCrypto()
+                  super().__init__(*args)
+
+              kindlekey.CryptUnprotectData = CryptUnprotectData
+            with self.sqltags:
+              with stackattrs(
+                  self,
+                  tags=self.sqltags.subdomain(f'{self.DEDRM_PACKAGE_NAME}'),
+              ):
+                yield
+
+  @pfx_method
+  def prepare_dedrm_shims(self, libdirpath):
+    ''' Create `__version` and `prefs` stub modules in `libdirpath`
+        to support the `import_name` method.
+
+        The stub modules to convince the plugin to run by providing
+        some things normally provided by the Calibre plugin
+        environment.
     '''
 
     def write_module(name, contents):
       ''' Write Python code `contents` to a top level module named `name`.
       '''
-      module_path = joinpath(tmpdirpath, f'{name}.py')
+      module_path = joinpath(libdirpath, f'{name}.py')
+      qvprint("DeDRM: write module", module_path)
       with pfx_call(open, module_path, 'w') as pyf:
         print(
             stripped_dedent(
@@ -259,65 +386,105 @@ class DeDRMWrapper(Promotable):
                 #
                 '''
             ),
-            file=pyf
+            file=pyf,
         )
         print(stripped_dedent(contents), file=pyf)
       ##os.system(f'set -x; cat {module_path}')
 
-    with TemporaryDirectory(prefix='dedrm_lib') as tmpdirpath:
-      # present the dedrm package as DEDRM_PACKAGE_NAME ('dedrm')
-      os.symlink(
-          self.dedrm_package_path,
-          joinpath(tmpdirpath, self.DEDRM_PACKAGE_NAME)
-      )
-      # fake up __version.py
-      write_module(
-          '__version',
-          f'''
-          PLUGIN_NAME = {self.DEDRM_PLUGIN_NAME!r}
-          PLUGIN_VERSION = {self.DEDRM_PLUGIN_VERSION!r}
-          PLUGIN_VERSION_TUPLE = {tuple(map(int, self.DEDRM_PLUGIN_VERSION.split('.')))!r}
-        ''',
-      )
-      # fake up prefs.DeDRM_Prefs()
-      write_module(
-          'prefs',
-          f'''
-          import os
-          import {self.DEDRM_PACKAGE_NAME}.prefs
-          from {self.DEDRM_PACKAGE_NAME}.prefs import DeDRM_Prefs as BaseDeDRM_Prefs
-          from {self.DEDRM_PACKAGE_NAME}.standalone.jsonconfig import JSONConfig as BaseJSONConfig
-          from cs.ebooks.dedrm import DeDRM_PrefsOverride
-          from cs.gimmicks import warning
-          class DeDRM_Prefs(DeDRM_PrefsOverride, BaseDeDRM_Prefs):
-            def __init__(self, json_path=None):
-              if json_path is not None:
-                warning(
-                    "DeDRM_Prefs: ignoring json_path=%r, using %r", json_path,
-                    os.devnull
-                )
-              BaseDeDRM_Prefs.__init__(self, json_path=os.devnull)
-          class JSONConfig(BaseJSONConfig):
-            def __init__(self, rel_path_to_cf_file):
-              super().__init__(rel_path_to_cf_file)
+    # present the dedrm package as DEDRM_PACKAGE_NAME ('dedrm')
+    dedrm_pkg_path = joinpath(libdirpath, self.DEDRM_PACKAGE_NAME)
+    if isdirpath(self.fspath):
+      # symlink to the source tree
+      pfx_call(os.symlink, self.fspath, dedrm_pkg_path)
+    else:
+      # unpack the plugin zip file
+      qvprint("unpack", self.fspath)
+      pfx_call(os.mkdir, dedrm_pkg_path)
+      with Pfx("unzip %r", self.fspath):
+        with ZipFile(self.fspath) as zipf:
+          for member in zipf.namelist():
+            if member.endswith('/'):
+              qvprint("skip", member)
+              continue
+            with Pfx(member):
+              validate_rpath(member)
+              path = joinpath(dedrm_pkg_path, member)
+              pathdir = dirname(path)
+              needdir(pathdir)
+              pfx_call(zipf.extract, member, dedrm_pkg_path)
+    # fake up __version.py
+    write_module(
+        '__version',
+        f'''
+        PLUGIN_NAME = {self.DEDRM_PLUGIN_NAME!r}
+        PLUGIN_VERSION = {self.DEDRM_PLUGIN_VERSION!r}
+        PLUGIN_VERSION_TUPLE = {tuple(map(int, self.DEDRM_PLUGIN_VERSION.split('.')))!r}
+      ''',
+    )
+    # fake up prefs.DeDRM_Prefs()
+    write_module(
+        'prefs',
+        f'''
+        import os
+        import {self.DEDRM_PACKAGE_NAME}.prefs
+        from {self.DEDRM_PACKAGE_NAME}.prefs import DeDRM_Prefs as BaseDeDRM_Prefs
+        from {self.DEDRM_PACKAGE_NAME}.standalone.jsonconfig import JSONConfig as BaseJSONConfig
+        from cs.ebooks.dedrm import DeDRM_PrefsOverride
+        from cs.gimmicks import debug
+        class DeDRM_Prefs(DeDRM_PrefsOverride, BaseDeDRM_Prefs):
+          def __init__(self, json_path=None):
+            if json_path is not None:
               warning(
-                  "JSONConfig: replacing file_path=%r with %r",
-                  self.file_path,
+                  "DeDRM_Prefs: ignoring json_path=%r, using %r", json_path,
                   os.devnull
               )
-              self.file_path = os.devnull
-          {self.DEDRM_PACKAGE_NAME}.prefs.JSONConfig = JSONConfig
-          ''',
-      )
-      with stackattrs(
-          sys,
-          path=[tmpdirpath, joinpath(tmpdirpath, self.DEDRM_PACKAGE_NAME)] +
-          sys.path):
-        import builtins
-        with stackattrs(builtins, print=print):
-          with redirect_stdout(sys.stderr):
-            import prefs  # imported for its side effect
-            yield
+            BaseDeDRM_Prefs.__init__(self, json_path=os.devnull)
+        class JSONConfig(BaseJSONConfig):
+          def __init__(self, rel_path_to_cf_file):
+            super().__init__(rel_path_to_cf_file)
+            debug(
+                "JSONConfig: replacing file_path=%r with %r",
+                self.file_path,
+                os.devnull
+            )
+            self.file_path = os.devnull
+        {self.DEDRM_PACKAGE_NAME}.prefs.JSONConfig = JSONConfig
+        ''',
+    )
+
+  @contextmanager
+  def dedrm_imports(self):
+    ''' A context manager to run some code with `self.shimlib_dirpath`
+        and {self.shimlib_dirpath}/{self.DEDRM_PACKAGE_NAME}
+        prepended to `sys.path` for import purposes.
+
+        This lets us import our generated stub modules and the DeDRM packages.
+    '''
+    with stackattrs(
+        sys,
+        path=[
+            # shims first
+            self.shimlib_dirpath,
+            # then the dedrm package itself, since it directly imports
+            # with absolute names like "kindlekeys"
+            joinpath(self.shimlib_dirpath, self.DEDRM_PACKAGE_NAME),
+        ] + sys.path + [
+            # dedrm/standalone/__init__.py self inserts its directory
+            # at the start of the path if it isn't already somewhere
+            # in sys.path (this is bad)
+            # https://github.com/noDRM/DeDRM_tools/issues/653
+            joinpath(self.shimlib_dirpath, self.DEDRM_PACKAGE_NAME,
+                     'standalone'),
+        ],
+    ):
+      # the DeDRM code is amazingly noisy to stdout
+      # so we intercept print and redirect stdout to stderr
+      # pylint: disable=import-outside-toplevel
+      import builtins
+      with stackattrs(builtins, print=qvprint):
+        with redirect_stdout(sys.stderr):
+          # pylint: disable=import-outside-toplevel
+          yield
 
   def import_name(self, module_name, name=None, *, package=None):
     ''' Shim for `importlib.import_module` to import from the DeDRM/noDRM package.
@@ -331,58 +498,120 @@ class DeDRMWrapper(Promotable):
         If `name` is omitted, return the imported module.
         Otherwise return the value of `name` from the imported module.
     '''
-    with self.dedrm_imports():
-      M = pfx_call(importlib.import_module, module_name, package=package)
-      if name is None:
-        return M
-      return pfx_call(getattr, M, name)
+    with self:  # just in case the caller hasn't done this
+      with self.dedrm_imports():
+        M = pfx_call(importlib.import_module, module_name, package=package)
+        if name is None:
+          return M
+        return pfx_call(getattr, M, name)
 
-  def remove(self, srcpath, dstpath, exists_ok=False):
+  @uses_fstags
+  @pfx_method
+  def decrypt(
+      self,
+      srcpath,
+      dstpath,
+      *,
+      fstags: FSTags,
+      booktype=None,
+      exists_ok=False,
+      obok_lib=None,
+  ):
     ''' Remove the DRM from `srcpath`, writing the resulting file to `dstpath`.
+        Return `True` if `srcpath` was decrypted into `dstpath`.
+        Return `False` if `srcpath` was not encrypted; `dstpath` will not be created.
+
+        A file may be decrypted in place by supplying the same path
+        for `srcpath` and `dstpath` and `exists_ok=True`.
 
         Parameters:
+        * `booktype`: specify the book type of `srcpath`
         * `exists_ok`: if true then `dstpath` may already exist; default `False`
     '''
+    if booktype is None:
+      # infer book type from file extension
+      booktype = splitext(basename(srcpath))[1][1:].lower()
+      if booktype == '':
+        # Kobo kepub files inside the "kepub" directory
+        if basename(dirname(srcpath)).lower() == 'kepub':
+          booktype = 'kepub'
+      if not booktype:
+        raise ValueError("cannot infer book type")
     with atomic_filename(dstpath, exists_ok=exists_ok) as T:
-      dedrm = self.dedrm
-      # monkey patch temporary_file method to return tmpfilename
-      with stackattrs(dedrm, temporary_file=lambda ext: T):
-        with self.dedrm_imports():
-          dedrm.starttime = time.time()
-          # infer book type from file extension
-          booktype = splitext(basename(srcpath))[1][1:].lower()
-          if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3', 'azw4',
-                          'tpz', 'kfx-zip']:
-            # Kindle/Mobipocket
-            decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
-          elif booktype == 'pdb':
-            # eReader
-            decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
-          elif booktype == 'pdf':
-            # Adobe PDF (hopefully) or LCP PDF
-            decrypted_ebook = dedrm.PDFDecrypt(srcpath)
-          elif booktype == 'epub':
-            # Adobe Adept, PassHash (B&N) or LCP ePub
-            decrypted_ebook = dedrm.ePubDecrypt(srcpath)
-          else:
-            raise ValueError(
-                "cannot decrypt %r, unhandle book type %r" %
-                (srcpath, booktype)
-            )
-          assert decrypted_ebook == T.name
+      if booktype == 'kepub':
+        from .kobo import import_obok, decrypt_obok
+        obok = import_obok()
+        if obok_lib is None:
+          from .kobo import default_kobo_library  # pylint: disable=import-outside-toplevel
+          obok_lib = obok.KoboLibrary(desktopkobodir=default_kobo_library())
+          need_close_lib = True
+        else:
+          need_close_lib = False
+        # pylint: disable=protected-access
+        obok_book = obok.KoboBook(
+            basename(srcpath), srcpath, srcpath, 'kepub', obok_lib.__cursor
+        )
+        decrypt_obok(obok_lib, obok_book, T.name, exists_ok=True)
+        if need_close_lib:
+          obok_lib.close()
+      else:
+        dedrm = self.dedrm
+
+        # have T.close() just flush the file content to the filesystem
+        with stackattrs(T, close=lambda: T.flush()):
+          # monkey patch temporary_file method to return tmpfilename
+          def dedrem_temporaryfile(fext):
+            return T
+
+          with stackattrs(dedrm, temporary_file=dedrem_temporaryfile):
+            with self.dedrm_imports():
+              dedrm.starttime = time.time()
+              if booktype in ['prc', 'mobi', 'pobi', 'azw', 'azw1', 'azw3',
+                              'azw4', 'tpz', 'kfx-zip']:
+                # Kindle/Mobipocket
+                decrypted_ebook = dedrm.KindleMobiDecrypt(srcpath)
+              elif booktype == 'pdb':
+                # eReader
+                decrypted_ebook = dedrm.eReaderDecrypt(srcpath)
+              elif booktype == 'pdf':
+                # Adobe PDF (hopefully) or LCP PDF
+                decrypted_ebook = dedrm.PDFDecrypt(srcpath)
+              elif booktype == 'epub':
+                # Adobe Adept, PassHash (B&N) or LCP ePub
+                decrypted_ebook = dedrm.ePubDecrypt(srcpath)
+              else:
+                raise ValueError(
+                    "cannot decrypt %r, unhandled book type %r" %
+                    (srcpath, booktype)
+                )
+              if decrypted_ebook == srcpath:
+                qvprint("srcpath is already decrypted")
+                pfx_call(os.remove, T.name)
+                return False
+              if file_checksum(srcpath) == file_checksum(decrypted_ebook):
+                qvprint("srcpath content is unchanged by decryption")
+                pfx_call(os.remove, T.name)
+                return False
+    # copy tags from the srcpath to the dstpath
+    fstags[dstpath].update(fstags[srcpath])
+    return True
 
   @contextmanager
-  def removed(self, srcpath):
-    ''' Context manager to produce a deDRMed copy of `srcpath`,
-        yielding the temporary file containing the copy.
+  def decrypted(self, srcpath, **decrypt_kw):
+    ''' A context manager to produce a deDRMed copy of `srcpath`,
+        yielding the temporary file containing the copy;
+        if `srcpath` is not decrypted this context manager yields `None`.
+        Keyword arguments are passed through to `DeDRMWrapper.decrypt`.
     '''
     srcext = splitext(basename(srcpath))[1]
     with NamedTemporaryFile(
         prefix=f'.{self.__class__.__name__}-',
         suffix=srcext,
     ) as T:
-      self.remove(srcpath, T.name, exists_ok=True)
-      yield T.name
+      yield (
+          T.name if
+          self.decrypt(srcpath, T.name, exists_ok=True, **decrypt_kw) else None
+      )
 
   @property
   def kindlekeys(self) -> List[dict]:
@@ -425,18 +654,6 @@ class DeDRMWrapper(Promotable):
     kk_tags['cache'] = kks
     return kks
 
-  @classmethod
-  def promote(cls, obj) -> "DeDRMWrapper":
-    ''' Promote an object to a `DeDRMWrapper`.
-
-        If `obj` is `None` or a `str` return `DeDRMWrapper(dedrm_package_path=obj)`.
-    '''
-    if isinstance(obj, cls):
-      return obj
-    if obj is None or isinstance(obj, str):
-      return cls(dedrm_package_path=obj)
-    raise TypeError("%s.promote: cannot promote %s", cls.__name__, r(obj))
-
 class DeDRMOverride:
   ''' A collection of override methods from the DeDRM/noDRM `DeDRM` class
       which we use to make it work outside the calibre plugin stuff.
@@ -448,8 +665,8 @@ class DeDRM_PrefsOverride:
 
 def getLibCrypto():
   ''' The OSX `LibCrypto` implementation as an experiment,
-        copied from `Other_Tools/DRM_Key_Scripts/Kindle_for_Mac_and_PC/kindlekey.pyw`.
-    '''
+      copied from `Other_Tools/DRM_Key_Scripts/Kindle_for_Mac_and_PC/kindlekey.pyw`.
+  '''
 
   class DrmException(Exception):
     ''' Really DeDRM/noDRM needs this in `__init__`, but instead
@@ -459,10 +676,19 @@ def getLibCrypto():
     pass
 
   # interface to needed routines in openssl's libcrypto
+  #
+  # Note that this started crashing with:
+  #   WARNING: /Users/cameron/tmp/venv--css-ebooks--apple.x86_64.darwin/bin/python3 is loading libcrypto in an unsafe way
+  #   [1]    85172 abort      env-dev python3 -m cs.ebooks kindle
+  # resolved by:
+  #   CSS[~/hg/css-ebooks(hg:ebooks)]fleet2*> cd /usr/local/lib
+  #   [/usr/local/lib]fleet2*> ln -s ~/var/homebrew/lib/libcrypto.* .
+  #   + exec ln -s /Users/cameron/var/homebrew/lib/libcrypto.3.dylib /Users/cameron/var/homebrew/lib/libcrypto.a /Users/cameron/var/homebrew/lib/libcrypto.dylib .
+  #
   def _load_crypto_libcrypto():
     from ctypes import (
-        CDLL, byref, POINTER, c_void_p, c_char_p, c_int, c_long, Structure,
-        c_ulong, create_string_buffer, addressof, string_at, cast
+        CDLL, POINTER, c_char_p, c_int, c_long, Structure, c_ulong,
+        create_string_buffer
     )
     from ctypes.util import find_library
 
@@ -536,8 +762,8 @@ def getLibCrypto():
 
       def set_decrypt_key(self, userkey, iv):
         self._blocksize = len(userkey)
-        if (self._blocksize != 16) and (self._blocksize !=
-                                        24) and (self._blocksize != 32):
+        if (self._blocksize != 16) and (self._blocksize
+                                        != 24) and (self._blocksize != 32):
           raise DrmException(u"AES improper key used")
           return
         keyctx = self._keyctx = AES_KEY()

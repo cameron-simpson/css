@@ -1,9 +1,9 @@
 #!/bin/sh
 #
-# Prepare an account for port forwarding.
-# Generate batch keys.
-# Emit public keys.
-# - Cameron Simpson <cs@cskk.id.au> 22jul2023
+# Prepare ssh keys for port forwarding or other batch ssh key use:
+# - Generate batch keys.
+# - Emit public keys.
+# Cameron Simpson <cs@cskk.id.au> 22jul2023
 #
 
 set -ue

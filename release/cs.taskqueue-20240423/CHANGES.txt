@@ -1,0 +1,1 @@
+lib/python/cs/taskqueue.py: cs.taskqueue: BaseTask.__init__: fix call to RunStateMixin.__init__; Task.__init__: fix init of omitted name parameter; shuffle @require and @typechecked

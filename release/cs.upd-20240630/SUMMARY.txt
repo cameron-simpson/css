@@ -1,0 +1,2 @@
+@without is now a decorator, rename old context manager to above.
+Bugfix @without and above() for when there is no current Upd instance.

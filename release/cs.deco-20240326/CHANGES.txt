@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.hashindex: default_params: update wrapper signature to mark the defaulted params as optional
+lib/python/cs/deco.py: cs.deco: default_params: fix reference to param_default, tidy imports

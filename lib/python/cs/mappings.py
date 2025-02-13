@@ -16,22 +16,24 @@
 
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
+from collections.abc import MutableMapping
 from contextlib import contextmanager
-from functools import partial
+from functools import cached_property, partial
 from inspect import isclass
 import json
 import re
 from threading import RLock
+from typing import Any, Callable
 from uuid import UUID, uuid4
 
-from cs.deco import strable
+from cs.deco import decorator, OBSOLETE, strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20230612-post'
+__version__ = '20231129-post'
 
 DISTINFO = {
     'description':
@@ -129,6 +131,7 @@ def named_row_tuple(
     attr_seq = Seq(start=1)
     mapping = column_map
 
+    # pylint: disable=function-redefined
     def column_map(raw_column_name):
       ''' Function to map raw column names to the values in the
           supplied mapping.
@@ -654,6 +657,23 @@ class MethodicalList(AttributableList):
           submethods.append(submethod)
     return MethodicalList(method() for method in submethods)
 
+class missingdict(dict):
+  ''' A little like `collections.defaultdict` but the factory
+      function accepts the key of the missing item.
+  '''
+
+  def __init__(self, missing: Callable[[Any], Any]):
+    ''' Initialise the dict. `missing` is a callable accepting a
+        key and returning the corresponding key, which is also stored
+        in the dict.
+    '''
+    self.__missing = missing
+
+  def __missing__(self, key):
+    value = self.__missing(key)
+    self[key] = value
+    return value
+
 class FallbackDict(defaultdict):
   ''' A dictlike object that inherits from another dictlike object;
       this is a convenience subclass of `defaultdict`.
@@ -670,8 +690,11 @@ class FallbackDict(defaultdict):
       return self.__otherdict[key]
     raise KeyError(key)
 
+@OBSOLETE('collections.ChainMap')
 class MappingChain(object):
   ''' A mapping interface to a sequence of mappings.
+
+      OBSOLETE: use collections.ChainMap instead.
 
       It does not support `__setitem__` at present;
       that is expected to be managed via the backing mappings.
@@ -1022,8 +1045,9 @@ class AttrableMappingMixin(object):
     try:
       return self[attr]
     except KeyError:
+      cls = type(self)
       try:
-        return self.ATTRABLE_MAPPING_DEFAULT
+        return cls.ATTRABLE_MAPPING_DEFAULT
       except AttributeError:
         names_msgs = []
         ks = list(self.keys())
@@ -1380,7 +1404,6 @@ class RemappedMappingProxy:
   def key(self, subk):
     ''' Return the external key for `subk`.
     '''
-    X("%s.key(subk=%r)...", self.__class__.__name__, subk)
     try:
       k = self._mapped_subkeys[subk]
     except KeyError:
@@ -1563,3 +1586,82 @@ StrKeyedDefaultDict = TypedKeyClass(
 UUIDKeyedDefaultDict = TypedKeyClass(
     UUID, defaultdict, name='UUIDKeyedDefaultDict'
 )
+
+@decorator
+def mapped_property(method, cached=True):
+  ''' A decorator for methods which present a mapping derived from `func`.
+
+      The optional decorator parameter `cached=True` causes computed
+      values to be cached if true.
+      If false then the mapping methods other than `__getitem__` and `get`
+      raise `NotImplementedError`.
+
+      Example:
+
+          class Piper:
+
+              def __init__(self, pipe_specs):
+                  self.pipe_specs = pipe_specs
+
+              def makepipe(self, pipe_spec):
+                  return a pipeline ...
+
+              @mapped_property
+              def pipes(self, pipe_name):
+                  return self.makepipe(pipe_name)
+
+          P = Piper({'pipe1': 'specification'})
+          pipe = P.pipes[pipe_name]
+
+  '''
+
+  class MappedProperty(MutableMapping):
+    ''' A mapping of keys to computed values.
+    '''
+
+    def __init__(self, myself):
+      self.myself = myself
+      self.cache = {} if cached else None
+
+    def __iter__(self):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      return iter(cache)
+
+    def __len__(self):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      return len(cache)
+
+    def __getitem__(self, key):
+      cache = self.cache
+      if cache is None:
+        return method(self.myself, key)
+      try:
+        return cache[key]
+      except KeyError:
+        value = method(self.myself, key)
+        cache[key] = value
+        return value
+
+    def __setitem__(self, key, value):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      cache[key] = value
+
+    def __delitem__(self, key):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      del cache[key]
+
+    def keys(self):
+      cache = self.cache
+      if cache is None:
+        raise NotImplementedError
+      return cache.keys()
+
+  return cached_property(lambda self: MappedProperty(self))

@@ -65,7 +65,7 @@ from cs.psutils import (
     remove_pidfile,
     signal_handlers,
 )
-from cs.sh import quotecmd
+from cs.sh import quoteargv
 
 __version__ = '20221228-post'
 
@@ -89,7 +89,9 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': ['svcd = cs.app.svcd:main'],
+        'console_scripts': {
+            'svcd': 'cs.app.svcd:main'
+        },
     },
 }
 
@@ -101,6 +103,10 @@ def main(argv=None):
 class SvcDCommand(BaseCommand):
   ''' Implementation of `SvcD` command line mode.
   '''
+
+  USAGE_KEYWORDS = {
+      'VARRUN': VARRUN,
+  }
 
   def disable(self, argv):
     ''' {cmd} disable names...
@@ -252,7 +258,7 @@ class SvcDCommand(BaseCommand):
         elif opt == '-x':
           trace = True
         else:
-          raise RuntimeError("unhandled option")
+          raise NotImplementedError("unhandled option")
     if not argv:
       warning("missing command")
     if name is None:
@@ -270,7 +276,7 @@ class SvcDCommand(BaseCommand):
       def sig_func():
         argv = ['sh', ('-xc' if trace else '-c'), sig_shcmd]
         if test_uid != uid:
-          su_shcmd = 'exec ' + quotecmd(argv)
+          su_shcmd = 'exec ' + quoteargv(argv)
           if trace:
             su_shcmd = 'set -x; ' + su_shcmd
           argv = ['su', test_username, '-c', su_shcmd]
@@ -290,14 +296,14 @@ class SvcDCommand(BaseCommand):
         with Pfx("main.test_func: shcmd=%r", test_shcmd):
           argv = ['sh', '-c', test_shcmd]
           if test_uid != uid:
-            argv = ['su', test_username, 'exec ' + quotecmd(argv)]
+            argv = ['su', test_username, 'exec ' + quoteargv(argv)]
           shcmd_ok = callproc(argv, stdin=DEVNULL) == 0
           if not quiet:
             info("exit status != 0")
           return shcmd_ok
 
     if run_uid != uid:
-      argv = ['su', run_username, 'exec ' + quotecmd(argv)]
+      argv = ['su', run_username, 'exec ' + quoteargv(argv)]
     if use_lock:
       argv = ['lock', '--', 'svcd-' + name] + argv
     S = SvcD(
@@ -381,6 +387,7 @@ class SvcD(FlaggedMixin, object):
       self,
       *argv,
       name=None,
+      pre_argv=(),
       environ=None,
       flags=None,
       group_name=None,
@@ -426,7 +433,7 @@ class SvcD(FlaggedMixin, object):
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if flags is None:
-      flags = Flags(environ=environ, debug=trace)
+      flags = Flags(environ=environ)  ##, debug=trace)
     if group_name is None:
       group_name = "SVCD " + name
     if test_flags is None:
@@ -437,6 +444,7 @@ class SvcD(FlaggedMixin, object):
       restart_delay = self.RESTART_DELAY
     FlaggedMixin.__init__(self, flags=flags)
     self.argv = argv
+    self.pre_argv = pre_argv
     self.name = name
     self.group_name = group_name
     self.test_flags = test_flags
@@ -529,7 +537,7 @@ class SvcD(FlaggedMixin, object):
     if self.subp is not None:
       raise RuntimeError("already running")
     self.dbg("%s: spawn %r", self.name, self.argv)
-    self.subp = LockedPopen(self.argv, stdin=DEVNULL)
+    self.subp = LockedPopen([*self.pre_argv, *self.argv], stdin=DEVNULL)
     self.flag_running = True
     self.alert('STARTED')
     if self.pidfile is not None:

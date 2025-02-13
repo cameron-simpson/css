@@ -1,0 +1,10 @@
+lib/python/cs/urlutils.py: sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace
+lib/python/cs/urlutils.py: cs.urlutils: clean some lint
+lib/python/cs/urlutils.py: cs.urlutils: fix spelling of @property
+lib/python/cs/urlutils.py: cs.urlutils: drop python 2 support/hacks
+lib/python/cs/urlutils.py: cs.urlutils: Make _URL type public as URL with a new promote() method, drop URL factory function, update URL constructors throughout
+lib/python/cs/urlutils.py: cs.urlutils: URL.__init__: make parameters keyword ony
+lib/python/cs/urlutils.py: cs.*: mark classes supporting @promote as Promotable
+lib/python/cs/urlutils.py: cs.urlutils: drop isURL() function now that URL is a class
+lib/python/cs/urlutils.py: remove the cs.xml module - provides little benefit and conflicts with something real from contact-software.com
+lib/python/cs/urlutils.py: cs.lex: update DISTINFO

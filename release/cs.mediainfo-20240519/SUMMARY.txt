@@ -1,0 +1,1 @@
+Initial PyPI release, particularly for SeriesEpisodeInfo which I use in cs.app.playon.

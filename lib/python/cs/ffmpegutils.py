@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Convenience facilities for using FFmpeg (ffmpeg.org).
-#   - Cameron Simpson <cs@cskk.id.au> 30oct2016
+# - Cameron Simpson <cs@cskk.id.au> 30oct2016
 #
 
 '''
@@ -12,22 +12,29 @@ with invocation via `ffmpeg-python`.
 from collections import namedtuple
 from dataclasses import dataclass
 import json
+import os
 from os.path import (
+    dirname,
     isfile as isfilepath,
 )
 import shlex
+from subprocess import CompletedProcess
 import sys
-from typing import Any, List, Optional, Tuple
+from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union
 
 import ffmpeg
 from typeguard import typechecked
 
+from cs.dockerutils import DockerRun
 from cs.fstags import FSTags, uses_fstags
+from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.mappings import attrable
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, print_argv
 from cs.tagset import TagSet
+
+__version__ = '20241122-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -35,13 +42,40 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
+    'entry_points': {
+        'console_scripts': {
+            'ffmpeg-docker': 'cs.ffmpegutils:main_ffmpeg_docker',
+        },
+    },
     'install_requires': [
+        'cs.dockerutils',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.mappings',
         'cs.pfx',
+        'cs.psutils',
         'cs.tagset',
         'ffmpeg-python',
         ##'git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python',
+        'typeguard',
     ],
 }
+
+FFMPEG_EXE_DEFAULT = 'ffmpeg'
+FFMPEG_EXE_ENVVAR = 'FFMPEG_EXE'
+
+# executable and image for use with docker
+FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
+FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
+FFMPEG_DOCKER_IMAGE_ENVVAR = 'FFMPEG_DOCKER_IMAGE'
+
+def main_ffmpeg_docker(argv=None):
+  ''' The `ffm[peg-docker` command line implementation.
+  '''
+  if argv is None:
+    argv = sys.argv
+  sys.exit(ffmpeg_docker(*sys.argv[1:]).returncode)
 
 class MetaData(TagSet):
   ''' Object containing fields which may be supplied to ffmpeg's -metadata option.
@@ -57,6 +91,7 @@ class MetaData(TagSet):
           'copyright',
           'description',
           'episode_id',
+          'disc',
           'genre',
           'grouping',
           'lyrics',
@@ -72,15 +107,16 @@ class MetaData(TagSet):
   # pylint: disable=redefined-builtin
   def __init__(self, format, **kw):
     super().__init__()
-    try:
-      allowed_fields = MetaData.FIELDNAMES[format]
-    except KeyError:
-      # pylint: disable=raise-missing-from
-      raise ValueError("unsupported target format %r" % (format,))
-    self.__dict__.update(format=format, allow_fields=allowed_fields)
+    ##try:
+    ##  allowed_fields = MetaData.FIELDNAMES[format]
+    ##except KeyError:
+    ##  # pylint: disable=raise-missing-from
+    ##  ##raise ValueError("unsupported target format %r" % (format,))
+    ##  allowed_fields = MetaData.FIELDNAMES['mp4']
+    ##self.__dict__.update(format=format, allowed_fields=allowed_fields)
     for k, v in kw.items():
-      if k not in allowed_fields:
-        raise ValueError("format %r does not support field %r" % (format, k))
+      ##if k not in allowed_fields:
+      ##  raise ValueError("format %r does not support field %r" % (format, k))
       self[k] = v
 
   def options(self):
@@ -89,7 +125,7 @@ class MetaData(TagSet):
     opts = []
     for field_name, value in self.items():
       if value is not None:
-        opts.extend(('-metadata', '='.join((field_name, value))))
+        opts.extend(('-metadata', f'{field_name}={value}'))
     return opts
 
 # source specification
@@ -174,8 +210,10 @@ class FFmpegSource:
 # A mapping of ffmpeg codec_name values to default converted names.
 # If there's no entry here, use copy mode.
 DEFAULT_CONVERSIONS = {
-    'mp2': 'aac',
-    'mpeg2video': 'h264',
+    'audio/aac_latm': 'aac',
+    'audio/mp2': 'aac',
+    'audio/pcm_s16le': 'aac',
+    'video/mpeg2video': 'h264',
 }
 DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
@@ -187,6 +225,7 @@ def convert(
     dstpath: str,
     doit=True,
     dstfmt=None,
+    ffmpeg_exe=None,
     fstags: FSTags,
     conversions=None,
     metadata: Optional[dict] = None,
@@ -195,7 +234,7 @@ def convert(
     acodec=None,
     vcodec=None,
     extra_opts=None,
-):
+) -> List[str]:
   ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
   '''
   if conversions is None:
@@ -208,6 +247,8 @@ def convert(
   srcpath = srcs[0].source
   if dstfmt is None:
     dstfmt = DEFAULT_MEDIAFILE_FORMAT
+  if ffmpeg_exe is None:
+    ffmpeg_exe = os.environ.get(FFMPEG_EXE_ENVVAR, FFMPEG_EXE_DEFAULT)
   # set up the initial source path, options and metadata
   ffinopts = {
       'loglevel': 'repeat+error',
@@ -215,30 +256,35 @@ def convert(
       ##'2': None,
   }
   # choose output formats
-  probed = ffprobe(srcpath)
-  for i, stream in enumerate(probed.streams):
-    codec_type = stream.get('codec_type', 'unknown')
-    codec_key = stream.get('codec_name', stream.codec_tag)
-    with Pfx("stream[%d]: %s/%s", i, codec_type, codec_key):
-      if codec_type not in ('audio', 'video'):
-        ##warning("not audio or video, skipping")
-        continue
-      try:
-        new_codec = conversions[codec_key]
-      except KeyError:
-        warning("no conversion, skipping")
-      else:
-        warning("convert to %r", new_codec)
-        if codec_type == 'audio' and acodec is None:
-          acodec = new_codec
-        elif codec_type == 'video' and vcodec is None:
-          vcodec = new_codec
-        else:
-          warning(
-              "no option to convert streams of type %r, ignoring new_codec=%r",
-              codec_type, new_codec
-          )
-  ffmeta_kw = dict(probed.format.get('tags', {}))
+  if acodec is None or vcodec is None:
+    probed = ffprobe(srcpath)
+    for i, stream in enumerate(probed.streams if doit else ()):
+      codec_type = stream.get('codec_type', 'unknown')
+      codec_key = stream.get('codec_name', stream.codec_tag)
+      conv_key = f'{codec_type}/{codec_key}'
+      with Pfx("stream[%d]: %s", i, conv_key):
+        if (codec_type == 'audio' and acodec is None
+            or codec_type == 'video' and vcodec is None):
+          try:
+            new_codec = conversions[conv_key]
+          except KeyError:
+            ##warning("no conversion, skipping")
+            pass
+          else:
+            warning("convert to %r", new_codec)
+            if codec_type == 'audio':
+              if acodec is None:
+                acodec = new_codec
+            elif codec_type == 'video':
+              if vcodec is None:
+                vcodec = new_codec
+            else:
+              warning(
+                  "no option to convert streams of type %s/%s, ignoring new_codec=%r",
+                  codec_type, codec_key, new_codec
+              )
+
+  ffmeta_kw = dict(probed.format.get('tags', {}) if doit else {})
   ffmeta_kw.update(metadata)
   # construct ffmpeg command
   ff = ffmpeg.input(srcpath, **ffinopts)
@@ -262,19 +308,21 @@ def convert(
   ff = ff.output(
       dstpath,
       format=dstfmt,
-      metadata=list(map('='.join, ffmeta_kw.items())),
+      metadata=[f'{k}={v}' for k, v in ffmeta_kw.items()],
       **output_opts,
   )
   if overwrite:
     ff = ff.overwrite_output()
   ff_args = ff.get_args()
+  ff_argv = [ffmpeg_exe, *ff_args]
   if doit:
-    print_argv('ffmpeg', *ff_args)
-    fstags[dstpath]['ffmpeg.argv'] = ['ffmpeg', *ff_args]
+    print_argv(*ff_argv)
+    fstags[dstpath]['ffmpeg.argv'] = ff_argv
     fstags.sync()
     ff.run()
   else:
-    print_argv('ffmpeg', *ff_args, fold=True)
+    print_argv(*ff_argv, fold=True)
+  return ff_argv
 
 def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
   ''' Run `ffprobe -print_format json` on `input_file`,
@@ -291,3 +339,101 @@ def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
   P = pipefrom(argv, quiet=quiet, text=True)
   probed = pfx_call(json.loads, pfx_call(P.stdout.read))
   return attrable(probed)
+
+@pfx
+@typechecked
+def ffmpeg_docker(
+    *ffmpeg_args: Iterable[str],
+    docker_run_opts: Optional[Union[List[str], Mapping]] = None,
+    doit: Optional[bool] = None,
+    quiet: Optional[bool] = None,
+    ffmpeg_exe: Optional[str] = None,
+    docker_exe: Optional[str] = None,
+    image: Optional[str] = None,
+    output_hostdir: Optional[str] = None,
+) -> Optional[CompletedProcess]:
+  ''' Invoke `ffmpeg` using docker.
+  '''
+  ffmpeg_args: List[str] = list(ffmpeg_args)
+  if docker_run_opts is None:
+    docker_run_opts = []
+  if ffmpeg_exe is None:
+    ffmpeg_exe = FFMPEG_DOCKER_EXE_DEFAULT
+  if image is None:
+    image = os.environ.get(
+        FFMPEG_DOCKER_IMAGE_ENVVAR, FFMPEG_DOCKER_IMAGE_DEFAULT
+    )
+  DR = DockerRun(image=image)
+  DR.popopts(docker_run_opts)
+  if docker_run_opts:
+    raise ValueError(f'unparsed docker_run args: {docker_run_opts!r}')
+  # parse ffmpeg options in order to extract the input and output files
+  ffmpeg_argv = [ffmpeg_exe]
+  while ffmpeg_args:
+    arg = ffmpeg_args.pop(0)
+    with Pfx(arg):
+      if arg == '':
+        raise ValueError("invalid empty outfile")
+      if arg == '-':
+        # output to stdout
+        ffmpeg_argv.append(arg)
+      elif not arg.startswith('-'):
+        # output filename
+        # TODO: URLs?
+        outputpath = arg
+        outputpath = cutprefix(outputpath, 'file:')
+        ffmpeg_argv.append(DR.add_output(outputpath))
+        if output_hostdir is None:
+          output_hostdir = dirname(outputpath)
+      elif arg == '-i':
+        # an input filename
+        # TODO: URLs?
+        inputpath = ffmpeg_args.pop(0)
+        inputpath = cutprefix(inputpath, 'file:')
+        if inputpath == '-':
+          # input from stdin
+          ffmpeg_argv.extend([arg, inputpath])
+        else:
+          ffmpeg_argv.extend(['-i', DR.add_input(inputpath)])
+      else:
+        arg_ = arg[1:]
+        # check for singular options
+        if arg_ in (
+            # information options
+            'version',
+            'buildconf',
+            'formats',
+            'muxers',
+            'demuxers',
+            'devices',
+            'codecs',
+            'decoders',
+            'encoders',
+            'bsfs',
+            'protocols',
+            'filters',
+            'pix_fmts',
+            'layouts',
+            'sample_fmts',
+            'dispositions',
+            'colors',
+            'hwaccels',  # global options
+            'report',
+            'y',
+            'n',
+            'ignore_unknown',
+            'stats',  # Per-file main options
+            'apad',
+            'reinit_filter',
+            'discard',
+            'disposition',  # Video options
+            'vn',
+            'dn',  # Audio options
+            'an',  # Subtitle options
+            'sn',
+        ):
+          ffmpeg_argv.append(arg)
+        else:
+          ffmpeg_argv.extend([arg, ffmpeg_args.pop(0)])
+  DR.output_hostdir = output_hostdir
+  return DR.run(*ffmpeg_argv, docker_exe=docker_exe, doit=doit, quiet=quiet)

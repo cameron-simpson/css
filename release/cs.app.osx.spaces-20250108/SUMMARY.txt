@@ -1,0 +1,1 @@
+New "current" subcommand to report the current space number.

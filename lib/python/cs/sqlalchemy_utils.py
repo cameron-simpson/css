@@ -19,18 +19,19 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
 from typeguard import typechecked
 
+from cs.context import contextif
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import lockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import ThreadState
 
 ##def CHECK():
 ##  ''' Debug function to check for open sqltags.sqlite files,
-##      called when there should be done.
+##      called when there should be none.
 ##  '''
 ##  X("CHECK")
 ##  if os.system(
@@ -41,7 +42,7 @@ from cs.threads import ThreadState
 ##  from cs.py.stack import caller
 ##  X("CHECK from %r", caller())
 
-__version__ = '20230612-post'
+__version__ = '20241122-post'
 
 DISTINFO = {
     'description':
@@ -56,6 +57,7 @@ DISTINFO = {
         'icontract',
         'sqlalchemy>=2.0',
         'typeguard',
+        'cs.context',
         'cs.deco',
         'cs.fileutils',
         'cs.lex',
@@ -282,7 +284,7 @@ class ORM(MultiOpenMixin, ABC):
         # no fs path
         db_fspath = None
     else:
-      # starts with sqlite:///, we have the db_fspath
+      # starts with sqlite:///, we have the db_fspath from the cutprefix
       pass
     self.db_url = db_url
     self.db_fspath = db_fspath
@@ -320,6 +322,8 @@ class ORM(MultiOpenMixin, ABC):
       self.engine_keywords.update(
           poolclass=NullPool, connect_args={'check_same_thread': False}
       )
+    self.__first_use = True
+    # declare the schema - does not access the db itself
     self.declare_schema()
 
   @abstractmethod
@@ -356,10 +360,17 @@ class ORM(MultiOpenMixin, ABC):
         The lock file is only operated if `self.db_fspath`,
         currently set only for filesystem SQLite database URLs.
     '''
-    if self.db_fspath:
-      with lockfile(self.db_fspath, poll_interval=0.2):
-        yield
-    else:
+    with contextif(
+        bool(self.db_fspath),
+        lockfile,
+        self.db_fspath,
+        poll_interval=2,
+    ):
+      # make sure that the db tables are up to date
+      if self.__first_use:
+        with self.sqla_state.auto_session() as session:
+          self.Base.metadata.create_all(bind=self.engine)
+        self.__first_use = False
       yield
 
   @property
@@ -703,6 +714,7 @@ def RelationProxy(
     *,
     id_column: Optional[str] = None,
     orm=None,
+    missing=None,
 ):
   ''' Construct a proxy for a row from a relation.
 
@@ -713,6 +725,10 @@ def RelationProxy(
       * `id_column`: options primary key column name,
         default from `BasicTableMixin.DEFAULT_ID_COLUMN`: `'id'`
       * `orm`: the ORM, default from `relation.orm`
+      * `missing`: an optional function to produce a default value
+        for a field if there is no matching record in the relation;
+        if `None` (the default) access to a field raises `KeyError`
+        or `AttributeError` as appropriate
 
       This is something of a workaround for applications which dip
       briefly into the database to obtain information instead of
@@ -766,6 +782,7 @@ def RelationProxy(
       self.id_column = id_column
       self.relation = relation
       self.orm = orm
+      self.missing = missing
       self.__fields = {}
       if db_row is not None:
         self.refresh_from_db(db_row)
@@ -799,9 +816,14 @@ def RelationProxy(
         except KeyError:
           pass
       with using_session(orm=orm) as session:
-        db_row = relation.by_id(
-            self.id, session=session, id_column=self.id_column
-        )
+        try:
+          db_row = relation.by_id(
+              self.id, session=session, id_column=self.id_column
+          )
+        except IndexError as e:
+          if missing is not None:
+            return missing(self, field)
+          raise KeyError(r(field)) from e
         self.refresh_from_db(db_row)
       return self.__fields[field]
 
@@ -818,7 +840,10 @@ def RelationProxy(
           return self[attr]
         except KeyError as e:
           with using_session(orm=orm) as session:
-            db_row = relation.by_id(self.id, session=session)
+            try:
+              db_row = relation.by_id(self.id, session=session)
+            except IndexError as e:
+              raise AttributeError(f'{self.__class__.__name__}.{attr}') from e
             self.__fields[attr] = getattr(db_row, attr)
           raise AttributeError(
               "%s: no cached field .%s" % (type(self).__name__, attr)

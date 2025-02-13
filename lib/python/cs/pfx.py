@@ -14,16 +14,13 @@ This stack is used to prefix logging messages and exception text with context.
 
 Usage is like this:
 
-    from cs.logutils import setup_logging, info
     from cs.pfx import Pfx
-    ...
-    setup_logging()
     ...
     def parser(filename):
       with Pfx(filename):
         with open(filename) as f:
           for lineno, line in enumerate(f, 1):
-            with Pfx(lineno) as P:
+            with Pfx(lineno):
               if line_is_invalid(line):
                 raise ValueError("problem!")
               info("line = %r", line)
@@ -45,7 +42,7 @@ but used with a little discretion produces far more debuggable results.
 from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
-from inspect import isgeneratorfunction
+from inspect import isclass, isgeneratorfunction
 import logging
 import sys
 import threading
@@ -57,7 +54,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20230604-post'
+__version__ = '20241208-post'
 
 DISTINFO = {
     'description':
@@ -275,7 +272,7 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       try:
-        exc_value._pfx_prefix
+        exc_value._pfx_prefix  # noqa: B018
       except AttributeError:
         exc_value._pfx_prefix = self._state.prefix
         # prevent outer Pfx wrappers from hacking stuff as well
@@ -339,8 +336,9 @@ class Pfx(object):
     )
 
   @classmethod
-  def prefixify_exception(cls, e):
+  def prefixify_exception(cls, e):  # noqa: C901
     ''' Modify the supplied exception `e` with the current prefix.
+        The original value of some .attr is preserved as .{attr}_without_prefix.
         Return `True` if modified, `False` if unable to modify.
     '''
     current_prefix = cls._state.prefix
@@ -352,26 +350,17 @@ class Pfx(object):
         continue
       if value is None:
         continue
+      ovalue = value
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
-        try:
-          value0, value1 = value
-        except ValueError as args_e:
-          X(
-              "prefixify_exception OSError.args: %s(%s) %s: args=%r: %s",
-              type(e).__name__,
-              ','.join(
-                  cls.__name__
-                  for cls in type(e).__mro__
-                  if cls is not type(e) and cls is not object
-              ),
-              e,
-              value,
-              args_e,
-          )
-          continue
-        else:
-          value = (value0, cls.prefixify(value1))
+        # prefixify the first string
+        value = list(value)
+        for i, v in enumerate(value):
+          if isinstance(v, str):
+            value[i] = cls.prefixify(v)
+            did_prefix = True
+            break
+        value = tuple(value)
       elif attr == 'args' and isinstance(e, LookupError):
         if (isinstance(value, tuple) and value):
           value0 = value[0]
@@ -382,6 +371,10 @@ class Pfx(object):
           value = (cls.prefixify(value0), *value[1:])
         else:
           continue
+      elif attr == 'message' and not isinstance(value, StringTypes):
+        # saw django.core.exceptions.ValidationError.message
+        # is not a string but some kind of proxy object
+        continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
@@ -405,7 +398,21 @@ class Pfx(object):
             value = [cls.prefixify(repr(value))]
           else:
             value = [cls.prefixify(value[0])] + list(value[1:])
+      t0 = type(ovalue)
+      t1 = type(value)
+      if t0 is not t1:
+        if set((t0, t1)) == set((list, tuple)):
+          # convert list back to tuple or tuple back to list
+          value = t0(value)
+        else:
+          X(
+              "prefixify_exception: %s.%s.%s:%s.%s:%r is a different type from the new value:%s:%r",
+              e.__class__.__module__, e.__class__.__name__, attr,
+              ovalue.__class__.__module__, ovalue.__class__.__name__, ovalue,
+              value.__class__.__name__, value
+          )
       try:
+        setattr(e, attr + '_without_prefix', ovalue)
         setattr(e, attr, value)
       except AttributeError as e2:
         print(
@@ -698,7 +705,10 @@ def pfx_method(method, use_str=False, with_args=False):
   def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
-    classref = self if use_str else type(self).__name__
+    classref = (
+        self
+        if use_str else self.__name__ if isclass(self) else type(self).__name__
+    )
     pfxfmt, pfxargs = func_a_kw_fmt(method, *a, **kw)
     with Pfx("%s." + pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)
@@ -712,7 +722,7 @@ def XP(msg, *args, **kwargs):
       which prefixes the message with the current Pfx prefix.
   '''
   if args:
-    return X("%s: " + msg, prefix(), *args, **kwargs)
+    return X("%s%s" + msg, prefix(), DEFAULT_SEPARATOR, *args, **kwargs)
   return X(prefix() + DEFAULT_SEPARATOR + msg, **kwargs)
 
 def XX(prepfx, msg, *args, **kwargs):

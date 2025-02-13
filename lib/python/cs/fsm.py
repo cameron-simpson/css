@@ -4,6 +4,7 @@
 '''
 
 from collections import defaultdict, namedtuple
+from itertools import chain
 from threading import Lock
 import time
 from typing import Optional, TypeVar
@@ -11,11 +12,12 @@ from typing import Optional, TypeVar
 from typeguard import typechecked
 
 from cs.gimmicks import exception
-from cs.gvutils import gvprint, quote as gvq, DOTNodeMixin
-from cs.lex import cutprefix
+from cs.gvutils import gvprint, gvsvg, quote as gvq, DOTNodeMixin
+from cs.lex import cutprefix, r
 from cs.pfx import Pfx, pfx_call
+from cs.seq import first
 
-__version__ = '20221118-post'
+__version__ = '20250120-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -25,9 +27,10 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.gimmicks',
-        'cs.gvutils',
+        'cs.gvutils>=20230816',
         'cs.lex',
         'cs.pfx',
+        'cs.seq',
         'typeguard',
     ],
 }
@@ -45,6 +48,30 @@ class FSMError(Exception):
   def __init__(self, msg: str, fsm: Optional[FSMSubType] = None):
     super().__init__(msg)
     self.fsm = fsm
+
+class CancellationError(FSMError):
+  ''' Subclass of `FSMError` Raised when trying to make use of an
+      `FSM` which is cancelled.
+
+      For example, this is raised by a `cs.result.Result`
+      when accessing `.result` or `.exc_info` after cancellation.
+  '''
+
+  def __init__(self, message=None, *, fsm=None, **kw):
+    ''' Initialise the `CancellationError`.
+
+        The optional `message` parameter (default `"cancelled"`)
+        is set as the `message` attribute.
+        Other keyword parameters set their matching attributes.
+    '''
+    if message is None:
+      message = "cancelled"
+    elif not isinstance(message, str):
+      message = 'cancelled: ' + str(message)
+    super().__init__(message, fsm=fsm)
+    self.message = message
+    for k, v in kw.items():
+      setattr(self, k, v)
 
 FSMTransitionEvent = namedtuple(
     'FSMTransitionEvent', 'old_state new_state event when extra'
@@ -73,7 +100,7 @@ class FSM(DOTNodeMixin):
   def __init__(self, state=None, *, history=None, lock=None, transitions=None):
     ''' Initialise the `FSM` from:
         * `state`: optional _positional_ parameter for the initial state,
-          default `self.FSM_DEFAULT_STATE`
+          default `self.FSM_DEFAULT_STATE` or the first key from `self.FSM_TRANSITIONS`
         * `history`: an optional object to record state transition
           history, default `None`; if not `None` this should be an
           iterable object with a `.append(entry)` method such as a
@@ -102,7 +129,10 @@ class FSM(DOTNodeMixin):
       try:
         state = self.FSM_DEFAULT_STATE
       except AttributeError:
-        pass
+        state = first(self.FSM_TRANSITIONS.keys())
+      else:
+        if state is None:  # who _does_ this? I do :-(
+          state = first(self.FSM_TRANSITIONS.keys())
     if lock is None:
       lock = Lock()
     if transitions is not None:
@@ -134,6 +164,8 @@ class FSM(DOTNodeMixin):
         Fall back to the superclass `__getattr__`.
     '''
     if not attr.startswith('_'):
+      if attr in ('fsm_state',):
+        return None
       if attr in self.FSM_TRANSITIONS:
         return attr
       try:
@@ -146,18 +178,34 @@ class FSM(DOTNodeMixin):
           # relies on upper case state names
           return state == in_state.upper()
         FSM_TRANSITIONS = self.FSM_TRANSITIONS
-        try:
-          statedef = FSM_TRANSITIONS[state]
-        except KeyError:
-          pass
-        else:
+        all_transitions = set(
+            chain(
+                *(
+                    per_state_transition.keys()
+                    for per_state_transition in FSM_TRANSITIONS.values()
+                )
+            )
+        )
+        if attr in all_transitions:
+          # only look up known transitions
+          try:
+            statedef = FSM_TRANSITIONS[state]
+          except KeyError as ke:
+            raise AttributeError(
+                f'FSM.{attr}: no FSM_TRANSITIONS for state {state!r}'
+            ) from ke
           if attr in statedef:
             return lambda **kw: self.fsm_event(attr, **kw)
+          raise AttributeError(
+              f'FSM.{attr}: no such transition for state {state!r}: {statedef!r}'
+          )
+    sup = super()
     try:
-      sga = super().__getattr__
+      sga = sup.__getattr__
     except AttributeError as e:
       raise AttributeError(
-          "no %s.%s attribute" % (self.__class__.__name__, attr)
+          "no %s.%s attribute (no %s.__getattr__: %s)" %
+          (self.__class__.__name__, attr, sup, e)
       ) from e
     return sga(attr)
 
@@ -188,10 +236,17 @@ class FSM(DOTNodeMixin):
         * `event`: the `event`
         * `when`: a UNIX timestamp from `time.time()`
         * `extra`: a `dict` with the `extra` information
+
         If `self.fsm_history` is not `None`,
         `transition` is appended to it.
+
         If there are callbacks for `new_state` or `FSM.FSM_ANY_STATE`,
         call each callback as `callback(self,transition)`.
+
+        *Important note*: the callbacks are run in series in the
+        current `Thread`.  If you need to dispatch a long running
+        activity from a state transtion, the callback should still
+        return promptly.
     '''
     with self.__lock:
       old_state = self.fsm_state
@@ -211,11 +266,19 @@ class FSM(DOTNodeMixin):
       )
       if self.fsm_history is not None:
         self.fsm_history.append(transition)
-    with Pfx("%s->%s", old_state, new_state):
+    with Pfx(
+        "fsm_event: run callbacks %s->%s->%s",
+        old_state,
+        event,
+        new_state,
+    ):
       for callback in (self.__callbacks[FSM.FSM_ANY_STATE] +
                        self.__callbacks[new_state]):
         try:
           pfx_call(callback, self, transition)
+        except CancellationError:
+          # ignore cancelled callbacks, eg an FSM instance in cancelled state
+          pass
         except Exception as e:  # pylint: disable=broad-except
           exception("exception from callback %s: %s", callback, e)
     return new_state
@@ -246,6 +309,11 @@ class FSM(DOTNodeMixin):
             ANY FSM:state1 FSMTransitionEvent(old_state='state2', new_state='state1', event='ev_b', when=..., extra={'foo': 4})
             'state1'
     '''
+    if state is not self.FSM_ANY_STATE and state not in self.FSM_TRANSITIONS:
+      raise ValueError(
+          "%s.fsm_callback: state %s not in self.FSM_TRANSITIONS %r" %
+          (self, r(state), sorted(self.FSM_TRANSITIONS))
+      )
     with self.__lock:
       self.__callbacks[state].append(callback)
 
@@ -257,17 +325,61 @@ class FSM(DOTNodeMixin):
           cb for cb in self.__callbacks[state] if cb != callback
       ]
 
-  @classmethod
-  def fsm_transitions_as_dot(cls, fsm_transitions, sep='\n', graph_name=None):
-    ''' Compute a DOT syntax graph description from a transitions dictionary.
+  def fsm_transitions_as_dot(self, transitions=None, **diagram_kw) -> str:
+    r'''Compute a DOT syntax graph description of the state diagram.
 
         Parameters:
-        * `fsm_transitions`: a mapping of *state*->*event*->*state*
+        * `transitions`: optional mapping of *state*->*event*->*state*,
+          default `self.FSM_TRANSITIONS`
         * `sep`: optional separator between "lines", default `'\n'`
         * `graph_name`: optional name for the graph, default the class name
+        * `history_style`: optional style mapping for event transition history,
+          used to style edges which have been traversed
     '''
+    return self.fsm_state_diagram_as_dot(
+        transitions,
+        state=self.fsm_state,
+        history=self.fsm_history,
+        **diagram_kw,
+    )
+
+  @classmethod
+  def fsm_state_diagram_as_dot(
+      cls,
+      transitions=None,
+      *,
+      sep='\n',
+      state=None,
+      graph_name=None,
+      history=None,
+      history_style=None,
+  ) -> str:
+    r'''Compute a DOT syntax graph description of the state diagram.
+
+        Parameters:
+        * `transitions`: optional mapping of *state*->*event*->*state*,
+          default `cls.FSM_TRANSITIONS`
+        * `state`: optional current state name, a key of 
+        * `sep`: optional separator between "lines", default `'\n'`
+        * `graph_name`: optional name for the graph, default the class name
+        * `history`: optional event transition history
+        * `history_style`: optional style mapping for event transition history,
+          used to style edges which have been traversed
+    '''
+    if transitions is None:
+      transitions = cls.FSM_TRANSITIONS
     if graph_name is None:
       graph_name = cls.__name__
+    traversed_edges = defaultdict(list)
+    if history_style and history:
+      # fill in the mapping of (old,event,new) -> count
+      for transition in history:
+        # particular types of transitions
+        traversed_edges[transition.old_state, transition.event,
+                        transition.new_state].append(transition)
+        # any type of transition
+        traversed_edges[transition.old_state,
+                        transition.new_state].append(transition)
     dot = [f'digraph {gvq(graph_name)} {{']
     # NB: we _do not_ sort the transition graph because the "dot" programme
     # layout is affected by the order in which the graph is defined.
@@ -275,19 +387,67 @@ class FSM(DOTNodeMixin):
     # insertion order in modern Python, which in turn means that
     # describing the transitions in the natural order in which they
     # occur typically produces a nicer graph diagram.
-    for src_state, transitions in fsm_transitions.items():
-      for event, dst_state in sorted(transitions.items()):
-        dot.append(
-            f'  {gvq(src_state)}->{gvq(dst_state)}[label={gvq(event)}];'
+    for src_state, state_transitions in transitions.items():
+      if state is not None and src_state == state:
+        # colour the current state
+        fillcolor = cls.DOT_NODE_FILLCOLOR_PALETTE.get(src_state)
+        if fillcolor:
+          attrs_s = cls.dot_node_attrs_str(
+              dict(style='filled', fillcolor=fillcolor)
+          )
+          dot.append(f'  {gvq(src_state)}[{attrs_s}];')
+      for event, dst_state in sorted(state_transitions.items()):
+        edge_style = dict(label=event)
+        if history_style and (src_state, dst_state) in traversed_edges:
+          edge_style.update(history_style)
+        edge_style_dot = ",".join(
+            f'{gvq(k)}={gvq(str(v))}' for k, v in edge_style.items()
         )
+        dot.append(f'  {gvq(src_state)}->{gvq(dst_state)}[{edge_style_dot}];')
     dot.append('}')
     return sep.join(dot)
 
-  @property
-  def fsm_dot(self):
-    ''' A DOT syntax description of `self.FSM_TRANSITIONS`.
+  @classmethod
+  def fsm_print_state_diagram(
+      cls,
+      file=None,
+      *,
+      fmt=None,
+      graph_name=None,
+      history=None,
+      history_style=None,
+      state=None,
+      transitions=None,
+      **gvprint_kw,
+  ):
+    ''' Print the state diagram via `cs.gvutils.gvprint`.
+
+        The DOT syntax graph description is computed with
+        `FSM.fsm_state_diagram_as_dot` and the `graph_name`,
+        `history`, `history_style`, `state` and `transitions`
+        parameters are passed through to this.
+
+        If `fmt` is specified as `dot` then the DOT and any remaining
+        keyword arguments are passed to `print()`.
+
+        Otherwise any remaining keyword paramaeters are passed to `gvprint`.
     '''
-    return self.fsm_transitions_as_dot(self.FSM_TRANSITIONS)
+    dot_s = cls.fsm_state_diagram_as_dot(
+        transitions,
+        state=state,
+        graph_name=graph_name,
+        history=history,
+        history_style=history_style,
+    )
+    if fmt == 'dot':
+      return print(dot_s, **gvprint_kw)
+    return gvprint(dot_s, file=file, fmt=fmt, **gvprint_kw)
+
+  @property
+  def fsm_dot(self) -> str:
+    ''' A DOT syntax description of the state diagram in the current state.
+    '''
+    return self.fsm_transitions_as_dot()
 
   @property
   def dot_node_palette_key(self):
@@ -302,6 +462,19 @@ class FSM(DOTNodeMixin):
         This is a wrapper for `cs.gvutils.gvprint`.
     '''
     return gvprint(self.fsm_dot, file=file, fmt=fmt, layout=layout, **dot_kw)
+
+  def fsm_as_svg(self, layout=None, history_style=None, **dot_kw) -> str:
+    ''' Render the state transition diagram as SVG. '''
+    return gvsvg(
+        self.fsm_transitions_as_dot(history_style=history_style),
+        layout=layout,
+        **dot_kw,
+    )
+
+  @property
+  def fsm_svg(self) -> str:
+    ''' The state transition diagram as SVG. '''
+    return self.fsm_as_svg()
 
 if __name__ == '__main__':
   import sys

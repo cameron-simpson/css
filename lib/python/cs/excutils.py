@@ -15,7 +15,7 @@ from cs.gimmicks import exception, warning
 from cs.py.func import funcname
 from cs.py3 import raise_from
 
-__version__ = '20230212.1-post'
+__version__ = '20240630-post'
 
 DISTINFO = {
     'description':
@@ -199,11 +199,6 @@ def unattributable(func):
   '''
   return transmute(func, AttributeError, RuntimeError)
 
-def safe_property(func):
-  ''' Substitute for @property which lets AttributeErrors escape as RuntimeErrors.
-  '''
-  return property(unattributable(func))
-
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''
@@ -248,32 +243,30 @@ class NoExceptions(object):
         warning("IGNORE> " + line[:-1])
     return True
 
-def LogExceptions(conceal=False):
+def LogExceptions(log=None, conceal=False):
   ''' Wrapper for `NoExceptions` which reports exceptions and optionally
       suppresses them.
   '''
 
-  def handler(exc_type, exc_value, _):
-    exception("EXCEPTION: <%s> %s", exc_type, exc_value)
+  def handler(exc_type, exc_value, exc_tb):
+    logmsg = exception if log is None else log
+    logmsg("EXCEPTION: <%s> %s", exc_type, exc_value)
     return conceal
 
   return NoExceptions(handler)
 
-def logexc(func):
+@decorator
+def logexc(func, **deco_kw):
   ''' Decorator to log exceptions and reraise.
   '''
 
   def logexc_wrapper(*a, **kw):
-    with LogExceptions():
+    with LogExceptions(**deco_kw):
       return func(*a, **kw)
 
-  try:
-    name = func.__name__
-  except AttributeError:
-    name = str(func)
-  logexc_wrapper.__name__ = 'logexc(%s)' % (name,)
   return logexc_wrapper
 
+@decorator
 def logexc_gen(genfunc):
   ''' Decorator to log exceptions and reraise for generators.
   '''
@@ -288,7 +281,6 @@ def logexc_gen(genfunc):
           return
         yield item
 
-  logexc_gen_wrapper.__name__ = 'logexc_gen(%s)' % (genfunc.__name__,)
   return logexc_gen_wrapper
 
 @decorator

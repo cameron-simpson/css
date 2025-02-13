@@ -16,9 +16,13 @@ import tempfile
 from cs.logutils import warning
 from cs.pfx import Pfx
 import cs.sh
-from cs.xml import etree
 
-__version__ = '20221228-post'
+try:
+  from lxml import etree
+except ImportError:
+  import xml.etree.ElementTree as etree
+
+__version__ = '20231129-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -31,7 +35,6 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.sh',
-        'cs.xml',
     ],
 }
 
