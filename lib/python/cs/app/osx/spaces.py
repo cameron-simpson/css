@@ -9,8 +9,10 @@ from getopt import GetoptError
 import os
 from os.path import (
     abspath,
+    dirname,
     exists as existspath,
     isdir as isdirpath,
+    isfile as isfilepath,
     join as joinpath,
 )
 from pprint import pprint
@@ -25,11 +27,10 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
-from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call
+from cs.fs import shortpath
+from cs.pfx import Pfx, pfx_call, pfx_method
 
 from .misc import macos_version
-
 from .objc import apple, cg
 
 __version__ = '20250108-post'
@@ -65,6 +66,8 @@ CG = apple.CoreGraphics
 HI = apple.HIServices
 
 DEFAULT_BACKGROUND_RGB = 0, 0, 0  # black background
+VALID_IMAGE_SUFFIXES = '.jpg', '.png'
+
 def main(argv=None):
   ''' cs.app.osx.spaces command line mode.
   '''
@@ -198,6 +201,7 @@ class Spaces:
         self.display_id, 0, space["uuid"]
     )
 
+  @pfx_method
   @typechecked
   def set_wp_config(self, space_index: int, wp_config: dict):
     ''' Set the desktop picture configuration of the space at
