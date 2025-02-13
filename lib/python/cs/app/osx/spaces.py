@@ -35,7 +35,7 @@ HI = apple.HIServices
 def main(argv=None):
   ''' cs.app.osx.spaces command line mode.
   '''
-  return SpacesCommand(sys.argv).run()
+  return SpacesCommand(argv).run()
 
 class Spaces:
   ''' The spaces for a particular display.
