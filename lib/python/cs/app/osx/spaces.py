@@ -229,9 +229,17 @@ class Spaces:
         Ugh.
     '''
     fspath = abspath(fspath)
-    if macos_version >= (14, 5):
-      fspath = fspath[1:]
-    return fspath
+    if macos_version < (14, 5):
+      spaces_path = fspath
+    else:
+      spaces_path = fspath[1:]
+      # a cut at seeing if the ~ _is_ meaningful, but it doesn't work
+      ##home = os.environ.get('HOME')
+      ##if home and isdirpath(home):
+      ##  home_prefix = f'{home}/'
+      ##  if fspath.startswith(home_prefix):
+      ##    spaces_path = f'~/{cutprefix(fspath,home_prefix)}'
+    return spaces_path
 
       self,
       space_index: int,

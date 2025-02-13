@@ -1,9 +1,9 @@
-osx: try using tilde in spaces_pathfor
-default: wpr RENEW to scan the spaces configs for the random directories?
+spaces: try using tilde in spaces_pathfor (tried it, does not work with ~/ or /~/)
+spaces: wpr RENEW to scan the spaces configs for the random directories?
 PipeLineSpec.make_stage_funcs: each input (item,P) should become (item,P=P.copy_with_vars(_=item)) so as to have its own set of variables
 default: wpr RENEW, fast mode
 RunState.__enter__exit__: also set runstate.cancel to the asyncio event loop SIGINT handler?
-cs.binary: genberate .5 manpage entries from classes? maybe just those built from struct formats initially
+cs.binary: generate .5 manpage entries from classes? maybe just those built from struct formats initially
 setvar: not expanding leading $MANPATH etc
 bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
 cs.jsonutils: merge the various JSON utility functions?
