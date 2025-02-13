@@ -64,6 +64,7 @@ DISTINFO = {
 CG = apple.CoreGraphics
 HI = apple.HIServices
 
+DEFAULT_BACKGROUND_RGB = 0, 0, 0  # black background
 def main(argv=None):
   ''' cs.app.osx.spaces command line mode.
   '''
@@ -245,6 +246,7 @@ class Spaces:
       space_index: int,
       dirpath: str,
       *,
+      background_color=DEFAULT_BACKGROUND_RGB,
       random=True,
       change_duration=5.0,
       placement='SizeToFit',
@@ -263,7 +265,7 @@ class Spaces:
       # This worked before I upgraded to Sonoma, MacOS 14.5.
       # pylint: disable=use-dict-literal
       wp_config = dict(
-          BackgroundColor=(0, 0, 0),
+          BackgroundColor=background_color,
           Change='TimeInterval',
           ChangePath=abspath(dirpath),
           NewChangePath=abspath(dirpath),
