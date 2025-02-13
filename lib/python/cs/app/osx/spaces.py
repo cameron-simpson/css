@@ -276,18 +276,18 @@ class Spaces:
           Placement=placement,
       )
     elif isdirpath(fspath):
-      spaces_dirpath = self.spaces_pathfor(dirpath)
+      spaces_dirpath = self.spaces_pathfor(fspath)
       images = [
-          filename for filename in os.listdir(dirpath)
+          filename for filename in os.listdir(fspath)
           if not filename.startswith('.') and '.' in filename
-          and filename.endwith(VALID_IMAGE_SUFFIXES)
+          and filename.endswith(VALID_IMAGE_SUFFIXES)
       ]
       if not images:
         raise ValueError(
-            f'no *.{{{",".join(VALID_IMAGE_SUFFIXES)}}} files in {dirpath}'
+            f'no *.{{{",".join(VALID_IMAGE_SUFFIXES)}}} files in {fspath}'
         )
       lastname = random_choice(images)
-      spaces_imagepath = self.spaces_pathfor(joinpath(dirpath, lastname))
+      spaces_imagepath = self.spaces_pathfor(joinpath(fspath, lastname))
       # pylint: disable=use-dict-literal
       wp_config = dict(
           BackgroundColor=background_color,
