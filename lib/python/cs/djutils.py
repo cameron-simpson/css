@@ -13,7 +13,7 @@ from inspect import isclass
 from itertools import chain
 import os
 import sys
-from typing import Iterable, List
+from typing import Iterable, List, Mapping
 
 from django.conf import settings
 from django.core.management.base import (
@@ -295,8 +295,16 @@ def model_batches_qs(
   qs0 = mgr.all()
   if exclude:
     qs0 = qs0.exclude(**exclude)
-  if filter:
-    qs0 = qs0.filter(**filter)
+  if exclude is not None:
+    if isinstance(exclude, Mapping):
+      qs0 = qs0.exclude(**exclude)
+    else:
+      qs0 = qs0.exclude(exclude)
+  if filter is not None:
+    if isinstance(filter, Mapping):
+      qs0 = qs0.filter(**filter)
+    else:
+      qs0 = qs0.filter(filter)
   qs = qs0.order_by(ordering)[:chunk_size]
   while True:
     key_list = list(qs.only(field_name).values_list(field_name, flat=True))
