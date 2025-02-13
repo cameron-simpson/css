@@ -105,11 +105,11 @@ def main(argv=None):
       if word_tuple not in seen_word_tuples:
         wpdir,_=update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
         seen_word_tuples.add(word_tuple)
-      spaces.set_wp_dirpath(wpn-1,wpdir)
+      spaces.set_wp_fspath(wpn-1,wpdir)
   else:
     wpdir,_=update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
     for wpn in space_list:
-      spaces.set_wp_dirpath(wpn-1,wpdir)
+      spaces.set_wp_fspath(wpn-1,wpdir)
 
 def last_wp_values(lv) -> dict[int, list[str]]:
   ''' Return a `dict` mapping space number to a list of words.
@@ -133,7 +133,7 @@ def update_random_wpdir(
   ''' Randomly `count` image paths found in `wppath` matching `words`.
       Choose a subdirectory of `wplinkdirpath` based on `words`, making it at need.
       Update its contents with symlinks to the chosen paths.
-      Return 2-tuple of (wpsublinkdirpath,namemap)` being the
+      Return 2-tuple of `(wpsublinkdirpath,namemap)` being the
       subdirectory path and a mapping of names in `linkdirpath` to
       absolute forms of `paths`.
   '''
@@ -170,6 +170,7 @@ def update_linkdir(linkdirpath: str, paths: Iterable[str], trim=False):
   '''
   # TODO: deal with paths which conflict by basename
   # TODO: hard link mode?
+  # TODO: move to cs.fs
   name_map = {basename(path): abspath(path) for path in paths}
   for name, linkpath in sorted(name_map.items()):
     linkpath_short = shortpath(linkpath)
