@@ -292,13 +292,14 @@ class Spaces:
       wp_config = dict(
           BackgroundColor=background_color,
           Change='TimeInterval',
+          ChangeDuration=change_duration,
           ChangePath=spaces_dirpath,
           NewChangePath=spaces_dirpath,
           ChangeTime=change_duration,
           DynamicStyle=0,
           ImageFilePath=spaces_imagepath,
-          NewImageFilePath=spaces_imagepath,
-          LastName=lastname,
+          ##NewImageFilePath=spaces_imagepath,
+          ##LastName=lastname,
           Placement=placement,
           Random=random,
       )  # pylint: disable=use-dict-literal
