@@ -15,7 +15,7 @@ from os.path import (
     isfile as isfilepath,
     join as joinpath,
 )
-from pprint import pprint
+from pprint import pformat, pprint
 from random import choice as random_choice
 import sys
 from typing import Optional
@@ -28,6 +28,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
 from cs.fs import shortpath
+from cs.lex import tabulate
 from cs.pfx import Pfx, pfx_call, pfx_method
 
 from .misc import macos_version
@@ -384,11 +385,14 @@ class SpacesCommand(BaseCommand):
     if wp_path is None:
       if space_indices is None:
         space_indices = list(range(len(spaces)))
+      report_lines = []
       for space_index in space_indices:
+        report_lines.append([f'Space {space_index + 1}'])
         space_num = space_index + 1
-        print("Space", space_num)
         for k, v in sorted(spaces.get_wp_config(space_index).items()):
-          print(" ", k, "=", str(v).replace("\n", ""))
+          report_lines.append([f'  {k}', pformat(v)])
+      for line in tabulate(*report_lines):
+        print(line)
     else:
       if space_indices is None:
         space_indices = [spaces.current_index]
