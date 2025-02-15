@@ -20,18 +20,20 @@ from cs.timeutils import time_func
 from cs.x import X
 
 DISTINFO = {
-    'description': "RFC2616 (HTTP 1.1) facilities",
+    'description':
+    "RFC2616 (HTTP 1.1) facilities",
     'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.timeutils'],
+    ],
+    'install_requires':
+    ['cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.timeutils'],
 }
 
 # character classes: see RFC2616 part 2.2
 CR = '\r'
-CHAR = ''.join( chr(o) for o in range(128) )
+CHAR = ''.join(chr(o) for o in range(128))
 LF = '\n'
 SP = ' '
 HT = '\t'
@@ -43,11 +45,11 @@ DIGIT = digits
 UPALPHA = ascii_uppercase
 LOALPHA = ascii_lowercase
 ALPHA = UPALPHA + LOALPHA
-CTL = ''.join( chr(o) for o in list(range(32))+[127] )
+CTL = ''.join(chr(o) for o in list(range(32)) + [127])
 SEPARATORS = '()<>@,;:\\' + DQ + '/[]?={}' + SP + HT
-TEXT = ''.join( c for c in [ chr(o) for o in range(256) ]
-                  if c in LWS or c not in CTL
-              )
+TEXT = ''.join(
+    c for c in [chr(o) for o in range(256)] if c in LWS or c not in CTL
+)
 QDTEXT = TEXT.replace('"', '').replace('\\', '')
 
 # encode and decode bytes<->str for HTTP stream: 8-bit 1-to-1
@@ -62,7 +64,7 @@ def get_lws(s, offset=0):
   '''
   if not s.startswith(CRLF, offset):
     raise ValueError("missing CRLF at start of LWS at offset %d" % (offset,))
-  spacing, offset = get_chars(s, offset+2, SP+HT)
+  spacing, offset = get_chars(s, offset + 2, SP + HT)
   if not spacing:
     raise ValueError("missing SP/HT after CRLF at offset %d" % (offset,))
   return CRLF + spacing, offset
@@ -82,7 +84,7 @@ def get_token(s, offset=0):
       Return token, new_offset.
       See RFC2616 part 2.2.
   '''
-  token, offset = get_other_chars(s, offset, CTL+SEPARATORS)
+  token, offset = get_other_chars(s, offset, CTL + SEPARATORS)
   if not token:
     raise ValueError("expected RFC2616 token at offset=%d" % (offset,))
   return token, offset
@@ -168,17 +170,23 @@ def parse_chunk_line1(bline):
   # collect chunk-extensions
   _, offset = get_space(line, offset)
   while offset < len(line) and line.startswith(';', offset):
-    chunk_ext_name, offset = get_token(line, offset+1)
+    chunk_ext_name, offset = get_token(line, offset + 1)
     if not line.startswith('=', offset):
-      raise ValueError("missing '=' after chunk-ext-name at offset %d" % (offset,))
-    chunk_ext_val, offset = get_chunk_ext_val(line, offset+1)
-    chunk_exts.append( (chunk_ext_name, chunk_ext_val) )
+      raise ValueError(
+          "missing '=' after chunk-ext-name at offset %d" % (offset,)
+      )
+    chunk_ext_val, offset = get_chunk_ext_val(line, offset + 1)
+    chunk_exts.append((chunk_ext_name, chunk_ext_val))
     _, offset = get_space(line, offset)
   if not line.startswith(CRLF, offset):
-    raise ValueError("missing CRLF at end of opening chunk line at offset %d" % (offset,))
+    raise ValueError(
+        "missing CRLF at end of opening chunk line at offset %d" % (offset,)
+    )
   offset += 2
   if offset != len(line):
-    raise ValueError("extra data after CRLF at offset %d: %r" % (offset, line[offset:]))
+    raise ValueError(
+        "extra data after CRLF at offset %d: %r" % (offset, line[offset:])
+    )
   return chunk_size, chunk_exts
 
 def read_http_request_line(fp):
@@ -198,8 +206,10 @@ def read_http_request_line(fp):
 def read_headers(fp):
   ''' Read headers from a binary file such as an HTTP stream, return the raw binary data and the corresponding Message object.
   '''
+
   def is_header_line(line):
     return line.startswith(b' ') or line.startswith(b'\t') or line.rstrip()
+
   header_lines = list(takewhile(is_header_line, fp))
   parser = BytesFeedParser()
   parser.feed(b''.join(header_lines))
@@ -237,7 +247,8 @@ def datetime_from_rfc850_date(s):
       Format: weekday, dd-mon-yy hh:mm:ss GMT
   '''
   weekday, etc = s.split(',', 1)
-  if weekday not in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'):
+  if weekday not in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+                     'Saturday', 'Sunday'):
     raise ValueError("invalid weekday: %r" % (weekday,))
   dt = datetime.datetime.strptime(etc, " %d-%b-%y %H:%M:%S GMT")
   dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta()))
