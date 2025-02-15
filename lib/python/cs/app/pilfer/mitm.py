@@ -36,13 +36,13 @@ from cs.progress import Progress
 from cs.py.func import funccite
 from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
+from cs.rfc2616 import content_length, content_type
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
-from .util import content_length
 
 if sys.stdout.isatty():
   print = upd_print
