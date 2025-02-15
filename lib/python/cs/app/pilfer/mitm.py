@@ -378,7 +378,13 @@ class MITMHookAction(Promotable):
       raise ValueError(f'expected dotted identifier: {hook_spec!r}')
     if offset < len(hook_spec):
       raise ValueError(f'unparsed text after params: {hook_spec[offset:]!r}')
-    return cls(action=cls.HOOK_SPEC_MAP[name], args=args, kwargs=kwargs)
+    try:
+      action = cls.HOOK_SPEC_MAP[name]
+    except KeyError as e:
+      raise ValueError(
+          f'unknown action name {name!r} (not in {cls.__name__}.HOOK_SPEC_MAP)'
+      ) from e
+    return cls(action=action, args=args, kwargs=kwargs)
 
   def __call__(self, *a, **kw):
     return self.action(*self.args, *a, **self.kwargs, **kw)
