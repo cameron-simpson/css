@@ -53,6 +53,20 @@ class URLMatcher(Promotable):
       return None
     return m.groupdict()
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to `URLMatcher`:
+        - `(hostname_fnmatch,url_regexp)` 2-tuples
+        - `url_regexp` strings
+    '''
+    if isinstance(obj, cls):
+      return obj
+    try:
+      hostname_fnmatch, url_regexp = obj
+    except (TypeError, ValueError):
+      return super().promote(obj)
+    return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
+
 @dataclass
 class SiteMap(Promotable):
   ''' A base class for site maps.
