@@ -238,15 +238,14 @@ class DocSite(SiteMap):
       '/ .css .gif .html .ico .jpg .js .png .svg .webp .woff2'.split()
   )
 
-  @promote
-  def url_key(self, url: URL, **_) -> str | None:
-    ''' Return a key for `.html` and `.js` and `..../` URLs.
-    '''
-    if url.path.endswith(self.CACHE_SUFFIXES):
-      key = url.path.lstrip('/')
-      if key.endswith('/'):
-        key += 'index.html'
-      return f'{url.hostname}/{key}'
+  URL_KEY_PATTERNS = [
+      ( # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+        ( None,
+         r'.*(/|\\'+'|\\'.join(CACHE_SUFFIXES),
+         ),
+       '{__}',
+       ),
+      ]
 
 @dataclass
 class Wikipedia(SiteMap):
