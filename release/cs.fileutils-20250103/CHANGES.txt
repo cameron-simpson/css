@@ -1,0 +1,7 @@
+lib/python/cs/fileutils.py: cs.fileutils: new rename_excl(oldpath,newpath) to rename oldpath to newpath provided newpath does not exist - race free unlike obsolete saferename
+lib/python/cs/fileutils.py: cs.fileutils: add missing import for rename_excl
+lib/python/cs/fileutils.py: cs.fileutils: atomic_filename: use rename_excl
+lib/python/cs/fileutils.py: cs.fileutils: ruff check --fix folded up an elif
+lib/python/cs/fileutils.py: cs.*: moved @cachedmethod from cs.deco to cs.cache
+lib/python/cs/fileutils.py: cs.cache,cs.fileutils: move file_based and @file_property from cs.fileutils to cs.cache
+lib/python/cs/fileutils.py: cs.fileutils: drop unused import

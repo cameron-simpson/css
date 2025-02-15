@@ -13,11 +13,11 @@ from typeguard import typechecked
 
 from cs.gimmicks import exception
 from cs.gvutils import gvprint, gvsvg, quote as gvq, DOTNodeMixin
-from cs.lex import cutprefix
+from cs.lex import cutprefix, r
 from cs.pfx import Pfx, pfx_call
 from cs.seq import first
 
-__version__ = '20240721.1-post'
+__version__ = '20250120-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -130,6 +130,9 @@ class FSM(DOTNodeMixin):
         state = self.FSM_DEFAULT_STATE
       except AttributeError:
         state = first(self.FSM_TRANSITIONS.keys())
+      else:
+        if state is None:  # who _does_ this? I do :-(
+          state = first(self.FSM_TRANSITIONS.keys())
     if lock is None:
       lock = Lock()
     if transitions is not None:
@@ -306,6 +309,11 @@ class FSM(DOTNodeMixin):
             ANY FSM:state1 FSMTransitionEvent(old_state='state2', new_state='state1', event='ev_b', when=..., extra={'foo': 4})
             'state1'
     '''
+    if state is not self.FSM_ANY_STATE and state not in self.FSM_TRANSITIONS:
+      raise ValueError(
+          "%s.fsm_callback: state %s not in self.FSM_TRANSITIONS %r" %
+          (self, r(state), sorted(self.FSM_TRANSITIONS))
+      )
     with self.__lock:
       self.__callbacks[state].append(callback)
 

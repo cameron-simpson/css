@@ -26,7 +26,8 @@ from typing import List, Optional
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import vprint
+from cs.cache import cachedmethod
+from cs.cmdutils import uses_cmd_options, vprint
 from cs.deco import cachedmethod, default_params, fmtdoc, promote, uses_verbose
 from cs.fs import findup, FSPathBasedSingleton, shortpath
 from cs.fstags import FSTags, TaggedPath, uses_fstags
@@ -59,6 +60,7 @@ DISTINFO = {
         },
     },
     'install_requires': [
+        'cs.cache',
         'cs.deco',
         'cs.fs',
         'cs.fstags',
@@ -145,6 +147,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       except FileNotFoundError:
         return ()
 
+  @uses_cmd_options(hashname=None, modes=None, doit=None, force=False)
   @uses_fstags
   @require(lambda filename: filename and '/' not in filename)
   @typechecked
@@ -154,8 +157,8 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       *,
       fstags: FSTags,
       hashname: str,
-      doit=False,
-      force=False,
+      doit: bool,
+      force: bool,
       modes=RULE_MODES,
   ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.

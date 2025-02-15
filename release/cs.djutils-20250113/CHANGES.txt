@@ -1,0 +1,3 @@
+lib/python/cs/djutils.py: cs.djutils: doc tweak
+lib/python/cs/djutils.py: cs.djutils: model_batches_qs: improve the query which measures the current batch
+lib/python/cs/djutils.py: cs.djutils: remove debugging print

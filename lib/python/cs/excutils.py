@@ -199,11 +199,6 @@ def unattributable(func):
   '''
   return transmute(func, AttributeError, RuntimeError)
 
-def safe_property(func):
-  ''' Substitute for @property which lets AttributeErrors escape as RuntimeErrors.
-  '''
-  return property(unattributable(func))
-
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''

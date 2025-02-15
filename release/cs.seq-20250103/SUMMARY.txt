@@ -1,0 +1,1 @@
+New skip_map(func, *iterables, except_types, quiet=False) generator function, like map() but skipping certain exceptions.

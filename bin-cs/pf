@@ -138,9 +138,7 @@ case $arg1 in
           for name
           do
             case "$name" in
-              ALL)  for pfname in $(portfwd_auto)
-                    do  set-x svcd restart "portfwd-$pfname"
-                    done
+              ALL)  set-x svcd restart $( portfwd_auto | sed 's/^/portfwd-/' )
                     ;;
               *)    set-x svcd restart "portfwd-$name"
                     ;;

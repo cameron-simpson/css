@@ -1,0 +1,1 @@
+BaseCommand.cmd_info: use compact=True with the pforat() call.

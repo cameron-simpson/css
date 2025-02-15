@@ -22,7 +22,7 @@ from threading import Lock, Thread
 from cs.deco import Promotable
 from cs.gimmicks import r
 
-__version__ = '20240630-post'
+__version__ = '20250111-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -31,10 +31,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
+    'markers': [
+        'python_version>=3.3',  # for os.pread
+    ],
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
-        'python_version>=3.3',  # for os.pread
     ],
 }
 

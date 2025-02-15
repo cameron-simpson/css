@@ -14,7 +14,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 import functools
 import sys
-from threading import RLock
+from threading import RLock, Thread
 import time
 from typing import Callable, Optional
 
@@ -24,6 +24,7 @@ from typeguard import typechecked
 from cs.deco import decorator, uses_quiet
 from cs.logutils import debug, exception
 from cs.py.func import funcname
+from cs.queues import IterableQueue, QueueIterator
 from cs.seq import seq
 from cs.threads import bg
 from cs.units import (
@@ -558,6 +559,22 @@ class BaseProgress(object):
           if update_period == 0:
             proxy.text = None
 
+  def qbar(self, label=None, **iterbar_kw) -> QueueIterator:
+    ''' Set up a progress bar, return a `QueueIterator` for receiving items.
+        This is a shim for `Progress.iterbar` which dispatches a
+        worker to iterate a queue which received items placed on
+        the queue.
+    '''
+    Q = IterableQueue(name=label)
+
+    def qbar_worker():
+      for _ in self.iterbar(Q, label=label, **iterbar_kw):
+        pass
+
+    T = Thread(target=qbar_worker, name=f'{self}.qbar.qbar_worker:{label}')
+    T.start()
+    return Q
+
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
 class Progress(BaseProgress):
@@ -1017,11 +1034,12 @@ def progressbar(
     position=None,
     total=None,
     units_scale=UNSCALED_SCALE,
+    upd: Upd,
     **iterbar_kw
 ):
   ''' Convenience function to construct and run a `Progress.iterbar`
       wrapping the iterable `it`,
-      issuing and withdrawning a progress bar during the iteration.
+      issuing and withdrawing a progress bar during the iteration.
 
       Parameters:
       * `it`: the iterable to consume
@@ -1042,6 +1060,8 @@ def progressbar(
           for row in progressbar(rows):
               ... do something with row ...
   '''
+  if upd is None or upd.disabled:
+    return it
   if total is None:
     try:
       total = len(it)
@@ -1055,7 +1075,7 @@ def progressbar(
 def auto_progressbar(func, label=None, report_print=False):
   ''' Decorator for a function accepting an optional `progress`
       keyword parameter.
-      If `progress` is `None` and the default `Upd` is not disabled,
+      If `progress` is not `None` and the default `Upd` is not disabled,
       run the function with a progress bar.
   '''
 

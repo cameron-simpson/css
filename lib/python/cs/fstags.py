@@ -1848,7 +1848,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       prefix: str,
       name: str,
       *,
-      state_func: Optional[Callable[str, Mapping[str, Any]]] = None,
+      state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ) -> "CachedValue":
     ''' Return `CachedValue` managing the  `prefix.name` tag.
     '''
@@ -2031,7 +2031,7 @@ class CachedValue:
       prefix: str,
       name: str,
       *,
-      state_func: Optional[Callable[str, Mapping[str, Any]]] = None,
+      state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ):
     ''' Initialise a cached value reference.
 

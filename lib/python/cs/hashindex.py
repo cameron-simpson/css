@@ -168,13 +168,13 @@ class HashIndexCommand(BaseCommand):
 
     # pylint: disable=use-dict-literal
     COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
         h_=('hashname', 'The file content hash algorithm name.'),
         H_=('hashindex_exe', 'The remote hashindex executable.'),
         o_=(
             'output_format',
             'Output format, default: {OUTPUT_FORMAT_DEFAULT!r}'
         ),
-        **BaseCommand.Options.COMMON_OPT_SPECS,
     )
 
   # pylint: disable=arguments-differ
@@ -514,22 +514,18 @@ def hashindex(
       for the files in `fspath`, which may be a file or directory path.
       Note that it yields `(None,filepath)` for files which cannot be accessed.
   '''
-  match fspath:
-    case TextIOBase():
-      # read hashindex from file
-      f = fspath
-      yield from read_hashindex(f, hashname=hashname, **kw)
-      return
-    case str() as fspath:
-      # a local filesystem path
-      pass
-    case [None, "-"]:
+  if isinstance(fspath, TextIOBase):
+    # read hashindex from file
+    f = fspath
+    yield from read_hashindex(f, hashname=hashname, **kw)
+    return
+  if not isinstance(fspath, str):
+    # should be a 2-tuple
+    if fspath == (None, "-"):
       yield from read_hashindex(sys.stdin, hashname=hashname, **kw)
       return
-    case [None, str() as fspath]:
-      # a local filesystem path because the remote host is None
-      pass
-    case [rhost, rfspath]:
+    rhost, rfspath = fspath
+    if rhost is not None:
       # a remote fspath
       yield from read_remote_hashindex(
           rhost,
@@ -539,8 +535,8 @@ def hashindex(
           **kw,
       )
       return
-    case _:
-      raise TypeError(f'hashindex: unhandled fspath={r(fspath)}')
+    # local fspath because rhost is None
+    fspath = rfspath
   # local hashindex
   if isfilepath(fspath):
     h = file_checksum(fspath, hashname=hashname)

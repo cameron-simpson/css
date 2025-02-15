@@ -1,0 +1,1 @@
+SubCommand.short_subusages: use a single tabluate() table for the entire recursive listing, produces a much more readable short listing.

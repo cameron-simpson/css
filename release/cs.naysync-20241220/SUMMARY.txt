@@ -1,0 +1,2 @@
+New async_iter(Iterable) returning an asynchronous iterator of a synchronous iterable.
+New amap(func,iterable) asynchronously mapping a function over an iterable.

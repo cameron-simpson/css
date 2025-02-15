@@ -42,7 +42,7 @@ from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.csvutils import csv_import
-from cs.deco import cachedmethod
+from cs.cache import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import s

@@ -1,0 +1,4 @@
+lib/python/cs/seq.py: cs.seq: rename a variable, tweak some docstrings
+lib/python/cs/seq.py: csseq: new skip_map(func, *iterables, except_types, quiet=False) generator function, like map() but skipping certain exceptions
+lib/python/cs/seq.py: cs.seq: clean some lint, reformat
+lib/python/cs/seq.py: merge default -> pilfer

@@ -1,0 +1,1 @@
+Prevent automatic creation of the default ConvCache instance on import, which tries to make its cache directory.

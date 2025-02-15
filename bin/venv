@@ -1,13 +1,14 @@
 #!/bin/sh
 #
 # Convenience tool for virtualenv setups.
-#       - Cameron Simpson <cs@cskk.id.au> 07mar2014
+# - Cameron Simpson <cs@cskk.id.au> 07mar2014
 #
 
 set -ue
 
+
 # the base location of the venvs
-: "${VENV_DIR:=$HOME/var/venv}"
+: "${VENV_DIR:="$HOME/var/venv"}"
 
 # this was inline, but vim's syntax highlighting broke
 pyver() {
@@ -16,70 +17,76 @@ pyver() {
   "$1" --version 2>&1 | awk '{print$2}'
 }
 
-cmd=`basename "$0"`
-usage="Usage:
-    $cmd [version]
-    $cmd [version] init [python [venv-dir]]
-    $cmd [version] [exec] command [args...]"
+cmd=$( basename "$0" )
+usage="Usage $cmd [subcmd ...]
+  version   Target Python version, eg 3.12.
+  Subcommands:
+  info      Recite virtualenv information. (Default.)
+  init [pyexe] venvpath [{package|-r requirements-file}...]
+            Create new environment at venvpath with the specified
+            additional packages.
+            pyexe is an optional base python executable for the
+            venv, otherwise python3.
+            venvpath specifies the venv location.
+  exec command ...
+            Execute command with the venv/bin at the from of \$PATH."
 
 trace=
 [ -t 2 ] && trace=set-x
 
 badopts=
 
-case "${1:-''}" in
-  [123]*)   pyver=$1; shift ;;
-  *)        pyver=3 ;;
-esac
-
 if [ $# = 0 ]
-then
-  pyver "$VENV_DIR/$pyver/bin/python"
-  exit $?
+then op=info
+else op=$1; shift
 fi
 
-op=$1
-shift
-
+cmd="$cmd $op"
 case "$op" in
+  info)
+    echo "VIRTUAL_ENV=$VIRTUAL_ENV"
+    pyver "$VIRTUAL_ENV/bin/python"
+    ;;
   init)
-    if [ $# -gt 0 ]
+    if [ $# -gt 0 ] && [ -f "$1" -a -x "$1" ]
     then  pyexe=$1; shift
-    else  pyexe=python$pyver
+    else  pyexe=$( which python3 )
     fi
     pyver=$( pyver "$pyexe" ) || exit 1
-    if [ $# -gt 0 ]
-    then  venvdir=$1; shift; set_major=
-    else  venvdir=$VENV_DIR/$pyver set_major=1
-    fi
-    $trace mkdir -- "$venvdir"
-    $trace virtualenv -p "$pyexe" --system-site-packages ${1+"$@"} -- "$venvdir"
-    if [ $set_major ]
+    if [ $# = 0 ]
     then
-      venvdir_up=$( dirname "$venvdir" )
-      pyver_major=$( expr "x$pyver" : 'x\([1-9]\)\..*' )
-      symlink=$venvdir_up/$pyver_major
-      [ -e "$symlink" ] || $trace ln -s "$pyver" "$symlink"
+      echo "$cmd: missing venvpath" >&2
+      badopts=1
+    else
+      venvpath=$1; shift
+      case "$venvpath" in
+        /* | ./* | ../* ) ;;
+        *)    venvpath=$VENV_DIR/$venvpath ;;
+      esac
+      [ ! -e "$venvpath" ] || {
+        echo "$cmd: venvpath already exists: $venvpath" >&2
+        badopts=1
+      }
     fi
-    exit $?
+    [ $badopts ] && { echo "$usage" >&2; exit 2; }
+    $trace "$pyexe" -m venv "$venvpath"
+    venvpath=$( cd "$venvpath" && pwd )
+    VIRTUAL_ENV=$venvpath
+    export VIRTUAL_ENV
+    pyexe=$VIRTUAL_ENV/bin/python3
+    $trace "$pyexe" -m pip install -U pip wheel uv
+    [ $# = 0 ] || $trace "$VIRTUAL_ENV/bin/uv" pip install "$@"
     ;;
   exec)
+    [ $# -gt 0 ] || {
+      echo "$cmd: missing command" >&2
+      echo "$usage" >&2
+      exit 2
+    }
+    exec $trace env "PATH=$VIRTUAL_ENV/bin:$PATH" -- "$@"
     ;;
-  # put the command back
-  *)set -- "$op" ${1+"$@"}
+  *)echo "$cmd: unrecognised subcommand" >&2
+    echo "$usage" >&2
+    exit 2
     ;;
 esac
-
-if [ $# = 0 ]
-then
-  echo "$cmd: missing command" >&2
-  badopts=1
-fi
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-venvdir=$VENV_DIR/$pyver
-PATH=$venvdir/bin:$PATH
-export PATH
-
-exec $trace "$@"

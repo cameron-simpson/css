@@ -25,8 +25,9 @@ from cs.logutils import warning, error, exception
 from cs.pfx import Pfx, PrePfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.queues import IterableQueue
-from cs.resources import not_closed, ClosedError, MultiOpenMixin, RunState
+from cs.resources import MultiOpenMixin, RunState
 from cs.result import Result, ResultSet
+from cs.semantics import not_closed, ClosedError
 from cs.seq import seq, Seq
 from cs.threads import locked, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE, DECIMAL_SCALE
@@ -58,6 +59,7 @@ DISTINFO = {
         'cs.queues',
         'cs.resources',
         'cs.result',
+        'cs.semantics',
         'cs.seq',
         'cs.threads',
     ]

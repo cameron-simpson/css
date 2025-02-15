@@ -1,0 +1,1 @@
+Initial PyPI release: ClosedError and @not_closed.

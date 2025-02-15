@@ -1,0 +1,2 @@
+lib/python/cs/cache.py: cs.cache: prevent automatic creation of the default ConvCache instance on import, which tries to make its cache directory
+lib/python/cs/cache.py: cs.cache: add missing import

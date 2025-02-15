@@ -85,10 +85,11 @@ from typeguard import typechecked
 
 from cs.binary import BinarySingleStruct, SimpleBinary
 from cs.buffer import CornuCopyBuffer
+from cs.cache import cachedmethod
 from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
 from cs.csvutils import csv_import
-from cs.deco import cachedmethod, decorator, promote, Promotable
+from cs.deco import decorator, promote, Promotable
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
@@ -115,6 +116,7 @@ DISTINFO = {
         'arrow',
         'cs.binary',
         'cs.buffer',
+        'cs.cache>=cachedmethod',
         'cs.cmdutils',
         'cs.configutils>=HasConfigIni',
         'cs.context',

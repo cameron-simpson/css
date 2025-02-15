@@ -1,0 +1,3 @@
+New rename_excl(oldpath,newpath) to rename oldpath to newpath provided newpath does not exist - race free unlike obsolete saferename.
+atomic_filename: use rename_excl.
+Moved file_based and @file_property from cs.fileutils to cs.cache.

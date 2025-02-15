@@ -14,7 +14,7 @@ anywhere in the code provided this module has been imported somewhere.
 
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
-* `abrk`: a decorator to call `breakpoint(0` in an `AssertionError`
+* `abrk`: a decorator to call `breakpoint()` on an `AssertionError`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`

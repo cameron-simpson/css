@@ -1,0 +1,2 @@
+lib/python/cs/obj.py: cs.obj: fix docstring typo
+lib/python/cs/obj.py: cs.obj: public_subclasses: new optional extras= parameter for additional classes to scan, now return a set

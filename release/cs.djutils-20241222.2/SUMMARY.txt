@@ -1,0 +1,1 @@
+BaseCommand.Options.settings: call settings.configure() on init if that has not already been done.

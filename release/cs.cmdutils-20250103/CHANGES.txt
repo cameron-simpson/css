@@ -1,0 +1,10 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: fix comment typo
+lib/python/cs/cmdutils.py: merge default => pilfer
+lib/python/cs/cmdutils.py: merge default ==> pilfer
+lib/python/cs/cmdutils.py: merge default -> pilfer
+lib/python/cs/cmdutils.py: merge default -> pilfer
+lib/python/cs/cmdutils.py: merge default => pilfer
+lib/python/cs/cmdutils.py: cs.cmdutils: some documentation improvements
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring updates
+lib/python/cs/cmdutils.py: cs.cmdinfo: BaseCommand.cmd_info: default skip_names is self.options.INFO_SKIP_NAMES
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring update

@@ -1,0 +1,1 @@
+lib/python/cs/djutils.py: cs.djutils: new model_instances() wrapper for model_batches_qs() returning an iterable of Model instance

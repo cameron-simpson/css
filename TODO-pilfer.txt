@@ -1,2 +1,22 @@
-use requests for the cs.urlutils URL class
+pipe-stage|pipeline runs the stage and pipes its results to pipeline, passing the original input through to the next stage
+allow mitm addon classes as actions
+√ mitm error and response methods which still call the hook actions
+we should not cache incomplete byte ranges?
+√ mitm to stream everything if no reponse hook
+streaming save action for "pilfer from"
+√ divert the mitm logging through upd.print and make into 1 line?
+"pilfer from" mirror action?
+mitm prefetch action
+recognise ~/foo/ in action params as a regexp and compile it?
+√ need to merge stream handlers, preserve .content if we have any "response" hooks
+the pipelines need to use P.copy_with_vars() for every stage so that vars are inherited and not shared
+enclose params in brackets instead of using the : prefix ?
+drop Set-Cookie from cached headers along with content-encoding?
+graphviz view of pipelines?
+pilfer mitm redirector mode for plugging in the adzapper
+mitm mode: feed Flow to pipes triggered on Addon.request (full request received) ?
+subcommand to dump HTML tags and classes to aid in writing scrapers and recipe decoders etc
+shutdown mode: every stage should be inspectable for idleness? wait for all idle?
+fill in pipeline staging using function type annotations?
+√ use requests for the cs.urlutils URL class
 cs.logutils,pilfer: drop D_mode and the D function

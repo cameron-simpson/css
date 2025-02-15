@@ -1344,6 +1344,15 @@ class SQLTagSet(SingletonMixin, TagSet):
   def __hash__(self):
     return id(self)
 
+  def __lt__(self, other):
+    if self.name is None:
+      if other.name is None:
+        return self.unixtime < other.unixtime
+      return True
+    if other.name is None:
+      return False
+    return self.name < other.name
+
   def __getitem__(self, key):
     try:
       return super().__getitem__(key)
