@@ -1,3 +1,4 @@
+cs.rfc2616: use cornucopybuffer, update read_chunked
 spaces: try using tilde in spaces_pathfor (tried it, does not work with ~/ or /~/)
 spaces: wpr RENEW to scan the spaces configs for the random directories?
 PipeLineSpec.make_stage_funcs: each input (item,P) should become (item,P=P.copy_with_vars(_=item)) so as to have its own set of variables
