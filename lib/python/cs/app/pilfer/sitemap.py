@@ -248,6 +248,23 @@ class DocSite(SiteMap):
       ]
 
 @dataclass
+class MiscDocsSite(DocSite):
+  ''' A general purpose doc site map with keys for `.html` and `.js` URLs
+      along with several other common extensions.
+  '''
+
+  URL_KEY_PATTERNS = [
+      (
+          # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+          (
+              'www.crummy.com',
+              r'/software/BeautifulSoup/bs4/doc/',
+          ),
+          '{__}',
+      ),
+  ]
+
+@dataclass
 class Wikipedia(SiteMap):
 
   URL_KEY_PATTERNS = [
