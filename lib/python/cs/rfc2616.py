@@ -6,9 +6,13 @@
 
 import sys
 import datetime
+from email.headerregistry import BaseHeader, ContentTypeHeader, HeaderRegistry
 from email.parser import BytesFeedParser
+from functools import cache
 from itertools import takewhile
 from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
+from typing import Mapping, Optional, Union
+
 from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
 from cs.logutils import warning
@@ -111,6 +115,45 @@ def get_chunk_ext_val(s, offset=0):
     return get_quoted_string(s, offset)
   else:
     return get_token(s, offset)
+
+@cache
+def default_headerregistry() -> HeaderRegistry:
+  ''' Return the default `email.headerregistry.HeaderRegistry` instance.
+      Note that this is shared and should probably not be modified.
+  '''
+  return HeaderRegistry()
+
+def header(
+    headers: Mapping[str, str],
+    header_name: str,
+    registry: Optional[HeaderRegistry] = None,
+) -> Union[None, BaseHeader]:
+  ''' Return a header parsed into an instance of `email.headerregistry.BaseHeader`
+      or `None` if `header_name` is not present.
+  '''
+  value = headers.get(header_name)
+  if value is None:
+    return None
+  if registry is None:
+    registry = default_headerregistry()
+  return registry(header_name, value)
+
+def content_length(headers: Mapping[str, str]) -> Union[None, int]:
+  ''' Return the value of the `Content-Length` header, or `None`.
+
+      Note that `headers` is expected to be a case insensitive mapping.
+  '''
+  hdr = header(headers, 'content-length')
+  if hdr is None:
+    return None
+  return int(hdr)
+
+def content_type(headers: Mapping[str, str]) -> ContentTypeHeader:
+  ''' Return the parsed value of the `Content-Type` header, or `None`.
+
+      Note that `headers` is expected to be a case insensitive mapping.
+  '''
+  return header(headers, 'content-type')
 
 def parse_chunk_line1(bline):
   ''' Parse the opening line of a chunked-encoding chunk.
