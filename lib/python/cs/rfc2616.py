@@ -1,16 +1,19 @@
 #!/usr/bin/python
 #
-# Convenience routines for working with HTTP 1.1 (RFC2616).
-#   - Cameron Simpson <cs@cskk.id.au> 28dec2014
+# - Cameron Simpson <cs@cskk.id.au> 28dec2014
 #
 
-import sys
+''' Some convenience routines for working with HTTP 1.1 (RFC2616).
+    See https://datatracker.ietf.org/doc/html/rfc2616
+'''
+
 import datetime
 from email.headerregistry import BaseHeader, ContentTypeHeader, HeaderRegistry
 from email.parser import BytesFeedParser
 from functools import cache
 from itertools import takewhile
 from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
+import sys
 from typing import Mapping, Optional, Union
 
 from cs.fileutils import copy_data
@@ -20,15 +23,17 @@ from cs.timeutils import time_func
 from cs.x import X
 
 DISTINFO = {
-    'description':
-    "RFC2616 (HTTP 1.1) facilities",
     'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.timeutils'],
+    'install_requires': [
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.timeutils',
+    ],
 }
 
 # character classes: see RFC2616 part 2.2
