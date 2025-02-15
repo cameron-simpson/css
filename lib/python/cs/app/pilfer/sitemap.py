@@ -110,7 +110,7 @@ class SiteMap(Promotable):
         raise ValueError(
             f'{cls.__name__}.from_str({sitemap_name!r}): no Pilfer to search for sitemaps'
         )
-    for name, sitwmap in P.sitemaps:
+    for name, sitemap in P.sitemaps:
       if name == sitemap_name:
         return sitemap
     raise ValueError(
@@ -133,12 +133,13 @@ class SiteMap(Promotable):
         * `patterns`: the iterable of `(match_to,arg)` 2-tuples
         * `extra`: an optional mapping to be passed to the match function
 
-        Each returned match is a `(match_to,arg,match,mapping)` 4-tuple
-        with the following values:
-        * `match_to`: the pattern's first component, used for matching
-        * `arg`: the pattern's second component, used by the caller to produce some result
+        Eachyielded match is a `SiteMapPatternMatch` instance
+        with the following atttributes:
+        * `sitemap`: `self`
+        * `pattern_test`: the pattern's first component, used for the test
+        * `pattern_arg`: the pattern's second component, used by the caller to produce some result
         * `match`: the match object returned from the match function
-        * `mapping`: a mapping of values cleaned during the match
+        * `mapping`: a mapping of values gleaned during the match
 
         This implementation expects all the patterns to be
         `(match_to,arg)` 2-tuples, where `match_to` is either
@@ -183,7 +184,7 @@ class SiteMap(Promotable):
         )
         mapping.update(url.query_dict())
         mapping.update(match)
-        yield match_to, arg, match, mapping
+        yield SiteMapPatternMatch(self, match_to, arg, match, mapping)
 
   def match(
       self,
@@ -195,9 +196,8 @@ class SiteMap(Promotable):
         returning the first match tuple from `self.matches()`
         or `None` if no match is found.
     '''
-    for match_to, on_match, match, mapping in self.matches(url, patterns,
-                                                           extra=extra):
-      return match_to, on_match, match, mapping
+    for matched in self.matches(url, patterns, extra=extra):
+      return matched
     return None
 
   @promote
@@ -221,8 +221,9 @@ class SiteMap(Promotable):
     matched = self.match(url, self.URL_KEY_PATTERNS, extra=extra)
     if not matched:
       return None
-    match_to, keyfn, match, mapping = matched
-    return keyfn.format_map(ChainMap(mapping, extra or {}))
+    return matched.pattern_arg.format_map(
+        ChainMap(matched.mapping, extra or {})
+    )
 
 # Some presupplied site maps.
 
