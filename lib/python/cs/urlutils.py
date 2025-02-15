@@ -12,7 +12,7 @@ import os
 import os.path
 import re
 import sys
-from typing import Iterable
+from typing import Iterable, Union
 
 from netrc import netrc
 from string import whitespace
@@ -453,6 +453,12 @@ class URL(HasThreadState, Promotable):
     '''
     return URL(urljoin(base, self), referer=base)
 
+  def urlto(self, other: Union["URL", str]) -> "URL":
+    ''' Return `other` resolved against `self.baseurl`.
+        If `other` is an abolute URL it will not be changed.
+    '''
+    return URL(urljoin(self.baseurl, other), referer=self)
+
   def normalised(self):
     ''' Return a normalised URL where "." and ".." components have been processed.
     '''
@@ -494,9 +500,7 @@ class URL(HasThreadState, Promotable):
       except KeyError:
         debug("no href, skip %r", A)
         continue
-      yield URL(
-          (urljoin(self.baseurl, href) if absolute else href), referer=self
-      )
+      yield self.urlto(href) if absolute else URL(href, referer=self)
 
   def srcs(self, *a, **kw):
     ''' All 'src=' values from the content HTML.
@@ -512,9 +516,7 @@ class URL(HasThreadState, Promotable):
       except KeyError:
         debug("no src, skip %r", A)
         continue
-      yield URL(
-          (urljoin(self.baseurl, src) if absolute else src), referer=self
-      )
+      yield self.urlto(src) if absolute else URL(src, referer=self)
 
   def savepath(self, rootdir):
     ''' Compute a local filesystem save pathname for this URL.
