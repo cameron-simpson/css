@@ -3,7 +3,7 @@
 ''' Base class for site maps.
 '''
 
-from collections import ChainMap
+from collections import ChainMap, namedtuple
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
@@ -66,6 +66,17 @@ class URLMatcher(Promotable):
     except (TypeError, ValueError):
       return super().promote(obj)
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
+
+class SiteMapPatternMatch(namedtuple(
+    "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
+  ''' A pattern match result:
+      * `sitemap`: the source `SiteMap` instance
+      * `pattern_test`: the pattern test object
+      * `pattern_arg`: the argument to the pattern
+      * `match`: the match result object from the pattern test
+        such as an `re.Match` instance
+      * `mapping`: a mapping of named values gleaned during the match
+  '''
 
 @dataclass
 class SiteMap(Promotable):
