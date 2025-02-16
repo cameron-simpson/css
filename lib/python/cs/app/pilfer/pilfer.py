@@ -420,6 +420,16 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       return sitemap
     return None
 
+  @promote
+  def url_matches(self, url: URL, pattern_type: str, *, extra=None):
+    ''' Scan `self.sitemaps_for(url)` for patterns matching the URL.
+        Yield `SiteMapPatternMatch` instances for each match.
+    '''
+    for sitemap in self.sitemaps_for(url):
+      patterns = getattr(sitemap, f'{pattern_type}_PATTERNS', None)
+      if patterns:
+        yield from sitemap.matches(url, patterns, extra=extra)
+
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
     if kw:
