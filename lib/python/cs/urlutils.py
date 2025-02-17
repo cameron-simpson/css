@@ -95,13 +95,15 @@ class URL(HasThreadState, Promotable):
   )
 
   @typechecked
-  def __init__(self, url_s: str, referer=None):
+  def __init__(self, url_s: str, referer=None, soup=None, text=None):
     ''' Initialise the `URL` from the URL string `url_s`.
     '''
     self.url_s = url_s
     self._lock = RLock()
     self._parts = None
     self._info = None
+    self._soup = soup
+    self._text = text
     self.flush()
 
   def __str__(self):
@@ -128,8 +130,8 @@ class URL(HasThreadState, Promotable):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      P = self.parsed
-      nodes = P.find_all(k.lower())
+      soup = self.soup
+      nodes = soup.find_all(k.lower())
       if plural:
         return nodes
       node, = nodes
@@ -186,7 +188,9 @@ class URL(HasThreadState, Promotable):
   def text(self) -> str:
     ''' The URL decoded content as a string.
     '''
-    return self.GET_response.text
+    if self._text is None:
+      self._text = self.GET_response.text
+    return self._text
 
   @property
   @unattributable
@@ -251,9 +255,11 @@ class URL(HasThreadState, Promotable):
 
   @cached_property
   @unattributable
-  def parsed(self):
+  def soup(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
+    if self._soup is not None:
+      return self._soup
     try:
       text = self.text
       if self.content_type == 'text/html':
@@ -261,16 +267,15 @@ class URL(HasThreadState, Promotable):
       else:
         parser_names = ('lxml', 'xml')
       try:
-        P = BeautifulSoup(text, 'html5lib')
-        ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
+        soup = BeautifulSoup(text, 'html5lib')
+        ##soup = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
       except Exception as e:
         exception(
             "%s: .parsed: BeautifulSoup(text,html5lib) fails: %s", self, e
         )
-        with open("cs.urlutils-unparsed.html", "wb") as bs:
-          bs.write(self.content)
         raise
-      return P
+      self._soup = soup
+      return soup
     except:
       raise
 
