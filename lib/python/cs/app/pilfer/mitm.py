@@ -360,6 +360,91 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   else:
     PR("  no action for hook", hook_name)
 
+@require(lambda flow: not flow.response.stream)
+@typechecked
+def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
+  ''' The generic operation of conditionally processing the content of a URL.
+
+      This is aimed at gathering the content and calling handlers
+      for the content based on the URL matches. If there are no
+      matches to the URL, the content is not gathered.
+
+      It is written to be called from `responseheaders` hook so
+      that the gathering of content can be conditional on matching
+      the URL.
+      A traditional `mitmproxy` content handlwr would use the `response`
+      hook, but the mere existence of such a hook causes `mitmproxy`
+      to gather the content for all URLs.
+
+      Parameters:
+      * `hook_name`: the `mitmproxy` hook being fired
+      * `flow`: the `Flow` for the URL
+      * `pattern_type`: the name identifying the patterns to use formatches
+      * `P`: the content `Pilfer` which holds the site maps
+
+      For each `Pilfer` site map matches are obtained from `P.url_matches(pattern_type)`.
+      If there are any matches a stream processor is dispatched to collect the content bytes.
+      When all the content is gathered, each match's `.sitemap.{pattern_type.lower()}_content`
+      method is called with `(match,flow,content_bs)`.
+  '''
+  # TODO: avoid prefetched from prefecthed URLs, do not prefetch multiple times
+  PR = lambda *a: print(
+      'PROCESS_CONTENT', pattern_type, hook_name, flow.request, *a
+  )
+  rq = flow.request
+  url = URL(rq.url)
+  if rq.method != "GET":
+    return
+  matches = list(P.url_matches(url, pattern_type))
+  if not matches:
+    # nothing to do
+    return
+
+  def gather_content(bss):
+    ''' Gather the content of the URL.
+        At the end, process the content against each match.
+        We do not use the `response` hook because that would gather
+        content for all URLs instead of just those of interest.
+        We process the stream content before yielding the find `b''` EOF marker.
+    '''
+    try:
+      chunks = []
+      for bs in bss:
+        if len(bs) == 0:
+          break
+        chunks.append(bs)
+        yield bs
+      content_bs = b''.join(chunks)
+      method_name = f'content_{pattern_type.lower()}'
+      for match in matches:
+        try:
+          content_handler = getattr(match.sitemap, method_name)
+        except AttributeError as e:
+          warning(
+              "no %s on match.sitemap of %s",
+              f'{match.sitemap.__class__.__name__}.{method_name}',
+              match,
+          )
+          continue
+        if not callable(content_handler):
+          warning(
+              "%s is not callable on match of %s",
+              f'{match.sitemap.__class__.__name__}.{method_name}',
+              match,
+          )
+          continue
+        try:
+          pfx_call(content_handler, match, flow, content_bs)
+        except Exception as e:
+          warning("match function %s fails: %e", match.pattern_arg, e)
+    finally:
+      # finally, send EOF
+      yield b''
+
+  flow.response.stream = process_stream(
+      gather_content, f'gather content for {pattern_type}'
+  )
+
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
