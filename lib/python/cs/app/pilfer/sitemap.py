@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
 import re
-from typing import Any, Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Mapping, Optional
 
 from cs.deco import promote, Promotable
 from cs.lex import cutsuffix
@@ -122,18 +122,17 @@ class SiteMap(Promotable):
       url: URL,
       patterns: Iterable,  # [Tuple[Tuple[str, str], Any]],
       extra: Optional[Mapping] = None,
-  ) -> Iterable[Tuple[str, str, dict, dict]]:
+  ) -> Iterable[SiteMapPatternMatch]:
     ''' A generator to match `url` against `patterns`, an iterable
         of `(match_to,arg)` 2-tuples which yields
-        a `(match_to,arg,match,mapping)` 4-tuple for each pattern
-        which matches `url`.
+        a `SiteMapPatternMatch` for each pattern which matches `url`.
 
         Parameters:
         * `url`: a `URL` to match
         * `patterns`: the iterable of `(match_to,arg)` 2-tuples
         * `extra`: an optional mapping to be passed to the match function
 
-        Eachyielded match is a `SiteMapPatternMatch` instance
+        Each yielded match is a `SiteMapPatternMatch` instance
         with the following atttributes:
         * `sitemap`: `self`
         * `pattern_test`: the pattern's first component, used for the test
@@ -191,9 +190,9 @@ class SiteMap(Promotable):
       url: URL,
       patterns: Iterable,
       extra: Optional[Mapping] = None,
-  ) -> Tuple[str, str, dict, dict] | None:
-    ''' Scan `patterns` for a match to `url`,
-        returning the first match tuple from `self.matches()`
+  ) -> SiteMapPatternMatch | None:
+    ''' Scan `patterns` for a match to `url`, returning the first
+        match `SiteMapPatternMatch` from `self.matches()`
         or `None` if no match is found.
     '''
     for matched in self.matches(url, patterns, extra=extra):
@@ -239,13 +238,15 @@ class DocSite(SiteMap):
   )
 
   URL_KEY_PATTERNS = [
-      ( # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
-        ( None,
-         r'.*(/|\\'+'|\\'.join(CACHE_SUFFIXES),
-         ),
-       '{__}',
-       ),
-      ]
+      (
+          # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+          (
+              None,
+              r'.*(/|\\' + '|\\'.join(CACHE_SUFFIXES),
+          ),
+          '{__}',
+      ),
+  ]
 
 @dataclass
 class MiscDocsSite(DocSite):
