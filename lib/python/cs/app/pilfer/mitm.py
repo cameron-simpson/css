@@ -452,6 +452,7 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
   assert P is not None
   process_content(hook_name, flow, 'PREFETCH', P=P)
 
+@attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
 def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
