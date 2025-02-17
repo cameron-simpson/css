@@ -1221,8 +1221,11 @@ class BaseCommand:
   Options = BaseCommandOptions
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
+  def __init__(
+      self, argv=None, *, cmd=None, options=None, **kw_options
+  ) -> str:
     ''' Initialise the command line.
+        Return the subcommand name, or `None` if there is only `main`.
         Raises `GetoptError` for unrecognised options.
 
         Parameters:
@@ -1387,8 +1390,10 @@ class BaseCommand:
           e,
           self.usage_text(short=True, show_subcmds=subcmd),
       ):
-        return
+        return subcmd
       raise
+    else:
+      return subcmd
 
   @classmethod
   def method_cmdname(cls, method_name: str):
@@ -1672,7 +1677,7 @@ class BaseCommand:
         then this may be provided by the `run_context()`
         context manager method.
     '''
-    self._prerun_setup()
+    subcmd = self._prerun_setup()
     options = self.options
     try:
       try:
@@ -1689,7 +1694,7 @@ class BaseCommand:
           self.cmd,
           options,
           e,
-          self.usage_text(cmd=self.cmd, short=False),
+          self.usage_text(cmd=self.cmd, show_subcmds=subcmd, short=False),
       ):
         return 2
       raise
