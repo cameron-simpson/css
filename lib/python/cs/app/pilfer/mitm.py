@@ -7,6 +7,7 @@ import asyncio
 from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
+from inspect import isgeneratorfunction
 import os
 from signal import SIGINT
 import sys
@@ -20,8 +21,8 @@ from mitmproxy.options import Options
 ##from mitmproxy.proxy.server import ProxyServer
 from mitmproxy.tools.dump import DumpMaster
 
+from icontract import require
 import requests
-
 from typeguard import typechecked
 
 from cs.cmdutils import vprint
@@ -50,6 +51,7 @@ if sys.stdout.isatty():
 # monkey patch so that Dumper.echo calls the desired print()
 mitmproxy.addons.dumper.print = print
 
+@require(lambda consumer: isgeneratorfunction(consumer))
 @typechecked
 def process_stream(
     consumer: Callable[Iterable[bytes], None],
@@ -60,7 +62,7 @@ def process_stream(
     runstate: Optional[RunState] = None,
 ) -> Callable[bytes, bytes]:
   ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
-      Return a callable to set as the `response.stream` in the caller.
+      Return a callable to set as the `flow.response.stream` in the caller.
 
       The `Flow.response.stream` attribute can be set to a callable
       which accepts a `bytes` instance as its sole callable;
@@ -72,6 +74,8 @@ def process_stream(
 
       Parameters:
       * `consumer`: a callable accepting an iterable of `bytes` instances
+        and returning an iterable of `bytes` instances;
+        usually a generator function yielding `bytes` instances
       * `progress_name`: optional progress bar name, default `None`;
         do not present a progress bar if `None`
       * `content_length`: optional expected length of the data stream,
@@ -117,32 +121,58 @@ def process_stream(
         progress_Q.close()
 
     runstate.notify_cancel.add(cancel_Qs)
-  data_Q = IterableQueue(name=name)
-  Thread(target=consumer, args=(data_Q,), name=name).start()
 
-  def copy_bs(bs: bytes) -> bytes:
-    ''' Copy `bs` to the `Data_Q` and also to the `progress_Q` if not `None`.
-        Return `bs` unchanged.
+  def filter_data(Qin, Qout):
+    ''' consume `data_Q` via the `consumer()` function, yield `bytes` istances.
+      '''
+    try:
+      for obs in consumer(Qin):
+        Qout.put(obs)
+    finally:
+      Qout.close()
+
+  # dispatch a worker Thread to consume data_Q and put results on post_Q
+  data_Q = IterableQueue(name=f'{name} -> consumer')
+  post_Q = IterableQueue(name=f'{name} <- consumer')
+  Thread(
+      target=filter_data,
+      args=(data_Q, post_Q),
+      name=f'{name}: data_Q -> consumer -> post_Q',
+  ).start()
+
+  def copy_bs(bs: bytes) -> Iterable[bytes]:
+    ''' Copy `bs` to the `data_Q` and also to the `progress_Q` if not `None`.
+        Yield chunks from the `post_Q`.
     '''
-    if data_Q.closed:
-      if len(bs) > 0:
-        warning(
-            "discarding %d bytes after close of data_Q:%s", len(bs),
-            data_Q.name
-        )
-    else:
+    if len(bs) == 0:
       try:
-        if len(bs) == 0:
-          data_Q.close()
-          if progress_Q is not None:
-            progress_Q.close()
-        else:
-          data_Q.put(bs)
-          if progress_Q is not None:
-            progress_Q.put(bs)
-      except Exception as e:
-        warning("%s: exception: %s", name, s(e))
-    return bs
+        # end of input = shut down the streams and collect the entire post_Q
+        data_Q.close()
+        if progress_Q is not None:
+          progress_Q.close()
+        # yield the remaining data from post_Q
+        for obs in post_Q:
+          if len(obs) > 0:
+            yield obs
+      finally:
+        # EOF
+        yield b''
+    else:
+      if data_Q.closed:
+        if len(bs) > 0:
+          warning(
+              "discarding %d bytes after close of data_Q:%s", len(bs),
+              data_Q.name
+          )
+      else:
+        data_Q.put(bs)
+        if progress_Q is not None:
+          progress_Q.put(bs)
+        # yield any ready data from post_Q
+        while not post_Q.empty():
+          obs = next(post_Q)
+          if len(bs) > 0:
+            yield obs
 
   return copy_bs
 
@@ -355,6 +385,7 @@ class MITMHookAction(Promotable):
   HOOK_SPEC_MAP = {
       'cache': cached_flow,
       'dump': dump_flow,
+      'prefetch': prefetch_urls,
       'print': print_rq,
       'save': save_stream,
       'stream': stream_flow,
@@ -549,30 +580,39 @@ class MITMAddon:
         stream, = stream_funcs
 
       else:
+        assert len(stream_funcs) > 1
 
-        def stream(bs: bytes) -> bytes:
+        def stream(bs: bytes) -> Iterable[bytes]:
           ''' Run each `bytes` instance through all the stream functions.
-              '''
+          '''
           stream_excs = []
+          bss = [bs]
           for stream_func in stream_funcs:
-            try:
-              bs2 = stream_func(bs)
-            except Exception as e:
-              warning(
-                  "exception calling hook_action stream_func %s: %s",
-                  funccite(stream_func), e
-              )
-              stream_excs.append(e)
-              ##breakpoint()
-            else:
-              bs = bs2
+            # feed bss through the stream function, collect results for the next function
+            obss = []
+            for bs in bss:
+              try:
+                obs = stream_func(bs)
+              except Exception as e:
+                warning(
+                    "exception calling hook_action stream_func %s: %s",
+                    funccite(stream_func), e
+                )
+                stream_excs.append(e)
+                ##breakpoint()
+              else:
+                if isinstance(obs, bytes):
+                  obss.append(obs)
+                else:
+                  obss.extend(obs)
+            bss = obss
           if excs:
             if len(excs) == 1:
               raise excs[0]
             raise ExceptionGroup(
                 f'multiple exceptions running actions for .{hook_name}', excs
             )
-          return bs
+          return bss
 
       flow.response.stream = stream
 
