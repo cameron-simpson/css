@@ -448,6 +448,12 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
+def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
+  assert P is not None
+  process_content(hook_name, flow, 'PREFETCH', P=P)
+
+@uses_pilfer
+@typechecked
 def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
   rsp = flow.response
   save_as = pfx_call(P.format_string, save_as_format, flow.request.url)
