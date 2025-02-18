@@ -1,3 +1,4 @@
+cache should cache against all sitemap keys
 pipe-stage|pipeline runs the stage and pipes its results to pipeline, passing the original input through to the next stage
 allow mitm addon classes as actions
 √ mitm error and response methods which still call the hook actions
