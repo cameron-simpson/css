@@ -1,3 +1,4 @@
+prefetch should skip+warning URLswith no cache keys
 requestheaders should block on in-progress identifcal fetches based on the cache keys?
 cache should cache against all sitemap keys
 pipe-stage|pipeline runs the stage and pipes its results to pipeline, passing the original input through to the next stage
