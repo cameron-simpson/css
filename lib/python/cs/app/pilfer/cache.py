@@ -218,7 +218,6 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         rsp.content,
         rsp.request.headers,
         rsp.headers,
-        old_md=old_md,
         mode=mode,
     )
 
@@ -231,7 +230,6 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       rq_headers,
       rsp_headers,
       *,
-      old_md: Optional[dict] = None,
       mode: str = 'modified',
       decoded=False,
       progress_name=None,
@@ -261,8 +259,6 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         rsp_headers = dict(rsp_headers)
         del rsp_headers['content-encoding']
     with self:
-      if old_md is None:
-        old_md = self.get(cache_key, {}, mode=mode)
       # new content file path
       urlbase, urlext = splitext(basename(url.path))
       content_type = rsp_headers.get('content-type', '').split(';')[0].strip()
@@ -324,7 +320,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
           'response_headers': dict(rsp_headers),
       }
       self[cache_key] = md
-      # remove the old content fie if different
+      # remove the old content file if different
+      old_md = self.get(cache_key, {}, mode=mode)
       old_content_rpath = old_md.get('content_rpath', '')
       if old_content_rpath and old_content_rpath != content_rpath:
         pfx_call(os.remove, self.cached_pathto(old_content_rpath))
