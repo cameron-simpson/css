@@ -105,6 +105,15 @@ DEFAULT_FILENAME_FORMAT = (
     '{series_prefix}{series_episode_name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
+# default "ls" output format
+LS_FORMAT = (
+    '{playon.ID} {playon.HumanSize} {resolution}'
+    ' {nice_name} {playon.ProviderID} {status:upper}'
+)
+
+# default "queue" output format
+QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
+
 # download parallelism
 DEFAULT_DL_PARALLELISM = 2
 
@@ -117,16 +126,6 @@ def main(argv=None):
 class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
   '''
-
-  # default "ls" output format
-  LS_FORMAT = (
-      '{playon.ID} {playon.HumanSize} {resolution}'
-      ' {nice_name} {playon.ProviderID} {status:upper}'
-  )
-
-  # default "queue" output format
-  QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
-
   USAGE_KEYWORDS = {
       'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
@@ -467,7 +466,7 @@ class PlayOnCommand(BaseCommand):
           -o format Format string for each entry.
           Default format: {LS_FORMAT}
     '''
-    return self._list(argv, self.options, ['available'], self.LS_FORMAT)
+    return self._list(argv, self.options, ['available'], LS_FORMAT)
 
   def cmd_poll(self, argv):
     if argv:
@@ -482,7 +481,7 @@ class PlayOnCommand(BaseCommand):
           -o format Format string for each entry.
           Default format: {QUEUE_FORMAT}
     '''
-    return self._list(argv, self.options, ['queued'], self.QUEUE_FORMAT)
+    return self._list(argv, self.options, ['queued'], QUEUE_FORMAT)
 
   cmd_q = cmd_queue
 
