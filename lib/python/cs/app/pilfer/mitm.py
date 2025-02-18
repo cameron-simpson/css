@@ -223,15 +223,16 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   # scan the sitemaps for the first one offering a key for this URL
   # extra values for use
   extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
+  cache = P.content_cache
+  cache_keys = []
   for sitemap in P.sitemaps_for(url):
     url_key = sitemap.url_key(url, extra=extra)
     if url_key is not None:
-      break
-  else:
+      cache_keys.append(cache.cache_key_for(sitemap, url_key))
+  if not cache_keys:
     PR("no URL key")
     return
-  cache = P.content_cache
-  cache_key = cache.cache_key_for(sitemap, url_key)
+  cache_key = cache_keys[0]
   with cache:
     if rsp:
       # update the cache
@@ -246,7 +247,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
         # response from upstream, update the cache
-        PR("to cache, cache_key", cache_key)
+        PR("to cache, cache_key", ", ".join(cache_keys))
         if rsp.content is None:
           # we are at the response headers
           # and will stream the content to the cache file
