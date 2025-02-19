@@ -290,6 +290,7 @@ class PlayOnCommand(BaseCommand):
     '''
     options = self.options
     dl_jobs = options.dl_jobs
+    no_download = options.dry_run
     sqltags = options.sqltags
     if not argv:
       argv = ['pending']
