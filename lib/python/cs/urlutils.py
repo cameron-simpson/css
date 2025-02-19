@@ -12,7 +12,7 @@ import os
 import os.path
 import re
 import sys
-from typing import Iterable
+from typing import Iterable, Union
 
 from netrc import netrc
 from string import whitespace
@@ -95,13 +95,15 @@ class URL(HasThreadState, Promotable):
   )
 
   @typechecked
-  def __init__(self, url_s: str, referer=None):
+  def __init__(self, url_s: str, referer=None, soup=None, text=None):
     ''' Initialise the `URL` from the URL string `url_s`.
     '''
     self.url_s = url_s
     self._lock = RLock()
     self._parts = None
     self._info = None
+    self._soup = soup
+    self._text = text
     self.flush()
 
   def __str__(self):
@@ -128,8 +130,8 @@ class URL(HasThreadState, Promotable):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      P = self.parsed
-      nodes = P.find_all(k.lower())
+      soup = self.soup
+      nodes = soup.find_all(k.lower())
       if plural:
         return nodes
       node, = nodes
@@ -186,7 +188,9 @@ class URL(HasThreadState, Promotable):
   def text(self) -> str:
     ''' The URL decoded content as a string.
     '''
-    return self.GET_response.text
+    if self._text is None:
+      self._text = self.GET_response.text
+    return self._text
 
   @property
   @unattributable
@@ -251,9 +255,11 @@ class URL(HasThreadState, Promotable):
 
   @cached_property
   @unattributable
-  def parsed(self):
+  def soup(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
+    if self._soup is not None:
+      return self._soup
     try:
       text = self.text
       if self.content_type == 'text/html':
@@ -261,16 +267,15 @@ class URL(HasThreadState, Promotable):
       else:
         parser_names = ('lxml', 'xml')
       try:
-        P = BeautifulSoup(text, 'html5lib')
-        ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
+        soup = BeautifulSoup(text, 'html5lib')
+        ##soup = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
       except Exception as e:
         exception(
             "%s: .parsed: BeautifulSoup(text,html5lib) fails: %s", self, e
         )
-        with open("cs.urlutils-unparsed.html", "wb") as bs:
-          bs.write(self.content)
         raise
-      return P
+      self._soup = soup
+      return soup
     except:
       raise
 
@@ -453,6 +458,12 @@ class URL(HasThreadState, Promotable):
     '''
     return URL(urljoin(base, self), referer=base)
 
+  def urlto(self, other: Union["URL", str]) -> "URL":
+    ''' Return `other` resolved against `self.baseurl`.
+        If `other` is an abolute URL it will not be changed.
+    '''
+    return URL(urljoin(self.baseurl, other), referer=self)
+
   def normalised(self):
     ''' Return a normalised URL where "." and ".." components have been processed.
     '''
@@ -494,9 +505,7 @@ class URL(HasThreadState, Promotable):
       except KeyError:
         debug("no href, skip %r", A)
         continue
-      yield URL(
-          (urljoin(self.baseurl, href) if absolute else href), referer=self
-      )
+      yield self.urlto(href) if absolute else URL(href, referer=self)
 
   def srcs(self, *a, **kw):
     ''' All 'src=' values from the content HTML.
@@ -512,9 +521,7 @@ class URL(HasThreadState, Promotable):
       except KeyError:
         debug("no src, skip %r", A)
         continue
-      yield URL(
-          (urljoin(self.baseurl, src) if absolute else src), referer=self
-      )
+      yield self.urlto(src) if absolute else URL(src, referer=self)
 
   def savepath(self, rootdir):
     ''' Compute a local filesystem save pathname for this URL.

@@ -3,12 +3,12 @@
 ''' Base class for site maps.
 '''
 
-from collections import ChainMap
+from collections import ChainMap, namedtuple
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
 import re
-from typing import Any, Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Mapping, Optional
 
 from cs.deco import promote, Promotable
 from cs.lex import cutsuffix
@@ -53,6 +53,31 @@ class URLMatcher(Promotable):
       return None
     return m.groupdict()
 
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to `URLMatcher`:
+        - `(hostname_fnmatch,url_regexp)` 2-tuples
+        - `url_regexp` strings
+    '''
+    if isinstance(obj, cls):
+      return obj
+    try:
+      hostname_fnmatch, url_regexp = obj
+    except (TypeError, ValueError):
+      return super().promote(obj)
+    return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
+
+class SiteMapPatternMatch(namedtuple(
+    "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
+  ''' A pattern match result:
+      * `sitemap`: the source `SiteMap` instance
+      * `pattern_test`: the pattern test object
+      * `pattern_arg`: the argument to the pattern
+      * `match`: the match result object from the pattern test
+        such as an `re.Match` instance
+      * `mapping`: a mapping of named values gleaned during the match
+  '''
+
 @dataclass
 class SiteMap(Promotable):
   ''' A base class for site maps.
@@ -85,7 +110,7 @@ class SiteMap(Promotable):
         raise ValueError(
             f'{cls.__name__}.from_str({sitemap_name!r}): no Pilfer to search for sitemaps'
         )
-    for name, sitwmap in P.sitemaps:
+    for name, sitemap in P.sitemaps:
       if name == sitemap_name:
         return sitemap
     raise ValueError(
@@ -97,23 +122,23 @@ class SiteMap(Promotable):
       url: URL,
       patterns: Iterable,  # [Tuple[Tuple[str, str], Any]],
       extra: Optional[Mapping] = None,
-  ) -> Iterable[Tuple[str, str, dict, dict]]:
+  ) -> Iterable[SiteMapPatternMatch]:
     ''' A generator to match `url` against `patterns`, an iterable
         of `(match_to,arg)` 2-tuples which yields
-        a `(match_to,arg,match,mapping)` 4-tuple for each pattern
-        which matches `url`.
+        a `SiteMapPatternMatch` for each pattern which matches `url`.
 
         Parameters:
         * `url`: a `URL` to match
         * `patterns`: the iterable of `(match_to,arg)` 2-tuples
         * `extra`: an optional mapping to be passed to the match function
 
-        Each returned match is a `(match_to,arg,match,mapping)` 4-tuple
-        with the following values:
-        * `match_to`: the pattern's first component, used for matching
-        * `arg`: the pattern's second component, used by the caller to produce some result
+        Each yielded match is a `SiteMapPatternMatch` instance
+        with the following atttributes:
+        * `sitemap`: `self`
+        * `pattern_test`: the pattern's first component, used for the test
+        * `pattern_arg`: the pattern's second component, used by the caller to produce some result
         * `match`: the match object returned from the match function
-        * `mapping`: a mapping of values cleaned during the match
+        * `mapping`: a mapping of values gleaned during the match
 
         This implementation expects all the patterns to be
         `(match_to,arg)` 2-tuples, where `match_to` is either
@@ -158,21 +183,20 @@ class SiteMap(Promotable):
         )
         mapping.update(url.query_dict())
         mapping.update(match)
-        yield match_to, arg, match, mapping
+        yield SiteMapPatternMatch(self, match_to, arg, match, mapping)
 
   def match(
       self,
       url: URL,
       patterns: Iterable,
       extra: Optional[Mapping] = None,
-  ) -> Tuple[str, str, dict, dict] | None:
-    ''' Scan `patterns` for a match to `url`,
-        returning the first match tuple from `self.matches()`
+  ) -> SiteMapPatternMatch | None:
+    ''' Scan `patterns` for a match to `url`, returning the first
+        match `SiteMapPatternMatch` from `self.matches()`
         or `None` if no match is found.
     '''
-    for match_to, on_match, match, mapping in self.matches(url, patterns,
-                                                           extra=extra):
-      return match_to, on_match, match, mapping
+    for matched in self.matches(url, patterns, extra=extra):
+      return matched
     return None
 
   @promote
@@ -196,8 +220,9 @@ class SiteMap(Promotable):
     matched = self.match(url, self.URL_KEY_PATTERNS, extra=extra)
     if not matched:
       return None
-    match_to, keyfn, match, mapping = matched
-    return keyfn.format_map(ChainMap(mapping, extra or {}))
+    return matched.pattern_arg.format_map(
+        ChainMap(matched.mapping, extra or {})
+    )
 
 # Some presupplied site maps.
 
@@ -212,15 +237,33 @@ class DocSite(SiteMap):
       '/ .css .gif .html .ico .jpg .js .png .svg .webp .woff2'.split()
   )
 
-  @promote
-  def url_key(self, url: URL, **_) -> str | None:
-    ''' Return a key for `.html` and `.js` and `..../` URLs.
-    '''
-    if url.path.endswith(self.CACHE_SUFFIXES):
-      key = url.path.lstrip('/')
-      if key.endswith('/'):
-        key += 'index.html'
-      return f'{url.hostname}/{key}'
+  URL_KEY_PATTERNS = [
+      (
+          # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+          (
+              None,
+              r'.*(/|\\' + '|\\'.join(CACHE_SUFFIXES),
+          ),
+          '{__}',
+      ),
+  ]
+
+@dataclass
+class MiscDocsSite(DocSite):
+  ''' A general purpose doc site map with keys for `.html` and `.js` URLs
+      along with several other common extensions.
+  '''
+
+  URL_KEY_PATTERNS = [
+      (
+          # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+          (
+              'www.crummy.com',
+              r'/software/BeautifulSoup/bs4/doc/',
+          ),
+          '{__}',
+      ),
+  ]
 
 @dataclass
 class Wikipedia(SiteMap):

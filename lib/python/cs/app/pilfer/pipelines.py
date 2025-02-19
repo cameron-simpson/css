@@ -116,8 +116,9 @@ class PipeLineSpec(Promotable):
               await outaq.put((subitem, sentinel))
 
           async def per(inq, pipespec):
-            ''' Process a single `item` through its own pipeline.
+            ''' Process each item from `inq` through its own pipeline.
                 Run all the subpipelines concurrently.
+                This means that the output may have pipeline outputs interleaved.
             '''
             aq = AQueue()  # async queue producing `(item,result)` 2-tuples
             nsubpipes = 0  # number of dispatched subpipelines

@@ -202,7 +202,8 @@ class PilferCommand(BaseCommand):
 
   @popopts
   def cmd_from(self, argv):
-    ''' Usage: {cmd} source [pipeline-defns..]
+    ''' Usage: {cmd} source [pipeline-defns...]
+          Scrape information from source.
           Source may be a URL or "-" to read URLs from standard input.
     '''
     options = self.options
@@ -353,7 +354,13 @@ class PilferCommand(BaseCommand):
           warning("unparsed text: %r", action[offset:])
           bad_actions = True
           continue
-        pfx_call(mitm_addon.add_action, hook_names, mitm_action, args, kwargs)
+        try:
+          pfx_call(
+              mitm_addon.add_action, hook_names, mitm_action, args, kwargs
+          )
+        except ValueError as e:
+          warning("invalid action spec: %s", e)
+          bad_actions = True
     if bad_actions:
       raise GetoptError("invalid action specifications")
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
