@@ -225,7 +225,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   def cache_response(
       self,
       url: URL,
-      cache_key: str,
+      cache_keys: str | Iterable[str],
       content: bytes | Iterable[bytes],
       rq_headers,
       rsp_headers,
@@ -235,9 +235,13 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       progress_name=None,
       runstate: Optional[RunState] = None,
   ) -> dict:
-    ''' Cache the `content` of a URL against `cache_key`.
+    ''' Cache the `content` of a URL against `cache_keys`.
         Return the resulting cache metadata for the response.
     '''
+    if isinstance(cache_keys, str):
+      cache_keys = (cache_keys,)
+    else:
+      cache_keys = tuple(cache_keys)
     if isinstance(content, bytes):
       content = [content]
     content = iter(content)
@@ -267,24 +271,11 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       else:
         warning("no response Content-Type")
         ctext = ''
-      # partition thekey into a directory part and the final component
-      # used as the basis for the cache filename
-      try:
-        ckdir, ckbase = cache_key.rsplit('/', 1)
-      except ValueError:
-        ckdir = None
-        ckbase = cache_key
-        contentdir = self.cached_path
-      else:
-        contentdir = self.cached_pathto(ckdir)
-        needdir(
-            contentdir, use_makedirs=True
-        ) and vprint("made", shortpath(contentdir))
       # write the content file
       # only make filesystem items if all the required compute succeeds
       ext = urlext or ctext
       with NamedTemporaryFile(
-          dir=contentdir,
+          dir=self.cached_path,
           prefix='.cache_response--',
           suffix=ext,
       ) as T:
@@ -296,36 +287,54 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         T.flush()
         runstate.raiseif()
         h = self.hashclass(hasher.digest())
-        content_base = (
-            f'{ckbase}--{urlbase or "index"}'[:128] + f'--{h}{ext}'
-        )
-        content_path = joinpath(contentdir, content_base)
-        content_rpath = (
-            content_base if ckdir is None else joinpath(ckdir, content_base)
-        )
-        # link the temp file to the final name
-        if existspath(content_path):
-          pfx_call(os.rename, T.name, content_path)
-          with open(T.name, 'xb'):
-            pass
-        else:
-          pfx_call(os.link, T.name, content_path)
-      # the new metadata
-      md = {
-          'url': str(url),
-          'unixtime': time.time(),
-          'content_hash': str(h),
-          'content_rpath': content_rpath,
-          'request_headers': dict(rq_headers),
-          'response_headers': dict(rsp_headers),
-      }
-      self[cache_key] = md
-      # remove the old content file if different
-      old_md = self.get(cache_key, {}, mode=mode)
-      old_content_rpath = old_md.get('content_rpath', '')
-      if old_content_rpath and old_content_rpath != content_rpath:
-        pfx_call(os.remove, self.cached_pathto(old_content_rpath))
-      return md
+        # link the content to the various cache locations
+        first_md = None
+        for cache_key in cache_keys:
+          # partition the key into a directory part and the final component
+          # used as the basis for the cache filename
+          try:
+            ckdir, ckbase = cache_key.rsplit('/', 1)
+          except ValueError:
+            ckdir = None
+            ckbase = cache_key
+            contentdir = self.cached_path
+          else:
+            contentdir = self.cached_pathto(ckdir)
+            needdir(
+                contentdir, use_makedirs=True
+            ) and vprint("made", shortpath(contentdir))
+          content_base = (
+              f'{ckbase}--{urlbase or "index"}'[:128] + f'--{h}{ext}'
+          )
+          content_path = joinpath(contentdir, content_base)
+          content_rpath = (
+              content_base if ckdir is None else joinpath(ckdir, content_base)
+          )
+          # link the temp file to the final name
+          if existspath(content_path):
+            pfx_call(os.rename, T.name, content_path)
+            with open(T.name, 'xb'):
+              pass
+          else:
+            pfx_call(os.link, T.name, content_path)
+          # update the metadata
+          old_md = self.get(cache_key, {}, mode=mode)
+          md = {
+              'url': str(url),
+              'unixtime': time.time(),
+              'content_hash': str(h),
+              'content_rpath': content_rpath,
+              'request_headers': dict(rq_headers),
+              'response_headers': dict(rsp_headers),
+          }
+          self[cache_key] = md
+          if first_md is None:
+            first_md = md
+          # remove the old content file if different
+          old_content_rpath = old_md.get('content_rpath', '')
+          if old_content_rpath and old_content_rpath != content_rpath:
+            pfx_call(os.remove, self.cached_pathto(old_content_rpath))
+      return first_md
 
 if __name__ == '__main__':
   sitemap = SiteMap()
