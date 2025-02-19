@@ -12,7 +12,7 @@ import os
 from signal import SIGINT
 import sys
 from threading import Thread
-from typing import Callable, Iterable, Mapping, Optional
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 from mitmproxy import ctx, http
 import mitmproxy.addons.dumper
@@ -51,13 +51,14 @@ if sys.stdout.isatty():
 # monkey patch so that Dumper.echo calls the desired print()
 mitmproxy.addons.dumper.print = print
 
-@require(lambda consumer: isgeneratorfunction(consumer))
+##@require(lambda consumer, is_sink: is_sink or isgeneratorfunction(consumer))
 @typechecked
 def process_stream(
-    consumer: Callable[Iterable[bytes], None],
+    consumer: Callable[Iterable[bytes], Any],
     progress_name: Optional[str] = None,
     *,
     content_length: Optional[int] = None,
+    is_sink: bool = False,
     name: Optional[str] = None,
     runstate: Optional[RunState] = None,
 ) -> Callable[bytes, bytes]:
@@ -75,11 +76,15 @@ def process_stream(
       Parameters:
       * `consumer`: a callable accepting an iterable of `bytes` instances
         and returning an iterable of `bytes` instances;
-        usually a generator function yielding `bytes` instances
+        often a generator function yielding `bytes` instances;
+        (unless `is_sink`, see below)
       * `progress_name`: optional progress bar name, default `None`;
         do not present a progress bar if `None`
       * `content_length`: optional expected length of the data stream,
         typically supplied from the response 'Content-Length` header
+      * `is_sink`: optional flag, default `False`;
+        if true then `consumer` is not expected to yiled the flow through data,
+        if false then consumer is expected to yield possibly filtered data
       * `name`: an optional string to name the worker `Thread`,
         default from `progress_name` or the name of `consumer`
 
@@ -121,6 +126,24 @@ def process_stream(
         progress_Q.close()
 
     runstate.notify_cancel.add(cancel_Qs)
+
+  if is_sink:
+    sink_Q = IterableQueue(name=f'{name} -> consumer-sink')
+
+    def copy_to_sink(bss):
+      try:
+        for bs in bss:
+          sink_Q.put(bs)
+          yield bs
+      finally:
+        sink_Q.close()
+
+    Thread(
+        target=consumer,
+        args=(sink_Q,),
+        name=f'{name}: sink_Q -> consumer (sink)',
+    ).start()
+    consumer = copy_to_sink
 
   def filter_data(Qin, Qout):
     ''' consume `data_Q` via the `consumer()` function, yield `bytes` istances.
@@ -265,6 +288,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               ),
               f'cache {cache_key}',
               content_length=content_length(rsp.headers),
+              is_sink=True,
               runstate=flow.runstate,
           )
 
