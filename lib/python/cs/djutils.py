@@ -237,6 +237,7 @@ def model_batches_qs(
     desc=False,
     exclude=None,
     filter=None,
+    only=None,
 ) -> Iterable[QuerySet]:
   ''' A generator yielding `QuerySet`s which produce nonoverlapping
       batches of `Model` instances.
@@ -257,6 +258,7 @@ def model_batches_qs(
         descending order instead of ascending order
       * `exclude`: optional mapping of Django query terms to exclude by
       * `filter`: optional mapping of Django query terms to filter by
+      * `only`: optional sequence of field names for a Django query `.only()`
 
       Example iteration of a `Model` would look like:
 
@@ -305,6 +307,8 @@ def model_batches_qs(
       qs0 = qs0.filter(**filter)
     else:
       qs0 = qs0.filter(filter)
+  if only is not None:
+    qs0 = qs0.only(*only)
   qs = qs0.order_by(ordering)[:chunk_size]
   while True:
     key_list = list(qs.only(field_name).values_list(field_name, flat=True))
@@ -319,6 +323,7 @@ def model_batches_qs(
 def model_instances(
     model: Model,
     field_name='pk',
+    only=None,
     **mbqs_kw,
 ) -> Iterable[Model]:
   ''' A generator yielding Model instances.
