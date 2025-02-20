@@ -1,3 +1,4 @@
+BUG - if the content comes from the cache the mitm fetch does not happen, so the following stream stages do not run against the content
 prefetch should skip+warning URLswith no cache keys
 requestheaders should block on in-progress identifcal fetches based on the cache keys?
 cache should cache against all sitemap keys
