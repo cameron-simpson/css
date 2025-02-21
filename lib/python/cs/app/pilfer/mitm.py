@@ -246,16 +246,11 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   # scan the sitemaps for the first one offering a key for this URL
   # extra values for use
   extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
-  cache = P.content_cache
-  cache_keys = []
-  for sitemap in P.sitemaps_for(url):
-    url_key = sitemap.url_key(url, extra=extra)
-    if url_key is not None:
-      cache_keys.append(cache.cache_key_for(sitemap, url_key))
+  cache_keys = P.cache_keys_for_url(url, extra=extra)
   if not cache_keys:
-    PR("no URL key")
+    PR("no URL keys")
     return
-  cache_key = cache_keys[0]
+  cache = P.cache
   with cache:
     if rsp:
       # update the cache
@@ -270,7 +265,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
         # response from upstream, update the cache
-        PR("to cache, cache_key", ", ".join(cache_keys))
+        PR("to cache, cache_keys", ", ".join(cache_keys))
         if rsp.content is None:
           # we are at the response headers
           # and will stream the content to the cache file
@@ -278,7 +273,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           rsp.stream = process_stream(
               lambda bss: cache.cache_response(
                   url,
-                  cache_key,
+                  cache_keys,
                   bss,
                   rqhdrs,
                   rsp.headers,
@@ -286,7 +281,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   decoded=False,
                   runstate=flow.runstate,
               ),
-              f'cache {cache_key}',
+              f'cache {cache_keys}',
               content_length=content_length(rsp.headers),
               is_sink=True,
               runstate=flow.runstate,
@@ -296,7 +291,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           assert hook_name == "response"
           md = cache.cache_response(
               url,
-              cache_key,
+              cache_keys,
               rsp.content,
               rqhdrs,
               rsphdrs,
@@ -306,8 +301,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
     else:
       # probe the cache
       assert hook_name == 'requestheaders'
-      md = cache.get(cache_key, {}, mode=mode)
-      if not md:
+      cache_key, md = cache.find(cache_keys)
+      if cache_key is None:
         # nothing cached
         PR("not cached, pass through")
         # we want to cache this, remove headers which can return a 304 Not Modified
@@ -315,6 +310,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           if hdr in rq.headers:
             del rq.headers[hdr]
         return
+      # a known key
       if rq.method == 'HEAD':
         content = b''
       else:
@@ -419,6 +415,7 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
   rq = flow.request
   url = URL(rq.url)
   if rq.method != "GET":
+    PR("not a GET, ignoring")
     return
   matches = list(P.url_matches(url, pattern_type))
   if not matches:
