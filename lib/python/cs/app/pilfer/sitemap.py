@@ -78,6 +78,12 @@ class SiteMapPatternMatch(namedtuple(
       * `mapping`: a mapping of named values gleaned during the match
   '''
 
+  def format_arg(self, extra: Optional[Mapping] = None) -> str:
+    ''' Treat `self.pattern_arg` as a format string and format it
+        using `self.mapping` and `extra`.
+    '''
+    return self.pattern_arg.format_map(ChainMap(self.mapping, extra or {}))
+
 @dataclass
 class SiteMap(Promotable):
   ''' A base class for site maps.
@@ -217,12 +223,10 @@ class SiteMap(Promotable):
         This base implementation matches the patterns in `URL_KEY_PATTERNS`
         class attribute which is `()` for the base class.
     '''
-    matched = self.match(url, self.URL_KEY_PATTERNS, extra=extra)
-    if not matched:
+    match = self.match(url, self.URL_KEY_PATTERNS, extra=extra)
+    if not match:
       return None
-    return matched.pattern_arg.format_map(
-        ChainMap(matched.mapping, extra or {})
-    )
+    return match.format_arg(extra=extra)
 
 # Some presupplied site maps.
 
