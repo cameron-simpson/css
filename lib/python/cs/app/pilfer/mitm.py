@@ -286,7 +286,6 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               is_sink=True,
               runstate=flow.runstate,
           )
-
         else:
           assert hook_name == "response"
           md = cache.cache_response(
@@ -653,10 +652,12 @@ class MITMAddon:
         warning("exception calling hook_action[%d]: %s", i, e)
         excs.append(e)
       if hook_name == 'responseheaders':
-        # if the .stream attribute was set, append it to the
-        # stream functions and reset the .stream attribute
-        if flow.response.stream:
-          stream_funcs.append(flow.response.stream)
+        # If the .stream attribute was modified, append it to the
+        # stream functions and reset the .stream attribute.
+        stream = flow.response.stream
+        if stream is not stream0:
+          if stream:
+            stream_funcs.append(stream)
           flow.response.stream = stream0
     if hook_name == 'responseheaders' and stream_funcs:
       # After the actions have run, define the stream attribute
@@ -667,7 +668,7 @@ class MITMAddon:
       # them together. If there's only one, we pass it straight
       # though without a wrapper.
       #
-      # Also, if there's a action for the "response" hook we
+      # Also, if there's an action for the "response" hook we
       # append a stream function which collates the final
       # output of the stream functions and computes a `.content`
       # attribute so that the "response" action has a valid
