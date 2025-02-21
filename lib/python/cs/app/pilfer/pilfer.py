@@ -523,7 +523,15 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
 
-  # Note: this method is _last_ because otherwise it it shadows the
+  def cache_keys_for_url(self, url, *, extra=None):
+    cache = self.content_cache
+    cache_keys = []
+    for match in self.url_matches(url, pattern_type='URL_KEY', extra=extra):
+      url_key = match.format_arg(extra=extra)
+      cache_keys.append(cache.cache_key_for(match.sitemap, url_key))
+    return cache_keys
+
+  # Note: this method is _last_ because otherwise it shadows the
   # @promote decorator, used on earlier methods.
   @classmethod
   def promote(cls, P):
