@@ -151,6 +151,19 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     return iter(self)
 
+  @trace
+  def find(self, keys: Iterable[str]) -> Mapping | None:
+    ''' Search the cache for entries from `keys`.
+        Return `(k,md)` for the first key found where `k` is the
+        matching key and `md` is the metadata entry.
+        Return `(None,None)` if no key matches.
+    '''
+    for k in keys:
+      value = self._query(k)
+      if value is not None:
+        return k, value
+    return None, None
+
   @typechecked
   def __getitem__(self, key: str) -> dict:
     value = self._query(key)
