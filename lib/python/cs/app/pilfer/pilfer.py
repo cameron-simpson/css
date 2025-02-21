@@ -110,6 +110,14 @@ class PseudoFlow:
   request: requests.Request = None
   response: requests.Response = None
 
+def cache_url(item_P):
+  ''' Pilfer base action for caching a UR.
+      Passes theough `item_P`, a 2-tuple of `(url,Pilfer)`.
+  '''
+  url, P = item_P
+  P.cache_url(url)
+  return item_P
+
 @dataclass
 class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
@@ -560,21 +568,3 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return P
 
 uses_pilfer = default_params(P=Pilfer.default)
-
-@promote
-@uses_pilfer
-def cache(url: URL, *, sitemap: SiteMap = None, P: Pilfer):
-  if sitemap is None:
-    sitemap = P.sitemap_for(url)
-    if sitemap is not None:
-      vprint("cache: sitemap", sitemap, "for", url)
-      url_key = sitemap.url_key(url)
-      if url_key is not None:
-        vprint("cache", sitemap, "->", url_key)
-        with P.content_cache:
-          P.content_cache.cache_url(url, sitemap)
-      else:
-        vprint("cache", sitemap, "no key for", url)
-    else:
-      vprint("cache: no sitemap for", url)
-  yield url
