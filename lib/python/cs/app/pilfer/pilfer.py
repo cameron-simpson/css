@@ -531,6 +531,24 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       cache_keys.append(cache.cache_key_for(match.sitemap, url_key))
     return cache_keys
 
+  @promote
+  def cache_url(self, url: URL, mode='missing', *, extra=None):
+    ''' Cache the content of `url` in the cache if missing/updated
+        as indicated by `mode`.
+        Return a mapping of each cache key to the cached metadata.
+    '''
+    matches = list(self.url_matches(url, pattern_type='URL_KEY', extra=extra))
+    if not matches:
+      print("cache_url: no matches for", url)
+      return
+    cache = self.content_cache
+    with cache:
+      cache_keys = [
+          cache.cache_key_for(match.sitemap, match.format_arg(extra=extra))
+          for match in matches
+      ]
+      return cache.cache_url(url, cache_keys, mode=mode)
+
   # Note: this method is _last_ because otherwise it shadows the
   # @promote decorator, used on earlier methods.
   @classmethod
