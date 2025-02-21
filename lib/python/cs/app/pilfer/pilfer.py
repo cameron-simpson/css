@@ -21,9 +21,10 @@ import shlex
 import sys
 from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
 
 import requests
+from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
@@ -35,7 +36,6 @@ from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
-from cs.obj import copy as obj_copy
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
