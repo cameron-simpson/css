@@ -54,11 +54,11 @@ mitmproxy.addons.dumper.print = print
 ##@require(lambda consumer, is_sink: is_sink or isgeneratorfunction(consumer))
 @typechecked
 def process_stream(
-    consumer: Callable[Iterable[bytes], Any],
+    consumer: Callable[Iterable[bytes], Iterable[bytes] | None],
     progress_name: Optional[str] = None,
     *,
     content_length: Optional[int] = None,
-    is_sink: bool = False,
+    is_filter: bool = False,
     name: Optional[str] = None,
     runstate: Optional[RunState] = None,
 ) -> Callable[bytes, bytes]:
@@ -74,17 +74,17 @@ def process_stream(
       enables that.
 
       Parameters:
-      * `consumer`: a callable accepting an iterable of `bytes` instances
-        and returning an iterable of `bytes` instances;
-        often a generator function yielding `bytes` instances;
-        (unless `is_sink`, see below)
+      * `consumer`: a callable accepting an iterable of `bytes` instances;
+        if `is_filter` (default `False`) then this is expected to
+        return an iterable of `bytes`, otherwise it is expected to
+        be a sink
       * `progress_name`: optional progress bar name, default `None`;
         do not present a progress bar if `None`
       * `content_length`: optional expected length of the data stream,
         typically supplied from the response 'Content-Length` header
-      * `is_sink`: optional flag, default `False`;
-        if true then `consumer` is not expected to yiled the flow through data,
-        if false then consumer is expected to yield possibly filtered data
+      * `is_filter`: optional flag, default `False`;
+        if true then `consumer` is expected to return a iterable of `bytes`,
+        otherwise it is treated as a sink
       * `name`: an optional string to name the worker `Thread`,
         default from `progress_name` or the name of `consumer`
 
@@ -127,7 +127,8 @@ def process_stream(
 
     runstate.notify_cancel.add(cancel_Qs)
 
-  if is_sink:
+  if not is_filter:
+    # wrap a sink function in a change-nothing filter
     sink_Q = IterableQueue(name=f'{name} -> consumer-sink')
 
     def copy_to_sink(bss):
@@ -283,10 +284,11 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
               ),
               f'cache {cache_keys}',
               content_length=content_length(rsp.headers),
-              is_sink=True,
               runstate=flow.runstate,
           )
         else:
+          # we are at the completed response
+          # pass rsp.content to the cache
           assert hook_name == "response"
           md = cache.cache_response(
               url,
@@ -428,39 +430,36 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
         content for all URLs instead of just those of interest.
         We process the stream content before yielding the find `b''` EOF marker.
     '''
-    try:
-      chunks = []
-      for bs in bss:
-        if len(bs) == 0:
-          break
-        chunks.append(bs)
-        yield bs
-      content_bs = b''.join(chunks)
-      method_name = f'content_{pattern_type.lower()}'
-      for match in matches:
-        try:
-          content_handler = getattr(match.sitemap, method_name)
-        except AttributeError as e:
-          warning(
-              "no %s on match.sitemap of %s",
-              f'{match.sitemap.__class__.__name__}.{method_name}',
-              match,
-          )
-          continue
-        if not callable(content_handler):
-          warning(
-              "%s is not callable on match of %s",
-              f'{match.sitemap.__class__.__name__}.{method_name}',
-              match,
-          )
-          continue
-        try:
-          pfx_call(content_handler, match, flow, content_bs)
-        except Exception as e:
-          warning("match function %s fails: %e", match.pattern_arg, e)
-    finally:
-      # finally, send EOF
-      yield b''
+    chunks = []
+    for bs in bss:
+      print("GATHER", len(bs), "bytes")
+      if len(bs) == 0:
+        break
+      chunks.append(bs)
+    content_bs = b''.join(chunks)
+    method_name = f'content_{pattern_type.lower()}'
+    for match in matches:
+      try:
+        content_handler = getattr(match.sitemap, method_name)
+      except AttributeError as e:
+        warning(
+            "no %s on match.sitemap of %s",
+            f'{match.sitemap.__class__.__name__}.{method_name}',
+            match,
+        )
+        continue
+      if not callable(content_handler):
+        warning(
+            "%s is not callable on match of %s",
+            f'{match.sitemap.__class__.__name__}.{method_name}',
+            match,
+        )
+        continue
+      try:
+        pfx_call(content_handler, match, flow, content_bs)
+      except Exception as e:
+        warning("match function %s fails: %e", match.pattern_arg, e)
+        raise
 
   flow.response.stream = process_stream(
       gather_content, f'gather content for {pattern_type}'
