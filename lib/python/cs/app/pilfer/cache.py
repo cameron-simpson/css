@@ -59,22 +59,31 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       for token, rq in inq:
         result = None
         try:
-          if isinstance(rq, tuple):
-            key, value = rq
-            assert isinstance(key, str)
-            assert isinstance(value, dict)
-            cache_map[self.dbmkey(key)] = json.dumps(value).encode('utf-8')
-          else:
+          if rq is None:
+            # look up the current keys
+            # TODO: decode in an undbmkey() method?
+            result = tuple((self.undbmkey(k) for k in cache_map.keys()))
+            breakpoint()
+          elif isinstance(rq, str):
+            # query a key
             key = rq
             assert isinstance(key, str)
             result = cache_map.get(self.dbmkey(key), None)
             if result is not None:
               result = json.loads(result.decode('utf-8'))
+          elif isinstance(rq, tuple):
+            # set the value for a key
+            key, value = rq
+            assert isinstance(key, str)
+            assert isinstance(value, dict)
+            cache_map[self.dbmkey(key)] = json.dumps(value).encode('utf-8')
+          else:
+            warning("%s: discarding unhandled request %s", self, r(rq))
         finally:
           outq.put((token, result))
 
   @typechecked
-  def _query(self, rq: Tuple[str, dict] | str):
+  def _query(self, rq: Tuple[str, dict] | str | None):
     token = object()
     with self._query_lock:
       self._to_worker.put((token, rq))
@@ -127,12 +136,15 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     return key.encode('utf-8')
 
+  def undbmkey(self, key_bs: bytes) -> str:
+    ''' The `str` form of a binary key: decode using UTF-8.
+    '''
+    return key_bs.decode('utf-8')
+
   def __iter__(self):
     ''' Return an iterator of the cache keys.
     '''
-    raise RuntimeError
-    for dbmkey in self.cache_map:
-      yield dbmkey.decode('utf-8')
+    return iter(self._query(None))
 
   def keys(self):
     ''' Get the keys by iteration.
