@@ -145,7 +145,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   later: Later = field(default_factory=Later)
   base_actions: Mapping[str, Any] = field(
       default_factory=lambda: dict(
-          cache=one_to_many(cache, with_P=True),
+          cache_url=one_to_many(cache_url, with_P=True),
           hrefs=one_to_many(hrefs),
           print=one_to_many(lambda item: (print(item), item)[-1:]),
           srcs=one_to_many(srcs),
