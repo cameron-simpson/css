@@ -120,7 +120,7 @@ do
         xit=0
         if [ $ruff ]
         then
-          $trace ruff check --output-format=concise "$lintfile" || xit=1
+          $trace ruff check --output-format=concise "--target-version=${RUFF_PYTHON_VERSION:-py38}" "$lintfile" || xit=1
         else
           $trace $python -We:invalid -m py_compile "$lintfile" || exit 1
           $trace $pyflakes "$lintfile" || xit=1
