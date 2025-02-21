@@ -219,33 +219,43 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   @promote
   @require(lambda mode: mode in ('missing', 'modified', 'force'))
   @typechecked
-  def cache_url(self, url: URL, sitemap: SiteMap, mode='missing') -> dict:
-    ''' Cache the contents of `url` if the request URL cache key is not `None`.
-        Return the resulting cache metadata for the URL.
+  def cache_url(self,
+                url: URL,
+                cache_keys: Iterable[str],
+                mode='missing') -> Mapping[str, dict]:
+    ''' Cache the contents of `url` against `cache_keys`.
+        Return a mapping of each cache key to the cached metadata.
     '''
-    url_key = sitemap.url_key(url)
-    if url_key is None:
-      warning("no URL cache key for %r", url)
-      return None
-    cache_key = self.cache_key_for(sitemap, url_key)
-    old_md = self.get(cache_key, {}, mode=mode)
-    if old_md:
-      # perform checks against the previous state
-      # since mode!="metadata", this implies the old content_rpath exists
-      if mode == 'missing':
-        return old_md
-      if mode == 'modified':
-        # check the etag if we have the old one
-        etag = old_md.get('response_headers', {}).get('etag', '').strip()
-        if etag:
-          head_rsp = URL.HEAD_response
-          if etag == head_rsp.headers.get('etag', '').strip():
-            return old_md
+    cache_keys = tuple(cache_keys)
+    if not cache_keys:
+      return
+    md_map = {}
+    missing_keys = []
+    for cache_key in cache_keys:
+      old_md = self.get(cache_key, {}, mode=mode)
+      if old_md:
+        # perform checks against the previous state
+        # since mode!="metadata", this implies the old content_rpath exists
+        if mode == 'missing':
+          md_map[cache_key] = old_md
+          continue
+        if mode == 'modified':
+          # check the etag if we have the old one
+          etag = old_md.get('response_headers', {}).get('etag', '').strip()
+          if etag:
+            head_rsp = URL.HEAD_response
+            if etag == head_rsp.headers.get('etag', '').strip():
+              md_map[cache_key] = old_md
+              continue
+      missing_keys.append(cache_key)
+    # if the cache is up to date, return immediately
+    if not missing_keys:
+      return md_map
     # fetch the current content
     rsp = url.GET_response
     return self.cache_response(
         url,
-        cache_key,
+        cache_keys,
         rsp.content,
         rsp.request.headers,
         rsp.headers,
