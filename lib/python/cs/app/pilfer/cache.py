@@ -17,7 +17,7 @@ from queue import Queue
 from tempfile import NamedTemporaryFile
 from threading import Lock, Thread
 import time
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Mapping, Optional, Tuple
 
 from icontract import require
 
@@ -63,7 +63,6 @@ class ContentCache(HasFSPath, MultiOpenMixin):
             # look up the current keys
             # TODO: decode in an undbmkey() method?
             result = tuple((self.undbmkey(k) for k in cache_map.keys()))
-            breakpoint()
           elif isinstance(rq, str):
             # query a key
             key = rq
@@ -194,6 +193,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     return md
 
   def get_content(self, cache_key: str) -> bytes:
+    ''' Return the entire cached content as a single `bytes` instance.
+    '''
     md = self[cache_key]
     content_rpath = md.get('content_rpath', '')
     if not content_rpath:
