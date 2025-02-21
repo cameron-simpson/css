@@ -165,11 +165,17 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     return None, None
 
   @typechecked
-  def __getitem__(self, key: str) -> dict:
-    value = self._query(key)
-    if value is None:
-      raise KeyError(key)
-    return value
+  def __getitem__(self, key: str | Iterable[str]) -> dict:
+    ''' Return the first existing metadata entry from `key`.
+    '''
+    if isinstance(key, str):
+      keys = key,
+    else:
+      keys = tuple(key)
+    k, md = self.find(keys)
+    if k is None:
+      raise KeyError(keys)
+    return md
 
   def get(self, key: str, default=None, *, mode='metadata'):
     ''' Get the metadata for for `key`, or `default` if it is missing or not valid.
