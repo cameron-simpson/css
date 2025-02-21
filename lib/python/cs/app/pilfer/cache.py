@@ -275,14 +275,17 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       decoded=False,
       progress_name=None,
       runstate: Optional[RunState] = None,
-  ) -> dict:
+  ) -> Mapping[str, dict]:
     ''' Cache the `content` of a URL against `cache_keys`.
-        Return the resulting cache metadata for the response.
+        Return a mapping of each cache key to the cached metadata.
     '''
     if isinstance(cache_keys, str):
       cache_keys = (cache_keys,)
     else:
       cache_keys = tuple(cache_keys)
+    md_map = {}
+    if not cache_keys:
+      return md_map
     if isinstance(content, bytes):
       content = [content]
     content = iter(content)
@@ -292,7 +295,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       content_length = None if content_length_s is None else int(
           content_length_s
       )
-      content = trace(progressbar)(
+      content = progressbar(
           content,
           progress_name,
           total=content_length,
@@ -315,6 +318,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       # write the content file
       # only make filesystem items if all the required compute succeeds
       ext = urlext or ctext
+      md_map = {}
       with NamedTemporaryFile(
           dir=self.cached_path,
           prefix='.cache_response--',
@@ -329,7 +333,6 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         runstate.raiseif()
         h = self.hashclass(hasher.digest())
         # link the content to the various cache locations
-        first_md = None
         for cache_key in cache_keys:
           # partition the key into a directory part and the final component
           # used as the basis for the cache filename
@@ -368,14 +371,13 @@ class ContentCache(HasFSPath, MultiOpenMixin):
               'request_headers': dict(rq_headers),
               'response_headers': dict(rsp_headers),
           }
-          self[cache_key] = md
-          if first_md is None:
-            first_md = md
+          self[cache_key] = md  # cache mapping
+          md_map[cache_key] = md  # return mapping
           # remove the old content file if different
           old_content_rpath = old_md.get('content_rpath', '')
           if old_content_rpath and old_content_rpath != content_rpath:
             pfx_call(os.remove, self.cached_pathto(old_content_rpath))
-      return first_md
+      return md_map
 
 if __name__ == '__main__':
   sitemap = SiteMap()
