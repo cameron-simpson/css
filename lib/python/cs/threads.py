@@ -241,19 +241,8 @@ class HasThreadState(ContextManagerMixin):
           (hts, for_with) for hts in cls.get_thread_states(True).values()
       )
     else:
-      enter_tuples = (
-          # all the current objects, marked as not-for-with
-          [
-              (
-                  getattr(
-                      getattr(htscls, htscls.THREAD_STATE_ATTR), 'current',
-                      None
-                  ), False
-              ) for htscls in HasThreadState._HasThreadState_classes
-          ] +
-          # the enter_objects, marked as for-with
-          [(obj, True) for obj in enter_objects or ()]
-      )
+      # just the specified objects, marked as for-with
+      enter_tuples = ((enter_obj, True) for enter_obj in enter_objects)
     enter_it = iter(enter_tuples)
 
     def with_enter_objects():
