@@ -20,6 +20,7 @@ import time
 from typing import Iterable, Mapping, Optional, Tuple
 
 from icontract import require
+import requests
 
 from cs.cmdutils import vprint
 from cs.context import stackattrs
@@ -228,12 +229,21 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   @promote
   @require(lambda mode: mode in ('missing', 'modified', 'force'))
   @typechecked
-  def cache_url(self,
-                url: URL,
-                cache_keys: Iterable[str],
-                mode='missing') -> Mapping[str, dict]:
+  def cache_url(
+      self,
+      url: URL,
+      cache_keys: Iterable[str],
+      mode='missing',
+      **requests_get_kw
+  ) -> Mapping[str, dict]:
     ''' Cache the contents of `url` against `cache_keys`.
         Return a mapping of each cache key to the cached metadata.
+
+        Parameters:
+        * `url`: the URL to fetch using `requests.get`
+        * `cache_keys`: an iterable of cache keys to associate with the response
+        * `mode`: the cache mode, as for `ContentCache.cache_response`
+        Other keywork arguments are passed to `requests.get`
     '''
     cache_keys = tuple(cache_keys)
     if not cache_keys:
@@ -261,11 +271,15 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     if not missing_keys:
       return md_map
     # fetch the current content
-    rsp = url.GET_response
+    rsp = requests.get(url.url, stream=True, **requests_get_kw)
+    if rsp.status_code != 200:
+      raise ValueError(
+          f'cache_url: GET {url}: expected 200 response, got {rsp.status_code}'
+      )
     return self.cache_response(
         url,
         cache_keys,
-        rsp.content,
+        rsp.iter_content(chunk_size=8192),
         rsp.request.headers,
         rsp.headers,
         mode=mode,
