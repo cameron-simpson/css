@@ -776,12 +776,15 @@ async def run_proxy(
     loop = asyncio.get_running_loop()
     # TODO: this belongs in RunState.__enter_exit__
     loop.add_signal_handler(SIGINT, runstate.cancel)
-    try:
-      with URLFetcher(pilfer=P) as worker_task:
-        await proxy.run()  # Run inside the event loop
+    with P:
+      try:
+        prefetcher = URLFetcher(pilfer=P)
+        with prefetcher as worker_task:
+          with stackattrs(P.state, prefetcher=prefetcher):
+            await proxy.run()  # Run inside the event loop
         await worker_task
-    finally:
-      loop.remove_signal_handler(SIGINT)
-      vprint("Stopping mitmproxy.")
-      proxy.shutdown()
-      runstate.fsm_callback_discard('STOPPING', on_cancel)
+      finally:
+        loop.remove_signal_handler(SIGINT)
+        vprint("Stopping mitmproxy.")
+        proxy.shutdown()
+        runstate.fsm_callback_discard('STOPPING', on_cancel)
