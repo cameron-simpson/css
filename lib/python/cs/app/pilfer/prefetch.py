@@ -4,6 +4,7 @@
 '''
 
 import asyncio
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Iterable, Mapping, Optional
@@ -11,7 +12,7 @@ from typing import Iterable, Mapping, Optional
 from cs.deco import promote
 from cs.logutils import warning
 from cs.naysync import IterableAsyncQueue, amap
-from cs.pfx import pfx_cal, pfx_method
+from cs.pfx import pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.result import Result
 from cs.upd import print
@@ -97,6 +98,7 @@ class URLFetcher(MultiOpenMixin):
     async for _ in amap(self.get_url, urlQ, concurrent=True, unordered=True):
       pass
 
+  @contextmanager
   def startup_shutdown(self):
     ''' Open the fetcher, yield the worker task.
     '''
