@@ -44,6 +44,7 @@ from cs.urlutils import URL
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
+from .prefetch import URLFetcher
 
 if sys.stdout.isatty():
   print = upd_print
@@ -765,33 +766,6 @@ async def run_proxy(
   vprint(f'Starting mitmproxy listening on {listen_host}:{listen_port}.')
   on_cancel = lambda rs, transition: proxy.should_exit.set()
   runstate.fsm_callback('STOPPING', on_cancel)
-
-  async def prefetch_worker(urlQ):
-    ''' Worker to fetch URLs from `urlQ` via the mitmproxy.
-    '''
-
-    @promote
-    def get_url(url: URL):
-      ''' Fetch `url` in streaming mode, discarding its content.
-      '''
-      try:
-        rsp = pfx_call(
-            trace(requests.get),
-            url.url,
-            proxies={url.scheme: mitm_proxy_url},
-            stream=True,
-        )
-      except Exception as e:
-        warning("prefetch_worker: %s", e)
-      else:
-        # consume the stream
-        for _ in rsp.iter_content(chunk_size=8192):
-          pass
-
-    async for _ in amap(get_url, urlQ, concurrent=True, unordered=True):
-      pass
-
-  prefetchQ = IterableQueue()
   with stackattrs(
       P,
       prefetchQ=prefetchQ,
@@ -803,11 +777,11 @@ async def run_proxy(
     # TODO: this belongs in RunState.__enter_exit__
     loop.add_signal_handler(SIGINT, runstate.cancel)
     try:
-      asyncio.create_task(prefetch_worker(prefetchQ))
-      await proxy.run()  # Run inside the event loop
+      with URLFetcher(pilfer=P) as worker_task:
+        await proxy.run()  # Run inside the event loop
+        await worker_task
     finally:
       loop.remove_signal_handler(SIGINT)
-      prefetchQ.close()
       vprint("Stopping mitmproxy.")
       proxy.shutdown()
       runstate.fsm_callback_discard('STOPPING', on_cancel)
