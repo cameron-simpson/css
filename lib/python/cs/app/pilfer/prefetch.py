@@ -6,12 +6,14 @@
 import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from queue import Queue
 from threading import Lock
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Mapping, Optional, Union
 
+from cs.context import stackattrs
 from cs.deco import promote
 from cs.logutils import warning
-from cs.naysync import IterableAsyncQueue, amap
+from cs.naysync import amap, aqiter
 from cs.pfx import pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.result import Result
@@ -92,7 +94,9 @@ class URLFetcher(MultiOpenMixin):
               )
 
   @uses_pilfer
-  async def prefetch_worker(self, urlQ, *, P: Pilfer):
+  async def prefetch_worker(
+      self, urls: Iterable[Union[URL, str]], *, P: Pilfer
+  ):
     ''' Worker to fetch URLs from `urlQ` via the mitmproxy.
     '''
     async for _ in amap(self._fetch_url, urls, concurrent=True,
@@ -104,9 +108,11 @@ class URLFetcher(MultiOpenMixin):
     ''' Open the fetcher, yield the worker task.
     '''
     with self.pilfer:
-      q = IterableAsyncQueue()
+      q = Queue()
+      eoq = object()
       try:
-        t = asyncio.create_task(self.prefetch_worker(q))
-        yield t
+        with stackattrs(self, _q=q):
+          t = asyncio.create_task(self.prefetch_worker(aqiter(q, eoq)))
+          yield t
       finally:
-        q.close()
+        q.put(eoq)
