@@ -204,7 +204,7 @@ class HasThreadState(ContextManagerMixin):
       else:
         # just the current instance of the calling class
         currency = {
-            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR, 'current'), None)
+            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
         }
     return currency
 
