@@ -43,17 +43,18 @@ class URLFetcher(MultiOpenMixin):
 
   @pfx_method
   @promote
-  def get_url(self, url: URL):
+  def _fetch_url(self, url: URL):
     ''' Fetch `url` in streaming mode, discarding its content.
     '''
+    PR = lambda *args: print(f'_fetch_url {url}', *args)
+    PR("FETCH", url, "...")
     P = self.pilfer
     cache = P.content_cache
-    PR = lambda *args: print(f'get_url{url}', *args)
     cache_keys = self.pilfer.cache_keys_for_url(url)
     if not cache_keys:
       PR("no cache keys")
       return
-    R = Result(f'get_url({url})')
+    R = Result(f'_fetch_url({url})')
     new_keys = []
     try:
       with self._lock:
@@ -64,7 +65,7 @@ class URLFetcher(MultiOpenMixin):
       if not new_keys:
         PR("all cache keys currently cached or being fetched")
         return
-      PR(f'cache {url} -> new_keys')
+      PR(f'cache {url} -> {new_keys}')
       try:
         R.run_func(
             cache.cache_response,
@@ -72,7 +73,7 @@ class URLFetcher(MultiOpenMixin):
             new_keys,
         )
       except Exception as e:
-        warning("get_url(%s): %s", url, e)
+        warning("_fetch_url(%s): %s", url, e)
     finally:
       # clean out the fetching table
       with self._lock:
@@ -80,13 +81,13 @@ class URLFetcher(MultiOpenMixin):
           try:
             FR = self.fetching[cache_key]
           except KeyError:
-            warning("get_url(%s):no %r in self.fetching", url, cache_key)
+            warning("_fetch_url(%s):no %r in self.fetching", url, cache_key)
           else:
             if FR is R:
               del self.fetching[cache_key]
             else:
               warning(
-                  "get_url(%s): self.fetching[%r] is not our Result", url,
+                  "_fetch_url(%s): self.fetching[%r] is not our Result", url,
                   cache_key
               )
 
@@ -94,8 +95,8 @@ class URLFetcher(MultiOpenMixin):
   async def prefetch_worker(self, urlQ, *, P: Pilfer):
     ''' Worker to fetch URLs from `urlQ` via the mitmproxy.
     '''
-
-    async for _ in amap(self.get_url, urlQ, concurrent=True, unordered=True):
+    async for _ in amap(self._fetch_url, urls, concurrent=True,
+                        unordered=True):
       pass
 
   @contextmanager
