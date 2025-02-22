@@ -22,6 +22,7 @@ import sys
 from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
+from types import SimpleNamespace as NS
 
 import requests
 from typeguard import typechecked
@@ -153,6 +154,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       )
   )
   content_cache: ContentCache = None
+  # for optional extra things hung on the Pilfer object
+  state: NS = field(default_factory=NS)
   _diversion_tasks: dict = field(default_factory=dict)
 
   @uses_later
