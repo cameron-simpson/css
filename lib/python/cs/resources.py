@@ -73,6 +73,7 @@ class _MultiOpenMixinOpenCloseState:
   opens_from: Mapping = field(default_factory=lambda: defaultdict(int))
   final_close_from: StackSummary = None
   join_lock: Lock = None
+  enter_value: Any = None
   _teardown: Callable = None
   _lock: RLock = field(
       default_factory=RLock
@@ -95,7 +96,9 @@ class _MultiOpenMixinOpenCloseState:
         self.opened = True
         self.join_lock = Lock()
         self.join_lock.acquire()
-        self._teardown = setup_cmgr(self.mom.startup_shutdown())
+        self.enter_value, self._teardown = setup_cmgr(
+            self.mom.startup_shutdown()
+        )
     return opens
 
   def close(
@@ -251,7 +254,7 @@ class MultiOpenMixin(ContextManagerMixin):
   def __enter_exit__(self):
     self.open()
     try:
-      yield
+      yield self.MultiOpenMixin_state.enter_value
     finally:
       self.close()
 
