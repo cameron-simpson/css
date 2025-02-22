@@ -266,7 +266,7 @@ class HasThreadState(ContextManagerMixin):
               yield from with_enter_objects()
           else:
             thread_state = getattr(enter_obj, enter_obj.THREAD_STATE_ATTR)
-            with thread_state(curret=enter_obj):
+            with thread_state(current=enter_obj):
               yield from with_enter_objects()
 
     def target_wrapper(*a, **kw):
@@ -299,6 +299,7 @@ class HasThreadState(ContextManagerMixin):
     cls = type(self)
     if enter_objects is None:
       enter_objects = (self,)
+    # run the module level bg() function, below
     return bg(
         func,
         thread_factory=cls.Thread,
@@ -318,7 +319,7 @@ def bg(
     kwargs=None,
     thread_factory=None,
     pre_enter_objects=None,
-    **tfkw,
+    **thread_factory_kw,
 ):
   ''' Dispatch the callable `func` in its own `Thread`;
       return the `Thread`.
@@ -369,7 +370,7 @@ def bg(
   T = thread_factory(
       name=thread_prefix,
       target=thread_body,
-      **tfkw,
+      **thread_factory_kw,
   )
   if not no_logexc:
     func = logexc(func)
