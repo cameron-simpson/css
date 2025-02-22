@@ -232,10 +232,10 @@ class HasThreadState(ContextManagerMixin):
     if name is None:
       name = funcname(target)
     if enter_objects is None:
-      # enter no obejcts
+      # enter no objects
       enter_tuples = ()
     elif isinstance(enter_objects, bool):
-      # all the current objs, marked as for-with or not-for-with
+      # all the current objects, marked as for-with or not-for-with
       for_with = enter_objects
       enter_tuples = tuple(
           (hts, for_with) for hts in cls.get_thread_states(True).values()
