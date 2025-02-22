@@ -767,8 +767,7 @@ async def run_proxy(
   on_cancel = lambda rs, transition: proxy.should_exit.set()
   runstate.fsm_callback('STOPPING', on_cancel)
   with stackattrs(
-      P,
-      prefetchQ=prefetchQ,
+      P.state,
       proxy=proxy,
       mitm_proxy_url=mitm_proxy_url,
       upstream_proxy_url=upstream_proxy_url,
