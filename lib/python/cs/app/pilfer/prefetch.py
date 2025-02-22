@@ -116,3 +116,8 @@ class URLFetcher(MultiOpenMixin):
           yield t
       finally:
         q.put(eoq)
+
+  def put(self, url: Union[URL, str]):
+    ''' Put `url` on the fetch queue.
+    '''
+    self._q.put(url)
