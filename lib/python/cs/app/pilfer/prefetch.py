@@ -70,7 +70,7 @@ class URLFetcher(MultiOpenMixin):
       PR(f'cache {url} -> {new_keys}')
       try:
         R.run_func(
-            cache.cache_response,
+            cache.cache_url,
             url,
             new_keys,
         )
