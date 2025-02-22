@@ -53,6 +53,7 @@ if sys.stdout.isatty():
 mitmproxy.addons.dumper.print = print
 
 ##@require(lambda consumer, is_sink: is_sink or isgeneratorfunction(consumer))
+@uses_pilfer
 @typechecked
 def process_stream(
     consumer: Callable[Iterable[bytes], Iterable[bytes] | None],
@@ -62,6 +63,7 @@ def process_stream(
     is_filter: bool = False,
     name: Optional[str] = None,
     runstate: Optional[RunState] = None,
+    P: Pilfer,
 ) -> Callable[bytes, bytes]:
   ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
       Return a callable to set as the `flow.response.stream` in the caller.
@@ -140,11 +142,10 @@ def process_stream(
       finally:
         sink_Q.close()
 
-    Thread(
-        target=consumer,
-        args=(sink_Q,),
+    P.bg(
+        partial(consumer, sink_Q),
         name=f'{name}: sink_Q -> consumer (sink)',
-    ).start()
+    )
     consumer = copy_to_sink
 
   def filter_data(Qin, Qout):
