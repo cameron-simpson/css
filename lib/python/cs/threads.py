@@ -231,14 +231,14 @@ class HasThreadState(ContextManagerMixin):
     '''
     if name is None:
       name = funcname(target)
-    if enter_objects is True:
-      # the bool True means enter all the state objects, marked as for-with
-      enter_tuples = (
-          (
-              getattr(
-                  getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None
-              ), True
-          ) for htscls in HasThreadState._HasThreadState_classes
+    if enter_objects is None:
+      # enter no obejcts
+      enter_tuples = ()
+    elif isinstance(enter_objects, bool):
+      # all the current objs, marked as for-with or not-for-with
+      for_with = enter_objects
+      enter_tuples = tuple(
+          (hts, for_with) for hts in cls.get_thread_states(True).values()
       )
     else:
       enter_tuples = (
