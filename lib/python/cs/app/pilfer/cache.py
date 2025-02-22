@@ -163,6 +163,14 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         return k, value
     return None, None
 
+  def __contains__(self, keys: Iterable[str] | str):
+    ''' Return `True` if any key from `keys` is known to the cache.
+    '''
+    if isinstance(keys, str):
+      keys = keys,
+    k, _ = self.find(keys)
+    return k is not None
+
   @typechecked
   def __getitem__(self, key: str | Iterable[str]) -> dict:
     ''' Return the first existing metadata entry from `key`.
