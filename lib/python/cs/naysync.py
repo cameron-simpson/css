@@ -217,6 +217,7 @@ async def amap(
     concurrent=False,
     unordered=False,
     indexed=False,
+    fast=False,
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
       for each `item` in the iterable `it`.
@@ -239,6 +240,9 @@ async def amap(
       `(i,result)` instead of just `result`, where `i` is the index
       if each item from `it` counting from `0`.
 
+      If `fast` is true (default `False`) assume that `func` does
+      not block or otherwise take a long time.
+
       Example of an async function to fetch URLs in parallel.
 
           async def get_urls(urls : List[str]):
@@ -252,7 +256,7 @@ async def amap(
                   yield urls[i], response
   '''
   # promote a synchronous function to an asynchronous function
-  func = afunc(func)
+  func = afunc(func, fast=fast)
   # promote the iterable to an asynchronous iterator
   ait = async_iter(it)
   if not concurrent:
