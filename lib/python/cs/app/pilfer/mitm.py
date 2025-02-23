@@ -36,7 +36,7 @@ from cs.logutils import warning
 from cs.naysync import amap, IterableAsyncQueue
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress
-from cs.py.func import funccite
+from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
 from cs.rfc2616 import content_length, content_type
@@ -504,6 +504,12 @@ class MITMHookAction(Promotable):
   action: Callable
   args: list = field(default_factory=list)
   kwargs: dict = field(default_factory=dict)
+
+  def __str__(self):
+    return (
+        self.__class__.__name__ + ':' +
+        func_a_kw(self.action, *self.args, **self.kwargs)
+    )
 
   @property
   def default_hooks(self):
