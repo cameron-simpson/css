@@ -464,12 +464,30 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
       gather_content, f'gather content for {pattern_type}'
   )
 
-@attr(default_hooks=('responseheaders',))
+@attr(default_hooks=(
+    'requestheaders',
+    'responseheaders',
+))
 @uses_pilfer
 @typechecked
 def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
+  ''' Process the content of URLs matching `SiteMap.PREFETCH_PATTERNS`,
+      queuing further URLs for fetching via the `SiteMap.content_prefetch` method.
+
+      Prefetched URLs are requested with the 
+  '''
   assert P is not None
-  process_content(hook_name, flow, 'PREFETCH', P=P)
+  rq = flow.request
+  if hook_name == 'requestheaders':
+    prefetch_flags = rq.headers.pop('x-prefetch', '').strip().split()
+    if 'no' in prefetch_flags:
+      flow.x_prefetch_skip = True
+  elif hook_name == 'responseheaders':
+    if getattr(flow, 'x_prefetch_skip', False):
+    else:
+      process_content(hook_name, flow, 'PREFETCH', P=P)
+  else:
+    warning("prefetch_urls: unexpected hook_name %r", hook_name)
 
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
