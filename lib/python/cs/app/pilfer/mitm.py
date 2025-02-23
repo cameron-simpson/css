@@ -147,6 +147,7 @@ def process_stream(
     P.bg(
         partial(consumer, sink_Q),
         name=f'{name}: sink_Q -> consumer (sink)',
+        enter_objects=True,
     )
     consumer = copy_to_sink
 
