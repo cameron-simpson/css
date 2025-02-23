@@ -151,7 +151,6 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     return iter(self)
 
-  @trace
   def find(self, keys: Iterable[str]) -> Mapping | None:
     ''' Search the cache for entries from `keys`.
         Return `(k,md)` for the first key found where `k` is the
@@ -286,6 +285,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     )
 
   @promote
+  @uses_runstate
   def cache_response(
       self,
       url: URL,
