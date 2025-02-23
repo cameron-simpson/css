@@ -10,11 +10,11 @@
     and capable of transcribing themselves in binary form
     (trivially via `bytes(instance)` and also otherwise).
 
-    Note: this module requires Python 3.6+ because various default
-    behaviours rely on `dict`s preserving their insert order.
-
     See `cs.iso14496` for an ISO 14496 (eg MPEG4) parser
     built using this module.
+
+    Note: this module requires Python 3.6+ because various default
+    behaviours rely on `dict`s preserving their insert order.
 
     Terminology used below:
     * buffer:
@@ -59,6 +59,82 @@
 
     There are several presupplied subclasses for common basic types
     such as `UInt32BE` (an unsigned 32 bit big endian integer).
+
+    # Two Examples
+
+    Here are two examples drawn from `cs.iso14496`.
+    Like all the `Binary*` subclasses, parsing an instance from a
+    stream can be done like this:
+
+        m9 = Matrix9Long.parse(bfr)
+        print("m9.v3", m9.v3)
+
+        edit_list = ELSTBoxBody.parse(bfr)
+        print("edit list: entry_count =", edit_list.entry_count)
+
+    and writing its binary form to a file like this:
+
+        f.write(bytes(m9))
+        f.write(bytes(edit_list))
+
+    A simple `struct` style definitiion for 9 longs:
+
+        Matrix9Long = BinaryMultiStruct(
+            'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
+        )
+
+    An MP4 ELST box:
+
+        class ELSTBoxBody(FullBoxBody):
+          """ An 'elst' Edit List FullBoxBody - section 8.6.6.
+          """
+
+          V0EditEntry = BinaryMultiStruct(
+              'ELSTBoxBody_V0EditEntry', '>Llhh',
+              'segment_duration media_time media_rate_integer media_rate_fraction'
+          )
+          V1EditEntry = BinaryMultiStruct(
+              'ELSTBoxBody_V1EditEntry', '>Qqhh',
+              'segment_duration media_time media_rate_integer media_rate_fraction'
+          )
+
+          @property
+          def entry_class(self):
+            """ The class representing each entry.
+            """
+            return self.V1EditEntry if self.version == 1 else self.V0EditEntry
+
+          @property
+          def entry_count(self):
+            """ The number of entries.
+            """
+            return len(self.entries)
+
+          def parse_fields(self, bfr: CornuCopyBuffer):
+            """ Parse the fields of an `ELSTBoxBody`.
+            """
+            super().parse_fields(bfr)
+            assert self.version in (0, 1)
+            entry_count = UInt32BE.parse_value(bfr)
+            self.entries = list(self.entry_class.scan(bfr, count=entry_count))
+
+          def transcribe(self):
+            """ Transcribe an `ELSTBoxBody`.
+            """
+            yield super().transcribe()
+            yield UInt32BE.transcribe_value(self.entry_count)
+            yield map(self.entry_class.transcribe, self.entries)
+
+    A Edit List box comes in a version 0 and version 1 form, differing
+    in the field sizes in the edit entries.  This defines two
+    flavours of edit entry structure and a property to return the
+    suitable class based on the version field.  The `parse_fields()`
+    method is called from the base `BoxBody` class' `parse()` method
+    to collect addition fields for any box.  For this box it collectsa
+    32 bit `entry_count` and then a list of that many edit entries.
+    The transcription yields corresponding values.
+
+    # Module Contents
 '''
 
 from abc import ABC, abstractmethod, abstractclassmethod
