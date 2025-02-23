@@ -8,6 +8,7 @@ from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
 from inspect import isgeneratorfunction
+from itertools import takewhile
 import os
 from signal import SIGINT
 import sys
@@ -25,6 +26,7 @@ from icontract import require
 import requests
 from typeguard import typechecked
 
+from cs.binary import bs
 from cs.cmdutils import vprint
 from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
@@ -432,13 +434,7 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
         content for all URLs instead of just those of interest.
         We process the stream content before yielding the find `b''` EOF marker.
     '''
-    chunks = []
-    for bs in bss:
-      print("GATHER", len(bs), "bytes")
-      if len(bs) == 0:
-        break
-      chunks.append(bs)
-    content_bs = b''.join(chunks)
+    content_bs = bs().join(takewhile(len, bss))
     method_name = f'content_{pattern_type.lower()}'
     for match in matches:
       try:
