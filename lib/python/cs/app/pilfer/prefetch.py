@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from queue import Queue
 from threading import Lock
-from typing import Iterable, Mapping, Optional, Union
+from typing import Iterable, Mapping, Optional, Tuple, Union
 
 from cs.context import stackattrs
 from cs.deco import promote
@@ -44,12 +44,12 @@ class URLFetcher(MultiOpenMixin):
   fetching: Mapping = field(default_factory=dict)
 
   @pfx_method
-  @promote
-  def _fetch_url(self, url: URL):
+  def _fetch_url(self, url_params: Tuple[str | URL, Mapping]):
     ''' Fetch `url` in streaming mode, discarding its content.
     '''
-    PR = lambda *args: print(f'_fetch_url {url}', *args)
-    PR("FETCH", url, "...")
+    url, get_params = url_params
+    url = URL.promote(url)
+    PR = lambda *args: print(f'FETCH {url}', *args)
     P = self.pilfer
     cache = P.content_cache
     cache_keys = self.pilfer.cache_keys_for_url(url)
@@ -73,6 +73,7 @@ class URLFetcher(MultiOpenMixin):
             cache.cache_url,
             url,
             new_keys,
+            **get_params,
         )
       except Exception as e:
         warning("_fetch_url(%s): %s", url, e)
@@ -117,7 +118,7 @@ class URLFetcher(MultiOpenMixin):
       finally:
         q.put(eoq)
 
-  def put(self, url: Union[URL, str]):
+  def put(self, url: Union[URL, str], get_kw: Optional[Mapping] = None):
     ''' Put `url` on the fetch queue.
     '''
-    self._q.put(url)
+    self._q.put((url, get_kw or {}))
