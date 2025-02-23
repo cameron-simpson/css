@@ -222,6 +222,28 @@ def pt_spec(pt, name=None):
   PTValue.__name__ += '_' + str(next(_pt_spec_seq))
   return PTValue
 
+class bs(bytes):
+  ''' A `bytes subclass with a compact `repr()`.
+  '''
+
+  def __repr__(self):
+    return cropped(super().__repr__())
+
+  def join(self, chunks):
+    ''' `bytes.join` but returning a `bs`.
+    '''
+    return self.__class__(super().join(chunks))
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `bytes` or `memoryview` to a `bs`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, (bytes, memoryview)):
+      return cls(obj)
+    raise TypeError(f'{cls.__name__}.promote({obj.__class__}): cannot promote')
+
 class AbstractBinary(ABC):
   ''' Abstract class for all `Binary`* implementations,
       specifying the abstract `parse` and `transcribe` methods
