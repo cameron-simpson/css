@@ -8,6 +8,7 @@ import copy
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
+from itertools import zip_longest
 import os
 import os.path
 from os.path import (
