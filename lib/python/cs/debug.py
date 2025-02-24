@@ -55,7 +55,7 @@ from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
 from cs.py.func import funccite, funcname, func_a_kw_fmt
-from cs.py.stack import caller
+from cs.py.stack import caller, frames
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.threads import ThreadState
@@ -198,29 +198,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
       * `log_level`: the logging level for the dump.
         If missing or `None`, use `cs.logutils.loginfo.level`.
   '''
-  if stack is None:
-    # default to the current stack
-    stack = traceback.extract_stack()
-  else:
-    # see if we can locate a stack frame
-    tb_frame = None
-    # does it look like a traceback object?
-    try:
-      tb_frame = stack.tb_frame
-    except AttributeError:
-      # does it looks like an exception?
-      try:
-        tb_frame = stack.__traceback__
-      except AttributeError:
-        pass
-    if tb_frame is None:
-      raise TypeError(
-          "stack_dump(stack=%s,...): unhandled stack type" % (r(stack),)
-      )
-    # extract the stack from the frame
-    stack = traceback.extract_stack(f=tb_frame)
-  if limit is not None:
-    stack = stack[:limit]
+  stack = frames(stack, limit=limit)
   if logger is None:
     logger = logging.getLogger()
   elif isinstance(logger, str):
