@@ -315,19 +315,23 @@ async def amap(
   # some capacity limitation on the event loop? I hope not.
   async def consume_ait():
     nonlocal ait, queued, consumed, terminated
+    tasks = []
     try:
       async for item in ait:
         if terminated:
           break
-        create_task(qfunc(queued, item))
+        # Keep a reference to the task so that it is not garbage
+        # collected before completion.
         queued += 1
+        tasks.append(create_task(qfunc(queued, item)))
     finally:
       consumed = True
       if queued == 0:
         # no functions queued, so we must close the resultQ ourselves
         await resultQ.close()
 
-  create_task(consume_ait())
+  # keep a reference to the consumer also
+  consumer = create_task(consume_ait())
   if unordered:
     async for i, result, exc in resultQ:
       if exc is not None:
