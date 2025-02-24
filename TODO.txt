@@ -1,3 +1,4 @@
+ContextManagerMixin: document robust recipe for classws which subclass 2 or more classes which subclass ContextManagerMixin, see cs.Later.Later for example
 cs.rfc2616: use cornucopybuffer, update read_chunked
 spaces: try using tilde in spaces_pathfor (tried it, does not work with ~/ or /~/)
 spaces: wpr RENEW to scan the spaces configs for the random directories?
