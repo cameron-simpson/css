@@ -256,7 +256,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   if not cache_keys:
     PR("no URL keys")
     return
-  cache = P.cache
+  cache = P.content_cache
   with cache:
     if rsp:
       # update the cache
