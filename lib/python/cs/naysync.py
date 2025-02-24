@@ -638,7 +638,7 @@ if __name__ == '__main__':
   if True:  # debugging
 
     async def demo_pipeline2(it: AnyIterable):
-      print("pipeline(hrefs)www.smh.com.au...")
+      print("pipeline(hrefs)...")
       try:
         from cs.app.pilfer.urls import hrefs
       except ImportError as e:
