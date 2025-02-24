@@ -313,17 +313,20 @@ async def amap(
   # Queue all the tasks with their sequence numbers.
   # Does this also need to be an async function in case there's
   # some capacity limitation on the event loop? I hope not.
+  # Keep a mapping of queue number to task so that tasks are not
+  # prematurely garbage collected.
+  tasks = {}
+
   async def consume_ait():
     nonlocal ait, queued, consumed, terminated
-    tasks = []
     try:
       async for item in ait:
         if terminated:
           break
         # Keep a reference to the task so that it is not garbage
         # collected before completion.
+        tasks[queued] = create_task(qfunc(queued, item))
         queued += 1
-        tasks.append(create_task(qfunc(queued, item)))
     finally:
       consumed = True
       if queued <= completed:
@@ -334,6 +337,7 @@ async def amap(
   consumer = create_task(consume_ait())
   if unordered:
     async for i, result, exc in resultQ:
+      del tasks[i]  # release the task reference
       if exc is not None:
         terminated = True
         raise exc
@@ -347,6 +351,7 @@ async def amap(
       heappush(results, i_result_exc)
       while results and results[0][0] == unqueued:
         i, result, exc = heappop(results)
+        del tasks[i]  # release the task reference
         if exc is not None:
           terminated = True
           raise exc
