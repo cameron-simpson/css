@@ -326,8 +326,8 @@ async def amap(
         tasks.append(create_task(qfunc(queued, item)))
     finally:
       consumed = True
-      if queued == 0:
-        # no functions queued, so we must close the resultQ ourselves
+      if queued <= completed:
+        # no functions outstanding, so we must close the resultQ ourselves
         await resultQ.close()
 
   # keep a reference to the consumer also
