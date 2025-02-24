@@ -228,9 +228,9 @@ async def amap(
 
       If `concurrent` is `False` (the default), run each `func(item)`
       call in series.
-
       If `concurrent` is true run the function calls as `asyncio`
       tasks concurrently.
+
       If `unordered` is true (default `False`) yield results as
       they arrive, otherwise yield results in the order of the items
       in `it`, but as they arrive - tasks still evaluate concurrently
