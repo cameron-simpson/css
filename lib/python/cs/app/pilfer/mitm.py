@@ -406,7 +406,7 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
       Parameters:
       * `hook_name`: the `mitmproxy` hook being fired
       * `flow`: the `Flow` for the URL
-      * `pattern_type`: the name identifying the patterns to use formatches
+      * `pattern_type`: the name identifying the patterns to use for matches
       * `P`: the content `Pilfer` which holds the site maps
 
       For each `Pilfer` site map matches are obtained from `P.url_matches(pattern_type)`.
@@ -433,7 +433,6 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
         At the end, process the content against each match.
         We do not use the `response` hook because that would gather
         content for all URLs instead of just those of interest.
-        We process the stream content before yielding the find `b''` EOF marker.
     '''
     content_bs = bs().join(takewhile(len, bss))
     method_name = f'content_{pattern_type.lower()}'
@@ -474,7 +473,10 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
   ''' Process the content of URLs matching `SiteMap.PREFETCH_PATTERNS`,
       queuing further URLs for fetching via the `SiteMap.content_prefetch` method.
 
-      Prefetched URLs are requested with the 
+      Prefetched URLs are requested with the "x-prefetch: no" header,
+      which we use to disable this action from queuing further
+      prefetches from them in an unbound cascade by setting
+      `flow.x_prefetch_skip=True` when the header is found.
   '''
   assert P is not None
   rq = flow.request
@@ -797,6 +799,7 @@ async def run_proxy(
     loop = asyncio.get_running_loop()
     # TODO: this belongs in RunState.__enter_exit__
     loop.add_signal_handler(SIGINT, runstate.cancel)
+    # Hold the root Pilfer open.
     with P:
       try:
         prefetcher = URLFetcher(pilfer=P)
