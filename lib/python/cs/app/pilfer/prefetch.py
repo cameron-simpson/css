@@ -46,6 +46,10 @@ class URLFetcher(MultiOpenMixin):
   @pfx_method
   def _fetch_url(self, url_params: Tuple[str | URL, Mapping]):
     ''' Fetch `url` in streaming mode, discarding its content.
+
+        Because the purpose of the prefetch is to populate the cache,
+        URLs with no cache keys or which are already cached
+        are discarded.
     '''
     url, get_params = url_params
     url = URL.promote(url)
@@ -68,6 +72,7 @@ class URLFetcher(MultiOpenMixin):
         ##PR("all cache keys currently cached or being fetched")
         return
       PR(f'cache -> {new_keys}')
+      # TODO: if there are old keys, link their content to the new keys and skip the fetch?
       try:
         R.run_func(
             cache.cache_url,
