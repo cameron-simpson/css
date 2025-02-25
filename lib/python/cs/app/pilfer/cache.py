@@ -32,6 +32,7 @@ from cs.pfx import pfx_call
 from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.rfc2616 import content_length
 from cs.urlutils import URL
 
 from typeguard import typechecked
@@ -314,14 +315,10 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     content = iter(content)
     if progress_name is not None:
       # present a progress bar if progress_name was supplied
-      content_length_s = rsp_headers.get('content-length')
-      content_length = None if content_length_s is None else int(
-          content_length_s
-      )
       content = progressbar(
           content,
           progress_name,
-          total=content_length,
+          total=content_length(rsp_headers),
           report_print=True,
       )
     if decoded:
