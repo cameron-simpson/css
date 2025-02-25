@@ -102,7 +102,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     try:
       from_worker = Queue()
       worker = Thread(
-          name=f'{self}.worker',
+          name=f'{self} SQLite worker',
           target=self._worker,
           args=(self.dbmpath, to_worker, from_worker),
       )
