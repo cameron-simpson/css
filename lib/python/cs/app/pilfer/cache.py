@@ -32,12 +32,14 @@ from cs.pfx import pfx_call
 from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
-from cs.rfc2616 import content_length
+from cs.rfc2616 import content_length, content_type
 from cs.urlutils import URL
 
 from typeguard import typechecked
 
 from .sitemap import SiteMap
+
+MIN_DURATION = 1.0  # minimum duration for a cache entry
 
 @dataclass
 class ContentCache(HasFSPath, MultiOpenMixin):
@@ -234,7 +236,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       url: URL,
       cache_keys: Iterable[str],
       mode='missing',
-      **requests_get_kw
+      duration: Optional[float] = None,
+      **requests_get_kw,
   ) -> Mapping[str, dict]:
     ''' Cache the contents of `url` against `cache_keys`.
         Return a mapping of each cache key to the cached metadata.
@@ -243,6 +246,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         * `url`: the URL to fetch using `requests.get`
         * `cache_keys`: an iterable of cache keys to associate with the response
         * `mode`: the cache mode, as for `ContentCache.cache_response`
+        * `duration`: optional duration for the cache entry
         Other keywork arguments are passed to `requests.get`
     '''
     cache_keys = tuple(cache_keys)
@@ -283,6 +287,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         rsp.request.headers,
         rsp.headers,
         mode=mode,
+        duration=duration,
     )
 
   @promote
@@ -296,12 +301,25 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       rsp_headers,
       *,
       mode: str = 'modified',
+      duration: Optional[float] = None,
       decoded=False,
       progress_name=None,
       runstate: Optional[RunState] = None,
   ) -> Mapping[str, dict]:
     ''' Cache the `content` of a URL against `cache_keys`.
         Return a mapping of each cache key to the cached metadata.
+
+        Parameters:
+        * `url`: the URL being cached
+        * `cache_keys`: an iterable of cache keys to associate with the response
+        * `content`: a `bytes` or iterable of `bytes` with the URL's content
+        * `rq_headers`: the request headers used obtaining the `content`
+        * `rsp_headers`: the response headers retrieved with the `content`
+        * `mode`: the cache mode, as for `ContentCache.cache_response`
+        * `duration`: optional duration for the cache entry
+        * `decoded`: optional Boolean, default `False`, indicating
+          whether the `content` has been decoded
+        * `progress_name`: optional progress bar name
     '''
     if isinstance(cache_keys, str):
       cache_keys = (cache_keys,)
@@ -313,6 +331,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     if isinstance(content, bytes):
       content = [content]
     content = iter(content)
+    if duration is not None and duration < MIN_DURATION:
+      raise ValueError(f'invalid {duration=}, should be >={MIN_DURATION=}')
     if progress_name is not None:
       # present a progress bar if progress_name was supplied
       content = progressbar(
@@ -338,6 +358,15 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       # write the content file
       # only make filesystem items if all the required compute succeeds
       ext = urlext or ctext
+      now = time.time()
+      base_md = {
+          'url': str(url),
+          'unixtime': now,
+          'request_headers': dict(rq_headers),
+          'response_headers': dict(rsp_headers),
+      }
+      if duration is not None:
+        base_md['expiry'] = now + duration
       md_map = {}
       with NamedTemporaryFile(
           dir=self.cached_path,
@@ -352,6 +381,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         T.flush()
         runstate.raiseif()
         h = self.hashclass(hasher.digest())
+        base_md.update(content_hash=str(h))
         # link the content to the various cache locations
         for cache_key in cache_keys:
           # partition the key into a directory part and the final component
@@ -383,14 +413,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
             pfx_call(os.link, T.name, content_path)
           # update the metadata
           old_md = self.get(cache_key, {}, mode=mode)
-          md = {
-              'url': str(url),
-              'unixtime': time.time(),
-              'content_hash': str(h),
-              'content_rpath': content_rpath,
-              'request_headers': dict(rq_headers),
-              'response_headers': dict(rsp_headers),
-          }
+          md = dict(**base_md, content_rpath=content_rpath)
           self[cache_key] = md  # cache mapping
           md_map[cache_key] = md  # return mapping
           # remove the old content file if different
