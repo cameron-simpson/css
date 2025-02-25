@@ -349,9 +349,9 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     with self:
       # new content file path
       urlbase, urlext = splitext(basename(url.path))
-      content_type = rsp_headers.get('content-type', '').split(';')[0].strip()
-      if content_type:
-        ctext = mimetypes.guess_extension(content_type) or ''
+      ct = content_type(rsp_headers)
+      if ct:
+        ctext = mimetypes.guess_extension(ct.content_type) or ''
       else:
         warning("no response Content-Type")
         ctext = ''
