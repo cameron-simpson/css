@@ -249,8 +249,10 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       return f.read()
 
   @typechecked
-  def __setitem__(self, key: str, metadata: dict):
-    self._query((key, metadata))
+  def __setitem__(self, key: str, md: dict):
+    ''' Set the entry for `key` to `md`.
+    '''
+    self._query((key, md))
 
   def __delitem__(self, key: str):
     ''' Delete the entry for key `key`.
