@@ -183,23 +183,33 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     return iter(self)
 
-  def find(self, keys: Iterable[str]) -> Mapping | None:
-    ''' Search the cache for entries from `keys`.
-        Return `(k,md)` for the first key found where `k` is the
+  def findall(self, keys: str | Iterable[str]) -> Iterable[Mapping]:
+    ''' Search the cache for entries from `keys`,
+        yield `(k,md)` for each key found where `k` is the
         matching key and `md` is the metadata entry.
-        Return `(None,None)` if no key matches.
-    '''
-    for k in keys:
-      value = self._query(k)
-      if value is not None:
-        return k, value
-    return None, None
-
-  def __contains__(self, keys: Iterable[str] | str):
-    ''' Return `True` if any key from `keys` is known to the cache.
+        Expired entries are removed as found, and not yielded.
     '''
     if isinstance(keys, str):
       keys = keys,
+    for k in keys:
+      md = self._query(k)
+      if md is None:
+        continue
+      expiry = md.get('expiry', None)
+      if expiry is not None and expiry < time.time():
+        del self[k]
+        continue
+      yield k, md
+
+  def find(self, keys: str | Iterable[str]) -> Mapping | None:
+    ''' Search the cache for entries from `keys`.
+        Return `(k,md)` for the first key found where `k` is the
+        matching key and `md` is the metadata entry and `md` is not expired.
+        Return `(None,None)` if no key matches.
+    '''
+    for k, md in self.findall(keys):
+      return k, md
+    return None, None
     k, _ = self.find(keys)
     return k is not None
 
