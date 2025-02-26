@@ -210,6 +210,10 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     for k, md in self.findall(keys):
       return k, md
     return None, None
+
+  def __contains__(self, keys: str | Iterable[str] | str):
+    ''' Return `True` if any key from `keys` is known to the cache.
+    '''
     k, _ = self.find(keys)
     return k is not None
 
