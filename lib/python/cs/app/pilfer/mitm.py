@@ -324,12 +324,12 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       rsp_hdrs = dict(md.get('response_headers', {}))
       # The http.Response.make factory accepts the supplied content
       # and _encodes_ it according to the Content-Encoding header, if any.
-      # But we cached the encoded content. So we pull off the Content-Encoding header
+      # But we cached the _encoded_ content. So we pull off the Content-Encoding header
       # (keeping a note of it), make the Response, then put the header back.
       ce = rsp_hdrs.pop('content-encoding', 'identity')
       flow.response = http.Response.make(
           200,  # HTTP status code
-          content,
+          content_bs,
           rsp_hdrs,
       )
       flow.response.headers['content-encoding'] = ce
