@@ -447,12 +447,11 @@ class ContentCache(HasFSPath, MultiOpenMixin):
               content_base if ckdir is None else joinpath(ckdir, content_base)
           )
           # link the temp file to the final name
-          if existspath(content_path):
-            pfx_call(os.rename, T.name, content_path)
-            with open(T.name, 'xb'):
-              pass
-          else:
-            pfx_call(os.link, T.name, content_path)
+          try:
+            pfx_call(os.remove, content_path)
+          except FileNotFoundError:
+            pass
+          pfx_call(os.link, T.name, content_path)
           # update the metadata
           old_md = self.get(cache_key, {})
           md = dict(**base_md, content_rpath=content_rpath)
