@@ -1,8 +1,15 @@
-default: wpr RENEW to scan the spaces configs for the random directories?
+default: sqlite worker - use the queue get_batch mode to collect requests, open sqlite db in bursts
+default: generic sqlite dbm with thread worker to be pulled from ContentCache, into a dbmutils or mappings class
+cs.urlutils: URL: use cs.rfc2616.content_type, content_length
+default: cs.debug.stack_dump vs cs.py/stack.stack_dump
+ContextManagerMixin: document robust recipe for classws which subclass 2 or more classes which subclass ContextManagerMixin, see cs.Later.Later for example
+cs.rfc2616: use cornucopybuffer, update read_chunked
+spaces: try using tilde in spaces_pathfor (tried it, does not work with ~/ or /~/)
+spaces: wpr RENEW to scan the spaces configs for the random directories?
 PipeLineSpec.make_stage_funcs: each input (item,P) should become (item,P=P.copy_with_vars(_=item)) so as to have its own set of variables
 default: wpr RENEW, fast mode
 RunState.__enter__exit__: also set runstate.cancel to the asyncio event loop SIGINT handler?
-cs.binary: genberate .5 manpage entries from classes? maybe just those built from struct formats initially
+cs.binary: generate .5 manpage entries from classes? maybe just those built from struct formats initially
 setvar: not expanding leading $MANPATH etc
 bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
 cs.jsonutils: merge the various JSON utility functions?
