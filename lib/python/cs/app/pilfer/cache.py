@@ -58,7 +58,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     self.hashclass = BaseHashCode.hashclass(self.hashname)
     self._query_lock = Lock()
 
-  def _worker(self, dbmpath, inq, outq):
+  def _sqlite_worker(self, dbmpath, inq, outq):
     ''' Worker thread to do db access, since SQLite requires all
         this to happen in the same thread.
     '''
@@ -132,7 +132,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       from_worker = Queue()
       worker = Thread(
           name=f'{self} SQLite worker',
-          target=self._worker,
+          target=self._sqlite_worker,
           args=(self.dbmpath, to_worker, from_worker),
       )
       worker.start()
