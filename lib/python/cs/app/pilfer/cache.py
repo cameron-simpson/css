@@ -47,6 +47,9 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   # present a progress bar for objects of 200KiB or more
   PROGRESS_THRESHOLD = 204800
 
+  # query key for deletion, the actual key will be the payload
+  _DELETE = object()
+
   fspath: str
   hashname: str = 'blake3'
 
@@ -59,6 +62,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     ''' Worker thread to do db access, since SQLite requires all
         this to happen in the same thread.
     '''
+    DELETE = self._DELETE
     with dbm.sqlite3.open(dbmpath, 'c') as cache_map:
       for token, rq in inq:
         result = None
@@ -75,11 +79,36 @@ class ContentCache(HasFSPath, MultiOpenMixin):
             if result is not None:
               result = json.loads(result.decode('utf-8'))
           elif isinstance(rq, tuple):
-            # set the value for a key
-            key, value = rq
-            assert isinstance(key, str)
-            assert isinstance(value, dict)
-            cache_map[self.dbmkey(key)] = json.dumps(value).encode('utf-8')
+            if rq[0] is DELETE:
+              # delete an entry
+              _, key = rq
+              dbkey = self.dbmkey(key)
+              try:
+                md_bs = cache_map[dbkey]
+              except KeyError as e:
+                warning("DELETE %r: %s", dbkey, e)
+                result = None
+              else:
+                # also remove the associated cache content file
+                md = json.loads(md_bs.decode('utf-8'))
+                # return the deleted cache entry
+                result = md
+                content_rpath = md.get('content_rpath', None)
+                if content_rpath is not None:
+                  fspath = self.cached_pathto(content_rpath)
+                  try:
+                    pfx_call(os.remove, fspath)
+                  except FileNotFoundError:
+                    pass
+                  except OSError as e:
+                    warning("remove fails: %s", e)
+                del cache_map[dbkey]
+            else:
+              # set the value for a key
+              key, value = rq
+              assert isinstance(key, str)
+              assert isinstance(value, dict)
+              cache_map[self.dbmkey(key)] = json.dumps(value).encode('utf-8')
           else:
             warning("%s: discarding unhandled request %s", self, r(rq))
         finally:
@@ -216,6 +245,11 @@ class ContentCache(HasFSPath, MultiOpenMixin):
   @typechecked
   def __setitem__(self, key: str, metadata: dict):
     self._query((key, metadata))
+
+  def __delitem__(self, key: str):
+    ''' Delete the entry for key `key`.
+    '''
+    self._query((self._DELETE, key))
 
   @staticmethod
   def cache_key_for(sitemap: SiteMap, url_key: str):
