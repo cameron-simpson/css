@@ -230,21 +230,13 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       raise KeyError(keys)
     return md
 
-  def get(self, key: str, default=None, *, mode='metadata'):
+  def get(self, key: str, default=None):
     ''' Get the metadata for for `key`, or `default` if it is missing or not valid.
-        If `mode=="metadata"` then it is enough for the metadata to be present
-        Otherwise the `content_rpath` must also resolve to a regular file.
     '''
     try:
-      md = self[key]
+      return self[key]
     except KeyError:
       return default
-    if mode == 'metadata':
-      return md
-    content_rpath = md.get('content_rpath', '')
-    if not content_rpath or not isfilepath(self.cached_pathto(content_rpath)):
-      return default
-    return md
 
   def get_content(self, cache_key: str) -> bytes:
     ''' Return the entire cached content as a single `bytes` instance.
@@ -303,7 +295,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     md_map = {}
     missing_keys = []
     for cache_key in cache_keys:
-      old_md = self.get(cache_key, {}, mode=mode)
+      old_md = self.get(cache_key, {})
       if old_md:
         # perform checks against the previous state
         # since mode!="metadata", this implies the old content_rpath exists
@@ -460,7 +452,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
           else:
             pfx_call(os.link, T.name, content_path)
           # update the metadata
-          old_md = self.get(cache_key, {}, mode=mode)
+          old_md = self.get(cache_key, {})
           md = dict(**base_md, content_rpath=content_rpath)
           self[cache_key] = md  # cache mapping
           md_map[cache_key] = md  # return mapping
