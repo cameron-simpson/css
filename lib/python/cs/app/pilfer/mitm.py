@@ -307,8 +307,9 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
     else:
       # probe the cache
       assert hook_name == 'requestheaders'
-      cache_key, md = cache.find(cache_keys)
-      if cache_key is None:
+      try:
+        cache_key, md, content_bs = cache.find_content(cache_keys)
+      except KeyError as e:
         # nothing cached
         PR("not cached, pass through")
         # we want to cache this, remove headers which can return a 304 Not Modified
@@ -318,13 +319,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         return
       # a known key
       if rq.method == 'HEAD':
-        content = b''
-      else:
-        try:
-          content = cache.get_content(cache_key)
-        except KeyError as e:
-          warning("cached_flow: %s %s: %s", rq.method, rq.pretty_url, e)
-          return
+        content_bs = b''
       # set the response, preempting the upstream fetch
       rsp_hdrs = dict(md.get('response_headers', {}))
       # The http.Response.make factory accepts the supplied content

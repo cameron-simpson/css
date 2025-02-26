@@ -238,15 +238,26 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     except KeyError:
       return default
 
-  def get_content(self, cache_key: str) -> bytes:
-    ''' Return the entire cached content as a single `bytes` instance.
+  def find_content(self,
+                   keys: str | Iterable[str]) -> Tuple[str, Mapping, bytes]:
+    ''' Look for the cached content for `keys`,
+        return a `(key,md,content_bs)` 3-tuple being the found `key`,
+        its associated metadata `md` and the cached `content_bs` as a `bytes`.
     '''
-    md = self[cache_key]
-    content_rpath = md.get('content_rpath', '')
-    if not content_rpath:
-      raise KeyError(f'{cache_key!r}: no content file, {md=}')
-    with pfx_call(open, self.cached_pathto(content_rpath), 'rb') as f:
-      return f.read()
+    for key, md in self.findall(keys):
+      content_rpath = md.get('content_rpath', None)
+      if content_rpath is None:
+        warning("find_content: %r: no content_rpath", key)
+        continue
+      fspath = self.cached_pathto(content_rpath)
+      try:
+        with pfx_call(open, fspath, 'rb') as f:
+          content_bs = f.read()
+      except OSError as e:
+        warning("find_content: %r->%r: %s", key, fspath, e)
+        continue
+      return key, md, content_bs
+    raise KeyError(keys)
 
   @typechecked
   def __setitem__(self, key: str, md: dict):
