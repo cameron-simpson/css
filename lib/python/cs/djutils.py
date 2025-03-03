@@ -10,15 +10,17 @@
 
 from dataclasses import dataclass, field
 from inspect import isclass
+from itertools import chain
 import os
 import sys
-from typing import Iterable, List
+from typing import Iterable, List, Mapping
 
 from django.conf import settings
 from django.core.management.base import (
     BaseCommand as DjangoBaseCommand,
     CommandError as DjangoCommandError,
 )
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.utils.functional import empty as djf_empty
 
@@ -28,7 +30,7 @@ from cs.cmdutils import BaseCommand as CSBaseCommand
 from cs.gimmicks import warning
 from cs.lex import cutprefix, stripped_dedent
 
-__version__ = '20250111-post'
+__version__ = '20250219-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -103,7 +105,7 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
 
       and `manage.py` will find it and run it as normal.
       But from that point on the style is as for `cs.cmdutils.BaseCommand`:
-      - no `aegparse` setup
+      - no `argparse` setup
       - direct support for subcommands as methods
       - succinct option parsing, if you want additional command line options
       - usage text in the subcommand method docstring
@@ -149,12 +151,11 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
       presupplied with a `.options` attribute which is an instance
       of `cs.cmdutils.BaseCommandOptions` (or some subclass).
 
-      Parsing options is light weight.
+      Parsing options is light weight and automatically updates the usage text.
       This example adds command line switches to the default switches:
       - `-x`: a Boolean, setting `self.options.x`
       - `--thing-limit` *n*: an `int`, setting `self.options.thing_limit=`*n*
       - `--mode` *blah*: a string, setting `self.options.mode=`*blah*
-      The automatic usage text is suitably updated.
 
       Code sketch:
 
@@ -229,17 +230,24 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
     parser.add_argument('argv', nargs='*')
 
 def model_batches_qs(
-    model,
+    model: Model,
     field_name='pk',
     *,
     chunk_size=1024,
     desc=False,
+    exclude=None,
+    filter=None,
+    only=None,
 ) -> Iterable[QuerySet]:
   ''' A generator yielding `QuerySet`s which produce nonoverlapping
-      batches of model instances.
+      batches of `Model` instances.
 
       Efficient behaviour requires the field to be indexed.
       Correct behaviour requires the field values to be unique.
+
+      See `model_instances` for an iterable of instances wrapper
+      of this function, where you have no need to further amend the
+      `QuerySet`s or to be aware of the batches.
 
       Parameters:
       * `model`: the `Model` to query
@@ -248,6 +256,9 @@ def model_batches_qs(
       * `chunk_size`: the maximum size of each chunk
       * `desc`: default `False`; if true then order the batches in
         descending order instead of ascending order
+      * `exclude`: optional mapping of Django query terms to exclude by
+      * `filter`: optional mapping of Django query terms to filter by
+      * `only`: optional sequence of field names for a Django query `.only()`
 
       Example iteration of a `Model` would look like:
 
@@ -283,14 +294,44 @@ def model_batches_qs(
   after_condition = f'{field_name}__lt' if desc else f'{field_name}__gt'
   mgr = model.objects
   # initial batch
-  qs = mgr.all().order_by(ordering)[:chunk_size]
+  qs0 = mgr.all()
+  if exclude:
+    qs0 = qs0.exclude(**exclude)
+  if exclude is not None:
+    if isinstance(exclude, Mapping):
+      qs0 = qs0.exclude(**exclude)
+    else:
+      qs0 = qs0.exclude(exclude)
+  if filter is not None:
+    if isinstance(filter, Mapping):
+      qs0 = qs0.filter(**filter)
+    else:
+      qs0 = qs0.filter(filter)
+  if only is not None:
+    qs0 = qs0.only(*only)
+  qs = qs0.order_by(ordering)[:chunk_size]
   while True:
-    print("qs sql =", qs.query)
-    key_list = list(qs.values_list(field_name, flat=True))
+    key_list = list(qs.only(field_name).values_list(field_name, flat=True))
     if not key_list:
       break
     end_key = key_list[-1]
     yield qs
-    qs = mgr.filter(**{
+    qs = qs0.filter(**{
         after_condition: end_key
     }).order_by(ordering)[:chunk_size]
+
+def model_instances(
+    model: Model,
+    field_name='pk',
+    only=None,
+    **mbqs_kw,
+) -> Iterable[Model]:
+  ''' A generator yielding Model instances.
+      This is a wrapper for `model_batches_qs` and accepts the same arguments.
+
+      Efficient behaviour requires the field to be indexed.
+      Correct behaviour requires the field values to be unique.
+  '''
+  return chain.from_iterable(
+      model_batches_qs(model, field_name=field_name, **mbqs_kw)
+  )

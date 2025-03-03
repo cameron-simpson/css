@@ -1,88 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
-# Stash or report the last value of some parameter.
-# - Cameron Simpson <cs@cskk.id.au> 02dec2002
+# lastvalue - set/get last values of various globals.
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
-set -ue
-
-: "${LASTVALUEDIR:=${LOGDIR:=$HOME/var/log}/lastvalue}"
-
-##echo "[$0 $*]" >&2
-
-dir=$LASTVALUEDIR
-append=1
-pop=
-
-cmd=$0
-usage="Usage: $cmd [-a] [-d dir] [param [value|-]]
-    -a  Append (push) the value.
-    -p  Pop the value.
-    -d  Directory holding value files."
-
-badopts=
-
-while [ $# -gt 0 ]
-do
-  case "$1" in
-    -d) dir=$2; shift ;;
-    -a) append=1 ;;
-    +a) append= ;;
-    -p) pop=1 ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" &>2; badopts=1 ;;
-    *)  break ;;
-  esac
-  shift
-done
-
-if [ $# = 0 ]
-then
-    [ $badopts ] && { echo "$usage" >&2; exit 2; }
-    cd "$dir" || exit 1
-    for f in *
-    do  [ -s "./$f" ] && tail -1 "./$f" | sed "s/^/$f: /"
-    done
-    exit 0
-fi
-
-param=$1; shift
-case "$param" in
-  ''|*/*)
-    echo "$cmd: bad param \"$param\"" >&2
-    badopts=1
-    ;;
-esac
-
-[ $# -gt 1 ] && {
-  echo "$cmd: $param=$value: extra arguments after value: $*" >&2
-  badopts=1
-}
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-# no args - recite value
-if [ $# = 0 ]
-then
-  ##[ $append ] && { echo "$cmd: value required in append mode" >&2; exit 2; }
-  tail -1 "$dir/$param" || exit 1
-  exec >/dev/null
-  [ $pop ] && lock "lastvalue_$param" bsed -s '$d' "$dir/$param"
-  exit 0
-fi
-
-exec >/dev/null
-
-[ -d "$dir/." ] || needdir "$dir" || exit 1
-cd "$dir"      || exit 1
-
-if [ "x$1" = x- ]
-then  read value || exit 1
-else  value=$1
-fi
-
-if [ $append ]
-then  echo "$value" >>"$param"
-else  echo "$value" >"$param"
-fi
-exit 0
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.lastvalue import main
+sys.exit(main(sys.argv))

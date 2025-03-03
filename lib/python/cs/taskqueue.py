@@ -26,7 +26,7 @@ from cs.seq import Seq, unrepeated
 from cs.threads import bg as bg_thread, locked, ThreadState, HasThreadState
 from cs.typingutils import subtype
 
-__version__ = '20240423-post'
+__version__ = '20250120-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -111,7 +111,7 @@ class BaseTask(FSM, RunStateMixin):
   '''
 
   @uses_runstate
-  def __init__(self, *, state=None, runstate: RunState):
+  def __init__(self, state=None, *, runstate: RunState):
     FSM.__init__(self, state)
     RunStateMixin.__init__(self, runstate=runstate)
 

@@ -9,23 +9,27 @@ from getopt import GetoptError
 import os
 from os.path import (
     abspath,
+    dirname,
     exists as existspath,
     isdir as isdirpath,
+    isfile as isfilepath,
     join as joinpath,
 )
-from pprint import pprint
-import random
+from pprint import pformat, pprint
+from random import choice as random_choice
 import sys
 from typing import Optional
 
 from CoreFoundation import CFUUIDCreateFromString
+
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
-from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call
+from cs.fs import shortpath
+from cs.lex import tabulate
+from cs.pfx import Pfx, pfx_call, pfx_method
 
 from .misc import macos_version
 from .objc import apple, cg
@@ -61,6 +65,9 @@ DISTINFO = {
 
 CG = apple.CoreGraphics
 HI = apple.HIServices
+
+DEFAULT_BACKGROUND_RGB = 0, 0, 0  # black background
+VALID_IMAGE_SUFFIXES = '.jpg', '.png'
 
 def main(argv=None):
   ''' cs.app.osx.spaces command line mode.
@@ -158,7 +165,7 @@ class Spaces:
             if space_num < 1:
               raise GetoptError("space# counts from 1")
             if space_num > len(self):
-              raise GetoptError("only %d spaces" % (len(self),))
+              raise GetoptError(f'only {len(self)} spaces')
             space_indices = (space_num - 1,)
     return space_indices
 
@@ -195,6 +202,7 @@ class Spaces:
         self.display_id, 0, space["uuid"]
     )
 
+  @pfx_method
   @typechecked
   def set_wp_config(self, space_index: int, wp_config: dict):
     ''' Set the desktop picture configuration of the space at
@@ -210,6 +218,95 @@ class Spaces:
         0,
         space["uuid"],
     )
+
+  @staticmethod
+  def spaces_pathfor(fspath: str):
+    ''' Return `fspath` adjusted for use in a spaces configuration.
+
+        Prior to MacOS Sonoma (14.5), this just returns the absolute path.
+
+        In MacOS Sonoma there's some hideous bug in the
+        DesktopPictureSetDisplayForSpace library where it seems to
+        see a leading home directory path and replace it with `/~`
+        (instead of something plausible like '~'), perhaps intended
+        for making paths track homedir moves.  It turns out that
+        providing a _relative_ path from '/' does The Right Thing.
+        Ugh.
+    '''
+    fspath = abspath(fspath)
+    if macos_version < (14, 5):
+      spaces_path = fspath
+    else:
+      spaces_path = fspath[1:]
+      # a cut at seeing if the ~ _is_ meaningful, but it doesn't work
+      ##home = os.environ.get('HOME')
+      ##if home and isdirpath(home):
+      ##  home_prefix = f'{home}/'
+      ##  if fspath.startswith(home_prefix):
+      ##    spaces_path = f'~/{cutprefix(fspath,home_prefix)}'
+    return spaces_path
+
+  @pfx_method
+  def set_wp_fspath(
+      self,
+      space_index: int,
+      fspath: str,
+      *,
+      background_color=DEFAULT_BACKGROUND_RGB,
+      random=True,
+      change_duration=5.0,
+      placement='SizeToFit',
+  ):
+    ''' Set the Space configuration of `space_index` to use images from `fspath`.
+    '''
+    print("spaces set_wp_fspath", space_index, fspath)
+    if isfilepath(fspath):
+      # an image file
+      if not fspath.endswith(VALID_IMAGE_SUFFIXES):
+        raise ValueError(
+            f'invalid image path suffix, expected one of {VALID_IMAGE_SUFFIXES!r}'
+        )
+      space_imagepath = self.spaces_pathfor(fspath)
+      dirpath = dirname(abspath(fspath))
+      spaces_dirpath = self.spaces_pathfor(dirpath)
+      wp_config = dict(
+          BackgroundColor=background_color,
+          ChangePath=spaces_dirpath,
+          NewChangePath=spaces_dirpath,
+          ImageFilePath=space_imagepath,
+          Placement=placement,
+      )
+    elif isdirpath(fspath):
+      spaces_dirpath = self.spaces_pathfor(fspath)
+      images = [
+          filename for filename in os.listdir(fspath)
+          if not filename.startswith('.') and '.' in filename
+          and filename.endswith(VALID_IMAGE_SUFFIXES)
+      ]
+      if not images:
+        raise ValueError(
+            f'no *.{{{",".join(VALID_IMAGE_SUFFIXES)}}} files in {fspath}'
+        )
+      lastname = random_choice(images)
+      spaces_imagepath = self.spaces_pathfor(joinpath(fspath, lastname))
+      # pylint: disable=use-dict-literal
+      wp_config = dict(
+          BackgroundColor=background_color,
+          Change='TimeInterval',
+          ChangeDuration=change_duration,
+          ChangePath=spaces_dirpath,
+          NewChangePath=spaces_dirpath,
+          ChangeTime=change_duration,
+          DynamicStyle=0,
+          ImageFilePath=spaces_imagepath,
+          ##NewImageFilePath=spaces_imagepath,
+          ##LastName=lastname,
+          Placement=placement,
+          Random=random,
+      )  # pylint: disable=use-dict-literal
+    else:
+      raise ValueError('unsupported fspath, neither image file nor directory')
+    self.set_wp_config(space_index, wp_config)
 
   def monitor_current(self, **kw):
     ''' Return a `cs.delta.monitor` generator for changes to the
@@ -252,7 +349,7 @@ class SpacesCommand(BaseCommand):
           Print the current space number.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     print(self.options.spaces.current_index + 1)
 
   def cmd_monitor(self, argv):
@@ -260,7 +357,7 @@ class SpacesCommand(BaseCommand):
           Monitor space switches.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     spaces = self.options.spaces
     for old, new, changes in monitor(
         lambda: (spaces.forget(), {'index': spaces.current_index})[-1],
@@ -284,76 +381,24 @@ class SpacesCommand(BaseCommand):
         if not existspath(wp_path):
           raise GetoptError("not a file")
     if argv:
-      raise GetoptError("extra aguments: %r" % (argv,))
+      raise GetoptError(f'extra aguments: {argv!r}')
     if wp_path is None:
       if space_indices is None:
         space_indices = list(range(len(spaces)))
+      report_lines = []
       for space_index in space_indices:
+        report_lines.append([f'Space {space_index + 1}'])
         space_num = space_index + 1
-        print("Space", space_num)
         for k, v in sorted(spaces.get_wp_config(space_index).items()):
-          print(" ", k, "=", str(v).replace("\n", ""))
+          report_lines.append([f'  {k}', pformat(v)])
+      for line in tabulate(*report_lines):
+        print(line)
     else:
       if space_indices is None:
         space_indices = [spaces.current_index]
       for space_index in space_indices:
-        with Pfx("%d <- %r", space_index + 1, wp_path):
-          if isdirpath(wp_path):
-            images = [
-                filename for filename in os.listdir(wp_path)
-                if not filename.startswith('.') and '.' in filename
-            ]
-            if not images:
-              warning("no *.* files in %r", wp_path)
-              return 1
-            lastname = random.choice(images)
-            imagepath = abspath(joinpath(wp_path, lastname))
-            if macos_version < (14, 5):
-              # This worked before I upgraded to Sonoma, MacOS 14.5.
-              # pylint: disable=use-dict-literal
-              wp_config = dict(
-                  BackgroundColor=(0, 0, 0),
-                  Change='TimeInterval',
-                  ChangePath=abspath(wp_path),
-                  NewChangePath=abspath(wp_path),
-                  ChangeTime=5,
-                  DynamicStyle=0,
-                  ImageFilePath=imagepath,
-                  NewImageFilePath=imagepath,
-                  LastName=lastname,
-                  Placement='SizeToFit',
-                  Random=True,
-              )  # pylint: disable=use-dict-literal
-            else:
-              # MacOS Sonoma onward
-              # There's some hideous bug in the DesktopPictureSetDisplayForSpace
-              # library where it seems to see a leading home directory path
-              # and replace it with '/~' (instead of something plausible like '~'),
-              # perhaps intended for making paths track homedir moves.
-              # It turns out that providing a _relative_ path from '/'
-              # does The Right Thing. Ugh.
-              wp_path = abspath(wp_path)
-              wp_path = wp_path[1:]
-              ##rwp_path = relpath(wp_path, os.environ['HOME'])
-              ##if not rwp_path.startswith('../'):
-              ##  wp_path = rwp_path
-              wp_config = dict(
-                  BackgroundColor=(0, 0, 0),
-                  Change='TimeInterval',
-                  ChangePath=wp_path,
-                  NewChangePath=wp_path,
-                  ChangeDuration=5.0,
-                  DynamicStyle=0,
-                  ##ImageFilePath=imagepath,
-                  ##NewImageFilePath=imagepath,
-                  LastName=lastname,
-                  Placement='SizeToFit',
-                  Random=True,
-              )  # pylint: disable=use-dict-literal
-          else:
-            # pylint: disable=use-dict-literal
-            wp_config = dict(ImageFilePath=abspath(wp_path),)
-          spaces.set_wp_config(space_index, wp_config)
+        with Pfx("%d <- %s", space_index + 1, shortpath(wp_path)):
+          spaces.set_wp_fspath(space_index, wp_path)
     return 0
 
   def cmd_wpm(self, argv):
@@ -371,7 +416,7 @@ class SpacesCommand(BaseCommand):
       except ValueError:
         # pylint: disable=raise-missing-from
         raise GetoptError(
-            "expected exactly one space index, got: %r" % (space_indices,)
+            f'expected exactly one space index, got: {space_indices!r}'
         )
     for old, new, changes in spaces.monitor_wp_config(
         space_index=space_index,

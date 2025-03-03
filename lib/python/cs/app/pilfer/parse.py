@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import copy
 import re
 from string import whitespace
 from typing import Iterable
@@ -11,12 +12,20 @@ except ImportError:
 from typeguard import typechecked
 
 from cs.lex import (
-    get_dotted_identifier, get_identifier, get_other_chars, get_qstr
+    get_decimal_or_float_value,
+    get_dotted_identifier,
+    get_identifier,
+    get_other_chars,
+    get_qstr,
+    skipwhite,
 )
 from cs.logutils import (debug, error, exception)
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.pipeline import StageType
+from cs.py.modules import import_module_name
 from cs.urlutils import URL
+
+from .format import FormatMapping
 
 # regular expressions used when parsing actions
 re_GROK = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
@@ -368,18 +377,18 @@ def parse_action(action, do_trace):
             Call `func_name( P, *a, **kw ).
             Receive a mapping of variable names to values in return.
             If not empty, copy P and apply the mapping via which is applied
-            with P.set_user_vars().
-            Returns P (possibly copied), as this is a one-to-one function.
+            with `P.copy_with_vars()`.
+            Returns `P` (possibly copied), as this is a one-to-one function.
         '''
-        mfunc = P.import_module_func(grok_module, grok_funcname)
-        if mfunc is None:
+        # TODO: use import_name()
+        grok_func = P.import_module_func(grok_module, grok_funcname)
+        if grok_func is None:
           error("import fails")
         else:
-          var_mapping = mfunc(P, *args, **kwargs)
+          var_mapping = grok_func(P, *args, **kwargs)
           if var_mapping:
             debug("grok: var_mapping=%r", var_mapping)
-            P = P.copy('user_vars')
-            P.set_user_vars(**var_mapping)
+            P = P.copy_with_vars(**var_mapping)
         return P
 
       return StageType.ONE_TO_ONE, grok
@@ -391,27 +400,26 @@ def parse_action(action, do_trace):
             Import `func_name` from module `module_name`.
             Call `func_name( Ps, *a, **kw ).
             Receive a mapping of variable names to values in return,
-            which is applied to each item[0] via .set_user_vars().
-            Return the possibly copied Ps.
+            which is applied to each item[0] via .copy_with_vars().
+            Return the possibly copied `Ps`.
         '''
         if not isinstance(Ps, list):
           Ps = list(Ps)
         if Ps:
-          mfunc = pfx_call(
+          # TODO: use import_name()
+          grok_func = pfx_call(
               Ps[0].import_module_func, grok_module, grok_funcname
           )
-          if mfunc is None:
+          if grok_func is None:
             error("import fails: %s.%s", grok_module, grok_funcname)
           else:
             try:
-              var_mapping = pfx_call(mfunc, Ps, *args, **kwargs)
+              var_mapping = pfx_call(grok_func, Ps, *args, **kwargs)
             except Exception as e:
               exception("call %s.%s: %s", grok_module, grok_funcname, e)
             else:
               if var_mapping:
-                Ps = [P.copy('user_vars') for P in Ps]
-                for P in Ps:
-                  P.set_user_vars(**var_mapping)
+                Ps = [P.copy_with_vars(**var_mapping) for P in Ps]
         return Ps
 
       return StageType.ONE_TO_MANY, grokall
@@ -585,12 +593,25 @@ def parse_action(action, do_trace):
     func = func_args
   return sig, func
 
-def parse_action_args(action, offset, delim=None):
+def get_action_args(action, offset, delim=None):
   ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
-     return `(args,kwargs,offset)`.
+      return `(args,kwargs,offset)`.
 
-     An `arg` is a quoted string or a sequence of nonwhitespace
-     excluding `delim` and comma.
+      Parameters:
+      - `action`,`offset`: the action string and the parse offset
+      - `delim`: an optional character ending the parse such as a closing bracket
+
+     The following `arg` forms are recognised:
+     - a quoted string delimited with `"` or `'`
+     - a decimal or floating point number
+     - a regular expression between tilde-redelim and redelim
+     - a run of characters not including whichspace or comma or `delim`
+
+     Examples:
+     - `"foo"`, `'foo'`: quoted strings
+     - `1`, `2.3`: numeric values
+     - `~/foo/`, `~ :this|[abc/def]:`: regular expressions
+     - `blah.snort`: nonwhitespace "bare" string
   '''
   other_chars = ',' + whitespace
   if delim is not None:
@@ -599,20 +620,83 @@ def parse_action_args(action, offset, delim=None):
   kwargs = {}
   while offset < len(action):
     with Pfx("parse_action_args(%r)", action[offset:]):
-      ch1 = action[offset]
-      if delim is not None and ch1 == delim:
+      if delim is not None and action.startswith(delim, offset):
         break
-      if ch1 == ',':
+      if action.startswith(',', offset):
         offset += 1
         continue
-      kw = None
       # gather leading "kw=" if present
       name, offset1 = get_identifier(action, offset)
-      if name and offset1 < len(action) and action[offset1] == '=':
+      if name and action.startswith('=', offset1):
         kw = name
         offset = offset1 + 1
-      if ch1 == '"' or ch1 == "'":
-        arg, offset = get_qstr(action, offset, q=ch1)
       else:
+        kw = None
+      # quoted string
+      if action.startswith(('"', "'")):
+        arg, offset = get_qstr(action, offset, q=action[offset])
+      # numeric value
+      elif action[offset:offset + 1].isdigit():
+        # TODO: recognise an optional sign
+        arg, offset = get_decimal_or_float_value(action, offset)
+      # ~ /regexp/
+      elif action.startswith('~', offset):
+        offset1 = skipwhite(action, offset + 1)
+        if offset1 == len(action):
+          raise SyntaxError("missing regexp delimter after tilde")
+        re_delim = action[offset1]
+        offset = offset1 + 1
+        end_offset = action.find(re_delim, offset)
+        if end_offset == -1:
+          raise SyntaxError(f'missing closing regexp delimiter {re_delim!r}')
+        assert end_offset > offset
+        regexp_s = action[offset:end_offset]
+        offset = end_offset + 1
+        arg = pfx_call(re.compile, regexp_s)
+      else:
+        # nonwhitespace etc
         arg, offset = get_other_chars(action, offset, other_chars)
+      if kw is None:
+        args.append(arg)
+      else:
+        kwargs[kw] = arg
   return args, kwargs, offset
+
+def get_name_and_args(
+    text: str,
+    offset: int = 0,
+    delim=None,
+) -> tuple[str, list | None, list | None, int]:
+  ''' Match a dotted identifier optionally followed by a colon
+      and position and keyword arguments.
+      Return `('',None,None,offset)` on no match.
+      Return `(name,args,kwargs,offset)` on a match.
+      '''
+  name, offset = get_dotted_identifier(text, offset)
+  if not name:
+    return name, None, None, offset
+  if text.startswith(':', offset):
+    offset += 1
+    args, kwargs, offset = get_action_args(text, offset, delim)
+    if offset < len(text):
+      raise ValueError(f'unparsed text after params: {text[offset:]!r}')
+  else:
+    args = []
+    kwargs = {}
+  return name, args, kwargs, offset
+
+@pfx
+def import_name(module_subname: str):
+  ''' Parse a reference to an object from a module, return the object.
+      Raise `ImportError` for a module which does not import.
+      Raise `NameError` for a name which does not resolve.
+
+      `module_subname` takes the form `*dotted_identifier:dotted_identifier`,
+      being the module name and the name within the module respectively.
+  '''
+  module_name, sub_name = module_subname.split(':', 1)
+  name, *sub_names = sub_name.split('.')
+  obj = import_module_name(module_name, name)
+  for attr in sub_names:
+    obj = getattr(obj, attr)
+  return obj

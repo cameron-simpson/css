@@ -30,7 +30,7 @@ from icontract import require
 import requests
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.deco import fmtdoc, promote, Promotable
 from cs.fileutils import atomic_filename
@@ -105,6 +105,15 @@ DEFAULT_FILENAME_FORMAT = (
     '{series_prefix}{series_episode_name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
+# default "ls" output format
+LS_FORMAT = (
+    '{playon.ID} {playon.HumanSize} {resolution}'
+    ' {nice_name} {playon.ProviderID} {status:upper}'
+)
+
+# default "queue" output format
+QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
+
 # download parallelism
 DEFAULT_DL_PARALLELISM = 2
 
@@ -117,16 +126,6 @@ def main(argv=None):
 class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
   '''
-
-  # default "ls" output format
-  LS_FORMAT = (
-      '{playon.ID} {playon.HumanSize} {resolution}'
-      ' {nice_name} {playon.ProviderID} {status:upper}'
-  )
-
-  # default "queue" output format
-  QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
-
   USAGE_KEYWORDS = {
       'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
@@ -160,6 +159,7 @@ class PlayOnCommand(BaseCommand):
 
   @dataclass
   class Options(BaseCommand.Options):
+    INFO_SKIP_NAMES = (*BaseCommand.Options.INFO_SKIP_NAMES, 'password')
     user: Optional[str] = field(
         default_factory=lambda: environ.
         get('PLAYON_USER', environ.get('EMAIL'))
@@ -167,10 +167,13 @@ class PlayOnCommand(BaseCommand):
     password: Optional[str] = field(
         default_factory=lambda: environ.get('PLAYON_PASSWORD')
     )
+    dl_jobs: int = DEFAULT_DL_PARALLELISM
     filename_format: str = field(
         default_factory=lambda: environ.
         get('FILENAME_FORMAT_ENVVAR', DEFAULT_FILENAME_FORMAT)
     )
+    ls_format: str = LS_FORMAT
+    queue_format: str = QUEUE_FORMAT
 
   @contextmanager
   def run_context(self):
@@ -234,6 +237,7 @@ class PlayOnCommand(BaseCommand):
     result = api.cdsurl_data(suburl)
     pprint(result)
 
+  @popopts(o_='filename_format')
   @uses_fstags
   def cmd_rename(self, argv, *, fstags: FSTags):
     ''' Usage: {cmd} [-o filename_format] filenames...
@@ -242,8 +246,6 @@ class PlayOnCommand(BaseCommand):
           -o filename_format
                 Format for the new filename, default {DEFAULT_FILENAME_FORMAT!r}.
     '''
-    options = self.options
-    options.popopts(argv, n='dry_run', o_='filename_format')
     api = options.api
     doit = options.doit
     filename_format = options.filename_format
@@ -281,28 +283,15 @@ class PlayOnCommand(BaseCommand):
     return xit
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+  @popopts(j_=('dl_jobs', 'Concurrent download jobs.', int))
   def cmd_dl(self, argv):
-    ''' Usage: {cmd} [-j jobs] [-n] [recordings...]
+    ''' Usage: {cmd} [recordings...]
           Download the specified recordings, default "pending".
-          -j jobs   Run this many downloads in parallel.
-                    The default is {DEFAULT_DL_PARALLELISM}.
-          -n        No download. List the specified recordings.
     '''
     options = self.options
+    dl_jobs = options.dl_jobs
+    no_download = options.dry_run
     sqltags = options.sqltags
-    dl_jobs = DEFAULT_DL_PARALLELISM
-    no_download = False
-    opts, argv = getopt(argv, 'j:n')
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-j':
-          dl_jobs = int(val)
-          if dl_jobs < 1:
-            raise GetoptError(f"invalid jobs, should be >= 1, got: {dl_jobs}")
-        elif opt == '-n':
-          no_download = True
-        else:
-          raise NotImplementedError("unhandled option")
     if not argv:
       argv = ['pending']
     api = options.api
@@ -447,13 +436,12 @@ class PlayOnCommand(BaseCommand):
             recording.add("downloaded")
     return xit
 
+  @popopts(l='long_mode')
   def cmd_feature(self, argv, locale='en_US'):
     ''' Usage: {cmd} [feature_id]
           List features.
     '''
-    long_mode = False
-    opts = self.popopts(argv, l='long_mode')
-    long_mode = opts['long_mode']
+    long_mode = options.long_mode
     if argv:
       feature_id = argv.pop(0)
     else:
@@ -479,7 +467,7 @@ class PlayOnCommand(BaseCommand):
           -o format Format string for each entry.
           Default format: {LS_FORMAT}
     '''
-    return self._list(argv, self.options, ['available'], self.LS_FORMAT)
+    return self._list(argv, self.options, ['available'], LS_FORMAT)
 
   def cmd_poll(self, argv):
     if argv:
@@ -494,7 +482,7 @@ class PlayOnCommand(BaseCommand):
           -o format Format string for each entry.
           Default format: {QUEUE_FORMAT}
     '''
-    return self._list(argv, self.options, ['queued'], self.QUEUE_FORMAT)
+    return self._list(argv, self.options, ['queued'], QUEUE_FORMAT)
 
   cmd_q = cmd_queue
 

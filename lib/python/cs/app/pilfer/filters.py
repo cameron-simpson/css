@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Filter functions and appings of names to such functions.
+''' Filter functions and mappings of names to such functions.
 '''
 
 import os
@@ -21,6 +21,8 @@ from cs.logutils import (debug, warning)
 from cs.py.func import funcname
 from cs.resources import uses_runstate
 from cs.urlutils import URL
+
+from .pilfer import Pilfer
 
 def notNone(v, name="value"):
   ''' Test whether `v` is `None`, raise a `ValueError` if so, return `True` if not.

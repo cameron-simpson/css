@@ -4,7 +4,7 @@
 '''
 
 from asyncio import to_thread, create_task
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 import shlex
 from subprocess import Popen, PIPE
@@ -16,21 +16,25 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.lex import BaseToken, is_identifier
+from cs.lex import BaseToken
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
 from cs.pfx import Pfx, pfx_call
 from cs.urlutils import URL
 
+from .parse import get_name_and_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 
+@dataclass
 class Action(BaseToken):
 
+  pilfer: Pilfer
   batchsize: Union[int, None] = None
 
   @classmethod
+  @uses_pilfer
   @typechecked
-  def from_str(cls, text) -> "Action":
+  def from_str(cls, text, *, P: Pilfer) -> "Action":
     ''' Convert an action specification into an `Action`.
 
         The following specifications are recognised:
@@ -40,16 +44,26 @@ class Action(BaseToken):
         - "/regexp": filter items to those matching regexp
         - "-/regexp": filter items to those not matching regexp
         - "..": treat items as URLs and produce their parent URL
+
+        Named stage functions are converted to `Action`s which keep
+        a reference to the supplied `Pilfer` instance, and the
+        `Pilfer` is used when converting the actions into pipeline
+        stage functions.
     '''
     with Pfx("%s.from_str(%r)", cls.__name__, text):
-      if is_identifier(text):
-        # TODO: options parameters?
-        # parse.parse_action_args?
+      # dotted_name[:param=,...]
+      name, args, kwargs, offset = get_name_and_args(text)
+      if name:
+        if offset < len(text):
+          raise ValueError(f'unparsed text after params: {text[offset:]!r}')
         return ActionByName(
+            pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
-            name=text,
+            name=name,
+            args=args,
+            kwargs=kwargs,
         )
 
       # "! shcmd" or "| shlex-split"
@@ -67,6 +81,7 @@ class Action(BaseToken):
         else:
           raise RuntimeError('unhandled shcmd/shlex subprocess')
         return ActionSubProcess(
+            pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
@@ -108,6 +123,7 @@ class Action(BaseToken):
             return regexp.search(str(item))
 
         return ActionSelect(
+            pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
@@ -117,6 +133,7 @@ class Action(BaseToken):
 
       if text == '..':
         return ActionModify(
+            pilfer=P,
             offset=0,
             source_text=text,
             end_offset=len(text),
@@ -126,18 +143,25 @@ class Action(BaseToken):
 
       raise SyntaxError('no action recognised')
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionByName(Action):
 
   name: str
+  args: list = field(default_factory=list)
+  kwargs: dict = field(default_factory=dict)
 
   @property
-  @uses_pilfer
-  def stage_spec(self, *, P: Pilfer):
-    return P.action_map[self.name]
+  def stage_spec(self):
+    ''' Produce the stage specification for this action.
+    '''
+    P = self.pilfer
+    try:
+      return P.action_map[self.name]
+    except KeyError:
+      return import_name(self.name)
 
 # TODO: this gathers it all, need to open pipe and stream, how?
-@dataclass
+@dataclass(kw_only=True)
 class ActionSubProcess(Action):
   ''' A action which passes items through a subprocess
       with `str(item)` on each input line
@@ -206,7 +230,7 @@ class ActionSubProcess(Action):
       warning("exit %d from subprocess %r", xit, self.argv)
 
 # TODO: this gathers it all, need to open pipe and stream, how?
-@dataclass
+@dataclass(kw_only=True)
 class ActionSelect(Action):
   ''' This action's `stage_func` yields the input item or not
       depending on the truthiness of `select_func`.
@@ -259,7 +283,7 @@ class ActionSelect(Action):
     '''
     return self.stage_func
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionModify(Action):
 
   modify_func: Callable[Tuple[Any, Pilfer], Tuple[Any, Pilfer]]

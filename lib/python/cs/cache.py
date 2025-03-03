@@ -7,7 +7,7 @@ from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 import errno
-from functools import partial
+from functools import cache, partial
 from itertools import chain
 import os
 from os.path import (
@@ -39,7 +39,7 @@ from cs.seq import splitoff, unrepeated
 
 from icontract import require
 
-__version__ = '20250103-post'
+__version__ = '20250111-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -566,12 +566,16 @@ class ConvCache(HasFSPath):
           pfx_call(conv_func, srcpath, T.name)
     return dstpath
 
-_default_conv_cache = ConvCache()
+@cache
+def get_default_conv_cache():
+  ''' Return the default instance of `ConvCache`.
+  '''
+  return ConvCache()
 
 def convof(srcpath, conv_subpath, conv_func, *, ext=None, force=False):
   ''' `ConvCache.convof` using the default cache.
   '''
-  return _default_conv_cache.convof(
+  return get_default_conv_cache().convof(
       srcpath, conv_subpath, conv_func, ext=ext, force=force
   )
 
