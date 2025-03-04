@@ -8,6 +8,7 @@ import copy
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
+from itertools import zip_longest
 import os
 import os.path
 from os.path import (
@@ -21,9 +22,11 @@ import shlex
 import sys
 from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
+from types import SimpleNamespace as NS
 
 import requests
+from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
@@ -35,7 +38,6 @@ from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
-from cs.obj import copy as obj_copy
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
@@ -110,6 +112,14 @@ class PseudoFlow:
   request: requests.Request = None
   response: requests.Response = None
 
+def cache_url(item_P):
+  ''' Pilfer base action for caching a UR.
+      Passes theough `item_P`, a 2-tuple of `(url,Pilfer)`.
+  '''
+  url, P = item_P
+  P.cache_url(url)
+  return item_P
+
 @dataclass
 class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
@@ -137,7 +147,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   later: Later = field(default_factory=Later)
   base_actions: Mapping[str, Any] = field(
       default_factory=lambda: dict(
-          cache=one_to_many(cache, with_P=True),
+          cache_url=one_to_many(cache_url, with_P=True),
           hrefs=one_to_many(hrefs),
           print=one_to_many(lambda item: (print(item), item)[-1:]),
           srcs=one_to_many(srcs),
@@ -145,6 +155,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       )
   )
   content_cache: ContentCache = None
+  # for optional extra things hung on the Pilfer object
+  state: NS = field(default_factory=NS)
   _diversion_tasks: dict = field(default_factory=dict)
 
   @uses_later
@@ -168,6 +180,15 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return "%s[%s]" % (self.name, self._)
 
   __repr__ = __str__
+
+  def __enter_exit__(self):
+    ''' Run both the inherited context managers.
+    '''
+    for _ in zip_longest(
+        MultiOpenMixin.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self) if self.default else (),
+    ):
+      yield
 
   @contextmanager
   def startup_shutdown(self):
@@ -523,7 +544,33 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
 
-  # Note: this method is _last_ because otherwise it it shadows the
+  def cache_keys_for_url(self, url, *, extra=None):
+    cache = self.content_cache
+    cache_keys = []
+    for match in self.url_matches(url, pattern_type='URL_KEY', extra=extra):
+      url_key = match.format_arg(extra=extra)
+      cache_keys.append(cache.cache_key_for(match.sitemap, url_key))
+    return cache_keys
+
+  @promote
+  def cache_url(self, url: URL, mode='missing', *, extra=None):
+    ''' Cache the content of `url` in the cache if missing/updated
+        as indicated by `mode`.
+        Return a mapping of each cache key to the cached metadata.
+    '''
+    matches = list(self.url_matches(url, pattern_type='URL_KEY', extra=extra))
+    if not matches:
+      print("cache_url: no matches for", url)
+      return
+    cache = self.content_cache
+    with cache:
+      cache_keys = [
+          cache.cache_key_for(match.sitemap, match.format_arg(extra=extra))
+          for match in matches
+      ]
+      return cache.cache_url(url, cache_keys, mode=mode)
+
+  # Note: this method is _last_ because otherwise it shadows the
   # @promote decorator, used on earlier methods.
   @classmethod
   def promote(cls, P):
@@ -534,21 +581,3 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return P
 
 uses_pilfer = default_params(P=Pilfer.default)
-
-@promote
-@uses_pilfer
-def cache(url: URL, *, sitemap: SiteMap = None, P: Pilfer):
-  if sitemap is None:
-    sitemap = P.sitemap_for(url)
-    if sitemap is not None:
-      vprint("cache: sitemap", sitemap, "for", url)
-      url_key = sitemap.url_key(url)
-      if url_key is not None:
-        vprint("cache", sitemap, "->", url_key)
-        with P.content_cache:
-          P.content_cache.cache_url(url, sitemap)
-      else:
-        vprint("cache", sitemap, "no key for", url)
-    else:
-      vprint("cache: no sitemap for", url)
-  yield url

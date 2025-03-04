@@ -178,10 +178,38 @@ class PilferCommand(BaseCommand):
       argv_offset += 1
       return spec, argv_offset
 
-  @popopts(md=('show_md', 'Show metadata.'))
+  @popopts(
+      md=('show_md', 'Show metadata.'),
+      modified=('Only update the cache if the content is modified.')
+  )
   def cmd_cache(self, argv):
+    ''' Usage: {cmd} URLs...
+          Cache the GET content of URLs.
+    '''
+    if not argv:
+      raise GetoptError('missing URs')
+    options = self.options
+    mode = 'modified' if options.modified else 'missing'
+    show_md = options.show_md
+    P = options.pilfer
+    for url in argv:
+      with Pfx("cache %s", url):
+        md_map = P.cache_url(url, mode=mode)
+        if show_md:
+          print(url)
+          for cache_key, md in sorted(md_map.items()):
+            print(" ", cache_key)
+            tabulate(
+                *[
+                    [f'    {mdk}', pformat(mdv)]
+                    for mdk, mdv in sorted(md.items())
+                ]
+            )
+
+  @popopts(md=('show_md', 'Show metadata.'))
+  def cmd_cacheq(self, argv):
     ''' Usage: {cmd} [cache-keys...]
-          List the URLs associated with the cache keys.
+          Query the URLs associated with the cache keys.
     '''
     options = self.options
     show_md = options.show_md

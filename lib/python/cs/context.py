@@ -409,8 +409,10 @@ def twostep(cmgr):
   yield
 
 def setup_cmgr(cmgr):
-  ''' Run the set up phase of the context manager `cmgr`
-      and return a callable which runs the tear down phase.
+  ''' Run the enter phase of the context manager `cmgr`.
+      Return a `(yielded,teardwon)` 2-tuple where `yielded` is the
+      value yielded from the cntext manager's enter step and
+      `callable` is a callable which runs the tear down phase.
 
       This is a convenience wrapper for the lower level `twostep()` function
       which produces a two iteration generator from a context manager.
@@ -459,7 +461,7 @@ def setup_cmgr(cmgr):
                   teardown()
   '''
   cmgr_twostep = twostep(cmgr)
-  next(cmgr_twostep)
+  enter_value = next(cmgr_twostep)
 
   def next2():
     try:
@@ -467,7 +469,7 @@ def setup_cmgr(cmgr):
     except StopIteration:
       pass
 
-  return next2
+  return enter_value, next2
 
 def push_cmgr(o, attr, cmgr):
   ''' A convenience wrapper for `twostep(cmgr)`

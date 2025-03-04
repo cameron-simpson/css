@@ -863,6 +863,8 @@ class Module:
       projspec['version'] = version
     if 'extra_requires' in dinfo:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
+    if 'python_requires' in dinfo:
+      projspec['requires-python'] = dinfo.pop('python_requires')
     package_dir = dinfo.pop('package_dir')
     dinfo_entry_points = dinfo.pop('entry_points', {})
     if dinfo_entry_points:

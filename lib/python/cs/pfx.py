@@ -37,6 +37,13 @@ which lets one put just the relevant complaint in exception and log
 messages and get useful calling context on the output.
 This does make for wordier logs and exceptions
 but used with a little discretion produces far more debuggable results.
+
+The main items supplied by this module are:
+- `Pfx`: a context manager for wrapping code in an addition prefix context
+- `@pfx`: a decorator for a function to wrap calls to the function
+- `@pfx_method`: like `@pfx` but for instance methods
+- `pfx_call(func,*a,**kw)`: call `func(*a,**kw)` inside a prefix context
+- `pfxprint()`: call `print()` with a leading prefix
 '''
 
 from __future__ import print_function
