@@ -481,6 +481,7 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
       flow.x_prefetch_skip = True
   elif hook_name == 'responseheaders':
     if getattr(flow, 'x_prefetch_skip', False):
+      print("SKIP PREFETCH scan of", rq.url)
     else:
       process_content(hook_name, flow, 'PREFETCH', P=P)
   else:
