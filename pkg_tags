@@ -67,7 +67,7 @@ cs.naysync ok_revision=d44fb1d1f3c3321034749f8842470708754bfcb8 features={"20241
 cs.ndjson ok_revision="9df558bd5a344fc076056fac0a84e1cf7f050872" pypi.release="20211208"
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063124469c features={"20220606":["intif"]}
-cs.obj pypi.release="20250103" ok_revision=ecef476c0e46f7e801e12c8ed7a6f0e6de52b1e5 features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"],"20241005":["public_subclasses"]}
+cs.obj pypi.release="20250103" ok_revision="7bc383c11106fbc6c6f841dfc9106c690eb7e236" features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"],"20241005":["public_subclasses"]}
 cs.other_command
 cs.packetstream pypi.release="20240630" ok_revision="1bc8c692373663edd0678222e3a7c30fd5292116" features={"20240630":["BaseRequest","HasPacketConnection"]}
 cs.pfx pypi.release="20241208" ok_revision="6ab24ce1f823c62b68d614c7f20f63c0f1d8d0ca" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
