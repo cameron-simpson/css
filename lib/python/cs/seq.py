@@ -95,8 +95,8 @@ def the(iterable, context=None):
 def first(iterable):
   ''' Return the first item from an iterable; raise `IndexError` on empty iterables.
   '''
-  for item in iterable:
-    return item
+  for first in iterable:
+    return first
   raise IndexError("empty iterable %r" % (iterable,))
 
 def last(iterable):
@@ -105,9 +105,10 @@ def last(iterable):
   nothing = True
   for item in iterable:
     nothing = False
+    last = item
   if nothing:
     raise IndexError("no items in iterable: %r" % (iterable,))
-  return item  # pylint: disable=undefined-loop-variable
+  return last  # pylint: disable=undefined-loop-variable
 
 def get0(iterable, default=None):
   ''' Return first element of an iterable, or the default.
@@ -167,8 +168,8 @@ def imerge(*iters, **kw):
 
   # prime the list of head elements with (value, iter)
   heap = []
-  for it in iters:
-    it = iter(it)
+  for iterable in iters:
+    it = iter(iterable)
     try:
       head = next(it)
     except StopIteration:
