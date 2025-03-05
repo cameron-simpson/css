@@ -79,7 +79,7 @@ cs.psutils pypi.release="20250108.1" ok_revision=e30b06bec323b666f3cde7ff6775010
 cs.py.doc pypi.release="20241007" ok_revision=a639a998cb404958be0e1e6860d39dc1a3dc616c
 cs.py.func pypi.release="20240630" ok_revision="0dd7f10b229df7807892a255ae6983d2136b819e" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
 cs.py.modules pypi.release="20241122" ok_revision="494204872267e1baa6abbc034af40932ae28a095" features={"20220606":["import_extra"]}
-cs.py.stack pypi.release="20240630" ok_revision="3f7db25a6e686983598ec71936a9c1e8995ba543" features={"20240412":["stack_dump__select"]}
+cs.py.stack pypi.release="20240630" ok_revision="2bddd66695de848f04309ca54c28c40af262ea57" features={"20240412":["stack_dump__select"]}
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
 cs.queues pypi.release="20250103" ok_revision="260bf39286db64ec89bdae2a4e57058ba6228ea0" features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"],"20240211":["ListQueue__unique"],"20240305":["get_batch"],"20240412":["QueueIterator__iter_batch","QueueIterator__next_batch"]}
 cs.range pypi.release="20230701" ok_revision=e733b04f48fcd613a257210411883fe0522ea424 features={"20230518":["as_list"]}
