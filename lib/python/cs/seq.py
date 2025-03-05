@@ -698,6 +698,10 @@ def infill_from_batches(
     obj_keys: Callable[[_infill_T], _infill_K],
     existing_keys: Callable[[_infill_T], _infill_K],
     all: Optional[bool] = False,
+    amend_batch: Optional[Callable[
+        [Iterable[_infill_T]],
+        Iterable[_infill_T],
+    ]] = lambda obj_batch: obj_batch,
 ):
   ''' A batched version of `infill(objs)` accepting an iterable of
       batches of objects which yields `(obj,obj_key)` 2-tuples
@@ -718,8 +722,10 @@ def infill_from_batches(
         an iterable of the existing keys
       * `all`: optional flag, default `False`: if true then yield
         `(obj,())` for objects with no missing records
+      * `amend_batch`: optional callable to amend the batch of objects,
+        for example to amend a `QuerySet` with `.select_related()` or similar
   '''
-  for objs in objss:
+  for objs in map(amend_batch, objss):
     yield from infill(
         objs, obj_keys=obj_keys, existing_keys=existing_keys, all=all
     )
