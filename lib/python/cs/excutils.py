@@ -15,7 +15,7 @@ from cs.gimmicks import exception, warning
 from cs.py.func import funcname
 from cs.py3 import raise_from
 
-__version__ = '20250306'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'description':
