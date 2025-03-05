@@ -217,6 +217,7 @@ async def amap(
     concurrent=False,
     unordered=False,
     indexed=False,
+    fast=False,
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
       for each `item` in the iterable `it`.
@@ -227,9 +228,9 @@ async def amap(
 
       If `concurrent` is `False` (the default), run each `func(item)`
       call in series.
-
       If `concurrent` is true run the function calls as `asyncio`
       tasks concurrently.
+
       If `unordered` is true (default `False`) yield results as
       they arrive, otherwise yield results in the order of the items
       in `it`, but as they arrive - tasks still evaluate concurrently
@@ -238,6 +239,9 @@ async def amap(
       If `indexed` is true (default `False`) yield 2-tuples of
       `(i,result)` instead of just `result`, where `i` is the index
       if each item from `it` counting from `0`.
+
+      If `fast` is true (default `False`) assume that `func` does
+      not block or otherwise take a long time.
 
       Example of an async function to fetch URLs in parallel.
 
@@ -252,7 +256,7 @@ async def amap(
                   yield urls[i], response
   '''
   # promote a synchronous function to an asynchronous function
-  func = afunc(func)
+  func = afunc(func, fast=fast)
   # promote the iterable to an asynchronous iterator
   ait = async_iter(it)
   if not concurrent:
@@ -309,23 +313,31 @@ async def amap(
   # Queue all the tasks with their sequence numbers.
   # Does this also need to be an async function in case there's
   # some capacity limitation on the event loop? I hope not.
+  # Keep a mapping of queue number to task so that tasks are not
+  # prematurely garbage collected.
+  tasks = {}
+
   async def consume_ait():
     nonlocal ait, queued, consumed, terminated
     try:
       async for item in ait:
         if terminated:
           break
-        create_task(qfunc(queued, item))
+        # Keep a reference to the task so that it is not garbage
+        # collected before completion.
+        tasks[queued] = create_task(qfunc(queued, item))
         queued += 1
     finally:
       consumed = True
-      if queued == 0:
-        # no functions queued, so we must close the resultQ ourselves
+      if queued <= completed:
+        # no functions outstanding, so we must close the resultQ ourselves
         await resultQ.close()
 
-  create_task(consume_ait())
+  # keep a reference to the consumer also
+  consumer = create_task(consume_ait())
   if unordered:
     async for i, result, exc in resultQ:
+      del tasks[i]  # release the task reference
       if exc is not None:
         terminated = True
         raise exc
@@ -339,6 +351,7 @@ async def amap(
       heappush(results, i_result_exc)
       while results and results[0][0] == unqueued:
         i, result, exc = heappop(results)
+        del tasks[i]  # release the task reference
         if exc is not None:
           terminated = True
           raise exc
@@ -625,7 +638,7 @@ if __name__ == '__main__':
   if True:  # debugging
 
     async def demo_pipeline2(it: AnyIterable):
-      print("pipeline(hrefs)www.smh.com.au...")
+      print("pipeline(hrefs)...")
       try:
         from cs.app.pilfer.urls import hrefs
       except ImportError as e:

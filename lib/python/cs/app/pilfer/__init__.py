@@ -29,6 +29,8 @@ DISTINFO = {
         "Topic :: Internet :: Proxy Servers",
         "Topic :: Utilities",
     ],
+    'python_requires':
+    '>=3.13',  # for configparser.UNNAMED_SECTION
     'entry_points': {
         'console_scripts': {
             'pilfer': 'cs.app.pilfer:main'

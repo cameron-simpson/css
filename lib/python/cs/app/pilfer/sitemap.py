@@ -10,9 +10,16 @@ from functools import cached_property
 import re
 from typing import Iterable, Mapping, Optional
 
+from cs.binary import bs
 from cs.deco import promote, Promotable
 from cs.lex import cutsuffix
+from cs.logutils import warning
+from cs.pfx import Pfx
+from cs.rfc2616 import content_type
 from cs.urlutils import URL
+
+from bs4 import BeautifulSoup
+from typeguard import typechecked
 
 @dataclass
 class URLMatcher(Promotable):
@@ -77,6 +84,12 @@ class SiteMapPatternMatch(namedtuple(
         such as an `re.Match` instance
       * `mapping`: a mapping of named values gleaned during the match
   '''
+
+  def format_arg(self, extra: Optional[Mapping] = None) -> str:
+    ''' Treat `self.pattern_arg` as a format string and format it
+        using `self.mapping` and `extra`.
+    '''
+    return self.pattern_arg.format_map(ChainMap(self.mapping, extra or {}))
 
 @dataclass
 class SiteMap(Promotable):
@@ -217,12 +230,76 @@ class SiteMap(Promotable):
         This base implementation matches the patterns in `URL_KEY_PATTERNS`
         class attribute which is `()` for the base class.
     '''
-    matched = self.match(url, self.URL_KEY_PATTERNS, extra=extra)
-    if not matched:
+    match = self.match(url, self.URL_KEY_PATTERNS, extra=extra)
+    if not match:
       return None
-    return matched.pattern_arg.format_map(
-        ChainMap(matched.mapping, extra or {})
-    )
+    return match.format_arg(extra=extra)
+
+  @typechecked
+  def content_prefetch(
+      self,
+      match: SiteMapPatternMatch,
+      flow,
+      content_bs: bs,
+      *,
+      P: Optional = None,
+  ):
+    ''' The generic prefetch handler.
+
+        This parses `content_bs` and queues URLs for prefetching
+        based on the value of `match.pattern_arg`.
+
+        The `match.pattern_arg` should be a list of strings (or a single string).
+        The supported strings are:
+        - `"hrefs"`: all the anchor `href` values
+        - `"srcs"`: all the anchor `src` values
+    '''
+    from .pilfer import Pilfer
+    if P is None:
+      P = Pilfer.default()
+    if not isinstance(P, Pilfer):
+      print("NO PILFER")
+      breakpoint()
+    rq = flow.request
+    rsp = flow.response
+    url = rq.url
+    print("prefetch from", url)
+    ct = content_type(rsp.headers)
+    with Pfx("content_prefetch: %s: %s", ct.content_type, url):
+      if ct is None:
+        warning('no content-type')
+        return
+      # parse the content
+      if ct.content_type == 'text/html':
+        encoding = ct.params.get('charset') or 'utf8'
+        soup = BeautifulSoup(content_bs, 'html.parser', from_encoding=encoding)
+      # TODO: text/xml, for RSS etc
+      else:
+        soup = None
+      url = URL(url, soup=soup)
+      to_fetch = match.pattern_arg
+      prefetcher = P.state.prefetcher
+      if isinstance(to_fetch, str):
+        to_fetch = [to_fetch]
+      with P:
+        for pre in to_fetch:
+          with Pfx(pre):
+            match pre:
+              case 'hrefs' | 'srcs':
+                if soup is None:
+                  warning("unoparsed")
+                  return
+                a_attr = pre[:-1]  # href or src
+                for a in soup.find_all('a'):
+                  ref = a.get(a_attr)
+                  if not ref:
+                    continue
+                  absurl = url.urlto(ref)
+                  prefetcher.put(
+                      absurl, get_kw=dict(headers={'x-prefetch': 'no'})
+                  )
+              case _:
+                warning("unhandled prefetch arg")
 
 # Some presupplied site maps.
 

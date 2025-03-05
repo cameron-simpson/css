@@ -43,6 +43,8 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
+    'python_requires':
+    '>=3.6',  # format strings
     'install_requires': [
         'cs.deco',
         'cs.lex',
@@ -1029,7 +1031,7 @@ class AttrableMappingMixin(object):
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
     if attr == 'ATTRABLE_MAPPING_DEFAULT':
-      raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+      raise AttributeError(f'{self.__class__.__name__}.{attr}')
     # try self.__dict__ first - this is because it appears that
     # getattr(dict,...) does not consult __dict__
     try:
@@ -1052,17 +1054,13 @@ class AttrableMappingMixin(object):
         names_msgs = []
         ks = list(self.keys())
         if ks:
-          names_msgs.append('keys=' + ','.join(sorted(ks)))
+          names_msgs.append(f'keys={",".join(sorted(ks))}')
         dks = self.__dict__.keys()
         if dks:
-          names_msgs.append('__dict__=' + ','.join(sorted(dks)))
+          names_msgs.append(f'__dict__={",".join(sorted(dks))}')
         # pylint: disable=raise-missing-from
         raise AttributeError(
-            "%s.%s (attrs=%s)" % (
-                type(self).__name__,
-                attr,
-                ','.join(names_msgs),
-            )
+            f'{self.__class__.__name__}.{attr} (attrs={",".join(names_msgs)}'
         )
 
 class JSONableMappingMixin:

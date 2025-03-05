@@ -98,7 +98,7 @@ class URL(HasThreadState, Promotable):
   def __init__(self, url_s: str, referer=None, soup=None, text=None):
     ''' Initialise the `URL` from the URL string `url_s`.
     '''
-    self.url_s = url_s
+    self.url_s = str(url_s)
     self._lock = RLock()
     self._parts = None
     self._info = None
