@@ -20,7 +20,7 @@ from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
 from cs.timeutils import time_func
 
-__version__ = '20250306'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python3"],
