@@ -2,7 +2,7 @@ Pillow
 arrow
 beautifulsoup4
 blake3
-cs.ansi_colour pypi.release="20220227" ok_revision="23084504e602ebccb928e18386761b11a2d0ca81" features={"20220227":["COLOUR_CODES","TerminalColors","colour_escape"]}
+cs.ansi_colour pypi.release="20250306" ok_revision="23084504e602ebccb928e18386761b11a2d0ca81" features={"20220227":["COLOUR_CODES","TerminalColors","colour_escape"]}
 cs.app.beyonwiz pypi.release=20160828
 cs.app.dlog ok_revision="8066478bc1a04af4b83d42e74c1b6ee2c38b793a" pypi.release="20240316"
 cs.app.flag pypi.release="20201228" ok_revision="8d880199ddcb60a456ee67bc162cb453ce85f491"
