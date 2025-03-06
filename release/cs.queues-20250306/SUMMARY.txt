@@ -1,0 +1,3 @@
+QueueIterator: annotate as Iterable[Any].
+Drop obsolete pretence of python 2 support, embrace the f-string.
+Some other minor updates.

@@ -33,7 +33,7 @@ from cs.resources import (
 from cs.result import CancellationError
 from cs.seq import seq, unrepeated
 
-__version__ = '20250103-post'
+__version__ = '20250306'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
