@@ -16,6 +16,7 @@ cs.app.osx.misc ok_revision=a8db5e27f6d608f7bad1854b0c06aa31338fa544 features={"
 cs.app.osx.objc ok_revision=bafa7354f7242e42dd089064362915d523d762da pypi.release="20240622"
 cs.app.osx.plist ok_revision="599e3e37c0af4e7ba92c2134c0a90d17effcfc39" pypi.release="20221228"
 cs.app.osx.spaces ok_revision="79e8ec468b70ea38aa0835694cd80d52f5c262e6" features={"20240622":["SpacesCommand"]} pypi.release="20250306"
+cs.app.pilfer.urls
 cs.app.playon ok_revision="6d46bd98f407fc8ff2326ce12af36517bd7a8483" pypi.release="20241007" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
 cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24ee4f1ca187096"
 cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
@@ -101,7 +102,7 @@ cs.taskqueue ok_revision="879d12f2e8d786307b2bee942c38f08ff73d8633" features={"2
 cs.testutils ok_revision="95ada344b6507ca853570f1788d69bdf64c3e080" features={"20230109":["SetupTeardownMixin","product_test"],"20240623":["assertSingleThread"]} pypi.release="20241122"
 cs.threads ok_revision=f8d1f0e18006c2806ebbaab429b4dbb383dba37c pypi.release="20250306" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"]}
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
-cs.timeutils
+cs.timeutils ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.units
 cs.upd ok_revision="08f7d62b98d3c1b2532c4b8c9199a0c756914c6c" pypi.release="20240630" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"],"20240216":["without"],"20240412":["without"]}
