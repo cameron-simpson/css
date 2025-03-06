@@ -20,7 +20,6 @@ from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
 from cs.logutils import warning
 from cs.timeutils import time_func
-from cs.x import X
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -200,7 +199,6 @@ def read_http_request_line(fp):
       If an empty request line is received return None, None, None.
   '''
   elapsed, bline = time_func(fp.readline)
-  X("GOT REQUEST-LINE: %r", bline)
   httprq = dec8(bline).strip()
   if not httprq:
     ##info("end of client requests")
@@ -227,11 +225,9 @@ def datetime_from_http_date(s):
   try:
     return datetime_from_rfc1123_date(s)
   except ValueError as e:
-    X("datetime_from_rfc1123_date(%r): %s", s, e)
     try:
       return datetime_from_rfc850_date(s)
     except ValueError as e:
-      X("datetime_from_rfc850_date(%r): %s", s, e)
       return datetime_from_asctime_date(s)
 
 def datetime_from_rfc1123_date(s):
