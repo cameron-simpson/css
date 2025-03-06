@@ -88,7 +88,7 @@ cs.result pypi.release="20250103" ok_revision="46da4a62b9cfe1664dd0b8c22220d3f59
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.semantics ok_revision="5bdebc5efd5ac356c34aeba3b0ba7f58042e3001" features={"20250103":["ClosedError","not_closed"]} pypi.release="20250103"
-cs.seq pypi.release="20250103" ok_revision=a4926c3e492c2bc61337766160197176611a8640 featu features={"20250103":["skip_map"],"20250306":["infill"]}
+cs.seq pypi.release="20250103" ok_revision=a4926c3e492c2bc61337766160197176611a8640 featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"]}
 cs.service_api ok_revision=d682ce35a261867118ef07bd49e2c0808c740ff9 pypi.release="20241007"
 cs.sh ok_revision="3af3cf2c5da8cc18eafa8a65437eaf1e7b7f1db3"
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
