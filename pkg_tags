@@ -87,7 +87,7 @@ cs.range pypi.release="20230701" ok_revision=e733b04f48fcd613a257210411883fe0522
 cs.resources pypi.release="20250306" ok_revision="441d08070b56bad6baf31d67ec5ef7273f01e4fb" features={"20220429":["catch_signal"],"20220918":["openif"],"20230503":["RunState_poll_cancel"],"20231221":["Runstate_raiseif"],"20240201":["MultiOpenMixin_is_open"],"20240412":["RunState__iter"],"20250103":["RunState__raiseif"]}
 cs.result pypi.release="20250306" ok_revision="080f60d7225148f5360f384677de6f110bb9d847" features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"],"20250103":["not_cancelled"]}
 cs.rfc2047 pypi.release="20200524"
-cs.rfc2616 pypi.release=20160828 ok_revision="74bf122de126cda4642d6030ed3cd6e992b971db" features={"20250306":["content_length","content_type","default_headerregistry","header"]}
+cs.rfc2616 pypi.release="20250306" ok_revision="74bf122de126cda4642d6030ed3cd6e992b971db" features={"20250306":["content_length","content_type","default_headerregistry","header"]}
 cs.semantics ok_revision="5bdebc5efd5ac356c34aeba3b0ba7f58042e3001" features={"20250103":["ClosedError","not_closed"]} pypi.release="20250103"
 cs.seq pypi.release="20250306" ok_revision=a4926c3e492c2bc61337766160197176611a8640 featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"]}
 cs.service_api ok_revision=d682ce35a261867118ef07bd49e2c0808c740ff9 pypi.release="20241007"
