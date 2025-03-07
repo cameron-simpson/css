@@ -849,8 +849,9 @@ class PlayOnSQLTags(SQLTags):
         r = pfx_call(re.compile, r_text, re.I)
         for recording in self:
           pl_tags = recording.subtags('playon')
-          if (pl_tags.Series and r.search(pl_tags.Series)
-              or pl_tags.Name and r.search(pl_tags.Name)):
+          name = getattr(pl_tags, 'Name', '')
+          series = getattr(pl_tags, 'Series', '')
+          if (series and r.search(series)) or (name and r.search(name)):
             recordings.append(recording)
       else:
         # integer recording id
