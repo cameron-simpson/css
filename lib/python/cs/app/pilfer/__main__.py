@@ -355,7 +355,7 @@ class PilferCommand(BaseCommand):
             mitm_action = pfx_call(import_name, action[:offset])
           except ImportError as e:
             warning(
-                "cannot import %r: %s", action[:offset], e.msg_without_prefix
+                "cannot import %r: %s", action[:offset], e._
             )
             bad_actions = True
             continue
