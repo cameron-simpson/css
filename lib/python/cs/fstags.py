@@ -3,7 +3,7 @@
 # pylint: disable=too-many-lines
 
 ''' Simple filesystem based file tagging
-    and the associated `fstags` command line script.
+    and the associated `fstags` command line tool.
 
     Many basic tasks can be performed with the `fstags` command line utility,
     documented under the `FSTagsCommand` class below.
@@ -21,7 +21,14 @@
     there is a line for each entry in the directory
     consisting of the directory entry name and the associated tags.
 
-    Tags may be "bare", or have a value.
+    Programmatically one creates an `FSTags` instance and accesses
+    the `TagSet`s for whichever filesystem paths are of interest:
+
+        with FSTags() as fstags:
+            tagged = fstags['/path/to/some/file']
+            tagged['foo']=9 # set the tag foo=9
+
+    In a `.fstags` tag file tags may be "bare", or have a value.
     If there is a value it is expressed with an equals (`'='`)
     followed by the JSON encoding of the value.
 
@@ -1177,7 +1184,7 @@ class FSTags(MultiOpenMixin):
       now = time.time()
       tagged_path = self._tagged_paths[keypath] = tagfile[basename(keypath)]
       elapsed = time.time() - now
-      if elapsed >= 1.0:
+      if elapsed >= 5.0:
         warning("FSTags[%r] took %ss", path, elapsed)
         ##raise RuntimeError("SLOW TAGFILE LOOKUP")
     return tagged_path
