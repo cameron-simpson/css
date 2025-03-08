@@ -94,7 +94,8 @@ cs.service_api ok_revision=d682ce35a261867118ef07bd49e2c0808c740ff9 pypi.release
 cs.sh ok_revision="3af3cf2c5da8cc18eafa8a65437eaf1e7b7f1db3"
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.splink ok_revision=d931f30ab0db0d1e1aef4df8295a1b20e364a4be pypi.release="20240316"
-cs.sqlalchemy_utils ok_revision="295d8d19971adb20df350997864bd29c6bd44eca" pypi.release="20241122" features={"20230612":["orchestrated_session"]}
+cs.sqlalchemy_utils ok_revision="511ca32658122179b40f257594ad68885af61ee8" pypi.release="20241122" features={"20230612":["orchestrated_session"]}
+cs.sqlalchemyutils
 cs.sqltags ok_revision="977113cd5173742347762aea02a88b7773f64d01" pypi.release="20240723"
 cs.tagset ok_revision=d5bf9847157202e21fef9f9b95dde26418687eeb features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"],"20240422":["fix_Tag__str__bad_TypeError","jsonable"],"20240422.2":["jsonable__for_json"]} pypi.release="20250306"
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
