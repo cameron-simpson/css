@@ -42,7 +42,7 @@ from cs.threads import ThreadState
 ##  from cs.py.stack import caller
 ##  X("CHECK from %r", caller())
 
-__version__ = '20250308'
+__version__ = '20250308-post'
 
 DISTINFO = {
     'description':
