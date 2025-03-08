@@ -1,0 +1,3 @@
+lib/python/cs/pfx.py: cs.pfx: Pfx.prefixify_exception: mention the .attr_without_prefix in the docstring
+lib/python/cs/pfx.py: cs.pfx: add quick summary to the module docstring
+lib/python/cs/pfx.py: cs.pfx: Pfx.prefixify_exception: preserve the original str(e) as e._
