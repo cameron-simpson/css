@@ -112,7 +112,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, Promotable
+from cs.deco import default_params, fmtdoc, Promotable, uses_verbose
 from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
 from cs.fs import HasFSPath, FSPathBasedSingleton, scandirpaths, scandirtree
 from cs.lex import (
@@ -1173,7 +1173,8 @@ class FSTags(MultiOpenMixin):
     return realpath(fspath) if self.config.physical else abspath(fspath)
 
   @locked
-  def __getitem__(self, path) -> "TaggedPath":
+  @uses_verbose
+  def __getitem__(self, path, *, verbose: bool) -> "TaggedPath":
     ''' Return the `TaggedPath` for `abspath(path)`.
     '''
     keypath = self.keypath(path)
@@ -1185,8 +1186,8 @@ class FSTags(MultiOpenMixin):
       tagged_path = self._tagged_paths[keypath] = tagfile[basename(keypath)]
       elapsed = time.time() - now
       if elapsed >= 5.0:
-        warning("FSTags[%r] took %ss", path, elapsed)
-        ##raise RuntimeError("SLOW TAGFILE LOOKUP")
+        if verbose or sys.stderr.isatty():
+          warning("FSTags[%r] took %ss", path, elapsed)
     return tagged_path
 
   @pfx_method
