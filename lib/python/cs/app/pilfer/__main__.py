@@ -25,7 +25,7 @@ from cs.lex import (
     cutsuffix,
     get_dotted_identifier,
     is_identifier,
-    tabulate,
+    printt,
 )
 import cs.logutils
 from cs.logutils import debug, error, warning
@@ -199,7 +199,7 @@ class PilferCommand(BaseCommand):
           print(url)
           for cache_key, md in sorted(md_map.items()):
             print(" ", cache_key)
-            tabulate(
+            printt(
                 *[
                     [f'    {mdk}', pformat(mdv)]
                     for mdk, mdv in sorted(md.items())
@@ -220,13 +220,16 @@ class PilferCommand(BaseCommand):
         for cache_key in cache_keys:
           print(cache_key)
           md = cache.get(cache_key, {})
-          for line in tabulate(*((f'  {mdk}', pformat(mdv))
-                                 for mdk, mdv in sorted(md.items()))):
-            print(line)
+          printt(
+              *([f'  {mdk}', pformat(mdv)] for mdk, mdv in sorted(md.items()))
+          )
       else:
-        for line in tabulate(*((cache_key, cache.get(cache_key, {}).get('url'))
-                               for cache_key in cache_keys)):
-          print(line)
+        printt(
+            *(
+                [cache_key, cache.get(cache_key, {}).get('url')]
+                for cache_key in cache_keys
+            )
+        )
 
   @popopts
   def cmd_from(self, argv):
@@ -354,9 +357,7 @@ class PilferCommand(BaseCommand):
           try:
             mitm_action = pfx_call(import_name, action[:offset])
           except ImportError as e:
-            warning(
-                "cannot import %r: %s", action[:offset], e._
-            )
+            warning("cannot import %r: %s", action[:offset], e._)
             bad_actions = True
             continue
         # :params
@@ -403,10 +404,12 @@ class PilferCommand(BaseCommand):
     P = self.options.pilfer
     xit = 0
     if not argv:
-      for line in tabulate(
-          *[[pattern, str(sitemap)]
-            for pattern, sitemap in self.options.pilfer.sitemaps]):
-        print(line)
+      printt(
+          *[
+              [pattern, str(sitemap)]
+              for pattern, sitemap in self.options.pilfer.sitemaps
+          ]
+      )
     else:
       map_name = argv.pop(0)
       print("map_name", map_name)
@@ -423,11 +426,10 @@ class PilferCommand(BaseCommand):
       else:
         for pattern in sitemap.URL_KEY_PATTERNS:
           (domain_glob, path_re_s), format_s = pattern
-          for line in tabulate(
+          printt(
               ('Format:', format_s),
               ('  Domain:', domain_glob),
               ('  Path RE:', path_re_s),
-          ):
-            print(line)
+          )
 
 sys.exit(main(sys.argv))
