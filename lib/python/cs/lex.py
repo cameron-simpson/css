@@ -20,6 +20,7 @@ from functools import partial
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from pprint import pformat
 import re
 from string import (
     ascii_letters,
@@ -1377,7 +1378,8 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
 def tabulate(*rows, sep='  '):
   r''' A generator yielding lines of values from `rows` aligned in columns.
 
-      Each row in rows is a list of strings. If the strings contain
+      Each row in rows is a list of strings. Non-`str` objects are
+      promoted to `str` via `pprint.pformat`. If the strings contain
       newlines they will be split into subrows.
 
       Example:
@@ -1401,6 +1403,14 @@ def tabulate(*rows, sep='  '):
   if not rows:
     # avoids max of empty list
     return
+  # promote all table cells to str via pformat
+  rows = [
+      [
+          (cell if isinstance(cell, str) else pformat(cell, compact=True))
+          for cell in row
+      ]
+      for row in rows
+  ]
   # pad short rows with empty columns
   max_cols = max(map(len, rows))
   for row in rows:
@@ -1432,6 +1442,24 @@ def tabulate(*rows, sep='  '):
     yield sep.join(
         f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
     ).rstrip()
+
+def printt(
+    *table, file=None, flush=False, indent='', print_func=None, **tabulate_kw
+):
+  ''' A wrapper for `tabulate()` to print the results.
+      Each positional argument is a table row.
+
+      Parameters:
+      * `file`: optional output file, passed to `print_func`
+      * `flush`: optional flush flag, passed to `print_func`
+      * `indent`: optional leading indent for the output lines
+      * `print_func`: optional `print()` function, default `builtins.print`
+      Other keyword arguments are passed to `tabulate()`.
+  '''
+  if print_func is None:
+    from builtins import print as print_func
+  for line in tabulate(*table, **tabulate_kw):
+    print_func(indent + line, file=file, flush=flush)
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):
