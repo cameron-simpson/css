@@ -28,7 +28,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
 from cs.fs import shortpath
-from cs.lex import tabulate
+from cs.lex import printt
 from cs.pfx import Pfx, pfx_call, pfx_method
 
 from .misc import macos_version
@@ -391,9 +391,8 @@ class SpacesCommand(BaseCommand):
         report_lines.append([f'Space {space_index + 1}'])
         space_num = space_index + 1
         for k, v in sorted(spaces.get_wp_config(space_index).items()):
-          report_lines.append([f'  {k}', pformat(v)])
-      for line in tabulate(*report_lines):
-        print(line)
+          report_lines.append([f'  {k}', pformat(v, compact=True)])
+      printt(*report_lines)
     else:
       if space_indices is None:
         space_indices = [spaces.current_index]
