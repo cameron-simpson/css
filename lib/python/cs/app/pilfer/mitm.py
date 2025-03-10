@@ -31,7 +31,7 @@ from cs.cmdutils import vprint
 from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
-from cs.lex import r, s, tabulate
+from cs.lex import printt, r, s, tabulate
 from cs.logutils import warning
 from cs.naysync import amap, IterableAsyncQueue
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -355,28 +355,34 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
     else:
       PR("sitemap", sitemap)
     print("  Request Headers:")
-    for line in tabulate(*[(key, value)
-                           for key, value in sorted(rq.headers.items())]):
-      print("   ", line)
+    printt(
+        *[(key, value) for key, value in sorted(rq.headers.items())],
+        indent="    ",
+    )
     if rq.method == "GET":
       q = url.query_dict()
       if False and q:
         print("  Query:")
-        for line in tabulate(*[(param, repr(value))
-                               for param, value in sorted(q.items())]):
-          print("   ", line)
+        printt(
+            *[(param, repr(value)) for param, value in sorted(q.items())],
+            indent="    ",
+        )
     elif rq.method == "POST":
       if False and rq.urlencoded_form:
         print("  Query:")
-        for line in tabulate(
-            *[(param, repr(value))
-              for param, value in sorted(rq.urlencoded_form.items())]):
-          print("   ", line)
+        printt(
+            *[
+                (param, repr(value))
+                for param, value in sorted(rq.urlencoded_form.items())
+            ],
+            indent="    ",
+        )
   elif hook_name == 'responseheaders':
     print("  Response Headers:")
-    for line in tabulate(*[(key, value)
-                           for key, value in sorted(rsp.headers.items())]):
-      print("   ", line)
+    printt(
+        *[(key, value) for key, value in sorted(rsp.headers.items())],
+        indent="    ",
+    )
   elif hook_name == 'response':
     PR("  Content:", len(flow.response.content))
   else:
