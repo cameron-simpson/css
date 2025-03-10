@@ -246,6 +246,7 @@ class PlayOnCommand(BaseCommand):
           -o filename_format
                 Format for the new filename, default {DEFAULT_FILENAME_FORMAT!r}.
     '''
+    options = self.options
     api = options.api
     doit = options.doit
     filename_format = options.filename_format
@@ -441,6 +442,7 @@ class PlayOnCommand(BaseCommand):
     ''' Usage: {cmd} [feature_id]
           List features.
     '''
+    options = self.options
     long_mode = options.long_mode
     if argv:
       feature_id = argv.pop(0)
