@@ -801,7 +801,7 @@ class NRLock:
     lock = self._lock
     if lock.locked() and current_thread() is self._lock_thread:
       raise DeadlockError(
-          f'lock already held by current Thread:{self._locked_by}'
+          f'lock {self._name!r} already held by current Thread:{self._locked_by}'
       )
     acquired = lock.acquire(*a, **kw)
     if acquired:
