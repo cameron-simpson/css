@@ -870,6 +870,19 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
   def __setitem__(self, tag_name, value):
     self.set(tag_name, value)
 
+  def _set(self, tag_name, value):
+    ''' This is the "raw" setitem for a `TagSet`.
+        It should set `tag_name=value` on the underlying mapping
+        (`dict.__setitem__` for a pure `TgaSet`)
+        with no checks or side effects.
+
+        This is presented for methods like `TagFile.save()`
+        which prefills `TagSet`s with a UUID if there is an `update_mapping`.
+        This was triggering a recursive save when it happened during
+        an `FSTags` shutdown.
+    '''
+    super().__setitem__(tag_name, value)
+
   @tag_or_tag_value
   def set(self, tag_name, value, *, verbose=None):
     ''' Set `self[tag_name]=value`.
@@ -887,7 +900,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
               (tag, old_value)
           )
           ifverbose(verbose, msg)
-    super().__setitem__(tag_name, value)
+    self._set(tag_name, value)
 
   # "set" mode
   # note: cannot just be add=set because it won't follow subclass overrides
