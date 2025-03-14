@@ -701,16 +701,15 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
     elif tag_name == 'unixtime':
       result = self.TE_VALUE_COMPARISON_FUNCS[
           self.comparison](te.unixtime, as_unixtime(tag_value))
+    elif tag_value is None:
+      result = tag_name in te
     else:
-      if tag_value is None:
-        result = tag_name in te
+      te_tag_value = te.get(tag_name)
+      if te_tag_value is None:
+        result = False
       else:
-        te_tag_value = te.get(tag_name)
-        if te_tag_value is None:
-          result = False
-        else:
-          result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
-                                                  ](te_tag_value, tag_value)
+        result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
+                                                ](te_tag_value, tag_value)
     return result if self.choice else not result
 
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
