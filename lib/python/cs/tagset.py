@@ -3642,7 +3642,7 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
           update_uuid_tag_name = self.update_uuid_tag_name
           update_prefix = self.update_prefix
           with openif(update_mapping):
-            for tags in tagsets:
+            for name, tags in tagsets.items():
               # mirror tags to secondary mapping eg an SQLTags
               # this associates a UUID with the file
               try:
@@ -3670,7 +3670,7 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
                 )
                 d = tags.as_dict()
                 del d[update_uuid_tag_name]
-                d['fspath'] = joinpath(dirname(filepath), name)
+                d['fspath'] = joinpath(dirname(self.fspath), name)
                 try:
                   update_mapping[key].update(d)
                 except AttributeError:
