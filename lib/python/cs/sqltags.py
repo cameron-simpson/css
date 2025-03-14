@@ -29,7 +29,7 @@ from builtins import id as builtin_id
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime
 from fnmatch import fnmatchcase
 try:
@@ -1187,7 +1187,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               )
             try:
               op_func = op_map[criterion.comparison]
-            except KeyError as e:
+            except KeyError:
               # pylint: disable=raise-missing-from
               raise TypeError(
                   "no implementation of op %r for %s=%s" %
@@ -2385,9 +2385,8 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
             if tag_choice.choice:
               if tag_choice.tag not in tags:
                 tags.set(tag_choice.tag)
-            else:
-              if tag_choice.tag in tags:
-                tags.discard(tag_choice.tag)
+            elif tag_choice.tag in tags:
+              tags.discard(tag_choice.tag)
     return xit
 
 class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
