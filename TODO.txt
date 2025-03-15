@@ -1,3 +1,4 @@
+wpr - do not import the osx stuff if we're not updating the spaces - it takes forever
 exract the make-a-dir-of-images from wpr as a tool
 RunState pause state and effects, Event to block for it?
 fstags - can we store tags for directories in the dir .fstags, requires a state maybe we already do that? migrate - if isdir and no tags in the dir fstags get them from the parent
