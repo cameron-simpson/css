@@ -454,7 +454,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       if WDFstate is None:
         # create a new data file
         while True:
-          filename = str(uuid4()) + self.DATA_DOT_EXT
+          filename = f'{uuid4()}{self.DATA_DOT_EXT}'
           pathname = self.datapathto(filename)
           if existspath(pathname):
             error("new datafile path already exists, retrying: %r", pathname)
