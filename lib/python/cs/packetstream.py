@@ -12,13 +12,14 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 import os
+import sys
 from time import sleep
 from threading import Lock
 from typing import Callable, List, Mapping, Optional, Protocol, Tuple, Union, runtime_checkable
 
 from cs.binary import AbstractBinary, SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
-from cs.context import closeall, stackattrs
+from cs.context import closeall, contextif, stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, exception
@@ -407,8 +408,10 @@ class PacketConnection(MultiOpenMixin):
               runstate = self._runstate
               with runstate:
                 # runstate->RUNNING
-                with rq_in_progress.bar(stalled="idle", report_print=True):
-                  with rq_out_progress.bar(stalled="idle", report_print=True):
+                with contextif(sys.stderr.isatty(), rq_in_progress.bar,
+                               stalled="idle", report_print=True):
+                  with contextif(sys.stderr.isatty(), rq_out_progress.bar,
+                                 stalled="idle", report_print=True):
                     # dispatch Thread to process received packets
                     self._recv_thread = bg_thread(
                         self._recv_loop,
