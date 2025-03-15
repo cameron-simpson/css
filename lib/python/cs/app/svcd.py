@@ -135,7 +135,7 @@ class SvcDCommand(BaseCommand):
           List known services.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     flags = Flags()
     for flagname in sorted(flags):
       flag_prefix = cutsuffix(flagname, '_RUNNING')

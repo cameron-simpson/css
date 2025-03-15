@@ -201,7 +201,7 @@ class PlayOnCommand(BaseCommand):
           Report account state.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
@@ -214,7 +214,7 @@ class PlayOnCommand(BaseCommand):
       raise GetoptError("missing suburl")
     suburl = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     result = api.suburl_data(suburl)
     pprint(result)
@@ -230,7 +230,7 @@ class PlayOnCommand(BaseCommand):
       raise GetoptError("missing suburl")
     suburl = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     lstate = api.login_state
     pprint(lstate)
@@ -449,7 +449,7 @@ class PlayOnCommand(BaseCommand):
     else:
       feature_id = None
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for feature in sorted(api.features(), key=lambda svc: svc['playon.ID']):
       playon = feature.subtags('playon', as_tagset=True)
@@ -473,7 +473,7 @@ class PlayOnCommand(BaseCommand):
 
   def cmd_poll(self, argv):
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     pprint(api.notifications())
 
@@ -522,7 +522,7 @@ class PlayOnCommand(BaseCommand):
     else:
       service_id = None
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for service in sorted(api.services(), key=lambda svc: svc['playon.ID']):
       playon = service.subtags('playon')

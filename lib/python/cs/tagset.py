@@ -3813,7 +3813,7 @@ class TagsOntologyCommand(BaseCommand):
           return 0
         if subcmd in ('list', 'ls'):
           if argv:
-            raise GetoptError("extra arguments: %r" % (argv,))
+            raise GetoptError(f'extra arguments: {argv!r}')
           for key, tags in sorted(ont.by_type(type_name, with_tagsets=True)):
             print(key, tags)
           return 0
