@@ -20,7 +20,10 @@ except ImportError:
     '''
     yield None
 
-from io import UnsupportedOperation
+try:
+  from io import UnsupportedOperation
+except ImportError:
+  UnsupportedOperation = OSError
 import os
 import stat
 import subprocess
