@@ -20,10 +20,7 @@ except ImportError:
     '''
     yield None
 
-try:
-  from io import UnsupportedOperation
-except ImportError:
-  UnsupportedOperation = OSError
+from io import UnsupportedOperation
 import os
 import stat
 import subprocess
@@ -84,11 +81,9 @@ except NameError:
           )
         Exception.__init__(self, msg)
 
-try:
-  from cs.lex import r, s  # pylint: disable=unused-import
-except ImportError:
-  r = repr
-  s = lambda obj: "%s:%s" % (obj.__class__.__name__, str(obj))
+# simplistic versions of cs.lex r() and s()
+r = lambda obj: "%s:%s" % (obj.__class__.__name__, repr(obj))
+s = lambda obj: "%s:%s" % (obj.__class__.__name__, str(obj))
 
 __version__ = '20240316-post'
 
