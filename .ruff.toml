@@ -6,8 +6,26 @@ line-length = 78
 indent-width = 2
 
 [lint]
-select = ["E4", "E7", "E9", "F", "B", "PL", "Q", "C90"]
-ignore = [ "B904", "E731", "Q000", "Q002" ]
+extend-select = ["D", "E4", "E7", "E9", "F", "B", "PL", "Q", "UP", "C90"]
+ignore = [
+    "B904",
+    "D200", # One-line docstring should fit on one line
+    "D210", # No whitespaces allowed surrounding docstring text
+    "D205", # blank line required between summary line and description
+    "D300", # Use triple double quotes
+    "D208", # Docstring is over-indented
+    "D407", # Missing dashed underline after section
+    "D413", # Missing blank line after last section
+    "D214", # Section is over-indented
+    "D400", # First line should end with a period
+    "D415", # First line should end with a period, question mark, or exclamation point
+    "D406", # Section name should end with a newline
+    "D401", # First line of docstring should be in imperative mood
+    "D412", # No blank lines allowed between a section header and its content
+    "E731",
+    "Q000",
+    "Q002",
+]
 flake8-quotes.docstring-quotes = "single"
 flake8-quotes.inline-quotes = "double"
 flake8-quotes.multiline-quotes = "single"
