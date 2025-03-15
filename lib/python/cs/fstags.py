@@ -2,7 +2,7 @@
 #
 # pylint: disable=too-many-lines
 
-''' Simple filesystem based file tagging
+r'''Simple filesystem based file tagging
     and the associated `fstags` command line tool.
 
     Many basic tasks can be performed with the `fstags` command line utility,
@@ -32,7 +32,7 @@
     If there is a value it is expressed with an equals (`'='`)
     followed by the JSON encoding of the value.
 
-    The tags for a file are the union of its direct tags
+    The inherited tags for a file are the union of its direct tags
     and all relevant ancestor tags,
     with priority given to tags closer to the file.
 
@@ -73,7 +73,7 @@
 
     Backup the `archive2` files using `rsync`:
 
-        fstags find --for-rsync /path/to/media backup=archive2 \\
+        fstags find --for-rsync /path/to/media backup=archive2 \
         | rsync -ia --include-from=- /path/to/media /path/to/backup_archive2
 
 '''
@@ -291,7 +291,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("missing dstpath")
     dstpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     fstags = self.options.fstags
     srctags = fstags[srcpath]
     fstags[dstpath].update(srctags)
@@ -2003,7 +2003,7 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
       "name should be a clean file basename"
   )
   def TagSetClass(self, name: str) -> TaggedPath:
-    ''' factory to create a `TaggedPath` from a `name`.
+    ''' Factory to create a `TaggedPath` from a `name`.
     '''
     fspath = joinpath(dirname(self.fspath), name)
     return TaggedPath(fspath, fstags=self.fstags)
