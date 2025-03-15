@@ -6,7 +6,68 @@ line-length = 78
 indent-width = 2
 
 [lint]
-extend-select = ["D", "E4", "E7", "E9", "F", "B", "PL", "Q", "UP", "C90"]
+extend-select = [
+    "A", # flake8-builtins
+    "ARG", # flake8-unused-arguments
+    "ASYNC", # flake8-async
+    "B", # flake8-bugbear
+    "BLE", # flake8-blind-except
+    "C", # flake8-comprehensions
+    "C", # mccabe
+    "COM", # flake8-commas
+    "D", # pydocstyle
+    "DJ", # flake8-django
+    # warns in concise mode "DOC", # pydoclint
+    "DTZ", # flake8-datetimez
+    "E", # pycodestyle
+    "F", # pyflakes
+    "FIX", # flake8-fixme
+    "FLY", # flynt
+    "FURB", # refurb
+    "G", # flake8-logging-format
+    "I", # isort
+    "ICN", # flake8-import-conventions
+    "ISC", # flake8-implicit-str-concat
+    "LOG", # flake8-logging
+    "N", # pep8-naming
+    "NPY", # numpy specific rules
+    "PD", # pandas-vet
+    "PERF", # Perflint
+    "PGH", # pygrep-hooks
+    "PIE", # flake8-pie
+    "PL", # pylint
+    "PLC", # pylint convention
+    "PLE", # pylint error
+    "PLR", # pylint refactor
+    "PLW", # pylint warning
+    "PYI", # flake8-pyi
+    "Q", # flake8-quotes
+    "RET", # flake8-return
+    "RSE", # flake8-raise
+    "RUF", # ruff specific rules
+    "SIM", # flake8-simplify
+    "SLF", # flake8-self
+    "SLOT", # flake8-slots
+    "T", # flake8-debugger
+    "TC", # flake8-type-checking
+    # unknown? "TDO", # flake8-todos
+    "TID", # flake8-tidy-imports
+    "TRY", # tryceratops
+    "UP", # pyupgrade
+    "W", # warning
+    # unknown? "YYT", # flake8-2020
+    # "ANN", # flake8-annotations
+    # "CPY", # flake8-copyright
+    # "EM", # flake8-errmsg
+    # "FA", # flake8-future-annotations
+    # "FBT", # flake8-boolean-trap
+    # "INP", # flake8-no-pep420
+    # "INT", # flake8-gettext
+    # "PT", # flake8-pytest-style
+    # "PTH", # flake8-use-pathlib
+    # "S", # flake8-bandit
+    # "T", # flake8-print
+]
 ignore = [
     "B904",
     "D200", # One-line docstring should fit on one line
@@ -14,6 +75,7 @@ ignore = [
     "D205", # blank line required between summary line and description
     "D208", # Docstring is over-indented
     "D210", # No whitespaces allowed surrounding docstring text
+    "D405", # Section name should be properly capitalized
     "D212", # multi-line-summary-first-line
     "D213", # Multi-line docstring summary should start at the second line
     "D214", # Section is over-indented
