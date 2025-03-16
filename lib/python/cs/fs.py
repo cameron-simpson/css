@@ -156,7 +156,8 @@ def scandirtree(
       * `sort_names`: option flag, default `False`; yield entires
         in lexical order if true
       * `follow_symlinks`: optional flag, default `False`; passed to `scandir`
-      * `recurse`: optional flag, default `True`; if true, recurse into subdrectories
+      * `recurse`: optional flag, default `True`; if true, recurse
+        into subdrectories
   '''
   if name_selector is None:
     name_selector = lambda name: name and not name.startswith('.')
@@ -220,7 +221,8 @@ def fnmatchdir(dirpath, fnglob):
 
 # pylint: disable=too-few-public-methods
 class HasFSPath:
-  ''' A mixin for an object with a `.fspath` attribute representing a filesystem location.
+  ''' A mixin for an object with a `.fspath` attribute representing
+      a filesystem location.
 
       The `__init__` method just sets the `.fspath` attribute, and
       need not be called if the main class takes care of that itself.
@@ -256,7 +258,8 @@ class HasFSPath:
     return joinpath(self.fspath, *subpaths)
 
   def fnmatch(self, fnglob):
-    ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
+    ''' Return a list of the names in `self.fspath` matching the
+        glob `fnglob`.
     '''
     return fnmatchdir(self.fspath, fnglob)
 
@@ -281,8 +284,9 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
         Parameters:
         * `fspath`: the filesystem path to resolve;
           this may be `None` to use the class defaults
-        * `envvar`: the environment variable to consult for a default `fspath`;
-          the default for this comes from `cls.FSPATH_ENVVAR` if defined
+        * `envvar`: the environment variable to consult for a default
+          `fspath`; the default for this comes from `cls.FSPATH_ENVVAR`
+          if defined
         * `default_attr`: the class attribute containing the default `fspath`
           if defined and there is no environment variable for `envvar`
 
