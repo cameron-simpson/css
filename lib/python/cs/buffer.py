@@ -411,10 +411,9 @@ class CornuCopyBuffer(Promotable):
       )
     if length is None:
       length = len(bs) - offset
-    else:
-      # sanity check supplied length
-      if length < 1:
-        raise ValueError("length(%d) < 1" % (length,))
+    # sanity check supplied length
+    elif length < 1:
+      raise ValueError("length(%d) < 1" % (length,))
     end_offset = offset + length
     if end_offset > len(bs):
       raise ValueError(
@@ -643,28 +642,27 @@ class CornuCopyBuffer(Promotable):
       # take all the fetched data
       taken = self.bufs
       self.bufs = []
+    elif size >= self.buflen:
+      # take the whole buffer
+      taken = self.bufs
+      self.bufs = []
     else:
-      if size >= self.buflen:
-        # take the whole buffer
-        taken = self.bufs
-        self.bufs = []
-      else:
-        # size < self.buflen
-        # take the leading data from the buffer
-        taken = []
-        bufs = self.bufs
-        while size > 0:
-          buf0 = bufs[0]
-          if len(buf0) <= size:
-            buf = buf0
-            bufs.pop(0)
-          else:
-            # len(buf0) > size: crop from buf0
-            assert len(buf0) > size
-            buf = buf0[:size]
-            bufs[0] = buf0[size:]
-          taken.append(buf)
-          size -= len(buf)
+      # size < self.buflen
+      # take the leading data from the buffer
+      taken = []
+      bufs = self.bufs
+      while size > 0:
+        buf0 = bufs[0]
+        if len(buf0) <= size:
+          buf = buf0
+          bufs.pop(0)
+        else:
+          # len(buf0) > size: crop from buf0
+          assert len(buf0) > size
+          buf = buf0[:size]
+          bufs[0] = buf0[size:]
+        taken.append(buf)
+        size -= len(buf)
     # advance offset by the size of the taken data
     taken_size = sum(len(buf) for buf in taken)
     self.buflen -= taken_size
