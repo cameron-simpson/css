@@ -788,23 +788,6 @@ class RunState(FSM, HasThreadState):
       elif a:
         msg = msg % a
       raise CancellationError(msg)
-
-  def raiseif(self, msg=None, *a):
-    ''' Raise `CancellationError` is cancelled.
-
-        Example:
-
-            for item in items:
-                runstate.raiseif()
-                ... process item ...
-    '''
-    if self.cancelled:
-      if msg is None:
-        msg = "%s.cancelled" % (self,)
-      else:
-        if a:
-          msg = msg % a
-      raise CancellationError(msg)
     self.pauseif()
 
   @property
