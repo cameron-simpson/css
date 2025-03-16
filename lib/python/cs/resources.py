@@ -583,7 +583,13 @@ class RunState(FSM, HasThreadState):
       },
       'RUNNING': {
           'cancel': 'STOPPING',
+          'pause': 'PAUSED',
           'stop': 'STOPPED',
+      },
+      'PAUSED': {
+          'cancel': 'CANCELLED',
+          'stop': 'STOPPED',
+          'resume': 'RUNNING',
       },
       'STOPPING': {
           'stop': 'STOPPED',
