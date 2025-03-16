@@ -624,6 +624,8 @@ class RunState(FSM, HasThreadState):
     # core state
     self._running = False
     self._cancelled = False
+    self._unpause = Event()
+    self._unpause.set()
     self.poll_cancel = poll_cancel
     # timing state
     self.start_time = None
@@ -704,8 +706,13 @@ class RunState(FSM, HasThreadState):
         On `'stop'`set `.stop_time`.
     '''
     new_state = super().fsm_event(event, **extra)
-    if event == 'cancel':
+    if event == 'pause':
+      self._unpause.clear()
+    elif event == 'resume':
+      self._unpause.set()
+    elif event == 'cancel':
       self._cancelled = True
+      self._unpause.set()
       # TODO: use the main FSM callback mechanism
       for notify in self.notify_cancel:
         notify(self)
@@ -767,6 +774,7 @@ class RunState(FSM, HasThreadState):
     ''' Raise `CancellationError` if cancelled.
         This is the concise way to terminate an operation which honours
         `.cancelled` if you're prepared to handle the exception.
+        Otherwise paused if the `RunState` is paused.
 
         Example:
 
@@ -797,6 +805,7 @@ class RunState(FSM, HasThreadState):
         if a:
           msg = msg % a
       raise CancellationError(msg)
+    self.pauseif()
 
   @property
   def running(self):
@@ -814,6 +823,24 @@ class RunState(FSM, HasThreadState):
     ''' Set the cancelled flag; the associated process should notice and stop.
     '''
     self.fsm_event('cancel')
+
+  def pause(self):
+    ''' Move to the paused state.
+        Callers which poll the runstate will block until unpaused.
+    '''
+    self.fsm_event('pause')
+
+  @property
+  def paused(self):
+    ''' Whether the `RunState` is paused.
+    '''
+    return self.fsm_state == 'PAUSED'
+
+  def pauseif(self):
+    ''' If we are paused, wait until we are unpaused.
+    '''
+    if self.paused:
+      self._unpause.wait()
 
   @property
   def run_time(self):
