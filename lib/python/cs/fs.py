@@ -7,6 +7,7 @@
 from fnmatch import filter as fnfilter
 from functools import partial
 import os
+from os import Pathlike
 from os.path import (
     abspath,
     basename,
@@ -46,6 +47,8 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
     ],
+    'python_requires':
+    '>=3.6',
 }
 
 pfx_listdir = partial(pfx_call, os.listdir)
@@ -92,15 +95,17 @@ def atomic_directory(infill_func, make_placeholder=False):
   '''
 
   def atomic_directory_wrapper(dirpath, *a, **kw):
-    assert isinstance(dirpath, str
-                      ), "dirpath not a str: %s:%r" % (type(dirpath), dirpath)
+    assert isinstance(
+        dirpath,
+        str,
+    ), f'dirpath not a str: {r(dirpath)}'
     remove_placeholder = False
     if make_placeholder:
       # prevent other users from using this directory
       pfx_mkdir(dirpath, 0o000)
       remove_placeholder = True
     elif existspath(dirpath):
-      raise ValueError("directory already exists: %r" % (dirpath,))
+      raise FileExistsError(dirpath)
     work_dirpath = dirname(dirpath)
     try:
       with TemporaryDirectory(
@@ -113,7 +118,7 @@ def atomic_directory(infill_func, make_placeholder=False):
           pfx_rmdir(dirpath)
           remove_placeholder = False
         elif existspath(dirpath):
-          raise ValueError("directory already exists: %r" % (dirpath,))
+          raise FileExistsError(dirpath)
         pfx_rename(tmpdirpath, dirpath)
         pfx_mkdir(tmpdirpath, 0o000)
     except:
@@ -222,6 +227,8 @@ class HasFSPath:
   '''
 
   def __init__(self, fspath):
+    ''' Save `fspath` as `.fspath`; often done by the parent class.
+    '''
     self.fspath = fspath
 
   def __str__(self):
@@ -266,7 +273,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
       cls,
       fspath: Optional[str] = None,
       envvar: Optional[str] = None,
-      default_attr: str = 'FSPATH_DEFAULT'
+      default_attr: str = 'FSPATH_DEFAULT',
   ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
         This key is used to identify instances in the singleton registry.
@@ -290,6 +297,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
         which has the notion of a default location for your Calibre library.
     '''
     if fspath is None:
+      # various sources for the default fspath
       # pylint: disable=no-member
       if envvar is None:
         envvar = getattr(cls, 'FSPATH_ENVVAR', None)
@@ -299,22 +307,9 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
           return cls.fspath_normalised(fspath)
       default = getattr(cls, default_attr, None)
       if default is not None:
-        if callable(default):
-          fspath = default()
-        else:
-          fspath = expanduser(default)
-        if fspath is not None:
-          return cls.fspath_normalised(fspath)
-      raise ValueError(
-          "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
-              (
-                  cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
-                  envvar
-              ),
-              cls.__name__,
-              default_attr,
-          )
-      )
+        fspath = default() if callable(default) else expanduser(default)
+    if fspath is None:
+      raise ValueError('_resolve_fspath: no default fspath')
     return cls.fspath_normalised(fspath)
 
   @classmethod
@@ -364,8 +359,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
     '''
     if isinstance(obj, cls):
       return obj
-    # TODO: or Pathlike?
-    if obj is None or isinstance(obj, str):
+    if obj is None or isinstance(obj, (str, Pathlike)):
       return cls(obj)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
 
@@ -373,7 +367,11 @@ SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
 @fmtdoc
 def shortpath(
-    fspath, prefixes=None, *, collapseuser=False, foldsymlinks=False
+    fspath,
+    prefixes=None,
+    *,
+    collapseuser=False,
+    foldsymlinks=False,
 ):
   ''' Return `fspath` with the first matching leading prefix replaced.
 
@@ -399,7 +397,7 @@ def shortpath(
     assert leaf.is_absolute()
     # Paths from leaf-parent to root
     parents = list(leaf.parents)
-    paths = [leaf] + parents
+    paths = [leaf, *parents]
 
     def statkey(S):
       ''' A 2-tuple of `(S.st_dev,Sst_info)`.
@@ -482,10 +480,10 @@ def shortpath(
           i = i + 1 if skip_to_i is None else skip_to_i
         except OSError:
           i += 1
-    parts = list(
+    parts = [
         (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
         for i, path_as in enumerate(keep_as)
-    )
+    ]
     parts.append(paths_as[-1][1] or leaf.name)
     fspath = os.sep.join(parts)
   # replace leading prefix
@@ -505,8 +503,7 @@ def longpath(path, prefixes=None):
     if path.startswith(subst):
       path = prefix + path[len(subst):]
       break
-  path = expandvars(path)
-  return path
+  return expandvars(path)
 
 @pfx
 def validate_rpath(rpath: str):
@@ -559,7 +556,7 @@ def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
       * `dirpath`: the starting directory
       * `criterion`: a `str` or a callable accepting a `str`
 
-      If `criterion` is a `str`, use look for the existence of `os.path.join(fspath,criterion)`
+      If `criterion` is a `str`, look for the existence of `os.path.join(fspath,criterion)`.
 
       Example:
 
