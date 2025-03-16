@@ -844,6 +844,12 @@ class RunState(FSM, HasThreadState):
     '''
     self._unpause.wait()
 
+  def resume(self):
+    ''' Resume running from the paused state.
+        Callers blocked on the pause will resume.
+    '''
+    self.fsm_event('resume')
+
   @property
   def run_time(self):
     ''' A property returning most recent run time (`stop_time-start_time`).
