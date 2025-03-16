@@ -812,9 +812,9 @@ class RunState(FSM, HasThreadState):
 
   @property
   def running(self):
-    ''' Whether the state is `'RUNNING'` or `'STOPPING'`.
+    ''' Whether the state is `'RUNNING'` or `'PAUSED'` or `'STOPPING'`.
     '''
-    return self.fsm_state in ('RUNNING', 'STOPPING')
+    return self.fsm_state in ('RUNNING', 'PAUSED', 'STOPPING')
 
   @property
   def stopping(self):
