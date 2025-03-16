@@ -842,8 +842,7 @@ class RunState(FSM, HasThreadState):
   def pauseif(self):
     ''' If we are paused, wait until we are unpaused.
     '''
-    if self.paused:
-      self._unpause.wait()
+    self._unpause.wait()
 
   @property
   def run_time(self):
