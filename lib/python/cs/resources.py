@@ -528,20 +528,22 @@ class Pool(object):
 
 # pylint: disable=too-many-instance-attributes
 class RunState(FSM, HasThreadState):
-  ''' A class to track a running task whose cancellation may be requested.
+  ''' A class to track and control a running task whose cancellation may be requested.
 
       Its purpose is twofold, to provide easily queriable state
       around tasks which can start and stop, and to provide control
-      methods to pronounce that a task has started (`.start`),
-      should stop (`.cancel`)
-      and has stopped (`.stop`).
+      methods to pronounce that a task has started (`.start()`),
+      should stop (`.cancel()`)
+      and has stopped (`.stop()`).
+      A running `RunState` may also be paused (`.pause()`)
+      and resumed (`.resume()`).
 
       A `RunState` can be used as a context manager, with the enter
       and exit methods calling `.start` and `.stop` respectively.
       Note that if the suite raises an exception
       then the exit method also calls `.cancel` before the call to `.stop`.
 
-      Monitor or daemon processes can poll the `RunState` to see when
+      Monitor or daemon worker processes can poll the `RunState` to see when
       they should terminate, and may also manage the overall state
       easily using a context manager.
       Example:
@@ -551,13 +553,31 @@ class RunState(FSM, HasThreadState):
                   while not self.runstate.cancelled:
                       ... main loop body here ...
 
-      A `RunState` has three main methods:
+      The other common form is to allow a `CancellationError` exception:
+
+          def monitor(self):
+              with self.runstate:
+                  while True: # or other "busy" condition
+                      self.runstate.raiseif()
+                      ... main loop body here ...
+
+      Calling `.raiseif()` will also pause if the `RunState` has
+      entered the paused state, blocking until a resume, providing
+      a convenient way to idle a worker temporarily.
+
+      A `RunState` has five main methods:
       * `.start()`: set `.running` and clear `.cancelled`
+      * `.paused()`: enter the paused state
+      * `.pauseif()`: pause if paused, waiting for a resume
+      * `.resume()`: leave the paused state
       * `.cancel()`: set `.cancelled`
+      * `.raiseif()`: raise `CancellationError` if cancelled,
+        otherwise pause until a resume if paused
       * `.stop()`: clear `.running`
 
       A `RunState` has the following properties:
       * `cancelled`: true if `.cancel` has been called.
+      * `paused`: true if in the puased state.
       * `running`: true if the task is running.
         Further, assigning a true value to it sets `.start_time` to now.
         Assigning a false value to it sets `.stop_time` to now.
@@ -774,7 +794,7 @@ class RunState(FSM, HasThreadState):
     ''' Raise `CancellationError` if cancelled.
         This is the concise way to terminate an operation which honours
         `.cancelled` if you're prepared to handle the exception.
-        Otherwise paused if the `RunState` is paused.
+        Otherwise pause if the `RunState` is paused.
 
         Example:
 
