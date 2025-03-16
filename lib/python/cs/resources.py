@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import partial
 import sys
-from threading import Lock, RLock, current_thread, main_thread
+from threading import Event, Lock, RLock, current_thread, main_thread
 import time
 from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
