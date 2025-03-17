@@ -7,7 +7,7 @@
 from fnmatch import filter as fnfilter
 from functools import partial
 import os
-from os import Pathlike
+from os import PathLike
 from os.path import (
     abspath,
     basename,
