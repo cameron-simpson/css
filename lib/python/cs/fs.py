@@ -4,6 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
+import errno
 from fnmatch import filter as fnfilter
 from functools import partial
 import os
@@ -27,7 +28,7 @@ from pathlib import Path
 from pwd import getpwuid
 from tempfile import TemporaryDirectory
 from threading import Lock
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Iterable, Optional, Union
 
 from cs.deco import decorator, fmtdoc, Promotable
 from cs.lex import r
@@ -219,6 +220,46 @@ def fnmatchdir(dirpath, fnglob):
   '''
   return fnfilter(pfx_listdir(dirpath), fnglob)
 
+def update_linkdir(linkdirpath: str, paths: Iterable[str], trim=False):
+  ''' Update `linkdirpath` with symlinks to `paths`.
+      Remove unused names if `trim`.
+      Return a mapping of names in `linkdirpath` to absolute forms of `paths`.
+  '''
+  # TODO: deal with paths which conflict by basename
+  # TODO: hard link mode?
+  # TODO: move to cs.fs
+  name_map = {basename(path): abspath(path) for path in paths}
+  for name, linkpath in sorted(name_map.items()):
+    linkpath_short = shortpath(linkpath)
+    namepath = joinpath(linkdirpath, name)
+    namepath_short = shortpath(namepath)
+    try:
+      linksto = os.readlink(namepath)
+    except FileNotFoundError:
+      pass
+    except OSError as e:
+      if e.errno != errno.EINVAL:
+        raise
+      # not a symlink
+      pfx_call(os.remove, namepath)
+    else:
+      if linksto == linkpath:
+        # symlink good, leave it alone
+        continue
+      pfx_call(os.remove, namepath)
+    pfx_call(os.symlink, linkpath, namepath)
+
+  if trim:
+    for name in sorted(os.listdir(linkdirpath)):
+      if name.startswith('.'):
+        continue
+      if name in name_map:
+        continue
+      namepath = joinpath(linkdirpath, name)
+      namepath_short = shortpath(namepath)
+      pfx_call(os.remove, namepath)
+  return name_map
+
 # pylint: disable=too-few-public-methods
 class HasFSPath:
   ''' A mixin for an object with a `.fspath` attribute representing
@@ -363,7 +404,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
     '''
     if isinstance(obj, cls):
       return obj
-    if obj is None or isinstance(obj, (str, Pathlike)):
+    if obj is None or isinstance(obj, (str, PathLike)):
       return cls(obj)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
 
@@ -560,7 +601,8 @@ def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
       * `dirpath`: the starting directory
       * `criterion`: a `str` or a callable accepting a `str`
 
-      If `criterion` is a `str`, look for the existence of `os.path.join(fspath,criterion)`.
+      If `criterion` is a `str`, look for the existence of
+      `os.path.join(fspath,criterion)`.
 
       Example:
 
