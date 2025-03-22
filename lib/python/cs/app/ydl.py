@@ -104,7 +104,7 @@ class YDLCommand(BaseCommand):
   '''
 
   GETOPT_SPEC = 'fj:'
-  USAGE_FORMAT = '''Usage: {cmd} [-f] [-j jobs] {{URLs|-}}...
+  USAGE_FORMAT = '''Usage: {cmd} [-f] [-j jobs] dl {{URLs|-}}...
     -f      Force download - do not use the cache.
     -j jobs Number of jobs (downloads) to run in parallel.
             Default: {DEFAULT_PARALLEL}'''
