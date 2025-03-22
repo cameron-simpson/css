@@ -112,6 +112,8 @@ class YDLCommand(BaseCommand):
       'DEFAULT_PARALLEL': DEFAULT_PARALLEL,
   }
 
+  SUBCOMMAND_ARGV_DEFAULT = "dl"
+
   @dataclass
   class Options(BaseCommand.Options):
     parallel: int = DEFAULT_PARALLEL
@@ -140,8 +142,9 @@ class YDLCommand(BaseCommand):
         else:
           raise NotImplementedError("unhandled option: %s=%s" % (opt, val))
 
-  def main(self, argv):
-    ''' Command line main programme.
+  def cmd_dl(self, argv):
+    ''' Usage: {cmd} URLs...
+          Download URLs.
     '''
     if not argv:
       raise GetoptError("missing URLs")
