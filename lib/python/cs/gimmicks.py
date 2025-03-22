@@ -63,9 +63,10 @@ except ImportError:
           )
       )
 
+# define the local symbol TimeoutError
 try:
   # pylint: disable=redefined-builtin,self-assigning-variable
-  _ = TimeoutError
+  TimeoutError = TimeoutError
 except NameError:
   try:
     import builtins
