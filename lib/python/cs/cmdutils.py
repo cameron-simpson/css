@@ -44,6 +44,7 @@ from inspect import isclass
 import os
 from os.path import basename
 from pprint import pformat
+import re
 # this enables readline support in the docmd stuff
 try:
   import readline  # pylint: disable=unused-import
@@ -1355,19 +1356,25 @@ class BaseCommand:
         self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
-        if not argv:
+        subcmd = argv[0] if argv else None
+        if subcmd is not None and re.match(r'^[a-z][-_\w]*$', subcmd):
+          # looks like a subcommand name, take it
+          argv.pop(0)
+        else:
+          # not a command name
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
             warning(
                 "missing subcommand, expected one of: %s",
                 ', '.join(sorted(subcmds.keys()))
             )
-            default_argv = ['help', '-s']
-          argv = (
-              [default_argv]
-              if isinstance(default_argv, str) else list(default_argv)
-          )
-        subcmd = argv.pop(0)
+            argv = ['help', '-s']
+          else:
+            # prefix the argv with the default argv
+            if isinstance(default_argv, str):
+              default_argv = [default_argv]
+            argv = [*default_argv, *argv]
+          subcmd = argv.pop(0)
         try:
           subcommand = self.subcommand(subcmd)
         except KeyError:
