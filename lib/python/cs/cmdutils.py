@@ -871,7 +871,7 @@ class BaseCommandOptions(HasThreadState):
   @contextmanager
   def __call__(self, **updates):
     ''' Calling the options object returns a context manager whose
-        value is a shallow copy of the options with any `suboptions` applied.
+        value is a shallow copy of the options with any `updates` applied.
 
         Example showing the semantics:
 
@@ -1154,13 +1154,13 @@ class BaseCommand:
           class MyCommand(BaseCommand):
 
               @dataclass
-              class Options(BaseCommandOptions):
+              class Options(BaseCommand.Options):
                   extra_mode : str = None
                   some_flag : bool = False
 
                   # extend the common options for the new fields
                   COMMON_OPT_SPECS = dict(
-                      **BaseCommandOptions.COMMON_OPT_SPECS,
+                      **BaseCommand.Options.COMMON_OPT_SPECS,
                       mode_=('extra_mode', 'The extra mode to do something.'),
                       flag='some_flag',
                   )
