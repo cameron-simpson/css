@@ -868,8 +868,8 @@ class CornuCopyBuffer(Promotable):
           input_seek(input_offset)
         except OSError as e:
           print(
-              f'{self}.skip: warning: input_data.seek({input_offset}): {e},'
-              f'resetting self.seekable to False,
+              f'{self}.skip: warning: input_data.seek({input_offset}): {e}'
+              ', resetting self.seekable to False',
               file=sys.stderr,
           )
           self.seekable = False
