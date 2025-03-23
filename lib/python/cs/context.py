@@ -454,7 +454,8 @@ def setup_cmgr(cmgr):
                   self.foo = foo
                   self._teardown = None
               def __enter__(self):
-                  self._teardown = setup_cmgr(stackattrs(o, setting=foo))
+                  enter_value, self._teardown = setup_cmgr(stackattrs(o, setting=foo))
+                  return enter_value
               def __exit__(self, *_):
                   teardown, self._teardown = self._teardown, None
                   teardown()
