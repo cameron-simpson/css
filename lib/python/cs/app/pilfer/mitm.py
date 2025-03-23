@@ -73,7 +73,7 @@ def process_stream(
       The `Flow.response.stream` attribute can be set to a callable
       which accepts a `bytes` instance as its sole callable;
       this provides no context to the stream processor.
-      You can keep context my preparing that callable with a closure,
+      You can keep context by preparing that callable with a closure,
       but often it is clearer to write a generator which accepts
       an iterable of `bytes` and yields `bytes`. This function
       enables that.
@@ -106,7 +106,9 @@ def process_stream(
           ):
               # put the flow into streaming mode, changing nothing
               flow.response.stream = process_stream(
-                  lambda bss: bss, f'stream {flow.request}', content_length=length
+                  lambda bss: bss,
+                  f'stream {flow.request}',
+                  content_length=length,
               )
   '''
   if name is None:
@@ -152,7 +154,7 @@ def process_stream(
     consumer = copy_to_sink
 
   def filter_data(Qin, Qout):
-    ''' consume `data_Q` via the `consumer()` function, yield `bytes` istances.
+    ''' Consume `Qin` (from the `consumer()` generator), put to `Qout`.
       '''
     try:
       for obs in consumer(Qin):
