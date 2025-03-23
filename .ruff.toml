@@ -4,6 +4,7 @@ exclude = [
 
 line-length = 78
 indent-width = 2
+target-version = "py38"
 
 [lint]
 extend-select = [
@@ -70,6 +71,8 @@ extend-select = [
 ]
 ignore = [
     "B904",
+    "C408", # Unnecessary `dict()` call (rewrite as a literal)
+    "COM812", # Trailing comma missing
     "D105", # Missing docstring in magic method
     "D200", # One-line docstring should fit on one line
     "D203", # incorrect-blank-line-before-class
@@ -91,6 +94,7 @@ ignore = [
     "E731",
     "I001", # Import block is un-sorted or un-formatted
     "TRY003", # Avoid specifying long messages outside the exception class
+    "UP007", # Use `X | Y` for type annotations
     "Q000",
     "Q002",
 ]
