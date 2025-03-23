@@ -21,7 +21,7 @@ from typing import Callable, Iterable
 from cs.deco import decorator
 from cs.gimmicks import error
 
-__version__ = '20250306-post'
+__version__ = '20250323'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
