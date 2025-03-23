@@ -1,0 +1,1 @@
+lib/python/cs/logutils.py: cs.logutils: setup_logging: default supplant_root_logger based on ttyness of the main log, update supplant logic in LogInfo.apply
