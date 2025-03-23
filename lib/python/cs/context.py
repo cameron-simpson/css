@@ -21,7 +21,7 @@ from typing import Callable, Iterable
 from cs.deco import decorator
 from cs.gimmicks import error
 
-__version__ = '20240630-post'
+__version__ = '20250323-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -41,8 +41,8 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
       if it is not used, allowing the enclosed code to test whether
       the context is active.
 
-      This is to ease uses where the context object is optional
-      i.e. `None` if not present. Example from `cs.vt.stream`:
+      This is to ease uses where the context object is optional,
+      for example `None` if not present. Example from `cs.vt.stream`:
 
           @contextmanager
           def startup_shutdown(self):
@@ -431,12 +431,11 @@ def setup_cmgr(cmgr):
 
       then the correct use of `setup_cmgr()` is:
 
-          teardown = setup_cmgr(my_cmgr_func(...))
+          enter_value, teardown = setup_cmgr(my_cmgr_func(...))
 
       and _not_:
 
-          cmgr_iter = setup_cmgr(my_cmgr_func)
-          ...
+          enter_value, teardown = setup_cmgr(my_cmgr_func)
 
       The purpose of `setup_cmgr()` is to split any context manager's operation
       across two steps when the set up and teardown phases must operate
@@ -455,7 +454,8 @@ def setup_cmgr(cmgr):
                   self.foo = foo
                   self._teardown = None
               def __enter__(self):
-                  self._teardown = setup_cmgr(stackattrs(o, setting=foo))
+                  enter_value, self._teardown = setup_cmgr(stackattrs(o, setting=foo))
+                  return enter_value
               def __exit__(self, *_):
                   teardown, self._teardown = self._teardown, None
                   teardown()

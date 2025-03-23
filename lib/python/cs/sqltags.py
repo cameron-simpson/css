@@ -29,7 +29,7 @@ from builtins import id as builtin_id
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime
 from fnmatch import fnmatchcase
 try:
@@ -185,7 +185,7 @@ class SQLTagProxy:
     self._tag_name = tag_name
 
   def __str__(self):
-    return "%s(tag_name=%r)" % (type(self).__name__, self._tag_name)
+    return f'{self.__class__.__name__}(tag_name={self._tag_name!r})'
 
   def __getattr__(self, sub_tag_name):
     ''' Magic access to dotted tag names: produce a new `SQLTagProxy` from ourself.
@@ -214,7 +214,7 @@ class SQLTagProxy:
       }[op_text]
     except KeyError:
       # pylint: disable=raise-missing-from
-      raise ValueError("unknown comparison operator text %r" % (op_text,))
+      raise ValueError(f'unknown comparison operator text {op_text!r}')
     return cmp_func(other, alias=alias)
 
   # pylint: disable=too-many-arguments
@@ -271,7 +271,7 @@ class SQLTagProxy:
           tag_value = other
           column = tags.string_value
         else:
-          raise TypeError("not supported for type %s" % (type(other),))
+          raise TypeError(f'not supported for type {type(other)}')
         other_condition = op(column, tag_value)
       return SQLParameters(
           criterion=pf,
@@ -474,7 +474,7 @@ class SQTEntityIdTest(SQTCriterion):
     self.entity_ids = ids
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.entity_ids)
+    return f'{self.__class__.__name__}({self.entity_ids!r})'
 
   # decimal parse, delim parameter not relevant
   # pylint: disable=unused-argument
@@ -657,8 +657,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       if tag_name == 'name':
         if not isinstance(tag_value, str):
           raise ValueError(
-              "name comparison requires a str, got %s:%r" %
-              (type(tag_value), tag_value)
+              f'name comparison requires a str, got {r(tag_value)}'
           )
         constraint_fn = self.SQL_NAME_VALUE_COMPARISON_FUNCS.get(
             self.comparison
@@ -671,7 +670,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         )
         constraint = constraint_fn and constraint_fn(alias, timestamp)
       else:
-        raise NotImplementedError("unhandled non-tag field %r" % (tag_name,))
+        raise NotImplementedError(f'unhandled non-tag field {tag_name!r}')
       sqlp = SQLParameters(
           criterion=self,
           alias=alias,
@@ -701,16 +700,15 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
     elif tag_name == 'unixtime':
       result = self.TE_VALUE_COMPARISON_FUNCS[
           self.comparison](te.unixtime, as_unixtime(tag_value))
+    elif tag_value is None:
+      result = tag_name in te
     else:
-      if tag_value is None:
-        result = tag_name in te
+      te_tag_value = te.get(tag_name)
+      if te_tag_value is None:
+        result = False
       else:
-        te_tag_value = te.get(tag_name)
-        if te_tag_value is None:
-          result = False
-        else:
-          result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
-                                                  ](te_tag_value, tag_value)
+        result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
+                                                ](te_tag_value, tag_value)
     return result if self.choice else not result
 
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
@@ -911,7 +909,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           'headline',
           PolyValue(
               float_value=None,
-              string_value="%s node 0: the metanode." % (type(self).__name__,),
+              string_value=f'{self.__class__.__name__} node 0: the metanode.',
               structured_value=None
           ),
           session=session,
@@ -953,12 +951,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
       def __str__(self):
         return (
-            "%s:%s(name=%r,when=%s)" % (
-                type(self).__name__,
-                self.id,
-                self.name,
-                self.datetime.isoformat(),
-            )
+            f'{self.__class__.__name__}:{self.id}(name={self.name!r},when={self.datetime.isoformat()})'
         )
 
       def _update_multivalues(self, tag_name, values, *, session):
@@ -1117,10 +1110,9 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     sqlps = []
     for criterion in criteria:
       with Pfx(criterion):
-        assert isinstance(criterion, SQTCriterion), (
-            "not an SQTCriterion: %s:%r" %
-            (type(criterion).__name__, criterion)
-        )
+        assert isinstance(
+            criterion, SQTCriterion
+        ), f'not an SQTCriterion: {r(criterion)}'
         if isinstance(criterion, SQTCriterion):
           try:
             sqlp = criterion.sql_parameters(self)
@@ -1179,19 +1171,13 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               }
               post_check = lambda te: tag_value.match(te[tag_name])
             else:
-              raise TypeError(
-                  "unhandled type for %s=%s" % (
-                      tag_name,
-                      r(tag_value),
-                  )
-              )
+              raise TypeError(f'unhandled type for {tag_name}={r(tag_value)}')
             try:
               op_func = op_map[criterion.comparison]
-            except KeyError as e:
+            except KeyError:
               # pylint: disable=raise-missing-from
               raise TypeError(
-                  "no implementation of op %r for %s=%s" %
-                  (op, tag_name, r(tag_value))
+                  f'no implementation of op {op!r} for {tag_name}={r(tag_value)}'
               )
           test_func = op_map[op]
           test_cond = test_func(column, tag_value)
@@ -1334,12 +1320,10 @@ class SQLTagSet(SingletonMixin, TagSet):
       self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=_sqltags)
       self._singleton_also_index()
     else:
-      assert pre_sqltags is _sqltags, "pre_sqltags is not sqltags: %s vs %s" % (
-          pre_sqltags, _sqltags
-      )
+      assert pre_sqltags is _sqltags, f'pre_sqltags is not sqltags: {pre_sqltags} vs {_sqltags}'
 
   def __str__(self):
-    return "id=%r:%s(%s)" % (self.id, self.name, super().__str__())
+    return f'id={self.id!r}:{self.name}({super().__str__()})'
 
   def __hash__(self):
     return id(self)
@@ -1397,7 +1381,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     ''' Return database `Entities` instance for this `SQLTagSet`.
     '''
     e = self.sqltags.db_entity(self.id)
-    assert e is not None, "no sqltags.db_entity(id=%r)" % self.id
+    assert e is not None, f'no sqltags.db_entity(id={self.id})'
     return e
 
   @classmethod
@@ -1415,9 +1399,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     with Pfx("to_js_str(%r, %s:%r)", tag_name, type(tag_value).__name__,
              tag_value):
       for typelabel, (type_, to_str, from_str) in cls.TYPE_JS_MAPPING.items():
-        assert ':' not in typelabel, "bad typelabel %r: colons forbidden" % (
-            typelabel,
-        )
+        assert ':' not in typelabel, f'bad typelabel {typelabel!r}: colons forbidden'
         if isinstance(tag_value, type_):
           with Pfx("typelabel=%r", typelabel):
             return typelabel + ':' + to_str(tag_value)
@@ -1495,7 +1477,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       pass
     else:
       return cls.jsonable(d)
-    raise TypeError('no JSONable value for %s:%r' % (type(value), value))
+    raise TypeError(f'no JSONable value for {r(value)}')
 
   @classmethod
   @ensure(lambda result: result.is_valid())
@@ -1525,7 +1507,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   @tag_or_tag_value
   def set(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
-      raise ValueError("may not set pseudoTag %r" % (tag_name,))
+      raise ValueError(f'may not set pseudoTag {tag_name!r}')
     with self.db_session():
       if tag_name in ('name', 'unixtime'):
         setattr(self, '_' + tag_name, value)
@@ -1550,7 +1532,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   @tag_or_tag_value
   def discard(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
-      raise ValueError("may not discard pseudoTag %r" % (tag_name,))
+      raise ValueError(f'may not discard pseudoTag {tag_name!r}')
     if tag_name in ('name', 'unixtime'):
       # direct columns
       if value is None or getattr(self, tag_name) == value:
@@ -1629,7 +1611,7 @@ class SQLTags(BaseTagSets, Promotable):
       db_url_s = shortpath(db_url)
     else:
       db_url_s = str(db_url)
-    return "%s(%s)" % (type(self).__name__, db_url_s)
+    return f'{self.__class__.__name__}({db_url_s})'
 
   def TAGSETCLASS_DEFAULT(self, *a, _sqltags=None, **kw):
     ''' Factory to return a suitable `TagSet` subclass instance.
@@ -1735,7 +1717,7 @@ class SQLTags(BaseTagSets, Promotable):
         return te
       tes = self.find(name=index)
     else:
-      raise TypeError("unsupported index: %s:%r" % (type(index), index))
+      raise TypeError(f'unsupported index: {r(index)}')
     tes = list(tes)
     if not tes:
       return default
@@ -1809,7 +1791,7 @@ class SQLTags(BaseTagSets, Promotable):
 
   def __delitem__(self, index):
     raise NotImplementedError(
-        "no %s.__delitem__(%s)" % (type(self).__name__, r(index))
+        f'no {self.__class__.__name__}.__delitem__({r(index)})'
     )
 
   def items(self, *, prefix=None):
@@ -1845,6 +1827,8 @@ class SQLTags(BaseTagSets, Promotable):
         Parameters:
         * `envvar`: environment variable to specify a default,
           default from `DBURL_ENVVAR` (`{DBURL_ENVVAR}`).
+        * `default_path`: optional default db URL if no environment
+          variable, default from `DBURL_DEFAULT` (`{DBURL_DEFAULT}`).
     '''
     if envvar is None:
       envvar = DBURL_ENVVAR
@@ -1865,9 +1849,7 @@ class SQLTags(BaseTagSets, Promotable):
       return entities.lookup1(id=index, session=session)
     if isinstance(index, str):
       return entities.lookup1(name=index, session=session)
-    raise TypeError(
-        "expected index to be int or str, got %s:%s" % (type(index), index)
-    )
+    raise TypeError(f'expected index to be int or str, got {r(index)}')
 
   @property
   def metanode(self):
@@ -1983,7 +1965,7 @@ class SQLTags(BaseTagSets, Promotable):
         e = entities.lookup1(name=te.name, session=session)
         if e:
           if not update_mode:
-            raise ValueError("entity named %r already exists" % (te.name,))
+            raise ValueError(f'entity named {te.name!r} already exists')
         else:
           # new named entry
           e = entities(name=te.name, unixtime=te.unixtime)
@@ -2019,7 +2001,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           Start an interactive database shell.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     orm = self.options.sqltags.orm
     db_url = orm.db_url
     if db_url.startswith("sqlite://"):
@@ -2101,7 +2083,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         )
     else:
       raise NotImplementedError(
-          "unimplemented export format %r" % (export_format,)
+          f'unimplemented export format {export_format!r}'
       )
 
   # pylint: disable=too-many-locals
@@ -2191,7 +2173,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           This includes defining the schema and making the root metanode.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     self.options.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
@@ -2331,7 +2313,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     with Pfx(subcmd):
       if subcmd == 'define_schema':
         if argv:
-          raise GetoptError("extra arguments: %s" % (argv,))
+          raise GetoptError(f'extra arguments: {argv!r}')
         self.options.sqltags.orm.define_schema()
       else:
         raise GetoptError("unrecognised subcommand")
@@ -2385,9 +2367,8 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
             if tag_choice.choice:
               if tag_choice.tag not in tags:
                 tags.set(tag_choice.tag)
-            else:
-              if tag_choice.tag in tags:
-                tags.discard(tag_choice.tag)
+            elif tag_choice.tag in tags:
+              tags.discard(tag_choice.tag)
     return xit
 
 class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
@@ -2410,6 +2391,9 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
 
   @dataclass
   class Options(BaseCommand.Options):
+    ''' Options for the `BaseSQLTagsCommand` class.
+    '''
+
     db_url: str = None
 
     COMMON_OPT_SPECS = dict(

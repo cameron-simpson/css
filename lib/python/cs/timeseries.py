@@ -560,7 +560,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
           Dump the contents of tspath.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     ts = options.ts
     if isinstance(ts, TimeSeries):
@@ -701,7 +701,7 @@ class TimeSeriesCommand(TimeSeriesBaseCommand):
           Report information about the time series stored at tspath.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     ts = self.options.ts
     print(ts)
     print(pformat(ts.info_dict(), compact=True))

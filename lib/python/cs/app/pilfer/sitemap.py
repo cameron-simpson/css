@@ -263,7 +263,7 @@ class SiteMap(Promotable):
     rq = flow.request
     rsp = flow.response
     url = rq.url
-    print("prefetch from", url)
+    print("PREFETCH from", url)
     ct = content_type(rsp.headers)
     with Pfx("content_prefetch: %s: %s", ct.content_type, url):
       if ct is None:
@@ -279,6 +279,7 @@ class SiteMap(Promotable):
       url = URL(url, soup=soup)
       to_fetch = match.pattern_arg
       prefetcher = P.state.prefetcher
+      # promote bare string to list
       if isinstance(to_fetch, str):
         to_fetch = [to_fetch]
       with P:
@@ -286,6 +287,7 @@ class SiteMap(Promotable):
           with Pfx(pre):
             match pre:
               case 'hrefs' | 'srcs':
+                print("PREFETCH", pre, "...")
                 if soup is None:
                   warning("unoparsed")
                   return
@@ -295,6 +297,7 @@ class SiteMap(Promotable):
                   if not ref:
                     continue
                   absurl = url.urlto(ref)
+                  print("PREFETCH, put", absurl)
                   prefetcher.put(
                       absurl, get_kw=dict(headers={'x-prefetch': 'no'})
                   )

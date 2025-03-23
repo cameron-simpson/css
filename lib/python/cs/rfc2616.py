@@ -12,15 +12,15 @@ from email.headerregistry import BaseHeader, ContentTypeHeader, HeaderRegistry
 from email.parser import BytesFeedParser
 from functools import cache
 from itertools import takewhile
-from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
+from string import ascii_uppercase, ascii_lowercase, digits
 import sys
 from typing import Mapping, Optional, Union
 
 from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
-from cs.logutils import warning
 from cs.timeutils import time_func
-from cs.x import X
+
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -31,7 +31,6 @@ DISTINFO = {
     'install_requires': [
         'cs.fileutils',
         'cs.lex',
-        'cs.logutils',
         'cs.timeutils',
     ],
 }
@@ -200,7 +199,6 @@ def read_http_request_line(fp):
       If an empty request line is received return None, None, None.
   '''
   elapsed, bline = time_func(fp.readline)
-  X("GOT REQUEST-LINE: %r", bline)
   httprq = dec8(bline).strip()
   if not httprq:
     ##info("end of client requests")
@@ -226,12 +224,10 @@ def datetime_from_http_date(s):
   '''
   try:
     return datetime_from_rfc1123_date(s)
-  except ValueError as e:
-    X("datetime_from_rfc1123_date(%r): %s", s, e)
+  except ValueError:
     try:
       return datetime_from_rfc850_date(s)
-    except ValueError as e:
-      X("datetime_from_rfc850_date(%r): %s", s, e)
+    except ValueError:
       return datetime_from_asctime_date(s)
 
 def datetime_from_rfc1123_date(s):

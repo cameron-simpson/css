@@ -32,7 +32,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import fmtdoc, promote, Promotable
+from cs.deco import fmtdoc, promote, Promotable, uses_quiet
 from cs.fileutils import atomic_filename
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
@@ -201,7 +201,7 @@ class PlayOnCommand(BaseCommand):
           Report account state.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
@@ -214,7 +214,7 @@ class PlayOnCommand(BaseCommand):
       raise GetoptError("missing suburl")
     suburl = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     result = api.suburl_data(suburl)
     pprint(result)
@@ -230,7 +230,7 @@ class PlayOnCommand(BaseCommand):
       raise GetoptError("missing suburl")
     suburl = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     lstate = api.login_state
     pprint(lstate)
@@ -246,6 +246,7 @@ class PlayOnCommand(BaseCommand):
           -o filename_format
                 Format for the new filename, default {DEFAULT_FILENAME_FORMAT!r}.
     '''
+    options = self.options
     api = options.api
     doit = options.doit
     filename_format = options.filename_format
@@ -441,13 +442,14 @@ class PlayOnCommand(BaseCommand):
     ''' Usage: {cmd} [feature_id]
           List features.
     '''
+    options = self.options
     long_mode = options.long_mode
     if argv:
       feature_id = argv.pop(0)
     else:
       feature_id = None
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for feature in sorted(api.features(), key=lambda svc: svc['playon.ID']):
       playon = feature.subtags('playon', as_tagset=True)
@@ -471,7 +473,7 @@ class PlayOnCommand(BaseCommand):
 
   def cmd_poll(self, argv):
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     pprint(api.notifications())
 
@@ -520,7 +522,7 @@ class PlayOnCommand(BaseCommand):
     else:
       service_id = None
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for service in sorted(api.services(), key=lambda svc: svc['playon.ID']):
       playon = service.subtags('playon')
@@ -849,8 +851,9 @@ class PlayOnSQLTags(SQLTags):
         r = pfx_call(re.compile, r_text, re.I)
         for recording in self:
           pl_tags = recording.subtags('playon')
-          if (pl_tags.Series and r.search(pl_tags.Series)
-              or pl_tags.Name and r.search(pl_tags.Name)):
+          name = getattr(pl_tags, 'Name', '')
+          series = getattr(pl_tags, 'Series', '')
+          if (series and r.search(series)) or (name and r.search(name)):
             recordings.append(recording)
       else:
         # integer recording id
@@ -1139,9 +1142,17 @@ class PlayOnAPI(HTTPServiceAPI):
 
   # pylint: disable=too-many-locals
   @pfx_method
+  @uses_quiet
   @uses_runstate
   @typechecked
-  def download(self, download_id: int, filename=None, *, runstate: RunState):
+  def download(
+      self,
+      download_id: int,
+      filename=None,
+      *,
+      quiet: bool,
+      runstate: RunState,
+  ):
     ''' Download the file with `download_id` to `filename_basis`.
         Return the `TagSet` for the recording.
 
@@ -1185,7 +1196,7 @@ class PlayOnAPI(HTTPServiceAPI):
             total=dl_length,
             units_scale=BINARY_BYTES_SCALE,
             itemlenfunc=len,
-            report_print=True,
+            report_print=not quiet,
         ):
           runstate.raiseif()
           offset = 0

@@ -6,6 +6,18 @@ Gimmicks and hacks to make some of my other modules more robust and
 less demanding of others.
 '''
 
+__version__ = '20250323-post'
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [],
+}
+
 # pylint: disable=wrong-import-position
 # pylint: disable=unnecessary-lambda-assignment
 
@@ -51,6 +63,7 @@ except ImportError:
           )
       )
 
+# define the local symbol TimeoutError
 try:
   # pylint: disable=redefined-builtin,self-assigning-variable
   TimeoutError = TimeoutError
@@ -81,23 +94,9 @@ except NameError:
           )
         Exception.__init__(self, msg)
 
-try:
-  from cs.lex import r, s  # pylint: disable=unused-import
-except ImportError:
-  r = repr
-  s = lambda obj: "%s:%s" % (obj.__class__.__name__, str(obj))
-
-__version__ = '20240316-post'
-
-DISTINFO = {
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-    ],
-    'install_requires': [],
-}
+# simplistic versions of cs.lex r() and s()
+r = lambda obj: "%s:%s" % (obj.__class__.__name__, repr(obj))
+s = lambda obj: "%s:%s" % (obj.__class__.__name__, str(obj))
 
 class _logging_map(dict):
 

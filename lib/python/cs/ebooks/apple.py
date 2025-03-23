@@ -233,7 +233,7 @@ class AppleBooksCommand(EBooksCommonBaseCommand):
           Start an interactive database shell.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     return self.options.apple.dbshell()
 
   def cmd_ls(self, argv):
@@ -246,7 +246,7 @@ class AppleBooksCommand(EBooksCommonBaseCommand):
       long_mode = True
       argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     for book in options.apple.books():
       print(f"{book.title}, {book.author} ({book.asset_id})")
       if long_mode:
@@ -264,7 +264,7 @@ class AppleBooksCommand(EBooksCommonBaseCommand):
     '''
     options = self.options
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     db = options.apple.db
     with db.db_session() as session:
       for md in db.metadata.lookup(session=session):

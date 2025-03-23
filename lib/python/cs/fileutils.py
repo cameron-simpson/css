@@ -38,7 +38,7 @@ import time
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import decorator, fmtdoc, OBSOLETE, strable
+from cs.deco import fmtdoc, OBSOLETE, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
 from cs.gimmicks import TimeoutError  # pylint: disable=redefined-builtin
@@ -50,7 +50,7 @@ from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
-from cs.threads import locked
+from cs.threads import locked, NRLock
 from cs.units import BINARY_BYTES_SCALE
 
 __version__ = '20250103-post'
@@ -571,6 +571,7 @@ def makelockfile(
     max_interval=37,
 ):
   ''' Create a lockfile and return its path.
+      If `keepopen`, return a `(lockpath,lockfd)` 2-tuple.
 
       The lockfile can be removed with `os.remove`.
       This is the core functionality supporting the `lockfile()`
@@ -648,22 +649,28 @@ def makelockfile(
     return lockpath
 
 @contextmanager
-def lockfile(path, **lock_kw):
+def lockfile(path, _lockmap={}, _lockmap_lock=Lock(), **makelockfile_kw):
   ''' A context manager which takes and holds a lock file.
       An open file descriptor is kept for the lock file as well
       to aid locating the process holding the lock file using eg `lsof`.
       This is just a context manager shim for `makelockfile`
-      and all arguments are plumbed through.
+      and all keyword arguments are plumbed through.
   '''
-  lockpath, lockfd = makelockfile(path, keepopen=True, **lock_kw)
-  try:
-    yield lockpath
-  finally:
+  with _lockmap_lock:
     try:
-      pfx_call(os.remove, lockpath)
-    except FileNotFoundError as e:
-      warning("lock file already removed: %s", e)
-    pfx_call(os.close, lockfd)
+      nrlock = _lockmap[path]
+    except KeyError:
+      nrlock = _lockmap[path] = NRLock(path)
+  with nrlock:
+    lockpath, lockfd = makelockfile(path, keepopen=True, **makelockfile_kw)
+    try:
+      yield lockpath
+    finally:
+      try:
+        pfx_call(os.remove, lockpath)
+      except FileNotFoundError as e:
+        warning("lock file already removed: %s", e)
+      pfx_call(os.close, lockfd)
 
 def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.

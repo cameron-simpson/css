@@ -13,6 +13,7 @@ import sys
 
 from cs.context import contextif, stackattrs
 from cs.gimmicks import warning
+from cs.lex import is_dotted_identifier
 from cs.pfx import Pfx, pfx
 
 __version__ = '20241122-post'
@@ -23,7 +24,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context', 'cs.gimmicks', 'cs.pfx'],
+    'install_requires': ['cs.context', 'cs.gimmicks', 'cs.lex', 'cs.pfx'],
 }
 
 @pfx
@@ -164,6 +165,9 @@ def direct_imports(src_filename, module_name):
               subimport = '.'.join(module_parts)
             if subimport == module_name:
               # HACK: simplistic parse finding ourself in a docstring
+              continue
+            if not is_dotted_identifier(subimport):
+              warning("ignoring %r, not a dotted identifier", subimport)
               continue
             subnames.add(subimport)
   return subnames

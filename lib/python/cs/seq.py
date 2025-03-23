@@ -15,11 +15,12 @@ in the course of its function.
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
+from typing import Callable, Hashable, Iterable, Optional, Tuple, TypeVar
 
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20250103-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'description':
@@ -27,13 +28,14 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
     ],
+    'python_requires':
+    '>=3',
 }
 
 class Seq(object):
@@ -93,8 +95,8 @@ def the(iterable, context=None):
 def first(iterable):
   ''' Return the first item from an iterable; raise `IndexError` on empty iterables.
   '''
-  for item in iterable:
-    return item
+  for first in iterable:
+    return first
   raise IndexError("empty iterable %r" % (iterable,))
 
 def last(iterable):
@@ -103,9 +105,10 @@ def last(iterable):
   nothing = True
   for item in iterable:
     nothing = False
+    last = item
   if nothing:
     raise IndexError("no items in iterable: %r" % (iterable,))
-  return item  # pylint: disable=undefined-loop-variable
+  return last  # pylint: disable=undefined-loop-variable
 
 def get0(iterable, default=None):
   ''' Return first element of an iterable, or the default.
@@ -165,8 +168,8 @@ def imerge(*iters, **kw):
 
   # prime the list of head elements with (value, iter)
   heap = []
-  for it in iters:
-    it = iter(it)
+  for iterable in iters:
+    it = iter(iterable)
     try:
       head = next(it)
     except StopIteration:
@@ -647,6 +650,85 @@ def skip_map(func, *iterables, except_types, quiet=False):
         quiet or warning(
             "skip_map(func=%s): item=%s: skip exception: %s", func, item, e
         )
+
+# infill object generic type
+_infill_T = TypeVar('_infill_T')
+# infill object key generic type
+_infill_K = TypeVar('_infill_K', bound=Hashable)
+
+def infill(
+    objs: Iterable[_infill_T],
+    *,
+    obj_keys: Callable[[_infill_T], _infill_K],
+    existing_keys: Callable[[_infill_T], _infill_K],
+    all: Optional[bool] = False,
+) -> Iterable[Tuple[_infill_T, _infill_K]]:
+  ''' A generator accepting an iterable of objects
+      which yields `(obj,missing_keys)` 2-tuples
+      indicating missing records requiring infill for each object.
+
+      Parameters:
+      * `objs`: an iterable of objects
+      * `obj_keys`: a callable accepting an object and returning
+        an iterable of the expected keys
+      * `existsing_keys`: a callable accepting an object and returning
+        an iterable of the existing keys
+      * `all`: optional flag, default `False`: if true then yield
+        `(obj,())` for objects with no missing records
+
+      Example:
+
+          for obj, missing_key in infill(objs,...):
+            ... infill a record for missing_key ...
+  '''
+  for obj in objs:
+    required = set(obj_keys(obj))
+    if not required:
+      if all:
+        yield obj, ()
+      continue
+    existing = set(existing_keys(obj))
+    missing = required - existing
+    if all or missing:
+      yield obj, missing
+
+def infill_from_batches(
+    objss: Iterable[Iterable[_infill_T]],
+    *,
+    obj_keys: Callable[[_infill_T], _infill_K],
+    existing_keys: Callable[[_infill_T], _infill_K],
+    all: Optional[bool] = False,
+    amend_batch: Optional[Callable[
+        [Iterable[_infill_T]],
+        Iterable[_infill_T],
+    ]] = lambda obj_batch: obj_batch,
+):
+  ''' A batched version of `infill(objs)` accepting an iterable of
+      batches of objects which yields `(obj,obj_key)` 2-tuples
+      indicating missing records requiring infill for each object.
+
+      This is aimed at processing batches of objects where it is
+      more efficient to prepare each batch as a whole, such as a
+      Django `QuerySet` which lets the caller make single database
+      queries for a batch of `Model` instances.
+      Thus this function can be used with `cs.djutils.model_batches_qs`
+      for more efficient infill processing.
+
+      Parameters:
+      * `objss`: an iterable of iterables of objects
+      * `obj_keys`: a callable accepting an object and returning
+        an iterable of the expected keys
+      * `existsing_keys`: a callable accepting an object and returning
+        an iterable of the existing keys
+      * `all`: optional flag, default `False`: if true then yield
+        `(obj,())` for objects with no missing records
+      * `amend_batch`: optional callable to amend the batch of objects,
+        for example to amend a `QuerySet` with `.select_related()` or similar
+  '''
+  for objs in map(amend_batch, objss):
+    yield from infill(
+        objs, obj_keys=obj_keys, existing_keys=existing_keys, all=all
+    )
 
 if __name__ == '__main__':
   import sys

@@ -34,7 +34,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20241005-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'description':
@@ -801,7 +801,7 @@ class NRLock:
     lock = self._lock
     if lock.locked() and current_thread() is self._lock_thread:
       raise DeadlockError(
-          f'lock already held by current Thread:{self._locked_by}'
+          f'lock {self._name!r} already held by current Thread:{self._locked_by}'
       )
     acquired = lock.acquire(*a, **kw)
     if acquired:

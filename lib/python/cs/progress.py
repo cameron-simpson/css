@@ -37,7 +37,7 @@ from cs.units import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20241122-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -501,6 +501,7 @@ class BaseProgress(object):
       itemlenfunc=None,
       incfirst=False,
       update_period=DEFAULT_UPDATE_PERIOD,
+      cancelled=None,
       **bar_kw,
   ):
     ''' An iterable progress bar: a generator yielding values
@@ -523,6 +524,7 @@ class BaseProgress(object):
         * `update_period`: default `DEFAULT_UPDATE_PERIOD`; if `0`
           then update on every iteration, otherwise every `update_period`
           seconds
+        * `cancelled`: an optional callable to test for iteration cancellation
         Other parameters are passed to `Progress.bar`.
 
         Example use:
@@ -547,6 +549,8 @@ class BaseProgress(object):
     '''
     with self.bar(label, update_period=update_period, **bar_kw) as proxy:
       for item in it:
+        if cancelled and cancelled():
+          break
         length = itemlenfunc(item) if itemlenfunc else 1
         if incfirst:
           self += length

@@ -418,7 +418,11 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           if map_name in named:
             warning("ignore previously seen map name: %r", map_name)
             continue
-          map_class = import_name(map_spec)
+          try:
+            map_class = import_name(map_spec)
+          except ImportError as e:
+            warning(e._)
+            continue
           sitemap = map_class(name=map_name)
           named[map_name] = sitemap
         # TODO: precompile glob style pattern to regexp?

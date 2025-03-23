@@ -44,6 +44,7 @@ from inspect import isclass
 import os
 from os.path import basename
 from pprint import pformat
+import re
 # this enables readline support in the docmd stuff
 try:
   import readline  # pylint: disable=unused-import
@@ -64,6 +65,7 @@ from cs.lex import (
     cutsuffix,
     indent,
     is_identifier,
+    printt,
     r,
     stripped_dedent,
     tabulate,
@@ -77,7 +79,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20250103-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -870,7 +872,7 @@ class BaseCommandOptions(HasThreadState):
   @contextmanager
   def __call__(self, **updates):
     ''' Calling the options object returns a context manager whose
-        value is a shallow copy of the options with any `suboptions` applied.
+        value is a shallow copy of the options with any `updates` applied.
 
         Example showing the semantics:
 
@@ -1153,13 +1155,13 @@ class BaseCommand:
           class MyCommand(BaseCommand):
 
               @dataclass
-              class Options(BaseCommandOptions):
+              class Options(BaseCommand.Options):
                   extra_mode : str = None
                   some_flag : bool = False
 
                   # extend the common options for the new fields
                   COMMON_OPT_SPECS = dict(
-                      **BaseCommandOptions.COMMON_OPT_SPECS,
+                      **BaseCommand.Options.COMMON_OPT_SPECS,
                       mode_=('extra_mode', 'The extra mode to do something.'),
                       flag='some_flag',
                   )
@@ -1354,19 +1356,25 @@ class BaseCommand:
         self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
-        if not argv:
+        subcmd = argv[0] if argv else None
+        if subcmd is not None and re.match(r'^[a-z][-_\w]*$', subcmd):
+          # looks like a subcommand name, take it
+          argv.pop(0)
+        else:
+          # not a command name
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
             warning(
                 "missing subcommand, expected one of: %s",
                 ', '.join(sorted(subcmds.keys()))
             )
-            default_argv = ['help', '-s']
-          argv = (
-              [default_argv]
-              if isinstance(default_argv, str) else list(default_argv)
-          )
-        subcmd = argv.pop(0)
+            argv = ['help', '-s']
+          else:
+            # prefix the argv with the default argv
+            if isinstance(default_argv, str):
+              default_argv = [default_argv]
+            argv = [*default_argv, *argv]
+          subcmd = argv.pop(0)
         try:
           subcommand = self.subcommand(subcmd)
         except KeyError:
@@ -1882,11 +1890,12 @@ class BaseCommand:
           field_name for field_name in options.as_dict().keys()
           if field_name not in skip_names
       )
-    for line in tabulate(
-        *((f'{field_name}:',
-           pformat(getattr(options, field_name), compact=True))
-          for field_name in field_names)):
-      print(line)
+    printt(
+        *(
+            (f'{field_name}:', getattr(options, field_name))
+            for field_name in field_names
+        )
+    )
     return xit
 
   def repl(self, *argv, banner=None, local=None):

@@ -231,7 +231,7 @@ class MailFilerCommand(BaseCommand):
           Report various things about a message from standard input.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     return self.mailfiler().report(self.options.stdin)
 
   def mailfiler(self):

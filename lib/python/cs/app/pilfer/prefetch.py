@@ -58,7 +58,7 @@ class URLFetcher(MultiOpenMixin):
     cache = P.content_cache
     cache_keys = self.pilfer.cache_keys_for_url(url)
     if not cache_keys:
-      ##PR("no cache keys")
+      PR("no cache keys")
       return
     R = Result(f'_fetch_url({url})')
     new_keys = []

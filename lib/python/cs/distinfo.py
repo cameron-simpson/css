@@ -390,7 +390,7 @@ class Module:
     try:
       M = pfx_call(importlib.import_module, self.name)
     except (ImportError, ModuleNotFoundError) as e:
-      warning("import fails: %s", e.msg_without_prefix)
+      warning("import fails: %s", e._)
       M = None
     except (NameError, SyntaxError) as e:
       warning("import fails: %s", e)
@@ -1646,7 +1646,7 @@ class CSReleaseCommand(BaseCommand):
     else:
       version = pkg.latest.version
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     with pkg.release_dir(vcs, vcstag,
@@ -1665,7 +1665,7 @@ class CSReleaseCommand(BaseCommand):
     if not is_dotted_identifier(pkg_name):
       raise GetoptError("invalid package name: %r" % (pkg_name,))
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = self.options.modules[pkg_name]
     pprint(pkg.compute_distinfo())
 
@@ -1690,7 +1690,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = self.options.modules[pkg_name]
     for files, firstline in pkg.log_since():
       files = [
@@ -1738,7 +1738,7 @@ class CSReleaseCommand(BaseCommand):
     else:
       changeset_hash = None
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     pkg = options.modules[pkg_name]
     if changeset_hash is None:
@@ -1771,7 +1771,7 @@ class CSReleaseCommand(BaseCommand):
     else:
       version = pkg.latest.version
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     with pkg.release_dir(
@@ -1814,7 +1814,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = self.options.modules[pkg_name]
     pyproject = pkg.compute_pyproject()
     sys.stdout.write(tomli_w.dumps(pyproject, multiline_strings=True))
@@ -1833,7 +1833,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     pkg = options.modules[pkg_name]
     docs = pkg.compute_doc(all_class_names=all_class_names)
@@ -1858,7 +1858,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = options.modules[pkg_name]
     vcs = options.vcs
     # issue new release tag
@@ -2024,7 +2024,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = self.options.modules[pkg_name]
     setup_cfg = pkg.compute_setup_cfg()
     setup_cfg.write(sys.stdout)

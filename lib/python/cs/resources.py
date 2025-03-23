@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import partial
 import sys
-from threading import Lock, RLock, current_thread, main_thread
+from threading import Event, Lock, RLock, current_thread, main_thread
 import time
 from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
@@ -32,7 +32,7 @@ from cs.result import CancellationError
 from cs.semantics import ClosedError, not_closed
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20250103-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -528,20 +528,22 @@ class Pool(object):
 
 # pylint: disable=too-many-instance-attributes
 class RunState(FSM, HasThreadState):
-  ''' A class to track a running task whose cancellation may be requested.
+  ''' A class to track and control a running task whose cancellation may be requested.
 
       Its purpose is twofold, to provide easily queriable state
       around tasks which can start and stop, and to provide control
-      methods to pronounce that a task has started (`.start`),
-      should stop (`.cancel`)
-      and has stopped (`.stop`).
+      methods to pronounce that a task has started (`.start()`),
+      should stop (`.cancel()`)
+      and has stopped (`.stop()`).
+      A running `RunState` may also be paused (`.pause()`)
+      and resumed (`.resume()`).
 
       A `RunState` can be used as a context manager, with the enter
       and exit methods calling `.start` and `.stop` respectively.
       Note that if the suite raises an exception
       then the exit method also calls `.cancel` before the call to `.stop`.
 
-      Monitor or daemon processes can poll the `RunState` to see when
+      Monitor or daemon worker processes can poll the `RunState` to see when
       they should terminate, and may also manage the overall state
       easily using a context manager.
       Example:
@@ -551,13 +553,31 @@ class RunState(FSM, HasThreadState):
                   while not self.runstate.cancelled:
                       ... main loop body here ...
 
-      A `RunState` has three main methods:
+      The other common form is to allow a `CancellationError` exception:
+
+          def monitor(self):
+              with self.runstate:
+                  while True: # or other "busy" condition
+                      self.runstate.raiseif()
+                      ... main loop body here ...
+
+      Calling `.raiseif()` will also pause if the `RunState` has
+      entered the paused state, blocking until a resume, providing
+      a convenient way to idle a worker temporarily.
+
+      A `RunState` has five main methods:
       * `.start()`: set `.running` and clear `.cancelled`
+      * `.paused()`: enter the paused state
+      * `.pauseif()`: pause if paused, waiting for a resume
+      * `.resume()`: leave the paused state
       * `.cancel()`: set `.cancelled`
+      * `.raiseif()`: raise `CancellationError` if cancelled,
+        otherwise pause until a resume if paused
       * `.stop()`: clear `.running`
 
       A `RunState` has the following properties:
       * `cancelled`: true if `.cancel` has been called.
+      * `paused`: true if in the puased state.
       * `running`: true if the task is running.
         Further, assigning a true value to it sets `.start_time` to now.
         Assigning a false value to it sets `.stop_time` to now.
@@ -583,7 +603,14 @@ class RunState(FSM, HasThreadState):
       },
       'RUNNING': {
           'cancel': 'STOPPING',
+          'pause': 'PAUSED',
           'stop': 'STOPPED',
+      },
+      'PAUSED': {
+          'cancel': 'STOPPING',
+          'pause': 'PAUSED',
+          'stop': 'STOPPED',
+          'resume': 'RUNNING',
       },
       'STOPPING': {
           'stop': 'STOPPED',
@@ -618,6 +645,8 @@ class RunState(FSM, HasThreadState):
     # core state
     self._running = False
     self._cancelled = False
+    self._unpause = Event()
+    self._unpause.set()
     self.poll_cancel = poll_cancel
     # timing state
     self.start_time = None
@@ -698,8 +727,13 @@ class RunState(FSM, HasThreadState):
         On `'stop'`set `.stop_time`.
     '''
     new_state = super().fsm_event(event, **extra)
-    if event == 'cancel':
+    if event == 'pause':
+      self._unpause.clear()
+    elif event == 'resume':
+      self._unpause.set()
+    elif event == 'cancel':
       self._cancelled = True
+      self._unpause.set()
       # TODO: use the main FSM callback mechanism
       for notify in self.notify_cancel:
         notify(self)
@@ -761,6 +795,7 @@ class RunState(FSM, HasThreadState):
     ''' Raise `CancellationError` if cancelled.
         This is the concise way to terminate an operation which honours
         `.cancelled` if you're prepared to handle the exception.
+        Otherwise pause if the `RunState` is paused.
 
         Example:
 
@@ -774,29 +809,13 @@ class RunState(FSM, HasThreadState):
       elif a:
         msg = msg % a
       raise CancellationError(msg)
-
-  def raiseif(self, msg=None, *a):
-    ''' Raise `CancellationError` is cancelled.
-
-        Example:
-
-            for item in items:
-                runstate.raiseif()
-                ... process item ...
-    '''
-    if self.cancelled:
-      if msg is None:
-        msg = "%s.cancelled" % (self,)
-      else:
-        if a:
-          msg = msg % a
-      raise CancellationError(msg)
+    self.pauseif()
 
   @property
   def running(self):
-    ''' Whether the state is `'RUNNING'` or `'STOPPING'`.
+    ''' Whether the state is `'RUNNING'` or `'PAUSED'` or `'STOPPING'`.
     '''
-    return self.fsm_state in ('RUNNING', 'STOPPING')
+    return self.fsm_state in ('RUNNING', 'PAUSED', 'STOPPING')
 
   @property
   def stopping(self):
@@ -808,6 +827,29 @@ class RunState(FSM, HasThreadState):
     ''' Set the cancelled flag; the associated process should notice and stop.
     '''
     self.fsm_event('cancel')
+
+  def pause(self):
+    ''' Move to the paused state.
+        Callers which poll the runstate will block until unpaused.
+    '''
+    self.fsm_event('pause')
+
+  @property
+  def paused(self):
+    ''' Whether the `RunState` is paused.
+    '''
+    return self.fsm_state == 'PAUSED'
+
+  def pauseif(self):
+    ''' If we are paused, wait until we are unpaused.
+    '''
+    self._unpause.wait()
+
+  def resume(self):
+    ''' Resume running from the paused state.
+        Callers blocked on the pause will resume.
+    '''
+    self.fsm_event('resume')
 
   @property
   def run_time(self):
