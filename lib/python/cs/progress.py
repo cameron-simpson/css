@@ -25,6 +25,7 @@ from cs.deco import decorator, uses_quiet
 from cs.logutils import debug, exception
 from cs.py.func import funcname
 from cs.queues import IterableQueue, QueueIterator
+from cs.resources import RunState, uses_runstate
 from cs.seq import seq
 from cs.threads import bg
 from cs.units import (
@@ -49,6 +50,7 @@ DISTINFO = {
         'cs.deco',
         'cs.logutils',
         'cs.py.func',
+        'cs.resources',
         'cs.seq',
         'cs.threads',
         'cs.units',
@@ -493,6 +495,7 @@ class BaseProgress(object):
         )
 
   # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
+  @uses_runstate
   def iterbar(
       self,
       it,
@@ -502,6 +505,7 @@ class BaseProgress(object):
       incfirst=False,
       update_period=DEFAULT_UPDATE_PERIOD,
       cancelled=None,
+      runstate: RunState,
       **bar_kw,
   ):
     ''' An iterable progress bar: a generator yielding values
@@ -547,6 +551,8 @@ class BaseProgress(object):
             for bs in P.iterbar(readfrom(f), itemlenfunc=len):
                 ... process the file data in bs ...
     '''
+    if cancelled is None:
+      cancelled = lambda: runstate.cancelled
     with self.bar(label, update_period=update_period, **bar_kw) as proxy:
       for item in it:
         if cancelled and cancelled():
