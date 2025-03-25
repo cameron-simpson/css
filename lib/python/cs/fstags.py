@@ -2087,7 +2087,7 @@ class TaggedPathSet:
     return iter(self.members)
 
   @locked
-  def update(self, paths: Iterable[str, TaggedPath]):
+  def update(self, paths: Iterable[Union[str, TaggedPath]]):
     ''' Add `paths` to the set.
     '''
     for path in paths:
