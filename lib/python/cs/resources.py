@@ -643,7 +643,6 @@ class RunState(FSM, HasThreadState):
     self._sigstack = None
     self._sighandler = handle_signal or self.handle_signal
     # core state
-    self._running = False
     self._cancelled = False
     self._unpause = Event()
     self._unpause.set()
