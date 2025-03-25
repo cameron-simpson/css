@@ -32,7 +32,7 @@ from cs.result import CancellationError
 from cs.semantics import ClosedError, not_closed
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20250325'
+__version__ = '20250325-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
