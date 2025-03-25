@@ -6,13 +6,13 @@
 from subprocess import PIPE
 
 from cs.app.osx.plist import ingest_plist
-from cs.deco import cachedmethod
+from cs.cache import cachedmethod
 from cs.lex import r
 from cs.psutils import run
 
 from typeguard import typechecked
 
-__version__ = '20241122-post'
+__version__ = '20250108-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -22,7 +22,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.osx.plist',
-        'cs.deco',
+        'cs.cache',
         'cs.lex',
         'cs.psutils',
         'typeguard',

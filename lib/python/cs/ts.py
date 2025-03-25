@@ -192,7 +192,7 @@ class TSCommand(BaseCommand):
           Scan the input as log lines and produce a timesheet summary prototype report.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     with Pfx("stdin"):
       last_span = None
       for span in LogSpan.from_entries(scan_loglines(sys.stdin,

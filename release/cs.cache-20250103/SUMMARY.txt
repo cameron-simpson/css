@@ -1,0 +1,2 @@
+Pull in @cachedmethod from cs.deco for dependency reasons.
+Move file_based and @file_property from cs.fileutils to cs.cache.

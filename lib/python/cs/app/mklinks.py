@@ -285,6 +285,8 @@ class Linker:
         runstate.raiseif()
         # order FileInfos by mtime (newest first) and then path
         FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
+        if len(FIs) < 2:
+          continue
         size = FIs[0].size
         with proxy.extend_prefix(f'size {size} '):
           for i, FI in enumerate(progressbar(FIs, f'size {size}')):

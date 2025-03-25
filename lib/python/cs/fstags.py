@@ -2,8 +2,8 @@
 #
 # pylint: disable=too-many-lines
 
-''' Simple filesystem based file tagging
-    and the associated `fstags` command line script.
+r'''Simple filesystem based file tagging
+    and the associated `fstags` command line tool.
 
     Many basic tasks can be performed with the `fstags` command line utility,
     documented under the `FSTagsCommand` class below.
@@ -21,11 +21,18 @@
     there is a line for each entry in the directory
     consisting of the directory entry name and the associated tags.
 
-    Tags may be "bare", or have a value.
+    Programmatically one creates an `FSTags` instance and accesses
+    the `TagSet`s for whichever filesystem paths are of interest:
+
+        with FSTags() as fstags:
+            tagged = fstags['/path/to/some/file']
+            tagged['foo']=9 # set the tag foo=9
+
+    In a `.fstags` tag file tags may be "bare", or have a value.
     If there is a value it is expressed with an equals (`'='`)
     followed by the JSON encoding of the value.
 
-    The tags for a file are the union of its direct tags
+    The inherited tags for a file are the union of its direct tags
     and all relevant ancestor tags,
     with priority given to tags closer to the file.
 
@@ -66,7 +73,7 @@
 
     Backup the `archive2` files using `rsync`:
 
-        fstags find --for-rsync /path/to/media backup=archive2 \\
+        fstags find --for-rsync /path/to/media backup=archive2 \
         | rsync -ia --include-from=- /path/to/media /path/to/backup_archive2
 
 '''
@@ -115,7 +122,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, promote, Promotable
+from cs.deco import default_params, fmtdoc, promote, Promotable, uses_verbose
 from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
 from cs.fs import HasFSPath, FSPathBasedSingleton, scandirpaths, scandirtree
 from cs.lex import (
@@ -295,7 +302,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("missing dstpath")
     dstpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     fstags = self.options.fstags
     srctags = fstags[srcpath]
     fstags[dstpath].update(srctags)
@@ -1177,7 +1184,8 @@ class FSTags(MultiOpenMixin):
     return realpath(fspath) if self.config.physical else abspath(fspath)
 
   @locked
-  def __getitem__(self, path) -> "TaggedPath":
+  @uses_verbose
+  def __getitem__(self, path, *, verbose: bool) -> "TaggedPath":
     ''' Return the `TaggedPath` for `abspath(path)`.
     '''
     keypath = self.keypath(path)
@@ -1188,9 +1196,9 @@ class FSTags(MultiOpenMixin):
       now = time.time()
       tagged_path = self._tagged_paths[keypath] = tagfile[basename(keypath)]
       elapsed = time.time() - now
-      if elapsed >= 1.0:
-        warning("FSTags[%r] took %ss", path, elapsed)
-        ##raise RuntimeError("SLOW TAGFILE LOOKUP")
+      if elapsed >= 5.0:
+        if verbose or sys.stderr.isatty():
+          warning("FSTags[%r] took %ss", path, elapsed)
     return tagged_path
 
   @pfx_method
@@ -1862,7 +1870,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       prefix: str,
       name: str,
       *,
-      state_func: Optional[Callable[str, Mapping[str, Any]]] = None,
+      state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ) -> "CachedValue":
     ''' Return `CachedValue` managing the  `prefix.name` tag.
     '''
@@ -2101,7 +2109,7 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
       "name should be a clean file basename"
   )
   def TagSetClass(self, name: str) -> TaggedPath:
-    ''' factory to create a `TaggedPath` from a `name`.
+    ''' Factory to create a `TaggedPath` from a `name`.
     '''
     fspath = joinpath(dirname(self.fspath), name)
     return TaggedPath(fspath, fstags=self.fstags)
@@ -2137,7 +2145,7 @@ class CachedValue:
       prefix: str,
       name: str,
       *,
-      state_func: Optional[Callable[str, Mapping[str, Any]]] = None,
+      state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ):
     ''' Initialise a cached value reference.
 

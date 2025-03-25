@@ -1,0 +1,13 @@
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: spit out the wallpaper-from-directory code to new Spaces.set_wp_dirpath method, going to call this from wpr
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: main: fix SpacesCommand invocation
+lib/python/cs/app/osx/spaces.py: merge default ==> osx
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: replace a bundle of percent formats with format strings
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces: extract the filesystem path Sonoma fix into new static method spaces_pathfor(fspath)
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces.spaces_pathfor: put in the ~/ attempts, commented out (they don't work)
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: new DEFAULT_BACKGROUND_RGB = 0, 0, 0 (black) default background colour, apply
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Space.set_wp_dirpath: rename to set_wp_fspath, accomodate single image or dir of images; update SpacesCommand.cmd_wp to use it
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: update imports, add setting
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces.set_wp_fspath: fixes in the directory control flow
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: Spaces.set_wp_fspath: for directories, add back ChangeDuration, comment out NewImageFilePath and LastName
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: SpacesCommand.cmd_wp: improve the spaces listing
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: update DISTINFO

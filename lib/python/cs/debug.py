@@ -14,7 +14,7 @@ anywhere in the code provided this module has been imported somewhere.
 
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
-* `abrk`: a decorator to call `breakpoint(0` in an `AssertionError`
+* `abrk`: a decorator to call `breakpoint()` on an `AssertionError`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`
@@ -55,14 +55,14 @@ from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
 from cs.py.func import funccite, funcname, func_a_kw_fmt
-from cs.py.stack import caller
+from cs.py.stack import caller, frames
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.threads import ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20241005-post'
+__version__ = '20250325-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -189,6 +189,8 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
       Parameters:
       * `stack`: a stack list as returned by `traceback.extract_stack`.
         If missing or `None`, use the result of `traceback.extract_stack()`.
+        If `stack` has a `.tb_frame` or `.__traceback__` attribute,
+        extract the stack from that (this covers traceback objects and exceptions).
       * `limit`: a limit to the number of stack entries to dump.
         If missing or `None`, dump all entries.
       * `logger`: a `logger.Logger` ducktype or the name of a logger.
@@ -196,10 +198,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
       * `log_level`: the logging level for the dump.
         If missing or `None`, use `cs.logutils.loginfo.level`.
   '''
-  if stack is None:
-    stack = traceback.extract_stack()
-  if limit is not None:
-    stack = stack[:limit]
+  stack = frames(stack, limit=limit)
   if logger is None:
     logger = logging.getLogger()
   elif isinstance(logger, str):

@@ -7,27 +7,25 @@ r'''
 Convenience facilities for objects.
 '''
 
-from __future__ import print_function
 from collections import defaultdict
 from copy import copy as copy0
 import sys
+from threading import Lock
 import traceback
 from types import SimpleNamespace
-from threading import Lock
 from weakref import WeakValueDictionary
-from cs.deco import OBSOLETE
-from cs.py3 import StringTypes
 
-__version__ = '20241009-post'
+from cs.deco import OBSOLETE
+
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.py3'],
+    'install_requires': ['cs.deco'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -138,7 +136,7 @@ def O_str(o, no_recurse=False, seen=None):
   if seen is None:
     seen = set()
   obj_type = type(o)
-  if obj_type in StringTypes:
+  if obj_type in (str,):
     return repr(o)
   if obj_type in (tuple, int, float, bool, list):
     return str(o)
@@ -167,21 +165,15 @@ def O_str(o, no_recurse=False, seen=None):
   seen.remove(id(o))
   return s
 
-def copy(obj, *a, **kw):
+def copy(obj, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.
 
-       Performs a shallow copy of `self` using copy.copy.
+       Performs a shallow copy of `self` using `copy.copy`.
 
-       Treat all positional parameters as attribute names, and
-       replace those attributes with shallow copies of the original
-       attribute.
-
-       Treat all keyword arguments as (attribute,value) tuples and
+       Treat all keyword arguments as `(attribute,value)` 2-tuples and
        replace those attributes with the supplied values.
   '''
   obj2 = copy0(obj)
-  for attr in a:
-    setattr(obj2, attr, copy(getattr(obj, attr)))
   for attr, value in kw.items():
     setattr(obj2, attr, value)
   return obj2
@@ -529,24 +521,28 @@ class Sentinel:
   def __eq__(self, other):
     return self is other
 
-def public_subclasses(cls):
-  ''' Return a list of the subclasses of `cls` which have public names.
+def public_subclasses(cls, extras=()):
+  ''' Return a set of the subclasses of `cls` which have public names.
   '''
-  classes = []
+  classes = set()
   q = list(cls.__subclasses__())
+  q.extend(extras)
   while q:
     subcls = q.pop(0)
-    if not issubclass(subcls, cls):
+    if subcls in classes:
+      # seen this one
       continue
     if not subcls.__name__.startswith('_'):
-      classes.append(subcls)
+      # public name, include it
+      classes.add(subcls)
+    # append the further subclasses for consideration
     try:
       subclasses = subcls.__subclasses__()
     except TypeError:
       # type is a subclass of object, but its __subclasses__ is just a function
       pass
     else:
-      q.extend(subcls.__subclasses__())
+      q.extend(subclasses)
   return classes
 
 if __name__ == '__main__':

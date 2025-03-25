@@ -22,7 +22,7 @@ from threading import Lock, Thread
 from cs.deco import Promotable
 from cs.gimmicks import r
 
-__version__ = '20240630-post'
+__version__ = '20250111-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -31,10 +31,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
+    'markers': [
+        'python_version>=3.3',  # for os.pread
+    ],
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
-        'python_version>=3.3',  # for os.pread
     ],
 }
 
@@ -178,12 +180,10 @@ class CornuCopyBuffer(Promotable):
   def selfcheck(self, msg=''):
     ''' Integrity check for the buffer, useful during debugging.
     '''
-    msgpfx = type(self).__name__ + '.selfcheck'
+    msgpfx = f'{self.__class__.__name__}.selfcheck'
     if msg:
       msgpfx += ': ' + msg
-    msgpfx += "buflen=%d, bufs=%r" % (
-        self.buflen, [len(buf) for buf in self.bufs]
-    )
+    msgpfx += f', buflen={self.buflen}, bufs={[len(buf) for buf in self.bufs]}'
     assert self.buflen == sum(
         len(buf) for buf in self.bufs
     ), msgpfx + ": self.buflen != sum of .bufs"
@@ -260,7 +260,11 @@ class CornuCopyBuffer(Promotable):
     else:
       it = FDIterator(fd, readsize=readsize, offset=offset)
     return cls(
-        it, close=it.close, offset=it.offset, final_offset=final_offset, **kw
+        it,
+        close=it.close,
+        offset=it.offset,
+        final_offset=final_offset,
+        **kw,
     )
 
   def as_fd(self, maxlength=Ellipsis):
@@ -294,7 +298,8 @@ class CornuCopyBuffer(Promotable):
         os.close(wfd)
 
     Thread(
-        name="%s.copy_to_fd_%d_as_%d" % (self, wfd, rfd), target=copy_buffer
+        name=f'{self}.copy_to_fd:{wfd=}:{rfd=}',
+        target=copy_buffer,
     ).start()
     return rfd
 
@@ -317,7 +322,11 @@ class CornuCopyBuffer(Promotable):
     '''
     it = SeekableMMapIterator(fd, readsize=readsize, offset=offset)
     return cls(
-        it, offset=it.offset, close=it.close, final_offset=it.end_offset, **kw
+        it,
+        offset=it.offset,
+        close=it.close,
+        final_offset=it.end_offset,
+        **kw,
     )
 
   @classmethod
@@ -380,7 +389,7 @@ class CornuCopyBuffer(Promotable):
         if offset2 < 0:
           raise ValueError(
               "offset %s is too far from the end of the file (st_size=%s)" %
-              (offset, S.st_size)
+              (offset, S.st_size),
           )
       bfr.skipto(offset)
     return bfr
@@ -402,31 +411,24 @@ class CornuCopyBuffer(Promotable):
         Other keyword arguments are passed to the buffer constructor.
     '''
     if offset < 0:
-      raise ValueError("offset(%d) should be >= 0" % (offset,))
+      raise ValueError(f'{offset=} should be >= 0')
     if offset > len(bs):
-      raise ValueError(
-          "offset(%d) beyond end of bs (%d bytes)" % (offset, len(bs))
-      )
+      raise ValueError(f'{offset=} beyond end of bs ({len(bs)} bytes)')
     if length is None:
       length = len(bs) - offset
-    else:
-      # sanity check supplied length
-      if length < 1:
-        raise ValueError("length(%d) < 1" % (length,))
+    # sanity check supplied length
+    elif length < 1:
+      raise ValueError(f'{length=} < 1')
     end_offset = offset + length
     if end_offset > len(bs):
-      raise ValueError(
-          "offset(%d)+length(%d) > len(bs):%d" % (offset, length, len(bs))
-      )
+      raise ValueError(f'{offset=}+{length=} > {len(bs)=}')
     bs = memoryview(bs)
     if offset > 0 or end_offset < len(bs):
       bs = bs[offset:end_offset]
     return cls([bs], offset=offset, final_offset=end_offset, **kw)
 
   def __str__(self):
-    return "%s(offset:%d:%r,buf:%d)" % (
-        type(self).__name__, self.offset, self.final_offset, self.buflen
-    )
+    return f'{self.__class__.__name__}(offset:{self.offset}:{self.final_offset},buf:{self.buflen}'
 
   def __len__(self):
     ''' The length is the length of the internal buffer: data available without a fetch.
@@ -463,13 +465,9 @@ class CornuCopyBuffer(Promotable):
     if index < 0:
       index = self.buflen - index
       if index < 0:
-        raise IndexError(
-            "index %s out of range (buflen=%d)" % (index0, self.buflen)
-        )
+        raise IndexError(f'index {index0} out of range ({self.buflen=})')
     if index >= self.buflen:
-      raise IndexError(
-          "index %s out of range (buflen=%d)" % (index0, self.buflen)
-      )
+      raise IndexError(f'index {index0} out of range ({self.buflen=})')
     buf_offset = 0
     for buf in self.bufs:
       if index < buf_offset + len(buf):
@@ -477,7 +475,7 @@ class CornuCopyBuffer(Promotable):
       buf_offset += len(buf)
     raise RuntimeError(
         "%s.__getitem__(%s): failed to locate byte in bufs %r" %
-        (self, index0, [len(buf) for buf in self.bufs])
+        (self, index0, [len(buf) for buf in self.bufs]),
     )
 
   def __iter__(self):
@@ -504,9 +502,7 @@ class CornuCopyBuffer(Promotable):
         or until EOF if `maxlength` is `Ellipsis`.
     '''
     if maxlength is not Ellipsis and maxlength < 1:
-      raise ValueError(
-          "maxlength mst be Ellipsis or >=1, got %r" % (maxlength,)
-      )
+      raise ValueError(f'{maxlength=} mst be Ellipsis or >=1')
     while maxlength is Ellipsis or maxlength > 0:
       try:
         bs = next(self)
@@ -589,7 +585,7 @@ class CornuCopyBuffer(Promotable):
     if min_size is Ellipsis:
       pass
     elif min_size < 1:
-      raise ValueError("min_size(%r) must be >= 1" % (min_size,))
+      raise ValueError(f'{min_size=} must be >= 1')
     while min_size is Ellipsis or min_size > self.buflen:
       if min_size is not Ellipsis:
         self.hint(min_size - self.buflen)
@@ -602,7 +598,7 @@ class CornuCopyBuffer(Promotable):
         # pylint: disable=raise-missing-from
         raise EOFError(
             "insufficient input data, wanted %d bytes but only found %d" %
-            (min_size, self.buflen)
+            (min_size, self.buflen),
         )
       if next_chunk:
         self.bufs.append(next_chunk)
@@ -641,28 +637,27 @@ class CornuCopyBuffer(Promotable):
       # take all the fetched data
       taken = self.bufs
       self.bufs = []
+    elif size >= self.buflen:
+      # take the whole buffer
+      taken = self.bufs
+      self.bufs = []
     else:
-      if size >= self.buflen:
-        # take the whole buffer
-        taken = self.bufs
-        self.bufs = []
-      else:
-        # size < self.buflen
-        # take the leading data from the buffer
-        taken = []
-        bufs = self.bufs
-        while size > 0:
-          buf0 = bufs[0]
-          if len(buf0) <= size:
-            buf = buf0
-            bufs.pop(0)
-          else:
-            # len(buf0) > size: crop from buf0
-            assert len(buf0) > size
-            buf = buf0[:size]
-            bufs[0] = buf0[size:]
-          taken.append(buf)
-          size -= len(buf)
+      # size < self.buflen
+      # take the leading data from the buffer
+      taken = []
+      bufs = self.bufs
+      while size > 0:
+        buf0 = bufs[0]
+        if len(buf0) <= size:
+          buf = buf0
+          bufs.pop(0)
+        else:
+          # len(buf0) > size: crop from buf0
+          assert len(buf0) > size
+          buf = buf0[:size]
+          bufs[0] = buf0[size:]
+        taken.append(buf)
+        size -= len(buf)
     # advance offset by the size of the taken data
     taken_size = sum(len(buf) for buf in taken)
     self.buflen -= taken_size
@@ -730,7 +725,7 @@ class CornuCopyBuffer(Promotable):
         returning up to to `size` bytes from a single I/O operation.
     '''
     if size < 1:
-      raise ValueError("size < 1: %r" % (size,))
+      raise ValueError(f'{size=} < 1')
     if size <= self.buflen:
       return self.take(size)
     # size > self.buflen
@@ -797,13 +792,11 @@ class CornuCopyBuffer(Promotable):
       offset += self.offset
     else:
       raise ValueError(
-          "seek: unsupported whence value %s, must be os.SEEK_SET or os.SEEK_CUR"
-          % (whence,)
+          f'seek: unsupported {whence=}, must be os.SEEK_SET or os.SEEK_CUR'
       )
     if offset < self.offset:
       raise ValueError(
-          "seek: target offset %s < buffer offset %s; may not seek backwards" %
-          (offset, self.offset)
+          f'seek: target {offset=} < {self.offset=}; may not seek backwards'
       )
     if offset > self.offset:
       self.skipto(offset, short_ok=short_ok)
@@ -824,11 +817,11 @@ class CornuCopyBuffer(Promotable):
     '''
     offset = self.offset
     if new_offset < offset:
-      raise ValueError(
-          "skipto: new_offset:%d < offset:%d" % (new_offset, offset)
-      )
+      raise ValueError(f'skipto: {new_offset=} < {offset=}')
     return self.skip(
-        new_offset - offset, copy_skip=copy_skip, short_ok=short_ok
+        new_offset - offset,
+        copy_skip=copy_skip,
+        short_ok=short_ok,
     )
 
   def skip(self, toskip, copy_skip=None, short_ok=False):
@@ -862,9 +855,9 @@ class CornuCopyBuffer(Promotable):
       except AttributeError:
         if seekable is not None:
           print(
-              "%s.skip: warning: seekable=%r but no input_data.seek method,"
-              " resetting seekable to False" % (self, seekable),
-              file=sys.stderr
+              f'{self}.skip: warning: {seekable=} but no input_data.seek method,'
+              " resetting seekable to False",
+              file=sys.stderr,
           )
         self.seekable = False
       else:
@@ -875,10 +868,9 @@ class CornuCopyBuffer(Promotable):
           input_seek(input_offset)
         except OSError as e:
           print(
-              "%s.skip: warning: input_data.seek(%r):"
-              " %s, resetting self.seekable to False" %
-              (self, input_offset, e),
-              file=sys.stderr
+              f'{self}.skip: warning: input_data.seek({input_offset}): {e}'
+              ', resetting self.seekable to False',
+              file=sys.stderr,
           )
           self.seekable = False
         else:
@@ -1027,18 +1019,16 @@ class CornuCopyBuffer(Promotable):
     else:
       # assume this iterates byteslike objects
       return cls(obj)
-    raise TypeError("%s.promote: cannot promote %s" % (cls, r(obj)))
+    raise TypeError(f'{cls}.promote: cannot promote {r(obj)}')
 
-class _BoundedBufferIterator(object):
+class _BoundedBufferIterator:
   ''' An iterator over the data from a CornuCopyBuffer with an end
       offset bound.
   '''
 
   def __init__(self, bfr, end_offset):
     if end_offset < bfr.offset:
-      raise ValueError(
-          "end_offset(%d) < bfr.offset(%d)" % (end_offset, bfr.offset)
-      )
+      raise ValueError(f'{end_offset=} < {bfr.offset=}')
     self.bfr = bfr
     self.end_offset = end_offset
 
@@ -1056,7 +1046,7 @@ class _BoundedBufferIterator(object):
     limit = self.end_offset - bfr.offset
     if limit <= 0:
       if limit < 0:
-        raise RuntimeError("limit:%d < 0" % (limit,))
+        raise RuntimeError(f'{limit=} < 0')
       raise StopIteration("limit reached")
     # post: limit > 0
     buf = next(bfr)
@@ -1080,19 +1070,18 @@ class _BoundedBufferIterator(object):
     ''' Do a seek on the underlying buffer, obeying the bounds.
     '''
     if whence == SEEK_SET:
-      pass
+      position = offset
     elif whence == SEEK_CUR:
-      offset += self.bfr.offset
+      position = offset + self.bfr.offset
     elif whence == SEEK_END:
-      offset += self.end_offset
+      position = self.end_offset + offset
     if not self.offset <= offset <= self.end_offset:
       raise ValueError(
-          "invalid seek position(%d) < self.offset(%d) or > self.end_offset(%d)"
-          % (offset, self.offset, self.end_offset)
+          f'invalid seek {position=} < {self.offset=} or > {self.end_offset=}'
       )
     return self.bfr.seek(offset, SEEK_SET)
 
-class CopyingIterator(object):
+class CopyingIterator:
   ''' Wrapper for an iterator that copies every item retrieved to a callable.
   '''
 
@@ -1135,9 +1124,9 @@ class _FetchIterator:
     if readsize is None:
       readsize = DEFAULT_READSIZE
     elif readsize < 1:
-      raise ValueError("readsize must be >=1, got: %r" % (readsize,))
+      raise ValueError(f'{readsize=} must be >=1')
     if offset < 0:
-      raise ValueError("offset must be >=0, got: %r" % (offset,))
+      raise ValueError(f'{offset=} must be >=0')
     self.offset = offset
     self.readsize = readsize
     self.align = align
@@ -1145,7 +1134,7 @@ class _FetchIterator:
     self._lock = Lock()
 
   def _fetch(self, readsize):
-    raise NotImplementedError("no _fetch method in class %s" % (type(self),))
+    raise NotImplementedError(f'no _fetch method in class {self.__class__}')
 
   def hint(self, size):
     ''' Hint that the next iteration is involved in obtaining at
@@ -1206,10 +1195,10 @@ class SeekableIteratorMixin:
           end_offset = self.end_offset
         except AttributeError as e:
           # pylint: disable=raise-missing-from
-          raise ValueError("mode=SEEK_END unsupported: %s" % (e,))
+          raise ValueError(f'mode=SEEK_END unsupported: {e}')
         new_offset += end_offset
       else:
-        raise ValueError("unknown mode %d" % (mode,))
+        raise ValueError(f'unknown {mode=}')
       self.offset = new_offset
       return new_offset
 
@@ -1292,7 +1281,10 @@ class FileIterator(_FetchIterator, SeekableIteratorMixin):
     if offset is None:
       offset = 0
     _FetchIterator.__init__(
-        self, offset=offset, readsize=readsize, align=align
+        self,
+        offset=offset,
+        readsize=readsize,
+        align=align,
     )
     self.fp = fp
     # try to use the frugal read method if available
@@ -1361,12 +1353,18 @@ class SeekableMMapIterator(_FetchIterator, SeekableIteratorMixin):
     if offset is None:
       offset = os.lseek(fd, 0, SEEK_CUR)
     _FetchIterator.__init__(
-        self, offset=offset, readsize=readsize, align=align
+        self,
+        offset=offset,
+        readsize=readsize,
+        align=align,
     )
     self.fd = fd
     self.base_offset = 0
     self.mmap = mmap.mmap(
-        self.fd, 0, flags=mmap.MAP_PRIVATE, prot=mmap.PROT_READ
+        self.fd,
+        0,
+        flags=mmap.MAP_PRIVATE,
+        prot=mmap.PROT_READ,
     )
     self.mv = memoryview(self.mmap)
 
@@ -1389,5 +1387,5 @@ class SeekableMMapIterator(_FetchIterator, SeekableIteratorMixin):
 
   def _fetch(self, readsize):
     if readsize < 1:
-      raise ValueError("readsize=%d" % (readsize,))
+      raise ValueError(f'{readsize=}')
     return self.mv[self.offset:self.offset + readsize]

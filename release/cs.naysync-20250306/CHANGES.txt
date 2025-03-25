@@ -1,0 +1,15 @@
+lib/python/cs/naysync.py: cs.naysync: AsyncPipeLine.__call__: just return self.outq, use try/finally in submit
+lib/python/cs/naysync.py: cs.naysync: back to exercising everything in "main" mode
+lib/python/cs/naysync.py: merge async ==> default
+lib/python/cs/naysync.py: cs.naysync: docstring updates
+lib/python/cs/naysync.py: merge default ==> pilfer: PipeLineSpec.make_pipeline: new "**" stage to make per item subpipelines which run concurrently
+lib/python/cs/naysync.py: cs.naysync: @agen: new optional `fast` parameter, plumbed to async_iter()
+lib/python/cs/naysync.py: cs.naysync: fix docstring typo
+lib/python/cs/naysync.py: cs.naysync: amap: progressive async consume and dispatch, allowing yield of results as items come in - does not wait for all items to be dispatched before yielding results
+lib/python/cs/naysync.py: cs.naysync: docstring tweak
+lib/python/cs/naysync.py: cs.naysync: amap: new fast=False parameter to indicate that func does not block
+lib/python/cs/naysync.py: cs.naysync: amap: keep references to tasks so that they are not garbage collected before completion
+lib/python/cs/naysync.py: cs.naysync: amap: consume_ait: bugfix result queue close criterion
+lib/python/cs/naysync.py: cs.naysync: amap: keep the task references in a mapping so that we can release the references after completion
+lib/python/cs/naysync.py: cs.naysync: tweak a print()
+lib/python/cs/naysync.py: cs.naysync: tweak docstring

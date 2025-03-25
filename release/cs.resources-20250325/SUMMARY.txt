@@ -1,0 +1,1 @@
+RunState: new PAUSED state to support suspending activity.

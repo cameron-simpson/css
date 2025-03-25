@@ -1,0 +1,1 @@
+DISTINFO: move python_version>=3.3 out to the "makers" section (presemly unused) because it was being used as a dependency, finding the python_version PyPI dsitribution.

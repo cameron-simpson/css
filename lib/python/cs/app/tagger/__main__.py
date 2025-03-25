@@ -58,9 +58,9 @@ class TaggerCommand(BaseCommand):
 
     # pylint: disable=use-dict-literal
     COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
         d_=('fspath', "The reference directory, default '.'."),
         h_=('hashname', 'The file content hash algorithm name.'),
-        **BaseCommand.Options.COMMON_OPT_SPECS,
     )
 
   @contextmanager
@@ -188,7 +188,7 @@ class TaggerCommand(BaseCommand):
     if argv:
       dirpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     if not isdirpath(dirpath):
       raise GetoptError("dirpath is not a directory: %r" % (dirpath,))
     tagger = self.tagger_for(dirpath)
@@ -238,7 +238,7 @@ class TaggerCommand(BaseCommand):
     type_name = argv.pop(0)
     with Pfx("type %r", type_name):
       if argv:
-        raise GetoptError("extra arguments: %r" % (argv,))
+        raise GetoptError(f'extra arguments: {argv!r}')
     print(type_name)
     for type_value in tagger.ont_values(type_name):
       ontkey = f"{type_name}.{type_value}"
@@ -266,7 +266,7 @@ class TaggerCommand(BaseCommand):
     if argv:
       dirpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     if not isdirpath(dirpath):
       raise GetoptError("not a directory: %r" % (dirpath,))
     tagger = Tagger(dirpath)
@@ -287,9 +287,13 @@ class TaggerCommand(BaseCommand):
           'rules',
       ]
     tagger = Tagger(dirpath)
-    print(shortpath(tagger.rcfile))
-    for n, rule in enumerate(tagger.rules, 1):
-      print(n, rule)
+    rcfile = tagger.rcfile
+    if rcfile is None:
+      warning("no rcfile for %s", tagger)
+    else:
+      print(shortpath(rcfile))
+      for n, rule in enumerate(tagger.rules, 1):
+        print(n, rule)
 
   @uses_fstags
   def cmd_test(self, argv, *, fstags: FSTags):
@@ -302,7 +306,7 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing path")
     path = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     tagged = fstags[path]
     changed = True
     while True:
