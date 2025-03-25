@@ -45,7 +45,7 @@ cs.ffmpegutils ok_revision="67dd2032154d8a0aeb4d80e51edecf6198ecc95d" pypi.relea
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20250103" ok_revision=b44b316352a44d8c59feaf82f7da285feab29688 features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"],"20241122":["atomic_copy2"],"20250103":["rename_excl"]}
 cs.fs ok_revision="8284e75a0eb6e20779f0a53c76594b635fc5dc48" pypi.release="20250325" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"],"20240422":["scandirpaths","scandirtree"],"20250325":["update_linkdir"]}
-cs.fsm ok_revision="68a98e58dc6b850fefb09fed84869d103735b31e" pypi.release="20250120" features={"20231018":["fsm_transitions_as_dot__history_style"],"20240630":["CancellationError"],"20240721":["FSM__fsm_print_state_diagram"]}
+cs.fsm ok_revision=b05a07abe155bbb10776c7a8ee7aaeba13177a13 pypi.release="20250120" features={"20231018":["fsm_transitions_as_dot__history_style"],"20240630":["CancellationError"],"20240721":["FSM__fsm_print_state_diagram"]}
 cs.fstags pypi.release="20241122" ok_revision=e6c567623d54c8e893c796587b2976cc67505148 features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"],"20240422":["fix_fstags__repr"],"20240709":["CachedValue"]}
 cs.gimmicks ok_revision="5304d45b48abf477a077743b7b23cb0aa066d83d" pypi.release="20250323" features={"20211208":["TimeoutError"],"20220429":["devnull"],"20230212":["gimmick_r","gimmick_s"],"20230331":["open_append"]}
 cs.gvutils ok_revision="4c81e06630110ce18f0422ece389d623cbc1bfaf" pypi.release="20230816" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"],"20221207":["gvsvg"]}
@@ -75,6 +75,7 @@ cs.pfx pypi.release="20250308" ok_revision="6f8afea340f346a0433e3fd1f51c3339cbe0
 cs.pipeline pypi.release="20191007.1" ok_revision="2a26b6f06610394b6c7e6fb6f9a5228e50367db9"
 cs.pop3 ok_revision="64592a92c8db0e90cf818f6ccf415f6cfb53c90d" pypi.release="20240316"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
+cs.prgress
 cs.progress pypi.release="20250306" ok_revision="0b2876481b754faac17fd72fa1fae3ccebabdf03" features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"],"20250306":["Progress__qbar"]}
 cs.psutils pypi.release="20250108.1" ok_revision=e30b06bec323b666f3cde7ff67750104d46839e8 features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"],"20241206":["run__remote"],"20250108":["run__fold"]}
 cs.py.doc pypi.release="20241007" ok_revision=a639a998cb404958be0e1e6860d39dc1a3dc616c
