@@ -64,7 +64,7 @@ DISTINFO = {
     ],
 }
 
-class LRU_Cache(object):
+class LRU_Cache:
   ''' A simple least recently used cache.
 
       Unlike `functools.lru_cache`
