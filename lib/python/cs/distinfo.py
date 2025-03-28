@@ -1511,17 +1511,23 @@ class CSReleaseCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = ['releases']
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-fqv] subcommand [subcommand-args...]
-      -f  Force. Sanity checks that would stop some actions normally
-          will not prevent them.
       -q  Quiet. Not verbose.
       -v  Verbose.
   '''
 
   @dataclass
   class Options(BaseCommand.Options):
-    cmd: str = 'cs-release'
-    force: bool = False
     release_message: str = None
+
+    COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+        f=(
+            'force',
+            ''' Force. Sanity checks that would stop some actions normally
+                will not prevent them.
+            ''',
+        )
+    )
 
     def stderr_isatty():
       ''' Test whether `sys.stderr` is a tty.
