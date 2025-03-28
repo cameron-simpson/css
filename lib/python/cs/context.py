@@ -509,8 +509,14 @@ def push_cmgr(o, attr, cmgr):
   cmgr_twostep = twostep(cmgr)
   enter_value = next(cmgr_twostep)
   # pylint: disable=unnecessary-lambda-assignment
-  pop_func = lambda: (popattrs(o, (attr,), pushed), next(cmgr_twostep))[1]
   pop_func_attr = '_push_cmgr__popfunc__' + attr
+
+  def pop_func():
+    ''' Pop the old attributes from `o`, run the final `cmgr_twostep` stage.
+    '''
+    popattrs(o, (attr, pop_func_attr), pushed)
+    return next(cmgr_twostep)
+
   pushed = pushattrs(o, **{attr: enter_value, pop_func_attr: pop_func})
   return enter_value
 
