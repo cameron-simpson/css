@@ -1825,16 +1825,21 @@ class CSReleaseCommand(BaseCommand):
     pyproject = pkg.compute_pyproject()
     sys.stdout.write(tomli_w.dumps(pyproject, multiline_strings=True))
 
+  @popopts(
+      a=(
+          'all_class_names',
+          '''' Document all public class members (default is just
+               __new__ and __init__ for the PyPI README.md file).''',
+      ),
+      raw='Do not format output with glow(1) on a tty.',
+  )
   def cmd_readme(self, argv):
     ''' Usage: {cmd} [-a] pkg_name
           Print out the package long_description.
-          -a  Document all public class members (default is just
-              __new__ and __init__ for the PyPI README.md file).
     '''
-    all_class_names = True  ## False
-    if argv and argv[0] == '-a':
-      all_class_names = True
-      argv.pop(0)
+    options = self.options
+    all_class_names = options.all_class_names
+    raw_mode = options.raw
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
@@ -1843,7 +1848,7 @@ class CSReleaseCommand(BaseCommand):
     options = self.options
     pkg = options.modules[pkg_name]
     docs = pkg.compute_doc(all_class_names=all_class_names)
-    if sys.stdout.isatty():
+    if not raw_mode and sys.stdout.isatty():
       with ps_pipeto(['glow', '-', '-p']) as P:
         print(docs.long_description, file=P.stdin)
     else:
