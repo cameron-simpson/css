@@ -237,14 +237,13 @@ class DataFile(FSPathBasedSingleton, MultiOpenMixin):
     yield from DataRecord.scan(bfr, with_offsets=with_offsets)
 
   @property
-  def wf(self):
+  def _wf(self):
     ''' The writable file for appending records to the `DataFile`.
-
-        Note that the file is opened for append with no buffering.
+        Note that the file is opened for append and that it must be flushed after use.
     '''
     with self._lock:
       if self._af is None:
-        self._af = pfx_call(open, self.fspath, 'ab', buffering=0)
+        self._af = pfx_call(open, self.fspath, 'ab')
       return self._af
 
   def add(self, data: bytes) -> Tuple[DataRecord, int, int]:
@@ -261,7 +260,7 @@ class DataFile(FSPathBasedSingleton, MultiOpenMixin):
     '''
     added = []
     with self._lock:
-      wf = self.wf
+      wf = self._wf
       offset = wf.tell()
       try:
         for data in chunks:
