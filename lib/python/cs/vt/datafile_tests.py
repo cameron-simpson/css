@@ -57,17 +57,17 @@ class TestDataFile(SetupTeardownMixin, unittest.TestCase):
     ''' Save RUN_SIZE random blocks, close, retrieve in random order.
     '''
     # save random blocks to a file
-    blocks = {}
+    blocks_by_offset = {}
     with open(self.pathname, 'wb') as f:
       for n in range(RUN_SIZE):
         with self.subTest(put_block_n=n):
           data = make_randblock(rand0(MAX_BLOCK_SIZE + 1))
           dr = DataRecord(data)
           offset = f.tell()
-          blocks[offset] = data
+          blocks_by_offset[offset] = data
           f.write(bytes(dr))
     # shuffle the block offsets
-    offsets = list(blocks.keys())
+    offsets = list(blocks_by_offset.keys())
     random.shuffle(offsets)
     # retrieve the blocks in random order, check for correct content
     with open(self.pathname, 'rb') as f:
@@ -77,7 +77,7 @@ class TestDataFile(SetupTeardownMixin, unittest.TestCase):
           bfr = CornuCopyBuffer.from_file(f)
           dr = DataRecord.parse(bfr)
           data = dr.data
-          self.assertTrue(data == blocks[offset])
+          self.assertTrue(data == blocks_by_offset[offset])
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
