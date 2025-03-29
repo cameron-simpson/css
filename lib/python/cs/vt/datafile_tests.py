@@ -4,10 +4,11 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
+from contextlib import contextmanager
 import os
-import sys
 import random
-import tempfile
+import sys
+from tempfile import NamedTemporaryFile
 import unittest
 
 try:
@@ -19,6 +20,7 @@ from cs.binary_tests import BaseTestBinaryClasses
 from cs.buffer import CornuCopyBuffer
 ##from cs.debug import thread_dump
 from cs.randutils import rand0, make_randblock
+from cs.testutils import SetupTeardownMixin
 
 from . import datafile
 from .datafile import DataRecord, DataFilePushable
@@ -35,21 +37,18 @@ class TestDataFileBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   '''
   test_module = datafile
 
-class TestDataFile(unittest.TestCase):
+class TestDataFile(SetupTeardownMixin, unittest.TestCase):
   ''' Tests for `DataFile`.
   '''
 
-  def setUp(self):
+  @contextmanager
+  def setupTeardown(self):
     random.seed()
-    tfd, pathname = tempfile.mkstemp(
-        prefix="datafile-test", suffix=".vtd", dir='.'
-    )
-    os.close(tfd)
-    self.pathname = pathname
-    self.rdatafile = DataFilePushable(pathname)
-
-  def tearDown(self):
-    os.remove(self.pathname)
+    with NamedTemporaryFile(prefix="datafile-test", suffix=".vtd",
+                            dir='.') as T:
+      self.pathname = T.name
+      self.rdatafile = DataFilePushable(self.pathname)
+      yield
 
   # TODO: tests:
   #   scan datafile
