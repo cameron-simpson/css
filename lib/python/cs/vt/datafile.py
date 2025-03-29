@@ -203,26 +203,38 @@ class DataFile(FSPathBasedSingleton, MultiOpenMixin):
               self._af.close()
               self._af = None
 
-  def get_record(self, offset: int) -> DataRecord:
+  def __getitem__(self, offset: int) -> DataRecord:
     ''' Read the `DataRecord` at `offset`.
     '''
-    bfr = CornuCopyBuffer.from_file(self.rf)
-    with self._lock:
-      self.rf.seek(offset, SEEK_SET)
-      DR = DataRecord.parse(bfr)
-    return DR
+    with self:
+      with self._lock:
+        for DR in self.scanfrom(offset, rf=self.rf):
+          return DR
+    raise IndexError(f'{offset=}')
 
-  def scanfrom(self, *, offset=0, **scan_kw):
+  def scanfrom(self,
+               offset=0,
+               *,
+               rf=None,
+               with_offsets=False) -> Iterable[DataRecord]:
     ''' Scan the file from `offset` (default `0`)
         and yield `DataRecord` instances.
-        This honours the `AbstractBinary.scan` parameters
-        such as `with_offsets`.
+        If `with_offsets`, yield `(offset,DataRecord,post_offset)` 3-tuples.
+        The optional `rf` parameter may specify an open binary file
+        for the scan such as `self.rf`; if supplied then the caller
+        must arrange exclusive access to the file for the duration
+        of the scan.
+        For example, `__getitem__` passes `rf=self.rf` while holding `self._lock`.
     '''
-    with pfx_call(open, self.fspath, 'rb') as rf:
-      if offset > 0:
-        rf.seek(offset, SEEK_SET)
-      bfr = CornuCopyBuffer.from_file(rf, offset=offset)
-      yield from DataRecord.scan(bfr, **scan_kw)
+    if rf is None:
+      # open our own file for the scan
+      with pfx_call(open, self.fspath, 'rb') as rf:
+        yield from scanfrom(offset, rf=rf, with_offsets=with_offsets)
+      return
+    if offset > 0:
+      rf.seek(offset, SEEK_SET)
+    bfr = CornuCopyBuffer.from_file(rf, offset=offset)
+    yield from DataRecord.scan(bfr, with_offsets=with_offsets)
 
   @property
   def wf(self):
