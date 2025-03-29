@@ -15,6 +15,7 @@ from os import SEEK_SET
 from os.path import realpath
 import sys
 from threading import Lock, RLock
+from typing import Iterable, List, Tuple
 from zlib import compress, decompress
 
 from icontract import require
@@ -22,7 +23,7 @@ from icontract import require
 from cs.binary import BSUInt, BSData, SimpleBinary
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.fs import HasFSPath
+from cs.fs import HasFSPath, FSPathBasedSingleton
 from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call, pfx_method
@@ -90,7 +91,7 @@ class DataRecord(SimpleBinary):
     return self.data == other.data
 
   @classmethod
-  def parse(cls, bfr):
+  def parse(cls, bfr: CornuCopyBuffer):
     ''' Parse a `DataRecord` from a buffer.
     '''
     flags = BSUInt.parse_value(bfr)
@@ -175,22 +176,18 @@ class DataFilePushable:
         progress += len(data)
     return True
 
-class DataFile(SingletonMixin, HasFSPath, MultiOpenMixin):
+class DataFile(FSPathBasedSingleton, MultiOpenMixin):
   ''' Management for a `.vtd` data file.
   '''
 
-  @classmethod
-  def _singleton_key(cls, fspath: str):
-    return realpath(fspath)
-
   @pfx_method
   def __init__(self, fspath: str):
+    if '_lock' in self.__dict__:
+      return
     if not fspath.endswith(DATAFILE_DOT_EXT):
       warning(f'fspath does not end with {DATAFILE_DOT_EXT!r}')
-    self.fspath = fspath
-    self.rf = None
+    super().__init__(fspath, lock=RLock())
     self._af = None
-    self._lock = RLock()
 
   @contextmanager
   def startup_shutdown(self):
