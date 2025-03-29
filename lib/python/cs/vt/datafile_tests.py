@@ -61,8 +61,16 @@ class TestDataFile(SetupTeardownMixin, unittest.TestCase):
       added = DF.extend(
           make_randblock(rand0(MAX_BLOCK_SIZE + 1)) for _ in range(RUN_SIZE)
       )
+      prev_offset = None
+      prev_length = None
       for DR, offset, length in added:
+        assert offset >= 0
+        assert length > 0
+        if prev_offset is not None:
+          self.assertEqual(offset, prev_offset + prev_length)
         blocks_by_offset[offset] = DR.data
+        prev_offset = offset
+        prev_length = length
     # shuffle the block offsets
     offsets = list(blocks_by_offset.keys())
     random.shuffle(offsets)
