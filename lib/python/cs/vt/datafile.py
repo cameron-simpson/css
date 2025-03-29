@@ -247,19 +247,33 @@ class DataFile(FSPathBasedSingleton, MultiOpenMixin):
         self._af = pfx_call(open, self.fspath, 'ab', buffering=0)
       return self._af
 
-  def append(self, data: bytes):
-    ''' Append the `data` to the file.
-        Return `(DR,offset,length)` being the `DataRecord` and the
-        location and length of the resulting binary record.
+  def add(self, data: bytes) -> Tuple[DataRecord, int, int]:
+    ''' Add the `data` to the file.
+        Return a `(DataRecord,offset,length)` 3-tuple.
     '''
-    DR = DataRecord(data)
-    wf = self.wf
-    bs = bytes(DR)
+    added, = self.extend([data])
+    return added
+
+  def extend(self,
+             chunks: Iterable[bytes]) -> List[Tuple[DataRecord, int, int]]:
+    ''' Add data chunks to the `DataFile` in a burst.
+        Return a list of `(DataRecord,offset,raw_length)` 3-tuples.
+    '''
+    added = []
     with self._lock:
+      wf = self.wf
       offset = wf.tell()
-      length = wf.write(bs)
-    assert length == len(bs)
-    return DR, offset, length
+      try:
+        for data in chunks:
+          DR = DataRecord(data)
+          bs = bytes(DR)
+          written = wf.write(bs)
+          assert written == len(bs)
+          added.append((DR, offset, written))
+          offset += written
+      finally:
+        wf.flush()
+    return added
 
 if __name__ == '__main__':
   from .datafile_tests import selftest
