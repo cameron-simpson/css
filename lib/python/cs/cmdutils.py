@@ -624,11 +624,16 @@ class SubCommand:
       return {}
     return get_subcommands()
 
-  @property
   def has_subcommands(self):
     ''' Whether this `SubCommand`'s `.method` has subcommands.
     '''
-    return bool(self.get_subcommands())
+    try:
+      has_subcommands = self.method.has_subcommands
+    except AttributeError:
+      # just inspect whatever subcommands the method has
+      return bool(self.get_subcommands())
+    # probaby a class - use its has_subcommands() test
+    return has_subcommands()
 
   def get_subcmds(self):
     ''' Return the names of `self.method`'s subcommands in lexical order.
@@ -653,7 +658,7 @@ class SubCommand:
               )
           ]
       )
-      if recurse and subcommand.has_subcommands:
+      if recurse and subcommand.has_subcommands():
         rows.extend(
             [indent(subc), indent(subd)]
             for subc, subd in subcommand.subusage_table(
@@ -721,43 +726,44 @@ class SubCommand:
     mapping = self.get_usage_keywords(cmd=cmd, usage_mapping=usage_mapping)
     with Pfx("format %r using %r", usage_format, mapping):
       usage = usage_format.format_map(mapping)
-    if short:
-      # the terse one subcommand-per-line listing
-      subusages = self.short_subusages(
-          show_subcmds, recurse=recurse, short=short
-      )
-    else:
-      # the longer descriptions
-      subusages = []
-      for subcmd in show_subcmds:
-        try:
-          subcommand = subcommands[subcmd]
-        except KeyError:
-          warning("unknown subcommand %r", subcmd)
-        else:
-          # recursive long listing
-          subusages.append(
-              subcommand.usage_text(
-                  short=short,
-                  recurse=recurse,
-                  seen_subcommands=sub_seen_subcommands,
-              )
-          )
     subusage_listing = []
-    if common_subcmds:
-      common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
-    if subusages:
-      subcmds_header = (
-          'Subcommands'
-          if show_subcmds is None or len(show_subcmds) > 1 else 'Subcommand'
-      )
-      subusage_listing.append(f'{subcmds_header}:')
+    if self.has_subcommands():
+      if short:
+        # the terse one subcommand-per-line listing
+        subusages = self.short_subusages(
+            show_subcmds, recurse=recurse, short=short
+        )
+      else:
+        # the longer descriptions
+        subusages = []
+        for subcmd in show_subcmds:
+          try:
+            subcommand = subcommands[subcmd]
+          except KeyError:
+            warning("unknown subcommand %r", subcmd)
+          else:
+            # recursive long listing
+            subusages.append(
+                subcommand.usage_text(
+                    short=short,
+                    recurse=recurse,
+                    seen_subcommands=sub_seen_subcommands,
+                )
+            )
       if common_subcmds:
-        subusage_listing.append(indent(common_subcmds_line))
-      subusage_listing.extend(map(indent, subusages))
-    else:
-      if common_subcmds:
-        subusage_listing.append(common_subcmds_line)
+        common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
+      if subusages:
+        subcmds_header = (
+            'Subcommands'
+            if show_subcmds is None or len(show_subcmds) > 1 else 'Subcommand'
+        )
+        subusage_listing.append(f'{subcmds_header}:')
+        if common_subcmds:
+          subusage_listing.append(indent(common_subcmds_line))
+        subusage_listing.extend(map(indent, subusages))
+      else:
+        if common_subcmds:
+          subusage_listing.append(common_subcmds_line)
     if subusage_listing:
       subusage = "\n".join(subusage_listing)
       usage = f'{usage}\n{indent(subusage)}'
