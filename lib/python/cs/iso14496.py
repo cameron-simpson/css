@@ -267,21 +267,17 @@ class MP4Command(BaseCommand):
           over_box = parse(parsee)
         over_box.dump(crop_length=None)
 
-  @popopts(p=('tag_prefix', 'Specify the tag prefix, default {TAG_PREFIX!r}.'))
+  @popopts(tag_prefix_='Specify the tag prefix, default {TAG_PREFIX!r}.')
   def cmd_tags(self, argv):
     ''' Usage: {cmd} [--tag-prefix prefix] path
           Report the tags of path based on embedded MP4 metadata.
     '''
+    options = self.options
+    tag_prefix = options.tag_prefix
+    if tag_prefix is None:
+      tag_prefix = self.TAG_PREFIX
     xit = 0
     fstags = FSTags()
-    tag_prefix = self.TAG_PREFIX
-    opts, argv = getopt(argv, 'p:', longopts=['prefix'])
-    for option, value in opts:
-      with Pfx(option):
-        if option in ('-p', '--prefix'):
-          tag_prefix = value
-        else:
-          raise NotImplementedError("unsupported option")
     if not argv:
       raise GetoptError("missing path")
     path = argv.pop(0)
