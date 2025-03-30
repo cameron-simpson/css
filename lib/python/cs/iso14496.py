@@ -801,10 +801,8 @@ class Box(SimpleBinary):
       body_offset = bfr_tail.offset
       self.body = body_class.parse(bfr_tail)
       # attach subBoxen to self
-      boxes = getattr(self.body, 'boxes', None)
-      if boxes:
-        for box in boxes:
-          box.parent = self
+      for subbox in self.body.boxes:
+        subbox.parent = self
       self.body.parent = self
       self.body.offset = body_offset
       self.body.post_offset = bfr_tail.offset
