@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
-''' Support for Kindle libraries.
+''' Support for Kindle CLassic (their former app) libraries.
 '''
 
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 import filecmp
-from getopt import GetoptError
 import os
 from os.path import (
     dirname,
@@ -17,7 +15,7 @@ from os.path import (
     join as joinpath,
 )
 import sys
-from typing import Optional
+from typing import Mapping
 
 from icontract import require
 from sqlalchemy import (
@@ -34,19 +32,20 @@ except ImportError:
   import xml.etree.ElementTree as etree
 
 from cs.app.osx.defaults import DomainDefaults as OSXDomainDefaults
-from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
-from cs.deco import cachedmethod, fmtdoc
+from cs.cmdutils import qvprint
+from cs.deco import (
+    cachedmethod,
+    fmtdoc,
+    uses_cmd_options,
+)
 from cs.fileutils import shortpath
-from cs.fs import FSPathBasedSingleton, HasFSPath
+from cs.fs import HasFSPath
 from cs.fstags import FSTags, uses_fstags
-from cs.lex import cutsuffix, s
-from cs.logutils import warning, error
+from cs.lex import cutsuffix
+from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
-from cs.progress import progressbar
 from cs.psutils import run
-from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
@@ -55,14 +54,8 @@ from cs.sqlalchemy_utils import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-from .dedrm import DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
-
-def main(argv=None):
-  ''' Kindle command line mode.
-  '''
-  return KindleCommand(argv).run()
-
-KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
+from . import KINDLE_LIBRARY_ENVVAR
+from ..common import AbstractEbooksTree
 
 KINDLE_APP_OSX_DEFAULTS_DOMAIN = 'com.amazon.Kindle'
 KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING = 'User Settings.CONTENT_PATH'
@@ -71,9 +64,11 @@ KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH = (
     'Application Support/Kindle/My Kindle Content'
 )
 
-# The default location of the Kindle content.
+# The default location of the Kindle content
+# if there is no enviroment variable
+# and, on MacOS/darwin, no defaults setting.
 # On MacOS ("darwin") this is KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH.
-# Otherwise use the made up path ~/media/kindle/My Kindle Content,
+# Otherwise use the made up path ~/media/kindle/My Kindle Content
 # which is where I'm putting my personal Kindle stuff.
 KINDLE_CONTENT_DEFAULT_PATH = {
     'darwin': KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH,
@@ -96,17 +91,7 @@ def kindle_content_path():
       return path
   return expanduser(KINDLE_CONTENT_DEFAULT_PATH)
 
-@fmtdoc
-def default_kindle_library():
-  ''' Return the default kindle library content path from `${KINDLE_LIBRARY_ENVVAR}`
-      otherwise fall back to `kindle_content_path()`.
-    '''
-  path = os.environ.get(KINDLE_LIBRARY_ENVVAR, None)
-  if path is not None:
-    return path
-  return kindle_content_path()
-
-class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
+class KindleTree(AbstractEbooksTree):
   ''' Work with a Kindle ebook tree.
 
       This actually knows very little about Kindle ebooks or its rather opaque database.
@@ -115,11 +100,50 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CONTENT_DIRNAME = 'My Kindle Content'
 
-  FSPATH_FACTORY = default_kindle_library
   FSPATH_DEFAULT = KINDLE_CONTENT_DEFAULT_PATH
   FSPATH_ENVVAR = KINDLE_LIBRARY_ENVVAR
 
+  @classmethod
+  @fmtdoc
+  def FSPATH_DEFAULT(cls):
+    ''' Return the default Kindle content path.
+        On MacOS this will look up
+        `{KINDLE_APP_OSX_DEFAULTS_DOMAIN}[{KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING}]`
+        if present.
+        Otherwise it returns `KINDLE_CONTENT_DEFAULT_PATH`
+        (`{KINDLE_CONTENT_DEFAULT_PATH!r}`).
+    '''
+    if sys.platform == 'darwin':
+      # use the app settings if provided
+      defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
+      path = defaults.get(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING)
+      if path is None:
+        path = expanduser(KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH)
+    else:
+      path = expanduser(KINDLE_CONTENT_DEFAULT_PATH)
+    return path
+
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
+
+  @classmethod
+  def fspath_normalised(cls, fspath: str):
+    ''' Normalise `fspath` by locating the book database file.
+      '''
+    db_subpaths = (
+        KindleBookAssetDB.DB_FILENAME,
+        joinpath(cls.CONTENT_DIRNAME, KindleBookAssetDB.DB_FILENAME),
+    )
+    for db_subpath in db_subpaths:
+      db_fspath = joinpath(fspath, db_subpath)
+      if existspath(db_fspath):
+        break
+    else:
+      raise ValueError(
+          f'{cls.__name__}: normalise {fspath!r}'
+          f': cannot find db at any of {" or ".join(map(repr, db_subpaths))}'
+      )
+    # resolve the directory containing the book database
+    return super().fspath_normalised(dirname(db_fspath))
 
   def __init__(self, fspath=None):
     if hasattr(self, '_bookrefs'):
@@ -128,12 +152,21 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     self._bookrefs = {}
 
     # define the proxy classes
-    class KindleBook(SingletonMixin, RelationProxy(self.db.books, [
-        'asin',
-        'type',
-        'revision',
-        'sampling',
-    ], id_column='asin'), HasFSPath):
+    class KindleBook(
+        SingletonMixin,
+        RelationProxy(
+            self.db.books,
+            [
+                'asin',
+                'type',
+                'revision',
+                'sampling',
+            ],
+            id_column='asin',
+            missing=lambda relp, field: None,
+        ),
+        HasFSPath,
+    ):
       ''' A reference to a Kindle library book subdirectory.
       '''
 
@@ -159,7 +192,9 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
           super().__init__(self.asin)
 
       def __str__(self):
-        return "%s[%s]:%s" % (self.tree, self.subdir_name, self.tags)
+        return "%s[%s]:%s" % (
+            self.tree, self.asin, ",".join(map(str, self.tags))
+        )
 
       def __repr__(self):
         return "%s(%r,%r)" % (type(self).__name__, self.tree, self.subdir_name)
@@ -243,16 +278,24 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
           return pfx_call(etree.fromstring, xml_bs)
 
       # pylint: disable=too-many-branches
-      def export_to_calibre(
-          self,
-          calibre,
-          *,
+      @uses_cmd_options(
+          calibre=None,
           dedrm=None,
           doit=True,
-          replace_format=False,
           force=False,
           quiet=False,
           verbose=False,
+      )
+      def export_to_calibre(
+          self,
+          *,
+          calibre,
+          dedrm,
+          replace_format=False,
+          doit,
+          force,
+          quiet,
+          verbose,
       ):
         ''' Export this Kindle book to a Calibre instance,
             return `(cbook,added)`
@@ -260,8 +303,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
             (books are not added if the format is already present).
 
             Parameters:
-            * `calibre`: the `CalibreTree`
-            * `dedrm`: optional `DeDRMWrapper` instance
+            * `calibre`: optional `CalibreTree`, default from the command line options
+            * `dedrm`: optional `DeDRMWrapper`, default from the command line options
             * `doit`: optional flag, default `True`;
               if false just recite planned actions
             * `force`: optional flag, default `False`;
@@ -284,15 +327,16 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
         if not cbooks:
           # new book
           # pylint: disable=expression-not-assigned
-          quiet or print("new book <=", shortpath(bookpath))
+          qvprint("new book <=", shortpath(bookpath))
           dbid = calibre.add(bookpath, dedrm=dedrm, doit=doit, quiet=quiet)
           if dbid is None:
             added = not doit
             cbook = None
           else:
             added = True
+            calibre.refresh_dbid(dbid)
             cbook = calibre[dbid]
-            quiet or print(" ", cbook)
+            qvprint(" ", cbook)
         else:
           # book already present in calibre
           cbook = cbooks[0]
@@ -311,7 +355,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
               if fmtpath and existspath(fmtpath):
                 if filecmp.cmp(fmtpath, azwpath):
                   # pylint: disable=expression-not-assigned
-                  verbose and print(
+                  qvprint(
                       cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
                   )
                   return cbook, False
@@ -327,19 +371,14 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
 
     self.KindleBook = KindleBook
 
-  def __str__(self):
-    return "%s:%s" % (type(self).__name__, shortpath(self.fspath))
-
-  def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, self.fspath)
-
   @contextmanager
   @uses_fstags
   def startup_shutdown(self, fstags: FSTags):
     ''' Context manager to obtain and release resources.
     '''
     with fstags:
-      yield
+      with self.db:
+        yield
 
   @property
   @cachedmethod
@@ -353,6 +392,37 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Interactive db shell.
     '''
     return self.db.shell()
+
+  def subdir_for_asin(self, asin: str) -> str:
+    ''' Return the subdirectory name for `asin`,
+        or `asin.upper()+self.SUBDIR_SUFFIXES[0]` if nothing is found.
+    '''
+    ASIN = asin.upper()
+    # convert ASIN_EBOK to ASIN, handy for copy/paste of subdir name from listing
+    for suffix in self.SUBDIR_SUFFIXES:
+      subdir_name = cutsuffix(ASIN, suffix)
+      if subdir_name is not ASIN:
+        ASIN = subdir_name
+        break
+    for suffix in self.SUBDIR_SUFFIXES:
+      subdir_name = ASIN + suffix
+      if isdirpath(self.pathto(subdir_name)):
+        return subdir_name
+    return ASIN + self.SUBDIR_SUFFIXES[0]
+
+  def get_library_books_mapping(self) -> Mapping:
+    ''' Return a mapping of library primary keys to library book instances.
+    '''
+    book_map = {}
+    for asin in self.asins():
+      try:
+        book = self._bookrefs[asin]
+      except KeyError:
+        book = self._bookrefs[asin] = self.KindleBook(
+            self, self.subdir_for_asin(asin)
+        )
+      book_map[asin] = book
+    return book_map
 
   def is_book_subdir(self, subdir_name):
     ''' Test whether `subdir_name` is a Kindle ebook subdirectory basename.
@@ -375,7 +445,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     with db.session() as session:
       return set(asin for asin, in session.query(books.asin))
 
-  def by_asin(self, asin):
+  def __getitem__(self, asin: str):
     ''' Return a `KindleBook` for the supplied `asin`.
     '''
     ASIN = asin.upper()
@@ -385,45 +455,7 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       if subdir_name is not ASIN:
         ASIN = subdir_name
         break
-    for suffix in self.SUBDIR_SUFFIXES:
-      subdir_name = ASIN + suffix
-      if isdirpath(self.pathto(subdir_name)):
-        return self[subdir_name]
-    return self[ASIN + self.SUBDIR_SUFFIXES[0]]
-
-  def keys(self):
-    ''' The keys of a `KindleTree` are its book subdirectory names.
-    '''
-    return self.book_subdir_names()
-
-  def __getitem__(self, subdir_name):
-    ''' Return the `KindleBook` for the ebook subdirectory named `subdir_name`.
-    '''
-    if not self.is_book_subdir(subdir_name):
-      raise ValueError(
-          "not a Kindle ebook subdirectory name: %r" % (subdir_name,)
-      )
-    try:
-      book = self._bookrefs[subdir_name]
-    except KeyError:
-      book = self._bookrefs[subdir_name] = self.KindleBook(self, subdir_name)
-    return book
-
-  def __iter__(self):
-    ''' Mapping iteration method.
-    '''
-    return iter(self.keys())
-
-  def values(self):
-    ''' Mapping method yielding `KindleBook` instances.
-    '''
-    yield from map(self.__getitem__, self)
-
-  def items(self):
-    ''' Mapping method yielding `(subdir_name,KindleBook)` pairs.
-    '''
-    for k in self:
-      yield k, self[k]
+    return super().__getitem__(ASIN)
 
 # pylint: disable=too-many-instance-attributes
 class KindleBookAssetDB(ORM):
@@ -454,7 +486,7 @@ class KindleBookAssetDB(ORM):
     '''
     print("sqlite3", self.db_path)
     with Upd().above():
-      run(['sqlite3', self.db_path], check=True)
+      run(['sqlite3', self.db_path], stdin=0, check=True)
     return 0
 
   # lifted from SQLTags
@@ -628,285 +660,3 @@ class KindleBookAssetDB(ORM):
     DeliveryType.orm = self
     self.asset_download_info = AssetDownloadInfo
     AssetDownloadInfo.orm = self
-
-class KindleCommand(BaseCommand):
-  ''' Command line for interacting with a Kindle filesystem tree.
-  '''
-
-  GETOPT_SPEC = 'C:K:'
-
-  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] [subcommand [...]]
-  Operate on a Kindle library.
-  Options:
-    -C calibre_library
-      Specify calibre library location.
-    -K kindle_library
-      Specify kindle library location.'''
-
-  SUBCOMMAND_ARGV_DEFAULT = 'info'
-
-  @dataclass
-  class Options(BaseCommand.Options):
-    ''' Set up the default values in `options`.
-    '''
-
-    def _kindle_path():
-      try:
-        # pylint: disable=protected-access
-        kindle_path = KindleTree._resolve_fspath(None)
-      except ValueError:
-        kindle_path = None
-      return kindle_path
-
-    kindle_path: Optional[str] = field(default_factory=_kindle_path)
-
-    def _calibre_path():
-      from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
-      try:
-        # pylint: disable=protected-access
-        calibre_path = CalibreTree._resolve_fspath(None)
-      except ValueError:
-        calibre_path = None
-      return calibre_path
-
-    calibre_path: Optional[str] = field(default_factory=_calibre_path)
-    dedrm_package_path: Optional[str] = field(
-        default_factory=lambda: os.environ.get(DEDRM_PACKAGE_PATH_ENVVAR)
-    )
-
-    COMMON_OPT_SPECS = dict(
-        C_='calibre_path',
-        K_='kindle_path',
-        **BaseCommand.Options.COMMON_OPT_SPECS,
-    )
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
-    options = self.options
-    if opt == '-C':
-      options.calibre_path = val
-    elif opt == '-K':
-      db_subpaths = (
-          KindleBookAssetDB.DB_FILENAME,
-          joinpath(KindleTree.CONTENT_DIRNAME, KindleBookAssetDB.DB_FILENAME),
-      )
-      for db_subpath in db_subpaths:
-        db_fspath = joinpath(val, db_subpath)
-        if existspath(db_fspath):
-          break
-      else:
-        raise GetoptError(
-            "cannot find db at %s" % (" or ".join(map(repr, db_subpaths)),)
-        )
-      options.kindle_path = dirname(db_fspath)
-    else:
-      super().apply_opt(opt, val)
-
-  @contextmanager
-  @uses_fstags
-  def run_context(self, fstags: FSTags):
-    ''' Prepare the `SQLTags` around each command invocation.
-    '''
-    from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
-    with super().run_context():
-      options = self.options
-      dedrm = (
-          DeDRMWrapper(options.dedrm_package_path)
-          if options.dedrm_package_path else None
-      )
-
-      with KindleTree(options.kindle_path) as kt:
-        with CalibreTree(options.calibre_path) as cal:
-          with stackattrs(options, kindle=kt, calibre=cal, dedrm=dedrm):
-            with fstags:
-              yield
-
-  def cmd_app_path(self, argv):
-    ''' Usage: {cmd} [content-path]
-          Report or set the content path for the Kindle application.
-    '''
-    if not argv:
-      print(kindle_content_path())
-      return 0
-    content_path = self.poparg(
-        argv,
-        lambda arg: arg,
-        "content-path",
-        lambda path: path == 'DEFAULT' or isdirpath(path),
-        "content-path should be DEFAULT or an existing directory",
-    )
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    if content_path == 'DEFAULT':
-      content_path = kindle_content_path()
-    if sys.platform == 'darwin':
-      defaults = OSXDomainDefaults(KINDLE_APP_OSX_DEFAULTS_DOMAIN)
-      defaults[KINDLE_APP_OSX_DEFAULTS_CONTENT_PATH_SETTING] = content_path
-    else:
-      error(
-          f'cannot set Kindle default content path on sys.platform=={sys.platform!r}'
-      )
-      return 1
-    return 0
-
-  def cmd_dbshell(self, argv):
-    ''' Usage: {cmd}
-          Start an interactive database prompt.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    return self.options.kindle.dbshell()
-
-  # pylint: disable=too-many-locals
-  @uses_runstate
-  def cmd_export(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-fnqv] [ASINs...]
-          Export AZW files to Calibre library.
-          -f    Force: replace the AZW3 format if already present.
-          -n    No action, recite planned actions.
-          -q    Quiet: report only warnings.
-          -v    Verbose: report more information about actions and inaction.
-          ASINs Optional ASIN identifiers to export.
-                The default is to export all books with no "calibre.dbid" fstag.
-    '''
-    options = self.options
-    options.popopts(argv, f='force')
-    kindle = options.kindle
-    calibre = options.calibre
-    dedrm = options.dedrm
-    doit = options.doit
-    force = options.force
-    quiet = options.quiet
-    verbose = options.verbose
-    asins = argv or sorted(kindle.asins())
-    xit = 0
-    quiet or print("export", kindle.shortpath, "=>", calibre.shortpath)
-    for asin in progressbar(asins, f"export to {calibre}"):
-      runstate.raiseif()
-      with Pfx(asin):
-        kbook = kindle.by_asin(asin)
-        try:
-          kbook.export_to_calibre(
-              calibre,
-              dedrm=dedrm,
-              doit=doit,
-              force=force,
-              replace_format=force,
-              quiet=quiet,
-              verbose=verbose,
-          )
-        except (dedrm.DeDRMError, ValueError) as e:
-          warning("export failed: %s", e)
-          xit = 1
-        except Exception as e:
-          warning("kbook.export_to_calibre: e=%s", s(e))
-          raise
-    return xit
-
-  @uses_runstate
-  def cmd_import_tags(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-nqv] [ASINs...]
-          Import Calibre book information into the fstags for a Kindle book.
-          This will support doing searches based on stuff like
-          titles which are, naturally, not presented in the Kindle
-          metadata db.
-    '''
-    options = self.options
-    kindle = options.kindle
-    calibre = options.calibre
-    self.popopts(argv, options, n='-doit', q='quiet', v='verbose')
-    doit = options.doit
-    quiet = options.quiet
-    verbose = options.verbose
-    asins = argv or sorted(kindle.asins())
-    xit = 0
-    for asin in progressbar(asins, f"import metadata from {calibre}"):
-      runstate.raiseif()
-      with Pfx(asin):
-        kbook = kindle.by_asin(asin)
-        cbooks = list(calibre.by_asin(asin))
-        if not cbooks:
-          # pylint: disable=expression-not-assigned
-          verbose and print("asin %s: no Calibre books" % (asin,))
-          continue
-        cbook = cbooks[0]
-        if len(cbooks) > 1:
-          # pylint: disable=expression-not-assigned
-          quiet or print(
-              f'asin {asin}: multiple Calibre books,',
-              f'dbids {[cb.dbid for cb in cbooks]!r}; choosing {cbook}'
-          )
-        ktags = kbook.tags
-        ctags = ktags.subtags('calibre')
-        import_tags = dict(
-            title=cbook.title,
-            authors=sorted([author.name for author in cbook.authors]),
-            dbfspath=calibre.fspath,
-            dbid=cbook.dbid,
-            identifiers=cbook.identifiers,
-            tags=cbook.tags,
-        )
-        first_update = True
-        for tag_name, tag_value in sorted(import_tags.items()):
-          with Pfx("%s=%r", tag_name, tag_value):
-            old_value = ctags.get(tag_name)
-            if old_value != tag_value:
-              if not quiet:
-                if first_update:
-                  print(f"{asin}: update from {cbook}")
-                  first_update = False
-                if old_value:
-                  print(
-                      f"  calibre.{tag_name}={tag_value!r}, was {old_value!r}"
-                  )
-                else:
-                  print(f"  calibre.{tag_name}={tag_value!r}")
-              if doit:
-                ctags[tag_name] = tag_value
-    return xit
-
-  def cmd_info(self, argv):
-    ''' Usage: {cmd}
-          Report basic information.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    print("kindle", self.options.kindle.shortpath)
-    print("calibre", self.options.calibre.shortpath)
-
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l]
-          List the contents of the library.
-          -l  Long mode.
-    '''
-    options = self.options
-    kindle = options.kindle
-    options.longmode = False
-    self.popopts(argv, options, l='longmode')
-    longmode = options.longmode
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    print(kindle.fspath)
-    for subdir_name, kbook in kindle.items():
-      line1 = [subdir_name]
-      title = kbook.tags.auto.calibre.title
-      if title:
-        line1.append(title)
-      authors = kbook.tags.auto.calibre.authors
-      if authors:
-        line1.append(','.join(authors))
-      print(*line1)
-      if longmode:
-        if kbook.type != 'kindle.ebook':
-          print("  type =", kbook.type)
-        if kbook.revision is not None:
-          print("  revision =", kbook.revision)
-        if kbook.sampling:
-          print("  sampling =", kbook.sampling)
-        for tag in sorted(kbook.tags.as_tags()):
-          if tag.name not in ('calibre.title', 'calibre.authors'):
-            print(" ", tag)
-
-if __name__ == '__main__':
-  sys.exit(main(sys.argv))

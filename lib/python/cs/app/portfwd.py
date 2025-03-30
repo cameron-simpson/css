@@ -37,12 +37,12 @@ from time import sleep
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
 from cs.env import envsub
+from cs.gimmicks import DEVNULL
 from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.psutils import pipefrom
 from cs.py.func import prop
-from cs.py3 import DEVNULL
-from cs.sh import quotecmd as shq
+from cs.sh import quoteargv as shq
 
 __version__ = '20221228-post'
 
@@ -180,7 +180,8 @@ def main(argv=None, environ=None):
       print(PFs.forward(target).test_shcmd())
       return 0
     argv.insert(0, opt1)
-    opts, argv = getopt(argv, '1AF:nxv')
+    opts, argv = getopt(argv, '1AF:nxv', ['pfx'])
+    pfx_filter = False
     for opt, arg in opts:
       with Pfx(opt):
         if opt == '-1':
@@ -191,6 +192,8 @@ def main(argv=None, environ=None):
           sshcfg = arg
         elif opt == '-n':
           doit = False
+        elif opt == '--pfx':
+          pfx_filter = True
         elif opt == '-x':
           trace = True
         elif opt == '-v':
@@ -219,7 +222,8 @@ def main(argv=None, environ=None):
       auto_mode=auto_mode,
       trace=trace,
       verbose=verbose,
-      flags=flags
+      flags=flags,
+      pfx_filter=pfx_filter,
   )
   if not doit:
     for target in sorted(PFs.targets_required()):
@@ -253,11 +257,12 @@ class Portfwd(FlaggedMixin):
       self,
       target,
       ssh_config=None,
+      pre_argv=(),
       conditions=(),
       test_shcmd=None,
       trace=False,
       verbose=False,
-      flags=None
+      flags=None,
   ):
     ''' Initialise the Portfwd.
 
@@ -278,6 +283,7 @@ class Portfwd(FlaggedMixin):
     FlaggedMixin.__init__(self, flags=flags)
     self.test_shcmd = test_shcmd
     self.ssh_config = ssh_config
+    self.pre_argv = pre_argv
     self.conditions = conditions
     self.trace = trace
     self.verbose = verbose
@@ -289,6 +295,7 @@ class Portfwd(FlaggedMixin):
         *self.ssh_argv(),
         name=self.svcd_name,
         group_name=self.group_name,
+        pre_argv=pre_argv,
         flags=self.flags,
         trace=trace,
         sig_func=self.get_ssh_options,
@@ -452,7 +459,8 @@ class Portfwds(object):
       auto_mode=None,
       trace=False,
       verbose=False,
-      flags=None
+      flags=None,
+      pfx_filter=False,
   ):
     ''' Initialise the `Portfwds` instance.
 
@@ -484,6 +492,7 @@ class Portfwds(object):
     self.verbose = verbose
     self.flags = flags
     self.environ = environ
+    self.pfx_filter = pfx_filter
     if ssh_config is None:
       ssh_config = environ.get('PORTFWD_SSH_CONFIG')
     self._ssh_config = ssh_config
@@ -507,8 +516,10 @@ class Portfwds(object):
       P = self._forwards[target]
     except KeyError:
       info("instantiate new target %r", target)
+      pre_argv = ('pfx', target) if self.pfx_filter else ()
       P = Portfwd(
           target,
+          pre_argv=pre_argv,
           ssh_config=self.ssh_config,
           trace=self.trace,
           flags=self.flags,

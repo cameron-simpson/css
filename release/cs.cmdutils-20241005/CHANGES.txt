@@ -1,0 +1,10 @@
+lib/python/cs/cmdutils.py: merge default -> ebooks
+lib/python/cs/cmdutils.py: merge default -> ebooks
+lib/python/cs/cmdutils.py: cs.cmdutils: provide an options.runstate to allow the command to override the default (almost never happens)
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring/comment tweaks
+lib/python/cs/cmdutils.py: cs.cmdutils: expose the option spec class
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.popopts: fix reference to OptionSpec class
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: put the try/except:CancellationError outside the self.run_context context manager call, as it can directly raise CancellationError
+lib/python/cs/cmdutils.py: cs.cmdutils: @uses_cmd_options: use the @decorator decorator
+lib/python/cs/cmdutils.py: cs.cmdutils: new vprint() function calling print() if options.verbose
+lib/python/cs/cmdutils.py: merge tagger ==> default

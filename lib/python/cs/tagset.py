@@ -63,7 +63,7 @@
         a=1 b=3 c=[1,2,3] d=dee
         >>> # since you can print a TagSet to a file as a line of text
         >>> # you can get it back from a line of text
-        >>> TagSet.from_line('a=1 b=3 c=[1,2,3] d=dee')
+        >>> TagSet.from_str('a=1 b=3 c=[1,2,3] d=dee')
         TagSet:{'a': 1, 'b': 3, 'c': [1, 2, 3], 'd': 'dee'}
         >>> # because TagSets are dicts you can format strings with them
         >>> print('topic:{topic} subtopic:{subtopic}'.format_map(tags))
@@ -194,7 +194,7 @@ from contextlib import contextmanager
 from datetime import date, datetime
 import errno
 from fnmatch import (fnmatch, fnmatchcase, translate as fn_translate)
-from functools import partial
+from functools import cached_property, partial
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
@@ -215,9 +215,9 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator, fmtdoc, Promotable
+from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable
 from cs.edit import edit_strings, edit as edit_lines
-from cs.fileutils import shortpath
+from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
@@ -232,10 +232,10 @@ from cs.mappings import (
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, openif
 from cs.threads import locked_property
 
-__version__ = '20240422.2-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -405,11 +405,11 @@ def jsonable(obj, converted: dict):
     try:
       it = iter(obj)
     except TypeError:
-      raise TypeError(f'jsoanble({t.__name__}): cannot convert for JSON')
+      raise TypeError(f'jsoanble({r(obj)}): cannot convert for JSON')
     else:
       if it is obj:
         raise TypeError(
-            f'jsoanble(t.__name__): refusing to convert an iterator for JSON because it would consume it'
+            f'jsoanble({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
         )
       # convert to list
       converted[id(obj)] = convobj = []
@@ -441,11 +441,17 @@ class _FormatStringTagProxy:
         type(self).__name__, type(self.__proxied).__name__, self.__proxied
     )
 
+  def __format__(self, format_spec):
+    ''' Formatting `self` formats `self.__proxied.value`.
+    '''
+    return format(self.__proxied.value, format_spec)
+
   def __getattr__(self, attr):
     return getattr(self.__proxied, attr)
 
 @has_format_attributes
-class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
+class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
+             Promotable):
   ''' A setlike class associating a set of tag names with values.
 
       This actually subclasses `dict`, so a `TagSet` is a direct
@@ -521,6 +527,27 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  @classmethod
+  def from_str(cls, tags_s, *, ontology=None, extra_types=None, verbose=None):
+    ''' Create a new `TagSet` from some text, a whitespace separated list of `Tag`s.
+    '''
+    tags = cls(_ontology=ontology)
+    offset = skipwhite(tags_s)
+    while offset < len(tags_s):
+      tag, offset = Tag.from_str2(
+          tags_s, offset, ontology=ontology, extra_types=extra_types
+      )
+      tags.add(tag, verbose=verbose)
+      offset = skipwhite(tags_s, offset)
+    return tags
+
+  @classmethod
+  @OBSOLETE("TagSet.from_str")
+  def from_line(cls, s, offset: int, **from_str_kw):
+    ''' Obsolete form of `TagSet.from_str`.
+    '''
+    return cls.from_str(s[offset:], **from_str_kw)
 
   def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
     ''' Dump a `TagSet` in multiline format.
@@ -773,22 +800,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     else:
       self[attr] = value
 
-  @classmethod
-  def from_line(
-      cls, line, offset=0, *, ontology=None, extra_types=None, verbose=None
-  ):
-    ''' Create a new `TagSet` from a line of text.
-    '''
-    tags = cls(_ontology=ontology)
-    offset = skipwhite(line, offset)
-    while offset < len(line):
-      tag, offset = Tag.from_str2(
-          line, offset, ontology=ontology, extra_types=extra_types
-      )
-      tags.add(tag, verbose=verbose)
-      offset = skipwhite(line, offset)
-    return tags
-
   def __contains__(self, tag):
     ''' Test for a tag being in this `TagSet`.
 
@@ -859,6 +870,19 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __setitem__(self, tag_name, value):
     self.set(tag_name, value)
 
+  def _set(self, tag_name, value):
+    ''' This is the "raw" setitem for a `TagSet`.
+        It should set `tag_name=value` on the underlying mapping
+        (`dict.__setitem__` for a pure `TgaSet`)
+        with no checks or side effects.
+
+        This is presented for methods like `TagFile.save()`
+        which prefills `TagSet`s with a UUID if there is an `update_mapping`.
+        This was triggering a recursive save when it happened during
+        an `FSTags` shutdown.
+    '''
+    super().__setitem__(tag_name, value)
+
   @tag_or_tag_value
   def set(self, tag_name, value, *, verbose=None):
     ''' Set `self[tag_name]=value`.
@@ -876,7 +900,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
               (tag, old_value)
           )
           ifverbose(verbose, msg)
-    super().__setitem__(tag_name, value)
+    self._set(tag_name, value)
 
   # "set" mode
   # note: cannot just be add=set because it won't follow subclass overrides
@@ -1041,6 +1065,17 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       self._tagset = tagset
       self._prefix = prefix
 
+    def __fullattr(self, attr):
+      ''' The absolute tag name associated with `attr`.
+      '''
+      return attr if self._prefix is None else f'{self._prefix}.{attr}'
+
+    @cached_property
+    def __prefixed_view(self):
+      ''' A `TagSetPrefixView` at this prefix.
+        '''
+      return TagSetPrefixView(self._tagset, self._prefix)
+
     def __bool__(self):
       ''' We return `False` so that an unresolved attribute,
           which returns a deeper `_Auto` instance,
@@ -1048,17 +1083,22 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
               title = tags.auto.title or "default title"
       '''
-      return False
+      return bool(self.__prefixed_view)
 
     def __getattr__(self, attr):
-      fullattr = (
-          attr if self._prefix is None else '.'.join((self._prefix, attr))
-      )
+      fullattr = self.__fullattr(attr)
       try:
         return self._tagset.auto_infer(fullattr)
       except ValueError:
         # auto view of deeper attributes
+        if attr in ('items', 'keys', 'values'):
+          return self.__prefixed_view.items
         return self._tagset._Auto(self._tagset, fullattr)
+
+    def __iter__(self):
+      ''' Iterate over the keys of the prefix view.
+      '''
+      return iter(self.__prefixed_view)
 
   @property
   def auto(self):
@@ -1131,7 +1171,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(line, offset, ontology=ontology)
+    tags = TagSet.from_str(line[offset:], ontology=ontology)
     if 'name' in tags:
       warning("discard explicit tag name=%r", tags.name)
       tags.discard('name')
@@ -2120,7 +2160,11 @@ class TagSetPrefixView(FormatableMixin):
   @require(lambda prefix: len(prefix) > 0)
   @typechecked
   def __init__(self, tags, prefix: str):
-    self.__dict__.update(_tags=tags, _prefix=prefix, _prefix_=prefix + '.')
+    self.__dict__.update(
+        _tags=tags,
+        _prefix=prefix,
+        _prefix_=prefix + '.',
+    )
 
   def __str__(self):
     tag = self.tag
@@ -3464,9 +3508,8 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(
-        line,
-        offset,
+    tags = TagSet.from_str(
+        line[offset:],
         extra_types=extra_types,
         ontology=ontology,
         verbose=verbose
@@ -3544,9 +3587,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
       unparsed,
       extra_types=None,
       prune=False,
-      update_mapping: Optional[Mapping] = None,
-      update_prefix: Optional[str] = None,
-      update_uuid_tag_name: Optional[str] = None,
   ):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
@@ -3564,64 +3604,27 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
       # skip save if no file and nothing to save
-      if name_tags or unparsed or isfilepath(filepath):
-        try:
-          with pfx_call(open, filepath, 'w') as f:
-            for _, line in unparsed:
-              if not line.startswith('#'):
-                f.write('##  ')
-              f.write(line)
+      if not isfilepath(filepath) and not name_tags and not unparsed:
+        return
+      try:
+        with atomic_filename(filepath, mode="w", exists_ok=True) as f:
+          for _, line in unparsed:
+            if not line.startswith('#'):
+              f.write('##  ')
+            f.write(line)
+            f.write('\n')
+          for name, tags in name_tags:
+            with Pfx(name):
+              if not tags:
+                continue
+              f.write(
+                  cls.tags_line(
+                      name, tags, extra_types=extra_types, prune=prune
+                  )
+              )
               f.write('\n')
-            for name, tags in name_tags:
-              with Pfx(name):
-                if not tags:
-                  continue
-                if update_mapping:
-                  # mirror tags to secondary mapping eg an SQLTags
-                  # this associates a UUID with the file
-                  try:
-                    uuid_s = tags[update_uuid_tag_name]
-                  except KeyError:
-                    uuid = uuid4()
-                    uuid_s = str(uuid)
-                    tags[update_uuid_tag_name] = uuid_s
-                  else:
-                    try:
-                      uuid = UUID(uuid_s)
-                    except ValueError as e:
-                      warning(
-                          "invalid UUID tag %r=%s: %s", update_uuid_tag_name,
-                          uuid_s, e
-                      )
-                      uuid = None
-                    else:
-                      uuid_s = str(uuid)
-                  if uuid is not None:
-                    # apply the tags to the secondary mapping
-                    key = (
-                        "%s.%s" %
-                        (update_prefix, uuid_s) if update_prefix else uuid_s
-                    )
-                    d = tags.as_dict()
-                    del d[update_uuid_tag_name]
-                    d['fspath'] = joinpath(dirname(filepath), name)
-                    try:
-                      update_mapping[key].update(d)
-                    except AttributeError:
-                      raise
-                    except Exception as e:
-                      warning(
-                          "update_mapping:%s[%r].update(%s): %s",
-                          s(update_mapping), key, cropped_repr(d), e
-                      )
-                f.write(
-                    cls.tags_line(
-                        name, tags, extra_types=extra_types, prune=prune
-                    )
-                )
-                f.write('\n')
-        except OSError as e:
-          error("save(%r) fails: %s", filepath, e)
+      except OSError as e:
+        error("save_tagsets(%r) fails: %s", filepath, e)
 
   def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.
@@ -3633,23 +3636,57 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     with self._lock:
       if self.is_modified():
         # there are modified TagSets
-        update_mapping_close = getattr(self.update_mapping, 'close', None)
-        if update_mapping_close:
-          self.update_mapping.open()
-        try:
-          self.save_tagsets(
-              self.fspath,
-              tagsets,
-              self.unparsed,
-              extra_types=extra_types,
-              prune=prune,
-              update_mapping=self.update_mapping,
-              update_prefix=self.update_prefix,
-              update_uuid_tag_name=self.update_uuid_tag_name,
-          )
-        finally:
-          if update_mapping_close:
-            pfx_call(update_mapping_close)
+        update_mapping = self.update_mapping
+        if update_mapping:
+          # infill missing UUIDs
+          update_uuid_tag_name = self.update_uuid_tag_name
+          update_prefix = self.update_prefix
+          with openif(update_mapping):
+            for name, tags in tagsets.items():
+              # mirror tags to secondary mapping eg an SQLTags
+              # this associates a UUID with the file
+              try:
+                uuid_s = tags[update_uuid_tag_name]
+              except KeyError:
+                uuid = uuid4()
+                uuid_s = str(uuid)
+                tags._set(update_uuid_tag_name, uuid_s)
+              else:
+                try:
+                  uuid = UUID(uuid_s)
+                except ValueError as e:
+                  warning(
+                      "invalid UUID tag %r=%s: %s", update_uuid_tag_name,
+                      uuid_s, e
+                  )
+                  uuid = None
+                else:
+                  uuid_s = str(uuid)
+              if uuid is not None:
+                # apply the tags to the secondary mapping
+                key = (
+                    "%s.%s" %
+                    (update_prefix, uuid_s) if update_prefix else uuid_s
+                )
+                d = tags.as_dict()
+                del d[update_uuid_tag_name]
+                d['fspath'] = joinpath(dirname(self.fspath), name)
+                try:
+                  update_mapping[key].update(d)
+                except AttributeError:
+                  raise
+                except Exception as e:
+                  warning(
+                      "update_mapping:%s[%r].update(%s): %s",
+                      s(update_mapping), key, cropped_repr(d), e
+                  )
+        self.save_tagsets(
+            self.fspath,
+            tagsets,
+            self.unparsed,
+            extra_types=extra_types,
+            prune=prune,
+        )
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
           tagset.modified = False
@@ -3776,7 +3813,7 @@ class TagsOntologyCommand(BaseCommand):
           return 0
         if subcmd in ('list', 'ls'):
           if argv:
-            raise GetoptError("extra arguments: %r" % (argv,))
+            raise GetoptError(f'extra arguments: {argv!r}')
           for key, tags in sorted(ont.by_type(type_name, with_tagsets=True)):
             print(key, tags)
           return 0

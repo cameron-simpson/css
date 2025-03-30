@@ -14,16 +14,18 @@ from collections import namedtuple
 from contextlib import contextmanager
 import functools
 import sys
-from threading import RLock
+from threading import RLock, Thread
 import time
 from typing import Callable, Optional
 
 from icontract import ensure
 from typeguard import typechecked
 
-from cs.deco import decorator
+from cs.deco import decorator, uses_quiet
 from cs.logutils import debug, exception
 from cs.py.func import funcname
+from cs.queues import IterableQueue, QueueIterator
+from cs.resources import RunState, uses_runstate
 from cs.seq import seq
 from cs.threads import bg
 from cs.units import (
@@ -36,7 +38,7 @@ from cs.units import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20240412-post'
+__version__ = '20250325-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -48,6 +50,7 @@ DISTINFO = {
         'cs.deco',
         'cs.logutils',
         'cs.py.func',
+        'cs.resources',
         'cs.seq',
         'cs.threads',
         'cs.units',
@@ -373,6 +376,7 @@ class BaseProgress(object):
 
   # pylint: disable=blacklisted-name,too-many-arguments
   @contextmanager
+  @uses_quiet
   @uses_upd
   def bar(
       self,
@@ -386,6 +390,7 @@ class BaseProgress(object):
       insert_pos=1,
       poll: Optional[Callable[["BaseProgress"], None]] = None,
       update_period=DEFAULT_UPDATE_PERIOD,
+      quiet: bool,
       upd: Upd,
   ):
     ''' A context manager to create and withdraw a progress bar.
@@ -425,6 +430,8 @@ class BaseProgress(object):
     '''
     if label is None:
       label = self.name
+    if report_print is None:
+      report_print = not quiet
     if statusfunc is None:
 
       def statusfunc(P, label, width):
@@ -477,17 +484,18 @@ class BaseProgress(object):
       cancel_ticker = True
       if update_period == 0:
         self.notify_update.remove(update)
-    if report_print:
-      if isinstance(report_print, bool):
-        report_print = print
-      report_print(
-          label + ':', self.format_counter(self.position - start_pos), 'in',
-          transcribe_units(
-              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
-          )
-      )
+      if report_print:
+        if isinstance(report_print, bool):
+          report_print = print
+        report_print(
+            label + ':', self.format_counter(self.position - start_pos), 'in',
+            transcribe_units(
+                self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+            )
+        )
 
   # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
+  @uses_runstate
   def iterbar(
       self,
       it,
@@ -496,6 +504,8 @@ class BaseProgress(object):
       itemlenfunc=None,
       incfirst=False,
       update_period=DEFAULT_UPDATE_PERIOD,
+      cancelled=None,
+      runstate: RunState,
       **bar_kw,
   ):
     ''' An iterable progress bar: a generator yielding values
@@ -518,6 +528,7 @@ class BaseProgress(object):
         * `update_period`: default `DEFAULT_UPDATE_PERIOD`; if `0`
           then update on every iteration, otherwise every `update_period`
           seconds
+        * `cancelled`: an optional callable to test for iteration cancellation
         Other parameters are passed to `Progress.bar`.
 
         Example use:
@@ -540,8 +551,12 @@ class BaseProgress(object):
             for bs in P.iterbar(readfrom(f), itemlenfunc=len):
                 ... process the file data in bs ...
     '''
+    if cancelled is None:
+      cancelled = lambda: runstate.cancelled
     with self.bar(label, update_period=update_period, **bar_kw) as proxy:
       for item in it:
+        if cancelled and cancelled():
+          break
         length = itemlenfunc(item) if itemlenfunc else 1
         if incfirst:
           self += length
@@ -553,6 +568,22 @@ class BaseProgress(object):
           self += length
           if update_period == 0:
             proxy.text = None
+
+  def qbar(self, label=None, **iterbar_kw) -> QueueIterator:
+    ''' Set up a progress bar, return a `QueueIterator` for receiving items.
+        This is a shim for `Progress.iterbar` which dispatches a
+        worker to iterate a queue which received items placed on
+        the queue.
+    '''
+    Q = IterableQueue(name=label)
+
+    def qbar_worker():
+      for _ in self.iterbar(Q, label=label, **iterbar_kw):
+        pass
+
+    T = Thread(target=qbar_worker, name=f'{self}.qbar.qbar_worker:{label}')
+    T.start()
+    return Q
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -1013,11 +1044,12 @@ def progressbar(
     position=None,
     total=None,
     units_scale=UNSCALED_SCALE,
+    upd: Upd,
     **iterbar_kw
 ):
   ''' Convenience function to construct and run a `Progress.iterbar`
       wrapping the iterable `it`,
-      issuing and withdrawning a progress bar during the iteration.
+      issuing and withdrawing a progress bar during the iteration.
 
       Parameters:
       * `it`: the iterable to consume
@@ -1038,6 +1070,8 @@ def progressbar(
           for row in progressbar(rows):
               ... do something with row ...
   '''
+  if upd is None or upd.disabled:
+    return it
   if total is None:
     try:
       total = len(it)
@@ -1051,7 +1085,7 @@ def progressbar(
 def auto_progressbar(func, label=None, report_print=False):
   ''' Decorator for a function accepting an optional `progress`
       keyword parameter.
-      If `progress` is `None` and the default `Upd` is not disabled,
+      If `progress` is not `None` and the default `Upd` is not disabled,
       run the function with a progress bar.
   '''
 

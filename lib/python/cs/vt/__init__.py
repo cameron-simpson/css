@@ -52,7 +52,7 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, promote
+from cs.deco import default_params, fmtdoc, promote, Promotable
 from cs.later import Later
 from cs.lex import r
 from cs.logutils import warning
@@ -81,6 +81,10 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: System :: Filesystems",
     ],
+    'ext-modules': [{
+        'name': 'cs.vt._scan',
+        'sources': ['_scan.c']
+    }],
     'install_requires': [
         'cs.buffer',
         'cs.app.flag',
@@ -119,10 +123,10 @@ DISTINFO = {
         'lmdb',
     ],
     'entry_points': {
-        'console_scripts': [
-            'vt = cs.vt.__main__:main',
-            'mount.vtfs = cs.vt.__main__:mount_vtfs',
-        ],
+        'console_scripts': {
+            'vt': 'vt.__main__:main',
+            'mount.vtfs': 'vt.__main__:mount_vtfs',
+        },
     },
     'extras_requires': {
         'FUSE': ['llfuse'],
@@ -194,7 +198,7 @@ PATHSEP = '/'
 run_modes = NS(show_progress=True,)
 
 class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
-            RunStateMixin, ABC):
+            RunStateMixin, Promotable, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but StoreSyncBase
@@ -342,7 +346,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def default(cls, config_spec=None, store_spec=None, cache_spec=None):
     ''' Get the prevailing `Store` instance.
         This calls `HasThreadState.default()` first,
-        but falls back to constrcting the default `Store` instance
+        but falls back to constructing the default `Store` instance
         from `Store.get_default_spec` and `Store.get_default_cache_spec`.
         As such, the returns `Store` is not necessarily "open"
         and users should open it for use. Example:
@@ -786,6 +790,15 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       return block_for(src, name=name)
 
   @classmethod
+  def from_str(cls, store_spec: str, config=None):
+    ''' Return the `Store` for the specification `store_spec`.
+    '''
+    if config is None:
+      from .config import Config  # pylint:disable=import-outside-toplevel
+      config = Config.default(factory=True)
+    return config.Store_from_spec(store_spec)
+
+  @classmethod
   @fmtdoc
   def promote(cls, obj, config=None):
     ''' Promote `obj` to a `Store` instance.
@@ -796,16 +809,9 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         variable ${VT_STORE_ENVVAR} or {VT_STORE_DEFAULT!r}
         and then promoted from `str`.
     '''
-    if isinstance(obj, cls):
-      return obj
     if obj is None:
       obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
-    if isinstance(obj, str):
-      if config is None:
-        from .config import Config  # pylint:disable=import-outside-toplevel
-        config = Config.default(factory=True)
-      return config.Store_from_spec(obj)
-    raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
+    return super().promote(obj, config=config)
 
 class StoreSyncBase(Store):
   ''' Subclass of Store expecting synchronous operations

@@ -1,0 +1,3 @@
+lib/python/cs/fstags.py: cs.fstags: FSTags.copy: use atomic_copy2 instead of shutil.copy2
+lib/python/cs/fstags.py: merge main => fstags
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand: rename "-o ontology" to "-O ontology", modernise option specifications

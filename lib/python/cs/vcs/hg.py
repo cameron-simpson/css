@@ -3,7 +3,7 @@
 ''' Mercurial support for the cs.vcs package.
 '''
 
-from cs.deco import cachedmethod
+from cs.cache import cachedmethod
 from cs.pfx import Pfx, pfx_method
 
 from . import VCS, ReleaseLogEntry

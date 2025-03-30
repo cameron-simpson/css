@@ -9,8 +9,11 @@ set -ue
 cmd=$0
 usage="Usage: $cmd [-a|table...]"
 
+trace=
+[ -t 2 ] && trace=set-x
+
 # no table name? recite tables
-[ $# -gt 0 ] || exec pfctl -sT
+[ $# -gt 0 ] || exec $trace pfctl -sT
 
 if [ "x$*" = x-a ]
 then
@@ -30,7 +33,7 @@ fi
 # must be exactly one table name
 table=$1; shift
 
-pfctl -t "$table" -T show -v \
+$trace pfctl -t "$table" -T show -v \
 | awk '/^ *[1-9]/ { ip=$1 }
        /^\tCleared:/ {
          mon=$3;

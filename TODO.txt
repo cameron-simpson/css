@@ -1,58 +1,98 @@
-make stdin and stdout work correctly so that I can pipe ffmpeg commands
-script to run strace or truss or sudo dtruss -p PID etc depending on the OS
-cs.cmdutils OptSpec to be promotable, leverage in popopts
-fetch the dedrm package if not present, store where?
-fetch the dedrm package if not present, store where?
-service_api: rate limiter? context manager to access it directly, implied if .API_RATE_LIMIT
-Upd: try the hide-the cursor stuff again, maybe in the update+clean method
-Upd: keep a set of dirty slots, update+clean method
-cs.cmdutils: getopt from a called subcommand should only produce the usage for the subcommand
-Result: embed state diagram in the PyPI README.md
-RunState: include state diagram in README.md
+hashindex check - check hashindex ls style output against files
+cs.cmdutils subcommand help should still recite the common options
+wpr - do not import the osx stuff if we're not updating the spaces - it takes forever
+exract the make-a-dir-of-images from wpr as a tool
+RunState pause state and effects, Event to block for it?
+fstags - can we store tags for directories in the dir .fstags, requires a state maybe we already do that? migrate - if isdir and no tags in the dir fstags get them from the parent
+default: sqlite worker - use the queue get_batch mode to collect requests, open sqlite db in bursts
+default: generic sqlite dbm with thread worker to be pulled from ContentCache, into a dbmutils or mappings class
+cs.urlutils: URL: use cs.rfc2616.content_type, content_length
+default: cs.debug.stack_dump vs cs.py/stack.stack_dump
+ContextManagerMixin: document robust recipe for classws which subclass 2 or more classes which subclass ContextManagerMixin, see cs.Later.Later for example
+cs.rfc2616: use cornucopybuffer, update read_chunked
+spaces: try using tilde in spaces_pathfor (tried it, does not work with ~/ or /~/)
+spaces: wpr RENEW to scan the spaces configs for the random directories?
+PipeLineSpec.make_stage_funcs: each input (item,P) should become (item,P=P.copy_with_vars(_=item)) so as to have its own set of variables
+default: wpr RENEW, fast mode
+RunState.__enter__exit__: also set runstate.cancel to the asyncio event loop SIGINT handler?
+cs.binary: generate .5 manpage entries from classes? maybe just those built from struct formats initially
 setvar: not expanding leading $MANPATH etc
 bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
 cs.jsonutils: merge the various JSON utility functions?
 merge the variable jsonable functions?
-cs.binary: _BinaryMultiValue_Base.for_json: use jsonable?
-contextif: bypass the callable check if cmgr has .__enter__
-atomic_filename: use the O_EXCL tick for reliable rename-to-target stuff?
-RunState.notify_cancel: use the FSM notification system
-cs.fsm: why is the default state a per-thread perthread_state.initial_state d
+cs.cmdutils: use @popopts in the cs.cmdutils and cs.djutils examples
+cs.distinfo: insert script metadata
+default: cs.cmdutils: usage_format_parts: return (usage,full_desc), provide usage_desc_split to get line1 and trailing lines, provide usage_format_desc for full desc, use in the tabulated listing
+√ cs.cmdutils: help -r but no -l - single tabulate call from the top level if subcommands?
+cs.djutils: return 1 from a cmd_ method seems to be ignored?
+pfx: each Pfx to include its sep for joining things up
+default: drop cs.lex.indent, stdlib textwrap.indent does a better job
+√ default: make an @popopts usable as a cmd method decorator
+uses_cmd_options: append to the function docstring?
+@promote: params to also accept a mapping of param_name to promotion_func
+default: media info: support "http://www.omdbapi.com/?apikey={OMDB_API_KEY}&type=movie&s=&genre={genre}&y={year}" ?
+√ cs.cmdutils: support opt=-field' for an inverted boolean option
+√ cs.cmdutils: usage_text: in short mode list just subcmd and the usage 1-liner tabulated d
+cs.cmdutils: generate zsh and bash autocompletion rules
+cs.cmdutils: getopt from a called subcommand should only produce the usage for the subcommand
 cs.cmdutils: solidify the thread wide runstate setup in run_context after merging the playon branch
-RunState: subclass FSM
-if no series/season/episode, check the thumbnail path for "series | season N" p
-motion-shrink-timelapse: use -disposition to extract the 7am video from as JPG and add as the embedded cover
-    motion-shrink-timelapse: -metadata fields
-    zz
-TODO: accept -f to specify the file?
-dk update: figure out the git rev associated with the imagewhich would be pulled, list log from fstag dk.lastrev to that rev
 cs.cmdutils/distinfo: cmd_blah descriptions should format the usage parts
 cs.cmdutils: recite module version in command usage message?
-cs.distinfo: a leading "# pylint:" comment is not a standin for a missing docstring
+BaseCommand: move most of __init__ into run-context along with setup_logging context manager use
+√ cs.cmdutils: cmd_foo=None to remove am inherited subcommand
+√ cs.cmdutils: help: suppress common subcommands?
+cs.app.ydl: adopt the name format in use by cs.app.playon
+cs.binary: _BinaryMultiValue_Base.for_json: use jsonable?
+contextif: bypass the callable check if cmgr has .__enter__
+√ atomic_filename: use the O_EXCL trick for reliable rename-to-target stuff?
+does sqlite need the lock file or can I detect the locked exception and retry?
 find all .from_any methods, convert to use @promote?
+promote: correct typo annotations
+@promote: update signature by inspecting the signatures of the promotion functions?
+rewrite mrg using hashindex?
+cs.delta: monitor() to accept an iterable of states as alternative to polling
+Result: embed state diagram in the PyPI README.md
+RunState: subclass FSM
+RunState: include state diagram in README.md
+RunState.notify_cancel: use the FSM notification system
+cs.fsm: why is the default state a per-thread perthread_state.initial_state d
+default: buglog in Python?
+default: use cs.psutils.prep_argv throughout cs.cmdutils d
+cs.cmdutils: shell: subcommand with no args - enter the subcommand mode even if there is a default subcommand, display usage on entry
+cs.jsonutils: merge the various JSON utility functions?
+merge the variable jsonable functions?
+√ default: replace underscores with dashes in subcommand names in cs.cmdutils
+√ fs.ftags: "fstags help ls" has bogus output
+cs.upd.run_task: wait 0.5s before displaying the ticker? probably interacts badly with use of the ticker proxy
+ffmpeg-docker: make stdin and stdout work correctly so that I can pipe ffmpeg commands
+script to run strace or truss or sudo dtruss -p PID etc depending on the OS
+√ cs.cmdutils OptSpec to be promotable, leverage in popopts
+fetch the dedrm package if not present, store where? maybe ebooks dedrm install ? put in calibre if present?
+service_api: rate limiter? context manager to access it directly, implied if .API_RATE_LIMIT
+Upd: try the hide-the cursor stuff again, maybe in the update+clean method
+Upd: keep a set of dirty slots, update+clean method
+setvar: not expanding leading $MANPATH etc
+bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
+motion-shrink-timelapse: use -disposition to extract the 7am video from as JPG and add as the embedded cover
+    motion-shrink-timelapse: -metadata fields
+TODO: accept -f to specify the file?
+dk update: figure out the git rev associated with the image which would be pulled, list log from fstag dk.lastrev to that rev
+cs.distinfo: a leading "# pylint:" comment is not a standin for a missing docstring
 HasThreadState.default: run as a decorator if arg0 is a callable? make factory etc keyword only
 ffmpeg-resize script - 2 pass ffmpeg
-playon refresh: accept q ids to ping the API, mainly to expire zombie entries
 mklinks: update the hashindex while scanning
-rewrite mrg using hashindex?
 hashindex ls: default exclusions eg .hg,.git b d
 fstags: drop rpaths func, merge into cs.fs.rpaths maybe?
 default_params: supply modified signature for wrapper function indicating the param is optional
 @uses_blah: correct type annotations
-promote: correct typo annotations
 ffmpeg-docker: does not like files in other directories or something - some bug in atomic filename?
 dlog: DLog to provide a Logger interface?
-ydl/ffmeg-docker - newtrok=none seems to break ffmpeg - what is it fteching and why, should I tweak the filenames?
+ydl/ffmeg-docker - network=none seems to break ffmpeg - what is it fteching and why, should I tweak the filenames?
 ydl - specify preferred ffmpeg_exe + envvar?
-cs.delta: monitor() to accept an iterable of states as alternative to polling
 √ hashindex rhashindex(rhost,dirpath[,ssh_exe=][,hashindex_exe=])
 hashindex rearrange --sh to emit sh quotes commands inc the mkdirs
 √ TagSet: parse_tag_value: a bare "nan" is a float
-taggerrc with pf-like rules instead of current arcane fstags stuff - sequential readable rules
 √ dlog needs a way to batch delayed updates
-does sqlite need the lock file or can I detect the locked exception and retry?
-cs.ebooks.dedrm: option to use the plugin.zip directly instead of an unpacked source tree?
-cs.ebooks.cbz: ABCF metadata? https://acbf.fandom.com/wiki/ACBF_Specifications
 √ file checksum and tree sync tool to maintain a parallel tree based on checksums eg in a dl folder
 cs.progress: progressbar with worker thread ticker to update the progress instead of updating on the iteration
 √ cs.tarutils: polling task which stats the current filename every 0.5 or so seconds
@@ -60,7 +100,6 @@ cs.tarutils: cope with filenames which are not validly utf-8 encoded in the tar 
 dk login update: silence on no change, same for update-sh
 √ rel needs to check packages against the list from the DE guys
 run-unbound: update config check incantation
-cs.app.ydl: adopt the name format in use by cs.app.playon
 √ ffmpeg-docker: support "ffmpeg-docker --version"
 √ ListQueue should have builtin unrepeated support
 Result with placholder return until some async operation completes it? thinking Tagger rule inference
@@ -96,7 +135,6 @@ cs.binary: a safe packet view into a file, based off the binary offset/length wh
 cs.units: make decompose return an object which proxies to the list but is formattable and has a nice __str__, supporting print(bytes_geek(nbytes)) etc
 cs.edit: use subprocess.run check=True
 cs.app.maildb: port to BaseCommand
-BaseCommand: move most of __init__ into run-context along with setup_logging context manager use
 cs.logutils: new LoggingSetup class embodying infer_log_level etc, as a context manager to push and pop the setup, setup_logging to do the first part, easy replacement for setup_logging of some kind and use it in run_context
 shortpath: optional using_symlinks mode switch to use bin-cs/shortpath-prompt sylink algoritm
 BaseCommand: drop run_argv method

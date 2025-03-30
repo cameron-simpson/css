@@ -22,7 +22,7 @@ usage="Usage: $cmd [--tm] [-U] [ffmpeg-command-line-arguments...]
   Run ffmpeg via \"docker run ... $image ...\" as a method for
   running a modern ffmpeg on a stale system.
 
-  With no ffmpeg command line, recite the current image.
+  With no ffmpeg command line arguments, recite the current image.
   If -U is supplied, update the image.
 
   Leading options:

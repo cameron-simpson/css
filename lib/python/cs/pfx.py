@@ -37,6 +37,13 @@ which lets one put just the relevant complaint in exception and log
 messages and get useful calling context on the output.
 This does make for wordier logs and exceptions
 but used with a little discretion produces far more debuggable results.
+
+The main items supplied by this module are:
+- `Pfx`: a context manager for wrapping code in an addition prefix context
+- `@pfx`: a decorator for a function to wrap calls to the function
+- `@pfx_method`: like `@pfx` but for instance methods
+- `pfx_call(func,*a,**kw)`: call `func(*a,**kw)` inside a prefix context
+- `pfxprint()`: call `print()` with a leading prefix
 '''
 
 from __future__ import print_function
@@ -54,7 +61,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20240630-post'
+__version__ = '20250308-post'
 
 DISTINFO = {
     'description':
@@ -338,8 +345,14 @@ class Pfx(object):
   @classmethod
   def prefixify_exception(cls, e):  # noqa: C901
     ''' Modify the supplied exception `e` with the current prefix.
+        The original value of some .attr is preserved as .{attr}_without_prefix.
         Return `True` if modified, `False` if unable to modify.
     '''
+    if hasattr(e, '_'):
+      return True
+    # preserve the original str(e) for concise messages
+    e._ = str(e)
+    # now try to modify the attributes to prefix the first one
     current_prefix = cls._state.prefix
     did_prefix = False
     for attr in 'args', 'message', 'msg', 'reason', 'strerror':
@@ -411,6 +424,7 @@ class Pfx(object):
               value.__class__.__name__, value
           )
       try:
+        setattr(e, attr + '_without_prefix', ovalue)
         setattr(e, attr, value)
       except AttributeError as e2:
         print(

@@ -9,8 +9,9 @@ from cs.cmdutils import BaseCommand
 
 from .apple import AppleBooksCommand
 from .calibre import CalibreCommand
-from .dedrm import DeDRMCommand
-from .kindle import KindleCommand
+from .common import EBooksCommonBaseCommand
+from .dedrm import DeDRMCommand, DeDRMWrapper, DEDRM_PACKAGE_PATH_ENVVAR
+from .kindle.__main__ import KindleCommand
 from .kobo import KoboCommand
 from .mobi import MobiCommand
 from .pdf import PDFCommand
@@ -20,7 +21,7 @@ def main(argv):
   '''
   return EBooksCommand(argv).run()
 
-class EBooksCommand(BaseCommand):
+class EBooksCommand(EBooksCommonBaseCommand):
   ''' Ebooks utility command.
   '''
 
