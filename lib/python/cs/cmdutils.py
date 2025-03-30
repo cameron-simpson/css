@@ -582,7 +582,7 @@ class SubCommand:
 
         This is an elaborate `ChainMap` of:
         - the optional `cmd` or `self.get_cmd()`
-        - the optional `usage_mapping`
+        - the optional `usage_mapping` parameter
         - `self.usage_mapping`
         - `self.method.USAGE_KEYWORDS` if present
         - the attributes of `self.command`
@@ -617,6 +617,7 @@ class SubCommand:
     '''
     method = self.method
     if isclass(method):
+      # special constructor using Ellipsis to get a placeholder instance
       method = method(...)
     try:
       get_subcommands = method.subcommands
