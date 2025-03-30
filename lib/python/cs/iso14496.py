@@ -41,7 +41,7 @@ from cs.binary import (
     pt_spec,
 )
 from cs.buffer import CornuCopyBuffer
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
 from cs.imageutils import sixel_from_image_bytes
@@ -160,15 +160,13 @@ class MP4Command(BaseCommand):
           B = deref_box(over_box, path)
           print(path, "offset=%d" % B.offset, B)
 
+  @popopts(H=('skip_header', 'Skip the Box header.'))
   def cmd_extract(self, argv):
     ''' Usage: {cmd} [-H] filename boxref output
           Extract the referenced Box from the specified filename into output.
-          -H  Skip the Box header.
     '''
-    skip_header = False
-    if argv and argv[0] == '-H':
-      argv.pop(0)
-      skip_header = True
+    options = self.options
+    skip_header = options.skip_header
     if not argv:
       warning("missing filename")
       badopts = True
@@ -269,9 +267,10 @@ class MP4Command(BaseCommand):
           over_box = parse(parsee)
         over_box.dump(crop_length=None)
 
+  @popopts(p=('tag_prefix', 'Specify the tag prefix, default {TAG_PREFIX!r}.'))
   def cmd_tags(self, argv):
-    ''' Usage: {cmd} [{{-p,--prefix}} prefix] path
-          Report the tags of `path` based on embedded MP4 metadata.
+    ''' Usage: {cmd} [--tag-prefix prefix] path
+          Report the tags of path based on embedded MP4 metadata.
     '''
     xit = 0
     fstags = FSTags()
