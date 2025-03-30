@@ -363,6 +363,7 @@ class OptionSpec:
 
   def option_usage(self):
     ''' A 2 line usage entry for this option.
+
         Example:
 
             -j jobs
@@ -1116,8 +1117,8 @@ def popopts(cmd_method, **opt_specs_kw):
               )
           )
       )
-    cmd_method.__doc__ = "\n\n".join((pre_usage, usage_format, post_usage)
-                                     ).strip()
+    cmd_method.__doc__ = f'{pre_usage}\n\n{usage_format}\n\n{post_usage}'.strip(
+    )
 
   return popopts_cmd_method_wrapper
 
@@ -1785,7 +1786,7 @@ class BaseCommand:
               with super().run_context():
                 try:
                   ... subclass context setup ...
-                    yield
+                  yield
                 finally:
                   ... any unconditional cleanup ...
 
