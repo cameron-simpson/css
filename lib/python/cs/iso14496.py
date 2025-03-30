@@ -541,6 +541,9 @@ class BoxBody(SimpleBinary):
   FIELD_TYPES = dict(offset=int, post_offset=int)
   SUBCLASSES_BY_BOXTYPE = {}
 
+  # class based default for .boxes for bodies with no subboxes
+  boxes = ()
+
   @classmethod
   def __init_subclass__(cls, bodyclass_name=None, doc=None):
     if bodyclass_name is not None:
@@ -605,20 +608,15 @@ class BoxBody(SimpleBinary):
     '''
     # .TYPE - the sole item in self.boxes matching b'type'
     if len(attr) == 4 and attr.isupper():
-      box, = getattr(self, attr + 's')
+      box, = getattr(self, f'{attr}s')
       return box
     # .TYPEs - all items of self.boxes matching b'type'
-    if len(attr) == 5 and (attr.endswith('s') or attr.endswith('0')):
+    # .TYPE0 - the sole box in self.boxes or None if empty
+    if len(attr) == 5 and attr.endswith(('s', '0')):
       attr4 = attr[:4]
       if attr4.isupper():
         box_type = attr4.lower().encode('ascii')
-        try:
-          boxes = self.boxes
-        except AttributeError:
-          warning("%s.%s: no .boxes", self.__class__.__name__, attr)
-          boxes = []
-        else:
-          boxes = [box for box in boxes if box.box_type == box_type]
+        boxes = [box for box in self.boxes if box.box_type == box_type]
         if attr.endswith('s'):
           return boxes
         if attr.endswith('0'):
@@ -1074,26 +1072,7 @@ def add_body_subclass(superclass, box_type, section, desc):
 
   return _SubClass
 
-class HasBoxesMixin:
-
-  def __iter__(self):
-    return iter(self.boxes)
-
-  def __getattr__(self, attr):
-    # .TYPE - the sole item in self.boxes matching b'type'
-    if len(attr) == 4 and attr.isupper():
-      box, = getattr(self, attr + 's')
-      return box
-    # .TYPEs - all items of self.boxes matching b'type'
-    if len(attr) == 5 and attr.endswith('s'):
-      attr4 = attr[:4]
-      if attr4.isupper():
-        box_type = attr4.lower().encode('ascii')
-        boxes = [box for box in self.boxes if box.box_type == box_type]
-        return boxes
-    raise AttributeError(type(self).__name__ + '.' + attr)
-
-class OverBox(BinaryListValues, HasBoxesMixin):
+class OverBox(BinaryListValues):
   ''' A fictitious `Box` encompassing all the Boxes in an input buffer.
   '''
 
@@ -1273,7 +1252,7 @@ class PDINBoxBody(FullBoxBody):
     self.add_field('pdinfo', list(PDINBoxBody.PDInfo.scan(bfr)))
 
 class ContainerBoxBody(BoxBody):
-  ''' Common subclass of several things with `.boxes`.
+  ''' Common superclass of several things with `.boxes`.
   '''
 
   FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=list)
@@ -1282,9 +1261,6 @@ class ContainerBoxBody(BoxBody):
   def parse_fields(self, bfr: CornuCopyBuffer):
     super().parse_fields(bfr)
     self.parse_boxes(bfr)
-
-  def __iter__(self):
-    return iter(self.boxes)
 
 class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
