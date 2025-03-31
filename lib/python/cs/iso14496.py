@@ -282,7 +282,7 @@ class MP4Command(BaseCommand):
       raise GetoptError("missing path")
     path = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments after path: %r" % (argv,))
+      raise GetoptError(f'extra arguments after path: {argv!r}')
     with fstags:
       out(path)
       with Pfx(path):
@@ -619,7 +619,7 @@ class BoxBody(SimpleBinary):
             return None
           box, = boxes
           return box
-    raise AttributeError("%s.%s" % (type(self).__name__, attr))
+    raise AttributeError(f'{self.__class__.__name}.{attr}')
 
   def __str__(self):
     return super().__str__(getattr(self, '_parsed_field_names', ()))
@@ -1292,7 +1292,7 @@ class MVHDBoxBody(FullBoxBody):
       self.parse_field('timescale', bfr, UInt32BE)
       self.parse_field('duration', bfr, UInt64BE)
     else:
-      raise ValueError("MVHD: unsupported version %d" % (self.version,))
+      raise ValueError(f'MVHD: unsupported {version=}')
     self.parse_field('rate_long', bfr, Int32BE)
     self.parse_field('volume_short', bfr, Int16BE)
     self.parse_field('reserved1', bfr, 10)  # 2-reserved, 2x4 reserved
@@ -1372,7 +1372,7 @@ class TKHDBoxBody(FullBoxBody):
       self.parse_field('reserved1', bfr, UInt32BE)
       self.parse_field('duration', bfr, UInt64BE)
     else:
-      raise ValueError("TRHD: unsupported version %d" % (self.version,))
+      raise ValueError(f'TRHD: unsupported {version=}')
     self.parse_field('reserved2', bfr, UInt32BE)
     self.parse_field('reserved3', bfr, UInt32BE)
     self.parse_field('layer', bfr, Int16BE)
@@ -1511,7 +1511,7 @@ class MDHDBoxBody(FullBoxBody):
       self.parse_field('timescale', bfr, UInt32BE)
       self.parse_field('duration', bfr, UInt64BE)
     else:
-      raise NotImplementedError("unsupported version %d" % (self.version,))
+      raise NotImplementedError(f'unsupported {self.version=}')
     self.parse_field('language_short', bfr, UInt16BE)
     self.parse_field('pre_defined', bfr, UInt16BE)
 
