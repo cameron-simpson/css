@@ -45,7 +45,7 @@ from cs.cmdutils import BaseCommand, popopts
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
 from cs.imageutils import sixel_from_image_bytes
-from cs.lex import get_identifier, get_decimal_value
+from cs.lex import get_identifier, get_decimal_value, tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.tagset import TagSet, Tag
@@ -250,21 +250,28 @@ class MP4Command(BaseCommand):
                       print('   ', tag.name, '=', repr(tag.value))
     return xit
 
-  def cmd_parse(self, argv):
-    ''' Usage: {cmd} [{{-|filename}}...]
+  @popopts(with_data='Include the data components of boxes.')
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} [--with-data] [{{-|filename}}...]
           Parse the named files (or stdin for "-").
     '''
+    options = self.options
     if not argv:
       argv = ['-']
     for spec in argv:
       with Pfx(spec):
+        print(spec)
         if spec == '-':
-          parsee = sys.stdin.fileno()
+          bfr = CornuCopyBuffer.from_fd(sys.stdin.fileno())
         else:
-          parsee = spec
-        with PARSE_MODE(discard_data=True):
-          over_box = parse(parsee)
-        over_box.dump(crop_length=None)
+          bfr = CornuCopyBuffer.from_filename(spec)
+        with PARSE_MODE(discard_data=not options.with_data):
+          rows = []
+          for box in Box.scan(bfr):
+            for level, box, subboxes in box.walk():
+              rows.append([f'{" "*level}{box.box_type_s}', str(box.body)])
+            for row in tabulate(*rows):
+              print(row)
 
   @popopts(tag_prefix_='Specify the tag prefix, default {TAG_PREFIX!r}.')
   def cmd_tags(self, argv):
