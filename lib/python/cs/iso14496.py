@@ -991,24 +991,25 @@ class Box(SimpleBinary):
     '''
     return dump_box(self, **kw)
 
-  def walk(self) -> Iterable[Tuple["Box", List["Box"]]]:
+  def walk(self, level=0) -> Iterable[Tuple["Box", List["Box"]]]:
     ''' Walk this `Box` hierarchy.
 
-        Yields the starting box and its children as `(self,subboxes)`
-        and then yields `(subbox,subsubboxes)` for each child in turn.
+        Yields the starting box and its children as `(level,self,subboxes)`
+        and then yields `(level+1,subbox,subsubboxes)` for each child in turn,
+        recursing into the subboxes.
 
         As with `os.walk`, the returned `subboxes` list
         may be modified in place to prune or reorder the subsequent walk.
     '''
     # We don't go list(self) or [].extend(self) because both of those fire
-    # the transcription of the box because of list's preallocation heuristics.
-    # Instead we make a bare iterator and list() that, specific
+    # the transcription of the box because of list's preallocation heuristics
+    # (it measures the length of each box).
+    # Instead we make a bare iterator and list() that; specific
     # incantation from Peter Otten.
-    subboxes = list(iter(self))
-    yield self, subboxes
+    subboxes = list(iter(self.boxes))
+    yield level, self, subboxes
     for subbox in subboxes:
-      if isinstance(subbox, Box):
-        yield from subbox.walk()
+      yield from subbox.walk(level + 1)
 
   def metatags(self):
     ''' Return a `TagSet` containing metadata for this box.
@@ -1038,7 +1039,7 @@ class Box(SimpleBinary):
     ''' Walk the `Box` hierarchy looking for metadata.
         Yield `(Box,TagSet)` for each `b'moov'` or `b'trak'` `Box`.
     '''
-    for box, _ in self.walk():
+    for _, box, _ in self.walk():
       if box.box_type in (b'moov', b'trak'):
         yield box, box.metatags()
 
@@ -1102,12 +1103,14 @@ class OverBox(BinaryListValues):
     return dump_box(self, **kw)
 
   def walk(self):
-    ''' Walk the `Box`es in the `OverBox`.
+    ''' Walk the `Box`es in the `OverBox`, like `Box.walk()`.
 
-        This does not yield the `OverBox` itself, it isn't really a `Box`.
+        Note: this does not yield the `OverBox` itself, it isn't really a `Box`.
     '''
-    for box in self:
-      yield from box.walk()
+    subboxes = list(iter(self.boxes))
+    ## not really a Box ## yield 0, self, subboxes
+    for subbox in subboxes:
+      yield from subbox.walk(1)
 
 class FullBoxBody(BoxBody):
   ''' A common extension of a basic BoxBody, with a version and flags field.
