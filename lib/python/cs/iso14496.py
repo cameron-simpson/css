@@ -692,11 +692,11 @@ class BoxBody(SimpleBinary):
         self._parsed_field_names,
     )
 
-  def parse_boxes(self, bfr: CornuCopyBuffer, **kw):
+  def parse_boxes(self, bfr: CornuCopyBuffer, **box_scan_kw):
     ''' Utility method to parse the remainder of the buffer as a
         sequence of `Box`es.
     '''
-    self.boxes = list(Box.scan(bfr, **kw))
+    self.boxes = list(Box.scan(bfr, **box_scan_kw))
     self._parsed_field_names.append('boxes')
 
   @classmethod
