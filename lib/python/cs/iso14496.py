@@ -631,7 +631,7 @@ class BoxBody(SimpleBinary):
     return super().__str__(getattr(self, '_parsed_field_names', ()))
 
   def __iter__(self):
-    yield from ()
+    yield from self.boxes
 
   @classmethod
   def parse(cls, bfr: CornuCopyBuffer):
