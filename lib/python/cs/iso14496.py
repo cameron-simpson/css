@@ -970,6 +970,7 @@ class Box(SimpleBinary):
 
   def ancestor(self, box_type):
     ''' Return the closest ancestor box of type `box_type`.
+        Raise `ValueError` if there is no such ancestor.
     '''
     if isinstance(box_type, str):
       box_type = box_type.encode('ascii')
@@ -978,7 +979,7 @@ class Box(SimpleBinary):
       if parent.box_type == box_type:
         return parent
       parent = parent.parent
-    return parent
+    raise ValueError(f'no ancestor with {box_type=}')
 
   def dump(self, **kw):
     ''' Dump this Box.
