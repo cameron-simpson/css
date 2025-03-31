@@ -962,12 +962,11 @@ class Box(SimpleBinary):
     '''
     return self.header.user_type
 
-  # NB: a @property instead of @prop to preserve AttributeError
   @property
   def BOX_TYPE(self):
     ''' The default .BOX_TYPE is inferred from the class name.
     '''
-    return type(self).boxbody_type_from_class()
+    return self.boxbody_type_from_class()
 
   def ancestor(self, box_type):
     ''' Return the closest ancestor box of type `box_type`.
