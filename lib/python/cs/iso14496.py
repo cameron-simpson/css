@@ -182,7 +182,7 @@ class MP4Command(BaseCommand):
     else:
       output = argv.pop(0)
     if argv:
-      warning("extra argments after boxref: %s", ' '.join(argv))
+      warning("extra argments after boxref: %r", argv)
       badopts = True
     if badopts:
       raise GetoptError("invalid arguments")
@@ -2530,7 +2530,7 @@ class ILSTBoxBody(ContainerBoxBody):
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
                 bs = databfr.take(...)
-                warning("%r: no schema, stashing bytes %r", subbox_type, bs)
+                ##warning("%r: no schema, stashing bytes %r", subbox_type, bs)
                 data_box.add_field(
                     'subbox__' + subbox_type.decode('ascii'), bs
                 )
