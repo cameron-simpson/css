@@ -964,9 +964,14 @@ class Box(SimpleBinary):
 
   @property
   def BOX_TYPE(self):
-    ''' The default .BOX_TYPE is inferred from the class name.
+    ''' The default `.BOX_TYPE` is inferred from the class name.
     '''
-    return self.boxbody_type_from_class()
+    try:
+      return self.boxbody_type_from_class()
+    except ValueError as e:
+      raise AttributeError(
+          f'no {self.__class__.__name__}.BOX_TYPE: {e}'
+      ) from e
 
   def ancestor(self, box_type):
     ''' Return the closest ancestor box of type `box_type`.
