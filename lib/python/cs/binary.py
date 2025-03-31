@@ -687,12 +687,23 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
     if attr_choose is None:
       # pylint: disable=unnecessary-lambda-assignment
       attr_choose = lambda attr: not attr.startswith('_')
+    attr_values = [
+        (attr, getattr(self, attr, None))
+        for attr in attr_names
+        if attr_choose(attr)
+    ]
     return "%s(%s)" % (
         type(self).__name__, ','.join(
             (
-                "%s=%s" % (attr, cropped_repr(getattr(self, attr, None)))
-                for attr in attr_names
-                if attr_choose(attr)
+                "%s=%s" % (
+                    attr, (
+                        cropped_repr(value.value) if (
+                            isinstance(value, AbstractBinary)
+                            and isinstance(value, tuple)
+                            and tuple.__len__(value) == 1
+                        ) else cropped_repr(value)
+                    )
+                ) for attr, value in attr_values
             )
         )
     )
@@ -966,6 +977,12 @@ def BinaryMultiStruct(
           ''' Alias `.value` as the first (and only) struct value.
           '''
           return self[0]
+
+      def __str__(self):
+        return str(self[0])
+
+      def __repr__(self):
+        return repr(self[0])
 
       @classmethod
       def parse_value(cls, bfr: CornuCopyBuffer):
