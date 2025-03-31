@@ -48,7 +48,6 @@ from cs.imageutils import sixel_from_image_bytes
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
-from cs.py.func import prop
 from cs.tagset import TagSet, Tag
 from cs.threads import locked_property, ThreadState
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
@@ -1314,14 +1313,14 @@ class MVHDBoxBody(FullBoxBody):
     yield self.predefined1
     yield self.next_track_id
 
-  @prop
+  @property
   def rate(self):
     ''' Rate field converted to float: 1.0 represents normal rate.
     '''
     rate_long = self.rate_long
     return (rate_long >> 16) + (rate_long & 0xffff) / 65536.0
 
-  @prop
+  @property
   def volume(self):
     ''' Volume field converted to float: 1.0 represents full volume.
     '''
@@ -1400,31 +1399,31 @@ class TKHDBoxBody(FullBoxBody):
     yield self.width
     yield self.height
 
-  @prop
+  @property
   def track_enabled(self):
     ''' Test flags bit 0, 0x1, track_enabled.
     '''
     return (self.flags & 0x1) != 0
 
-  @prop
+  @property
   def track_in_movie(self):
     ''' Test flags bit 1, 0x2, track_in_movie.
     '''
     return (self.flags & 0x2) != 0
 
-  @prop
+  @property
   def track_in_preview(self):
     ''' Test flags bit 2, 0x4, track_in_preview.
     '''
     return (self.flags & 0x4) != 0
 
-  @prop
+  @property
   def track_size_is_aspect_ratio(self):
     ''' Test flags bit 3, 0x8, track_size_is_aspect_ratio.
     '''
     return (self.flags & 0x8) != 0
 
-  @prop
+  @property
   def timescale(self):
     ''' The `timescale` comes from the movie header box (8.3.2.3).
     '''
@@ -1524,7 +1523,7 @@ class MDHDBoxBody(FullBoxBody):
     yield self.language_short
     yield self.pre_defined
 
-  @prop
+  @property
   def language(self):
     ''' The ISO 639‐2/T language code as decoded from the packed form.
     '''
