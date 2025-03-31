@@ -267,11 +267,11 @@ class MP4Command(BaseCommand):
           bfr = CornuCopyBuffer.from_filename(spec)
         with PARSE_MODE(discard_data=not options.with_data):
           rows = []
-          for box in Box.scan(bfr):
-            for level, box, subboxes in box.walk():
+          for topbox in Box.scan(bfr):
+            for level, box, subboxes in topbox.walk():
               rows.append([f'{" "*level}{box.box_type_s}', str(box.body)])
-            for row in tabulate(*rows):
-              print(row)
+          for row in tabulate(*rows):
+            print(row)
 
   @popopts(tag_prefix_='Specify the tag prefix, default {TAG_PREFIX!r}.')
   def cmd_tags(self, argv):
