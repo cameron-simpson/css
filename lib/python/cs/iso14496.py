@@ -2283,13 +2283,16 @@ def ILSTRawSchema(attribute_name):
   return attribute_name, _ILSTRawSchema
 
 # class to decode bytes as UTF-8
-_ILSTTextSchema = pt_spec(
+class _ILSTTextSchema(pt_spec(
     (
         lambda bfr: bfr.take(...).decode('utf-8'),
         lambda txt: txt.encode('utf-8'),
     ),
     name='ILSTTextSchema',
-)
+)):
+
+  def __repr__(self):
+    return repr(self.value)
 
 def ILSTTextSchema(attribute_name):
   ''' Attribute name and type for ILST text schema.
