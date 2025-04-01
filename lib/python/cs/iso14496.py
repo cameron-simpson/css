@@ -1390,7 +1390,7 @@ class MVHDBoxBody(FullBoxBody):
       self.parse_field('timescale', bfr, UInt32BE)
       self.parse_field('duration', bfr, UInt64BE)
     else:
-      raise ValueError(f'MVHD: unsupported {version=}')
+      raise ValueError(f'MVHD: unsupported {self.version=}')
     self.parse_field('rate_long', bfr, Int32BE)
     self.parse_field('volume_short', bfr, Int16BE)
     self.parse_field('reserved1', bfr, 10)  # 2-reserved, 2x4 reserved
@@ -1470,7 +1470,7 @@ class TKHDBoxBody(FullBoxBody):
       self.parse_field('reserved1', bfr, UInt32BE)
       self.parse_field('duration', bfr, UInt64BE)
     else:
-      raise ValueError(f'TRHD: unsupported {version=}')
+      raise ValueError(f'TRHD: unsupported {self.version=}')
     self.parse_field('reserved2', bfr, UInt32BE)
     self.parse_field('reserved3', bfr, UInt32BE)
     self.parse_field('layer', bfr, Int16BE)
