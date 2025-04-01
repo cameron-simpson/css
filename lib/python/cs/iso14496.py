@@ -564,6 +564,14 @@ class BoxBody(SimpleBinary):
       cls.__name__ = bodyclass_name
     if doc is not None:
       cls.__doc__ = doc
+    # apply some default docstrings to known methods
+    for method_name, method_doc_str in (
+        ('parse_fields', 'Gather the fields of `{cls.__name__}`.'),
+        ('transcribe', 'Transcribe a `{cls.__name__}`.'),
+    ):
+      method = getattr(cls, method_name)
+      if not (getattr(method, '__doc__', None) or '').strip():
+        method.__doc__ = method_doc_str.format(cls=cls)
     # update the mapping of box_type to BoxBody subclass
     try:
       # explicit list of box_type byte strings
