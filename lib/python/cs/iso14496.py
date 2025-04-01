@@ -16,10 +16,12 @@ from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime
+from functools import cached_property
 from getopt import getopt, GetoptError
 import os
 import sys
 from typing import Iterable, List, Tuple
+from uuid import UUID
 
 from icontract import require
 from typeguard import typechecked
@@ -535,6 +537,17 @@ class BoxHeader(BinaryMultiValue('BoxHeader', {
     if self.box_type == b'uuid':
       yield self.user_type
 
+  @cached_property
+  def type_uuid(self) -> UUID:
+    ''' The `UUID` for the box header type, if `self.type` is `b'uuid'`,
+        made from `self.user_type`.
+    '''
+    if self.type != b'uuid':
+      raise AttributeError(
+          f'{self.__class__.__name__}.box_type_uuid: header type is not b"uuid"'
+      )
+    return UUID(bytes=self.user_type)
+
 class BoxBody(SimpleBinary):
   ''' Abstract basis for all `Box` bodies.
   '''
@@ -931,18 +944,27 @@ class Box(SimpleBinary):
     return self.header.type
 
   @property
-  def box_type_s(self):
+  def box_type_s(self) -> str:
     ''' The `Box` header type as a string.
 
-        If the header type bytes decode as ASCII, return that,
-        otherwise the header bytes' repr().
+        If the header type is a UUID, return its `str` form.
+        Otherwise, if the header type bytes decode as ASCII, return that.
+        Otherwise the header bytes' repr().
     '''
     box_type_b = bytes(self.box_type)
+    if box_type_b == b'uuid':
+      return str(self.box_type_uuid)
     try:
       box_type_name = box_type_b.decode('ascii')
     except UnicodeDecodeError:
       box_type_name = repr(box_type_b)
     return box_type_name
+
+  @property
+  def box_type_uuid(self) -> UUID:
+    ''' The `Box` header type `UUID` for boxes whose `box_type` is `b'uuid'`.
+    '''
+    return self.header.type_uuid
 
   @property
   def box_type_path(self):
