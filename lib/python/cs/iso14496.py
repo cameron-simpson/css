@@ -47,7 +47,7 @@ from cs.cmdutils import BaseCommand, popopts
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
 from cs.imageutils import sixel_from_image_bytes
-from cs.lex import get_identifier, get_decimal_value, tabulate
+from cs.lex import cropped_repr, get_identifier, get_decimal_value, printt, tabulate
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.tagset import TagSet, Tag
@@ -252,28 +252,35 @@ class MP4Command(BaseCommand):
                       print('   ', tag.name, '=', repr(tag.value))
     return xit
 
-  @popopts(with_data='Include the data components of boxes.')
+  @popopts(
+      with_data='Include the data components of boxes.',
+      with_fields='Include a line for each box field.',
+  )
   def cmd_scan(self, argv):
-    ''' Usage: {cmd} [--with-data] [{{-|filename}}...]
+    ''' Usage: {cmd} [--with-data] [--with-fields] [{{-|filename}}...]
           Parse the named files (or stdin for "-").
     '''
     options = self.options
     if not argv:
       argv = ['-']
+    xit = 0
     for spec in argv:
       with Pfx(spec):
         print(spec)
         if spec == '-':
           bfr = CornuCopyBuffer.from_fd(sys.stdin.fileno())
         else:
-          bfr = CornuCopyBuffer.from_filename(spec)
+          try:
+            bfr = CornuCopyBuffer.from_filename(spec)
+          except FileNotFoundError as e:
+            warning("scannot scan: %s", e)
+            xit = 1
+            continue
         with PARSE_MODE(discard_data=not options.with_data):
           rows = []
           for topbox in Box.scan(bfr):
-            for level, box, subboxes in topbox.walk():
-              rows.append([f'{" "*level}{box.box_type_s}', str(box.body)])
-          for row in tabulate(*rows):
-            print(row)
+            topbox.dump(recurse=True, dump_fields=options.with_fields)
+    return xit
 
   @popopts(tag_prefix_='Specify the tag prefix, default {TAG_PREFIX!r}.')
   def cmd_tags(self, argv):
@@ -1023,12 +1030,56 @@ class Box(SimpleBinary):
       parent = parent.parent
     raise ValueError(f'no ancestor with {box_type=}')
 
-  def dump(self, **kw):
-    ''' Dump this Box.
+  def dump_table(
+      self,
+      table=None,
+      indent='',
+      subindent='  ',
+      dump_fields=False,
+      recurse=False,
+      file=None
+  ) -> List[Tuple[str, str]]:
+    ''' Dump this `Box` 
     '''
-    return dump_box(self, **kw)
+    if table is None:
+      table = []
+    for level, box, subboxes in self.walk(limit=(None if recurse else 0)):
+      row_indent = indent + subindent * level
+      body = box.body
+      table.append(
+          (
+              (
+                  f'{row_indent}{box.box_type_s}:{body.__class__.__name__}',
+                  body.__class__.__doc__.strip().split("\n")[0],
+              ) if dump_fields else (
+                  f'{row_indent}{box.box_type_s}',
+                  str(body),
+              )
+          )
+      )
+      # indent the subrows
+      if dump_fields:
+        field_indent = row_indent + subindent
+        for field_name in sorted(filter(lambda name: not name.startswith('_'),
+                                        body.__dict__.keys())):
+          if field_name.startswith('_'):
+            continue
+          if field_name == 'boxes' and recurse:
+            continue
+          field = getattr(body, field_name)
+          table.append((f'{field_indent}.{field_name}', cropped_repr(field)))
+    return table
 
-  def walk(self, level=0) -> Iterable[Tuple["Box", List["Box"]]]:
+  def dump(self, file=None, **dump_table_kw):
+    ''' Dump this `Box` to `file` (default `sys.stdout` per `cs.lex.printt`.
+        Other keyword paramaters are passed to `Box.dump_table`.
+    '''
+    printt(*self.dump_table(**dump_table_kw), file=file)
+
+  def walk(self,
+           *,
+           level=0,
+           limit=None) -> Iterable[Tuple["Box", List["Box"]]]:
     ''' Walk this `Box` hierarchy.
 
         Yields the starting box and its children as `(level,self,subboxes)`
@@ -1045,8 +1096,11 @@ class Box(SimpleBinary):
     # incantation from Peter Otten.
     subboxes = list(iter(self.boxes))
     yield level, self, subboxes
-    for subbox in subboxes:
-      yield from subbox.walk(level + 1)
+    if limit is None or limit > 0:
+      for subbox in subboxes:
+        yield from subbox.walk(
+            level=level + 1, limit=(None if limit is None else limit - 1)
+        )
 
   def metatags(self):
     ''' Return a `TagSet` containing metadata for this box.
@@ -2715,45 +2769,6 @@ def parse_fields(bfr, copy_offsets=None, **kw):
   if copy_offsets is not None:
     bfr.copy_offsets = copy_offsets
   yield from OverBox.scan(bfr, **kw)
-
-# pylint: disable=too-many-branches
-def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
-  ''' Recursively dump a Box.
-  '''
-  if fp is None:
-    fp = sys.stdout
-  if indent_incr is None:
-    indent_incr = '  '
-  fp.write(indent)
-  summary = str(B)
-  if crop_length is not None:
-    if len(summary) > crop_length - len(indent):
-      summary = summary[:crop_length - len(indent) - 4] + '...)'
-  fp.write(summary)
-  fp.write('\n')
-  boxes = getattr(B, 'boxes', None)
-  body = getattr(B, 'body', None)
-  if body is not None:
-    for field_name in sorted(filter(lambda name: not name.startswith('_'),
-                                    body.__dict__.keys())):
-      if field_name == 'boxes':
-        boxes = None
-      field = getattr(body, field_name)
-      if isinstance(field, BinaryListValues):
-        if field_name != 'boxes':
-          fp.write(indent + indent_incr)
-          fp.write(field_name)
-          if field.value:
-            fp.write(':\n')
-          else:
-            fp.write(': []\n')
-        for subbox in field.values:
-          subbox.dump(
-              indent=indent + indent_incr, fp=fp, crop_length=crop_length
-          )
-  if boxes:
-    for subbox in boxes:
-      subbox.dump(indent=indent + indent_incr, fp=fp, crop_length=crop_length)
 
 # pylint: disable=too-many-locals,too-many-branches
 def report(box, indent='', fp=None, indent_incr=None):
