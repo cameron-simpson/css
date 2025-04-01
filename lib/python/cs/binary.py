@@ -147,7 +147,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from cs.buffer import CornuCopyBuffer
 from cs.deco import OBSOLETE, promote, strable
 from cs.gimmicks import warning, debug
-from cs.lex import cropped, cropped_repr, typed_str
+from cs.lex import cropped, cropped_repr, stripped_dedent, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
@@ -227,9 +227,9 @@ def pt_spec(pt, name=None):
       If the specification `pt` is a subclass of `AbstractBinary`
       this is returned directly.
 
-      If `pt` is a 2-tuple of `str`
+      If `pt` is a (str,str) 2-tuple
       the values are presumed to be a format string for `struct.struct`
-      and filed names separated by spaces;
+      and field names separated by spaces;
       a new `BinaryMultiStruct` class is created from these and returned.
 
       Otherwise two functions
@@ -262,19 +262,15 @@ def pt_spec(pt, name=None):
       f_parse_value = lambda bfr: bfr.take(pt)
       f_transcribe_value = lambda value: value
     else:
-      pt0, pt1 = pt
-      if isinstance(pt0, str) and isinstance(pt1, str):
+      struct_format, struct_fields = pt
+      if isinstance(struct_format, str) and isinstance(struct_fields, str):
+        # (str,str) 2-tuple
         # struct format and field names
-        return BinaryMultiStruct(
-            '_'.join(
-                (
-                    name or "PTStruct", str(next(_pt_spec_seq)),
-                    pt1.replace(' ', '__')
-                )
-            ), pt0, pt1
-        )
-      f_parse_value = pt0
-      f_transcribe_value = pt1
+        if name is None:
+          name = f'PTStruct_{next(_pt_spec_seq)}__{struct_fields.replace(" ", "__")}'
+        return BinaryMultiStruct(name, struct_format, struct_fields)
+      # otherwise a parse/transcribe pair
+      f_parse_value, f_transcribe_value = pt
 
   class PTValue(BinarySingleValue):  # pylint: disable=used-before-assignment
     ''' A `BinarySingleValue` subclass
@@ -293,9 +289,12 @@ def pt_spec(pt, name=None):
       '''
       return f_transcribe_value(value)
 
-  if name is not None:
-    PTValue.__name__ = name
-  PTValue.__name__ += '_' + str(next(_pt_spec_seq))
+  PTValue.__name__ = name or f'PTValue_{next(_pt_spec_seq)}'
+  PTValue.__doc__ = stripped_dedent(
+      f'''{name}, a `BinarySingleValue` subclass
+          made from {f_parse_value=} and {f_transcribe_value=}.
+      '''
+  )
   return PTValue
 
 class bs(bytes):
