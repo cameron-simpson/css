@@ -655,8 +655,13 @@ class BoxBody(SimpleBinary):
           return box
     raise AttributeError(f'{self.__class__.__name}.{attr}')
 
-  def __str__(self):
-    return super().__str__(getattr(self, '_parsed_field_names', ()))
+  def __str__(self, attr_names=None):
+    if attr_names is None:
+      attr_names = sorted(
+          attr_name for attr_name in getattr(self, '_parsed_field_names', ())
+          if not attr_name.startswith('_') and attr_name != 'boxes'
+      )
+    return super().__str__(attr_names)
 
   def __iter__(self):
     yield from self.boxes
