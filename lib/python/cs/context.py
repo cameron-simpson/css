@@ -62,7 +62,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
       The signature is flexible, offering 2 basic modes of use.
 
       *Flagged use*: `contextif(flag,cmgr,*a,**kw)`: if `flag` is a
-      Boolean then it governs whether the context manager `cmgr`
+      Boolean (`bool`) then it governs whether the context manager `cmgr`
       is used. Historically the driving use case was verbosity
       dependent status lines or progress bars. Example:
 
@@ -78,7 +78,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
               ... do the thing, setting proxy.text as needed ...
 
       *Unflagged use*: `contextif(cmgr,*a,**kw)`: use `cmgr` as the
-      flag: if false (eg `None`) then `cmgr` is not used.
+      flag: if falsey (eg `None`) then `cmgr` is not used.
 
       Additionally, `cmgr` may be a callable, in which case the
       context manager itself is obtained by calling
@@ -87,7 +87,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
       `cmgr_args` or `cmgr_kwargs`.
 
       This last mode can be a bit fiddly. If `cmgr` is a context
-      manager _but is also callable for other purposes_ you will
+      manager _but is also callable for some other purposes_ you will
       need to do a little shuffle to avoid the implied call:
 
           with contexif(flag, lambda: cmgr):
