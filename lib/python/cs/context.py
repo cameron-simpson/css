@@ -411,7 +411,7 @@ def twostep(cmgr):
 def setup_cmgr(cmgr):
   ''' Run the enter phase of the context manager `cmgr`.
       Return a `(yielded,teardwon)` 2-tuple where `yielded` is the
-      value yielded from the cntext manager's enter step and
+      value returned from the context manager's enter step and
       `callable` is a callable which runs the tear down phase.
 
       This is a convenience wrapper for the lower level `twostep()` function
@@ -454,7 +454,8 @@ def setup_cmgr(cmgr):
                   self.foo = foo
                   self._teardown = None
               def __enter__(self):
-                  enter_value, self._teardown = setup_cmgr(stackattrs(o, setting=foo))
+                  the_context = stackattrs(o, setting=foo)
+                  enter_value, self._teardown = setup_cmgr(the_context)
                   return enter_value
               def __exit__(self, *_):
                   teardown, self._teardown = self._teardown, None
