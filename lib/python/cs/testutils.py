@@ -94,7 +94,9 @@ class SetupTeardownMixin:
     ''' Run `super().setUp()` then the set up step of `self.setupTeardown()`.
     '''
     super().setUp()
-    push_cmgr(self, '_SetupTeardownMixin__tearDown', self.setupTeardown())
+    return push_cmgr(
+        self, '_SetupTeardownMixin__tearDown', self.setupTeardown()
+    )
 
   def tearDown(self):
     ''' Run the tear down step of `self.setupTeardown()`,
@@ -130,3 +132,27 @@ def assertSingleThread(include_daemon=False, exclude=None):
           ),
       )
   )
+
+if __name__ == '__main__':
+  from contextlib import contextmanager
+  import sys
+  import unittest
+  from cs.debug import trace
+
+  class TestSetupTeardownMixin(SetupTeardownMixin, unittest.TestCase):
+
+    @contextmanager
+    ##@trace(retval=True)
+    def setupTeardown(self):
+      print("setupTeardown start")
+      yield 2
+      print("setupTeardown end")
+
+    def test_1(self):
+      print("test 1")
+
+    def test_2(self):
+      print("test 2")
+      assert False
+
+  unittest.main(__name__, None, sys.argv)
