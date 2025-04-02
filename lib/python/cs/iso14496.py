@@ -1188,11 +1188,6 @@ class OverBox(BinaryListValues):
     '''
     return sum(map(len, self.boxes))
 
-  def dump(self, **kw):
-    ''' Dump this OverBox.
-    '''
-    return dump_box(self, **kw)
-
   def walk(self):
     ''' Walk the `Box`es in the `OverBox`, like `Box.walk()`.
 
