@@ -257,29 +257,62 @@ class MP4Command(BaseCommand):
       with_fields='Include a line for each box field.',
   )
   def cmd_scan(self, argv):
-    ''' Usage: {cmd} [--with-data] [--with-fields] [{{-|filename}}...]
+    ''' Usage: {cmd} [--with-data] [--with-fields] [{{-|filename}} [type_paths...]]
           Parse the named files (or stdin for "-").
     '''
     options = self.options
     if not argv:
       argv = ['-']
+    filespec = argv.pop(0)
+    type_paths = list(argv)
     xit = 0
-    for spec in argv:
-      with Pfx(spec):
-        print(spec)
-        if spec == '-':
-          bfr = CornuCopyBuffer.from_fd(sys.stdin.fileno())
-        else:
-          try:
-            bfr = CornuCopyBuffer.from_filename(spec)
-          except FileNotFoundError as e:
-            warning("scannot scan: %s", e)
-            xit = 1
-            continue
-        with PARSE_MODE(discard_data=not options.with_data):
-          rows = []
-          for topbox in Box.scan(bfr):
+    with Pfx("%r", filespec):
+      print(filespec)
+      if filespec == '-':
+        bfr = CornuCopyBuffer.from_fd(sys.stdin.fileno())
+      else:
+        try:
+          bfr = CornuCopyBuffer.from_filename(filespec)
+        except FileNotFoundError as e:
+          warning("scannot scan: %s", e)
+          return 1
+      with PARSE_MODE(discard_data=not options.with_data):
+        rows = []
+        seen_paths = {path: False for path in type_paths}
+        for topbox in Box.scan(bfr):
+          if not type_paths:
             topbox.dump(recurse=True, dump_fields=options.with_fields)
+          else:
+            for type_path in type_paths:
+              first_match = True
+              toptype, *tail_types = type_path.split('.')
+              if topbox.box_type_s == toptype:
+                if not tail_types:
+                  if first_match:
+                    print(type_path)
+                    first_match = False
+                    seen_paths[type_path] = True
+                  topbox.dump(
+                      recurse=True,
+                      dump_fields=options.with_fields,
+                      indent='  '
+                  )
+                else:
+                  for subbox in topbox.descendants(tail_types):
+                    if first_match:
+                      print(type_path)
+                      first_match = False
+                      seen_paths[type_path] = True
+                    subbox.dump(
+                        recurse=True,
+                        dump_fields=options.with_fields,
+                        indent='  '
+                    )
+      if type_paths:
+        for type_path in type_paths:
+          if not seen_paths[type_path]:
+            warning("no match for %r", type_path)
+            xit = 1
     return xit
 
   @popopts(tag_prefix_='Specify the tag prefix, default {TAG_PREFIX!r}.')
