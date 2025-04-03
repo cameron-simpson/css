@@ -326,7 +326,6 @@ def model_batches_qs(
 def model_instances(
     model: Model,
     field_name='pk',
-    only=None,
     **mbqs_kw,
 ) -> Iterable[Model]:
   ''' A generator yielding Model instances.
