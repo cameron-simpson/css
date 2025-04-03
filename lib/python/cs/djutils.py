@@ -74,7 +74,7 @@ class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
       return super().__call__(argv)
     method = self.method
     instance = method()
-    return instance.run_from_argv([method.__module__, self.cmd] + argv)
+    return instance.run_from_argv([method.__module__, self.cmd, *argv])
 
   def usage_text(self, *, cmd=None, **kw):
     ''' Return the usage text for this subcommand.
@@ -184,8 +184,8 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   class Options(CSBaseCommand.Options):
     settings: type(settings) = field(
         default_factory=lambda: dict(
-            (k, getattr(settings, k, None)) for k in sorted(dir(settings)) if k
-            and not k.startswith('_') and k not in ('SECRET_KEY',)
+            (k, getattr(settings, k, None)) for k in sorted(dir(settings)) if
+            (k and not k.startswith('_') and k not in ('SECRET_KEY',))
         )
     )
 
@@ -237,7 +237,7 @@ def model_batches_qs(
     chunk_size=1024,
     desc=False,
     exclude=None,
-    filter=None,
+    filter=None,  # noqa: A002
     only=None,
 ) -> Iterable[QuerySet]:
   ''' A generator yielding `QuerySet`s which produce nonoverlapping
