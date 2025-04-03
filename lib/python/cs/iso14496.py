@@ -1035,6 +1035,22 @@ class Box(SimpleBinary):
       parent = parent.parent
     raise ValueError(f'no ancestor with {box_type=}')
 
+  def descendants(self, sub_box_types: str | List):
+    ''' A generator to scan descendants of this box for boxes
+        matching `sub_box_types`.
+
+        The `sub_box_types` may be a dot separated string or a list.
+    '''
+    if isinstance(sub_box_types, str):
+      sub_box_types = sub_box_types.split('.')
+    box_type_s, *tail_box_types = sub_box_types
+    for subbox in self.boxes:
+      if subbox.box_type_s == box_type_s:
+        if tail_box_types:
+          yield from subbox.descendants(tail_box_types)
+        else:
+          yield subbox
+
   def dump_table(
       self,
       table=None,
