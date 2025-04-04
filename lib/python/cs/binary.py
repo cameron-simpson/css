@@ -145,7 +145,7 @@ from types import SimpleNamespace
 from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 
 from cs.buffer import CornuCopyBuffer
-from cs.deco import OBSOLETE, promote, strable
+from cs.deco import OBSOLETE, decorator, promote, Promotable, strable
 from cs.gimmicks import warning, debug
 from cs.lex import cropped, cropped_repr, stripped_dedent, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
@@ -319,7 +319,7 @@ class bs(bytes):
       return cls(obj)
     raise TypeError(f'{cls.__name__}.promote({obj.__class__}): cannot promote')
 
-class AbstractBinary(ABC):
+class AbstractBinary(Promotable, ABC):
   ''' Abstract class for all `Binary`* implementations,
       specifying the abstract `parse` and `transcribe` methods
       and providing various helper methods.
@@ -797,6 +797,18 @@ class BinarySingleValue(AbstractBinary):
         Subclasses must implement this method or `transcribe`.
     '''
     return cls(value).transcribe()
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to an instance of this `BinarySingleValue` subclass.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    try:
+      # see if there are type specific ._from_blah methods
+      return super().promote(obj)
+    except TypeError:
+      return cls(obj)
 
 class BinaryByteses(AbstractBinary):
   ''' A list of `bytes` parsed directly from the native iteration of the buffer.
