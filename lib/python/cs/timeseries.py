@@ -1813,12 +1813,12 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     return self.fstags[self.fspath]
 
   @property
-  @cachedmethod
   def array(self):
     ''' The time series as an `array.array` object.
         This loads the array data from `self.fspath` on first use.
     '''
-    assert self._array is None
+    if self._array is not None:
+      return self._array
     # we load the data from an mmap
     # ensure we have a current mmap, use it, close it
     if self._mmap is None:
@@ -1847,6 +1847,7 @@ class TimeSeriesFile(TimeSeries, HasFSPath):
     if header.bigendian != NATIVE_BIGENDIANNESS[header.typecode]:
       ary.byteswap()
     self.modified = False
+    self._array = ary
     return ary
 
   def _array_peek_offset(self, offset):
