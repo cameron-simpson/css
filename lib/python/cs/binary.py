@@ -139,6 +139,7 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
+from dataclasses import dataclass, fields
 from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
@@ -1634,6 +1635,71 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
         ''' % (field_order,)
     )
     return bmv_class
+
+@decorator
+def binclass(cls):
+  ''' Experimental decorator for `dataclass`-like binary classes.
+  '''
+
+  class BinClass(AbstractBinary):
+    # the inner dataclass
+    _dataclass = dataclass(cls, kw_only=True)
+    # cache a mapping of its fields by name
+    _datafields = {field.name: field for field in fields(_dataclass)}
+    assert all(
+        issubclass(field.type, AbstractBinary)
+        for field in _datafields.values()
+    ), 'all fields must subclass AbstractBinary'
+
+    @classmethod
+    def promote_field_value(cls, fieldname, obj):
+      ''' Promote a received `obj` to an `AbstractBinary` instance.
+      '''
+      return cls._datafields[fieldname].type.promote(obj)
+
+    def __init__(self, **dcls_values):
+      cls = self.__class__
+      # promote nonbinary values to single binary values
+      dvalues = {
+          attr: self.promote_field_value(attr, obj)
+          for attr, obj in dcls_values.items()
+      }
+      self._data = cls.dataclass(**dcls_values)
+
+    def __getattr__(self, attr):
+      ''' Return a data field value, the `.value` attribute if it is a single value field.
+      '''
+      obj = getattr(self._data, attr)
+      if is_single_value(obj):
+        return obj.value
+      return obj
+
+    def __setattr__(self, attr, value):
+      ''' Set a data field from `value`.
+      '''
+      cls = self.__class__
+      try:
+        field = cls._datafields[attr]
+      except KeyError:
+        raise AttributeError(f'{cls.__name__}.{attr}')
+      setattr(self._data, attr, self.promote_field_value(value))
+
+    @classmethod
+    def parse(cls, bfr: CornuCopyBuffer):
+      ''' Parse an instance from `bfr`.
+      '''
+      init_kw = {}
+      for fieldname, field in cls._datafields:
+        with Pfx("%s.parse[%r]", cls.__name__, fieldname):
+          init_kw[fieldname] = field.type.parse(bfr)
+      return cls(**init_kw)
+
+    def transcribe(self):
+      ''' Transcribe this instance.
+      '''
+      yield from self._data.values()
+
+  return BinClass
 
 def BinaryFixedBytes(class_name: str, length: int):
   ''' Factory for an `AbstractBinary` subclass matching `length` bytes of data.
