@@ -664,6 +664,17 @@ class AbstractBinary(ABC):
       file.flush()
     return length
 
+def is_single_value(obj):
+  ''' Test whether `obj` is a single value binary object.
+
+      This currently recognises `BinarySingleValue` instances
+      and tuple based `AbstractBinary` instances of length 1.
+  '''
+  return isinstance(obj, BinarySingleValue) or (
+      isinstance(obj, AbstractBinary) and isinstance(obj, tuple)
+      and tuple.__len__(obj) == 1
+  )
+
 class SimpleBinary(SimpleNamespace, AbstractBinary):
   ''' Abstract binary class based on a `SimpleNamespace`,
       thus providing a nice `__str__` and a keyword based `__init__`.
@@ -696,15 +707,10 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
             (
                 "%s=%s" % (
                     attr, (
-                        cropped_repr(value.value) if (
-                            isinstance(value, BinarySingleValue) or (
-                                isinstance(value, AbstractBinary)
-                                and isinstance(value, tuple)
-                                and tuple.__len__(value) == 1
-                            )
-                        ) else cropped_repr(value)
+                        cropped_repr(obj.value)
+                        if is_single_value(obj) else cropped_repr(obj)
                     )
-                ) for attr, value in attr_values
+                ) for attr, obj in attr_values
             )
         )
     )
