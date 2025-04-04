@@ -395,6 +395,22 @@ class CornuCopyBuffer(Promotable):
     return bfr
 
   @classmethod
+  def from_cli_filespec(cls, filespec: str, **kw):
+    ''' Return a `CornuCopyBuffer` fed from the supplied command
+        line file specification `filespec`.
+
+        If `filespec` is `"-"` return a buffer using `sys.stdin`,
+        otherwise treat it as a filename.
+
+        Note: the use of `sys.stdin` relies on `sys.stdin.fileno()`
+        because we need to do binary reads and `sys.stdin` is
+        normally in text mode.
+    '''
+    if filespec == '-':
+      return cls.from_fd(sys.stdin.fileno(), **kw)
+    return cls.from_filename(filespec, **kw)
+
+  @classmethod
   def from_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Return a `CornuCopyBuffer` fed from the supplied bytes `bs`
         starting at `offset` and ending after `length`.
