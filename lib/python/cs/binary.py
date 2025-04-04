@@ -697,9 +697,11 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
                 "%s=%s" % (
                     attr, (
                         cropped_repr(value.value) if (
-                            isinstance(value, AbstractBinary)
-                            and isinstance(value, tuple)
-                            and tuple.__len__(value) == 1
+                            isinstance(value, BinarySingleValue) or (
+                                isinstance(value, AbstractBinary)
+                                and isinstance(value, tuple)
+                                and tuple.__len__(value) == 1
+                            )
                         ) else cropped_repr(value)
                     )
                 ) for attr, value in attr_values
