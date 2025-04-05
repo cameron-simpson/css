@@ -1630,15 +1630,25 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
 
     bmv_class.__name__ = class_name
     bmv_class.__doc__ = (
-        ''' An `SimpleBinary` which parses and transcribes
-            the fields `%r`.
-        ''' % (field_order,)
+        f'''A `SimpleBinary` which parses and transcribes
+            the fields {field_order!r}.
+        '''
     )
     return bmv_class
 
+# TODO: if a binclass subclasses a binclass the dataclass should
+# subclass the inner super binclass dataclass
+# TODO: can we subclass a non-binclass? Probably not?
 @decorator
 def binclass(cls):
   ''' Experimental decorator for `dataclass`-like binary classes.
+
+      Example use:
+
+          @binclass
+          class SomeStruct:
+              count : UInt32BE
+              flags : UInt8
   '''
 
   class BinClass(AbstractBinary):
