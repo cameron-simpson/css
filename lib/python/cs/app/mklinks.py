@@ -74,7 +74,7 @@ class MKLinksCmd(BaseCommand):
   '''
 
   @popopts
-  def main(self, argv, *, runstate: RunState):
+  def main(self, argv):
     ''' Usage: mklinks [-n] paths...
           Hard link files with identical contents.
     '''
