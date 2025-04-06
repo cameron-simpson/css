@@ -147,13 +147,13 @@ class HashIndexCommand(BaseCommand):
       on their hashcode.
   '''
 
-  USAGE_FORMAT = r'''Usage: {cmd} subcommand...
-    Generate or process file content hash listings.'''
   # pylint: disable=use-dict-literal
   USAGE_KEYWORDS = dict(
       HASHNAME_DEFAULT=HASHNAME_DEFAULT,
       OUTPUT_FORMAT_DEFAULT=OUTPUT_FORMAT_DEFAULT,
   )
+
+  SUBCOMMAND_ARGV_DEFAULT = 'ls'
 
   @dataclass
   class Options(BaseCommand.Options):
