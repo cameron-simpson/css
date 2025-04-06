@@ -404,12 +404,17 @@ def split_usage(doc: Union[str, None],
   try:
     pre_usage, usage_onward = doc.split(usage_marker, 1)
   except ValueError:
-    # no usage: paragraph
-    return doc, '', ''
-  try:
-    usage_format, post_usage = usage_onward.split("\n\n", 1)
-  except ValueError:
-    usage_format, post_usage = usage_onward.rstrip(), ''
+    # no Usage: paragraph
+    # use the first paragraph
+    pre_usage = ''
+    usage_format, *post_usage_paras = doc.split("\n\n")
+    usage_format = f'Usage: {{cmd}} subcommand [options...]\n{usage_format}'
+    post_usage = "\n\n".join(post_usage_paras)
+  else:
+    try:
+      usage_format, post_usage = usage_onward.split("\n\n", 1)
+    except ValueError:
+      usage_format, post_usage = usage_onward.rstrip(), ''
   usage_format = stripped_dedent(usage_format)
   # indent the second and following lines
   try:
