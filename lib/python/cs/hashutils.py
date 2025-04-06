@@ -250,3 +250,10 @@ SHA224 = BaseHashCode.hashclass('sha224')
 SHA256 = BaseHashCode.hashclass('sha256')
 SHA384 = BaseHashCode.hashclass('sha384')
 SHA512 = BaseHashCode.hashclass('sha512')
+# define BLAKE3 if available
+try:
+  from blake3 import blake3
+except ImportError:
+  pass
+else:
+  BLAKE3 = BaseHashCode.hashclass('blake3')
