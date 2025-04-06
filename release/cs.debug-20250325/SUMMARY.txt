@@ -1,0 +1,2 @@
+stack_dump: stack may also be a traceback object or an exception.
+stack_dump: move the logic to obtain the stack into cs.py.stack.frames().

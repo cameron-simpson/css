@@ -1014,7 +1014,7 @@ def without(func):
 
 @uses_upd
 def above(*, upd: Upd):
-  ''' Context manager withdraw the `Upd` while something runs.
+  ''' A context manager to withdraw the `Upd` while something runs.
 
       Example:
 
@@ -1023,7 +1023,7 @@ def above(*, upd: Upd):
           with above_upd():
               os.system('ls -la')
   '''
-  return contextif(None if upd is None else upd.above())
+  return contextif(upd and upd.above)
 
 # pylint: disable=redefined-builtin
 breakpoint = without(builtin_breakpoint)

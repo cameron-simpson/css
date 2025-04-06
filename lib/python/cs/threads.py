@@ -28,13 +28,13 @@ from cs.context import (
 )
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.gimmicks import error, warning
+from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20250306-post'
+__version__ = '20250325-post'
 
 DISTINFO = {
     'description':
@@ -48,7 +48,7 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.excutils',
-        'cs.gimmicks',
+        'cs.logutils',
         'cs.pfx',
         'cs.py.func',
         'cs.py.stack',
@@ -414,7 +414,6 @@ class AdjustableSemaphore(object):
     return "%s[%d]" % (self.__name, self.limit0)
 
   def __enter__(self):
-    from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
     with LogTime("%s(%d).__enter__: acquire", self.__name, self.__value):
       self.acquire()
 
@@ -463,7 +462,6 @@ class AdjustableSemaphore(object):
           self.__sem.release()
           delta -= 1
       else:
-        from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
         while delta < 0:
           with LogTime("AdjustableSemaphore(%s): acquire excess capacity",
                        self.__name):

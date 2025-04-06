@@ -78,10 +78,11 @@ r'''Simple filesystem based file tagging
 
 '''
 
+from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import contextmanager
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 import errno
 from getopt import getopt, GetoptError
@@ -105,20 +106,30 @@ from pathlib import Path
 import shutil
 import sys
 from threading import Lock, RLock
-from typing import Any, Callable, Mapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 from icontract import ensure, require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, Promotable, uses_verbose
+from cs.deco import default_params, fmtdoc, promote, Promotable, uses_verbose
 from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
 from cs.fs import HasFSPath, FSPathBasedSingleton, scandirpaths, scandirtree
 from cs.lex import (
     cutsuffix,
     get_ini_clause_entryname,
     FormatAsError,
+    r,
     titleify_lc,
 )
 from cs.logutils import error, warning, ifverbose
@@ -1653,6 +1664,9 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   def __str__(self):
     return Tag.transcribe_value(str(self.fspath)) + ' ' + str(self.all_tags)
 
+  def __lt__(self, other):
+    return HasFSPath.__lt__(self, other)
+
   @classmethod
   @uses_fstags
   def from_str(cls, fspath, *, fstags: FSTags):
@@ -1986,6 +2000,98 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       update_xattr_value(
           fspath, xattr_name, None if tag_value is None else str(tag_value)
       )
+
+@dataclass
+class TaggedPathSet:
+  ''' A set of `TaggedPath` instances also indexed by their `Tag`s.
+  '''
+
+  # the TaggedPaths
+  members: set[TaggedPath]
+  # mapping of (tag_name,tag_value) to TaggedPath
+  _by_tag_name: Mapping[str, Set[TaggedPath]] = field(
+      default_factory=lambda: defaultdict(set)
+  )
+  _by_tag_value: Mapping[Tuple[str, Any], Set[TaggedPath]] = field(
+      default_factory=lambda: defaultdict(set)
+  )
+  _lock: RLock = field(default_factory=RLock)
+
+  @locked
+  def clear(self):
+    ''' Clear the set.
+    '''
+    self.members.clear()
+    self._by_tag_name = defaultdict(set)
+    self._by_tag_value = defaultdict(set)
+
+  @promote
+  @locked
+  def add(self, path: TaggedPath):
+    ''' Add `path` to the set.
+        This indexes its _current_ tag names and values.
+        To reindex a path, add it again.
+    '''
+    # forget it
+    self.discard(path)
+    # then add it and reindex it
+    self.members.add(path)
+    for tag_name, tag_value in path.items():
+      self._by_tag_name[tag_name] = path
+      try:
+        self._by_tag_value[tag_name, tag_value] = path
+      except TypeError:
+        # tag_value is presumably not hashable
+        pass
+
+  @promote
+  @locked
+  def discard(self, path: TaggedPath):
+    ''' Discard `path` if known.
+        This removes `path` from the main set and the indices.
+    '''
+    self.members.discard(path)
+    for paths in self.__by_tag_name.values():
+      paths.discard(path)
+    for paths in self.__by_tag_values.values():
+      paths.discard(path)
+
+  @promote
+  @locked
+  def __contains__(self, path: TaggedPath):
+    return path in self.members
+
+  @promote
+  @locked
+  def remove(self, path: TaggedPath):
+    if path not in self:
+      raise KeyError
+    self.discard(path)
+
+  @locked
+  def __getitem__(self, key: Union[str, Tuple[str, Any], Tag]):
+    ''' Fetch matching `TaggedPath`s by `key`.
+        This looks up a tag name or a `(name,value)` pair or a `Tag`.
+    '''
+    if isinstance(key, str):
+      paths = self._by_tag_name.get(key, ())
+    elif isinstance(key, tuple):
+      paths = self._by_tag_value.get(key, ())
+    elif isinstance(key, Tag):
+      paths = self._by_tag_value.get((key.name, key.value), ())
+    else:
+      raise TypeError(f'cannot look up this type of key: {r(key)}')
+    return set(path for path in paths if path in self)
+
+  def __iter__(self):
+    return iter(self.members)
+
+  @locked
+  def update(self, paths: Iterable[Union[str, TaggedPath]]):
+    ''' Add `paths` to the set.
+    '''
+    for path in paths:
+      self.add(path)
 
 class FSTagsTagFile(TagFile, HasFSTagsMixin):
   ''' A `FSTagsTagFile` indexing `TagSet`s for file paths

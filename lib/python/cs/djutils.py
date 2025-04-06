@@ -74,7 +74,7 @@ class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
       return super().__call__(argv)
     method = self.method
     instance = method()
-    return instance.run_from_argv([method.__module__, self.cmd] + argv)
+    return instance.run_from_argv([method.__module__, self.cmd, *argv])
 
   def usage_text(self, *, cmd=None, **kw):
     ''' Return the usage text for this subcommand.
@@ -184,8 +184,8 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   class Options(CSBaseCommand.Options):
     settings: type(settings) = field(
         default_factory=lambda: dict(
-            (k, getattr(settings, k, None)) for k in sorted(dir(settings)) if k
-            and not k.startswith('_') and k not in ('SECRET_KEY',)
+            (k, getattr(settings, k, None)) for k in sorted(dir(settings)) if
+            (k and not k.startswith('_') and k not in ('SECRET_KEY',))
         )
     )
 
@@ -233,10 +233,11 @@ def model_batches_qs(
     model: Model,
     field_name='pk',
     *,
+    after=None,
     chunk_size=1024,
     desc=False,
     exclude=None,
-    filter=None,
+    filter=None,  # noqa: A002
     only=None,
 ) -> Iterable[QuerySet]:
   ''' A generator yielding `QuerySet`s which produce nonoverlapping
@@ -253,6 +254,8 @@ def model_batches_qs(
       * `model`: the `Model` to query
       * `field_name`: default `'pk'`, the name of the field on which
         to order the batches
+      * `after`: an optional field value - iteration commences
+        immediately after this value
       * `chunk_size`: the maximum size of each chunk
       * `desc`: default `False`; if true then order the batches in
         descending order instead of ascending order
@@ -309,21 +312,20 @@ def model_batches_qs(
       qs0 = qs0.filter(filter)
   if only is not None:
     qs0 = qs0.only(*only)
-  qs = qs0.order_by(ordering)[:chunk_size]
   while True:
+    qs = qs0
+    if after is not None:
+      qs = qs.filter(**{after_condition: after})
+    qs = qs.order_by(ordering)[:chunk_size]
     key_list = list(qs.only(field_name).values_list(field_name, flat=True))
     if not key_list:
       break
-    end_key = key_list[-1]
     yield qs
-    qs = qs0.filter(**{
-        after_condition: end_key
-    }).order_by(ordering)[:chunk_size]
+    after = key_list[-1]
 
 def model_instances(
     model: Model,
     field_name='pk',
-    only=None,
     **mbqs_kw,
 ) -> Iterable[Model]:
   ''' A generator yielding Model instances.

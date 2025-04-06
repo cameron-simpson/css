@@ -1,3 +1,5 @@
+cs.cmdutils: accept popopts(long_name=(....),short="long_name") sharing a common opt spec
+hashindex check - check hashindex ls style output against files
 cs.cmdutils subcommand help should still recite the common options
 wpr - do not import the osx stuff if we're not updating the spaces - it takes forever
 exract the make-a-dir-of-images from wpr as a tool

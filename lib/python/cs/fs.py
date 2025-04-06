@@ -35,7 +35,7 @@ from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20241122-post'
+__version__ = '20250325-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -276,6 +276,9 @@ class HasFSPath:
 
   def __str__(self):
     return f'{self.__class__.__name__}(fspath={self.shortpath})'
+
+  def __lt__(self, other):
+    return self.fspath < other.fspath
 
   @property
   def shortpath(self):
