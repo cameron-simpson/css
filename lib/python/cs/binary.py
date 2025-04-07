@@ -143,7 +143,18 @@ from dataclasses import dataclass, fields
 from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
-from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
+
+from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import OBSOLETE, decorator, promote, Promotable, strable
@@ -173,19 +184,18 @@ DISTINFO = {
     '>=3.6',
 }
 
-if (sys.version_info.major < 3
-    or (sys.version_info.major == 3 and sys.version_info.minor < 6)):
+if sys.version_info < (3, 6):
   warning(
       "module %r requires Python 3.6 for reliable field ordering but version_info=%s",
       __name__, sys.version_info
   )
 
-def flatten(chunks):
+def flatten(chunks) -> Iterable[bytes]:
   ''' Flatten `chunks` into an iterable of `bytes`-like instances.
       None of the `bytes` instances will be empty.
 
       This exists to allow subclass methods to easily return
-      transcribeable things (having a `.transcribe` method), ASCII
+      transcribable things (having a `.transcribe` method), ASCII
       strings or bytes or iterables or even `None`, in turn allowing
       them simply to return their superclass' chunks iterators
       directly instead of having to unpack them.
@@ -198,7 +208,7 @@ def flatten(chunks):
               yield self.boxes
 
       The binary classes `flatten` the result of the `.transcribe`
-      method to obtain `bytes` insteances for the object's bnary
+      method to obtain `bytes` instances for the object's binary
       transcription.
   '''
   if chunks is None:
@@ -223,7 +233,7 @@ def pt_spec(pt, name=None):
 
       This is largely used to provide flexibility
       in the specifications for the `BinaryMultiValue` factory
-      but can be used as a factory for other simple classes.
+      but can also be used as a factory for other simple classes.
 
       If the specification `pt` is a subclass of `AbstractBinary`
       this is returned directly.
@@ -961,10 +971,13 @@ def BinaryMultiStruct(
         raise ValueError(
             "field name conflicts with AbstractBinary.%s" % (field_name,)
         )
-  tuple_type = namedtuple(class_name or "StructSubValues", field_names)
 
   # pylint: disable=function-redefined
-  class struct_class(tuple_type, AbstractBinary):
+  class struct_class(
+      namedtuple(class_name or "StructSubValues", field_names),
+      AbstractBinary,
+      Promotable,
+  ):
     ''' A struct field for a complex struct format.
     '''
 
@@ -1059,9 +1072,7 @@ def BinarySingleStruct(
           >>> field.value
           515
   '''
-  if field_name is None:
-    field_name = 'value'
-  return BinaryMultiStruct(class_name, struct_format, field_name)
+  return BinaryMultiStruct(class_name, struct_format, field_name or 'value')
 
 # various common values
 UInt8 = BinarySingleStruct('UInt8', 'B')
@@ -1507,9 +1518,14 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
   ''' Construct a `SimpleBinary` subclass named `class_name`
       whose fields are specified by the mapping `field_map`.
 
-      The `field_map` is a mapping of field name to buffer parsers and transcribers.
+      The `field_map` is a mapping of field name
+      to parse/trasncribe specifications suitable for `pt_spec()`;
+      these are all promoted by `pt_spec` into `AbstractBinary` subclasses.
 
-      *Note*:
+      The `field_order` is an optional ordering of the field names;
+      the default comes from the iteration order of `field_map`.
+
+      *Note* for Python <3.6:
       if `field_order` is not specified
       it is constructed by iterating over `field_map`.
       Prior to Python 3.6, `dict`s do not provide a reliable order
@@ -1523,9 +1539,6 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       Subclasses with variable records should override
       the `.parse` and `.transcribe` methods
       accordingly.
-
-      The `field_map` is a mapping of field name
-      to a class returned by the `pt_spec()` function.
 
       If the class has both `parse_value` and `transcribe_value` methods
       then the value itself will be directly stored.
@@ -1569,9 +1582,9 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
             >>> bmv.n2
             34
             >>> bmv  #doctest: +ELLIPSIS
-            BMV(n1=17, n2=34, n3=119, nd=nd_1_short__bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
+            BMV(n1=17, n2=34, n3=119, nd=nd(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
             >>> bmv.nd  #doctest: +ELLIPSIS
-            nd_1_short__bs(short=33154, bs=b'zyxw')
+            nd(short=33154, bs=b'zyxw')
             >>> bmv.nd.bs
             b'zyxw'
             >>> bytes(bmv.nd)
@@ -1589,11 +1602,10 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
   with Pfx("BinaryMultiValue(%r,...)", class_name):
     if field_order is None:
       field_order = tuple(field_map)
-      if (sys.version_info.major, sys.version_info.minor) < (3, 6):
-        warning(
-            "Python version %s < 3.6: dicts are not ordered,"
-            " and the inferred field order may not be correct: %r",
-            sys.version, field_order
+      if len(field_order) > 1 and sys.version_info < (3, 6):
+        raise ValueError(
+            f'class {class_name}: Python version {sys.version} < 3.6:'
+            ' dicts are not ordered and so we cannot infer the field_order'
         )
     else:
       field_order = tuple(
