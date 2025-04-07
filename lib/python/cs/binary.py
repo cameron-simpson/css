@@ -148,7 +148,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from cs.buffer import CornuCopyBuffer
 from cs.deco import OBSOLETE, decorator, promote, Promotable, strable
 from cs.gimmicks import warning, debug
-from cs.lex import cropped, cropped_repr, stripped_dedent, typed_str
+from cs.lex import cropped, cropped_repr, r, stripped_dedent, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
@@ -1641,17 +1641,28 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
 # TODO: can we subclass a non-binclass? Probably not?
 @decorator
 def binclass(cls):
-  ''' Experimental decorator for `dataclass`-like binary classes.
+  r'''Experimental decorator for `dataclass`-like binary classes.
 
       Example use:
 
-          @binclass
-          class SomeStruct:
-              count : UInt32BE
-              flags : UInt8
+          >>> @binclass
+          ... class SomeStruct:
+          ...     """A struct containing a count and some flags."""
+          ...     count : UInt32BE
+          ...     flags : UInt8
+          >>> ss = SomeStruct(count=3, flags=0x04)
+          >>> ss
+          SomeStruct(count=UInt32BE(value=3), flags=UInt8(value=4))
+          >>> print(ss)
+          SomeStruct(count=3,flags=4)
+          >>> bytes(ss)
+          b'\x00\x00\x00\x03\x04'
+          >>> SomeStruct.promote(b'\x00\x00\x00\x03\x04')
+          SomeStruct(count=UInt32BE(value=3), flags=UInt8(value=4))
   '''
 
   class BinClass(AbstractBinary):
+
     # the inner dataclass
     _dataclass = dataclass(cls, kw_only=True)
     # cache a mapping of its fields by name
@@ -1661,25 +1672,46 @@ def binclass(cls):
         for field in _datafields.values()
     ), 'all fields must subclass AbstractBinary'
 
+    def __init__(self, **dcls_kwargs):
+      self.__dict__['_data'] = None  # get dummy entry in early, aids debugging
+      cls = self.__class__
+      # promote nonbinary values to single binary values
+      dcls_kwargs = {
+          attr: self.promote_field_value(attr, obj)
+          for attr, obj in dcls_kwargs.items()
+      }
+      dcls = cls._dataclass(**dcls_kwargs)
+      self.__dict__['_data'] = dcls
+
+    def __str__(self):
+      cls = self.__class__
+      fieldnames = [field.name for field in cls._datafields.values()]
+      if len(fieldnames) == 1:
+        return str(getattr(self, fieldnames[0]))
+      return "%s(%s)" % (
+          cls.__name__,
+          ",".join(
+              f'{fieldname}={getattr(self,fieldname)}'
+              for fieldname in fieldnames
+          ),
+      )
+
+    def __repr__(self):
+      return repr(self._data)
+
     @classmethod
     def promote_field_value(cls, fieldname, obj):
       ''' Promote a received `obj` to an `AbstractBinary` instance.
       '''
       return cls._datafields[fieldname].type.promote(obj)
 
-    def __init__(self, **dcls_values):
-      cls = self.__class__
-      # promote nonbinary values to single binary values
-      dvalues = {
-          attr: self.promote_field_value(attr, obj)
-          for attr, obj in dcls_values.items()
-      }
-      self._data = cls.dataclass(**dcls_values)
-
     def __getattr__(self, attr):
       ''' Return a data field value, the `.value` attribute if it is a single value field.
       '''
       obj = getattr(self._data, attr)
+      assert isinstance(
+          obj, AbstractBinary
+      ), f'{self._data}.{attr}={r(obj)} is not an AbstractBinary'
       if is_single_value(obj):
         return obj.value
       return obj
@@ -1699,7 +1731,7 @@ def binclass(cls):
       ''' Parse an instance from `bfr`.
       '''
       init_kw = {}
-      for fieldname, field in cls._datafields:
+      for fieldname, field in cls._datafields.items():
         with Pfx("%s.parse[%r]", cls.__name__, fieldname):
           init_kw[fieldname] = field.type.parse(bfr)
       return cls(**init_kw)
@@ -1707,7 +1739,9 @@ def binclass(cls):
     def transcribe(self):
       ''' Transcribe this instance.
       '''
-      yield from self._data.values()
+      cls = self.__class__
+      for fieldname in cls._datafields:
+        yield getattr(self._data, fieldname).transcribe()
 
   return BinClass
 
