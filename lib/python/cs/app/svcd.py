@@ -363,8 +363,9 @@ def LockedPopen(*argv, **popen_kw):
       slightly not multithead safe. This function exists to test
       that theory.
   '''
+  argv = prep_argv(*argv)
   with _Popen_lock:
-    return Popen(*prep_argv(*argv), **popen_kw)  # pylint: disable=consider-using-with
+    return Popen(argv, **popen_kw)  # pylint: disable=consider-using-with
 
 def callproc(*a, **kw):
   ''' Workalike for subprocess.call, using LockedPopen.
