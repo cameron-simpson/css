@@ -92,8 +92,7 @@ USAGE = '''Usage:
     -A  Automatic. Maintain a port forward to "foo" for each set
         flag PORTFWD_FOO_AUTO.
     -F  Ssh configuration file with clause for target.
-        Default from $PORTFWD_SSH_CONFIG,
-        otherwise ~/.ssh/config-pf, otherwise ~/.ssh/config.
+        Default from $PORTFWD_SSH_CONFIG, otherwise ~/.ssh/config.
     -n  No action. Recite final command.
     -x  Trace execution.
     -v  Verbose. Passed to ssh.
@@ -588,9 +587,7 @@ class Portfwds(object):
     '''
     cfg = self._ssh_config
     if cfg is None:
-      cfg = envsub('$HOME/.ssh/config-pf')
-      if not pathexists(cfg):
-        cfg = envsub('$HOME/.ssh/config')
+      cfg = envsub('$HOME/.ssh/config')
     return cfg
 
   def resolve_target_spec(self, spec):
