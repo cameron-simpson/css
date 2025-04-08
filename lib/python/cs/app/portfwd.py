@@ -267,7 +267,7 @@ class Portfwd(FlaggedMixin):
     ''' Initialise the Portfwd.
 
         Parameters:
-        * `target`: the tunnel name, and also the name of the ssh configuration used
+        * `target`: the tunnel name
         * `ssh_config`: ssh configuration file if not the default
         * `conditions`: an iterable of `Condition`s
           which must hold before the tunnel is set up;
@@ -353,12 +353,18 @@ class Portfwd(FlaggedMixin):
       argv.extend(['--', self.target])
     return argv
 
+  @property
+  def ssh_clause_name(self):
+    ''' The name of the ssh clause associated with `self.target`.
+    '''
+    return f'{self.target}-pf'
+
   def get_ssh_options(self):
     ''' Return a defaultdict(list) of `{option: values}`
         representing the ssh configuration.
     '''
     with Pfx("get_ssh_options(%r)", self.target):
-      argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
+      argv = self.ssh_argv(bare=True) + ['-G', '--', self.ssh_clause_name]
       P = pipefrom(argv, quiet=not self.verbose)
       options = defaultdict(list)
       parsed = [line.strip().split(None, 1) for line in P.stdout]
