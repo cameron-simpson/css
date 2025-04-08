@@ -330,28 +330,20 @@ class Portfwd(FlaggedMixin):
   def ssh_argv(self, bare=False):
     ''' An ssh command line argument list.
 
-        `bare`: just to command and options, no trailing "--".
+        Parameters:
+        * `bare`: just the command and options, no trailing "--"
     '''
-    argv = ['ssh']
-    if self.verbose:
-      argv.append('-v')
-    if self.ssh_config:
-      argv.extend(['-F', self.ssh_config])
-    argv.extend(
-        [
-            '-N',
-            '-T',
-            '-o',
-            'ExitOnForwardFailure=yes',
-            '-o',
-            'PermitLocalCommand=yes',
-            '-o',
-            'LocalCommand=' + self.ssh_localcommand,
-        ]
-    )
-    if not bare:
-      argv.extend(['--', self.target])
-    return argv
+    return [
+        'ssh',
+        self.verbose and '-v',
+        self.ssh_config and ('-F', self.ssh_config),
+        '-N',
+        '-T',
+        ('-o', 'ExitOnForwardFailure=yes'),
+        ('-o', 'PermitLocalCommand=yes'),
+        ('-o', f'LocalCommand={self.ssh_localcommand}'),
+        not bare and ('--', self.ssh_clause_name),
+    ]
 
   @property
   def ssh_clause_name(self):
