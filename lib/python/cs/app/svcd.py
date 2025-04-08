@@ -61,9 +61,10 @@ from cs.logutils import warning, info, debug, exception
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import (
     PidFileManager,
-    write_pidfile,
+    prep_argv,
     remove_pidfile,
     signal_handlers,
+    write_pidfile,
 )
 from cs.sh import quoteargv
 
@@ -354,7 +355,7 @@ class SvcDCommand(BaseCommand):
 
 _Popen_lock = Lock()
 
-def LockedPopen(*a, **kw):
+def LockedPopen(*argv, **popen_kw):
   ''' Serialise the `Popen` calls.
 
       My long term multithreaded `SvcD` programmes sometimes coredumps.
@@ -363,8 +364,7 @@ def LockedPopen(*a, **kw):
       that theory.
   '''
   with _Popen_lock:
-    P = Popen(*a, **kw)  # pylint: disable=consider-using-with
-  return P
+    return Popen(*prep_argv(*argv), **popen_kw)  # pylint: disable=consider-using-with
 
 def callproc(*a, **kw):
   ''' Workalike for subprocess.call, using LockedPopen.
@@ -537,7 +537,7 @@ class SvcD(FlaggedMixin, object):
     if self.subp is not None:
       raise RuntimeError("already running")
     self.dbg("%s: spawn %r", self.name, self.argv)
-    self.subp = LockedPopen([*self.pre_argv, *self.argv], stdin=DEVNULL)
+    self.subp = LockedPopen(*self.pre_argv, *self.argv, stdin=DEVNULL)
     self.flag_running = True
     self.alert('STARTED')
     if self.pidfile is not None:
