@@ -382,8 +382,7 @@ class Portfwd(FlaggedMixin):
     alert_argv = [
         'alert', '-g', alert_group, '-t', alert_title, '--', alert_message
     ]
-    shcmd = 'exec </dev/null; ' + shq(setflag_argv
-                                      ) + '; ' + shq(alert_argv) + ' &'
+    shcmd = f'exec </dev/null; {shq(setflag_argv)};{shq(alert_argv)} &'
     return shcmd
 
   def on_spawn(self):
