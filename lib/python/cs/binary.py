@@ -1051,6 +1051,14 @@ def BinaryMultiStruct(
         '''
         return struct.pack(value)
 
+      @classmethod
+      def promote(cls, obj):
+        ''' Promote a single value to an instance of `cls`.
+        '''
+        if isinstance(obj, cls):
+          return obj
+        return cls(**{field_names[0]: obj})
+
   struct_class.__name__ = class_name
   struct_class.__doc__ = (
       ''' An `AbstractBinary` `namedtuple` which parses and transcribes
