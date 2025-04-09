@@ -340,6 +340,47 @@ class AbstractBinary(Promotable, ABC):
       - `scan`* methods are generators yielding successive instances from a buffer
   '''
 
+  def __str__(self, attr_names=None, attr_choose=None, str_func=None):
+    ''' The string summary of this object.
+        If called explicitly rather than via `str()` the following
+        optional parametsrs may be supplied:
+        * `attr_names`: an iterable of `str` naming the attributes to include;
+          the default if the keys of `self.__dict__`
+        * `attr_choose`: a callable to select amongst the attribute names names;
+          the default is to choose names which do not start with an underscore
+        * `str_func`: a callable returning the string form of an attribute value;
+          the default returns `cropped_repr(v)` where `v` is the value's `.value`
+          attribute for single value objects otherwise the object itself
+    '''
+    if attr_names is None:
+      attr_names = sorted(self.__dict__.keys())
+    if attr_choose is None:
+      # pylint: disable=unnecessary-lambda-assignment
+      attr_choose = lambda attr: not attr.startswith('_')
+    if str_func is None:
+      str_func = lambda obj: (
+          cropped_repr(obj.value)
+          if is_single_value(obj) else cropped_repr(obj)
+      )
+    attr_values = [
+        (attr, getattr(self, attr, None))
+        for attr in attr_names
+        if attr_choose(attr)
+    ]
+    return "%s(%s)" % (
+        type(self).__name__, ','.join(
+            ("%s=%s" % (attr, str_func(obj)) for attr, obj in attr_values)
+        )
+    )
+
+  def __repr__(self):
+    return "%s(%s)" % (
+        self.__class__.__name__, ",".join(
+            "%s=%s:%s" % (attr, type(value).__name__, cropped_repr(value))
+            for attr, value in self.__dict__.items()
+        )
+    )
+
   # pylint: disable=deprecated-decorator
   @abstractclassmethod
   def parse(cls, bfr: CornuCopyBuffer):
@@ -701,30 +742,6 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
               """
               super().__init__(field1=field1, field2=field2)
   '''
-
-  def __str__(self, attr_names=None, attr_choose=None):
-    if attr_names is None:
-      attr_names = sorted(self.__dict__.keys())
-    if attr_choose is None:
-      # pylint: disable=unnecessary-lambda-assignment
-      attr_choose = lambda attr: not attr.startswith('_')
-    attr_values = [
-        (attr, getattr(self, attr, None))
-        for attr in attr_names
-        if attr_choose(attr)
-    ]
-    return "%s(%s)" % (
-        type(self).__name__, ','.join(
-            (
-                "%s=%s" % (
-                    attr, (
-                        cropped_repr(obj.value)
-                        if is_single_value(obj) else cropped_repr(obj)
-                    )
-                ) for attr, obj in attr_values
-            )
-        )
-    )
 
 class BinarySingleValue(AbstractBinary):
   ''' A representation of a single value as the attribute `.value`.
