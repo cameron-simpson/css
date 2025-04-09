@@ -5,11 +5,11 @@ sshopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -o) sshopts="$sshopts $1 $2"; shift ;;
-    -v) sshopts="$sshopts $1" ;;
-    --) shift; break ;;
-    -?*)echo "$0: unsupported option: $1"; exit 2 ;;
-    *)  break ;;
+    -o)     sshopts="$sshopts $1 $2"; shift ;;
+    -[Gv])  sshopts="$sshopts $1" ;;
+    --)     shift; break ;;
+    -?*)    echo "$0: unsupported option: $1"; exit 2 ;;
+    *)      break ;;
   esac
   shift
 done
