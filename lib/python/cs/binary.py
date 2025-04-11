@@ -618,7 +618,7 @@ class AbstractBinary(Promotable, ABC):
         `self.scan_with_offsets(..,**kw)` according to the
         `with_offsets` parameter.
 
-        *Deprecated; please just call `scan` with a filesystem pathname.
+        *Deprecated; please just call `scan` with a filesystem pathname.*
 
         Parameters:
         * `fspath`: the filesystem path of the file to scan
@@ -1764,7 +1764,7 @@ def binclass(cls):
 
     @classmethod
     def promote_field_value(cls, fieldname, obj):
-      ''' Promote a received `obj` to an `AbstractBinary` instance.
+      ''' Promote a received `obj` to the appropriate `AbstractBinary` instance.
       '''
       return cls._datafields[fieldname].type.promote(obj)
 
