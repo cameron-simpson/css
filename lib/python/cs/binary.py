@@ -1373,6 +1373,14 @@ class BSData(BinarySingleValue, type=Buffer):
     '''
     return BSData(bs).data_offset
 
+  @classmethod
+  def promote(cls, obj):
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, Buffer):
+      return cls(bytes(obj))
+    raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
+
 class BSString(BinarySingleValue, type=str):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
