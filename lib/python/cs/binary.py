@@ -139,6 +139,10 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
+try:
+  from collections.abc import Buffer
+except ImportError:
+  from typing import ByteString as Buffer
 from dataclasses import dataclass, fields
 from struct import Struct  # pylint: disable=no-name-in-module
 import sys
