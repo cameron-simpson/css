@@ -1009,6 +1009,8 @@ def BinaryMultiStruct(
     ''' A struct field for a complex struct format.
     '''
 
+    _field_names = tuple(field_names)
+
     @classmethod
     @promote
     def parse(cls, bfr: CornuCopyBuffer):
