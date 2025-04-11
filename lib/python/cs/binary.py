@@ -1040,6 +1040,12 @@ def BinaryMultiStruct(
 
     if len(field_names) == 1:
 
+      def __str__(self):
+        return str(self[0])
+
+      ##def __repr__(self):
+      ##  return repr(self[0])
+
       def __int__(self):
         return int(self[0])
 
@@ -1053,12 +1059,6 @@ def BinaryMultiStruct(
           ''' Alias `.value` as the first (and only) struct value.
           '''
           return self[0]
-
-      def __str__(self):
-        return str(self[0])
-
-      def __repr__(self):
-        return repr(self[0])
 
       @classmethod
       def parse_value(cls, bfr: CornuCopyBuffer):
