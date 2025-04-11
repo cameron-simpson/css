@@ -764,7 +764,18 @@ class BinarySingleValue(AbstractBinary):
       * `transcribe` or `transcribe_value`
   '''
 
+  @classmethod
+  def __init_subclass__(cls, *, type, **isc_kw):
+    if not issubclass(type, object):
+      raise TypeError(f'{cls}.__init_subclass: type={r(type)} is not a type')
+    super().__init_subclass__(**isc_kw)
+    cls.VALUE_TYPE = type
+
   def __init__(self, value):
+    if not isinstance(value, self.__class__.VALUE_TYPE):
+      raise TypeError(
+          f'{self.__class__}: value is not an instance of {self.__class__.VALUE_TYPE}: {r(value)}'
+      )
     self.value = value
 
   def __repr__(self):
@@ -1223,7 +1234,7 @@ Float64LE.TEST_CASES = (
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
 )
 
-class BSUInt(BinarySingleValue):
+class BSUInt(BinarySingleValue, type=int):
   ''' A binary serialised unsigned `int`.
 
       This uses a big endian byte encoding where continuation octets
@@ -1304,7 +1315,7 @@ class BSUInt(BinarySingleValue):
       n >>= 7
     return bytes(reversed(bs))
 
-class BSData(BinarySingleValue):
+class BSData(BinarySingleValue, type=Buffer):
   ''' A run length encoded data chunk, with the length encoded as a `BSUInt`.
   '''
 
@@ -1382,7 +1393,7 @@ class BSString(BinarySingleValue):
     payload = value.encode(encoding)
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
-class BSSFloat(BinarySingleValue):
+class BSSFloat(BinarySingleValue, type=float):
   ''' A float transcribed as a `BSString` of `str(float)`.
   '''
 
@@ -1803,7 +1814,7 @@ def BinaryFixedBytes(class_name: str, length: int):
   '''
   return BinarySingleStruct(class_name, f'>{length}s', 'data')
 
-class BinaryUTF8NUL(BinarySingleValue):
+class BinaryUTF8NUL(BinarySingleValue, type=str):
   ''' A NUL terminated UTF-8 string.
   '''
 
@@ -1859,7 +1870,7 @@ class BinaryUTF8NUL(BinarySingleValue):
     yield s.encode('utf-8')
     yield b'\0'
 
-class BinaryUTF16NUL(BinarySingleValue):
+class BinaryUTF16NUL(BinarySingleValue, type=str):
   ''' A NUL terminated UTF-16 string.
   '''
 
