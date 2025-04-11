@@ -357,7 +357,7 @@ class AbstractBinary(Promotable, ABC):
           attribute for single value objects otherwise the object itself
     '''
     if attr_names is None:
-      attr_names = sorted(self.__dict__.keys())
+      attr_names = self._field_names
     if attr_choose is None:
       # pylint: disable=unnecessary-lambda-assignment
       attr_choose = lambda attr: not attr.startswith('_')
@@ -384,6 +384,10 @@ class AbstractBinary(Promotable, ABC):
             for attr, value in self.__dict__.items()
         )
     )
+
+  @property
+  def _field_names(self):
+    return self.__dict__.keys()
 
   # pylint: disable=deprecated-decorator
   @abstractclassmethod
