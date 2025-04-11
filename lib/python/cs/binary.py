@@ -1725,7 +1725,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
 # subclass the inner super binclass dataclass
 # TODO: can we subclass a non-binclass? Probably not?
 @decorator
-def binclass(cls):
+def binclass(cls, kw_only=True):
   r'''Experimental decorator for `dataclass`-like binary classes.
 
       Example use:
@@ -1737,25 +1737,74 @@ def binclass(cls):
           ...     flags : UInt8
           >>> ss = SomeStruct(count=3, flags=0x04)
           >>> ss
-          SomeStruct(count=UInt32BE(value=3), flags=UInt8(value=4))
+          SomeStruct:SomeStruct__dataclass(count=UInt32BE(value=3),flags=UInt8(value=4))
           >>> print(ss)
           SomeStruct(count=3,flags=4)
           >>> bytes(ss)
           b'\x00\x00\x00\x03\x04'
           >>> SomeStruct.promote(b'\x00\x00\x00\x03\x04')
-          SomeStruct(count=UInt32BE(value=3), flags=UInt8(value=4))
+          SomeStruct:SomeStruct__dataclass(count=UInt32BE(value=3),flags=UInt8(value=4))
+
+      Extending an existing `@binclass` class, for example to add
+      the body of a structure to some header part:
+
+          >>> @binclass
+          ... class HeaderStruct:
+          ...     """A header containing a count and some flags."""
+          ...     count : UInt32BE
+          ...     flags : UInt8
+          >>> @binclass
+          ... class Packet(HeaderStruct):
+          ...     body_text : BSString
+          ...     body_data : BSData
+          ...     body_longs : BinaryMultiStruct(
+          ...         'longs', '>LL', 'long1 long2'
+          ...     )
+          >>> packet = Packet(
+          ...     count=5, flags=0x03,
+          ...     body_text="hello",
+          ...     body_data=b'xyzabc',
+          ...     body_longs=(10,20),
+          ... )
+          >>> packet
+          Packet:Packet__dataclass(count=UInt32BE(value=5),flags=UInt8(value=3),body_text=BSString('hello'),body_data=BSData(b'xyzabc'),body_longs=longs(long1=10, long2=20))
   '''
+
+  # collate the annotated class attributes
+  attr_annotations = {}
+  for supercls in reversed(cls.__mro__):
+    for attr, type in getattr(supercls, '__annotations__', {}).items():
+      attr_annotations[attr] = type
+  if not attr_annotations:
+    raise TypeError(f'{cls} has no annotated attributes')
+
+  # create the dataclass
+  class dcls:
+    pass
+
+  for attr in attr_annotations.keys():
+    try:
+      attr_value = getattr(cls, attr)
+    except AttributeError:
+      continue
+    setattr(dcls, attr, attr_value)
+  dcls.__annotations__ = attr_annotations
+  dcls.__doc__ = f'The inner dataclass supporting {cls.__module__}.{cls.__name__}.'
+  dcls.__name__ = f'{cls.__name__}__dataclass'
+  dcls = dataclass(dcls, kw_only=kw_only)
+
+  # cache a mapping of its fields by name
+  # this dict's keys will be in the fields() order
+  fieldmap = {field.name: field for field in fields(dcls)}
+  assert all(
+      issubclass(field.type, AbstractBinary) for field in fieldmap.values()
+  ), 'all fields must subclass AbstractBinary'
 
   class BinClass(AbstractBinary):
 
-    # the inner dataclass
-    _dataclass = dataclass(cls, kw_only=True)
-    # cache a mapping of its fields by name
-    _datafields = {field.name: field for field in fields(_dataclass)}
-    assert all(
-        issubclass(field.type, AbstractBinary)
-        for field in _datafields.values()
-    ), 'all fields must subclass AbstractBinary'
+    _dataclass = dcls
+    _datafields = fieldmap
+    _field_names = tuple(fieldmap)
 
     def __init__(self, **dcls_kwargs):
       self.__dict__['_data'] = None  # get dummy entry in early, aids debugging
@@ -1765,16 +1814,16 @@ def binclass(cls):
           attr: self.promote_field_value(attr, obj)
           for attr, obj in dcls_kwargs.items()
       }
-      dcls = cls._dataclass(**dcls_kwargs)
-      self.__dict__['_data'] = dcls
+      dataobj = cls._dataclass(**dcls_kwargs)
+      self.__dict__['_data'] = dataobj
 
     def __str__(self):
       cls = self.__class__
-      fieldnames = [field.name for field in cls._datafields.values()]
+      fieldnames = self._field_names
       if len(fieldnames) == 1:
         return str(getattr(self, fieldnames[0]))
       return "%s(%s)" % (
-          cls.__name__,
+          self.__class__.__name__,
           ",".join(
               f'{fieldname}={getattr(self,fieldname)}'
               for fieldname in fieldnames
@@ -1782,7 +1831,17 @@ def binclass(cls):
       )
 
     def __repr__(self):
-      return repr(self._data)
+      cls = self.__class__
+      data = self._data
+      fieldnames = self._field_names
+      return "%s:%s(%s)" % (
+          self.__class__.__name__,
+          data.__class__.__name__,
+          ",".join(
+              f'{fieldname}={getattr(data,fieldname)!r}'
+              for fieldname in fieldnames
+          ),
+      )
 
     @classmethod
     def promote_field_value(cls, fieldname, obj):
@@ -1793,7 +1852,10 @@ def binclass(cls):
     def __getattr__(self, attr):
       ''' Return a data field value, the `.value` attribute if it is a single value field.
       '''
-      obj = getattr(self._data, attr)
+      try:
+        obj = getattr(self._data, attr)
+      except AttributeError as e:
+        raise AttributeError(f'{self.__class__.__name__}._data.{attr}') from e
       assert isinstance(
           obj, AbstractBinary
       ), f'{self._data}.{attr}={r(obj)} is not an AbstractBinary'
@@ -1809,7 +1871,9 @@ def binclass(cls):
         field = cls._datafields[attr]
       except KeyError:
         raise AttributeError(f'{cls.__name__}.{attr}')
-      setattr(self._data, attr, self.promote_field_value(value))
+      dataobj = self._data
+      datavalue = self.promote_field_value(attr, value)
+      setattr(dataobj, attr, datavalue)
 
     @classmethod
     def parse(cls, bfr: CornuCopyBuffer):
