@@ -361,6 +361,8 @@ class AbstractBinary(Promotable, ABC):
     if attr_choose is None:
       # pylint: disable=unnecessary-lambda-assignment
       attr_choose = lambda attr: not attr.startswith('_')
+    elif attr_choose is True:
+      attr_choose = lambda: True
     if str_func is None:
       str_func = lambda obj: (
           cropped_repr(obj.value)
