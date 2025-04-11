@@ -1081,6 +1081,20 @@ def BinaryMultiStruct(
         if isinstance(obj, cls):
           return obj
         return cls(**{field_names[0]: obj})
+    else:
+
+      @classmethod
+      def promote(cls, obj):
+        ''' Promote an iterable of field values to an instance of `cls`.
+        '''
+        if isinstance(obj, cls):
+          return obj
+        return cls(
+            **{
+                field_name: item
+                for field_name, item in zip(field_names, obj)
+            }
+        )
 
   struct_class.__name__ = class_name
   struct_class.__doc__ = (
