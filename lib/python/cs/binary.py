@@ -1373,7 +1373,7 @@ class BSData(BinarySingleValue, type=Buffer):
     '''
     return BSData(bs).data_offset
 
-class BSString(BinarySingleValue):
+class BSString(BinarySingleValue, type=str):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
 
