@@ -1217,43 +1217,6 @@ def add_body_subclass(superclass, box_type, section, desc):
 
   return _SubClass
 
-class OverBox(BinaryListValues):
-  ''' A fictitious `Box` encompassing all the Boxes in an input buffer.
-  '''
-
-  @property
-  def boxes(self):
-    ''' Alias `.value` as `.boxes`: the `Box`es encompassed by this `OverBox`.
-    '''
-    return self.values
-
-  # TODO: this seems to parse a single `Box`: can we drop `OverBox`?
-  @classmethod
-  def parse(cls, bfr: CornuCopyBuffer):
-    ''' Parse the `OverBox`.
-    '''
-    offset = bfr.offset
-    self = super().parse(bfr, pt=Box)
-    self.offset = offset
-    self.end_offset = bfr.offset
-    return self
-
-  @property
-  def length(self):
-    ''' The `OverBox` is as long as the subsidary Boxes.
-    '''
-    return sum(map(len, self.boxes))
-
-  def walk(self):
-    ''' Walk the `Box`es in the `OverBox`, like `Box.walk()`.
-
-        Note: this does not yield the `OverBox` itself, it isn't really a `Box`.
-    '''
-    subboxes = list(iter(self.boxes))
-    ## not really a Box ## yield 0, self, subboxes
-    for subbox in subboxes:
-      yield from subbox.walk(1)
-
 class FullBoxBody(BoxBody):
   ''' A common extension of a basic `BoxBody`, with a version and flags field.
       ISO14496 section 4.2.
