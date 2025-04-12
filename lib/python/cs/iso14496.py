@@ -44,6 +44,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand, popopts
+from cs.deco import decorator
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
 from cs.imageutils import sixel_from_image_bytes
@@ -347,6 +348,26 @@ class MP4Command(BaseCommand):
     import cs.iso14496_tests
     cs.iso14496_tests.selftest([self.options.cmd] + argv)
 
+@decorator
+def parse_offsets(parse, report=False):
+  ''' Decorate `parse` to record the buffer starting offset as `self.offset`
+      and the buffer post parse offset as `self.end_offset`.
+      If the decorator parameter `report` is true,
+      call `bfr.report_offset()` with the starting offset at the end of the parse.
+  '''
+
+  @trace
+  def parse_wrapper(cls, bfr: CornuCopyBuffer, **parse_kw):
+    offset = bfr.offset
+    self = trace(parse)(cls, bfr, **parse_kw)
+    self.offset = offset
+    self.end_offset = bfr.offset
+    if report:
+      bfr.report_offset(offset)
+    return self
+
+  return parse_wrapper
+
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
 
@@ -537,12 +558,11 @@ class BoxHeader(BinaryMultiValue('BoxHeader', {
   MAX_BOX_SIZE_32 = 2**32 - 8
 
   @classmethod
+  @parse_offsets
   def parse(cls, bfr: CornuCopyBuffer):
     ''' Decode a box header from `bfr`.
     '''
     self = cls()
-    # note start of header
-    self.offset = bfr.offset
     box_size = UInt32BE.parse_value(bfr)
     box_type = self.box_type = bfr.take(4)
     if box_size == 0:
@@ -559,8 +579,6 @@ class BoxHeader(BinaryMultiValue('BoxHeader', {
       self.user_type = bfr.take(16)
     else:
       self.user_type = None
-    # note end of self
-    self.end_offset = bfr.offset
     self.type = box_type
     return self
 
@@ -700,6 +718,7 @@ class BoxBody(SimpleBinary):
     yield from self.boxes
 
   @classmethod
+  @parse_offsets
   def parse(cls, bfr: CornuCopyBuffer):
     ''' Create a new instance and gather the `Box` body fields from `bfr`.
 
@@ -850,11 +869,11 @@ class Box(SimpleBinary):
     yield from iter(self.body)
 
   @classmethod
+  @parse_offsets(report=True)
   def parse(cls, bfr: CornuCopyBuffer):
     ''' Decode a `Box` from `bfr` and return it.
     '''
     self = cls()
-    self.offset = bfr.offset
     header = self.header = BoxHeader.parse(bfr)
     with Pfx("%s.parse", header.box_type):
       length = header.box_size
@@ -880,9 +899,7 @@ class Box(SimpleBinary):
       if bfr_tail is not bfr:
         assert not bfr_tail.bufs, "bfr_tail.bufs=%r" % (bfr_tail.bufs,)
         bfr_tail.flush()
-      self.end_offset = bfr.offset
       self.self_check()
-      bfr.report_offset(self.offset)
       copy_boxes = PARSE_MODE.copy_boxes
       if copy_boxes:
         copy_boxes(self)
