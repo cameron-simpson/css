@@ -1755,9 +1755,6 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
     )
     return bmv_class
 
-# TODO: if a binclass subclasses a binclass the dataclass should
-# subclass the inner super binclass dataclass
-# TODO: can we subclass a non-binclass? Probably not?
 @decorator
 def binclass(cls, kw_only=True):
   r'''Experimental decorator for `dataclass`-like binary classes.
@@ -1878,7 +1875,14 @@ def binclass(cls, kw_only=True):
       )
 
     @classmethod
-    def promote_field_value(cls, fieldname, obj):
+    def parse_field(cls, fieldname: str, bfr: CornuCopyBuffer):
+      ''' Parse an instance of the field named `fieldname` from `bfr`.
+          Return the instance.
+      '''
+      return cls._datafields[fieldname].type.parse(bfr)
+
+    @classmethod
+    def promote_field_value(cls, fieldname: str, obj):
       ''' Promote a received `obj` to the appropriate `AbstractBinary` instance.
       '''
       return cls._datafields[fieldname].type.promote(obj)
