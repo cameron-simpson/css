@@ -191,7 +191,9 @@ class HashIndexCommand(BaseCommand):
           yield
 
   @staticmethod
-  def popdirspec(argv: List[str], name: str = 'dirspec') -> RemotePath:
+  def poppathspec(
+      argv: List[str], name: str = 'dirspec', check_isdir=False
+  ) -> RemotePath:
     ''' Pop a leading dirspec from `argv`, a filesystem path with
         an optional leading `[user@]rhost:` prefix.
         Return a `(host,fspath)` 2-tuple being the remote host (`None` if omitted)
@@ -205,9 +207,8 @@ class HashIndexCommand(BaseCommand):
       dirspec = RemotePath.from_str(spec)
       host, fspath = dirspec
       if host is None:
-        if fspath != '-':
-          if not isdirpath(fspath):
-            raise GetoptError(f'not a directory: {fspath!r}')
+        if check_isdir and fspath != '-' and not isdirpath(fspath):
+          raise GetoptError(f'not a directory: {fspath!r}')
       elif fspath == '-':
         raise GetoptError(f'remote {fspath!r} not supported')
     return dirspec
