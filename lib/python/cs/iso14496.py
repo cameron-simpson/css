@@ -53,7 +53,14 @@ from cs.deco import decorator
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
 from cs.imageutils import sixel_from_image_bytes
-from cs.lex import cropped_repr, get_identifier, get_decimal_value, printt, tabulate
+from cs.lex import (
+    cropped_repr,
+    cutsuffix,
+    get_identifier,
+    get_decimal_value,
+    printt,
+    tabulate,
+)
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.tagset import TagSet, Tag
@@ -1109,7 +1116,7 @@ class Box(SimpleBinary):
                   body.__class__.__doc__.strip().split("\n")[0],
               ) if dump_fields else (
                   f'{row_indent}{box.box_type_s}',
-                  str(body),
+                  cutsuffix(str(body), '()'),
               )
           )
       )
