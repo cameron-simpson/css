@@ -720,7 +720,7 @@ class BoxBody(SimpleBinary):
         store the instance as the field `field_name+'__Binary'`
         for transcription.
 
-        Note that this disassociaes the plain value attribute
+        Note that this disassociates the plain value attribute
         from what gets transcribed.
     '''
     instance = binary_cls.parse(bfr)
@@ -810,12 +810,12 @@ class Box(SimpleBinary):
     try:
       body = self.body
     except AttributeError:
-      s = "%s:NO_BODY" % (type_name,)
+      s = f'{type_name}:NO_BODY'
     else:
-      s = "%s[%d]:%s" % (type_name, self.parse_length, body)
+      s = f'{type_name}[{self.parse_length}]{body}'
     unparsed_bs = getattr(self, 'unparsed_bs', None)
     if unparsed_bs and unparsed_bs != b'\0':
-      s += ":unparsed=%r" % (unparsed_bs[:16],)
+      s += f':{unparsed_bs[:16]=}'
     return s
 
   __repr__ = __str__
@@ -1203,7 +1203,7 @@ def add_body_subclass(superclass, box_type, section, desc):
   class _SubClass(
       superclass,
       bodyclass_name=classname,
-      doc=f'An {box_type!r} {desc} box - ISO14496 section {section}.',
+      doc=f'A {box_type!r} {desc} box - ISO14496 section {section}.',
   ):
 
     def transcribe(self):
@@ -1251,7 +1251,7 @@ class OverBox(BinaryListValues):
       yield from subbox.walk(1)
 
 class FullBoxBody(BoxBody):
-  ''' A common extension of a basic BoxBody, with a version and flags field.
+  ''' A common extension of a basic `BoxBody`, with a version and flags field.
       ISO14496 section 4.2.
   '''
 
