@@ -490,39 +490,38 @@ def file_checksum(
 
 @uses_cmd_options(hashname=None)
 def hashindex(
-    fspath: Union[str, TextIOBase, Tuple[Union[None, str], str]],
+    src: Union[TextIOBase, RemotePath, str, Tuple[Union[None, str], str]],
     *,
     hashname: str,
     relative: bool = False,
     **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
-      for the files in `fspath`, which may be a file or directory path.
-      Note that it yields `(None,filepath)` for files which cannot be accessed.
+      for the files in `src`, which may be a file or a `RemotePath`
+      or a `(host,fspath)` 2-tuple or a filesystem path.
+      Note that this yields `(None,filepath)` for files which cannot be accessed.
   '''
-  if isinstance(fspath, TextIOBase):
+  if isinstance(src, TextIOBase):
     # read hashindex from file
-    f = fspath
-    yield from read_hashindex(f, hashname=hashname, **kw)
+    yield from read_hashindex(src, hashname=hashname, **kw)
     return
-  if not isinstance(fspath, str):
-    # should be a 2-tuple
-    if fspath == (None, "-"):
-      yield from read_hashindex(sys.stdin, hashname=hashname, **kw)
-      return
-    rhost, rfspath = fspath
-    if rhost is not None:
-      # a remote fspath
-      yield from read_remote_hashindex(
-          rhost,
-          rfspath,
-          hashname=hashname,
-          relative=relative,
-          **kw,
-      )
-      return
-    # local fspath because rhost is None
-    fspath = rfspath
+  rhost, fspath = RemotePath.promote(src)
+  if rhost is None and fspath == '-':
+    # read hashindex from stdin
+    yield from read_hashindex(sys.stdin, hashname=hashname, **kw)
+    return
+  if rhost is not None:
+    # read hashindex from remote
+    if fspath == '-':
+      raise ValueError("cannot read remote stdin")
+    yield from read_remote_hashindex(
+        rhost,
+        fspath,
+        hashname=hashname,
+        relative=relative,
+        **kw,
+    )
+    return
   # local hashindex
   if isfilepath(fspath):
     h = file_checksum(fspath, hashname=hashname)
