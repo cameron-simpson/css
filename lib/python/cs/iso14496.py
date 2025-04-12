@@ -610,6 +610,7 @@ class BoxBody(SimpleBinary):
 
   @classmethod
   def __init_subclass__(cls, bodyclass_name=None, doc=None):
+    super().__init_subclass__()
     if bodyclass_name is not None:
       cls.__name__ = bodyclass_name
     if doc is not None:
