@@ -144,6 +144,7 @@ try:
 except ImportError:
   from typing import ByteString as Buffer
 from dataclasses import dataclass, fields
+from inspect import signature, Signature
 from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
@@ -231,7 +232,7 @@ def flatten(chunks) -> Iterable[bytes]:
 
 _pt_spec_seq = Seq()
 
-def pt_spec(pt, name=None):
+def pt_spec(pt, name=None, type=None):
   ''' Convert a parse/transcribe specification `pt`
       into an `AbstractBinary` subclass.
 
@@ -269,17 +270,23 @@ def pt_spec(pt, name=None):
     pass
   # other specifications construct a class
   try:
+    # an object with .parse_value and .transcribe_value attributes
     f_parse_value = pt.parse_value
     f_transcribe_value = pt.transcribe_value
   except AttributeError:
+    # an int number of bytes
     if isinstance(pt, int):
       # pylint: disable=unnecessary-lambda-assignment
       f_parse_value = lambda bfr: bfr.take(pt)
       f_transcribe_value = lambda value: value
+      if type is None:
+        type = Buffer
+      elif not issubclass(type, Buffer):
+        raise TypeError(f'supplied {type=} is not a subclass of Buffer')
     else:
       struct_format, struct_fields = pt
       if isinstance(struct_format, str) and isinstance(struct_fields, str):
-        # (str,str) 2-tuple
+        # a struct (format,fields) 2-tuple
         # struct format and field names
         if name is None:
           name = f'PTStruct_{next(_pt_spec_seq)}__{struct_fields.replace(" ", "__")}'
@@ -287,14 +294,20 @@ def pt_spec(pt, name=None):
       # otherwise a parse/transcribe pair
       f_parse_value, f_transcribe_value = pt
 
-  class PTValue(BinarySingleValue):  # pylint: disable=used-before-assignment
+  if type is None:
+    sig = signature(f_parse_value)
+    type = sig.return_annotation
+    if type is Signature.empty:
+      raise ValueError(f'no return type annotation on {f_parse_value=}')
+
+  class PTValue(BinarySingleValue, type=type):  # pylint: disable=used-before-assignment
     ''' A `BinarySingleValue` subclass
         made from `f_parse_value` and `f_transcribe_value`.
     '''
 
     @staticmethod
-    def parse_value(bfr: CornuCopyBuffer):
-      ''' Parse value form buffer.
+    def parse_value(bfr: CornuCopyBuffer) -> type:
+      ''' Parse value from buffer.
       '''
       return f_parse_value(bfr)
 
