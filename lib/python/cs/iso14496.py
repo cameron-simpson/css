@@ -40,6 +40,7 @@ from cs.binary import (
     BinaryMultiStruct,
     BinaryMultiValue,
     BinarySingleValue,
+    parse_offsets,
     pt_spec,
 )
 from cs.buffer import CornuCopyBuffer
@@ -347,26 +348,6 @@ class MP4Command(BaseCommand):
     '''
     import cs.iso14496_tests
     cs.iso14496_tests.selftest([self.options.cmd] + argv)
-
-@decorator
-def parse_offsets(parse, report=False):
-  ''' Decorate `parse` to record the buffer starting offset as `self.offset`
-      and the buffer post parse offset as `self.end_offset`.
-      If the decorator parameter `report` is true,
-      call `bfr.report_offset()` with the starting offset at the end of the parse.
-  '''
-
-  @trace
-  def parse_wrapper(cls, bfr: CornuCopyBuffer, **parse_kw):
-    offset = bfr.offset
-    self = trace(parse)(cls, bfr, **parse_kw)
-    self.offset = offset
-    self.end_offset = bfr.offset
-    if report:
-      bfr.report_offset(offset)
-    return self
-
-  return parse_wrapper
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)

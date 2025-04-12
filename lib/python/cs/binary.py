@@ -230,6 +230,27 @@ def flatten(chunks) -> Iterable[bytes]:
     for subchunk in chunks:
       yield from flatten(subchunk)
 
+@decorator
+def parse_offsets(parse, report=False):
+  ''' Decorate `parse` (usually an `AbstractBinary` class method)
+      to record the buffer starting offset as `self.offset`
+      and the buffer post parse offset as `self.end_offset`.
+      If the decorator parameter `report` is true,
+      call `bfr.report_offset()` with the starting offset at the end of the parse.
+  '''
+
+  @trace
+  def parse_wrapper(cls, bfr: CornuCopyBuffer, **parse_kw):
+    offset = bfr.offset
+    self = parse(cls, bfr, **parse_kw)
+    self.offset = offset
+    self.end_offset = bfr.offset
+    if report:
+      bfr.report_offset(offset)
+    return self
+
+  return parse_wrapper
+
 _pt_spec_seq = Seq()
 
 def pt_spec(pt, name=None, type=None):
