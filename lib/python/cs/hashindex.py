@@ -240,61 +240,25 @@ class HashIndexCommand(BaseCommand):
     elif mode_count > 1:
       warning("only one of -1, -2 or -3 may be provided")
       badopts = True
-    if not argv:
-      warning("missing path1")
-      badopts = True
-      path1spec = None
-    else:
-      path1spec = argv.pop(0)
-      with Pfx("path1 %r", path1spec):
-        path1host, path1dir = split_remote_path(path1spec)
-        if path1host is None:
-          if path1dir != '-':
-            if not isdirpath(path1dir):
-              warning("not a directory")
-              badopts = True
-        elif path1dir == '-':
-          warning('remote "-" not supported')
-          badopts = True
-    if not argv:
-      warning("missing path2")
-      badopts = True
-      path2spec = None
-    else:
-      path2spec = argv.pop(0)
-      with Pfx("path2 %r", path2spec):
-        path2host, path2dir = split_remote_path(path2spec)
-        if path2host is None:
-          if path2dir != '-':
-            if not isdirpath(path2dir):
-              warning("not a directory")
-              badopts = True
-        elif path2dir == '-':
-          warning('remote "-" not supported')
-          badopts = True
+    path1 = self.popdirspec(argv, 'path1')
+    path2 = self.popdirspec(argv, 'path2')
     if argv:
       warning("extra arguments after path2: %r", argv)
       badopts = True
-    if path1spec == '-' and path2spec == '-':
+    if path1 == (None, '-') and path2 == (None, '-'):
       warning('path1 and path2 may not both be "-"')
       badopts = True
     if badopts:
       raise GetoptError('bad arguments')
-    with Pfx("path1 %r", path1spec):
+    with run_task(f'scan {path1}'):
       fspaths1_by_hashcode = defaultdict(list)
-      for hashcode, fspath in hashindex(
-          (path1host, path1dir),
-          relative=relative,
-      ):
+      for hashcode, fspath in hashindex(path1, relative=relative):
         runstate.raiseif()
         if hashcode is not None:
           fspaths1_by_hashcode[hashcode].append(fspath)
-    with Pfx("path2 %r", path2spec):
+    with run_task(f'scan {path2}'):
       fspaths2_by_hashcode = defaultdict(list)
-      for hashcode, fspath in hashindex(
-          (path2host, path2dir),
-          relative=relative,
-      ):
+      for hashcode, fspath in hashindex(path2, relative=relative):
         runstate.raiseif()
         if hashcode is not None:
           fspaths2_by_hashcode[hashcode].append(fspath)
