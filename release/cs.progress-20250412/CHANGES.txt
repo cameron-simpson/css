@@ -1,0 +1,1 @@
+lib/python/cs/progress.py: cs.progress: progressbar: fix early return if no active Upd
