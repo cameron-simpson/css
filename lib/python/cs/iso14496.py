@@ -14,11 +14,11 @@ ISO make the standard available here:
 
 from base64 import b64encode, b64decode
 from collections import namedtuple
-from contextlib import contextmanager
 try:
   from collections.abc import Buffer
 except ImportError:
   from typing import ByteString as Buffer
+from contextlib import closing, contextmanager
 from datetime import datetime
 from functools import cached_property
 from getopt import getopt, GetoptError
@@ -194,14 +194,18 @@ class MP4Command(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError("invalid arguments")
-    over_box = parse(filename)
-    over_box.dump()
+    top_box_type, *sub_box_types = boxref.split('.')
     B = over_box
     for box_type_s in boxref.split('.'):
       B = getattr(B, box_type_s.upper())
-    with Pfx(filename):
-      fd = os.open(filename, os.O_RDONLY)
-      bfr = CornuCopyBuffer.from_fd(fd)
+    bfr = CornuCopyBuffer.from_filename(filename)
+    with closing(bfr):
+      for topbox in Box.scan(bfr):
+        if topbox.box_type_s == top_box_type:
+          break
+      else:
+        warning("no top box of type %r found", top_box_type)
+        return 1
       offset = B.offset
       need = B.length
       if skip_header:
@@ -216,7 +220,6 @@ class MP4Command(BaseCommand):
               chunk = chunk[need]
             ofp.write(chunk)
             need -= len(chunk)
-      os.close(fd)
 
   def cmd_info(self, argv):
     ''' Usage: {cmd} [{{-|filename}}]...]
