@@ -15,6 +15,10 @@ ISO make the standard available here:
 from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import contextmanager
+try:
+  from collections.abc import Buffer
+except ImportError:
+  from typing import ByteString as Buffer
 from datetime import datetime
 from functools import cached_property
 from getopt import getopt, GetoptError
@@ -2384,6 +2388,7 @@ class METABoxBody(FullBoxBody):
 _ILSTRawSchema = pt_spec(
     (lambda bfr: bfr.take(...), lambda bs: bs),
     name='ILSTRawSchema',
+    type=Buffer,
 )
 
 def ILSTRawSchema(attribute_name):
@@ -2398,7 +2403,8 @@ class _ILSTTextSchema(pt_spec(
         lambda txt: txt.encode('utf-8'),
     ),
     name='ILSTTextSchema',
-)):
+    type=str,
+), type=str):
 
   def __repr__(self):
     return repr(self.value)
@@ -2434,7 +2440,8 @@ _ILSTISOFormatSchema = pt_spec(
         lambda bfr: datetime.fromisoformat(bfr.take(...).decode('utf-8')),
         lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode('utf-8'),
     ),
-    name='ILSTTextSchema'
+    name='ILSTTextSchema',
+    type=str,
 )
 
 def ILSTISOFormatSchema(attribute_name):
@@ -2458,7 +2465,7 @@ itunes_store_country_code = namedtuple(
     'country_name iso_3166_1_code itunes_store_code'
 )
 
-class _ILSTUTF8Text(BinarySingleValue):
+class _ILSTUTF8Text(BinarySingleValue, type=str):
   ''' A full-buffer piece of UTF-8 encoded text.
   '''
 
