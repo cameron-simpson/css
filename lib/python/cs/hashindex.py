@@ -90,7 +90,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand, popopts, vprint
 from cs.context import contextif, reconfigure_file
 from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
-from cs.fs import needdir, shortpath
+from cs.fs import needdir, RemotePath, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.lex import r, split_remote_path
@@ -191,6 +191,28 @@ class HashIndexCommand(BaseCommand):
       with fstags:
         with super().run_context(**kw):
           yield
+
+  @staticmethod
+  def popdirspec(argv: List[str], name: str = 'dirspec') -> RemotePath:
+    ''' Pop a leading dirspec from `argv`, a filesystem path with
+        an optional leading `[user@]rhost:` prefix.
+        Return a `(host,fspath)` 2-tuple being the remote host (`None` if omitted)
+        and the filesystem path.
+        Raises `GetoptError` on a missing or invalid argument.
+    '''
+    if not argv:
+      raise GetoptError(f'missing {name}')
+    spec = argv.pop(0)
+    with Pfx("%s %r", name, spec):
+      dirspec = RemotePath.from_str(spec)
+      host, fspath = dirspec
+      if host is None:
+        if fspath != '-':
+          if not isdirpath(fspath):
+            raise GetoptError(f'not a directory: {fspath!r}')
+      elif fspath == '-':
+        raise GetoptError(f'remote {fspath!r} not supported')
+    return dirspec
 
   #pylint: disable=too-many-locals
   @uses_runstate
