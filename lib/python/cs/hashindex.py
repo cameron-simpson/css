@@ -300,19 +300,16 @@ class HashIndexCommand(BaseCommand):
     if not argv:
       argv = ['.']
     xit = 0
-    for path in argv:
+    while argv:
       runstate.raiseif()
+      path = self.poppathspec(argv, '[host:]path')
       with Pfx(path):
-        rhost, lpath = split_remote_path(path)
-        if rhost is None:
-          if relative and not isdirpath(path):
+        if path.host is None:
+          if relative and not isdirpath(path.path):
             warning("not a directory and -r (relative) specified")
             xit = 1
             continue
-        for h, fspath in hashindex(
-            (rhost, lpath),
-            relative=relative,
-        ):
+        for h, fspath in hashindex(path, relative=relative):
           runstate.raiseif()
           if h is not None:
             print(output_format.format(hashcode=h, fspath=fspath))
