@@ -274,14 +274,11 @@ class MP4Command(BaseCommand):
     xit = 0
     with Pfx("%r", filespec):
       print(filespec)
-      if filespec == '-':
-        bfr = CornuCopyBuffer.from_fd(sys.stdin.fileno())
-      else:
-        try:
-          bfr = CornuCopyBuffer.from_filename(filespec)
-        except FileNotFoundError as e:
-          warning("scannot scan: %s", e)
-          return 1
+      try:
+        bfr = CornuCopyBuffer.from_cli_filespec(filespec)
+      except FileNotFoundError as e:
+        warning("scannot scan: %s", e)
+        return 1
       with PARSE_MODE(discard_data=not options.with_data):
         rows = []
         seen_paths = {path: False for path in type_paths}
