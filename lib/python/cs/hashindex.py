@@ -142,9 +142,7 @@ def main(argv=None):
   return HashIndexCommand(argv).run()
 
 class HashIndexCommand(BaseCommand):
-  ''' A tool to generate indices of file content hashcodes
-      and to link or otherwise rearrange files to destinations based
-      on their hashcode.
+  ''' A tool to generate and use indices of file content hashcodes.
   '''
 
   # pylint: disable=use-dict-literal
