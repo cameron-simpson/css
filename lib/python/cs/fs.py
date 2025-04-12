@@ -426,15 +426,20 @@ class RemotePath(
   def __init__(self, host, fspath):
     pass
 
-  def __str__(self):
-    ''' Return the string form of this path.
+  @staticmethod
+  def str(host, fspath):
+    ''' Return the string form of a remote path.
     '''
-    host, fspath = self
     if host is None:
       if ':' in fspath.split('/')[0]:
         fspath = f'./{fspath}'
       return fspath
     return f'{host}:{fspath}'
+
+  def __str__(self):
+    ''' Return the string form of this path.
+    '''
+    return self.str(self.host, self.fspath)
 
   @classmethod
   def from_str(cls, pathspec: str):
