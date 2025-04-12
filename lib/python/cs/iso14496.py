@@ -738,7 +738,7 @@ class BoxBody(SimpleBinary):
         `binary_cls` may also be an `int`, in which case that many
         bytes are read from `bfr`.
     '''
-    if isinstance(binary_cls, int):
+    if binary_cls is ... or isinstance(binary_cls, int):
       value = bfr.take(binary_cls)
     else:
       value = pt_spec(binary_cls).parse(bfr)
