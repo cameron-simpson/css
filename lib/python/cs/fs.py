@@ -4,6 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
+from collections import namedtuple
 import errno
 from fnmatch import filter as fnfilter
 from functools import partial
@@ -410,6 +411,46 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
     if obj is None or isinstance(obj, (str, PathLike)):
       return cls(obj)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
+
+class RemotePath(
+    namedtuple('RemotePath', 'host fspath'),
+    HasFSPath,
+    Promotable,
+):
+  ''' A representation of a remote filesystem path (local if `host` is `None`).
+
+      This is useful for things like `rsync` targets.
+  '''
+
+  # dummy init since namedtuple does not have one
+  def __init__(self, host, fspath):
+    pass
+
+  def __str__(self):
+    ''' Return the string form of this path.
+    '''
+    host, fspath = self
+    if host is None:
+      if ':' in fspath.split('/')[0]:
+        fspath = f'./{fspath}'
+      return fspath
+    return f'{host}:{fspath}'
+
+  @classmethod
+  def from_str(cls, pathspec: str):
+    ''' Produce a RemotePath` from `pathspec`, a path with an
+        optional leading `[user@]rhost:` prefix.
+    '''
+    if ':' in pathspec.split('/')[0]:
+      host, fspath = pathspec.split(':', 1)
+    else:
+      host, fspath = None, pathspec
+    return cls(host, fspath)
+
+  def from_tuple(cls, host_fspath: tuple):
+    ''' Produce a RemotePath` from `host_fspath`, a `(host,fspath)` 2-tuple.
+    '''
+    return cls(*host_fspath)
 
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
