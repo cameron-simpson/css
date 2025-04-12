@@ -239,8 +239,8 @@ class HashIndexCommand(BaseCommand):
     elif mode_count > 1:
       warning("only one of -1, -2 or -3 may be provided")
       badopts = True
-    path1 = self.popdirspec(argv, 'path1')
-    path2 = self.popdirspec(argv, 'path2')
+    path1 = self.poppathspec(argv, 'path1')
+    path2 = self.poppathspec(argv, 'path2')
     if argv:
       warning("extra arguments after path2: %r", argv)
       badopts = True
