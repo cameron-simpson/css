@@ -409,6 +409,70 @@ class HashIndexCommand(BaseCommand):
       ).returncode
     return xit
 
+  @uses_fstags
+  @popopts(delete='Delete from dstdir, passes --delete to rsync.')
+  def cmd_rsync(self, argv, *, fstags: FSTags):
+    ''' Usage: {cmd} [options] srcdir dstdir
+          Rearrange dstdir according to srcdir then rsync srcdir into dstdir.
+    '''
+    options = self.options
+    delete = options.delete
+    doit = options.doit
+    quiet = options.quiet
+    runstate = options.runstate
+    verbose = options.verbose
+    srcdir = self.poppathspec(argv, 'srcdir', check_isdir=True)
+    dstdir = self.poppathspec(argv, 'dstdir', check_isdir=True)
+    with run_task(f'scan srcdir {srcdir}'):
+      fspaths_by_hashcode = hashindex_map(srcdir, relative=True)
+    xit = 0
+    # rearrange the source directory.
+    if dstdir.host is None:
+      # local srcdir and dstdir
+      # make stdout line buffered if srcdir is local
+      with contextif(
+          not quiet,
+          reconfigure_file,
+          sys.stdout,
+          line_buffering=True,
+      ):
+        rearrange(
+            srcdir.fspath,
+            fspaths_by_hashcode,
+            dstdir.fspath,
+            move_mode=True,
+            symlink_mode=False,
+        )
+    else:
+      # remote srcdir and dstdir
+      xit = remote_rearrange(
+          dstdir.host,
+          dstdir.fspath,
+          fspaths_by_hashcode,
+          move_mode=True,
+          symlink_mode=False,
+      )
+    if xit == 0:
+      # rsync source to destination
+      with above_upd():
+        run(
+            [
+                'rsync',
+                '-ar',
+                delete and '--delete',
+                not doit and '-n',
+                not quiet and '-i',
+                verbose and '-v',
+                doit and not quiet and sys.stderr.isatty() and '--progress',
+                f'--exclude={fstags.tagsfile_basename}',
+                '--',
+                f'{srcdir}/',
+                f'{dstdir}/',
+            ],
+            doit=True,
+            quiet=quiet,
+        )
+
 @pfx
 @uses_fstags
 def file_checksum(
