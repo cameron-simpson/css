@@ -788,6 +788,59 @@ def rearrange(
       for srcpath in sorted(to_remove):
         pfx_call(os.remove, srcpath)
 
+@fmtdoc
+@uses_cmd_options(
+    doit=True,
+    hashindex_exe=HASHINDEX_EXE_DEFAULT,
+    hashname=HASHNAME_DEFAULT,
+    move_mode=True,
+    quiet=False,
+    symlink_mode=False,
+    verbose=False,
+)
+@typechecked
+def remote_rearrange(
+    rhost: str,
+    dstdir: str,
+    fspaths_by_hashcode: Mapping[BaseHashCode, List[str]],
+    *,
+    doit: bool,
+    hashindex_exe: str,
+    hashname: str,
+    move_mode: bool,
+    quiet: bool,
+    symlink_mode: bool,
+    verbose: bool,
+):
+  ''' Rearrange a remote directory `dstdir` on `rhost`
+      according to the hashcode mapping `fspaths_by_hashcode`.
+  '''
+  # remote srcdir and dstdir
+  # prepare the remote input
+  reflines = []
+  for hashcode, fspaths in fspaths_by_hashcode.items():
+    for fspath in fspaths:
+      reflines.append(f'{hashcode} {fspath}\n')
+  input_s = "".join(reflines)
+  return run_remote_hashindex(
+      rhost,
+      [
+          'rearrange',
+          not doit and '-n',
+          ('-h', hashname),
+          quiet and '-q',
+          verbose and '-v',
+          move_mode and '--mv',
+          symlink_mode and '-s',
+          '-',
+          RemotePath.str(None, dstdir),
+      ],
+      input=input_s,
+      text=True,
+      doit=True,  # we pass -n to the remote hashindex
+      quiet=False,
+  ).returncode
+
 @pfx
 @uses_fstags
 @uses_verbose
