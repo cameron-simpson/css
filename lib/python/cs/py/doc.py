@@ -128,13 +128,13 @@ def module_doc(
         if issubclass(obj, BaseCommand):
           # extract the Usage: paragraph if present, append a full usage
           doc_without_usage, usage_text = obj.extract_usage()
-          obj_doc = ''.join(
+          obj_doc += ''.join(
               (
                   doc_without_usage,
                   "\n\nUsage summary:\n\n",
                   indent("Usage: " + usage_text, "    "),
               )
-          ) + '\n'
+          )
         full_docs.append(doc_item(Mname, f'Class `{classname_etc}', obj_doc))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
