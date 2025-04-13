@@ -13,7 +13,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.lex import r
 
-__version__ = '20241207-post'
+__version__ = '20250414'
 
 DISTINFO = {
     'keywords': ["python3"],
