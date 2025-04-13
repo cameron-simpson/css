@@ -1,6 +1,34 @@
 #!/usr/bin/python
 
 ''' Convenience hashing facilities.
+
+    This predefines classes for various hash algorithms:
+    `BLAKE3` (if we can import `blake3`), `MD5`, `SHA1`, `SHA224`,
+    `SHA256`, `SHA384`, `SHA512`, and a `BaseHashCode` base class
+    as a common ancestor with a `.hashclass()` factory method for
+    creating new subclasses for other algorithms.
+
+    All `BaseHashCode` classes have a variety of convenience factories for making instances:
+    * `from_hashbytes`: from an existing digest `bytes`
+    * `from_hashbytes_hex`: from a hex string of an existing digest
+    * `from_named_hashbytes_hex`: from a hashname (eg `'blake3'`) and a hex string
+    * `from_named_hashbytes_hex`: from a *hashname*`:`*hex* string
+    * `from_data`: from `bytes` content
+    * `from_buffer`: from a `CornuCopyBuffer` or anything which can be promoted to one
+    * `from_fspath`: from a filesystem path
+
+    Hashing some content returns instances of these classes, which
+    are subclasses of `bytes` i.e. the digest. All `BaseHashCode` classes various methods:
+    * `str(hashcode)`: returns a *hashname*`:`*hex* string
+    * `.hashname`: the hash function name
+    * `.hex()`: the digest as a hex string
+
+    The common example:
+
+        # obtain the contwnt hash from the file `fspath`
+        hashcode = hashclass.from_fspath(fspath)
+
+    where `hashclass` is whatever `BaseHashCode` subclass is in use.
 '''
 
 from binascii import hexlify, unhexlify
