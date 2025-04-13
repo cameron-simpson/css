@@ -353,13 +353,10 @@ class HashIndexCommand(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError('bad arguments')
-    # scan the reference directory
-    fspaths_by_hashcode = defaultdict(list)
     xit = 0
+    # scan the reference directory
     with run_task(f'scan refdir {refdir}'):
-      for hashcode, fspath in hashindex(refdir, relative=True):
-        if hashcode is not None:
-          fspaths_by_hashcode[hashcode].append(fspath)
+      fspaths_by_hashcode = hashindex_map(refdir, relative=True)
     if not fspaths_by_hashcode:
       quiet or print("no files in refdir, nothing to rearrange")
       return xit
@@ -382,31 +379,13 @@ class HashIndexCommand(BaseCommand):
         )
     else:
       # remote srcdir and dstdir
-      # prepare the remote input
-      reflines = []
-      for hashcode, fspaths in fspaths_by_hashcode.items():
-        for fspath in fspaths:
-          reflines.append(f'{hashcode} {fspath}\n')
-      input_s = "".join(reflines)
-      xit = run_remote_hashindex(
+      xit = remote_rearrange(
           srcdir.host,
-          [
-              'rearrange',
-              not doit and '-n',
-              ('-h', options.hashname),
-              quiet and '-q',
-              verbose and '-v',
-              move_mode and '--mv',
-              symlink_mode and '-s',
-              '-',
-              RemotePath.str(None, srcdir.fspath),
-              RemotePath.str(None, dstdir.fspath),
-          ],
-          input=input_s,
-          text=True,
-          doit=True,  # we pass -n to the remote hashindex
-          quiet=False,
-      ).returncode
+          dstdir.fspath,
+          fspaths_by_hashcode,
+          move_mode=move_mode,
+          symlink_mode=symlink_mode,
+      )
     return xit
 
   @uses_fstags
