@@ -58,7 +58,7 @@
 '''
 
 from collections import defaultdict
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from dataclasses import dataclass
 import errno
 from getopt import GetoptError
@@ -880,6 +880,7 @@ def remote_rearrange(
           '-',
           RemotePath.str(None, dstdir),
       ],
+      hashindex_exe=hashindex_exe,
       input=input_s,
       text=True,
       doit=True,  # we pass -n to the remote hashindex
