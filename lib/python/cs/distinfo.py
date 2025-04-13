@@ -39,7 +39,7 @@ import tomli_w
 from typeguard import typechecked
 
 from cs.ansi_colour import colourise
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.dateutils import isodate
 from cs.fs import atomic_directory, scandirpaths
@@ -1867,12 +1867,12 @@ class CSReleaseCommand(BaseCommand):
   # pylint: disable=too-many-locals,too-many-return-statements
   # pylint: disable=too-many-branches,too-many-statements
   @uses_upd
+  @popopts(f='force', m_='release_message')
   def cmd_release(self, argv, *, upd):
     ''' Usage: {cmd} [-f] [-m release-message] pkg_name
           Issue a new release for the named package.
     '''
     options = self.options
-    options.popopts(argv, f='force', m_='release_message')
     force = options.force
     release_message = options.release_message
     if not argv:
