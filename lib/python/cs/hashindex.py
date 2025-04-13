@@ -683,10 +683,11 @@ def dir_remap(
     lambda dstdirpath: dstdirpath is None or isdirpath(dstdirpath),
     'dstdirpath is not a directory'
 )
+@typechecked
 def rearrange(
     srcdirpath: str,
     rfspaths_by_hashcode,
-    dstdirpath=None,
+    dstdirpath: str | None = None,
     *,
     hashname: str,
     move_mode: bool = False,
@@ -705,13 +706,18 @@ def rearrange(
       * `dstdirpath`: optional target directory for the rearranged files;
         defaults to `srcdirpath`, rearranging the files in place
       * `hashname`: the file content hash algorithm name
-      * `move_move`: move files instead of linking them
+      * `move_mode`: move files instead of linking them
       * `symlink_mode`: symlink files instead of linking them
       * `doit`: if true do the link/move/symlink, otherwise just print
   '''
-  with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
-    if dstdirpath is None:
-      dstdirpath = srcdirpath
+  if dstdirpath is None:
+    dstdirpath = srcdirpath
+    task_label = f'rearrange {shortpath(srcdirpath)}'
+  elif dstdirpath == srcdirpath:
+    task_label = f'rearrange {shortpath(srcdirpath)}'
+  else:
+    task_label = f'rearrange {shortpath(srcdirpath)} into {shortpath(dstdirpath)}'
+  with run_task(task_label) as proxy:
     to_remove = set()
     for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode,
                                        hashname=hashname):
