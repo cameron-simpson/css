@@ -284,7 +284,7 @@ def clean_release_entry(entry):
   lines = list(
       filter(
           lambda line: (
-              line and line != 'Summary:' and not line.
+              line.strip() and line != 'Summary:' and not line.
               startswith('Release information for ')
           ),
           entry.strip().split('\n')
