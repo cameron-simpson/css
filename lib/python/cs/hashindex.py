@@ -461,11 +461,13 @@ def file_checksum(
   return hashcode
 
 @uses_cmd_options(hashname=None)
+@uses_runstate
 def hashindex(
     src: Union[TextIOBase, RemotePath, str, Tuple[Union[None, str], str]],
     *,
     hashname: str,
     relative: bool = False,
+    runstate: RunState,
     **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
@@ -480,19 +482,23 @@ def hashindex(
   rhost, fspath = RemotePath.promote(src)
   if rhost is None and fspath == '-':
     # read hashindex from stdin
-    yield from read_hashindex(sys.stdin, hashname=hashname, **kw)
+    for item in read_hashindex(sys.stdin, hashname=hashname, **kw):
+      runstate.raiseif()
+      yield item
     return
   if rhost is not None:
     # read hashindex from remote
     if fspath == '-':
       raise ValueError("cannot read remote stdin")
-    yield from read_remote_hashindex(
+    for item in read_remote_hashindex(
         rhost,
         fspath,
         hashname=hashname,
         relative=relative,
         **kw,
-    )
+    ):
+      runstate.raiseif()
+      yield item
     return
   # local hashindex
   if isfilepath(fspath):
@@ -500,6 +506,7 @@ def hashindex(
     yield h, fspath
   elif isdirpath(fspath):
     for filepath in dir_filepaths(fspath):
+      runstate.raiseif()
       h = file_checksum(filepath, hashname=hashname)
       yield h, relpath(filepath, fspath) if relative else filepath
   else:
