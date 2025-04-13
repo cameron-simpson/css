@@ -634,6 +634,21 @@ def run_remote_hashindex(
         **subp_options,
     )
 
+@uses_cmd_options(hashname=None)
+def hashindex_map(dirpath: str,
+                  *,
+                  hashname: str,
+                  relative=False) -> dict[BaseHashCode, list[str]]:
+  ''' Construct a mapping of hashcodes to filesystem paths
+      by walking `dirpath`.
+  '''
+  fspaths_by_hashcode = defaultdict(list)
+  for hashcode, fspath in hashindex(dirpath, hashname=hashname,
+                                    relative=relative):
+    if hashcode is not None:
+      fspaths_by_hashcode[hashcode].append(fspath)
+  return fspaths_by_hashcode
+
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
   ''' Generator yielding the filesystem paths of the files in `dirpath`.
