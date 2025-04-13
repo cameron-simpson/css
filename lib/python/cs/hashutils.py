@@ -161,7 +161,7 @@ class BaseHashCode(bytes):
 
   @classmethod
   def from_named_hashbytes_hex(cls, hashname, hashhex):
-    ''' Factory function to return a `HashCode` object
+    ''' Factory function to return a `BaseHashCode` object
         from the hash type name and the hash bytes hex text.
     '''
     hashclass = cls.hashclass(hashname)
