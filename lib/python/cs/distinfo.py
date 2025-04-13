@@ -407,6 +407,11 @@ class Module:
   def isthirdparty(self):
     ''' Test whether this is a third party module.
     '''
+    if self.ismine():
+      return False
+    if hasattr(sys, 'stdlib_module_names'):
+      # what about removed batteries? just not use them?
+      return not self.isstdlib()
     M = self.module
     if M is None:
       return False
@@ -416,11 +421,16 @@ class Module:
   def isstdlib(self):
     ''' Test if this module exists in the stdlib.
     '''
-    if self.ismine():
-      return False
-    if self.isthirdparty():
-      return False
-    return True
+    try:
+      stdlib_module_names = sys.stdlib_module_names
+    except AttributeError:
+      if self.ismine():
+        return False
+      if self.isthirdparty():
+        return False
+      return True
+    else:
+      return self.name in stdlib_module_names
 
   @cached_property
   @pfx_method(use_str=True)
