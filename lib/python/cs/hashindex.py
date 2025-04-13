@@ -93,7 +93,7 @@ from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
 from cs.fs import needdir, RemotePath, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
-from cs.lex import r, split_remote_path
+from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, run
@@ -650,6 +650,7 @@ def read_remote_hashindex(
 
 @fmtdoc
 @uses_cmd_options(hashindex_exe='hashindex')
+@typechecked
 def run_remote_hashindex(
     rhost: str,
     argv,
@@ -692,6 +693,7 @@ def hashindex_map(dirpath: str,
       fspaths_by_hashcode[hashcode].append(fspath)
   return fspaths_by_hashcode
 
+# TODO: use the functions from cs.fs ?
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
   ''' Generator yielding the filesystem paths of the files in `dirpath`.
