@@ -412,12 +412,15 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
+# TODO: add an optional detab=n parameter?
 def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
       strip the supplied string `s`, pull off the leading line,
       dedent the rest, put back the leading line.
+
+      This is a lot like the `inspect.cleandoc()` function.
 
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
