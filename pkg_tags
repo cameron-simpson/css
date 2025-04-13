@@ -51,7 +51,7 @@ cs.fstags pypi.release="20241122" ok_revision=e6c567623d54c8e893c796587b2976cc67
 cs.gimmicks ok_revision="5304d45b48abf477a077743b7b23cb0aa066d83d" pypi.release="20250323" features={"20211208":["TimeoutError"],"20220429":["devnull"],"20230212":["gimmick_r","gimmick_s"],"20230331":["open_append"]}
 cs.gvutils ok_revision="4c81e06630110ce18f0422ece389d623cbc1bfaf" pypi.release="20230816" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"],"20221207":["gvsvg"]}
 cs.hashindex ok_revision="1697ec5598b226ceeece76de9f4e057807bb7c2f" pypi.release="20241207" features={"20240216":["read_remote_hashindex","run_remote_hashindex"],"20240709":["blake3"]}
-cs.hashutils ok_revision=c6776503fc8e6ddb87655beef1a600882ec0fdcc pypi.release="20241207" features={"20240412":["BaseHashCode__get_hashfunc","blake3"],"20250414":["BLAKE3"]}
+cs.hashutils ok_revision=c6776503fc8e6ddb87655beef1a600882ec0fdcc pypi.release="20250414" features={"20240412":["BaseHashCode__get_hashfunc","blake3"],"20250414":["BLAKE3"]}
 cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280d3f"
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.imageutils ok_revision="1f307905c3dd39927aebaa421d0100ba88edd6d8" features={"20240422":["ThumbnailCache","sixel"]} pypi.release="20240422.1"
