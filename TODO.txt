@@ -1,3 +1,4 @@
+cs.cmdutils: support --no-thing options with no arg
 hashindex: make default rearrange mode mv ?
 distinfo: strip #doctest: +ELLIPSIS
 cs.cmdutils: accept popopts(long_name=(....),short="long_name") sharing a common opt spec
