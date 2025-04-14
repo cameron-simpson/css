@@ -93,6 +93,7 @@ ignore = [
     "D415", # First line should end with a period, question mark, or exclamation point
     "E731",
     "I001", # Import block is un-sorted or un-formatted
+    "SIM108", # Use ternary operator
     "TRY003", # Avoid specifying long messages outside the exception class
     "Q000",
     "Q002",
