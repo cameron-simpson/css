@@ -351,11 +351,15 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   rsp = flow.response
   PR(rq)
   if hook_name == 'requestheaders':
+  if hook_name in ('requestheaders', 'responseheaders'):
     sitemap = P.sitemap_for(url)
     if sitemap is None:
-      PR("no site map")
+      PR("  no site map for URL")
     else:
-      PR("sitemap", sitemap)
+      PR(
+          "  URL sitemap",
+          sitemap,
+      )
     print("  Request Headers:")
     printt(
         *[(key, value) for key, value in sorted(rq.headers.items())],
@@ -378,16 +382,14 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
             ],
             indent="    ",
         )
-  elif hook_name == 'responseheaders':
+  if hook_name == 'responseheaders':
     print("  Response Headers:")
     printt(
         *[(key, value) for key, value in sorted(rsp.headers.items())],
         indent="    ",
     )
-  elif hook_name == 'response':
+  if hook_name == 'response':
     PR("  Content:", len(flow.response.content))
-  else:
-    PR("  no action for hook", hook_name)
 
 @require(lambda flow: not flow.response.stream)
 @typechecked
