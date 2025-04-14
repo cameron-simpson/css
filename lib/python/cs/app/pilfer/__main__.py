@@ -391,7 +391,6 @@ class PilferCommand(BaseCommand):
               offset = skipwhite(action, offset + 1)
               regexp, offset = get_delim_regexp(action, offset)
               url_regexps.append(regexp)
-              breakpoint()
             else:
               warning("unparsed text: %r", action[offset:])
               bad_actions = True
