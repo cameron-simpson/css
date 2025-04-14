@@ -1050,6 +1050,8 @@ def progressbar(
   ''' Convenience function to construct and run a `Progress.iterbar`
       wrapping the iterable `it`,
       issuing and withdrawing a progress bar during the iteration.
+      If there is no current `Upd` instance or it is disabled, this
+      returns `it` directly.
 
       Parameters:
       * `it`: the iterable to consume
@@ -1071,16 +1073,15 @@ def progressbar(
               ... do something with row ...
   '''
   if upd is None or upd.disabled:
-    yield from it
-  else:
-    if total is None:
-      try:
-        total = len(it)
-      except TypeError:
-        total = None
-    yield from Progress(
-        name=label, position=position, total=total, units_scale=units_scale
-    ).iterbar(it, **iterbar_kw)
+    return it
+  if total is None:
+    try:
+      total = len(it)
+    except TypeError:
+      total = None
+  return Progress(
+      name=label, position=position, total=total, units_scale=units_scale
+  ).iterbar(it, **iterbar_kw)
 
 @decorator
 def auto_progressbar(func, label=None, report_print=False):
