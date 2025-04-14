@@ -475,7 +475,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       return md_map
 
 if __name__ == '__main__':
-  sitemap = SiteMap()
+  sitemap = SiteMap("demo")
   sitemap.url_key = lambda self, url: url.replace('/', '_')
   cache = ContentCache(fspath='content')
   cache.cache_response('foo', sitemap)
