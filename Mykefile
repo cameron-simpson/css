@@ -106,7 +106,7 @@ _setup:
 _venv:
     set -uex \
     [ -d $(venv_dir) ] || { \
-        $(base_python) -m ensurepip \
+        ##$(base_python) -m ensurepip \
         $(base_pip) install -U pip wheel build uv \
         $(uv) venv --python $(base_python) --seed $(venv_dir) \
     }
@@ -117,6 +117,9 @@ _venv:
     pip_reqs=$$TMPDIR/reqs-pip-$$$$.txt \
     if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
     then  $(trace) $(venv_pip) install -r "$$pip_reqs" \
+    fi
+    if [ -n "$${VENV_EXTRAS:-}" ] \
+    then  $(trace) $(uv) pip install -p '$(venv_python)' $$VENV_EXTRAS \
     fi
 
 _tags:  tags
