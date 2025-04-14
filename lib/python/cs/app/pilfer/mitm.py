@@ -587,13 +587,16 @@ class MITMAddon:
       hook_action: MITMHookAction,
       args,
       kwargs,
+      url_regexps=(),
   ):
     ''' Add a `MITMHookAction` to a list of hooks for `hook_name`.
     '''
     if hook_names is None:
       hook_names = hook_action.default_hooks
     for hook_name in hook_names:
-      self.hook_map[hook_name].append((hook_action, args, kwargs))
+      self.hook_map[hook_name].append(
+          (hook_action, args, kwargs, list(url_regexps))
+      )
 
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
@@ -650,7 +653,7 @@ class MITMAddon:
       flow.runstate.stop()
 
   @pfx_method
-  def call_hooks_for(self, hook_name: str, *mitm_hook_a, **mitm_hook_kw):
+  def call_hooks_for(self, hook_name: str, flow, *mitm_hook_a, **mitm_hook_kw):
     ''' This calls all the actions for the specified `hook_name`.
     '''
     # look up the actions when we're called
@@ -661,10 +664,22 @@ class MITMAddon:
     excs = []
     # for collating any .stream functions
     stream_funcs = []
-    for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
+    for i, (
+        action,
+        action_args,
+        action_kwargs,
+        url_regexps,
+    ) in enumerate(hook_actions):
+      if url_regexps:
+        for regexp in url_regexps:
+          if regexp.search(flow.request.url):
+            break
+        else:
+          print("SKIP", action, "does not match URL", flow.request.url)
+          continue
       if hook_name == 'responseheaders':
         flow = mitm_hook_a[0]
-        # note the initial state of the .steam attribute
+        # note the initial state of the .stream attribute
         stream0 = flow.response.stream
         assert not stream0, \
             f'expected falsey flow.response.stream, got {flow.response.stream=}'
@@ -673,6 +688,7 @@ class MITMAddon:
             action,
             *action_args,
             hook_name,
+            flow,
             *mitm_hook_a,
             **action_kwargs,
             **mitm_hook_kw,
