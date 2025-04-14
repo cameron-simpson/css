@@ -8,6 +8,18 @@
 
 ''' A progress tracker with methods for throughput, ETA and update notification;
     also a compound progress meter composed from other progress meters.
+
+    This contains the follow main items:
+    * `progressbar`: a wrapper for an iterable presenting a progress
+      bar in the terminal
+    * `Progress`: a progress tracking class
+    * `OverProgress`: a progress tracking class which tracks the
+      aggregate of multiple `Progress` instances
+
+    Example:
+
+        for item in progressbar(items):
+            ....
 '''
 
 from collections import namedtuple
