@@ -1,3 +1,4 @@
+cs.progress: @auto_progress - rename to @uses_progress?
 cs.cmdutils: support --no-thing options with no arg
 hashindex: make default rearrange mode mv ?
 distinfo: strip #doctest: +ELLIPSIS
