@@ -39,7 +39,7 @@ import tomli_w
 from typeguard import typechecked
 
 from cs.ansi_colour import colourise
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.dateutils import isodate
 from cs.fs import atomic_directory, scandirpaths
@@ -284,7 +284,7 @@ def clean_release_entry(entry):
   lines = list(
       filter(
           lambda line: (
-              line and line != 'Summary:' and not line.
+              line.strip() and line != 'Summary:' and not line.
               startswith('Release information for ')
           ),
           entry.strip().split('\n')
@@ -407,6 +407,11 @@ class Module:
   def isthirdparty(self):
     ''' Test whether this is a third party module.
     '''
+    if self.ismine():
+      return False
+    if hasattr(sys, 'stdlib_module_names'):
+      # what about removed batteries? just not use them?
+      return not self.isstdlib()
     M = self.module
     if M is None:
       return False
@@ -416,11 +421,16 @@ class Module:
   def isstdlib(self):
     ''' Test if this module exists in the stdlib.
     '''
-    if self.ismine():
-      return False
-    if self.isthirdparty():
-      return False
-    return True
+    try:
+      stdlib_module_names = sys.stdlib_module_names
+    except AttributeError:
+      if self.ismine():
+        return False
+      if self.isthirdparty():
+        return False
+      return True
+    else:
+      return self.name in stdlib_module_names
 
   @cached_property
   @pfx_method(use_str=True)
@@ -1857,12 +1867,12 @@ class CSReleaseCommand(BaseCommand):
   # pylint: disable=too-many-locals,too-many-return-statements
   # pylint: disable=too-many-branches,too-many-statements
   @uses_upd
+  @popopts(f='force', m_='release_message')
   def cmd_release(self, argv, *, upd):
     ''' Usage: {cmd} [-f] [-m release-message] pkg_name
           Issue a new release for the named package.
     '''
     options = self.options
-    options.popopts(argv, f='force', m_='release_message')
     force = options.force
     release_message = options.release_message
     if not argv:

@@ -40,14 +40,14 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import fmtdoc, decorator, Promotable
+from cs.deco import fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20250323-post'
+__version__ = '20250414-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -412,12 +412,15 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
+# TODO: add an optional detab=n parameter?
 def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
       strip the supplied string `s`, pull off the leading line,
       dedent the rest, put back the leading line.
+
+      This is a lot like the `inspect.cleandoc()` function.
 
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
@@ -1357,23 +1360,17 @@ def snakecase(camelcased):
     strs.append(c)
   return ''.join(strs)
 
+@OBSOLETE('cs.fs.RemotePath.from_str')
 def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   ''' Split a path with an optional leading `[user@]rhost:` prefix
       into the prefix and the remaining path.
       `None` is returned for the prefix is there is none.
       This is useful for things like `rsync` targets etc.
+
+      OBSOLETE, use `cs.fs.RemotePath.from_str` instead.
   '''
-  ssh_target = None
-  # check for [user@]rhost
-  try:
-    prefix, suffix = remotepath.split(':', 1)
-  except ValueError:
-    pass
-  else:
-    if prefix and '/' not in prefix:
-      ssh_target = prefix
-      remotepath = suffix
-  return ssh_target, remotepath
+  from cs.fs import RemotePath
+  return RemotePath.from_str(remotepath)
 
 def tabulate(*rows, sep='  '):
   r''' A generator yielding lines of values from `rows` aligned in columns.

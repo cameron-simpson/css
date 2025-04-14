@@ -8,6 +8,18 @@
 
 ''' A progress tracker with methods for throughput, ETA and update notification;
     also a compound progress meter composed from other progress meters.
+
+    This contains the follow main items:
+    * `progressbar`: a wrapper for an iterable presenting a progress
+      bar in the terminal
+    * `Progress`: a progress tracking class
+    * `OverProgress`: a progress tracking class which tracks the
+      aggregate of multiple `Progress` instances
+
+    Example:
+
+        for item in progressbar(items):
+            ....
 '''
 
 from collections import namedtuple
@@ -38,7 +50,7 @@ from cs.units import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20250325-post'
+__version__ = '20250412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1050,6 +1062,8 @@ def progressbar(
   ''' Convenience function to construct and run a `Progress.iterbar`
       wrapping the iterable `it`,
       issuing and withdrawing a progress bar during the iteration.
+      If there is no current `Upd` instance or it is disabled, this
+      returns `it` directly.
 
       Parameters:
       * `it`: the iterable to consume
@@ -1077,7 +1091,7 @@ def progressbar(
       total = len(it)
     except TypeError:
       total = None
-  yield from Progress(
+  return Progress(
       name=label, position=position, total=total, units_scale=units_scale
   ).iterbar(it, **iterbar_kw)
 

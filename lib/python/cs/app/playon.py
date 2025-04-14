@@ -49,6 +49,7 @@ from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
+from cs.rfc2616 import content_length
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.tagset import TagSet
@@ -1188,8 +1189,9 @@ class PlayOnAPI(HTTPServiceAPI):
       dl_rsp = requests.get(
           dl_url, auth=RequestsNoAuth(), cookies=jar, stream=True
       )
-      dl_length = int(dl_rsp.headers['Content-Length'])
-      with pfx_call(atomic_filename, filename, mode='wb') as f:
+      dl_length = content_length(dl_rsp.headers)
+      assert dl_length is not None
+      with pfx_call(atomic_filename, filename, mode='xb') as f:
         for chunk in progressbar(
             dl_rsp.iter_content(chunk_size=131072),
             label=filename,
