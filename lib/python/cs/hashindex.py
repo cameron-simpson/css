@@ -37,6 +37,12 @@
     rescan of the source file. I keep a shell alias `mv="fstags mv"`
     so this is routine for me.
 
+    A common "backup to remote" use case of mine is addressed by:
+
+        hashindex rsync src dst
+
+    which rearranges `dst` based on `src`, then uses rsync(1) to update `dst`.
+
     I have a backup script [`histbackup`](https://hg.sr.ht/~cameron-simpson/css/browse/bin/histbackup)
     which works by making a hard link tree of the previous backup
     and `rsync`ing into it.  It has long been subject to huge
@@ -305,7 +311,7 @@ class HashIndexCommand(BaseCommand):
       path = self.poppathspec(argv, '[host:]path')
       with Pfx(path):
         if path.host is None:
-          if relative and not isdirpath(path.path):
+          if relative and not isdirpath(path.fspath):
             warning("not a directory and -r (relative) specified")
             xit = 1
             continue
