@@ -26,6 +26,7 @@ from cs.lex import (
     get_dotted_identifier,
     is_identifier,
     printt,
+    skipwhite,
 )
 import cs.logutils
 from cs.logutils import debug, error, warning
@@ -38,7 +39,7 @@ from . import (
     DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
     DEFAULT_MITM_LISTEN_PORT
 )
-from .parse import get_action_args, import_name
+from .parse import get_action_args, get_delim_regexp, import_name
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 
@@ -334,6 +335,10 @@ class PilferCommand(BaseCommand):
     mitm_addon = MITMAddon()
     for action in argv:
       with Pfx("action %r", action):
+        hook_names = None
+        args = []
+        kwargs = {}
+        url_regexps = []
         name, offset = get_dotted_identifier(action)
         if not name:
           warning("no action name")
@@ -360,32 +365,45 @@ class PilferCommand(BaseCommand):
             warning("cannot import %r: %s", action[:offset], e._)
             bad_actions = True
             continue
-        # :params
-        if action.startswith(':', offset):
-          offset += 1
-          args, kwargs, offset = get_action_args(action, offset, '@')
-        else:
-          args = []
-          kwargs = {}
-        # @hook,...
-        if action.startswith('@', offset):
-          offset += 1
-          end_hooks = action.find(':', offset)
-          if end_hooks == -1:
-            hook_names = action[offset:].split(',')
-            offset = len(action)
-          else:
-            hook_names = action[offset:end_hooks].split(',')
-            offset = end_hooks
-        else:
-          hook_names = None
-        if offset < len(action):
-          warning("unparsed text: %r", action[offset:])
-          bad_actions = True
-          continue
+        # gather @hooks and :params suffixes
+        while offset < len(action):
+          print("action", action, offset)
+          with Pfx("offset %d", offset):
+            # :params
+            if action.startswith(':', offset):
+              offset += 1
+              a, kw, offset = get_action_args(action, offset, '@')
+              args.extend(a)
+              kwargs.update(kw)
+            # @hook,...
+            elif action.startswith('@', offset):
+              offset += 1
+              # TODO: gather commas separated identifiers
+              end_hooks = action.find(':', offset)
+              if end_hooks == -1:
+                hook_names = action[offset:].split(',')
+                offset = len(action)
+              else:
+                hook_names = action[offset:end_hooks].split(',')
+                offset = end_hooks
+            # ~ /url-regexp/
+            elif action.startswith('~', offset):
+              offset = skipwhite(action, offset + 1)
+              regexp, offset = get_delim_regexp(action, offset)
+              url_regexps.append(regexp)
+              breakpoint()
+            else:
+              warning("unparsed text: %r", action[offset:])
+              bad_actions = True
+              break
         try:
           pfx_call(
-              mitm_addon.add_action, hook_names, mitm_action, args, kwargs
+              mitm_addon.add_action,
+              hook_names,
+              mitm_action,
+              args,
+              kwargs,
+              url_regexps=url_regexps,
           )
         except ValueError as e:
           warning("invalid action spec: %s", e)
