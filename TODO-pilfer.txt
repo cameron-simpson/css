@@ -1,3 +1,5 @@
+expose the site-by-sitemap stuff etc as methods on sitemaps?
+multiple @listen ? could listen on localhost and fleet2-wg
 autoreload modified sitemaps if modified and syntax ok?
 pilfer from: can we use the Pilfer cache.find_content over url.GET ?
 URLFetcher - if there are cached keys and uncaches keys for a URL, link an old cache entry to the new keys
