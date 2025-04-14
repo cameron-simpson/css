@@ -361,17 +361,16 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
         *[(key, value) for key, value in sorted(rq.headers.items())],
         indent="    ",
     )
-    if rq.method == "GET":
-      q = url.query_dict()
-      if False and q:
-        print("  Query:")
-        printt(
-            *[(param, repr(value)) for param, value in sorted(q.items())],
-            indent="    ",
-        )
-    elif rq.method == "POST":
-      if False and rq.urlencoded_form:
-        print("  Query:")
+    q = url.query_dict()
+    if q:
+      print("  URL query part:")
+      printt(
+          *[(param, repr(value)) for param, value in sorted(q.items())],
+          indent="    ",
+      )
+    if rq.method == "POST":
+      if rq.urlencoded_form:
+        print("  POST query:")
         printt(
             *[
                 (param, repr(value))
