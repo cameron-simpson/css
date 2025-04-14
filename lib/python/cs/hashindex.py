@@ -405,6 +405,7 @@ class HashIndexCommand(BaseCommand):
     doit = options.doit
     quiet = options.quiet
     runstate = options.runstate
+    ssh_exe = options.ssh_exe
     verbose = options.verbose
     srcdir = self.poppathspec(argv, 'srcdir', check_isdir=True)
     dstdir = self.poppathspec(argv, 'dstdir', check_isdir=True)
@@ -443,6 +444,7 @@ class HashIndexCommand(BaseCommand):
         run(
             [
                 'rsync',
+                ('-e', ssh_exe),
                 '-ar',
                 delete and '--delete',
                 not doit and '-n',
