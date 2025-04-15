@@ -39,7 +39,6 @@ from cs.py.func import funcname
 from cs.queues import IterableQueue, QueueIterator
 from cs.resources import RunState, uses_runstate
 from cs.seq import seq
-from cs.threads import bg
 from cs.units import (
     transcribe_time,
     transcribe as transcribe_units,
@@ -64,7 +63,6 @@ DISTINFO = {
         'cs.py.func',
         'cs.resources',
         'cs.seq',
-        'cs.threads',
         'cs.units',
         'cs.upd',
         'icontract',
@@ -490,7 +488,7 @@ class BaseProgress(object):
       ) as proxy:
         update(self, None)
         if update_period > 0:
-          bg(ticker, daemon=True)
+          Thread(_ticker, daemon=True).start()
         yield proxy
     finally:
       cancel_ticker = True
