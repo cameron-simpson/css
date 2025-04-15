@@ -624,7 +624,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         r='recurse',
     )
     xit = 0
-    paths = argv or ['.']
+    paths = argv or ('.',)
     for path in paths:
       fullpath = realpath(path)
       for fspath in ((fullpath,)
@@ -765,7 +765,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise NotImplementedError("unsupported option")
     xit = 0
-    paths = argv or ['.']
+    paths = argv or ('.',)
     for path in paths:
       fullpath = realpath(path)
       for fspath in ((fullpath,) if directories_like_files else scandirpaths(
