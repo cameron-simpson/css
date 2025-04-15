@@ -18,7 +18,7 @@
 
     Example:
 
-        for item in progressbar(items):
+        for item in progressbar(items, "task name"):
             ....
 '''
 
@@ -33,7 +33,7 @@ from typing import Callable, Optional
 from icontract import ensure
 from typeguard import typechecked
 
-from cs.deco import decorator, uses_quiet
+from cs.deco import decorator, fmtdoc, uses_quiet
 from cs.logutils import debug, exception
 from cs.py.func import funcname
 from cs.queues import IterableQueue, QueueIterator
@@ -388,6 +388,7 @@ class BaseProgress(object):
   @contextmanager
   @uses_quiet
   @uses_upd
+  @fmtdoc
   def bar(
       self,
       label=None,
@@ -407,13 +408,14 @@ class BaseProgress(object):
         It returns the `UpdProxy` which displays the progress bar.
 
         Parameters:
-        * `label`: a label for the progress bar,
+        * `label`: an optional label for the progress bar,
           default from `self.name`.
-        * `statusfunc`: an optional function to compute the progress bar text
-          accepting `(self,label,width)`.
-        * `width`: an optional width expressing how wide the progress bar
-          text may be.
-          The default comes from the `proxy.width` property.
+        * `insert_pos`: where to insert the progress bar within the `cs.Upd`,
+          default `1`
+        * `poll`: an optional callable which will receive `self`,
+          which can be used to update the progress state before
+          updating the progress bar display; useful if the progress
+          should be updates from some other programme state
         * `recent_window`: optional timeframe to define "recent" in seconds;
           if the default `statusfunc` (`Progress.status`) is used
           this is passed to it
@@ -422,11 +424,15 @@ class BaseProgress(object):
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
         * `stalled`: optional string to replace the word `'stalled'`
-          in the status line; for a worked this might be betteer as `'idle'`
-        * `insert_pos`: where to insert the progress bar, default `1`
-        * `poll`: an optional callable accepting a `BaseProgress`
-          which can be used to update the progress state before
-          updating the progress bar display
+          in the status line; for a worker this might be better as `'idle'`
+        * `statusfunc`: an optional function to compute the progress bar text
+          accepting `(self,label,width)`; default `Progress.status`
+        * `update_period`: an optional frequency with which to update the display,
+          default from `DEFAULT_UPDATE_PERIOD` ({DEFAULT_UPDATE_PERIOD}s);
+          if set to `0` then the display is updated whenever `self` is updated
+        * `width`: an optional width expressing how wide the progress bar
+          text may be.
+          The default comes from the `proxy.width` property.
 
         Example use:
 
@@ -543,7 +549,7 @@ class BaseProgress(object):
         * `cancelled`: an optional callable to test for iteration cancellation
         Other parameters are passed to `Progress.bar`.
 
-        Example use:
+        Example uses:
 
             from cs.units import DECIMAL_SCALE
             rows = [some list of data]
@@ -551,17 +557,17 @@ class BaseProgress(object):
             for row in P.iterbar(rows, incfirst=True):
                 ... do something with each row ...
 
-            f = open(data_filename, 'rb')
-            datalen = os.stat(f).st_size
-            def readfrom(f):
-                while True:
-                    bs = f.read(65536)
-                    if not bs:
-                        break
-                    yield bs
-            P = Progress(total=datalen)
-            for bs in P.iterbar(readfrom(f), itemlenfunc=len):
-                ... process the file data in bs ...
+            with open(data_filename, 'rb') as f:
+                datalen = os.stat(f).st_size
+                def readfrom(f):
+                    while True:
+                        bs = f.read(65536)
+                        if not bs:
+                            break
+                        yield bs
+                P = Progress(total=datalen)
+                for bs in P.iterbar(readfrom(f), itemlenfunc=len):
+                    ... process the file data in bs ...
     '''
     if cancelled is None:
       cancelled = lambda: runstate.cancelled
@@ -582,14 +588,23 @@ class BaseProgress(object):
             proxy.text = None
 
   def qbar(self, label=None, **iterbar_kw) -> QueueIterator:
-    ''' Set up a progress bar, return a `QueueIterator` for receiving items.
-        This is a shim for `Progress.iterbar` which dispatches a
-        worker to iterate a queue which received items placed on
-        the queue.
+    ''' Set up a progress bar, return a closeable `Queue`-like object
+        for receiving items. This is a shim for `Progress.iterbar`
+        which dispatches a worker to iterate items put onto a queue.
+
+        Example:
+
+            Q = Progress.qbar("label")
+            try:
+                ... do work, calling Q.put(item) ...
+            finally:
+                Q.close()
     '''
     Q = IterableQueue(name=label)
 
     def qbar_worker():
+      ''' Consume the items from `Q`, updating the progress bar.
+      '''
       for _ in self.iterbar(Q, label=label, **iterbar_kw):
         pass
 
