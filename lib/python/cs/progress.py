@@ -469,7 +469,7 @@ class BaseProgress(object):
 
     cancel_ticker = False
 
-    def ticker():
+    def _ticker():
       ''' Worker to update the progress bar every `update_period` seconds.
       '''
       time.sleep(update_period)
@@ -477,8 +477,6 @@ class BaseProgress(object):
         update(self, None)
         time.sleep(update_period)
 
-    if update_period == 0:
-      self.notify_update.add(update)
     try:
       start_pos = self.position
       with upd.insert(
@@ -487,7 +485,11 @@ class BaseProgress(object):
           text_auto=text_auto,
       ) as proxy:
         update(self, None)
-        if update_period > 0:
+        if update_period == 0:
+          # update every time the Progress is updated
+          self.notify_update.add(update)
+        elif update_period > 0:
+          # update every update_period seconds
           Thread(_ticker, daemon=True).start()
         yield proxy
     finally:
