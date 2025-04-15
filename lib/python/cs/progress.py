@@ -1057,6 +1057,7 @@ def progressbar(
     total=None,
     units_scale=UNSCALED_SCALE,
     upd: Upd,
+    report_print=None,
     **iterbar_kw
 ):
   ''' Convenience function to construct and run a `Progress.iterbar`
@@ -1084,7 +1085,7 @@ def progressbar(
           for row in progressbar(rows):
               ... do something with row ...
   '''
-  if upd is None or upd.disabled:
+  if not report_print and (upd is None or upd.disabled):
     return it
   if total is None:
     try:
@@ -1093,7 +1094,9 @@ def progressbar(
       total = None
   return Progress(
       name=label, position=position, total=total, units_scale=units_scale
-  ).iterbar(it, **iterbar_kw)
+  ).iterbar(
+      it, report_print=report_print, **iterbar_kw
+  )
 
 @decorator
 def auto_progressbar(func, label=None, report_print=False):
