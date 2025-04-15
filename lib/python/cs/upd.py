@@ -957,7 +957,9 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
               i += 1
               time.sleep(tick_delay)
 
-          Thread(target=_ticker, daemon=True).start()
+          Thread(
+              target=_ticker, name="%s-task-ticker" % label, daemon=True
+          ).start()
         proxy.text = '...'
         start_time = time.time()
         try:
