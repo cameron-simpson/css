@@ -496,7 +496,7 @@ class BaseProgress(object):
           self.notify_update.add(update)
         elif update_period > 0:
           # update every update_period seconds
-          Thread(_ticker, daemon=True).start()
+          Thread(target=_ticker, name=f'{label}-ticker',daemon=True).start()
         yield proxy
     finally:
       cancel_ticker = True
