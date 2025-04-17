@@ -1897,6 +1897,12 @@ def binclass(cls, kw_only=True):
     _datafields = fieldmap
     _field_names = tuple(fieldmap)
 
+    # a list of the fields used by AbstractBinary.self_check
+    FIELD_TYPES = {
+        fieldname: (True, fieldtype)
+        for fieldname, fieldtype in fieldmap.items()
+    }
+
     def __init__(self, **dcls_kwargs):
       self.__dict__['_data'] = None  # get dummy entry in early, aids debugging
       cls = self.__class__
