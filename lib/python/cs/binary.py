@@ -462,8 +462,9 @@ class AbstractBinary(Promotable, ABC):
     ''' Internal self check. Returns `True` if passed.
 
         If the structure has a `FIELD_TYPES` attribute, normally a
-        class attribute, then check the fields against it. The
-        `FIELD_TYPES` attribute is a mapping of `field_name` to
+        class attribute, then check the fields against it.
+
+        The `FIELD_TYPES` attribute is a mapping of `field_name` to
         a specification of `required` and `types`. The specification
         may take one of 2 forms:
         * a tuple of `(required,types)`
@@ -508,6 +509,7 @@ class AbstractBinary(Promotable, ABC):
       ##ok = False
     else:
       # check fields against self.FIELD_TYPES
+      # TODO: call self_check on members with a .self_check() method
       for field_name, field_spec in fields_spec.items():
         with Pfx(".%s=%s", field_name, field_spec):
           if isinstance(field_spec, tuple):
@@ -1089,7 +1091,7 @@ def BinaryMultiStruct(
   elif not isinstance(field_names, tuple):
     field_names = tuple(field_names)
   if len(set(field_names)) != len(field_names):
-    raise ValueError("field names not unique")
+    raise ValueError(f'repeated name in {field_names=}')
   struct = Struct(struct_format)
   fieldmap = struct_field_types(struct_format, field_names)
   for field_name in field_names:
@@ -1097,7 +1099,7 @@ def BinaryMultiStruct(
       if (field_name in ('length', 'struct', 'format')
           or hasattr(AbstractBinary, field_name)):
         raise ValueError(
-            "field name conflicts with AbstractBinary.%s" % (field_name,)
+            f'field name conflicts with AbstractBinary.{field_name}'
         )
 
   # pylint: disable=function-redefined
@@ -1126,6 +1128,7 @@ def BinaryMultiStruct(
       return struct.pack(*self)
 
     if len(field_names) == 1:
+      # structs with a single field
 
       def __str__(self):
         return str(self[0])
@@ -1852,6 +1855,10 @@ def binclass(cls, kw_only=True):
           ... )
           >>> packet
           Packet:Packet__dataclass(count=UInt32BE(value=5),flags=UInt8(value=3),body_text=BSString('hello'),body_data=BSData(b'xyzabc'),body_longs=longs(long1=10, long2=20))
+          >>> print(packet)
+          Packet(count=5,flags=3,body_text=hello,body_data=b'xyzabc',body_longs=longs(long1=10,long2=20))
+          >>> packet.body_data
+          b'xyzabc'
   '''
 
   # collate the annotated class attributes
