@@ -1,3 +1,4 @@
+cs.binary as_hexpat() class method for ImHex Hex Editor Hex Patterns, maybe a cs.hexpat modules later
 units - conciser transcribe function names
 cs.progress: @auto_progress - rename to @uses_progress?
 cs.cmdutils: support --no-thing options with no arg
