@@ -1003,6 +1003,65 @@ class BinaryListValues(AbstractBinary):
         if isinstance(value, bytes) else value.transcribe(), self.values
     )
 
+def struct_field_types(
+    struct_format: str,
+    field_names: Union[str, Iterable[str]],
+) -> Mapping[str, type]:
+  ''' Construct a `dict` mapping field names to struct return types.
+
+      Example:
+
+          >>> struct_field_types('>Hs', 'count text_bs')
+          {'count': int, 'text_bs':bytes}
+  '''
+  if isinstance(field_names, str):
+    field_names = field_names.split()
+  else:
+    field_names = list(field_names)
+  fieldmap = {}
+  for c in struct_format:
+    if not c.isalpha():
+      continue
+    try:
+      fieldtype = {
+          'x': None,
+          'C': int,
+          'b': int,
+          'B': int,
+          'h': int,
+          'H': int,
+          'i': int,
+          'I': int,
+          'l': int,
+          'L': int,
+          'q': int,
+          'Q': int,
+          'n': int,
+          'N': int,
+          'e': float,
+          'f': float,
+          'd': float,
+          's': bytes,
+          'p': str,
+          'P': int,
+      }[c]
+    except KeyError:
+      raise ValueError(
+          f'no type known for struct spec {c=} in {struct_format=}'
+      )
+    if fieldtype is None:
+      # padding
+      continue
+    try:
+      field_name = field_names.pop(0)
+    except IndexError:
+      raise ValueError(
+          f'no field names left at struct spec {c=} in {struct_format=}'
+      )
+    fieldmap[field_name] = fieldtype
+  if field_names:
+    raise ValueError(f'unused field names {field_names=} vs {struct_format=}')
+  return fieldmap
 
 @pfx
 def BinaryMultiStruct(
