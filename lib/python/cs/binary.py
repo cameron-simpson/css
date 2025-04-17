@@ -1091,6 +1091,7 @@ def BinaryMultiStruct(
   if len(set(field_names)) != len(field_names):
     raise ValueError("field names not unique")
   struct = Struct(struct_format)
+  fieldmap = struct_field_types(struct_format, field_names)
   for field_name in field_names:
     with Pfx(field_name):
       if (field_name in ('length', 'struct', 'format')
@@ -1147,7 +1148,7 @@ def BinaryMultiStruct(
           return self[0]
 
       @classmethod
-      def parse_value(cls, bfr: CornuCopyBuffer):
+      def parse_value(cls, bfr: CornuCopyBuffer) -> fieldmap[field_names[0]]:
         ''' Parse a value from `bfr`, return the value.
         '''
         bs = bfr.take(struct.size)
