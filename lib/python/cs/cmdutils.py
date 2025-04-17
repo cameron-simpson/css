@@ -132,7 +132,7 @@ def docmd(dofunc):
     ''' Run a `Cmd` "do" method with some context and handling.
     '''
     if not funcname.startswith('do_'):
-      raise ValueError("function does not start with 'do_': %s" % (funcname,))
+      raise ValueError(f"function does not start with 'do_': {funcname}")
     argv0 = funcname[3:]
     with Pfx(argv0):
       try:
@@ -145,7 +145,7 @@ def docmd(dofunc):
         exception("%s", e)
         return None
 
-  docmd_wrapper.__name__ = '@docmd(%s)' % (funcname,)
+  docmd_wrapper.__name__ = f'@docmd({funcname})'
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
 
@@ -1514,9 +1514,7 @@ class BaseCommand:
           subusage_format, *_ = doc.split('\n\n', 1)
       else:
         # default usage text - include the docstring below a header
-        subusage_format = "\n  ".join(
-            ['{cmd} ...'] + [doc.split('\n\n', 1)[0]]
-        )
+        subusage_format = f'{cmd} ...\n  {doc.split("\n\n", 1)[0]}'
     if subusage_format:
       if short:
         subusage_format, *_ = subusage_format.split('\n', 1)
@@ -1556,7 +1554,7 @@ class BaseCommand:
         and would imply that a `GETOPT_SPEC` was supplied
         without an `apply_opt` or `apply_opts` method to implement the options.
     '''
-    raise NotImplementedError("unhandled option %r" % (opt,))
+    raise NotImplementedError(f'unhandled option {opt!r}')
 
   def apply_opts(self, opts):
     ''' Apply command line options.
@@ -1566,7 +1564,7 @@ class BaseCommand:
     '''
     badopts = False
     for opt, val in opts:
-      with Pfx(opt if val is None else "%s %r" % (opt, val)):
+      with Pfx(opt if val is None else f'{opt} {val!r}'):
         try:
           self.apply_opt(opt, val)
         except GetoptError as e:
@@ -2020,6 +2018,8 @@ class BaseCommandCmd(Cmd):
     self.__command = command
 
   def get_names(self):
+    ''' Return a list of the subcommand names.
+    '''
     cmdcls = type(self.__command)
     names = []
     for method_name in dir(cmdcls):
@@ -2050,7 +2050,7 @@ class BaseCommandCmd(Cmd):
         return do_subcmd
       if subcmd in ('EOF', 'exit', 'quit'):
         return lambda _: True
-    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+    raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
 @uses_cmd_options(quiet=False, verbose=False)
 def qvprint(*print_a, quiet, verbose, **print_kw):
@@ -2068,9 +2068,14 @@ def vprint(*print_a, **qvprint_kw):
 if __name__ == '__main__':
 
   class DemoCommand(BaseCommand):
+    ''' A deomnstration CLI.
+    '''
 
     @popopts
     def cmd_demo(self, argv):
+      ''' Usage: {cmd} [args...]
+            Demonstration subcommand.
+      '''
       print("This is a demo.")
       print("argv =", argv)
 
