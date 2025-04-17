@@ -1003,7 +1003,6 @@ class BinaryListValues(AbstractBinary):
         if isinstance(value, bytes) else value.transcribe(), self.values
     )
 
-_binary_multi_struct_classes = {}
 
 @pfx
 def BinaryMultiStruct(
@@ -1032,12 +1031,6 @@ def BinaryMultiStruct(
     field_names = tuple(field_names)
   if len(set(field_names)) != len(field_names):
     raise ValueError("field names not unique")
-  # we memoise the class definitions
-  key = (struct_format, field_names, class_name)
-  struct_class = _binary_multi_struct_classes.get(key)
-  if struct_class:
-    return struct_class
-  # construct new class
   struct = Struct(struct_format)
   for field_name in field_names:
     with Pfx(field_name):
