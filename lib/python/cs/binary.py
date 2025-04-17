@@ -1028,7 +1028,7 @@ def BinaryMultiStruct(
   '''
   if isinstance(field_names, str):
     field_names = field_names.split()
-  if not isinstance(field_names, tuple):
+  elif not isinstance(field_names, tuple):
     field_names = tuple(field_names)
   if len(set(field_names)) != len(field_names):
     raise ValueError("field names not unique")
