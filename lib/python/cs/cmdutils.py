@@ -1340,12 +1340,13 @@ class BaseCommand:
     subcmd = None  # default: no subcmd specific usage available
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
-      # catch bare -h or --help if no 'h' in the getopt_spec
+      # catch bare -help or --help or -h (if no 'h' in the getopt_spec)
       if (len(argv) == 1
           and (argv[0] in ('-help', '--help') or
                ('h' not in getopt_spec and argv[0] in ('-h',)))):
         argv = self._argv = ['help', '-l']
       else:
+        # options and preargv before the subcommand
         if getopt_spec:
           # legacy GETOPT_SPEC mode
           # we do this regardless in order to honour '--'
@@ -1357,7 +1358,7 @@ class BaseCommand:
           options.popopts(argv)
         # We do this regardless so that subclasses can do some presubcommand parsing
         # _after_ any command line options.
-        argv = self._argv = self.apply_preargv(argv)
+        argv = self.apply_preargv(argv)
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
@@ -1366,6 +1367,7 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
+        self._argv = argv
         self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
@@ -1403,6 +1405,7 @@ class BaseCommand:
           with Pfx(subcmd):
             return subcommand(argv)
 
+        self._argv = argv
         self._run = _run
     except GetoptError as e:
       if self.getopt_error_handler(
@@ -1577,9 +1580,7 @@ class BaseCommand:
     ''' Do any preparsing of `argv` before the subcommand/main-args.
         Return the remaining arguments.
 
-        This default implementation applies the default options
-        supported by `self.options` (an instance of `self.Options`
-        class).
+        This default implementation does nothing.
     '''
     return argv
 
