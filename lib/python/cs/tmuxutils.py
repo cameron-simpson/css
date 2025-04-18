@@ -27,6 +27,51 @@ from cs.resources import MultiOpenMixin
 
 from cs.debug import trace, X, s, r
 
+def main(argv=None):
+  ''' The CLI mode for `cs.tmuxutils`.
+  '''
+  return TMuxUtilsCommand(argv).run()
+
+class TMuxUtilsCommand(BaseCommand):
+  ''' CLI to access various cs.tmuxutils facilities.
+  '''
+
+  SUBCOMMAND_ARGV_DEFAULT = ['ls', '-n']
+
+  @contextmanager
+  def run_context(self):
+    ''' Establish a tmux(1) control connection during the command run.
+    '''
+    with super().run_context():
+      with TmuxControl() as tmux:
+        with stackattrs(self.options, tmux=tmux):
+          yield
+
+  @trace
+  @popopts(a='all_sessions', n=('number_list', 'Number the listing.'))
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [-n]
+          List sessions.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    all_sessions = options.all_sessions
+    number_list = options.number_list
+    tmux = options.tmux
+    n = 0
+    for session_id, annotations, parsed in tmux.sessions():
+      if not all_sessions and not isinstance(session_id, str):
+        continue
+      n += 1
+      if number_list:
+        print(
+            f'{n:3d}', session_id, "created",
+            parsed['created_dt'].isoformat(sep=' ')
+        )
+      else:
+        print(line)
+
 @dataclass
 class TmuxCommandResponse:
   ''' A tmux control command response.
@@ -322,6 +367,4 @@ def run_pane(*argv) -> IterableQueue:
   shcmd = shq(argv)
 
 if __name__ == '__main__':
-  with TmuxControl() as tm:
-    print(tm('list-sessions'))
-    print(tm('list-panes'))
+  sys.exit(main(sys.argv))
