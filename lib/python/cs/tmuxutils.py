@@ -3,29 +3,36 @@
 ''' Utlity functions for working with tmux(1).
 '''
 
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
+from functools import cached_property
+from getopt import GetoptError
 import os
-from os import O_RDWR
 from os.path import join as joinpath
+import re
 from shlex import join as shq
-from socket import socket, AF_UNIX, SHUT_RD, SHUT_WR, SOCK_STREAM
 from subprocess import CompletedProcess, PIPE, Popen
+import sys
 from threading import Lock
 from typing import List
 
 from icontract import require
 from typeguard import typechecked
 
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.fs import HasFSPath
+from cs.lex import cutprefix
 from cs.logutils import info, warning
-from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.psutils import run
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
+from cs.result import Result
+from cs.threads import bg
 
-from cs.debug import trace, X, s, r
+from cs.debug import trace, X
 
 def main(argv=None):
   ''' The CLI mode for `cs.tmuxutils`.
@@ -70,7 +77,7 @@ class TMuxUtilsCommand(BaseCommand):
             parsed['created_dt'].isoformat(sep=' ')
         )
       else:
-        print(line)
+        print(session_id, "created", parsed['created_dt'].isoformat(sep=' '))
 
 @dataclass
 class TmuxCommandResponse:
@@ -122,7 +129,7 @@ class TmuxCommandResponse:
     while True:
       bs = rf.readline()
       if not bs:
-        raise EOFError()
+        raise EOFError
       if bs.startswith((b'%end ', b'%error ')):
         break
       output.append(bs)
@@ -178,8 +185,6 @@ class TmuxCommandResponse:
       if m := re.match(r'^(\d+) windows', etc):
         parsed['nwindows'] = int(m.group(1))
         etc = etc[m.end():]
-      else:
-        nwindows = None
       while etc:
         if m := re.match(r'^\s*\(([^()]+)\)', etc):
           annotation = m.group(1)
@@ -313,11 +318,11 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       wf.flush()
     return R
 
-  # TODO: worker thread to consume the control data and complete Results
-
   @pfx_method
   @typechecked
   def __call__(self, tmux_command: str) -> TmuxCommandResponse:
+    ''' Call us with a `tmux_command`, return the `TmuxCommandResponse`.
+    '''
     with self:
       R = self.submit(tmux_command)
       return R()
