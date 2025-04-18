@@ -239,6 +239,8 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
     pending = self.pending
     notify = self.notify
     lock = self._lock
+    # consume the initial greeting response
+    rsp0 = TmuxCommandResponse.read_response(rf, notify=notify)
     while True:
       rsp = TmuxCommandResponse.read_response(rf, notify=notify)
       if rsp is None:
