@@ -277,6 +277,21 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       R = self.submit(tmux_command)
       return R()
 
+  def sessions(self):
+    ''' Return a list of `(session_id,annotations,parsed)` 3-tuples
+        as from `parse_session_line` for the current sessions.
+    '''
+    rsp = self('list-session')
+    return [rsp.parse_session_line(line) for line in rsp.lines]
+
+  def session_names(self):
+    ''' Return a list of the session names.
+    '''
+    return [
+        session_id for session_id, annotations, parsed in self.sessions()
+        if isinstance(session_id, str)
+    ]
+
 def tmux(tmux_command, *tmux_args) -> CompletedProcess:
   ''' Execute the tmux(1) command `tmux_command`.
   '''
