@@ -32,8 +32,6 @@ from cs.resources import MultiOpenMixin
 from cs.result import Result
 from cs.threads import bg
 
-from cs.debug import trace, X
-
 def main(argv=None):
   ''' The CLI mode for `cs.tmuxutils`.
   '''
