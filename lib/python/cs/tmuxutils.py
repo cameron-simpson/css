@@ -174,13 +174,16 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
 
   TMUX = 'tmux'
 
-  def __init__(self, socketpath=None, notify=None):
+  def __init__(self, socketpath=None, notify=None, tmux_exe=None):
     if socketpath is None:
       socketpath = self.get_socketpath()
     if notify is None:
       notify = self.default_notify
+    if tmux_exe is None:
+      tmux_exe = self.TMUX
     self.fspath = socketpath
     self.notify = notify
+    self.tmux_exe = tmux_exe
     self._lock = Lock()
 
   @staticmethod
@@ -205,8 +208,11 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
   def startup_shutdown(self):
     ''' Open/close the control socket.
     '''
-    with Popen([self.TMUX, '-S', self.fspath, '-C'], stdin=PIPE,
-               stdout=PIPE) as P:
+    with Popen(
+        [self.tmux_exe, '-S', self.fspath, '-C'],
+        stdin=PIPE,
+        stdout=PIPE,
+    ) as P:
       try:
         pending = []  # queue of pending Results
         with stackattrs(self, rf=P.stdout, wf=P.stdin, pending=pending):
