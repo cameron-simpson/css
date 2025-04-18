@@ -96,6 +96,68 @@ class TmuxCommandResponse:
         notifications=notifications,
     )
 
+  @cached_property
+  def lines(self):
+    ''' A tuple of `str` from the response output, including the trailing newline.
+    '''
+    return tuple(
+        line_bs.decode('utf-8', errors='replace') for line_bs in self.output
+    )
+
+  @staticmethod
+  def parse_session_line(line):
+    ''' Parse a tmux(1) `list-sessions` response line
+        into a `(id,annotations,parsed)` 3-tuple where:
+        - `id` is the session id, and `int` if unnamed, a `str` if named
+        - `annotations` a list of text parts of the "(text)" suffixes
+        - `parsed` is a dict containing parsed values
+
+        The `parsed` dict always contains:
+        - `nwindows`, the number of windows in the session
+        - `created`, the UNIX timestamp of when the session was created
+        - `attached`, whether the session is currently attached
+    '''
+    id_s, etc = line.rstrip().split(': ', 1)
+    try:
+      session_id = int(id_s)
+    except ValueError:
+      session_id = id_s
+    with Pfx("session %s", session_id):
+      annotations = []
+      parsed = dict(
+          attached=False,
+          created=None,
+          nwindows=None,
+          session_id=session_id,
+      )
+      if m := re.match(r'^(\d+) windows', etc):
+        parsed['nwindows'] = int(m.group(1))
+        etc = etc[m.end():]
+      else:
+        nwindows = None
+      while etc:
+        if m := re.match(r'^\s*\(([^()]+)\)', etc):
+          annotation = m.group(1)
+          annotations.append(annotation)
+          etc = etc[m.end():]
+          created_date = cutprefix(annotation, 'created ')
+          if annotation == 'attached':
+            parsed['attached'] = True
+          elif created_date != annotation:
+            try:
+              dt = datetime.strptime(created_date, '%a %b %d %H:%M:%S %Y')
+            except ValueError as e:
+              warning("cannot parse created date %r: %s", created_date, e)
+            else:
+              parsed['created'] = dt.timestamp()
+              parsed['created_dt'] = dt
+          else:
+            warning("unhandled annotation %r", annotation)
+        else:
+          warning("unparsed session information: %r", etc)
+          break
+    return session_id, annotations, parsed
+
 class TmuxControl(HasFSPath, MultiOpenMixin):
   ''' A class to control tmux(1) via its control socket.
 
