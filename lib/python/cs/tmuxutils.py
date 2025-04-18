@@ -216,11 +216,12 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       try:
         pending = []  # queue of pending Results
         with stackattrs(self, rf=P.stdout, wf=P.stdin, pending=pending):
-          workerT = bg(self._worker)
+          workerT = bg(self._worker, name='tmux response parser')
           with stackattrs(self, workerT=workerT):
             yield
       finally:
         P.stdin.close()
+        workerT.join()
         P.wait()
 
   def default_notify(self, bs: bytes):
