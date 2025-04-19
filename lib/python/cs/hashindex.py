@@ -192,8 +192,8 @@ class HashIndexCommand(BaseCommand):
       warning(f'{hashname=} not known: {e}')
       yield 1
     else:
-      with fstags:
-        with super().run_context(**kw):
+      with super().run_context(**kw):
+        with fstags:
           yield
 
   @staticmethod
@@ -410,8 +410,9 @@ class HashIndexCommand(BaseCommand):
       fspaths_by_hashcode = hashindex_map(srcdir, relative=True)
     xit = 0
     # rearrange the source directory.
-    if dstdir.host is None:
-      # local srcdir and dstdir
+    with run_task(f'rearrange dstdir {dstdir}'):
+      if dstdir.host is None:
+        # local srcdir and dstdir
         rearrange(
             srcdir.fspath,
             fspaths_by_hashcode,
@@ -419,15 +420,15 @@ class HashIndexCommand(BaseCommand):
             move_mode=True,
             symlink_mode=False,
         )
-    else:
-      # remote srcdir and dstdir
-      xit = remote_rearrange(
-          dstdir.host,
-          dstdir.fspath,
-          fspaths_by_hashcode,
-          move_mode=True,
-          symlink_mode=False,
-      )
+      else:
+        # remote srcdir and dstdir
+        xit = remote_rearrange(
+            dstdir.host,
+            dstdir.fspath,
+            fspaths_by_hashcode,
+            move_mode=True,
+            symlink_mode=False,
+        )
     if xit == 0:
       # rsync source to destination
       with above_upd():
