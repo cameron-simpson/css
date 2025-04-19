@@ -9,12 +9,12 @@
     and other command line related stuff.
 
     This module provides the following main items:
-    - `@docmd`: a decorator for command methods of a `cmd.Cmd` class
-      providing better quality of service
     - `BaseCommand`: a base class for creating command line programmes
       with easier setup and usage than libraries like `optparse` or `argparse`
-    - `@popopts`: a decorator which works with `BaseCommand` command
+    - `@popopts`: a decorator which works with `BaseCommand` subcommand
       methods to parse their command line options
+    - `@docmd`: a decorator for command methods of a `cmd.Cmd` class
+      providing better quality of service
 
     Editorial: why not arparse?
     I find the whole argparse `add_argument` thing very cumbersome

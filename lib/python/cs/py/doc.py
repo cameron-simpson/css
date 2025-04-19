@@ -74,7 +74,7 @@ def module_doc(
     list_item = f'{nl}- <a name="{anchor}"></a>`{str(header)}`: {stripped_dedent(obj_doc,sub_indent="  ")}'
     return list_item
 
-  full_docs.append(f'\n\nModule contents:')
+  full_docs.append('\n\nShort summary:')
   for Mname, obj in sorted(module_attributes(module), key=sort_key):
     with Pfx(Mname):
       if ALL and Mname not in ALL:
@@ -85,6 +85,29 @@ def module_doc(
       if obj_module is not module:
         # name imported from another module
         continue
+      docstring = getattr(obj, '__doc__', '').strip()
+      if not docstring:
+        continue
+      line1 = " ".join(
+          line.strip()
+          for line in docstring.split("\n\n")[0].split(". ")[0].split("\n")
+      )
+      if line1[0].isupper() and not line1.endswith('.'):
+        line1 += '.'
+      full_docs.append(f'\n* `{Mname}`: {line1}')
+
+  full_docs.append('\n\nModule contents:')
+  for Mname, obj in sorted(module_attributes(module), key=sort_key):
+    with Pfx(Mname):
+      if ALL and Mname not in ALL:
+        continue
+      if not filter_key(Mname):
+        continue
+      obj_module = getmodule(obj)
+      if obj_module is not module:
+        # name imported from another module
+        continue
+      assert obj_module
       obj_doc = obj_docstring(obj) if obj_module else ''
       if not callable(obj):
         if obj_doc:
