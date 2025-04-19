@@ -94,6 +94,8 @@ ignore = [
     "D415", # First line should end with a period, question mark, or exclamation point
     "E731",
     "I001", # Import block is un-sorted or un-formatted
+    "SIM117", # Use a single `with` statement with multiple contexts instead of nested `with` statements
+    "T201", # `print` found
     "TRY003", # Avoid specifying long messages outside the exception class
     "Q000",
     "Q002",
