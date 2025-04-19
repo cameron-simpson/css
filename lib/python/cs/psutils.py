@@ -5,7 +5,7 @@ r'''
 Assorted process and subprocess management functions.
 
 Not to be confused with the excellent
-(psutil)[https://pypi.org/project/psutil/] package.
+[psutil package](https://pypi.org/project/psutil/).
 '''
 
 import builtins
@@ -25,7 +25,7 @@ from cs.deco import fmtdoc, uses_cmd_options
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
-__version__ = '20241206-post'
+__version__ = '20250108.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -261,7 +261,14 @@ def run(
     else:
       if fold is None:
         fold = False
-      print_argv(*argv, indent="+ ", file=sys.stderr, fold=fold, print=print)
+      print_argv(
+          *argv,
+          indent0="+ ",
+          indent="  ",
+          file=sys.stderr,
+          fold=fold,
+          print=print
+      )
   if input is None:
     if stdin is None:
       stdin = subprocess_DEVNULL
@@ -469,6 +476,7 @@ def prep_argv(*argv, ssh_exe, remote=None):
 
 def print_argv(
     *argv,
+    indent0=None,
     indent="",
     subindent="  ",
     end="\n",
@@ -478,6 +486,8 @@ def print_argv(
 ):
   ''' Print an indented possibly folded command line.
   '''
+  if indent0 is None:
+    indent0 = indent
   if file is None:
     file = sys.stdout
   if print is None:
@@ -486,7 +496,7 @@ def print_argv(
   was_opt = False
   for i, arg in enumerate(argv):
     if i == 0:
-      pr_argv.append(indent)
+      pr_argv.append(indent0)
       was_opt = False
     elif len(arg) >= 2 and arg.startswith('-'):
       if fold:

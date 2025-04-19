@@ -68,6 +68,13 @@ def module_doc(
     module = pfx_call(importlib.import_module, module)
   full_docs = [obj_docstring(module)]
   ALL = getattr(module, '__all__', None)
+
+  def doc_item(anchor, header, obj_doc, nl="\n"):
+    ## return f'\n\n## <a name="{anchor}"></a>`{header}`\n\n{obj_doc}'
+    list_item = f'{nl}- <a name="{anchor}"></a>`{str(header)}`: {stripped_dedent(obj_doc,sub_indent="  ")}'
+    return list_item
+
+  full_docs.append(f'\n\nModule contents:')
   for Mname, obj in sorted(module_attributes(module), key=sort_key):
     with Pfx(Mname):
       if ALL and Mname not in ALL:
@@ -81,17 +88,13 @@ def module_doc(
       obj_doc = obj_docstring(obj) if obj_module else ''
       if not callable(obj):
         if obj_doc:
-          full_docs.append(
-              f'\n\n## <a name="{Mname}"></a>`{Mname} = {obj!r}`\n\n{obj_doc}'
-          )
+          full_docs.append(doc_item(Mname, f'{Mname} = {obj!r}', obj_doc))
         continue
       if not obj_doc:
         continue
       if isfunction(obj):
         sig = signature(obj)
-        full_docs.append(
-            f'\n\n## <a name="{Mname}"></a>`{Mname}{sig}`\n\n{obj_doc}'
-        )
+        full_docs.append(doc_item(Mname, f'{Mname}{sig}', obj_doc))
       elif isclass(obj):
         classname_etc = Mname
         # compute the list of immediate superclass names
@@ -125,16 +128,14 @@ def module_doc(
         if issubclass(obj, BaseCommand):
           # extract the Usage: paragraph if present, append a full usage
           doc_without_usage, usage_text = obj.extract_usage()
-          obj_doc = ''.join(
+          obj_doc += ''.join(
               (
                   doc_without_usage,
                   "\n\nUsage summary:\n\n",
                   indent("Usage: " + usage_text, "    "),
               )
           )
-        full_docs.append(
-            f'\n\n## <a name="{Mname}"></a>Class `{classname_etc}`\n\n{obj_doc}'
-        )
+        full_docs.append(doc_item(Mname, f'Class `{classname_etc}', obj_doc))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order

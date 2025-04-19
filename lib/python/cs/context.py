@@ -21,7 +21,7 @@ from typing import Callable, Iterable
 from cs.deco import decorator
 from cs.gimmicks import error
 
-__version__ = '20240630-post'
+__version__ = '20250412-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -41,8 +41,8 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
       if it is not used, allowing the enclosed code to test whether
       the context is active.
 
-      This is to ease uses where the context object is optional
-      i.e. `None` if not present. Example from `cs.vt.stream`:
+      This is to ease uses where the context object is optional,
+      for example `None` if not present. Example from `cs.vt.stream`:
 
           @contextmanager
           def startup_shutdown(self):
@@ -62,7 +62,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
       The signature is flexible, offering 2 basic modes of use.
 
       *Flagged use*: `contextif(flag,cmgr,*a,**kw)`: if `flag` is a
-      Boolean then it governs whether the context manager `cmgr`
+      Boolean (`bool`) then it governs whether the context manager `cmgr`
       is used. Historically the driving use case was verbosity
       dependent status lines or progress bars. Example:
 
@@ -78,7 +78,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
               ... do the thing, setting proxy.text as needed ...
 
       *Unflagged use*: `contextif(cmgr,*a,**kw)`: use `cmgr` as the
-      flag: if false (eg `None`) then `cmgr` is not used.
+      flag: if falsey (eg `None`) then `cmgr` is not used.
 
       Additionally, `cmgr` may be a callable, in which case the
       context manager itself is obtained by calling
@@ -87,7 +87,7 @@ def contextif(cmgr, *cmgr_args, **cmgr_kwargs):
       `cmgr_args` or `cmgr_kwargs`.
 
       This last mode can be a bit fiddly. If `cmgr` is a context
-      manager _but is also callable for other purposes_ you will
+      manager _but is also callable for some other purposes_ you will
       need to do a little shuffle to avoid the implied call:
 
           with contexif(flag, lambda: cmgr):
@@ -409,8 +409,10 @@ def twostep(cmgr):
   yield
 
 def setup_cmgr(cmgr):
-  ''' Run the set up phase of the context manager `cmgr`
-      and return a callable which runs the tear down phase.
+  ''' Run the enter phase of the context manager `cmgr`.
+      Return a `(yielded,teardwon)` 2-tuple where `yielded` is the
+      value returned from the context manager's enter step and
+      `callable` is a callable which runs the tear down phase.
 
       This is a convenience wrapper for the lower level `twostep()` function
       which produces a two iteration generator from a context manager.
@@ -429,12 +431,11 @@ def setup_cmgr(cmgr):
 
       then the correct use of `setup_cmgr()` is:
 
-          teardown = setup_cmgr(my_cmgr_func(...))
+          enter_value, teardown = setup_cmgr(my_cmgr_func(...))
 
       and _not_:
 
-          cmgr_iter = setup_cmgr(my_cmgr_func)
-          ...
+          enter_value, teardown = setup_cmgr(my_cmgr_func)
 
       The purpose of `setup_cmgr()` is to split any context manager's operation
       across two steps when the set up and teardown phases must operate
@@ -453,13 +454,15 @@ def setup_cmgr(cmgr):
                   self.foo = foo
                   self._teardown = None
               def __enter__(self):
-                  self._teardown = setup_cmgr(stackattrs(o, setting=foo))
+                  the_context = stackattrs(o, setting=foo)
+                  enter_value, self._teardown = setup_cmgr(the_context)
+                  return enter_value
               def __exit__(self, *_):
                   teardown, self._teardown = self._teardown, None
                   teardown()
   '''
   cmgr_twostep = twostep(cmgr)
-  next(cmgr_twostep)
+  enter_value = next(cmgr_twostep)
 
   def next2():
     try:
@@ -467,7 +470,7 @@ def setup_cmgr(cmgr):
     except StopIteration:
       pass
 
-  return next2
+  return enter_value, next2
 
 def push_cmgr(o, attr, cmgr):
   ''' A convenience wrapper for `twostep(cmgr)`
@@ -507,8 +510,14 @@ def push_cmgr(o, attr, cmgr):
   cmgr_twostep = twostep(cmgr)
   enter_value = next(cmgr_twostep)
   # pylint: disable=unnecessary-lambda-assignment
-  pop_func = lambda: (popattrs(o, (attr,), pushed), next(cmgr_twostep))[1]
   pop_func_attr = '_push_cmgr__popfunc__' + attr
+
+  def pop_func():
+    ''' Pop the old attributes from `o`, run the final `cmgr_twostep` stage.
+    '''
+    popattrs(o, (attr, pop_func_attr), pushed)
+    return next(cmgr_twostep)
+
   pushed = pushattrs(o, **{attr: enter_value, pop_func_attr: pop_func})
   return enter_value
 

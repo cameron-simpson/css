@@ -3,7 +3,9 @@
 ''' Mercurial support for the cs.vcs package.
 '''
 
-from cs.deco import cachedmethod
+from types import SimpleNamespace as NS
+
+from cs.cache import cachedmethod
 from cs.pfx import Pfx, pfx_method
 
 from . import VCS, ReleaseLogEntry
@@ -129,18 +131,31 @@ class VCS_Hg(VCS):
       yield '-I'
       yield 'path:' + subpath
 
-  def log_entry(self, rev):
+  def log_entries(self, *revs):
     ''' Return the log entry for the specified revision `rev`.
     '''
-    with self._pipefrom('log', '-r', rev, '--template', '{desc}\n',
-                        '--') as piped:
-      return ''.join(piped)
+    with trace(self._pipefrom)(
+        'log',
+        *(('-r', rev) for rev in revs),
+        '--template',
+        '{node}\n{tags}\n{desc}\a',
+        '--',
+    ) as piped:
+      for entry_s in ''.join(piped).split('\a'):
+        if not entry_s:
+          continue
+        node, tags, desc = entry_s.split('\n', 2)
+        yield NS(node=node, tags=tags.split(), desc=desc)
 
   def release_log(self, tag_prefix):
     ''' Generator yielding `ReleaseLogEntry` instances
         for the release tags starting with `tag_prefix`
         in reverse tag order (most recent first).
     '''
-    for tag in sorted(filter(lambda tag: tag.startswith(tag_prefix),
-                             self.tags()), reverse=True):
-      yield ReleaseLogEntry(tag, self.log_entry(tag))
+    release_tags = sorted(
+        filter(lambda tag: tag.startswith(tag_prefix), self.tags()),
+        reverse=True
+    )
+    for log in self.log_entries(*release_tags):
+      tag, = (logtag for logtag in log.tags if logtag.startswith(tag_prefix))
+      yield ReleaseLogEntry(tag, log.desc)

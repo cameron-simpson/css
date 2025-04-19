@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Assorted convenience functions for files and filenames/pathnames.
 # - Cameron Simpson <cs@cskk.id.au>
@@ -38,7 +38,7 @@ import time
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import cachedmethod, decorator, fmtdoc, OBSOLETE, strable
+from cs.deco import fmtdoc, OBSOLETE, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
 from cs.gimmicks import TimeoutError  # pylint: disable=redefined-builtin
@@ -50,10 +50,10 @@ from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
-from cs.threads import locked
+from cs.threads import locked, NRLock
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20241122-post'
+__version__ = '20250103-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -392,78 +392,6 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
       return new_state, R
   return None, None
 
-@decorator
-def file_based(
-    func,
-    attr_name=None,
-    filename=None,
-    poll_delay=None,
-    sig_func=None,
-    **dkw
-):
-  ''' A decorator which caches a value obtained from a file.
-
-      In addition to all the keyword arguments for `@cs.deco.cachedmethod`,
-      this decorator also accepts the following arguments:
-      * `attr_name`: the name for the associated attribute, used as
-        the basis for the internal cache value attribute
-      * `filename`: the filename to monitor.
-        Default from the `._{attr_name}__filename` attribute.
-        This value will be passed to the method as the `filename` keyword
-        parameter.
-      * `poll_delay`: delay between file polls, default `DEFAULT_POLL_INTERVAL`.
-      * `sig_func`: signature function used to encapsulate the relevant
-        information about the file; default
-        cs.filestate.FileState({filename}).
-
-      If the decorated function raises OSError with errno == ENOENT,
-      this returns None. Other exceptions are reraised.
-  '''
-  if attr_name is None:
-    attr_name = func.__name__
-  filename_attr = '_' + attr_name + '__filename'
-  filename0 = filename
-  if poll_delay is None:
-    poll_delay = DEFAULT_POLL_INTERVAL
-  sig_func = dkw.pop('sig_func', None)
-  if sig_func is None:
-
-    def sig_func(self):
-      ''' The default signature function: `FileState(filename,missing_ok=True)`.
-      '''
-      filename = filename0
-      if filename is None:
-        filename = getattr(self, filename_attr)
-      return FileState(filename, missing_ok=True)
-
-  def wrap0(self, *a, **kw):
-    ''' Inner wrapper for `func`.
-    '''
-    filename = kw.pop('filename', None)
-    if filename is None:
-      if filename0 is None:
-        filename = getattr(self, filename_attr)
-      else:
-        filename = filename0
-    kw['filename'] = filename
-    try:
-      return func(self, *a, **kw)
-    except OSError as e:
-      if e.errno == errno.ENOENT:
-        return None
-      raise
-
-  dkw['attr_name'] = attr_name
-  dkw['poll_delay'] = poll_delay
-  dkw['sig_func'] = sig_func
-  return cachedmethod(**dkw)(wrap0)
-
-@decorator
-def file_property(func, **dkw):
-  ''' A property whose value reloads if a file changes.
-  '''
-  return property(file_based(func, **dkw))
-
 def files_property(func):
   ''' A property whose value reloads if any of a list of files changes.
 
@@ -643,6 +571,7 @@ def makelockfile(
     max_interval=37,
 ):
   ''' Create a lockfile and return its path.
+      If `keepopen`, return a `(lockpath,lockfd)` 2-tuple.
 
       The lockfile can be removed with `os.remove`.
       This is the core functionality supporting the `lockfile()`
@@ -720,22 +649,28 @@ def makelockfile(
     return lockpath
 
 @contextmanager
-def lockfile(path, **lock_kw):
+def lockfile(path, _lockmap={}, _lockmap_lock=Lock(), **makelockfile_kw):
   ''' A context manager which takes and holds a lock file.
       An open file descriptor is kept for the lock file as well
       to aid locating the process holding the lock file using eg `lsof`.
       This is just a context manager shim for `makelockfile`
-      and all arguments are plumbed through.
+      and all keyword arguments are plumbed through.
   '''
-  lockpath, lockfd = makelockfile(path, keepopen=True, **lock_kw)
-  try:
-    yield lockpath
-  finally:
+  with _lockmap_lock:
     try:
-      pfx_call(os.remove, lockpath)
-    except FileNotFoundError as e:
-      warning("lock file already removed: %s", e)
-    pfx_call(os.close, lockfd)
+      nrlock = _lockmap[path]
+    except KeyError:
+      nrlock = _lockmap[path] = NRLock(path)
+  with nrlock:
+    lockpath, lockfd = makelockfile(path, keepopen=True, **makelockfile_kw)
+    try:
+      yield lockpath
+    finally:
+      try:
+        pfx_call(os.remove, lockpath)
+      except FileNotFoundError as e:
+        warning("lock file already removed: %s", e)
+      pfx_call(os.close, lockfd)
 
 def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.

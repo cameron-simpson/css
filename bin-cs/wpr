@@ -1,92 +1,166 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # Select random screencaps and set MacOS desktop to selection.
 # - Cameron Simpson <cs@cskk.id.au> 24dec2022
 #
 
-set -ue
+import errno
+from functools import partial
+import os
+from os.path import (
+    abspath,
+    basename,
+    expanduser,
+    isdir as isdirpath,
+    join as joinpath,
+)
+import random
+import re
+import sys
+from typing import Iterable, Sequence
 
-: "${SSV_DIR=$HOME/im/screencaps}"
-: "${WPDIR:=$HOME/im/wp}"
-: "${WPLINKDIR:=$HOME/var/im/wp}"
-: "${WPPATH:=$WPDIR:$SSV_DIR}"
+from icontract import require
+from typeguard import typechecked
 
-nwp=128
-spaces=.
-trace= ## set-x
+from cs.app.osx.spaces import Spaces
+from cs.fs import needdir, scandirtree, shortpath, update_linkdir
+from cs.lastvalue import LastValue
+from cs.lex import cutprefix
+from cs.mappings import missingdict
+from cs.pfx import pfx_call
 
-cmd=$( basename "$0" )
-usage="Usage: $cmd [-nwp] [-x] [--] [spaces] words...
-    Select up to nwp (${nwp}) wallpapers from the directories in \$WPPATH,
-    default from \$WPDIR:\$SSV_DIR: $WPPATH
-    at random matching the sed-regexps \"words\".
-    Construct a scratch directoy in \$WPLINKDIR: $WPLINKDIR
-    and symlink the selected images into it, then set that directory
-    as the wallpaper directory for the current (or specified) space."
+# cached autopopulating mapping of  to list of re.Pattern
+word_re_map = missingdict(partial(re.compile, flags=re.I))
 
-badopts=
+def main(argv=None):
+  USAGE_FORMAT = '''Usage: {cmd} [-nwp] [-N] [-P wppath] [--] [spaces] [ RENEW | words...]
+      Select wallpapers from the directories in $WPPATH
+      at random matching the sed-regexps "words".
+      Construct a scratch directoy in $WPLINKDIR: $WPLINKDIR
+      and symlink the selected images into it, then set that directory
+      as the wallpaper directory for the current (or specified) space.
+      -nwp        Limit the number of wallpapers to nwp (${nwp}).
+      -N          Do not update the OSX Spaces wallpaper settings.
+      -W wppath   Use the supplied wallpaper path, default from
+                  $WPPATH, which defaults to $WPDIR:$SSV_DIR: {":".join(wppath)}'''
+  if argv is None:
+    argv = list(sys.argv)
+  cmd = argv.pop(0)
+  lv = LastValue()
+  spaces = Spaces()
+  do_renew = False
+  nwp = 16
+  update_spaces = True
+  ssvdirpath = os.environ.get('SSV_DIR', expanduser('~/im/screencaps'))
+  wpdirpath = os.environ.get('WPDIR', expanduser('~/im/wp'))
+  wplinkdirpath = os.environ.get('WPLINKDIR', expanduser('~/var/im/wp'))
+  wppath = (os.environ.get('WPPATH') or f'{wpdirpath}:{ssvdirpath}').split(':')
+  space_list = [spaces.current_index + 1]
+  badopts = False
+  while argv and argv[0].startswith('-'):
+    opt = argv.pop(0)[1:]
+    if not opt:
+      argv.insert(0, '-')
+      break
+    if opt == '-':
+      break
+    if opt.isdigit():
+      nwp = int(opt)
+    elif opt == 'N':
+      update_spaces = False
+    elif opt == 'P':
+      wppath = argv.pop(0).split(':')
+    else:
+      print(f'{cmd}: unrecognised option: -{opt}', file=sys.stderr)
+      badopts = True
+  if argv:
+    arg0 = argv.pop(0)
+    if arg0 == '.':
+      space_list = [spaces.current_index + 1]
+    elif arg0 and arg0[0].isdigit():
+      space_list = [int(space_n) for space_n in arg0.split(',')]
+    elif arg0 == '*':
+      space_list = [index + 1 for index in range(len(spaces))]
+    else:
+      argv.insert(0, arg0)
+  if argv == ['RENEW']:
+    do_renew = True
+    argv.pop(0)
+    if argv:
+      print(f'{cmd}: aextra arguments after RENEW: {argv!r}', file=sys.stderr)
+      badopts = True
+  elif not argv:
+    print(f'{cmd}: missing words', file=sys.stderr)
+    badopts = True
+  else:
+    word_tuple = tuple(argv)
+  if badopts:
+    print(USAGE_FORMAT.format(cmd=cmd), file=sys.stderr)
+    return 2
+  if do_renew:
+    seen_word_tuples = set()
+    for wpn, word_list in sorted(last_wp_values(lv).items()):
+      word_tuple = tuple(word_list)
+      if word_tuple not in seen_word_tuples:
+        wpdir, _ = update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
+        seen_word_tuples.add(word_tuple)
+      spaces.set_wp_fspath(wpn - 1, wpdir)
+  else:
+    wpdir, _ = update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
+    for wpn in space_list:
+      spaces.set_wp_fspath(wpn - 1, wpdir)
 
-while [ $# -gt 0 ]
-do
-  case "$1" in
-    -[1-9]*)
-        _nwp=$1; shift
-        nwp=$( expr "x$_nwp" : 'x-\([1-9][0-9]*\)' ) || {
-          echo "$cmd: -nwp \"$1\": invalid number" >&2
-          badopts=1
-        }
-        ;;
-    -x) trace=set-x
-        ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
-    *)  break ;;
-  esac
-  shift
-done
+def last_wp_values(lv) -> dict[int, list[str]]:
+  ''' Return a `dict` mapping space number to a list of words.
+  '''
+  space_words = {}
+  for key, value in lv.items():
+    wpn = cutprefix(key, 'wp_')
+    if key != wpn and wpn.isdigit():
+      space_words[int(wpn)] = tuple(value.split())
+  return space_words
 
-if [ $# -gt 0 ]
-then
-  case "$1" in
-    . | \* | [1-9] | [1-9][1-9] )
-        spaces=$1
-        shift
-        ;;
-  esac
-fi
+@require(lambda count: count >= 1)
+@typechecked
+def update_random_wpdir(
+    wplinkdirpath: str,
+    words: Sequence[str],
+    wppath: list[str],
+    count: int,
+    exts=('.jpg', '.png'),
+) -> tuple[str, dict[str, str]]:
+  ''' Randomly choose `count` image paths found in `wppath` matching `words`.
+      Choose a subdirectory of `wplinkdirpath` based on `words`, making it at need.
+      Update its contents with symlinks to the chosen paths.
+      Return 2-tuple of `(wpsublinkdirpath,namemap)` being the
+      subdirectory path and a mapping of names in `linkdirpath` to
+      absolute forms of `paths`.
+  '''
+  all_matchpaths = []
+  for wpdirpath in wppath:
+    for is_dir, subpath in scandirtree(wpdirpath):
+      if is_dir:
+        continue
+      if basename(subpath).startswith('.'):
+        continue
+      if not subpath.endswith(exts):
+        continue
+      for word in words:
+        if not word_re_map[word].search(subpath):
+          break
+      else:
+        all_matchpaths.append(joinpath(wpdirpath, subpath))
+  if count >= len(all_matchpaths):
+    matchpaths = all_matchpaths
+  else:
+    matchpaths = random.sample(all_matchpaths, count)
+  wpsublinkdirpath = joinpath(wplinkdirpath, 'random', '-'.join(words).lower())
+  if not isdirpath(wpsublinkdirpath):
+    print("mkdir", wpsublinkdirpath)
+    needdir(wpsublinkdirpath)
+  return wpsublinkdirpath, update_linkdir(
+      wpsublinkdirpath, matchpaths, trim=True
+  )
 
-if [ $# = 0 ]
-then
-  echo "$cmd: missing words" >&2
-  badopts=1
-fi
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-rd=$WPLINKDIR/$( echo "$*" | tr ' /' -- )/random
-
-[ -d "$rd" ] || set-x mkdir -p "$rd"
-cd "$rd"
-(
-  for wpsrcdir in $( echo "$WPPATH" | tr : ' ' )
-  do
-    $trace find -L "$wpsrcdir"/* -type f \( -name \*.png -o -name \*.jpg \) || :
-  done \
-  | $trace grepall -- "$@" \
-  | shuffle \
-  | sed "${nwp}q"
-) \
-| {
-  first=1
-  while read -r img
-  do
-    [ $first ] && rm -f ./*
-    ln -- "$img" . || ln -s -- "$img" .
-    first=
-  done
-  [ -t 1 ] && $trace ls "$rd/"
-  [ $first ] && { echo "$cmd: nothing found" >&2; exit 1; }
-  $trace spaces wp "$spaces" "$rd"
-}
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

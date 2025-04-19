@@ -104,7 +104,7 @@ from types import SimpleNamespace as NS
 
 from cs.logutils import warning, error
 from cs.pfx import Pfx, pfx
-from cs.sh import quotecmd
+from cs.sh import quoteargv
 
 __version__ = '20211031-post'
 
@@ -546,7 +546,7 @@ class MegaRAID(NS):
     ''' Open a pipe from the megacli command and yield lines from its output.
     '''
     cmdargs = [self.megacli] + list(args)
-    print("+", quotecmd(cmdargs), file=sys.stderr)
+    print("+", quoteargv(cmdargs), file=sys.stderr)
     P = Popen(cmdargs, stdout=PIPE, close_fds=True, encoding='ascii')
     for line in P.stdout:
       yield line
@@ -559,7 +559,7 @@ class MegaRAID(NS):
         Return True if the exit code is 0, False otherwise.
     '''
     cmdargs = [self.megacli] + list(args)
-    print("#", quotecmd(cmdargs))
+    print("#", quoteargv(cmdargs))
     ## return call(cmdargs) == 0
     return True
 

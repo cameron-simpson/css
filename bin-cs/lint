@@ -6,6 +6,8 @@
 
 set -ue
 
+: "${RUFF_PYTHON_VERSION:=py38}"
+
 trace=
 [ -t 2 ] && trace=set-x
 
@@ -37,6 +39,7 @@ do
   case $1 in
     -2) pymode=2 ;;
     -3) pymode=3 ;;
+    -3.*) pymode=3 RUFF_PYTHON_VERSION=py3$( expr "x$1" : 'x-3.\(.*\)' ) ;;
     -q) quick=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -120,14 +123,14 @@ do
         xit=0
         if [ $ruff ]
         then
-          $trace ruff check --output-format=concise "$lintfile" || xit=1
+          $trace ruff check --output-format=concise "--target-version=$RUFF_PYTHON_VERSION" "$lintfile" || xit=1
         else
           $trace $python -We:invalid -m py_compile "$lintfile" || exit 1
           $trace $pyflakes "$lintfile" || xit=1
+          [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
+          ##[ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+          ##[ $quick ] || $trace $pyiclint "$lintfile" || xit=1
         fi
-        [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
-        ##[ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
-        ##[ $quick ] || $trace $pyiclint "$lintfile" || xit=1
         exit $xit
       ) || xit=1
       ;;

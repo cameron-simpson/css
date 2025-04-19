@@ -80,6 +80,7 @@ from cs.deco import decorator, default_params, fmtdoc
 from cs.gimmicks import open_append, warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
+from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.threads import HasThreadState, ThreadState
 from cs.tty import ttysize
@@ -105,6 +106,7 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.lex',
         'cs.obj>=20210122',
+        'cs.pfx',
         'cs.resources',
         'cs.threads',
         'cs.tty',
@@ -938,38 +940,41 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
         It yields the proxy.
     '''
-    if tick_delay < 0:
-      raise ValueError(
-          "run_task(%r,...,tick_delay=%s): tick_delay should be >=0" %
-          (label, tick_delay)
-      )
-    with self.insert(1, prefix=label + ' ') as proxy:
-      if tick_delay > 0:
-        cancel_ticker = False
+    with Pfx(label):
+      if tick_delay < 0:
+        raise ValueError(
+            "run_task(%r,...,tick_delay=%s): tick_delay should be >=0" %
+            (label, tick_delay)
+        )
+      with self.insert(1, prefix=label + ' ') as proxy:
+        if tick_delay > 0:
+          cancel_ticker = False
 
-        def _ticker():
-          i = 0
-          while not cancel_ticker:
-            proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
-            i += 1
-            time.sleep(tick_delay)
+          def _ticker():
+            i = 0
+            while not cancel_ticker:
+              proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
+              i += 1
+              time.sleep(tick_delay)
 
-        Thread(target=_ticker, daemon=True).start()
-      proxy.text = '...'
-      start_time = time.time()
-      try:
-        yield proxy
-      finally:
-        end_time = time.time()
-        cancel_ticker = True
-    elapsed_time = end_time - start_time
-    if report_print:
-      if isinstance(report_print, bool):
-        report_print = print
-      report_print(
-          label + ': in',
-          transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
-      )
+          Thread(
+              target=_ticker, name="%s-task-ticker" % label, daemon=True
+          ).start()
+        proxy.text = '...'
+        start_time = time.time()
+        try:
+          yield proxy
+        finally:
+          end_time = time.time()
+          cancel_ticker = True
+      elapsed_time = end_time - start_time
+      if report_print:
+        if isinstance(report_print, bool):
+          report_print = print
+        report_print(
+            label + ': in',
+            transcribe(elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True)
+        )
 
 @decorator
 def uses_upd(func):
@@ -1014,7 +1019,7 @@ def without(func):
 
 @uses_upd
 def above(*, upd: Upd):
-  ''' Context manager withdraw the `Upd` while something runs.
+  ''' A context manager to withdraw the `Upd` while something runs.
 
       Example:
 
@@ -1023,7 +1028,7 @@ def above(*, upd: Upd):
           with above_upd():
               os.system('ls -la')
   '''
-  return contextif(None if upd is None else upd.above())
+  return contextif(upd and upd.above)
 
 # pylint: disable=redefined-builtin
 breakpoint = without(builtin_breakpoint)

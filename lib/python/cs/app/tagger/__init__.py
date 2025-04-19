@@ -26,6 +26,7 @@ from typing import List, Optional
 from icontract import require
 from typeguard import typechecked
 
+from cs.cache import cachedmethod
 from cs.cmdutils import uses_cmd_options, vprint
 from cs.deco import cachedmethod, default_params, fmtdoc, promote, uses_verbose
 from cs.fs import findup, FSPathBasedSingleton, shortpath
@@ -59,6 +60,7 @@ DISTINFO = {
         },
     },
     'install_requires': [
+        'cs.cache',
         'cs.deco',
         'cs.fs',
         'cs.fstags',

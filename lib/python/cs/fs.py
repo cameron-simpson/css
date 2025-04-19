@@ -4,9 +4,12 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
+from collections import namedtuple
+import errno
 from fnmatch import filter as fnfilter
 from functools import partial
 import os
+from os import PathLike
 from os.path import (
     abspath,
     basename,
@@ -26,14 +29,14 @@ from pathlib import Path
 from pwd import getpwuid
 from tempfile import TemporaryDirectory
 from threading import Lock
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Iterable, Optional, Union
 
 from cs.deco import decorator, fmtdoc, Promotable
 from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call
 
-__version__ = '20241122-post'
+__version__ = '20250414-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -46,6 +49,8 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
     ],
+    'python_requires':
+    '>=3.6',
 }
 
 pfx_listdir = partial(pfx_call, os.listdir)
@@ -92,15 +97,17 @@ def atomic_directory(infill_func, make_placeholder=False):
   '''
 
   def atomic_directory_wrapper(dirpath, *a, **kw):
-    assert isinstance(dirpath, str
-                      ), "dirpath not a str: %s:%r" % (type(dirpath), dirpath)
+    assert isinstance(
+        dirpath,
+        str,
+    ), f'dirpath not a str: {r(dirpath)}'
     remove_placeholder = False
     if make_placeholder:
       # prevent other users from using this directory
       pfx_mkdir(dirpath, 0o000)
       remove_placeholder = True
     elif existspath(dirpath):
-      raise ValueError("directory already exists: %r" % (dirpath,))
+      raise FileExistsError(dirpath)
     work_dirpath = dirname(dirpath)
     try:
       with TemporaryDirectory(
@@ -113,7 +120,7 @@ def atomic_directory(infill_func, make_placeholder=False):
           pfx_rmdir(dirpath)
           remove_placeholder = False
         elif existspath(dirpath):
-          raise ValueError("directory already exists: %r" % (dirpath,))
+          raise FileExistsError(dirpath)
         pfx_rename(tmpdirpath, dirpath)
         pfx_mkdir(tmpdirpath, 0o000)
     except:
@@ -151,7 +158,8 @@ def scandirtree(
       * `sort_names`: option flag, default `False`; yield entires
         in lexical order if true
       * `follow_symlinks`: optional flag, default `False`; passed to `scandir`
-      * `recurse`: optional flag, default `True`; if true, recurse into subdrectories
+      * `recurse`: optional flag, default `True`; if true, recurse
+        into subdrectories
   '''
   if name_selector is None:
     name_selector = lambda name: name and not name.startswith('.')
@@ -213,19 +221,65 @@ def fnmatchdir(dirpath, fnglob):
   '''
   return fnfilter(pfx_listdir(dirpath), fnglob)
 
+def update_linkdir(linkdirpath: str, paths: Iterable[str], trim=False):
+  ''' Update `linkdirpath` with symlinks to `paths`.
+      Remove unused names if `trim`.
+      Return a mapping of names in `linkdirpath` to absolute forms of `paths`.
+  '''
+  # TODO: deal with paths which conflict by basename
+  # TODO: hard link mode?
+  # TODO: move to cs.fs
+  name_map = {basename(path): abspath(path) for path in paths}
+  for name, linkpath in sorted(name_map.items()):
+    linkpath_short = shortpath(linkpath)
+    namepath = joinpath(linkdirpath, name)
+    namepath_short = shortpath(namepath)
+    try:
+      linksto = os.readlink(namepath)
+    except FileNotFoundError:
+      pass
+    except OSError as e:
+      if e.errno != errno.EINVAL:
+        raise
+      # not a symlink
+      pfx_call(os.remove, namepath)
+    else:
+      if linksto == linkpath:
+        # symlink good, leave it alone
+        continue
+      pfx_call(os.remove, namepath)
+    pfx_call(os.symlink, linkpath, namepath)
+
+  if trim:
+    for name in sorted(os.listdir(linkdirpath)):
+      if name.startswith('.'):
+        continue
+      if name in name_map:
+        continue
+      namepath = joinpath(linkdirpath, name)
+      namepath_short = shortpath(namepath)
+      pfx_call(os.remove, namepath)
+  return name_map
+
 # pylint: disable=too-few-public-methods
 class HasFSPath:
-  ''' A mixin for an object with a `.fspath` attribute representing a filesystem location.
+  ''' A mixin for an object with a `.fspath` attribute representing
+      a filesystem location.
 
       The `__init__` method just sets the `.fspath` attribute, and
       need not be called if the main class takes care of that itself.
   '''
 
   def __init__(self, fspath):
+    ''' Save `fspath` as `.fspath`; often done by the parent class.
+    '''
     self.fspath = fspath
 
   def __str__(self):
     return f'{self.__class__.__name__}(fspath={self.shortpath})'
+
+  def __lt__(self, other):
+    return self.fspath < other.fspath
 
   @property
   def shortpath(self):
@@ -249,7 +303,8 @@ class HasFSPath:
     return joinpath(self.fspath, *subpaths)
 
   def fnmatch(self, fnglob):
-    ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
+    ''' Return a list of the names in `self.fspath` matching the
+        glob `fnglob`.
     '''
     return fnmatchdir(self.fspath, fnglob)
 
@@ -266,7 +321,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
       cls,
       fspath: Optional[str] = None,
       envvar: Optional[str] = None,
-      default_attr: str = 'FSPATH_DEFAULT'
+      default_attr: str = 'FSPATH_DEFAULT',
   ):
     ''' Resolve the filesystem path `fspath` using `os.path.realpath`.
         This key is used to identify instances in the singleton registry.
@@ -274,8 +329,9 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
         Parameters:
         * `fspath`: the filesystem path to resolve;
           this may be `None` to use the class defaults
-        * `envvar`: the environment variable to consult for a default `fspath`;
-          the default for this comes from `cls.FSPATH_ENVVAR` if defined
+        * `envvar`: the environment variable to consult for a default
+          `fspath`; the default for this comes from `cls.FSPATH_ENVVAR`
+          if defined
         * `default_attr`: the class attribute containing the default `fspath`
           if defined and there is no environment variable for `envvar`
 
@@ -290,6 +346,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
         which has the notion of a default location for your Calibre library.
     '''
     if fspath is None:
+      # various sources for the default fspath
       # pylint: disable=no-member
       if envvar is None:
         envvar = getattr(cls, 'FSPATH_ENVVAR', None)
@@ -299,22 +356,9 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
           return cls.fspath_normalised(fspath)
       default = getattr(cls, default_attr, None)
       if default is not None:
-        if callable(default):
-          fspath = default()
-        else:
-          fspath = expanduser(default)
-        if fspath is not None:
-          return cls.fspath_normalised(fspath)
-      raise ValueError(
-          "_resolve_fspath: fspath=None and no %s and no %s.%s" % (
-              (
-                  cls.__name__ + '.FSPATH_ENVVAR' if envvar is None else '$' +
-                  envvar
-              ),
-              cls.__name__,
-              default_attr,
-          )
-      )
+        fspath = default() if callable(default) else expanduser(default)
+    if fspath is None:
+      raise ValueError('_resolve_fspath: no default fspath')
     return cls.fspath_normalised(fspath)
 
   @classmethod
@@ -364,16 +408,64 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath, Promotable):
     '''
     if isinstance(obj, cls):
       return obj
-    # TODO: or Pathlike?
-    if obj is None or isinstance(obj, str):
+    if obj is None or isinstance(obj, (str, PathLike)):
       return cls(obj)
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
+
+class RemotePath(
+    namedtuple('RemotePath', 'host fspath'),
+    HasFSPath,
+    Promotable,
+):
+  ''' A representation of a remote filesystem path (local if `host` is `None`).
+
+      This is useful for things like `rsync` targets.
+  '''
+
+  # dummy init since namedtuple does not have one
+  def __init__(self, host, fspath):
+    pass
+
+  @staticmethod
+  def str(host, fspath):
+    ''' Return the string form of a remote path.
+    '''
+    if host is None:
+      if ':' in fspath.split('/')[0]:
+        fspath = f'./{fspath}'
+      return fspath
+    return f'{host}:{fspath}'
+
+  def __str__(self):
+    ''' Return the string form of this path.
+    '''
+    return self.str(self.host, self.fspath)
+
+  @classmethod
+  def from_str(cls, pathspec: str):
+    ''' Produce a RemotePath` from `pathspec`, a path with an
+        optional leading `[user@]rhost:` prefix.
+    '''
+    if ':' in pathspec.split('/')[0]:
+      host, fspath = pathspec.split(':', 1)
+    else:
+      host, fspath = None, pathspec
+    return cls(host, fspath)
+
+  def from_tuple(cls, host_fspath: tuple):
+    ''' Produce a RemotePath` from `host_fspath`, a `(host,fspath)` 2-tuple.
+    '''
+    return cls(*host_fspath)
 
 SHORTPATH_PREFIXES_DEFAULT = (('$HOME/', '~/'),)
 
 @fmtdoc
 def shortpath(
-    fspath, prefixes=None, *, collapseuser=False, foldsymlinks=False
+    fspath,
+    prefixes=None,
+    *,
+    collapseuser=False,
+    foldsymlinks=False,
 ):
   ''' Return `fspath` with the first matching leading prefix replaced.
 
@@ -399,7 +491,7 @@ def shortpath(
     assert leaf.is_absolute()
     # Paths from leaf-parent to root
     parents = list(leaf.parents)
-    paths = [leaf] + parents
+    paths = [leaf, *parents]
 
     def statkey(S):
       ''' A 2-tuple of `(S.st_dev,Sst_info)`.
@@ -482,10 +574,10 @@ def shortpath(
           i = i + 1 if skip_to_i is None else skip_to_i
         except OSError:
           i += 1
-    parts = list(
+    parts = [
         (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
         for i, path_as in enumerate(keep_as)
-    )
+    ]
     parts.append(paths_as[-1][1] or leaf.name)
     fspath = os.sep.join(parts)
   # replace leading prefix
@@ -505,8 +597,7 @@ def longpath(path, prefixes=None):
     if path.startswith(subst):
       path = prefix + path[len(subst):]
       break
-  path = expandvars(path)
-  return path
+  return expandvars(path)
 
 @pfx
 def validate_rpath(rpath: str):
@@ -559,7 +650,8 @@ def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
       * `dirpath`: the starting directory
       * `criterion`: a `str` or a callable accepting a `str`
 
-      If `criterion` is a `str`, use look for the existence of `os.path.join(fspath,criterion)`
+      If `criterion` is a `str`, look for the existence of
+      `os.path.join(fspath,criterion)`.
 
       Example:
 

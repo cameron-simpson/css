@@ -20,6 +20,7 @@ from functools import partial
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from pprint import pformat
 import re
 from string import (
     ascii_letters,
@@ -39,14 +40,14 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import fmtdoc, decorator, Promotable
+from cs.deco import fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20241207-post'
+__version__ = '20250414-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -411,12 +412,15 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
+# TODO: add an optional detab=n parameter?
 def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
       strip the supplied string `s`, pull off the leading line,
       dedent the rest, put back the leading line.
+
+      This is a lot like the `inspect.cleandoc()` function.
 
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
@@ -1356,28 +1360,23 @@ def snakecase(camelcased):
     strs.append(c)
   return ''.join(strs)
 
+@OBSOLETE('cs.fs.RemotePath.from_str')
 def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   ''' Split a path with an optional leading `[user@]rhost:` prefix
       into the prefix and the remaining path.
       `None` is returned for the prefix is there is none.
       This is useful for things like `rsync` targets etc.
+
+      OBSOLETE, use `cs.fs.RemotePath.from_str` instead.
   '''
-  ssh_target = None
-  # check for [user@]rhost
-  try:
-    prefix, suffix = remotepath.split(':', 1)
-  except ValueError:
-    pass
-  else:
-    if prefix and '/' not in prefix:
-      ssh_target = prefix
-      remotepath = suffix
-  return ssh_target, remotepath
+  from cs.fs import RemotePath
+  return RemotePath.from_str(remotepath)
 
 def tabulate(*rows, sep='  '):
   r''' A generator yielding lines of values from `rows` aligned in columns.
 
-      Each row in rows is a list of strings. If the strings contain
+      Each row in rows is a list of strings. Non-`str` objects are
+      promoted to `str` via `pprint.pformat`. If the strings contain
       newlines they will be split into subrows.
 
       Example:
@@ -1401,6 +1400,14 @@ def tabulate(*rows, sep='  '):
   if not rows:
     # avoids max of empty list
     return
+  # promote all table cells to str via pformat
+  rows = [
+      [
+          (cell if isinstance(cell, str) else pformat(cell, compact=True))
+          for cell in row
+      ]
+      for row in rows
+  ]
   # pad short rows with empty columns
   max_cols = max(map(len, rows))
   for row in rows:
@@ -1432,6 +1439,24 @@ def tabulate(*rows, sep='  '):
     yield sep.join(
         f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
     ).rstrip()
+
+def printt(
+    *table, file=None, flush=False, indent='', print_func=None, **tabulate_kw
+):
+  ''' A wrapper for `tabulate()` to print the results.
+      Each positional argument is a table row.
+
+      Parameters:
+      * `file`: optional output file, passed to `print_func`
+      * `flush`: optional flush flag, passed to `print_func`
+      * `indent`: optional leading indent for the output lines
+      * `print_func`: optional `print()` function, default `builtins.print`
+      Other keyword arguments are passed to `tabulate()`.
+  '''
+  if print_func is None:
+    from builtins import print as print_func
+  for line in tabulate(*table, **tabulate_kw):
+    print_func(indent + line, file=file, flush=flush)
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):

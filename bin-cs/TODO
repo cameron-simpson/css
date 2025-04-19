@@ -43,42 +43,48 @@ mode=TODO   # vs GH
 
 case "$mode" in
   TODO)
+    find_todo(){
+      ( case "$1" in
+          '') todoname=TODO.txt ;;
+          *)  todoname=TODO-$1.txt ;;
+        esac
+        exec findup "$todoname"
+      )
+    }
     category=
-    todo_path=$( findup TODO.txt || : )
-
+    todo_path=
+    # check for leading "category:" prefix
     case "$1" in
       ?*:)
         category=$( expr "x$1" : 'x\(.*\):' )
         shift
-        ;;
-      *)category=$( vcs branch || :)
+        # see if there is a TODO.txt for this
+        if path=$( find_todo "$category" )
+        then  todo_path=$path
+        else  set -- "$category:" ${1+"$@"}
+              category=
+        fi
         ;;
     esac
-    if [ -n "$category" ]
-    then
-        todo_path2=$( findup "TODO-$category.txt" || : )
-        if [ -f "$todo_path2" ]
-        then  todo_path=$todo_path2
-        else  set -- "$category:" ${1+"$@"}
-        fi
-    fi
-
+    [ -n "$todo_path" ] || {
+      if category=$( vcs branch ) && path=$( find_todo "$category" )
+      then  todo_path=$path
+      else  category=
+      fi
+    }
+    [ -n "$todo_path" ] || todo_path=$( find_todo "" )
     [ -f "$todo_path" ] || {
       echo "$cmd: no TODO.txt file found: $todo_path" >&2
       exit 1
     }
-
     # no args? just list the TODOs
     [ $# -gt 0 ] || {
         echo "$todo_path"
         sed -n 's/./  &/p' "$todo_path"
         exit
     }
-
     dlog log -c "TODO,$category" "TODO: $*"
-
     [ -s "$todo_path" ] || echo >>"$todo_path"
-
     if $trace bsed "1i\\
 $*" "$todo_path"
     then
