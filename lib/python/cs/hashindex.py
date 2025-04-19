@@ -388,7 +388,10 @@ class HashIndexCommand(BaseCommand):
     return xit
 
   @uses_fstags
-  @popopts(delete='Delete from dstdir, passes --delete to rsync.')
+  @popopts(
+      delete='Delete from dstdir, passed to rsync.',
+      partial='Keep partially transferred files, passed to rsync.',
+  )
   def cmd_rsync(self, argv, *, fstags: FSTags):
     ''' Usage: {cmd} [options] srcdir dstdir
           Rearrange dstdir according to srcdir then rsync srcdir into dstdir.
@@ -396,6 +399,7 @@ class HashIndexCommand(BaseCommand):
     options = self.options
     delete = options.delete
     doit = options.doit
+    partial = options.partial
     quiet = options.quiet
     runstate = options.runstate
     ssh_exe = options.ssh_exe
@@ -434,6 +438,7 @@ class HashIndexCommand(BaseCommand):
                 ('-e', ssh_exe),
                 not quiet and '-i',
                 verbose and '-v',
+                partial and '--partial',
                 doit and not quiet and sys.stderr.isatty() and '--progress',
                 '-ar',
                 delete and '--delete',
