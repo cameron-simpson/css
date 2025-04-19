@@ -444,13 +444,13 @@ class HashIndexCommand(BaseCommand):
         run(
             [
                 'rsync',
-                ('-e', ssh_exe),
-                '-ar',
-                delete and '--delete',
                 not doit and '-n',
+                ('-e', ssh_exe),
                 not quiet and '-i',
                 verbose and '-v',
                 doit and not quiet and sys.stderr.isatty() and '--progress',
+                '-ar',
+                delete and '--delete',
                 f'--exclude={fstags.tagsfile_basename}',
                 '--',
                 f'{srcdir}/',
