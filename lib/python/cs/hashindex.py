@@ -94,7 +94,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts, vprint
-from cs.context import contextif, reconfigure_file
+from cs.context import contextif
 from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
 from cs.fs import needdir, RemotePath, shortpath
 from cs.fstags import FSTags, uses_fstags
@@ -369,20 +369,13 @@ class HashIndexCommand(BaseCommand):
     # rearrange the source directory.
     if srcdir.host is None:
       # local srcdir and dstdir
-      # make stdout line buffered if srcdir is local
-      with contextif(
-          not quiet,
-          reconfigure_file,
-          sys.stdout,
-          line_buffering=True,
-      ):
-        rearrange(
-            srcdir.fspath,
-            fspaths_by_hashcode,
-            dstdir.fspath,
-            move_mode=move_mode,
-            symlink_mode=symlink_mode,
-        )
+      rearrange(
+          srcdir.fspath,
+          fspaths_by_hashcode,
+          dstdir.fspath,
+          move_mode=move_mode,
+          symlink_mode=symlink_mode,
+      )
     else:
       # remote srcdir and dstdir
       xit = remote_rearrange(
@@ -415,13 +408,6 @@ class HashIndexCommand(BaseCommand):
     # rearrange the source directory.
     if dstdir.host is None:
       # local srcdir and dstdir
-      # make stdout line buffered if srcdir is local
-      with contextif(
-          not quiet,
-          reconfigure_file,
-          sys.stdout,
-          line_buffering=True,
-      ):
         rearrange(
             srcdir.fspath,
             fspaths_by_hashcode,
@@ -957,6 +943,7 @@ def merge(
             "# identical content at",
             shortpath(dstpath),
             verbose=verbose,
+            flush=True,
         )
         if doit:
           pfx_call(os.remove, srcpath)
