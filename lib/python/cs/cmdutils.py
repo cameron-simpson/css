@@ -1514,7 +1514,8 @@ class BaseCommand:
           subusage_format, *_ = doc.split('\n\n', 1)
       else:
         # default usage text - include the docstring below a header
-        subusage_format = f'{cmd} ...\n  {doc.split("\n\n", 1)[0]}'
+        paragraph1 = doc.split("\n\n", 1)[0]
+        subusage_format = f'{cmd} ...\n  {paragraph1}'
     if subusage_format:
       if short:
         subusage_format, *_ = subusage_format.split('\n', 1)
