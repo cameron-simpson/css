@@ -905,7 +905,10 @@ class BinarySingleValue(AbstractBinary):
     except TypeError:
       return cls(obj)
 
-class BinaryByteses(AbstractBinary):
+class BinaryByteses(
+    BinarySingleValue,
+    value_type=Union[Buffer, Iterable[Buffer]],
+):
   ''' A list of `bytes` parsed directly from the native iteration of the buffer.
       Subclasses are initialised with a `consume=` class parameter
       indicating how many bytes to console on parse; the default
@@ -914,16 +917,14 @@ class BinaryByteses(AbstractBinary):
       that many bytes.
   '''
 
-  def __init_subclass__(cls, *, consume=...):
+  def __init_subclass__(cls, *, consume=..., **bsv_kw):
     if consume is not Ellipsis:
       if not isinstance(consume, int) or consume < 1:
         raise ValueError(
             f'class {cls.__name__}: consume should be Ellipsis or a positive int, got {r(consume)}'
         )
+    super().__init_subclass__(value_type=Buffer, **bsv_kw)
     cls.PARSE_SIZE = consume
-
-  def __init__(self):
-    self._bufs = []
 
   def __repr__(self):
     cls = self.__class__
@@ -948,9 +949,7 @@ class BinaryByteses(AbstractBinary):
   def parse(cls, bfr: CornuCopyBuffer):
     ''' Consume `cls.PARSE_SIZE` bytes from the buffer and instantiate a new instance.
     '''
-    self = cls()
-    self._bufs.extend(bfr.takev(cls.PARSE_SIZE))
-    return self
+    return cls(bfr.takev(cls.PARSE_SIZE))
 
   def transcribe(self):
     ''' Transcribe each value.
