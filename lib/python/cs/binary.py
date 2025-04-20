@@ -1367,7 +1367,7 @@ Float64LE.TEST_CASES = (
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
 )
 
-class BSUInt(BinarySingleValue, type=int):
+class BSUInt(BinarySingleValue, value_type=int):
   ''' A binary serialised unsigned `int`.
 
       This uses a big endian byte encoding where continuation octets
@@ -1448,7 +1448,7 @@ class BSUInt(BinarySingleValue, type=int):
       n >>= 7
     return bytes(reversed(bs))
 
-class BSData(BinarySingleValue, type=Buffer):
+class BSData(BinarySingleValue, value_type=Buffer):
   ''' A run length encoded data chunk, with the length encoded as a `BSUInt`.
   '''
 
@@ -1500,7 +1500,7 @@ class BSData(BinarySingleValue, type=Buffer):
       return cls(bytes(obj))
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
 
-class BSString(BinarySingleValue, type=str):
+class BSString(BinarySingleValue, value_type=str):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
 
@@ -1534,7 +1534,7 @@ class BSString(BinarySingleValue, type=str):
     payload = value.encode(encoding)
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
-class BSSFloat(BinarySingleValue, type=float):
+class BSSFloat(BinarySingleValue, value_type=float):
   ''' A float transcribed as a `BSString` of `str(float)`.
   '''
 
@@ -2033,7 +2033,7 @@ def BinaryFixedBytes(class_name: str, length: int):
   '''
   return BinaryStruct(class_name, f'>{length}s', 'data')
 
-class BinaryUTF8NUL(BinarySingleValue, type=str):
+class BinaryUTF8NUL(BinarySingleValue, value_type=str):
   ''' A NUL terminated UTF-8 string.
   '''
 
@@ -2089,7 +2089,7 @@ class BinaryUTF8NUL(BinarySingleValue, type=str):
     yield s.encode('utf-8')
     yield b'\0'
 
-class BinaryUTF16NUL(BinarySingleValue, type=str):
+class BinaryUTF16NUL(BinarySingleValue, value_type=str):
   ''' A NUL terminated UTF-16 string.
   '''
 
