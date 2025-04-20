@@ -806,11 +806,13 @@ class BinarySingleValue(AbstractBinary):
   '''
 
   @classmethod
-  def __init_subclass__(cls, *, type, **isc_kw):
-    if not issubclass(type, object):
-      raise TypeError(f'{cls}.__init_subclass: type={r(type)} is not a type')
+  def __init_subclass__(cls, *, value_type, **isc_kw):
+    if not isinstance(value_type, type) and not get_origin(value_type):
+      raise TypeError(
+          f'{cls.__name__}.__init_subclass__: value_type={r(value_type)} is not a type'
+      )
     super().__init_subclass__(**isc_kw)
-    cls.VALUE_TYPE = type
+    cls.VALUE_TYPE = value_type
 
   def __init__(self, value):
     if not isinstance(value, self.__class__.VALUE_TYPE):
