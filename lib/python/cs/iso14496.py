@@ -41,7 +41,7 @@ from cs.binary import (
     BinaryUTF16NUL,
     SimpleBinary,
     BinaryListValues,
-    BinaryMultiStruct,
+    BinaryStruct,
     BinaryMultiValue,
     BinarySingleValue,
     parse_offsets,
@@ -434,7 +434,7 @@ def deref_box(B, path):
         B = nextB
     return B
 
-Matrix9Long = BinaryMultiStruct(
+Matrix9Long = BinaryStruct(
     'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
 )
 
@@ -1354,7 +1354,7 @@ class PDINBoxBody(FullBoxBody):
   )
 
   # field names for the tuples in a PDINBoxBody
-  PDInfo = BinaryMultiStruct('PDInfo', '>LL', 'rate initial_delay')
+  PDInfo = BinaryStruct('PDInfo', '>LL', 'rate initial_delay')
 
   def parse_fields(self, bfr: CornuCopyBuffer, **kw):
     ''' Gather the normal version information
@@ -1454,7 +1454,7 @@ class TKHDBoxBody(FullBoxBody):
   ''' A 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
 
-  TKHDMatrix = BinaryMultiStruct(
+  TKHDMatrix = BinaryStruct(
       'TKHDMatrix', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
   )
 
@@ -1801,10 +1801,10 @@ def add_generic_sample_boxbody(
     struct_format_v1 = struct_format_v0
   class_name = box_type.decode('ascii').upper() + 'BoxBody'
   sample_class_name = class_name + 'Sample'
-  sample_type_v0 = BinaryMultiStruct(
+  sample_type_v0 = BinaryStruct(
       sample_class_name + 'V0', struct_format_v0, sample_fields
   )
-  sample_type_v1 = BinaryMultiStruct(
+  sample_type_v1 = BinaryStruct(
       sample_class_name + 'V1', struct_format_v1, sample_fields
   )
 
@@ -1909,12 +1909,8 @@ class CSLGBoxBody(FullBoxBody):
       'greatestDecodeToDisplayDelta', 'compositionStartTime',
       'compositionEndTime'
   )
-  CSLGParamsLong = BinaryMultiStruct(
-      'CSLGParamsLong', '>lllll', CSLG_PARAM_NAMES
-  )
-  CSLGParamsQuad = BinaryMultiStruct(
-      'CSLGParamsLong', '>qqqqq', CSLG_PARAM_NAMES
-  )
+  CSLGParamsLong = BinaryStruct('CSLGParamsLong', '>lllll', CSLG_PARAM_NAMES)
+  CSLGParamsQuad = BinaryStruct('CSLGParamsLong', '>qqqqq', CSLG_PARAM_NAMES)
 
   def parse_fields(self, bfr: CornuCopyBuffer):
     ''' Gather the compositionToDTSShift`, `leastDecodeToDisplayDelta`,
@@ -1961,11 +1957,11 @@ class ELSTBoxBody(FullBoxBody):
   ''' An 'elst' Edit List FullBoxBody - section 8.6.6.
   '''
 
-  V0EditEntry = BinaryMultiStruct(
+  V0EditEntry = BinaryStruct(
       'ELSTBoxBody_V0EditEntry', '>Llhh',
       'segment_duration media_time media_rate_integer media_rate_fraction'
   )
-  V1EditEntry = BinaryMultiStruct(
+  V1EditEntry = BinaryStruct(
       'ELSTBoxBody_V1EditEntry', '>Qqhh',
       'segment_duration media_time media_rate_integer media_rate_fraction'
   )
@@ -2154,7 +2150,7 @@ class STSCBoxBody(FullBoxBody):
       entries_bs=bytes,
   )
 
-  STSCEntry = BinaryMultiStruct(
+  STSCEntry = BinaryStruct(
       'STSCEntry', '>LLL',
       'first_chunk samples_per_chunk sample_description_index'
   )
