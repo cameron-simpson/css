@@ -253,7 +253,7 @@ def parse_offsets(parse, report=False):
 
 _pt_spec_seq = Seq()
 
-def pt_spec(pt, name=None, type=None):
+def pt_spec(pt, name=None, type=None, as_repr=None, as_str=None):
   ''' Convert a parse/transcribe specification `pt`
       into an `AbstractBinary` subclass.
 
@@ -325,6 +325,11 @@ def pt_spec(pt, name=None, type=None):
     ''' A `BinarySingleValue` subclass
         made from `f_parse_value` and `f_transcribe_value`.
     '''
+
+    if as_str:
+      __str__ = as_str
+    if as_repr:
+      __repr__ = as_repr
 
     @staticmethod
     def parse_value(bfr: CornuCopyBuffer) -> type:
