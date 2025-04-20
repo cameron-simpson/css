@@ -2006,6 +2006,38 @@ def binclass(cls, kw_only=True):
       return cls._datafields[fieldname].type.parse(bfr)
 
     @classmethod
+    def parse_field(
+        cls,
+        fieldname: str,
+        bfr: CornuCopyBuffer,
+        fieldtypes: Optional[Mapping[str, type]] = None
+    ):
+      ''' Parse an instance of the field named `fieldname` from `bfr`.
+          Return the field instance.
+      '''
+      if fieldtypes is None:
+        fieldtypes = cls._datafields
+      return fieldtypes[fieldname].type.parse(bfr)
+
+    @classmethod
+    def parse_fields(
+        cls,
+        bfr: CornuCopyBuffer,
+        fieldtypes: Optional[Mapping[str, type]] = None
+    ) -> Mapping[str, Any]:
+      ''' Parse all the fields from `cls._datafields` from `bfr`
+          by calling `cls.parse_field(fieldname,bfr)` for each.
+          Return a mapping of field names to values
+          suitable for passing to `cls`.
+      '''
+      if fieldtypes is None:
+        fieldtypes = cls._datafields
+      return {
+          fieldname: cls.parse_field(fieldname, bfr, fieldtypes)
+          for fieldname in fieldtypes
+      }
+
+    @classmethod
     def promote_field_value(cls, fieldname: str, obj):
       ''' Promote a received `obj` to the appropriate `AbstractBinary` instance.
       '''
@@ -2040,12 +2072,9 @@ def binclass(cls, kw_only=True):
     @classmethod
     def parse(cls, bfr: CornuCopyBuffer):
       ''' Parse an instance from `bfr`.
+          This default implementation calls `cls(**cls.parse_fields(bfr))`.
       '''
-      init_kw = {}
-      for fieldname, field in cls._datafields.items():
-        with Pfx("%s.parse[%r]", cls.__name__, fieldname):
-          init_kw[fieldname] = field.type.parse(bfr)
-      return cls(**init_kw)
+      return cls(**cls.parse_fields(bfr))
 
     def transcribe(self):
       ''' Transcribe this instance.
