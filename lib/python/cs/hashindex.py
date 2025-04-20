@@ -389,6 +389,7 @@ class HashIndexCommand(BaseCommand):
 
   @uses_fstags
   @popopts(
+      bwlimit_='Rsync bandwidth limit, passed to rsync.',
       delete='Delete from dstdir, passed to rsync.',
       partial='Keep partially transferred files, passed to rsync.',
   )
@@ -397,6 +398,7 @@ class HashIndexCommand(BaseCommand):
           Rearrange dstdir according to srcdir then rsync srcdir into dstdir.
     '''
     options = self.options
+    bwlimit = options.bwlimit
     delete = options.delete
     doit = options.doit
     partial = options.partial
@@ -440,6 +442,7 @@ class HashIndexCommand(BaseCommand):
                 not quiet and '-i',
                 verbose and '-v',
                 partial and '--partial',
+                bwlimit and ('--bwlimit', bwlimit),
                 doit and not quiet and sys.stderr.isatty() and '--progress',
                 '-ar',
                 delete and '--delete',
