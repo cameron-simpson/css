@@ -1893,8 +1893,8 @@ def binclass(cls, kw_only=True):
   # collate the annotated class attributes
   attr_annotations = {}
   for supercls in reversed(cls.__mro__):
-    for attr, type in getattr(supercls, '__annotations__', {}).items():
-      attr_annotations[attr] = type
+    for attr, anno_type in getattr(supercls, '__annotations__', {}).items():
+      attr_annotations[attr] = anno_type
   if not attr_annotations:
     raise TypeError(f'{cls} has no annotated attributes')
 
@@ -1916,9 +1916,38 @@ def binclass(cls, kw_only=True):
   # cache a mapping of its fields by name
   # this dict's keys will be in the fields() order
   fieldmap = {field.name: field for field in fields(dcls)}
-  assert all(
-      issubclass(field.type, AbstractBinary) for field in fieldmap.values()
-  ), 'all fields must subclass AbstractBinary'
+
+  # sanity check the filed types - they should be AbstractBinary subclasses
+  for field_name, field in fieldmap.items():
+    field_type = field.type
+    X("field_type = %r", field_type)
+    if isinstance(field.type, type):
+      if not issubclass(field_type, AbstractBinary):
+        raise TypeError(
+            f'field {field_name!r}, type {field_type} should be a subclass of AbstractBinary'
+        )
+    else:
+      # a Union of types?
+      typing_class = get_origin(field_type)
+      if typing_class is Union:
+        for element_type in get_args(field_type):
+          if element_type is not None and not issubclass(element_type,
+                                                         AbstractBinary):
+            raise TypeError(
+                f'field {field_name!r}, Union element type {element_type} should be a subclass of AbstractBinary'
+            )
+      elif field.type is Ellipsis or isinstance(field.type, int):
+        # a ... or an int indicates a object consuming that many bytes
+        class FieldClass(BinaryByteses, consume=field.type):
+          pass
+
+        FieldClass.__name__ = field_name
+        FieldClass.__doc__ = f'BinaryByteses,consume={field.type})'
+        field.type = FieldClass
+      else:
+        raise TypeError(
+            f'field {field_name!r}, type {field_type} is not supported'
+        )
 
   class BinClass(AbstractBinary):
 
@@ -1972,7 +2001,7 @@ def binclass(cls, kw_only=True):
     @classmethod
     def parse_field(cls, fieldname: str, bfr: CornuCopyBuffer):
       ''' Parse an instance of the field named `fieldname` from `bfr`.
-          Return the instance.
+          Return the field instance.
       '''
       return cls._datafields[fieldname].type.parse(bfr)
 
