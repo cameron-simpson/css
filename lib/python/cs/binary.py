@@ -1066,17 +1066,20 @@ def struct_field_types(
   return fieldmap
 
 @pfx
-def BinaryMultiStruct(
-    class_name: str, struct_format: str, field_names: Union[str, List[str]]
+def BinaryStruct(
+    class_name: str,
+    struct_format: str,
+    field_names: Union[str, List[str]] = 'value',
 ):
   ''' A class factory for `AbstractBinary` `namedtuple` subclasses
-      built around complex `struct` formats.
+      built around potentially complex `struct` formats.
 
       Parameters:
       * `class_name`: name for the generated class
       * `struct_format`: the `struct` format string
-      * `field_names`: field name list,
-        a space separated string or an interable of strings
+      * `field_names`: optional field name list,
+        a space separated string or an interable of strings;
+        the default is `'value'`, intended for single field structs
 
       Example:
 
@@ -1085,6 +1088,19 @@ def BinaryMultiStruct(
 
           # a "cut" record from the .cuts file
           Enigma2Cut = BinaryMultiStruct('Enigma2Cut', '>QL', 'pts type')
+
+          >>> UInt16BE = BinaryStruct('UInt16BE', '>H')
+          >>> UInt16BE.__name__
+          'UInt16BE'
+          >>> UInt16BE.format
+          '>H'
+          >>> UInt16BE.struct   #doctest: +ELLIPSIS
+          <_struct.Struct object at ...>
+          >>> field = UInt16BE.from_bytes(bytes((2,3)))
+          >>> field
+          UInt16BE(value=515)
+          >>> field.value
+          515
   '''
   if isinstance(field_names, str):
     field_names = field_names.split()
@@ -1111,6 +1127,7 @@ def BinaryMultiStruct(
     ''' A struct field for a complex struct format.
     '''
 
+    _struct = struct
     _field_names = tuple(field_names)
 
     @classmethod
@@ -1186,6 +1203,7 @@ def BinaryMultiStruct(
             }
         )
 
+  assert isinstance(struct_class, type)
   struct_class.__name__ = class_name
   struct_class.__doc__ = (
       ''' An `AbstractBinary` `namedtuple` which parses and transcribes
@@ -1196,46 +1214,18 @@ def BinaryMultiStruct(
   struct_class.format = struct_format
   struct_class.length = struct.size
   struct_class.field_names = field_names
-  _binary_multi_struct_classes[key] = struct_class
   return struct_class
 
-def BinarySingleStruct(
-    class_name: str, struct_format: str, field_name: Optional[str] = None
-):
-  ''' A convenience wrapper for `BinaryMultiStruct`
-      for `struct_format`s with a single field.
-
-      Parameters:
-      * `class_name`: the class name for the generated class
-      * `struct_format`: the struct format string, specifying a
-        single struct field
-      * `field_name`: optional field name for the value,
-        default `'value'`
-
-      Example:
-
-          >>> UInt16BE = BinarySingleStruct('UInt16BE', '>H')
-          >>> UInt16BE.__name__
-          'UInt16BE'
-          >>> UInt16BE.format
-          '>H'
-          >>> UInt16BE.struct   #doctest: +ELLIPSIS
-          <_struct.Struct object at ...>
-          >>> field = UInt16BE.from_bytes(bytes((2,3)))
-          >>> field
-          UInt16BE(value=515)
-          >>> field.value
-          515
-  '''
-  return BinaryMultiStruct(class_name, struct_format, field_name or 'value')
+BinaryMultiStruct = OBSOLETE(BinaryStruct)
+BinarySingleStruct = OBSOLETE(BinaryStruct)
 
 # various common values
-UInt8 = BinarySingleStruct('UInt8', 'B')
+UInt8 = BinaryStruct('UInt8', 'B')
 UInt8.TEST_CASES = (
     (0, b'\0'),
     (65, b'A'),
 )
-Int16BE = BinarySingleStruct('Int16BE', '>h')
+Int16BE = BinaryStruct('Int16BE', '>h')
 Int16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1243,7 +1233,7 @@ Int16BE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x80\x00'),
 )
-Int16LE = BinarySingleStruct('Int16LE', '<h')
+Int16LE = BinaryStruct('Int16LE', '<h')
 Int16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1251,7 +1241,7 @@ Int16LE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x00\x80'),
 )
-Int32BE = BinarySingleStruct('Int32BE', '>l')
+Int32BE = BinaryStruct('Int32BE', '>l')
 Int32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1259,7 +1249,7 @@ Int32BE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x80\x00\x00\x00'),
 )
-Int32LE = BinarySingleStruct('Int32LE', '<l')
+Int32LE = BinaryStruct('Int32LE', '<l')
 Int32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1267,7 +1257,7 @@ Int32LE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x00\x00\x00\x80'),
 )
-UInt16BE = BinarySingleStruct('UInt16BE', '>H')
+UInt16BE = BinaryStruct('UInt16BE', '>H')
 UInt16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1275,7 +1265,7 @@ UInt16BE.TEST_CASES = (
     (32768, b'\x80\x00'),
     (65535, b'\xff\xff'),
 )
-UInt16LE = BinarySingleStruct('UInt16LE', '<H')
+UInt16LE = BinaryStruct('UInt16LE', '<H')
 UInt16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1283,7 +1273,7 @@ UInt16LE.TEST_CASES = (
     (32768, b'\x00\x80'),
     (65535, b'\xff\xff'),
 )
-UInt32BE = BinarySingleStruct('UInt32BE', '>L')
+UInt32BE = BinaryStruct('UInt32BE', '>L')
 UInt32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1292,7 +1282,7 @@ UInt32BE.TEST_CASES = (
     (4294967294, b'\xff\xff\xff\xfe'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt32LE = BinarySingleStruct('UInt32LE', '<L')
+UInt32LE = BinaryStruct('UInt32LE', '<L')
 UInt32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1301,7 +1291,7 @@ UInt32LE.TEST_CASES = (
     (4294967294, b'\xfe\xff\xff\xff'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt64BE = BinarySingleStruct('UInt64BE', '>Q')
+UInt64BE = BinaryStruct('UInt64BE', '>Q')
 UInt64BE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\0\0\0\0\0\0\0\1'),
@@ -1314,7 +1304,7 @@ UInt64BE.TEST_CASES = (
     (18446744073709551614, b'\xff\xff\xff\xff\xff\xff\xff\xfe'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-UInt64LE = BinarySingleStruct('UInt64LE', '<Q')
+UInt64LE = BinaryStruct('UInt64LE', '<Q')
 UInt64LE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\1\0\0\0\0\0\0\0'),
@@ -1327,12 +1317,12 @@ UInt64LE.TEST_CASES = (
     (18446744073709551614, b'\xfe\xff\xff\xff\xff\xff\xff\xff'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-Float64BE = BinarySingleStruct('Float64BE', '>d')
+Float64BE = BinaryStruct('Float64BE', '>d')
 Float64BE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'?\xf0\x00\x00\x00\x00\x00\x00'),
 )
-Float64LE = BinarySingleStruct('Float64LE', '<d')
+Float64LE = BinaryStruct('Float64LE', '<d')
 Float64LE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
@@ -2002,7 +1992,7 @@ def BinaryFixedBytes(class_name: str, length: int):
   ''' Factory for an `AbstractBinary` subclass matching `length` bytes of data.
       The bytes are saved as the attribute `.data`.
   '''
-  return BinarySingleStruct(class_name, f'>{length}s', 'data')
+  return BinaryStruct(class_name, f'>{length}s', 'data')
 
 class BinaryUTF8NUL(BinarySingleValue, type=str):
   ''' A NUL terminated UTF-8 string.
