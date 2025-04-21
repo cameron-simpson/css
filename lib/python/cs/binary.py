@@ -139,10 +139,6 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
-try:
-  from collections.abc import Buffer
-except ImportError:
-  from typing import ByteString as Buffer
 from dataclasses import dataclass, fields
 from inspect import signature, Signature
 from struct import Struct  # pylint: disable=no-name-in-module
@@ -163,7 +159,7 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import OBSOLETE, decorator, promote, Promotable, strable
-from cs.gimmicks import warning, debug
+from cs.gimmicks import Buffer, debug, warning
 from cs.lex import cropped, cropped_repr, r, stripped_dedent, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.seq import Seq
@@ -239,7 +235,6 @@ def parse_offsets(parse, report=False):
       call `bfr.report_offset()` with the starting offset at the end of the parse.
   '''
 
-  @trace
   def parse_wrapper(cls, bfr: CornuCopyBuffer, **parse_kw):
     offset = bfr.offset
     self = parse(cls, bfr, **parse_kw)
@@ -288,6 +283,7 @@ def pt_spec(pt, name=None, value_type=None, as_repr=None, as_str=None):
     if issubclass(pt, AbstractBinary):
       return pt
   except TypeError:
+    # not a class at all, fall through
     pass
   # other specifications construct a class
   try:
@@ -413,9 +409,10 @@ class AbstractBinary(Promotable, ABC):
         if attr_choose(attr)
     ]
     return "%s(%s)" % (
-        type(self).__name__, ','.join(
+        self.__class__.__name__,
+        ','.join(
             ("%s=%s" % (attr, str_func(obj)) for attr, obj in attr_values)
-        )
+        ),
     )
 
   def __repr__(self):
@@ -823,7 +820,8 @@ class BinarySingleValue(AbstractBinary):
 
   def __repr__(self):
     return "%s(%r)" % (
-        type(self).__name__, getattr(self, 'value', '<no-value>')
+        type(self).__name__,
+        getattr(self, 'value', f'<NO-{self.__class__.__name__}.value>')
     )
 
   def __str__(self):
@@ -1044,6 +1042,7 @@ class BinaryListValues(AbstractBinary):
         if isinstance(value, bytes) else value.transcribe(), self.values
     )
 
+@typechecked
 def struct_field_types(
     struct_format: str,
     field_names: Union[str, Iterable[str]],
@@ -1920,7 +1919,6 @@ def binclass(cls, kw_only=True):
   # sanity check the filed types - they should be AbstractBinary subclasses
   for field_name, field in fieldmap.items():
     field_type = field.type
-    X("field_type = %r", field_type)
     if isinstance(field.type, type):
       if not issubclass(field_type, AbstractBinary):
         raise TypeError(
