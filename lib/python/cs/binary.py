@@ -1146,7 +1146,7 @@ def BinaryStruct(
           <_struct.Struct object at ...>
           >>> field = UInt16BE.from_bytes(bytes((2,3)))
           >>> field
-          UInt16BE(value=515)
+          UInt16BE('>H',value=515)
           >>> field.value
           515
   '''
@@ -1178,6 +1178,14 @@ def BinaryStruct(
     _struct = struct
     _field_names = tuple(field_names)
 
+    def __repr__(self):
+      cls = self.__class__
+      values_s = ",".join(
+          f'{attr}={getattr(self,attr)}' for attr in self._field_names
+      )
+      ##breakpoint()
+      return f'{cls.__name__}({struct.format!r},{values_s})'
+
     @classmethod
     @promote
     def parse(cls, bfr: CornuCopyBuffer):
@@ -1197,9 +1205,6 @@ def BinaryStruct(
 
       def __str__(self):
         return str(self[0])
-
-      ##def __repr__(self):
-      ##  return repr(self[0])
 
       def __int__(self):
         return int(self[0])
@@ -1783,9 +1788,9 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
             >>> bmv.n2
             34
             >>> bmv  #doctest: +ELLIPSIS
-            BMV(n1=17, n2=34, n3=119, nd=nd(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
+            BMV(n1=17, n2=34, n3=119, nd=nd('>H4s',short=33154,bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
             >>> bmv.nd  #doctest: +ELLIPSIS
-            nd(short=33154, bs=b'zyxw')
+            nd('>H4s',short=33154,bs=b'zyxw')
             >>> bmv.nd.bs
             b'zyxw'
             >>> bytes(bmv.nd)
@@ -1862,13 +1867,13 @@ def binclass(cls, kw_only=True):
           ...     flags : UInt8
           >>> ss = SomeStruct(count=3, flags=0x04)
           >>> ss
-          SomeStruct:SomeStruct__dataclass(count=UInt32BE(value=3),flags=UInt8(value=4))
+          SomeStruct:SomeStruct__dataclass(count=UInt32BE('>L',value=3),flags=UInt8('B',value=4))
           >>> print(ss)
           SomeStruct(count=3,flags=4)
           >>> bytes(ss)
           b'\x00\x00\x00\x03\x04'
           >>> SomeStruct.promote(b'\x00\x00\x00\x03\x04')
-          SomeStruct:SomeStruct__dataclass(count=UInt32BE(value=3),flags=UInt8(value=4))
+          SomeStruct:SomeStruct__dataclass(count=UInt32BE('>L',value=3),flags=UInt8('B',value=4))
 
       Extending an existing `@binclass` class, for example to add
       the body of a structure to some header part:
@@ -1892,7 +1897,7 @@ def binclass(cls, kw_only=True):
           ...     body_longs=(10,20),
           ... )
           >>> packet
-          Packet:Packet__dataclass(count=UInt32BE(value=5),flags=UInt8(value=3),body_text=BSString('hello'),body_data=BSData(b'xyzabc'),body_longs=longs(long1=10, long2=20))
+          Packet:Packet__dataclass(count=UInt32BE('>L',value=5),flags=UInt8('B',value=3),body_text=BSString('hello'),body_data=BSData(b'xyzabc'),body_longs=longs('>LL',long1=10,long2=20))
           >>> print(packet)
           Packet(count=5,flags=3,body_text=hello,body_data=b'xyzabc',body_longs=longs(long1=10,long2=20))
           >>> packet.body_data
