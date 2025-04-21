@@ -811,12 +811,19 @@ class BinarySingleValue(AbstractBinary):
     super().__init_subclass__(**isc_kw)
     cls.VALUE_TYPE = value_type
 
-  def __init__(self, value):
-    if not isinstance(value, self.__class__.VALUE_TYPE):
-      raise TypeError(
-          f'{self.__class__}: value is not an instance of {self.__class__.VALUE_TYPE}: {r(value)}'
-      )
-    self.value = value
+    @typechecked
+    def init(self, value: value_type):
+      ''' Initialise `self` with `value`.
+
+          This uses `@typeguard` to validate the type of `value` because
+          `isinstance(value,self.__class__.VALUE_TYPE)` raises a type error
+          if the type is a subscripts generic eg `List[Buffer]` etc.
+          Thus the cumbersome shuffle to install an `__init__` with
+          the right type annoation for `value`.
+      '''
+      self.value = value
+
+    cls.__init__ = init
 
   def __repr__(self):
     return "%s(%r)" % (
