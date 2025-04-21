@@ -1929,51 +1929,54 @@ def binclass(cls, kw_only=True):
   dcls.__name__ = f'{cls.__name__}__dataclass'
   dcls = dataclass(dcls, kw_only=kw_only)
 
+  def promote_fieldtypemap(fieldtypemap):
+    ''' Promote the types in a field type map into `AbstractBinary` subclasses.  
+    '''
+    for field_name, field_type in tuple(fieldtypemap.items()):
+      if isinstance(field_type, type):
+        if not issubclass(field_type, AbstractBinary):
+          raise TypeError(
+              f'field {field_name!r}, type {field_type} should be a subclass of AbstractBinary'
+          )
+      else:
+        # a Union of types?
+        typing_class = get_origin(field_type)
+        if typing_class is Union:
+          for element_type in get_args(field_type):
+            if element_type is not None and not issubclass(element_type,
+                                                           AbstractBinary):
+              raise TypeError(
+                  f'field {field_name!r}, Union element type {element_type} should be a subclass of AbstractBinary'
+              )
+        elif field_type is Ellipsis or isinstance(field_type, int):
+          # a ... or an int indicates a object consuming that many bytes
+          class FieldClass(BinaryByteses, consume=field_type):
+            pass
+
+          FieldClass.__name__ = field_name
+          FieldClass.__doc__ = f'BinaryByteses,consume={field_type})'
+          fieldtypemap[field_name] = FieldClass
+          X("update fieldtypemap[%r] = %r", field_name, FieldClass)
+        else:
+          raise TypeError(
+              f'field {field_name!r}, type {field_type} is not supported'
+          )
+
   # cache a mapping of its fields by name
   # this dict's keys will be in the fields() order
-  fieldmap = {field.name: field for field in fields(dcls)}
+  fieldtypemap = {field.name: field.type for field in fields(dcls)}
+  promote_fieldtypemap(fieldtypemap)
 
-  # sanity check the filed types - they should be AbstractBinary subclasses
-  for field_name, field in fieldmap.items():
-    field_type = field.type
-    if isinstance(field.type, type):
-      if not issubclass(field_type, AbstractBinary):
-        raise TypeError(
-            f'field {field_name!r}, type {field_type} should be a subclass of AbstractBinary'
-        )
-    else:
-      # a Union of types?
-      typing_class = get_origin(field_type)
-      if typing_class is Union:
-        for element_type in get_args(field_type):
-          if element_type is not None and not issubclass(element_type,
-                                                         AbstractBinary):
-            raise TypeError(
-                f'field {field_name!r}, Union element type {element_type} should be a subclass of AbstractBinary'
-            )
-      elif field.type is Ellipsis or isinstance(field.type, int):
-        # a ... or an int indicates a object consuming that many bytes
-        class FieldClass(BinaryByteses, consume=field.type):
-          pass
-
-        FieldClass.__name__ = field_name
-        FieldClass.__doc__ = f'BinaryByteses,consume={field.type})'
-        field.type = FieldClass
-      else:
-        raise TypeError(
-            f'field {field_name!r}, type {field_type} is not supported'
-        )
-
-  class BinClass(AbstractBinary):
+  class BinClass(cls, AbstractBinary):  ## , AbstractBinary):
 
     _dataclass = dcls
-    _datafields = fieldmap
-    _field_names = tuple(fieldmap)
+    _datafieldtypes = fieldtypemap
+    _field_names = tuple(fieldtypemap)
 
     # a list of the fields used by AbstractBinary.self_check
     FIELD_TYPES = {
         fieldname: (True, fieldtype)
-        for fieldname, fieldtype in fieldmap.items()
+        for fieldname, fieldtype in fieldtypemap.items()
     }
 
     def __init__(self, **dcls_kwargs):
@@ -2014,13 +2017,6 @@ def binclass(cls, kw_only=True):
       )
 
     @classmethod
-    def parse_field(cls, fieldname: str, bfr: CornuCopyBuffer):
-      ''' Parse an instance of the field named `fieldname` from `bfr`.
-          Return the field instance.
-      '''
-      return cls._datafields[fieldname].type.parse(bfr)
-
-    @classmethod
     def parse_field(
         cls,
         fieldname: str,
@@ -2046,7 +2042,7 @@ def binclass(cls, kw_only=True):
           suitable for passing to `cls`.
       '''
       if fieldtypes is None:
-        fieldtypes = cls._datafields
+        fieldtypes = cls._datafieldtypes
       return {
           fieldname: cls.parse_field(fieldname, bfr, fieldtypes)
           for fieldname in fieldtypes
@@ -2076,9 +2072,7 @@ def binclass(cls, kw_only=True):
       ''' Set a data field from `value`.
       '''
       cls = self.__class__
-      try:
-        field = cls._datafields[attr]
-      except KeyError:
+      if attr not in cls._datafieldtypes:
         raise AttributeError(f'{cls.__name__}.{attr}')
       dataobj = self._data
       datavalue = self.promote_field_value(attr, value)
@@ -2095,7 +2089,7 @@ def binclass(cls, kw_only=True):
       ''' Transcribe this instance.
       '''
       cls = self.__class__
-      for fieldname in cls._datafields:
+      for fieldname in cls._datafieldtypes:
         yield getattr(self._data, fieldname).transcribe()
 
   return BinClass
