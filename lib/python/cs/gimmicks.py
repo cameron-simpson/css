@@ -22,6 +22,11 @@ DISTINFO = {
 # pylint: disable=unnecessary-lambda-assignment
 
 try:
+  from collections.abc import Buffer
+except ImportError:
+  from typing import ByteString as Buffer
+
+try:
   from contextlib import nullcontext  # pylint: disable=unused-import
 except ImportError:
   from contextlib import contextmanager
