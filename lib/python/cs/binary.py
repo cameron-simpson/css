@@ -922,13 +922,19 @@ class BinaryByteses(
       that many bytes.
   '''
 
-  def __init_subclass__(cls, *, consume=..., **bsv_kw):
+  def __init_subclass__(
+      cls,
+      *,
+      consume=...,
+      value_type=Union[Buffer, Iterable[Buffer]],
+      **bsv_kw,
+  ):
     if consume is not Ellipsis:
       if not isinstance(consume, int) or consume < 1:
         raise ValueError(
             f'class {cls.__name__}: consume should be Ellipsis or a positive int, got {r(consume)}'
         )
-    super().__init_subclass__(value_type=Buffer, **bsv_kw)
+    super().__init_subclass__(value_type=value_type, **bsv_kw)
     cls.PARSE_SIZE = consume
 
   def __repr__(self):
