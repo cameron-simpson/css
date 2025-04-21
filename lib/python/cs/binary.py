@@ -30,10 +30,7 @@
       but in principle also things like `bytearray`.
 
     There are 5 main classes on which an implementor should base their data structures:
-    * `BinarySingleStruct`: a factory for classes based
-      on a `struct.struct` format string with a single value;
-      this builds a `namedtuple` subclass
-    * `BinaryMultiStruct`: a factory for classes based
+    * `BinaryStruct`: a factory for classes based
       on a `struct.struct` format string with multiple values;
       this also builds a `namedtuple` subclass
     * `BinarySingleValue`: a base class for subclasses
@@ -79,7 +76,7 @@
 
     A simple `struct` style definitiion for 9 longs:
 
-        Matrix9Long = BinaryMultiStruct(
+        Matrix9Long = BinaryStruct(
             'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
         )
 
@@ -89,11 +86,11 @@
           """ An 'elst' Edit List FullBoxBody - section 8.6.6.
           """
 
-          V0EditEntry = BinaryMultiStruct(
+          V0EditEntry = BinaryStruct(
               'ELSTBoxBody_V0EditEntry', '>Llhh',
               'segment_duration media_time media_rate_integer media_rate_fraction'
           )
-          V1EditEntry = BinaryMultiStruct(
+          V1EditEntry = BinaryStruct(
               'ELSTBoxBody_V1EditEntry', '>Qqhh',
               'segment_duration media_time media_rate_integer media_rate_fraction'
           )
@@ -262,7 +259,7 @@ def pt_spec(pt, name=None, value_type=None, as_repr=None, as_str=None):
       If `pt` is a (str,str) 2-tuple
       the values are presumed to be a format string for `struct.struct`
       and field names separated by spaces;
-      a new `BinaryMultiStruct` class is created from these and returned.
+      a new `BinaryStruct` class is created from these and returned.
 
       Otherwise two functions
       `f_parse_value(bfr)` and `f_transcribe_value(value)`
@@ -307,7 +304,7 @@ def pt_spec(pt, name=None, value_type=None, as_repr=None, as_str=None):
         # struct format and field names
         if name is None:
           name = f'PTStruct_{next(_pt_spec_seq)}__{struct_fields.replace(" ", "__")}'
-        return BinaryMultiStruct(name, struct_format, struct_fields)
+        return BinaryStruct(name, struct_format, struct_fields)
       # otherwise a parse/transcribe pair
       f_parse_value, f_transcribe_value = pt
 
@@ -1135,10 +1132,10 @@ def BinaryStruct(
       Example:
 
           # an "access point" record from the .ap file
-          Enigma2APInfo = BinaryMultiStruct('Enigma2APInfo', '>QQ', 'pts offset')
+          Enigma2APInfo = BinaryStruct('Enigma2APInfo', '>QQ', 'pts offset')
 
           # a "cut" record from the .cuts file
-          Enigma2Cut = BinaryMultiStruct('Enigma2Cut', '>QL', 'pts type')
+          Enigma2Cut = BinaryStruct('Enigma2Cut', '>QL', 'pts type')
 
           >>> UInt16BE = BinaryStruct('UInt16BE', '>H')
           >>> UInt16BE.__name__
@@ -1885,7 +1882,7 @@ def binclass(cls, kw_only=True):
           ... class Packet(HeaderStruct):
           ...     body_text : BSString
           ...     body_data : BSData
-          ...     body_longs : BinaryMultiStruct(
+          ...     body_longs : BinaryStruct(
           ...         'longs', '>LL', 'long1 long2'
           ...     )
           >>> packet = Packet(
