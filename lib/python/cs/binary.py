@@ -1062,7 +1062,7 @@ def struct_field_types(
       Example:
 
           >>> struct_field_types('>Hs', 'count text_bs')
-          {'count': int, 'text_bs':bytes}
+          {'count': <class 'int'>, 'text_bs': <class 'bytes'>}
   '''
   if isinstance(field_names, str):
     field_names = field_names.split()
@@ -1905,12 +1905,14 @@ def binclass(cls, kw_only=True):
   '''
 
   # collate the annotated class attributes
+  # these are our own, and those from the superclasses
   attr_annotations = {}
   for supercls in reversed(cls.__mro__):
     for attr, anno_type in getattr(supercls, '__annotations__', {}).items():
       attr_annotations[attr] = anno_type
   if not attr_annotations:
     raise TypeError(f'{cls} has no annotated attributes')
+  ##pprint(attr_annotations, sort_dicts=False)
 
   # create the dataclass
   class dcls:
@@ -2038,7 +2040,7 @@ def binclass(cls, kw_only=True):
         bfr: CornuCopyBuffer,
         fieldtypes: Optional[Mapping[str, type]] = None
     ) -> Mapping[str, Any]:
-      ''' Parse all the fields from `cls._datafields` from `bfr`
+      ''' Parse all the fields from `cls._datafieldtypes` from `bfr`
           by calling `cls.parse_field(fieldname,bfr)` for each.
           Return a mapping of field names to values
           suitable for passing to `cls`.
