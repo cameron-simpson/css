@@ -2027,8 +2027,10 @@ def binclass(cls, kw_only=True):
           Return the field instance.
       '''
       if fieldtypes is None:
-        fieldtypes = cls._datafields
       return fieldtypes[fieldname].type.parse(bfr)
+        fieldtypes = cls._datafieldtypes
+      else:
+        promote_fieldtypemap(fieldtypes)
 
     @classmethod
     def parse_fields(
@@ -2043,6 +2045,8 @@ def binclass(cls, kw_only=True):
       '''
       if fieldtypes is None:
         fieldtypes = cls._datafieldtypes
+      else:
+        promote_fieldtypemap(fieldtypes)
       return {
           fieldname: cls.parse_field(fieldname, bfr, fieldtypes)
           for fieldname in fieldtypes
