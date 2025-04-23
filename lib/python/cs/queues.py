@@ -307,7 +307,7 @@ class PushQueue(MultiOpenMixin, RunStateMixin):
   def __init__(
       self,
       name: str,
-      functor: Callable[Any, Iterable],
+      functor: Callable[[Any], Iterable],
       outQ,
       runstate: RunState,
   ):
