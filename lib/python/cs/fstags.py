@@ -2007,7 +2007,7 @@ class TaggedPathSet:
   '''
 
   # the TaggedPaths
-  members: set[TaggedPath]
+  members: Set[TaggedPath]
   # mapping of (tag_name,tag_value) to TaggedPath
   _by_tag_name: Mapping[str, Set[TaggedPath]] = field(
       default_factory=lambda: defaultdict(set)
