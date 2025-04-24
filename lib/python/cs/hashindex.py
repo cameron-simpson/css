@@ -345,7 +345,7 @@ class HashIndexCommand(BaseCommand):
   def cmd_rearrange(self, argv):
     ''' Usage: {cmd} {{[[user@]host:]refdir|-}} [[user@]rhost:]srcdir [dstdir]
           Rearrange files from srcdir into dstdir based on their positions in refdir.
-          Other arguments:
+          Arguments:
             refdir    The reference directory, which may be local or remote
                       or "-" indicating that a hash index will be read from
                       standard input.
@@ -361,7 +361,14 @@ class HashIndexCommand(BaseCommand):
     quiet = options.quiet
     verbose = options.verbose
     symlink_mode = options.symlink_mode
-    refdir = self.poppathspec(argv, 'refdir', check_isdir=True)
+    if not argv:
+      warning("missing refdir")
+      badopts = True
+    elif argv[0] == '-':
+      argv.pop(0)
+      refdir = None  # read hashindex from standard input
+    else:
+      refdir = self.poppathspec(argv, 'refdir', check_isdir=True)
     srcdir = self.poppathspec(argv, 'srcdir', check_isdir=True)
     if argv:
       dstdir = self.poppathspec(argv, 'dstdir', check_isdir=True)
@@ -376,9 +383,15 @@ class HashIndexCommand(BaseCommand):
     if badopts:
       raise GetoptError('bad arguments')
     xit = 0
-    # scan the reference directory
-    with run_task(f'scan refdir {refdir}'):
-      fspaths_by_hashcode = hashindex_map(refdir, relative=True)
+    if refdir is None:
+      # read hash index from standard input
+      fspaths_by_hashcode = defaultdict(list)
+      for hashcode, fspath in read_hashindex(sys.stdin, hashname=hashname):
+        fspaths_by_hashcode[hashcode].append(fspath)
+    else:
+      # scan the reference directory
+      with run_task(f'scan refdir {refdir}'):
+        fspaths_by_hashcode = hashindex_map(refdir, relative=True)
     if not fspaths_by_hashcode:
       quiet or print("no files in refdir, nothing to rearrange")
       return xit
