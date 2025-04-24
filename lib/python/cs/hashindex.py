@@ -357,6 +357,7 @@ class HashIndexCommand(BaseCommand):
     options = self.options
     badopts = False
     doit = options.doit
+    hashname = options.hashname
     move_mode = options.move_mode
     quiet = options.quiet
     verbose = options.verbose
