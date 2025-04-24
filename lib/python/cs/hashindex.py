@@ -104,7 +104,13 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, run
 from cs.resources import RunState, uses_runstate
-from cs.upd import above as above_upd, print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import (
+    above as above_upd,
+    print,
+    run_task,  # pylint: disable=redefined-builtin
+    Upd,
+    uses_upd,
+)
 
 __version__ = '20241207-post'
 
@@ -295,13 +301,17 @@ class HashIndexCommand(BaseCommand):
       )
   )
   @uses_runstate
-  def cmd_ls(self, argv, *, runstate: RunState):
+  @uses_upd
+  def cmd_ls(self, argv, *, runstate: RunState, upd: Upd):
     ''' Usage: {cmd} [options...] [[host:]path...]
           Walk filesystem paths and emit a listing.
           The default path is the current directory.
+          In quiet mode (-q) the hash indicies are just updated
+          and nothing is printed.
     '''
     options = self.options
     output_format = options.output_format
+    quiet = options.quiet
     relative = options.relative
     if not argv:
       argv = ['.']
@@ -315,10 +325,16 @@ class HashIndexCommand(BaseCommand):
             warning("not a directory and -r (relative) specified")
             xit = 1
             continue
-        for h, fspath in hashindex(path, relative=relative):
-          runstate.raiseif()
-          if h is not None:
-            print(output_format.format(hashcode=h, fspath=fspath))
+        current_dirpath = None
+        with run_task("scan") as proxy:
+          for h, fspath in hashindex(path, relative=relative):
+            runstate.raiseif()
+            dirpath = dirname(fspath)
+            if dirpath != current_dirpath:
+              proxy.text = shortpath(dirpath)
+              current_dirpath = dirpath
+            if h is not None:
+              quiet or print(output_format.format(hashcode=h, fspath=fspath))
     return xit
 
   @popopts(
