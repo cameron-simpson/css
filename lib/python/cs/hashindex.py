@@ -360,7 +360,7 @@ class HashIndexCommand(BaseCommand):
     hashname = options.hashname
     move_mode = options.move_mode
     quiet = options.quiet
-    verbose = options.verbose
+    verbose = options.verbose or not quiet
     symlink_mode = options.symlink_mode
     if not argv:
       warning("missing refdir")
@@ -406,6 +406,7 @@ class HashIndexCommand(BaseCommand):
           dstdir.fspath,
           move_mode=move_mode,
           symlink_mode=symlink_mode,
+          verbose=verbose,
       )
     else:
       # remote srcdir and dstdir
@@ -416,6 +417,7 @@ class HashIndexCommand(BaseCommand):
           fspaths_by_hashcode,
           move_mode=move_mode,
           symlink_mode=symlink_mode,
+          verbose=verbose,
       )
     return xit
 
@@ -778,7 +780,7 @@ def dir_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
   )
 
-@uses_cmd_options(doit=True, hashname=None)
+@uses_cmd_options(doit=True, hashname=None, verbose=True)
 @uses_fstags
 @uses_runstate
 @require(
@@ -801,6 +803,7 @@ def rearrange(
     doit: bool,
     fstags: FSTags,
     runstate: RunState,
+    verbose: bool,
 ):
   ''' Rearrange the files in `dirpath` according to the
       hashcode->[relpaths] `fspaths_by_hashcode`.
@@ -832,6 +835,7 @@ def rearrange(
         continue
       filename = basename(srcpath)
       if filename.startswith('.') or filename == fstags.tagsfile_basename:
+        # skip hidden or fstags files
         continue
       opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
       with Pfx(srcpath):
@@ -845,6 +849,7 @@ def rearrange(
           ##    "rdstpath:%r is not a clean subpath" % (rdstpath,)
           ##)
           if rsrcpath == rdstpath:
+            # already there, skip
             continue
           dstpath = joinpath(dstdirpath, rdstpath)
           if doit:
@@ -859,6 +864,7 @@ def rearrange(
                 symlink_mode=symlink_mode,
                 fstags=fstags,
                 doit=doit,
+                verbose=True,
             )
           except FileExistsError as e:
             warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
