@@ -297,7 +297,7 @@ class HashIndexCommand(BaseCommand):
       r=(
           'relative',
           ''' Emit relative paths in the listing.
-              This requires each path to be a directory.''',
+              This requires each command line path to be a directory.''',
       )
   )
   @uses_runstate
@@ -383,6 +383,7 @@ class HashIndexCommand(BaseCommand):
       quiet or print("no files in refdir, nothing to rearrange")
       return xit
     # rearrange the source directory.
+    assert srcdir.host == dstdir.host
     if srcdir.host is None:
       # local srcdir and dstdir
       rearrange(
