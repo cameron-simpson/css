@@ -733,6 +733,9 @@ def hashindex_map(dirpath: str,
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
   ''' Generator yielding the filesystem paths of the files in `dirpath`.
   '''
+  if not isdirpath(dirpath):
+    raise ValueError(f'dir_filepaths: not a directory: {dirpath=}')
+  # TODO: use cs.fs.scandirtree (os.walk ignores errors)
   for subdirpath, dirnames, filenames in os.walk(dirpath):
     dirnames[:] = sorted(dirnames)
     for filename in sorted(filenames):
