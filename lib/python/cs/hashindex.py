@@ -410,6 +410,7 @@ class HashIndexCommand(BaseCommand):
       # remote srcdir and dstdir
       xit = remote_rearrange(
           srcdir.host,
+          srcdir.fspath,
           dstdir.fspath,
           fspaths_by_hashcode,
           move_mode=move_mode,
@@ -456,6 +457,7 @@ class HashIndexCommand(BaseCommand):
         # remote srcdir and dstdir
         xit = remote_rearrange(
             dstdir.host,
+            srcdir.fspath,
             dstdir.fspath,
             fspaths_by_hashcode,
             move_mode=True,
@@ -879,6 +881,7 @@ def rearrange(
 @typechecked
 def remote_rearrange(
     rhost: str,
+    srcdir: str,
     dstdir: str,
     fspaths_by_hashcode: Mapping[BaseHashCode, List[str]],
     *,
@@ -890,8 +893,8 @@ def remote_rearrange(
     symlink_mode: bool,
     verbose: bool,
 ):
-  ''' Rearrange a remote directory `dstdir` on `rhost`
-      according to the hashcode mapping `fspaths_by_hashcode`.
+  ''' Rearrange a remote directory `srcdir` on `rhost` into `dstdir`
+      on `rhost` according to the hashcode mapping `fspaths_by_hashcode`.
   '''
   # remote srcdir and dstdir
   # prepare the remote input
@@ -911,6 +914,7 @@ def remote_rearrange(
           move_mode and '--mv',
           symlink_mode and '-s',
           '-',
+          RemotePath.str(None, srcdir),
           RemotePath.str(None, dstdir),
       ],
       hashindex_exe=hashindex_exe,
