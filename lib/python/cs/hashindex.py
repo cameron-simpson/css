@@ -921,7 +921,7 @@ def remote_rearrange(
           ('-h', hashname),
           quiet and '-q',
           verbose and '-v',
-          move_mode and '--mv',
+          not (move_mode or symlink_mode) and '--ln',
           symlink_mode and '-s',
           '-',
           RemotePath.str(None, srcdir),
