@@ -430,7 +430,7 @@ class Module:
         return False
       return True
     else:
-      return self.name in stdlib_module_names
+      return self.name.split('.')[0] in stdlib_module_names
 
   @cached_property
   @pfx_method(use_str=True)
