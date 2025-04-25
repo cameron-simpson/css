@@ -854,13 +854,16 @@ def rearrange(
           dstpath = joinpath(dstdirpath, rdstpath)
           if doit:
             needdir(dirname(dstpath), use_makedirs=True, log=warning)
+          # merge the src to the dst
+          # do a real move if there is only one rfspaths
+          # otherwise a link and then a later remove
           try:
             merge(
                 srcpath,
                 dstpath,
                 opname=opname,
                 hashname=hashname,
-                move_mode=False,  # we do our own remove below
+                move_mode=move_mode and len(rfspaths) == 1,
                 symlink_mode=symlink_mode,
                 fstags=fstags,
                 doit=doit,
@@ -869,7 +872,7 @@ def rearrange(
           except FileExistsError as e:
             warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
           else:
-            if move_mode and rsrcpath not in rfspaths:
+            if move_mode and len(rfspaths) > 1 and rsrcpath not in rfspaths:
               if doit:
                 to_remove.add(srcpath)
     # purge the srcpaths last because we might want them multiple
