@@ -26,6 +26,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
+        'cs.debug',
         'cs.deco',
     ],
 }
