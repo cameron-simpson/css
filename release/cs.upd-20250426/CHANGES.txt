@@ -1,0 +1,3 @@
+lib/python/cs/upd.py: cs.upd: above: fix contextif() call
+lib/python/cs/upd.py: cs.upd: run_task: establish a Pfx context around the task
+lib/python/cs/upd.py: cs.Upd: Upd.run_task: give a name to the ticker Thread
