@@ -1872,7 +1872,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       *,
       state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ) -> "CachedValue":
-    ''' Return `CachedValue` managing the  `prefix.name` tag.
+    ''' Return a `CachedValue` managing the `prefix.name` tag.
     '''
     return CachedValue(self, prefix, name, state_func=state_func)
 
