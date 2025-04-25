@@ -338,7 +338,7 @@ class HashIndexCommand(BaseCommand):
     return xit
 
   @popopts(
-      mv='move_mode',
+      ln=('link_mode', 'Hard link files instead of moving them.'),
       s='symlink_mode',
   )
   @typechecked
@@ -358,7 +358,7 @@ class HashIndexCommand(BaseCommand):
     badopts = False
     doit = options.doit
     hashname = options.hashname
-    move_mode = options.move_mode
+    move_mode = not options.link_mode
     quiet = options.quiet
     verbose = options.verbose or not quiet
     symlink_mode = options.symlink_mode
