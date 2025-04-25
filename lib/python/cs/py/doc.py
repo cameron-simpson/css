@@ -214,6 +214,7 @@ def module_doc(
         warning("UNHANDLED %r, neither function nor class", Mname)
   return ''.join(full_docs)
 
+# TODO: use inspect.getdoc() initially
 def obj_docstring(obj):
   ''' Return a docstring for `obj` which has been passed through `stripped_dedent`.
 
