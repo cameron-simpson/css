@@ -177,7 +177,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
           X("foo = %s", s(foo))
   '''
   # pylint: disable=redefined-outer-name
-  o_s = repr(o) if use_repr else str(o)
+  o_s = cropped_repr(o) if use_repr else str(o)
   if max_length is not None:
     o_s = cropped(o_s, max_length)
   s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
