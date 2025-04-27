@@ -142,6 +142,8 @@ from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
 from typing import (
+    get_args,
+    get_origin,
     Any,
     Callable,
     Iterable,
@@ -599,11 +601,10 @@ class AbstractBinary(Promotable, ABC):
     if count is None:
       if min_count is None:
         min_count = 0
-      else:
-        if min_count < 0:
-          raise ValueError(
-              "min_count must be >=0 if specified, got: %r" % (min_count,)
-          )
+      elif min_count < 0:
+        raise ValueError(
+            "min_count must be >=0 if specified, got: %r" % (min_count,)
+        )
       if max_count is not None:
         if max_count < 0:
           raise ValueError(
@@ -1195,7 +1196,6 @@ def BinaryStruct(
       values_s = ",".join(
           f'{attr}={getattr(self,attr)}' for attr in self._field_names
       )
-      ##breakpoint()
       return f'{cls.__name__}({struct.format!r},{values_s})'
 
     @classmethod
@@ -1925,13 +1925,12 @@ def binclass(cls, kw_only=True):
       attr_annotations[attr] = anno_type
   if not attr_annotations:
     raise TypeError(f'{cls} has no annotated attributes')
-  ##pprint(attr_annotations, sort_dicts=False)
 
   # create the dataclass
   class dcls:
     pass
 
-  for attr in attr_annotations.keys():
+  for attr in attr_annotations:
     try:
       attr_value = getattr(cls, attr)
     except AttributeError:
@@ -1982,7 +1981,6 @@ def binclass(cls, kw_only=True):
   promote_fieldtypemap(fieldtypemap)
 
   @decorator
-  ##@trace
   def bcmethod(func):
     ''' A decorator for a `BinClass` method
         to look first for a direct override in `cls`
@@ -2024,14 +2022,13 @@ def binclass(cls, kw_only=True):
     def __init__(self, **dcls_kwargs):
       self.__dict__['_data'] = None  # get dummy entry in early, aids debugging
       cls = self.__class__
-      # promote nonbinary values to single binary values
       dcls = cls._dataclass
       # promote nonbinary values to AbstractBinary values
       dcls_kwargs = {
           attr: self.promote_field_value(attr, obj)
           for attr, obj in dcls_kwargs.items()
       }
-      dataobj = cls._dataclass(**dcls_kwargs)
+      dataobj = dcls(**dcls_kwargs)
       self.__dict__['_data'] = dataobj
 
     def __str__(self):
@@ -2068,7 +2065,7 @@ def binclass(cls, kw_only=True):
       data = self._data
       try:
         obj = getattr(data, attr)
-      except AttributeError as e:
+      except AttributeError:
         raise AttributeError(
             f'{self.__class__.__name__}.{attr}: no entry in the dataclass instance (self._data)'
         )
@@ -2168,9 +2165,6 @@ def binclass(cls, kw_only=True):
     def promote_field_value(cls, fieldname: str, obj):
       ''' Promote a received `obj` to the appropriate `AbstractBinary` instance.
       '''
-      X(
-          f'{cls.__name__} BINCLASS PARSE_FIELDS ---------------------------------------------------------'
-      )
       try:
         fieldtype = cls._datafieldtypes[fieldname]
       except KeyError:
@@ -2227,7 +2221,6 @@ def binclass(cls, kw_only=True):
   cls.__name__ = f'{name0}__original'
   assert BinClass._baseclass is cls
   assert BinClass._dataclass is dcls
-  assert BinClass._dataclass.__name__.startswith(cls.name0)
   BinClass.__name__ = name0
   ##X("@binclass: returning %s %r", BinClass, BinClass.__name__)
   ##X("  BinClass %d:%s", id(BinClass), BinClass.__name__)
@@ -2373,12 +2366,14 @@ if __name__ == '__main__':
   @binclass
   class HeaderStruct:
     """A header containing a count and some flags."""
+
     count: UInt32BE
     flags: UInt8
 
   @binclass
   class Packet(HeaderStruct):
     ''' The Packet, subclassing HeaderStruct. '''
+
     body_text: BSString
     body_data: BSData
     body_longs: BinaryStruct('ll_longs', '>LL', 'long1 long2')
@@ -2391,4 +2386,4 @@ if __name__ == '__main__':
       body_longs=(10, 20),
   )
   print(repr(packet))
-  breakpoint()
+  ##breakpoint()
