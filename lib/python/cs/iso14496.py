@@ -1432,59 +1432,71 @@ class MOOVBoxBody(ContainerBoxBody):
       Decode the contained boxes.
   '''
 
-class MVHDBoxBody(FullBoxBody):
+@boxbodyclass
+class MVHDBoxBody(FullBoxBody2):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
   '''
+  creation_time: Union[TimeStamp32, TimeStamp64]
+  modification_time: Union[TimeStamp32, TimeStamp64]
+  timescale: UInt32BE
+  duration: Union[UInt32BE, UInt64BE]
+  rate_long: Int32BE
+  volume_short: Int16BE
+  reserved1_: 10  # 2-reserved, 2x4 reserved
+  matrix: Matrix9Long
+  predefined1_: 24  # 6x4 predefined
+  next_track_id: UInt32BE
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      creation_time=(True, (TimeStamp32, TimeStamp64)),
-      modification_time=(True, (TimeStamp32, TimeStamp64)),
-      timescale=UInt32BE,
-      duration=(True, (UInt32BE, UInt64BE)),
-      rate_long=Int32BE,
-      volume_short=Int16BE,
-      reserved1=bytes,
-      matrix=Matrix9Long,
-      predefined1=bytes,
-      next_track_id=UInt32BE,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    super().parse_fields(bfr)
+  @classmethod
+  def parse_fields(cls, bfr: CornuCopyBuffer) -> Mapping[str, AbstractBinary]:
+    # parse the fixed fields from the superclass, FullBoxBody2
+    parse_fields = super().parse_fields
+    superfields = super()._datafieldtypes
+    ##parse_fields = FullBoxBody2.parse_fields
+    field_values = parse_fields(bfr, superfields)
+    version = field_values['version'].value
     # obtain box data after version and flags decode
-    if self.version == 0:
-      self.parse_field('creation_time', bfr, TimeStamp32)
-      self.parse_field('modification_time', bfr, TimeStamp32)
-      self.parse_field('timescale', bfr, UInt32BE)
-      self.parse_field('duration', bfr, UInt32BE)
-    elif self.version == 1:
-      self.parse_field('creation_time', bfr, TimeStamp64)
-      self.parse_field('modification_time', bfr, TimeStamp64)
-      self.parse_field('timescale', bfr, UInt32BE)
-      self.parse_field('duration', bfr, UInt64BE)
+    if version == 0:
+      field_values.update(
+          super().parse_fields(
+              bfr,
+              dict(
+                  creation_time=TimeStamp32,
+                  modification_time=TimeStamp32,
+                  timescale=UInt32BE,
+                  duration=UInt32BE,
+              )
+          )
+      )
+    elif version == 1:
+      field_values.update(
+          super().parse_fields(
+              bfr,
+              dict(
+                  creation_time=TimeStamp64,
+                  modification_time=TimeStamp64,
+                  timescale=UInt32BE,
+                  duration=UInt64BE,
+              )
+          )
+      )
     else:
-      raise ValueError(f'MVHD: unsupported {self.version=}')
-    self.parse_field('rate_long', bfr, Int32BE)
-    self.parse_field('volume_short', bfr, Int16BE)
-    self.parse_field('reserved1', bfr, 10)  # 2-reserved, 2x4 reserved
-    self.parse_field('matrix', bfr, Matrix9Long)
-    self.parse_field('predefined1', bfr, 24)  # 6x4 predefined
-    self.parse_field('next_track_id', bfr, UInt32BE)
-    return self
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.creation_time
-    yield self.modification_time
-    yield self.timescale
-    yield self.duration
-    yield self.rate_long
-    yield self.volume_short
-    yield self.reserved1
-    yield self.matrix
-    yield self.predefined1
-    yield self.next_track_id
+      raise ValueError(f'{cls.__name__}: unsupported {version=}')
+    field_values.update(
+        super().parse_fields(
+            bfr,
+            # TODO: just pass a list of field names here
+            dict(
+                rate_long=Int32BE,
+                volume_short=Int16BE,
+                reserved1_=10,
+                matrix=Matrix9Long,
+                predefined1_=24,
+                next_track_id=UInt32BE,
+            )
+        )
+    )
+    return field_values
 
   @property
   def rate(self):
