@@ -799,7 +799,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
               super().__init__(field1=field1, field2=field2)
   '''
 
-class BinarySingleValue(AbstractBinary):
+class BinarySingleValue(AbstractBinary, Promotable):
   ''' A representation of a single value as the attribute `.value`.
 
       Subclasses must implement:
@@ -902,18 +902,6 @@ class BinarySingleValue(AbstractBinary):
         Subclasses must implement this method or `transcribe`.
     '''
     return cls(value).transcribe()
-
-  @classmethod
-  def promote(cls, obj):
-    ''' Promote `obj` to an instance of this `BinarySingleValue` subclass.
-    '''
-    if isinstance(obj, cls):
-      return obj
-    try:
-      # see if there are type specific ._from_blah methods
-      return super().promote(obj)
-    except TypeError:
-      return cls(obj)
 
 class BinaryByteses(
     BinarySingleValue,
