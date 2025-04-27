@@ -1287,6 +1287,22 @@ class FullBoxBody(BoxBody):
     '''
     return (self.flags0 << 16) | (self.flags1 << 8) | self.flags2
 
+@boxbodyclass
+class FullBoxBody2(BoxBody):
+  ''' A common extension of a basic `BoxBody`, with a version and flags field.
+      ISO14496 section 4.2.
+  '''
+  version: UInt8
+  flags0: UInt8
+  flags1: UInt8
+  flags2: UInt8
+
+  @property
+  def flags(self):
+    ''' The flags value, computed from the 3 flag bytes.
+    '''
+    return (self.flags0 << 16) | (self.flags1 << 8) | self.flags2
+
 class MDATBoxBody(BoxBody):
   ''' A Media Data Box - ISO14496 section 8.1.1.
   '''
