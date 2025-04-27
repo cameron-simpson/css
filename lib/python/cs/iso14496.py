@@ -2416,45 +2416,52 @@ class METABoxBody(FullBoxBody):
             return value
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
-# class to glom all the bytes
-_ILSTRawSchema = pt_spec(
-    (lambda bfr: bfr.take(...), lambda bs: bs),
-    name='ILSTRawSchema',
-    type=Buffer,
-)
+class _attr_schema(namedtuple('attributed_schema',
+                              'attribute_name schema_class')):
+
+  def __repr__(self):
+    return f'schema({self.attribute_name}={self.schema_class.__name__})'
+
+class _ILSTRawSchema(BinaryBytes):
+  ''' All the bytes in an ILST.
+  '''
+
+_ILSTRawSchema.__name__ = 'ILSTRawSchema'
 
 def ILSTRawSchema(attribute_name):
   ''' Attribute name and type for ILST raw schema.
   '''
-  return attribute_name, _ILSTRawSchema
+  return _attr_schema(attribute_name, _ILSTRawSchema)
 
 # class to decode bytes as UTF-8
-class _ILSTTextSchema(pt_spec(
-    (
-        lambda bfr: bfr.take(...).decode('utf-8'),
-        lambda txt: txt.encode('utf-8'),
+class _ILSTTextSchema(
+    pt_spec(
+        (
+            lambda bfr: bfr.take(...).decode('utf-8'),
+            lambda txt: txt.encode('utf-8'),
+        ),
+        name='ILSTTextSchema',
+        value_type=str,
     ),
-    name='ILSTTextSchema',
-    type=str,
-), type=str):
+    value_type=str,
+):
+  pass
 
-  def __repr__(self):
-    return repr(self.value)
 
 def ILSTTextSchema(attribute_name):
   ''' Attribute name and type for ILST text schema.
   '''
-  return attribute_name, _ILSTTextSchema
+  return _attr_schema(attribute_name, _ILSTTextSchema)
 
 def ILSTUInt32BESchema(attribute_name):
   ''' Attribute name and type for ILST `UInt32BE` schema.
   '''
-  return attribute_name, UInt32BE
+  return _attr_schema(attribute_name, UInt32BE)
 
 def ILSTUInt8Schema(attribute_name):
   ''' Attribute name and type for ILST `UInt8BE` schema.
   '''
-  return attribute_name, UInt8
+  return _attr_schema(attribute_name, UInt8)
 
 # class to decode n/total as a pair of UInt32BE values
 _ILSTAofBSchema = BinaryMultiValue(
@@ -2464,7 +2471,7 @@ _ILSTAofBSchema = BinaryMultiValue(
 def ILSTAofBSchema(attribute_name):
   ''' Attribute name and type for ILST "A of B" schema.
   '''
-  return attribute_name, _ILSTAofBSchema
+  return _attr_schema(attribute_name, _ILSTAofBSchema)
 
 # class to decode bytes as UTF-8 of ISO8601 datetime string
 _ILSTISOFormatSchema = pt_spec(
@@ -2472,14 +2479,14 @@ _ILSTISOFormatSchema = pt_spec(
         lambda bfr: datetime.fromisoformat(bfr.take(...).decode('utf-8')),
         lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode('utf-8'),
     ),
-    name='ILSTTextSchema',
-    type=str,
+    name='ILSTISOFormatSchema',
+    value_type=datetime,
 )
 
 def ILSTISOFormatSchema(attribute_name):
   ''' Attribute name and type for ILST ISO format schema.
   '''
-  return attribute_name, _ILSTISOFormatSchema
+  return _attr_schema(attribute_name, _ILSTISOFormatSchema)
 
 itunes_media_type = namedtuple('itunes_media_type', 'type stik')
 
@@ -2497,7 +2504,7 @@ itunes_store_country_code = namedtuple(
     'country_name iso_3166_1_code itunes_store_code'
 )
 
-class _ILSTUTF8Text(BinarySingleValue, type=str):
+class _ILSTUTF8Text(BinarySingleValue, value_type=str):
   ''' A full-buffer piece of UTF-8 encoded text.
   '''
 
