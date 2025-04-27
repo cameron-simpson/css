@@ -1964,11 +1964,11 @@ def binclass(cls, kw_only=True):
               )
         elif field_type is Ellipsis or isinstance(field_type, int):
           # a ... or an int indicates a object consuming that many bytes
-          class FieldClass(BinaryByteses, consume=field_type):
+          class FieldClass(BinaryBytes, consume=field_type):
             pass
 
           FieldClass.__name__ = field_name
-          FieldClass.__doc__ = f'BinaryByteses,consume={field_type})'
+          FieldClass.__doc__ = f'BinaryBytes,consume={field_type})'
           fieldtypemap[field_name] = FieldClass
           X("update fieldtypemap[%r] = %r", field_name, FieldClass)
         else:
