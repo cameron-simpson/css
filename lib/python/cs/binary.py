@@ -2039,6 +2039,7 @@ def binclass(cls, kw_only=True):
           ",".join(
               f'{fieldname}={getattr(self,fieldname)}'
               for fieldname in fieldnames
+              if not fieldname.endswith('_')
           ),
       )
 
