@@ -903,7 +903,7 @@ class BinarySingleValue(AbstractBinary, Promotable):
     '''
     return cls(value).transcribe()
 
-class BinaryByteses(
+class BinaryBytes(
     BinarySingleValue,
     value_type=Union[Buffer, Iterable[Buffer]],
 ):
@@ -932,7 +932,11 @@ class BinaryByteses(
 
   def __repr__(self):
     cls = self.__class__
-    return f'{cls.__name__}[cls.PARSE_SIZE]:{self._bufs}'
+    bufs = getattr(self, "_bufs", "NO_BUFS")
+    return f'{cls.__name__}[cls.PARSE_SIZE]:{bufs}'
+
+  def __iter__(self):
+    return iter(self._bufs)
 
   @property
   def value(self):
@@ -958,7 +962,19 @@ class BinaryByteses(
   def transcribe(self):
     ''' Transcribe each value.
     '''
-    yield from iter(self.values)
+    return self._bufs
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to a `BinaryBytes` instance.
+        Other instances of `AbstractBinary` will be transcribed into the buffers.
+        Otherwise use `BinarySingleValue.promote(obj)`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, AbstractBinary):
+      return cls(obj.transcribe())
+    return super().promote(obj)
 
 class BinaryListValues(AbstractBinary):
   ''' A list of values with a common parse specification,
