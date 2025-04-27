@@ -1904,6 +1904,7 @@ def binclass(cls, kw_only=True):
           >>> packet.body_data
           b'xyzabc'
   '''
+  name0 = cls.__name__
 
   # collate the annotated class attributes
   # these are our own, and those from the superclasses
