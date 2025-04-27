@@ -2101,10 +2101,14 @@ def binclass(cls, kw_only=True):
           Return the field instance.
       '''
       if fieldtypes is None:
-      return fieldtypes[fieldname].type.parse(bfr)
         fieldtypes = cls._datafieldtypes
       else:
+        # a mapping of field name -> type: copy and promote it
+        fieldtypes = dict(**fieldtypes)
         promote_fieldtypemap(fieldtypes)
+      fieldtype = fieldtypes[fieldname]
+      parse = fieldtype.parse
+      return parse(bfr)
 
     @classmethod
     @bcmethod
