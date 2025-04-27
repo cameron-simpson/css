@@ -602,26 +602,19 @@ class AbstractBinary(Promotable, ABC):
       if min_count is None:
         min_count = 0
       elif min_count < 0:
-        raise ValueError(
-            "min_count must be >=0 if specified, got: %r" % (min_count,)
-        )
+        raise ValueError(f'{min_count=} must be >=0 if specified')
       if max_count is not None:
         if max_count < 0:
-          raise ValueError(
-              "max_count must be >=0 if specified, got: %r" % (max_count,)
-          )
+          raise ValueError(f'{max_count=} must be >=0 if specified')
         if max_count < min_count:
-          raise ValueError(
-              "max_count must be >= min_count, got: min_count=%r, max_count=%rr"
-              % (min_count, max_count)
-          )
+          raise ValueError(f'{max_count=} must be >= {min_count=}')
     else:
       if min_count is not None or max_count is not None:
         raise ValueError(
             "scan_with_offsets: may not combine count with either min_count or max_count"
         )
       if count < 0:
-        raise ValueError("count must be >=0 if specified, got: %r" % (count,))
+        raise ValueError(f'{count=} must be >=0 if specified')
       min_count = max_count = count
     scanned = 0
     while (max_count is None or scanned < max_count) and not bfr.at_eof():
@@ -721,9 +714,7 @@ class AbstractBinary(Promotable, ABC):
     '''
     instance, offset = cls.parse_bytes(bs, **parse_bytes_kw)
     if offset < len(bs):
-      raise ValueError(
-          "unparsed data at offset %d: %r" % (offset, bs[offset:])
-      )
+      raise ValueError(f'unparsed data at {offset=}: {bs[offset:]!r}')
     return instance
 
   @classmethod
@@ -986,7 +977,7 @@ class BinaryListValues(AbstractBinary):
     self.values = []
 
   def __str__(self):
-    return "%s%r" % (type(self).__name__, self.values)
+    return '{self.__class__.__name__}{self.values!r}'
 
   __repr__ = __str__
 
@@ -1031,16 +1022,14 @@ class BinaryListValues(AbstractBinary):
       if min_count is None:
         min_count = count
       elif min_count < count:
-        raise ValueError("min_count(%s) < count(%s)" % (min_count, count))
+        raise ValueError(f'{min_count=} < {count=}')
       if max_count is None:
         max_count = count
       elif max_count > count:
-        raise ValueError("max_count(%s) > count(%s)" % (max_count, count))
+        raise ValueError(f'{max_count=} > {count=}')
     if (min_count is not None and max_count is not None
         and min_count > max_count):
-      raise ValueError(
-          "min_count(%s) > max_count(%s)" % (min_count, max_count)
-      )
+      raise ValueError(f'{min_count=} > {max_count=}')
     self = cls()
     values = self.values
     func_parse = pt_spec(pt).parse
@@ -1271,9 +1260,9 @@ def BinaryStruct(
   assert isinstance(struct_class, type)
   struct_class.__name__ = class_name
   struct_class.__doc__ = (
-      ''' An `AbstractBinary` `namedtuple` which parses and transcribes
-          the struct format `%r` and presents the attributes %r.
-      ''' % (struct_format, field_names)
+      f'''An `AbstractBinary` `namedtuple` which parses and transcribes
+          the struct format `{struct_format!r}` and presents the attributes {field_names!r}.
+      '''
   )
   struct_class.struct = struct
   struct_class.format = struct_format
@@ -2278,7 +2267,7 @@ class BinaryUTF8NUL(BinarySingleValue, value_type=str):
       nul = bfr.take(1)
       if nul != b'\0':
         raise RuntimeError(
-            "after %d bytes, expected NUL, found %r" % (nul_pos, nul)
+            f'after {nul_pos} bytes, expected NUL, found {nul!r}'
         )
     return utf8
 
@@ -2311,8 +2300,7 @@ class BinaryUTF16NUL(BinarySingleValue, value_type=str):
   def __init__(self, value: str, *, encoding: str):
     if encoding not in self.VALID_ENCODINGS:
       raise ValueError(
-          'unexpected encoding %r, expected one of %r' %
-          (encoding, self.VALID_ENCODINGS)
+          f'unexpected {encoding=}, expected one of {self.VALID_ENCODINGS!r}'
       )
     self.encoding = encoding
     self.value = value
