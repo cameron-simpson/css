@@ -568,8 +568,12 @@ class AbstractBinary(Promotable, ABC):
       with_offsets=False,
       **parse_kw,
   ):
-    ''' Function to scan the buffer `bfr` for repeated instances of `cls`
-        until end of input and yield them.
+    ''' A generator to scan the buffer `bfr` for repeated instances of `cls`
+        until end of input, and yield them.
+
+        Note that if `bfr` is not already a `CornuCopyBuffer`
+        it is promoted to `CornuCopyBuffer` from several types
+        such as filenames etc; see `CornuCopyBuffer.promote`.
 
         Parameters:
         * `bfr`: the buffer to scan, or any object suitable for `CornuCopyBuffer.promote`
@@ -586,8 +590,7 @@ class AbstractBinary(Promotable, ABC):
         Scanning stops after `max_count` instances (if specified).
         If fewer than `min_count` instances (if specified) are scanned
         a warning is issued.
-        This is to accomodate nonconformant streams
-        without raising exceptions.
+        This is to accomodate nonconformant streams without raising exceptions.
         Callers wanting to validate `max_count` may want to probe `bfr.at_eof()`
         after return.
         Callers not wanting a warning over `min_count` should not specify it,
@@ -1864,7 +1867,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
 
 @decorator
 def binclass(cls, kw_only=True):
-  r'''Experimental decorator for `dataclass`-like binary classes.
+  r'''A decorator for `dataclass`-like binary classes.
 
       Example use:
 
@@ -1914,6 +1917,7 @@ def binclass(cls, kw_only=True):
 
   # collate the annotated class attributes
   # these are our own, and those from the superclasses
+  # TODO: should it be an error to find a field twice?
   attr_annotations = {}
   for supercls in reversed(cls.__mro__):
     for attr, anno_type in getattr(supercls, '__annotations__', {}).items():
@@ -1938,10 +1942,11 @@ def binclass(cls, kw_only=True):
   dcls = dataclass(dcls, kw_only=kw_only)
 
   def promote_fieldtypemap(fieldtypemap):
-    ''' Promote the types in a field type map into `AbstractBinary` subclasses.  
+    ''' Promote the types in a field type map into `AbstractBinary` subclasses.
     '''
     for field_name, field_type in tuple(fieldtypemap.items()):
       if isinstance(field_type, type):
+        # a class
         if not issubclass(field_type, AbstractBinary):
           raise TypeError(
               f'field {field_name!r}, type {field_type} should be a subclass of AbstractBinary'
@@ -1978,7 +1983,9 @@ def binclass(cls, kw_only=True):
   class BinClass(cls, AbstractBinary):  ## , AbstractBinary):
 
     _dataclass = dcls
+    # the mapping of field names to types as annotated
     _datafieldtypes = fieldtypemap
+    # a list of the field names in order
     _field_names = tuple(fieldtypemap)
 
     # a list of the fields used by AbstractBinary.self_check
@@ -2238,3 +2245,28 @@ class BinaryUTF16NUL(BinarySingleValue, value_type=str):
     '''
     yield value.encode(encoding)
     yield b'\0\0'
+
+if __name__ == '__main__':
+
+  @binclass
+  class HeaderStruct:
+    """A header containing a count and some flags."""
+    count: UInt32BE
+    flags: UInt8
+
+  @binclass
+  class Packet(HeaderStruct):
+    ''' The Packet, subclassing HeaderStruct. '''
+    body_text: BSString
+    body_data: BSData
+    body_longs: BinaryStruct('ll_longs', '>LL', 'long1 long2')
+
+  packet = Packet(
+      count=5,
+      flags=0x03,
+      body_text="hello",
+      body_data=b'xyzabc',
+      body_longs=(10, 20),
+  )
+  print(repr(packet))
+  breakpoint()
