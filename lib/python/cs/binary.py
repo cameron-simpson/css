@@ -1960,7 +1960,6 @@ def binclass(cls, kw_only=True):
           FieldClass.__name__ = field_name
           FieldClass.__doc__ = f'BinaryBytes,consume={field_type})'
           fieldtypemap[field_name] = FieldClass
-          X("update fieldtypemap[%r] = %r", field_name, FieldClass)
         else:
           raise TypeError(
               f'field {field_name!r}, type {field_type} is not supported'
@@ -2221,10 +2220,6 @@ def binclass(cls, kw_only=True):
   assert BinClass._baseclass is cls
   assert BinClass._dataclass is dcls
   BinClass.__name__ = name0
-  ##X("@binclass: returning %s %r", BinClass, BinClass.__name__)
-  ##X("  BinClass %d:%s", id(BinClass), BinClass.__name__)
-  ##X("  cls      %d:%s", id(cls), cls.__name__)
-  ##X("  dcls     %d:%s", id(dcls), dcls.__name__)
   return BinClass
 
 def BinaryFixedBytes(class_name: str, length: int):
