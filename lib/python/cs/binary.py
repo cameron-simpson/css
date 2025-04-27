@@ -2062,6 +2062,20 @@ def binclass(cls, kw_only=True):
           ),
       )
 
+    def __setattr__(self, attr, value):
+      ''' Set a data field from `value`.
+      '''
+      assert attr != '_dataclass'
+      cls = self.__class__
+      if attr in cls._datafieldtypes:
+        # dataclass attribute
+        dataobj = self._data
+        datavalue = self.promote_field_value(attr, value)
+        setattr(dataobj, attr, datavalue)
+      else:
+        # ordinary attribute
+        self.__dict__[attr] = value
+
     @classmethod
     @bcmethod
     def parse_field(
