@@ -2062,6 +2062,24 @@ def binclass(cls, kw_only=True):
           ),
       )
 
+    def __getattr__(self, attr: str):
+      ''' Return a data field value, the `.value` attribute if it is a single value field.
+      '''
+      data = self._data
+      try:
+        obj = getattr(data, attr)
+      except AttributeError as e:
+        raise AttributeError(
+            f'{self.__class__.__name__}.{attr}: no entry in the dataclass instance (self._data)'
+        )
+      # we have a dataclass instance attribute
+      assert isinstance(
+          obj, AbstractBinary
+      ), f'{self._data}.{attr}={r(obj)} is not an AbstractBinary'
+      if is_single_value(obj):
+        return obj.value
+      return obj
+
     def __setattr__(self, attr, value):
       ''' Set a data field from `value`.
       '''
