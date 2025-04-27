@@ -605,7 +605,7 @@ class BoxBody(SimpleBinary):
   ''' Abstract basis for all `Box` bodies.
   '''
 
-  FIELD_TYPES = dict(offset=int, post_offset=int)
+  FIELD_TYPES = dict(offset=int, end_offset=int)
   SUBCLASSES_BY_BOXTYPE = {}
 
   # class based default for .boxes for bodies with no subboxes
