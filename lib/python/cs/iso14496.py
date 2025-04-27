@@ -820,6 +820,19 @@ class BoxBody(SimpleBinary):
         return class_prefix.replace('_', ' ').lower().encode('ascii')
     raise ValueError(f'no automatic box type for class named {class_name!r}')
 
+@decorator
+def boxbodyclass(cls):
+  ''' A decorator for `@binclass` style `BoxBody` subclasses
+      which reregisters the new binclass in the
+      `BoxBody.SUBCLASSES_BY_BOXTYPE` mapping.
+  '''
+  if not issubclass(cls, BoxBody):
+    raise TypeError(f'@boxbodyclass: {cls=} is not a subclass of BoxBody')
+  cls0 = cls
+  cls = binclass(cls0)
+  BoxBody._register_subclass_boxtypes(cls, cls0)
+  return cls
+
 class Box(SimpleBinary):
   ''' Base class for all boxes - ISO14496 section 4.2.
 
