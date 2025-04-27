@@ -779,11 +779,8 @@ def is_single_value(obj):
       and tuple based `AbstractBinary` instances of length 1.
   '''
   return True if isinstance(obj, BinarySingleValue) else (
-      len(obj.binary_fields) == 1 if isinstance(obj, BaseMultiValueBinary) else
-      (
-          tuple.__len__(obj) == 1 if isinstance(obj, AbstractBinary)
-          and isinstance(obj, tuple) else False
-      )
+      tuple.__len__(obj) == 1
+      if isinstance(obj, AbstractBinary) and isinstance(obj, tuple) else False
   )
 
 class SimpleBinary(SimpleNamespace, AbstractBinary):
