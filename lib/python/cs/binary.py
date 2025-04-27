@@ -2212,7 +2212,8 @@ def binclass(cls, kw_only=True):
       ''' Parse an instance from `bfr`.
           This default implementation calls `cls(**cls.parse_fields(bfr))`.
       '''
-      return cls(**cls.parse_fields(bfr))
+      fields = cls.parse_fields(bfr)
+      return cls(**fields)
 
     @bcmethod
     def transcribe(self):
@@ -2222,6 +2223,16 @@ def binclass(cls, kw_only=True):
       for fieldname in cls._datafieldtypes:
         yield getattr(self._data, fieldname).transcribe()
 
+  cls.name0 = name0
+  cls.__name__ = f'{name0}__original'
+  assert BinClass._baseclass is cls
+  assert BinClass._dataclass is dcls
+  assert BinClass._dataclass.__name__.startswith(cls.name0)
+  BinClass.__name__ = name0
+  ##X("@binclass: returning %s %r", BinClass, BinClass.__name__)
+  ##X("  BinClass %d:%s", id(BinClass), BinClass.__name__)
+  ##X("  cls      %d:%s", id(cls), cls.__name__)
+  ##X("  dcls     %d:%s", id(dcls), dcls.__name__)
   return BinClass
 
 def BinaryFixedBytes(class_name: str, length: int):
