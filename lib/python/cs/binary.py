@@ -2116,16 +2116,47 @@ def binclass(cls, kw_only=True):
     def parse_fields(
         cls,
         bfr: CornuCopyBuffer,
-        fieldtypes: Optional[Mapping[str, type]] = None
-    ) -> Mapping[str, Any]:
+        fieldtypes: Optional[Union[
+            Mapping[str, type],
+            Iterable[str],
+            str,
+        ]] = None,
+    ) -> Mapping[str, AbstractBinary]:
       ''' Parse all the fields from `cls._datafieldtypes` from `bfr`
           by calling `cls.parse_field(fieldname,bfr)` for each.
           Return a mapping of field names to values
           suitable for passing to `cls`.
+
+          The `fieldtypes` defaults to `cls._datafieldtypes` but may be provided as:
+          - a mapping of field name to type
+          - an iterable of field names, whose types will come from
+            `cls._datafieldtypes`
+          - a string being a space separated list of field names,
+            whose types will come from `cls._datafieldtypes`
+
+          Each of these will be converted to a mapping and then
+          promoted with `promote_fieldtypemap`.
       '''
       if fieldtypes is None:
+        # use the default mapping, already promoted
         fieldtypes = cls._datafieldtypes
+      elif isinstance(fieldtypes, Mapping):
+        # a mapping of field name -> type: copy and promote it
+        fieldtypes = dict(**fieldtypes)
+        promote_fieldtypemap(fieldtypes)
+      elif isinstance(fieldtypes, str):
+        # space separated field names
+        fieldtypes = {
+            fieldname: cls._datafieldtypes[fieldname]
+            for fieldname in fieldtypes.split()
+        }
+        promote_fieldtypemap(fieldtypes)
       else:
+        # should be an iterable of str (field names)
+        fieldtypes = {
+            fieldname: cls._datafieldtypes[fieldname]
+            for fieldname in fieldtypes
+        }
         promote_fieldtypemap(fieldtypes)
       return {
           fieldname: cls.parse_field(fieldname, bfr, fieldtypes)
