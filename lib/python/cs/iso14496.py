@@ -24,19 +24,21 @@ from functools import cached_property
 from getopt import getopt, GetoptError
 import os
 import sys
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Mapping, Tuple, Union
 from uuid import UUID
 
 from icontract import require
 from typeguard import typechecked
 
 from cs.binary import (
+    AbstractBinary,
     UInt8,
     Int16BE,
     Int32BE,
     UInt16BE,
     UInt32BE,
     UInt64BE,
+    BinaryBytes,
     BinaryUTF8NUL,
     BinaryUTF16NUL,
     SimpleBinary,
@@ -44,6 +46,7 @@ from cs.binary import (
     BinaryStruct,
     BinaryMultiValue,
     BinarySingleValue,
+    binclass,
     parse_offsets,
     pt_spec,
 )
@@ -61,7 +64,7 @@ from cs.lex import (
     printt,
     tabulate,
 )
-from cs.logutils import warning
+from cs.logutils import warning, debug
 from cs.pfx import Pfx, pfx_method, XP
 from cs.tagset import TagSet, Tag
 from cs.threads import locked_property, ThreadState
@@ -747,6 +750,7 @@ class BoxBody(SimpleBinary):
         bytes are read from `bfr`.
     '''
     if binary_cls is ... or isinstance(binary_cls, int):
+      # collect raw data
       value = bfr.take(binary_cls)
     else:
       value = pt_spec(binary_cls).parse(bfr)
@@ -1175,8 +1179,6 @@ class Box(SimpleBinary):
       meta_box = self.META0
       if meta_box:
         tags.update(meta_box.tagset(), prefix=box_prefix + '.meta')
-      else:
-        pass  # X("NO .META0")
       udta_box = self.UDTA0
       if udta_box:
         pass  # X("UDTA?")
