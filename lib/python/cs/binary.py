@@ -2168,31 +2168,43 @@ def binclass(cls, kw_only=True):
     def promote_field_value(cls, fieldname: str, obj):
       ''' Promote a received `obj` to the appropriate `AbstractBinary` instance.
       '''
-      return cls._datafields[fieldname].type.promote(obj)
-
-    def __getattr__(self, attr):
-      ''' Return a data field value, the `.value` attribute if it is a single value field.
-      '''
+      X(
+          f'{cls.__name__} BINCLASS PARSE_FIELDS ---------------------------------------------------------'
+      )
       try:
-        obj = getattr(self._data, attr)
-      except AttributeError as e:
-        raise AttributeError(f'{self.__class__.__name__}._data.{attr}') from e
-      assert isinstance(
-          obj, AbstractBinary
-      ), f'{self._data}.{attr}={r(obj)} is not an AbstractBinary'
-      if is_single_value(obj):
-        return obj.value
+        fieldtype = cls._datafieldtypes[fieldname]
+      except KeyError:
+        if not isinstance(obj, AbstractBinary):
+          raise TypeError(
+              f'promote_field_value({cls.__name__}.promote_field_value({fieldname=},{r(obj)}): not an AbstractBinary and not in {cls.__name__}._datafieldtypes:{sorted(cls._datafieldtypes)}'
+          )
+      else:
+        try:
+          promote = fieldtype.promote
+        except AttributeError:
+          # no .promote, but accept if we're already an instance
+          if not isinstance(obj, fieldtype):
+            # see if we're a Union, if so try promoting to the subtypes
+            uniontype = get_origin(fieldtype)
+            if uniontype is Union:
+              for element_type in get_args(fieldtype):
+                try:
+                  promote = element_type.promote
+                except AttributeError:
+                  promote = element_type
+                try:
+                  obj = promote(obj)
+                except (ValueError, TypeError):
+                  pass
+                else:
+                  break
+              else:
+                raise TypeError(
+                    f'{cls.__name__}.promote_field_value({fieldname=},obj={r(obj)}): cannot promote obj'
+                )
+        else:
+          obj = pfx_call(promote, obj)
       return obj
-
-    def __setattr__(self, attr, value):
-      ''' Set a data field from `value`.
-      '''
-      cls = self.__class__
-      if attr not in cls._datafieldtypes:
-        raise AttributeError(f'{cls.__name__}.{attr}')
-      dataobj = self._data
-      datavalue = self.promote_field_value(attr, value)
-      setattr(dataobj, attr, datavalue)
 
     @classmethod
     @bcmethod
