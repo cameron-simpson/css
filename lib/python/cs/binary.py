@@ -1982,6 +1982,25 @@ def binclass(cls, kw_only=True):
   promote_fieldtypemap(fieldtypemap)
 
   class BinClass(cls, AbstractBinary):  ## , AbstractBinary):
+  @decorator
+  ##@trace
+  def bcmethod(func):
+    ''' A decorator for a `BinClass` method
+        to look first for a direct override in `cls`
+        then to fall back to the `BinClass` method.
+
+        Note that this resolution is done at `BinClass` definition
+        time, not method call time.
+    '''
+    methodname = func.__name__
+    clsd = cls.__dict__
+    try:
+      method = clsd[methodname]
+      method._desc = f'BinClass:{name0}.{methodname} from base class {cls.__name__}'
+    except KeyError:
+      method = func
+      method._desc = f'BinClass:{name0}.{methodname} from BinClass for {cls.__name__}'
+    return method
 
     _dataclass = dcls
     # the mapping of field names to types as annotated
@@ -2033,6 +2052,7 @@ def binclass(cls, kw_only=True):
       )
 
     @classmethod
+    @bcmethod
     def parse_field(
         cls,
         fieldname: str,
@@ -2049,6 +2069,7 @@ def binclass(cls, kw_only=True):
         promote_fieldtypemap(fieldtypes)
 
     @classmethod
+    @bcmethod
     def parse_fields(
         cls,
         bfr: CornuCopyBuffer,
@@ -2069,6 +2090,7 @@ def binclass(cls, kw_only=True):
       }
 
     @classmethod
+    @bcmethod
     def promote_field_value(cls, fieldname: str, obj):
       ''' Promote a received `obj` to the appropriate `AbstractBinary` instance.
       '''
@@ -2099,12 +2121,14 @@ def binclass(cls, kw_only=True):
       setattr(dataobj, attr, datavalue)
 
     @classmethod
+    @bcmethod
     def parse(cls, bfr: CornuCopyBuffer):
       ''' Parse an instance from `bfr`.
           This default implementation calls `cls(**cls.parse_fields(bfr))`.
       '''
       return cls(**cls.parse_fields(bfr))
 
+    @bcmethod
     def transcribe(self):
       ''' Transcribe this instance.
       '''
