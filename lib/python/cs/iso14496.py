@@ -46,6 +46,7 @@ from cs.binary import (
     BinaryStruct,
     BinaryMultiValue,
     BinarySingleValue,
+    ListOfBinary,
     binclass,
     parse_offsets,
     pt_spec,
@@ -1396,17 +1397,18 @@ class FTYPBoxBody(BoxBody):
         for offset in range(0, len(self.brands_bs), 4)
     ]
 
-class PDINBoxBody(FullBoxBody):
+class PDINBoxBody(FullBoxBody2):
   ''' A 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
   '''
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      pdinfo=list,
-  )
 
   # field names for the tuples in a PDINBoxBody
   PDInfo = BinaryStruct('PDInfo', '>LL', 'rate initial_delay')
+
+  class PDInfoList(ListOfBinary, item_type=PDInfo):
+    pass
+
+  pdinfo: PDInfoList
 
   def parse_fields(self, bfr: CornuCopyBuffer, **kw):
     ''' Gather the normal version information
@@ -1414,7 +1416,6 @@ class PDINBoxBody(FullBoxBody):
         as the `pdinfo` field.
     '''
     super().parse_fields(bfr, **kw)
-    self.add_field('pdinfo', list(PDINBoxBody.PDInfo.scan(bfr)))
 
 class ContainerBoxBody(BoxBody):
   ''' Common superclass of several things with `.boxes`.
