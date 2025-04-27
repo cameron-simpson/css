@@ -115,6 +115,15 @@ def decorator(deco):
     if decorated is not func:
       # We got a wrapper function back, pretty up the returned wrapper.
       try:
+        from functools import update_wrapper
+      except ImportError:
+        pass
+      else:
+        try:
+          update_wrapper(decorated, func)
+        except AttributeError:
+          pass
+      try:
         decorated.__name__ = func_name
       except AttributeError:
         pass
