@@ -467,7 +467,7 @@ class AbstractBinary(Promotable, ABC):
     raise NotImplementedError("transcribe")
 
   @pfx_method
-  def self_check(self):
+  def self_check(self, *, field_types=None):
     ''' Internal self check. Returns `True` if passed.
 
         If the structure has a `FIELD_TYPES` attribute, normally a
@@ -511,38 +511,39 @@ class AbstractBinary(Promotable, ABC):
         it has more than one acceptable type.
     '''
     ok = True
-    try:
-      fields_spec = self.FIELD_TYPES
-    except AttributeError:
-      warning("no FIELD_TYPES")
-      ##ok = False
-    else:
-      # check fields against self.FIELD_TYPES
-      # TODO: call self_check on members with a .self_check() method
-      for field_name, field_spec in fields_spec.items():
-        with Pfx(".%s=%s", field_name, field_spec):
-          if isinstance(field_spec, tuple):
-            required, basetype = field_spec
-          else:
-            required, basetype = True, field_spec
-          try:
-            field = getattr(self, field_name)
-          except AttributeError:
-            if required:
-              warning(
-                  "missing required field %s.%s: __dict__=%s",
-                  type(self).__name__, field_name, cropped_repr(self.__dict__)
-              )
-              ok = False
-          else:
-            if not isinstance(field, basetype):
-              warning(
-                  "should be an instance of %s:%s but is %s", (
-                      'tuple'
-                      if isinstance(basetype, tuple) else basetype.__name__
-                  ), basetype, typed_str(field, max_length=64)
-              )
-              ok = False
+    if field_types is None:
+      try:
+        field_types = self.FIELD_TYPES
+      except AttributeError:
+        warning("no FIELD_TYPES")
+        field_types = {}
+    # check fields against self.FIELD_TYPES
+    # TODO: call self_check on members with a .self_check() method
+    for field_name, field_spec in field_types.items():
+      with Pfx(".%s=%s", field_name, field_spec):
+        if isinstance(field_spec, tuple):
+          required, basetype = field_spec
+        else:
+          required, basetype = True, field_spec
+        try:
+          field = getattr(self, field_name)
+        except AttributeError:
+          if required:
+            warning(
+                "missing required field %s.%s: __dict__=%s",
+                type(self).__name__, field_name, cropped_repr(self.__dict__)
+            )
+            ok = False
+        else:
+          if not isinstance(field, basetype):
+            warning(
+                "should be an instance of %s:%s but is %s", (
+                    'tuple'
+                    if isinstance(basetype, tuple) else basetype.__name__
+                ), basetype, typed_str(field, max_length=64)
+            )
+            ok = False
+            raise RuntimeError
     return ok
 
   def __bytes__(self):
@@ -2020,6 +2021,13 @@ def binclass(cls, kw_only=True):
       }
       dataobj = dcls(**dcls_kwargs)
       self.__dict__['_data'] = dataobj
+
+    def self_check(self):
+      ''' An `@binclass` class instance's raw fields are in `self._data`.
+      '''
+      return AbstractBinary.self_check(
+          self._data, field_types=self.FIELD_TYPES
+      )
 
     def __str__(self):
       cls = self.__class__
