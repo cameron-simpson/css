@@ -2842,20 +2842,6 @@ def parse(o):
     os.close(fd)
   return over_box
 
-def parse_fields(bfr, copy_offsets=None, **kw):
-  ''' Parse an ISO14496 stream from the CornuCopyBuffer `bfr`,
-      yield top level OverBoxes.
-
-      Parameters:
-      * `bfr`: a `CornuCopyBuffer` provided the stream data,
-        preferably seekable
-      * `discard_data`: whether to discard unparsed data, default `False`
-      * `copy_offsets`: callable to receive `Box` offsets
-  '''
-  if copy_offsets is not None:
-    bfr.copy_offsets = copy_offsets
-  yield from OverBox.scan(bfr, **kw)
-
 # pylint: disable=too-many-locals,too-many-branches
 def report(box, indent='', fp=None, indent_incr=None):
   ''' Report some human friendly information about a box.
