@@ -722,7 +722,7 @@ class BoxBody(SimpleBinary):
             return None
           box, = boxes
           return box
-    raise AttributeError(f'{self.__class__.__name}.{attr}')
+    raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
   def __str__(self, attr_names=None):
     if attr_names is None:
