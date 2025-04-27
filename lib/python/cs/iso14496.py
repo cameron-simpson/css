@@ -625,7 +625,23 @@ class BoxBody(SimpleBinary):
     ):
       method = getattr(cls, method_name)
       if not (getattr(method, '__doc__', None) or '').strip():
-        method.__doc__ = method_doc_str.format(cls=cls)
+        try:
+          method.__doc__ = method_doc_str.format(cls=cls)
+        except AttributeError as e:
+          debug(
+              "%s: cannot set %s.__doc__: %s", cls.__name__, method.__name__, e
+          )
+    if cls.__name__ == 'BinClass':
+      # This came from the BinClass inside the @binclass decorator.
+      # Because this subclasses BoxBody (because it subclasses cls, a BoxBody)
+      # we get it when made, before  it gets its __name__.
+      # Skip the registration here.
+      pass
+    else:
+      BoxBody._register_subclass_boxtypes(cls)
+
+  @staticmethod
+  def _register_subclass_boxtypes(cls, prior_cls=None):
     # update the mapping of box_type to BoxBody subclass
     try:
       # explicit list of box_type byte strings
@@ -635,6 +651,7 @@ class BoxBody(SimpleBinary):
       try:
         box_type = cls.boxbody_type_from_class()
       except ValueError as e:
+        debug("cannot infer box type from cls %s %r: %s", cls, cls.__name__, e)
         box_types = ()
       else:
         box_types = (box_type,)
@@ -646,9 +663,13 @@ class BoxBody(SimpleBinary):
         # new box_type as expected
         SUBCLASSES_BY_BOXTYPE[box_type] = cls
       else:
-        raise TypeError(
-            f'box_type {box_type!r} already in BoxBody.SUBCLASSES_BY_BOXTYPE as {existing_box_class.__name__}'
-        )
+        if prior_cls is not None and existing_box_class is prior_cls:
+          # replace prior_cls with cls
+          SUBCLASSES_BY_BOXTYPE[box_type] = cls
+        else:
+          raise TypeError(
+              f'box_type {box_type!r} already in BoxBody.SUBCLASSES_BY_BOXTYPE as {existing_box_class.__name__}'
+          )
 
   @staticmethod
   @require(lambda box_type: len(box_type) == 4)
