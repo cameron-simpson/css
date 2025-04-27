@@ -924,7 +924,6 @@ class Box(SimpleBinary):
         subbox.parent = self
       self.body.parent = self
       self.body.offset = body_offset
-      self.body.post_offset = bfr_tail.offset
       self.body.self_check()
       self.unparsed_offset = bfr_tail.offset
       self.unparsed = list(bfr_tail)
