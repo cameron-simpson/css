@@ -814,8 +814,9 @@ class BoxBody(SimpleBinary):
     ''' Compute the Box's 4 byte type field from the class name.
     '''
     class_name = cls.__name__
-    if len(class_name) == 11 and class_name.endswith('BoxBody'):
-      class_prefix = class_name[:4]
+    if ((class_prefix := cutsuffix(class_name,
+                                   ('BoxBody', 'BoxBody2'))) is not class_name
+        and len(class_prefix) == 4):
       if class_prefix.rstrip('_').isupper():
         return class_prefix.replace('_', ' ').lower().encode('ascii')
     raise ValueError(f'no automatic box type for class named {class_name!r}')
