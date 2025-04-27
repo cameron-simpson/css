@@ -188,15 +188,23 @@ if sys.version_info < (3, 6):
       __name__, sys.version_info
   )
 
-def flatten(chunks) -> Iterable[bytes]:
-  ''' Flatten `chunks` into an iterable of `bytes`-like instances.
-      None of the `bytes` instances will be empty.
+def flatten(transcription) -> Iterable[bytes]:
+  ''' Flatten `transcription` into an iterable of `Buffer`s.
+      None of the `Buffer`s will be empty.
 
       This exists to allow subclass methods to easily return
       transcribable things (having a `.transcribe` method), ASCII
       strings or bytes or iterables or even `None`, in turn allowing
       them simply to return their superclass' chunks iterators
       directly instead of having to unpack them.
+
+      The supplied `transcription` may be any of the following:
+      - `None`: yield nothing
+      - an object with a `.transcribe` method: yield from
+        `flatten(transcription.transcribe())`
+      - a `Buffer`: yield the `Buffer` if it is not empty
+      - a `str`: yield `transcription.encode('ascii')`
+      - an iterable: yield from `flatten(item)` for each item in `transcription`
 
       An example from the `cs.iso14496.METABoxBody` class:
 
@@ -209,19 +217,19 @@ def flatten(chunks) -> Iterable[bytes]:
       method to obtain `bytes` instances for the object's binary
       transcription.
   '''
-  if chunks is None:
+  if transcription is None:
     pass
-  elif hasattr(chunks, 'transcribe'):
-    yield from flatten(chunks.transcribe())
-  elif isinstance(chunks, (bytes, memoryview)):
-    if chunks:
-      yield chunks
-  elif isinstance(chunks, str):
-    if chunks:
-      yield chunks.encode('ascii')
+  elif hasattr(transcription, 'transcribe'):
+    yield from flatten(transcription.transcribe())
+  elif isinstance(transcription, Buffer):
+    if transcription:
+      yield transcription
+  elif isinstance(transcription, str):
+    if transcription:
+      yield transcription.encode('ascii')
   else:
-    for subchunk in chunks:
-      yield from flatten(subchunk)
+    for item in transcription:
+      yield from flatten(item)
 
 @decorator
 def parse_offsets(parse, report=False):
