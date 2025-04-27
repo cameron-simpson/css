@@ -16,6 +16,7 @@ import traceback
 import typing
 
 from cs.gimmicks import warning
+from cs.typingutils import is_optional
 
 __version__ = '20250306-post'
 
@@ -25,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks'],
+    'install_requires': ['cs.gimmicks', 'cs.typeutils'],
 }
 
 def ALL(func):
