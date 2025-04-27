@@ -1981,7 +1981,6 @@ def binclass(cls, kw_only=True):
   fieldtypemap = {field.name: field.type for field in fields(dcls)}
   promote_fieldtypemap(fieldtypemap)
 
-  class BinClass(cls, AbstractBinary):  ## , AbstractBinary):
   @decorator
   ##@trace
   def bcmethod(func):
@@ -2002,6 +2001,14 @@ def binclass(cls, kw_only=True):
       method._desc = f'BinClass:{name0}.{methodname} from BinClass for {cls.__name__}'
     return method
 
+  class BinClass(cls, AbstractBinary):
+    ''' The wrapper class for the `@binclass` class.
+        This subclasses `cls` so a to inherit its methods.
+    '''
+
+    # the class being wrapped
+    _baseclass = cls
+    # the generated dataclass
     _dataclass = dcls
     # the mapping of field names to types as annotated
     _datafieldtypes = fieldtypemap
@@ -2018,6 +2025,8 @@ def binclass(cls, kw_only=True):
       self.__dict__['_data'] = None  # get dummy entry in early, aids debugging
       cls = self.__class__
       # promote nonbinary values to single binary values
+      dcls = cls._dataclass
+      # promote nonbinary values to AbstractBinary values
       dcls_kwargs = {
           attr: self.promote_field_value(attr, obj)
           for attr, obj in dcls_kwargs.items()
@@ -2040,14 +2049,16 @@ def binclass(cls, kw_only=True):
 
     def __repr__(self):
       cls = self.__class__
-      data = self._data
-      fieldnames = self._field_names
+      data = self.__dict__.get('_data')
+      fieldnames = cls._field_names
       return "%s:%s(%s)" % (
           self.__class__.__name__,
-          data.__class__.__name__,
-          ",".join(
-              f'{fieldname}={getattr(data,fieldname)!r}'
-              for fieldname in fieldnames
+          ("NONE" if data is None else data.__class__.__name__),
+          (
+              "NO-DATA" if data is None else ",".join(
+                  f'{fieldname}={getattr(data,fieldname)!r}'
+                  for fieldname in fieldnames
+              )
           ),
       )
 
