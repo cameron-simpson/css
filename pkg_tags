@@ -15,7 +15,7 @@ cs.app.osx.defaults ok_revision=c4bf6397de9e224c88cb14cffa7cb06db960b74c pypi.re
 cs.app.osx.misc ok_revision=a8db5e27f6d608f7bad1854b0c06aa31338fa544 features={"20240622":["macos_version"]} pypi.release="20240622.1"
 cs.app.osx.objc ok_revision=bafa7354f7242e42dd089064362915d523d762da pypi.release="20240622"
 cs.app.osx.plist ok_revision="599e3e37c0af4e7ba92c2134c0a90d17effcfc39" pypi.release="20221228"
-cs.app.osx.spaces ok_revision="79e8ec468b70ea38aa0835694cd80d52f5c262e6" features={"20240622":["SpacesCommand"]} pypi.release="20250306"
+cs.app.osx.spaces ok_revision="18d2a8e3069260982b9cca6982097413b7f70893" features={"20240622":["SpacesCommand"]} pypi.release="20250306"
 cs.app.pilfer
 cs.app.pilfer.urls
 cs.app.playon ok_revision="6d46bd98f407fc8ff2326ce12af36517bd7a8483" pypi.release="20241007" features={"20221228":["PlayonCommand_cmd_api","PlayonCommand_cmd_cds","PlayonCommand_cmd_poll"]}
