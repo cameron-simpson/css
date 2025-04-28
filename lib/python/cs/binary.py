@@ -976,6 +976,7 @@ class ListOfBinary(list, BinarySingleValue, value_type=Iterable):
     '''
     return self
 
+  @classmethod
   def parse(cls, bfr: CornuCopyBuffer, **scan_kw):
     ''' Scan instances of `cls.LIST_ITEM_TYPE` and return a new instance.
     '''
