@@ -2758,7 +2758,7 @@ class VMHDBoxBody(FullBoxBody):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
 
-  OpColor = BinaryMultiStruct('OpColor', '>HHH', 'red green blue')
+  OpColor = BinaryStruct('OpColor', '>HHH', 'red green blue')
 
   FIELD_TYPES = dict(
       FullBoxBody.FIELD_TYPES,
