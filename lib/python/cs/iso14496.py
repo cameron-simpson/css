@@ -1745,27 +1745,46 @@ add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
 class _SampleTableContainerBoxBody(FullBoxBody):
   ''' An intermediate FullBoxBody subclass which contains more boxes.
   '''
+class EntryCountListOfBoxes(FullBoxBody2):
+  ''' An intermediate `FullBoxBody` subclass which contains more boxes
+      whose number if specified with a leading `entry_count`
+      whose defaut type is `UInt32BE`.
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      entry_count=UInt32BE,
-      boxes=list,
-  )
+      This is a common superclass of `_SampleTableContainerBoxBody` and 
+  '''
+  boxes: ListOfBoxes
+
+  ENTRY_COUNT_TYPE = None
+
+  def __init_subclass__(cls, count_type=UInt32BE, **ickw):
+    super().__init_subclass__(**ickw)
+    cls.ENTRY_COUNT_TYPE = count_type
 
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
+  @property
+  def entry_count(self):
+    ''' The `entry_count` is the number of `Box`es.
+    '''
+    return len(self.boxes)
+
+  @classmethod
+  def parse_fields(cls, bfr: CornuCopyBuffer):
     ''' Gather the `entry_count` and `boxes`.
     '''
-    super().parse_fields(bfr)
-    # obtain box data after version and flags decode
-    self.entry_count = UInt32BE.parse(bfr)
-    self.parse_boxes(bfr, count=int(self.entry_count.value))
+    # parse the fixed fields from the superclass, FullBoxBody2
+    parse_fields = super().parse_fields
+    superfields = super()._datafieldtypes
+    field_values = parse_fields(bfr, superfields)
+    entry_count = cls.ENTRY_COUNT_TYPE.parse_value(bfr)
+    field_values.update(boxes=ListOfBoxes.parse(bfr, count=entry_count))
+    self = trace(cls)(**field_values)
+    return self
 
   def transcribe(self):
     yield super().transcribe()
-    yield self.entry_count
+    yield self.ENTRY_COUNT_TYPE(self.entry_count)
     yield self.boxes
 
 add_body_subclass(
