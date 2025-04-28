@@ -1,0 +1,3 @@
+lib/python/cs/lex.py: cs.lex: cutprefix,cutsuffix: also accept a tuple of str like str.startswith and str.endswith
+lib/python/cs/lex.py: cs.lex: typed_str: use cropped_repr() instead of repr()
+lib/python/cs/lex.py: merge main -> media
