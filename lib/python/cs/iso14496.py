@@ -1742,9 +1742,6 @@ class ELNGBoxBody(FullBoxBody2):
 
 add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
 
-class _SampleTableContainerBoxBody(FullBoxBody):
-  ''' An intermediate FullBoxBody subclass which contains more boxes.
-  '''
 class EntryCountListOfBoxes(FullBoxBody2):
   ''' An intermediate `FullBoxBody` subclass which contains more boxes
       whose number if specified with a leading `entry_count`
@@ -1787,9 +1784,8 @@ class EntryCountListOfBoxes(FullBoxBody2):
     yield self.ENTRY_COUNT_TYPE(self.entry_count)
     yield self.boxes
 
-add_body_subclass(
-    _SampleTableContainerBoxBody, b'stsd', '8.5.2', 'Sample Description'
-)
+class _SampleTableContainerBoxBody(EntryCountListOfBoxes):
+  pass
 
 class _SampleEntry(BoxBody):
   ''' Superclass of Sample Entry boxes.
