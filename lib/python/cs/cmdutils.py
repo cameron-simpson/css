@@ -1345,17 +1345,19 @@ class BaseCommand:
           and (argv[0] in ('-help', '--help') or
                ('h' not in getopt_spec and argv[0] in ('-h',)))):
         argv = self._argv = ['help', '-l']
+        has_subcmds = True  # fake this mode in order to run cmd_help
       else:
-        # options and preargv before the subcommand
-        if getopt_spec:
-          # legacy GETOPT_SPEC mode
-          # we do this regardless in order to honour '--'
-          opts, argv = getopt(argv, getopt_spec, '')
-          self.apply_opts(opts)
-        else:
-          # modern mode
-          # use the options.COMMON_OPT_SPECS
-          options.popopts(argv)
+        # ordinary mode: leading options then preargv
+        if has_subcmds:
+          # do the leading argument parse
+          if not getopt_spec:
+            # the modern way with popopts
+            # use the options.COMMON_OPT_SPECS
+            options.popopts(argv)
+          else:
+            # legacy GETOPT_SPEC mode
+            opts, argv = getopt(argv, getopt_spec, '')
+            self.apply_opts(opts)
         # We do this regardless so that subclasses can do some presubcommand parsing
         # _after_ any command line options.
         argv = self.apply_preargv(argv)
@@ -1376,9 +1378,10 @@ class BaseCommand:
           # looks like a subcommand name, take it
           argv.pop(0)
         else:
-          # not a command name
+          # not a command name, is there a default command?
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
+            # no, emit the short help
             warning(
                 "missing subcommand, expected one of: %s",
                 ', '.join(sorted(subcmds.keys()))

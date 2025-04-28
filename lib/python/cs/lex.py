@@ -177,7 +177,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
           X("foo = %s", s(foo))
   '''
   # pylint: disable=redefined-outer-name
-  o_s = repr(o) if use_repr else str(o)
+  o_s = cropped_repr(o) if use_repr else str(o)
   if max_length is not None:
     o_s = cropped(o_s, max_length)
   s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
@@ -1149,8 +1149,10 @@ def as_lines(chunks, partials=None):
 
 # pylint: disable=redefined-outer-name
 def cutprefix(s, prefix):
-  ''' Strip a `prefix` from the front of `s`.
+  ''' Remove `prefix` from the front of `s` if present.
       Return the suffix if `s.startswith(prefix)`, else `s`.
+      As with `str.startswith`, `prefix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching prefix from the tuple will be removed.
 
       Example:
 
@@ -1161,15 +1163,30 @@ def cutprefix(s, prefix):
           'abc.def'
           >>> cutprefix(abc_def, '.zzz') is abc_def
           True
+          >>> cutprefix('this_that', ('this', 'thusly'))
+          '_that'
+          >>> cutprefix('thusly_that', ('this', 'thusly'))
+          '_that'
   '''
   if prefix and s.startswith(prefix):
+    if isinstance(prefix, tuple):
+      # a tuple of str
+      for pfx in prefix:
+        if s.startswith(pfx):
+          return s[len(pfx):]
+      # no match, return the original object
+      return s
+    # a str
     return s[len(prefix):]
+  # no match, return the original object
   return s
 
 # pylint: disable=redefined-outer-name
 def cutsuffix(s, suffix):
-  ''' Strip a `suffix` from the end of `s`.
+  ''' Remove `suffix` from the end of `s` if present.
       Return the prefix if `s.endswith(suffix)`, else `s`.
+      As with `str.endswith`, `suffix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching suffix from the tuple will be removed.
 
       Example:
 
@@ -1180,9 +1197,22 @@ def cutsuffix(s, suffix):
           'abc.def'
           >>> cutsuffix(abc_def, '.zzz') is abc_def
           True
+          >>> cutsuffix('this_that', ('that', 'tother'))
+          'this_'
+          >>> cutsuffix('this_tother', ('that', 'tother'))
+          'this_'
   '''
   if suffix and s.endswith(suffix):
+    if isinstance(suffix, tuple):
+      # a tuple of str
+      for sfx in suffix:
+        if s.endswith(sfx):
+          return s[:-len(sfx)]
+      # no match, return the original object
+      return s
+    # a str
     return s[:-len(suffix)]
+  # no match, return the original object
   return s
 
 def common_prefix(*strs):
