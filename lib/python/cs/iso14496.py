@@ -1405,7 +1405,6 @@ class PDINBoxBody(FullBoxBody2):
   ''' A 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
   '''
 
-
   # field names for the tuples in a PDINBoxBody
   PDInfo = BinaryStruct('PDInfo', '>LL', 'rate initial_delay')
 
@@ -1413,13 +1412,6 @@ class PDINBoxBody(FullBoxBody2):
     pass
 
   pdinfo: PDInfoList
-
-  def parse_fields(self, bfr: CornuCopyBuffer, **kw):
-    ''' Gather the normal version information
-        and then the `(rate,initial_delay)` pairs of the data section
-        as the `pdinfo` field.
-    '''
-    super().parse_fields(bfr, **kw)
 
 class ContainerBoxBody(BoxBody):
   ''' Common superclass of several things with `.boxes`.
