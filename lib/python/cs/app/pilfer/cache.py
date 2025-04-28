@@ -471,7 +471,10 @@ class ContentCache(HasFSPath, MultiOpenMixin):
           # remove the old content file if different
           old_content_rpath = old_md.get('content_rpath', '')
           if old_content_rpath and old_content_rpath != content_rpath:
-            pfx_call(os.remove, self.cached_pathto(old_content_rpath))
+            try:
+              pfx_call(os.remove, self.cached_pathto(old_content_rpath))
+            except FileNotFoundError as e:
+              warning("file not present in cache: %s", e)
       return md_map
 
 if __name__ == '__main__':

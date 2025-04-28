@@ -1,0 +1,1 @@
+Bugfix progressbar: fix early return if no active Upd.
