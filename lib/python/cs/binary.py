@@ -982,8 +982,7 @@ class ListOfBinary(list, BinarySingleValue, value_type=Iterable):
     return cls(cls.LIST_ITEM_TYPE.scan(bfr, **scan_kw))
 
   def transcribe(self):
-    for item in self:
-      yield item.transcribe()
+    return self
 
 # TODO: can this just be ListOfBinary above?
 class BinaryListValues(AbstractBinary):
