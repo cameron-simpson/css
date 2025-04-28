@@ -2225,7 +2225,8 @@ def binclass(cls, kw_only=True):
       ''' Parse an instance from `bfr`.
           This default implementation calls `cls(**cls.parse_fields(bfr))`.
       '''
-      fields = cls.parse_fields(bfr)
+      parse_fields = cls.parse_fields
+      fields = trace(parse_fields)(bfr)
       return cls(**fields)
 
     @bcmethod
