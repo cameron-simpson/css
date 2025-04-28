@@ -1714,48 +1714,22 @@ class MDHDBoxBody(FullBoxBody):
         ]
     ).decode('ascii')
 
-class HDLRBoxBody(FullBoxBody):
+@boxbodyclass
+class HDLRBoxBody(FullBoxBody2):
   ''' A HDLRBoxBody is a Handler Reference box - ISO14496 section 8.4.3.
   '''
-
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      pre_defined=UInt32BE,
-      handler_type_long=UInt32BE,
-      reserved1=UInt32BE,
-      reserved2=UInt32BE,
-      reserved3=UInt32BE,
-      name=BinaryUTF8NUL,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `handler_type_long` and `name` fields.
-    '''
-    super().parse_fields(bfr)
-    # NB: handler_type is supposed to be an unsigned long, but in
-    # practice seems to be 4 ASCII bytes, so we present it as a string
-    # for readability
-    self.parse_field('pre_defined', bfr, UInt32BE)
-    self.parse_field('handler_type_long', bfr, UInt32BE)
-    self.parse_field('reserved1', bfr, UInt32BE)
-    self.parse_field('reserved2', bfr, UInt32BE)
-    self.parse_field('reserved3', bfr, UInt32BE)
-    self.parse_field('name', bfr, BinaryUTF8NUL)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.pre_defined
-    yield self.handler_type_long
-    yield self.reserved1
-    yield self.reserved2
-    yield self.reserved3
-    yield self.name
+  pre_defined_: UInt32BE
+  handler_type_long: UInt32BE
+  reserved1_: UInt32BE
+  reserved2_: UInt32BE
+  reserved3_: UInt32BE
+  name: BinaryUTF8NUL
 
   @property
   def handler_type(self):
     ''' The handler_type as an ASCII string, its usual form.
     '''
-    return bytes(self.handler_type_long).decode('ascii')
+    return bytes(self._data.handler_type_long).decode('ascii')
 
 add_body_subclass(ContainerBoxBody, b'minf', '8.4.4', 'Media Information')
 add_body_subclass(FullBoxBody, 'nmhd', '8.4.5.2', 'Null Media Header')
