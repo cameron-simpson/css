@@ -1413,16 +1413,11 @@ class PDINBoxBody(FullBoxBody2):
 
   pdinfo: PDInfoList
 
+@boxbodyclass
 class ContainerBoxBody(BoxBody):
   ''' Common superclass of several things with `.boxes`.
   '''
-
-  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=list)
-
-  @pfx_method
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    super().parse_fields(bfr)
-    self.parse_boxes(bfr)
+  boxes: ListOfBoxes
 
 class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
