@@ -107,7 +107,7 @@ cs.threads ok_revision="89e5900d57041ed26e687c931258fd73ad2fa71b" pypi.release="
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.tty
-cs.typingutils ok_revision="3654853d2facea604cfef62988be6ba53a262166" features={"20230331":["subtype"]} pypi.release="20230331"
+cs.typingutils ok_revision="8cb326b27b27d0423c56586ef5790a29452df154" features={"20230331":["subtype"]} pypi.release="20230331"
 cs.units
 cs.upd ok_revision="37f6ffd00d1c80db5ad1d7d983dbaed669a65613" pypi.release="20250426" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"],"20240216":["without"],"20240412":["without"]}
 cs.urlutils ok_revision="7eeaa1d7ef5d4e82b88e9d614e8646d80a5344e7" pypi.release="20231129"
