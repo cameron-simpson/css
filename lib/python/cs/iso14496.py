@@ -1239,6 +1239,10 @@ class Box(SimpleBinary):
 Box.FIELD_TYPES['parent'] = (False, (type(None), Box))
 BoxBody.FIELD_TYPES['parent'] = Box
 
+class ListOfBoxes(ListOfBinary, item_type=Box):
+  ''' A `ListOfBinary` containing `Box`es.
+  '''
+
 def add_body_subclass(superclass, box_type, section, desc):
   ''' Create and register a new `BoxBody` class that is simply a subclass of
       another.
