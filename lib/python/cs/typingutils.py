@@ -5,7 +5,7 @@
 
 from typing import get_args, get_origin, TypeVar, Union
 
-__version__ = '20250428'
+__version__ = '20250428-post'
 
 DISTINFO = {
     'keywords': ["python3"],
