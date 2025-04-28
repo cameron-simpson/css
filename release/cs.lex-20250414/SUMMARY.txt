@@ -1,0 +1,1 @@
+Obsolete split_remote_path(), supplanted by cs.fs.RemotePath.from_str().

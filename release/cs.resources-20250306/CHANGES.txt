@@ -1,0 +1,1 @@
+lib/python/cs/resources.py: cs.resources: MultiOpenMixin: bugfix yield from __enter_exit__ to return that yielded from startup_shutdown

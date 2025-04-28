@@ -1,0 +1,2 @@
+lib/python/cs/context.py: cs.context: update docstrings for new return from setup_cmgr()
+lib/python/cs/context.py: cs.context: another docstring update for the new return value

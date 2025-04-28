@@ -1,0 +1,1 @@
+ORM.startup_shutdown: make the poll interval 2s instead of 0.2s, which seems a bit aggressive when there's contention.

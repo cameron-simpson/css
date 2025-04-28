@@ -23,7 +23,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.app.osx.spaces import Spaces
-from cs.fs import needdir, scandirtree, shortpath
+from cs.fs import needdir, scandirtree, shortpath, update_linkdir
 from cs.lastvalue import LastValue
 from cs.lex import cutprefix
 from cs.mappings import missingdict
@@ -129,7 +129,7 @@ def update_random_wpdir(
     count: int,
     exts=('.jpg', '.png'),
 ) -> tuple[str, dict[str, str]]:
-  ''' Randomly `count` image paths found in `wppath` matching `words`.
+  ''' Randomly choose `count` image paths found in `wppath` matching `words`.
       Choose a subdirectory of `wplinkdirpath` based on `words`, making it at need.
       Update its contents with symlinks to the chosen paths.
       Return 2-tuple of `(wpsublinkdirpath,namemap)` being the
@@ -161,46 +161,6 @@ def update_random_wpdir(
   return wpsublinkdirpath, update_linkdir(
       wpsublinkdirpath, matchpaths, trim=True
   )
-
-def update_linkdir(linkdirpath: str, paths: Iterable[str], trim=False):
-  ''' Update `linkdirpath` with symlinks to `paths`.
-      Remove unused names if `trim`.
-      Return a mapping of names in `linkdirpath` to absolute forms of `paths`.
-  '''
-  # TODO: deal with paths which conflict by basename
-  # TODO: hard link mode?
-  # TODO: move to cs.fs
-  name_map = {basename(path): abspath(path) for path in paths}
-  for name, linkpath in sorted(name_map.items()):
-    linkpath_short = shortpath(linkpath)
-    namepath = joinpath(linkdirpath, name)
-    namepath_short = shortpath(namepath)
-    try:
-      linksto = os.readlink(namepath)
-    except FileNotFoundError:
-      pass
-    except OSError as e:
-      if e.errno != errno.EINVAL:
-        raise
-      # not a symlink
-      pfx_call(os.remove, namepath)
-    else:
-      if linksto == linkpath:
-        # symlink good, leave it alone
-        continue
-      pfx_call(os.remove, namepath)
-    pfx_call(os.symlink, linkpath, namepath)
-
-  if trim:
-    for name in sorted(os.listdir(linkdirpath)):
-      if name.startswith('.'):
-        continue
-      if name in name_map:
-        continue
-      namepath = joinpath(linkdirpath, name)
-      namepath_short = shortpath(namepath)
-      pfx_call(os.remove, namepath)
-  return name_map
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

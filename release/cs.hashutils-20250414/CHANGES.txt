@@ -1,0 +1,2 @@
+lib/python/cs/hashutils.py: cs.hashutils: define BLAKE3 if we can import blake3
+lib/python/cs/hashutils.py: cs.hashutils: fix docstring typo

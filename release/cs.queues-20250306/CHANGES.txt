@@ -1,0 +1,3 @@
+lib/python/cs/queues.py: cs.queues: QueueIterator: annotate as Iterable[Any]
+lib/python/cs/queues.py: cs.queues: drop obsolete pretence of python 2 support, embrace the f-string, tweak a docstring
+lib/python/cs/queues.py: cs.queues: fix import, update docstrings and warning message

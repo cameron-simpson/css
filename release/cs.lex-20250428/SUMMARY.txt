@@ -1,0 +1,2 @@
+cutprefix,cutsuffix: also accept a tuple of str like str.startswith and str.endswith.
+typed_str: use cropped_repr() instead of repr().

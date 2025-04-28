@@ -163,7 +163,7 @@ do
             image)      set -- rsync -a $rsvopts --delete-after $etc "$src$suffix" "$HOME/$dst$suffix" ;;
             mv)         set -- rsync -a $rsvopts --remove-source-files $etc "$src$suffix" "$HOME/$dst$suffix" ;;
             push)       set -- rsync -a $rsvopts $etc "$src$suffix" "$HOME/$dst$suffix" ;;
-            histbackup) set -- incd "$HOME/$dst" histbackup "$src" . ;;
+            histbackup) set -- incd "$HOME/$dst" histbackup -x --hashindex "$src" . ;;
             *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
                         exit 1
                         ;;

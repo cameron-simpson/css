@@ -1422,7 +1422,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
           Start an interactive database prompt.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     return self.options.calibre.dbshell()
 
   def cmd_decrypt(self, argv):
@@ -1667,7 +1667,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
           List the library preferences.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     xit = 0
     db = self.options.calibre.db
     with db.session() as session:
@@ -1860,7 +1860,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
             options: self.options
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     interact(
         banner=f'{self.cmd}: {options.calibre}',

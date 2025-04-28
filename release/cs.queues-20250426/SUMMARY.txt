@@ -1,0 +1,1 @@
+Fix typing annotation, failing on Python 3.8.

@@ -1,0 +1,5 @@
+lib/python/cs/deco.py: cs.deco: @decorator: bugfix the post decorate attribute update of __name__, __doc__ etc - collect these values _before_ the decoration
+lib/python/cs/deco.py: cs.deco: @promote: update the optional type detection to use cs.typingutils.is_optional
+lib/python/cs/deco.py: cs.deco: Promotable.promote: fall back to calling cls(obj) instead of raising a TypeError - the class init can do that
+lib/python/cs/deco.py: cs.deco: import cs.typingutils for is_optional()
+lib/python/cs/deco.py: cs.deco: @decorator: restore use of functools.update_wrapper as it propagates the function signature

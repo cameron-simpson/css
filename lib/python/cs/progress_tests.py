@@ -4,10 +4,10 @@
 #       - Cameron Simpson <cs@cskk.id.au> 23dec2015
 #
 
-from __future__ import absolute_import
 import time
 import unittest
-from .progress import Progress, DEFAULT_THROUGHPUT_WINDOW
+
+from cs.progress import Progress, DEFAULT_THROUGHPUT_WINDOW
 
 class TestProgress(unittest.TestCase):
   ''' Test `cs.progress.Progress`.

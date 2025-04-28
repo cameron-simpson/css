@@ -188,7 +188,7 @@ class TaggerCommand(BaseCommand):
     if argv:
       dirpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     if not isdirpath(dirpath):
       raise GetoptError("dirpath is not a directory: %r" % (dirpath,))
     tagger = self.tagger_for(dirpath)
@@ -238,7 +238,7 @@ class TaggerCommand(BaseCommand):
     type_name = argv.pop(0)
     with Pfx("type %r", type_name):
       if argv:
-        raise GetoptError("extra arguments: %r" % (argv,))
+        raise GetoptError(f'extra arguments: {argv!r}')
     print(type_name)
     for type_value in tagger.ont_values(type_name):
       ontkey = f"{type_name}.{type_value}"
@@ -266,7 +266,7 @@ class TaggerCommand(BaseCommand):
     if argv:
       dirpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     if not isdirpath(dirpath):
       raise GetoptError("not a directory: %r" % (dirpath,))
     tagger = Tagger(dirpath)
@@ -306,7 +306,7 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing path")
     path = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     tagged = fstags[path]
     changed = True
     while True:

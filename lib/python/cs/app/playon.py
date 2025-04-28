@@ -32,7 +32,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import fmtdoc, promote, Promotable
+from cs.deco import fmtdoc, promote, Promotable, uses_quiet
 from cs.fileutils import atomic_filename
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
@@ -49,6 +49,7 @@ from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
+from cs.rfc2616 import content_length
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.tagset import TagSet
@@ -105,6 +106,15 @@ DEFAULT_FILENAME_FORMAT = (
     '{series_prefix}{series_episode_name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
+# default "ls" output format
+LS_FORMAT = (
+    '{playon.ID} {playon.HumanSize} {resolution}'
+    ' {nice_name} {playon.ProviderID} {status:upper}'
+)
+
+# default "queue" output format
+QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
+
 # download parallelism
 DEFAULT_DL_PARALLELISM = 2
 
@@ -117,16 +127,6 @@ def main(argv=None):
 class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
   '''
-
-  # default "ls" output format
-  LS_FORMAT = (
-      '{playon.ID} {playon.HumanSize} {resolution}'
-      ' {nice_name} {playon.ProviderID} {status:upper}'
-  )
-
-  # default "queue" output format
-  QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
-
   USAGE_KEYWORDS = {
       'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
@@ -202,7 +202,7 @@ class PlayOnCommand(BaseCommand):
           Report account state.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
@@ -215,7 +215,7 @@ class PlayOnCommand(BaseCommand):
       raise GetoptError("missing suburl")
     suburl = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     result = api.suburl_data(suburl)
     pprint(result)
@@ -231,7 +231,7 @@ class PlayOnCommand(BaseCommand):
       raise GetoptError("missing suburl")
     suburl = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     lstate = api.login_state
     pprint(lstate)
@@ -247,6 +247,7 @@ class PlayOnCommand(BaseCommand):
           -o filename_format
                 Format for the new filename, default {DEFAULT_FILENAME_FORMAT!r}.
     '''
+    options = self.options
     api = options.api
     doit = options.doit
     filename_format = options.filename_format
@@ -291,6 +292,7 @@ class PlayOnCommand(BaseCommand):
     '''
     options = self.options
     dl_jobs = options.dl_jobs
+    no_download = options.dry_run
     sqltags = options.sqltags
     if not argv:
       argv = ['pending']
@@ -441,13 +443,14 @@ class PlayOnCommand(BaseCommand):
     ''' Usage: {cmd} [feature_id]
           List features.
     '''
+    options = self.options
     long_mode = options.long_mode
     if argv:
       feature_id = argv.pop(0)
     else:
       feature_id = None
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for feature in sorted(api.features(), key=lambda svc: svc['playon.ID']):
       playon = feature.subtags('playon', as_tagset=True)
@@ -467,11 +470,11 @@ class PlayOnCommand(BaseCommand):
           -o format Format string for each entry.
           Default format: {LS_FORMAT}
     '''
-    return self._list(argv, self.options, ['available'], self.LS_FORMAT)
+    return self._list(argv, self.options, ['available'], LS_FORMAT)
 
   def cmd_poll(self, argv):
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     pprint(api.notifications())
 
@@ -482,7 +485,7 @@ class PlayOnCommand(BaseCommand):
           -o format Format string for each entry.
           Default format: {QUEUE_FORMAT}
     '''
-    return self._list(argv, self.options, ['queued'], self.QUEUE_FORMAT)
+    return self._list(argv, self.options, ['queued'], QUEUE_FORMAT)
 
   cmd_q = cmd_queue
 
@@ -520,7 +523,7 @@ class PlayOnCommand(BaseCommand):
     else:
       service_id = None
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     for service in sorted(api.services(), key=lambda svc: svc['playon.ID']):
       playon = service.subtags('playon')
@@ -849,8 +852,9 @@ class PlayOnSQLTags(SQLTags):
         r = pfx_call(re.compile, r_text, re.I)
         for recording in self:
           pl_tags = recording.subtags('playon')
-          if (pl_tags.Series and r.search(pl_tags.Series)
-              or pl_tags.Name and r.search(pl_tags.Name)):
+          name = getattr(pl_tags, 'Name', '')
+          series = getattr(pl_tags, 'Series', '')
+          if (series and r.search(series)) or (name and r.search(name)):
             recordings.append(recording)
       else:
         # integer recording id
@@ -1139,9 +1143,17 @@ class PlayOnAPI(HTTPServiceAPI):
 
   # pylint: disable=too-many-locals
   @pfx_method
+  @uses_quiet
   @uses_runstate
   @typechecked
-  def download(self, download_id: int, filename=None, *, runstate: RunState):
+  def download(
+      self,
+      download_id: int,
+      filename=None,
+      *,
+      quiet: bool,
+      runstate: RunState,
+  ):
     ''' Download the file with `download_id` to `filename_basis`.
         Return the `TagSet` for the recording.
 
@@ -1177,15 +1189,16 @@ class PlayOnAPI(HTTPServiceAPI):
       dl_rsp = requests.get(
           dl_url, auth=RequestsNoAuth(), cookies=jar, stream=True
       )
-      dl_length = int(dl_rsp.headers['Content-Length'])
-      with pfx_call(atomic_filename, filename, mode='wb') as f:
+      dl_length = content_length(dl_rsp.headers)
+      assert dl_length is not None
+      with pfx_call(atomic_filename, filename, mode='xb') as f:
         for chunk in progressbar(
             dl_rsp.iter_content(chunk_size=131072),
             label=filename,
             total=dl_length,
             units_scale=BINARY_BYTES_SCALE,
             itemlenfunc=len,
-            report_print=True,
+            report_print=not quiet,
         ):
           runstate.raiseif()
           offset = 0

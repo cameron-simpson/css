@@ -1,0 +1,1 @@
+lib/python/cs/tagset.py: cs.tagset: TagFile.save_tagsets: use atomic_filename to write the tag file

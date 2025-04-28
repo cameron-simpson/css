@@ -25,7 +25,7 @@ from cs.lex import (
     cutsuffix,
     get_dotted_identifier,
     is_identifier,
-    tabulate,
+    printt,
 )
 import cs.logutils
 from cs.logutils import debug, error, warning
@@ -178,10 +178,38 @@ class PilferCommand(BaseCommand):
       argv_offset += 1
       return spec, argv_offset
 
-  @popopts(md=('show_md', 'Show metadata.'))
+  @popopts(
+      md=('show_md', 'Show metadata.'),
+      modified=('Only update the cache if the content is modified.')
+  )
   def cmd_cache(self, argv):
+    ''' Usage: {cmd} URLs...
+          Cache the GET content of URLs.
+    '''
+    if not argv:
+      raise GetoptError('missing URs')
+    options = self.options
+    mode = 'modified' if options.modified else 'missing'
+    show_md = options.show_md
+    P = options.pilfer
+    for url in argv:
+      with Pfx("cache %s", url):
+        md_map = P.cache_url(url, mode=mode)
+        if show_md:
+          print(url)
+          for cache_key, md in sorted(md_map.items()):
+            print(" ", cache_key)
+            printt(
+                *[
+                    [f'    {mdk}', pformat(mdv)]
+                    for mdk, mdv in sorted(md.items())
+                ]
+            )
+
+  @popopts(md=('show_md', 'Show metadata.'))
+  def cmd_cacheq(self, argv):
     ''' Usage: {cmd} [cache-keys...]
-          List the URLs associated with the cache keys.
+          Query the URLs associated with the cache keys.
     '''
     options = self.options
     show_md = options.show_md
@@ -192,17 +220,21 @@ class PilferCommand(BaseCommand):
         for cache_key in cache_keys:
           print(cache_key)
           md = cache.get(cache_key, {})
-          for line in tabulate(*((f'  {mdk}', pformat(mdv))
-                                 for mdk, mdv in sorted(md.items()))):
-            print(line)
+          printt(
+              *([f'  {mdk}', pformat(mdv)] for mdk, mdv in sorted(md.items()))
+          )
       else:
-        for line in tabulate(*((cache_key, cache.get(cache_key, {}).get('url'))
-                               for cache_key in cache_keys)):
-          print(line)
+        printt(
+            *(
+                [cache_key, cache.get(cache_key, {}).get('url')]
+                for cache_key in cache_keys
+            )
+        )
 
   @popopts
   def cmd_from(self, argv):
-    ''' Usage: {cmd} source [pipeline-defns..]
+    ''' Usage: {cmd} source [pipeline-defns...]
+          Scrape information from source.
           Source may be a URL or "-" to read URLs from standard input.
     '''
     options = self.options
@@ -325,9 +357,7 @@ class PilferCommand(BaseCommand):
           try:
             mitm_action = pfx_call(import_name, action[:offset])
           except ImportError as e:
-            warning(
-                "cannot import %r: %s", action[:offset], e.msg_without_prefix
-            )
+            warning("cannot import %r: %s", action[:offset], e._)
             bad_actions = True
             continue
         # :params
@@ -353,7 +383,13 @@ class PilferCommand(BaseCommand):
           warning("unparsed text: %r", action[offset:])
           bad_actions = True
           continue
-        pfx_call(mitm_addon.add_action, hook_names, mitm_action, args, kwargs)
+        try:
+          pfx_call(
+              mitm_addon.add_action, hook_names, mitm_action, args, kwargs
+          )
+        except ValueError as e:
+          warning("invalid action spec: %s", e)
+          bad_actions = True
     if bad_actions:
       raise GetoptError("invalid action specifications")
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
@@ -368,10 +404,12 @@ class PilferCommand(BaseCommand):
     P = self.options.pilfer
     xit = 0
     if not argv:
-      for line in tabulate(
-          *[[pattern, str(sitemap)]
-            for pattern, sitemap in self.options.pilfer.sitemaps]):
-        print(line)
+      printt(
+          *[
+              [pattern, str(sitemap)]
+              for pattern, sitemap in self.options.pilfer.sitemaps
+          ]
+      )
     else:
       map_name = argv.pop(0)
       print("map_name", map_name)
@@ -388,11 +426,10 @@ class PilferCommand(BaseCommand):
       else:
         for pattern in sitemap.URL_KEY_PATTERNS:
           (domain_glob, path_re_s), format_s = pattern
-          for line in tabulate(
+          printt(
               ('Format:', format_s),
               ('  Domain:', domain_glob),
               ('  Path RE:', path_re_s),
-          ):
-            print(line)
+          )
 
 sys.exit(main(sys.argv))

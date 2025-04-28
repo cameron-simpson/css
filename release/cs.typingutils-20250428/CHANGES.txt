@@ -1,0 +1,1 @@
+lib/python/cs/typingutils.py: cs.typingutils: new is_optional(annotation) function to recognise Optional[type] annotations, returning type if true, None otherwise

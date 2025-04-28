@@ -1,0 +1,1 @@
+MultiOpenMixin: bugfix yield from __enter_exit__ to return the value yielded from startup_shutdown.

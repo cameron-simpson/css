@@ -1,0 +1,7 @@
+lib/python/cs/rfc2616.py: my email address has changed - update Python code
+lib/python/cs/rfc2616.py: cs.rfc2616,cs.app.pilfer: import fixes
+lib/python/cs/rfc2616.py: cs.rfc2616: new default_headerregistry(), header(headers,name), content_length(headers) and content_type(headers)
+lib/python/cs/rfc2616.py: cs.rfc2616: autoformat
+lib/python/cs/rfc2616.py: cs.rfc2616: module docstring, update DISTINFO
+lib/python/cs/rfc2616.py: cs.rfc2616: remove some debug
+lib/python/cs/rfc2616.py: cs.rfc2616: clean some lint

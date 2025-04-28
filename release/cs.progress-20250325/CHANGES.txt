@@ -1,0 +1,1 @@
+lib/python/cs/progress.py: cs.progress: iterbar: use @uses_runstate, accept a runstate parameter overridable by cancelled param

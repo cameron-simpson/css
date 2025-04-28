@@ -1,0 +1,4 @@
+Mark MappingChain as obsolete.
+New missingdict(factory:Callable[key]) type, like defaultdict but capable of key specific default values.
+New @mapped_property decorator to turn a key-based factory method into a mapping of key->value.
+Now requires Python >= 3.6 (for format strings, already in use previously).

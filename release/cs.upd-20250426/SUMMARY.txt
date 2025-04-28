@@ -1,0 +1,2 @@
+above: bugfix contextif() call.
+run_task: establish a Pfx context around the task, give a name to the ticker Thread.

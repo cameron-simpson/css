@@ -18,7 +18,7 @@ import sys
 
 from cs.gimmicks import warning
 
-__version__ = '20220227-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -93,18 +93,41 @@ def env_no_color(environ=None):
     environ = os.environ
   return 'NO_COLOR' in environ
 
-def colourise(s, colour=None, uncolour=None):
+def colourise(
+    s,
+    colour=None,
+    uncolour=None,
+    colour_padding=False,
+):
   ''' Return a string enclosed in colour-on and colour-off ANSI sequences.
 
+      Parameters:
+      * `s`: the string to colour
       * `colour`: names the desired ANSI colour.
       * `uncolour`: may be used to specify the colour-off colour;
         the default is 'normal' (from `NORMAL_COLOUR`).
+      * `colour_padding`: default `False`; if true colour the entire text,
+        otherwise do not colour the leading and trailing whitespace of each line.
   '''
   if colour is None:
     colour = DEFAULT_HIGHLIGHT
   if uncolour is None:
     uncolour = NORMAL_COLOUR
-  return COLOURS[colour] + s + COLOURS[uncolour]
+  colour_on = COLOURS[colour]
+  colour_off = COLOURS[uncolour]
+  if colour_padding:
+    return colour_on + s + colour_off
+  clines = []
+  for line in s.split("\n"):
+    if line[:1].isspace() or line[-1:].isspace():
+      right = line.lstrip()
+      lpad = line[:-len(right)]
+      middle = right.rstrip()
+      rpad = right[len(middle):]
+      clines.append(lpad + colour_on + middle + colour_off + rpad)
+    else:
+      clines.append(colour_on + line + colour_off)
+  return "\n".join(clines)
 
 def make_pattern(pattern, default_colour=None):
   ''' Convert a `pattern` specification into a `(colour,regexp)` tuple.

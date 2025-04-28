@@ -1,0 +1,4 @@
+lib/python/cs/gimmicks.py: cs.gimmicks: hack for missing io.UnsupportedOperation
+lib/python/cs/gimmicks.py: cs.gimmicks: revert UnsupportedOperation hack, provide direct r() and s() instead of circular cs.lex import
+lib/python/cs/gimmicks.py: cs.gimmicks: move __version__ and DISTINFO up the top, tweak lint
+lib/python/cs/gimmicks.py: cs.gimmicks: fix definition of TimeoutError

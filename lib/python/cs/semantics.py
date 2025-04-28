@@ -36,7 +36,6 @@ def not_closed(func):
           def doit(self):
               ... proceed know we were not closed ...
   '''
-
   if iscoroutinefunction(func):
 
     async def not_closed_wrapper(self, *a, **kw):
@@ -44,7 +43,7 @@ def not_closed(func):
       '''
       if self.closed:
         raise ClosedError(
-            "%s: %s: already closed" % (not_closed_wrapper.__name__, self)
+            f'{not_closed_wrapper.__name__}: {self}: already closed',
         )
       return await func(self, *a, **kw)
 
@@ -55,7 +54,7 @@ def not_closed(func):
       '''
       if self.closed:
         raise ClosedError(
-            "%s: %s: already closed" % (not_closed_wrapper.__name__, self)
+            f'{not_closed_wrapper.__name__}: {self}: already closed',
         )
       return func(self, *a, **kw)
 

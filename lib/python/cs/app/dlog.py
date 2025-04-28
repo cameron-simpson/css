@@ -14,17 +14,19 @@
     which I alias as `dl`, with additional aliases like `HOME` for `dl HOME:`
     and so forth; as short a throwaway line as I can get away with.
     In particular, I use this to make notes about work activity
-    (none of the several time tracking tools I've tried work for me)
+    (none of the several time tracking tools I've tried works for me)
     and things like banking and purchases eg:
 
         dl MYBANK,VENDOR: xfer \\$99 to vendor for widget from bank acct rcpt 1234567
 
     I've got scripts to pull out the work ones for making invoices
-    and an assortment of other scripts (eg my `alert` script) also log via `dlog`.
+    and an assortment of other scripts (eg my `alert` script) also
+    log via `dlog`.
 
     The current incarnation logs to a flat text file (default `~/var/dlog-quick`)
     and to `SQLTags` SQLite database.
-    It has a little daemon mode to reduce contention for the SQLite database too.
+    It has a little daemon mode to reduce contention for the SQLite
+    database too.
 '''
 
 from dataclasses import dataclass, field
@@ -190,7 +192,7 @@ class DLog:
 
   @property
   def dt_s(self):
-    ''' This log entry's local time as a string.
+    ''' The log entry's local time as a string.
     '''
     return datetime.fromtimestamp(self.when).isoformat(
         sep=" ", timespec="seconds"
@@ -242,9 +244,9 @@ class DLog:
       try:
         S = pfx_call(os.stat, pipepath)
       except FileNotFoundError:
-        # no server pipe
-        warning("no pipepath %r", pipepath)
-      except Exception as e:  # pylint: disable=broad-exception-caught
+        # no pipe, fall through
+        pass
+      except OSError as e:
         warning(
             "cannot stat pipepath:%r: %s, falling back to direct log",
             pipepath, e

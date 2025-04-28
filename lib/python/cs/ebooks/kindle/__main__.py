@@ -64,7 +64,7 @@ class KindleCommand(EBooksCommonBaseCommand):
         "content-path should be DEFAULT or an existing directory",
     )
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     if content_path == 'DEFAULT':
       content_path = kindle_content_path()
     if sys.platform == 'darwin':
@@ -82,7 +82,7 @@ class KindleCommand(EBooksCommonBaseCommand):
           Start an interactive database prompt.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     return self.options.kindle.dbshell()
 
   # pylint: disable=too-many-locals
@@ -207,7 +207,7 @@ class KindleCommand(EBooksCommonBaseCommand):
     kindle = options.kindle
     long_mode = options.long_mode
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     runstate = options.runstate
     print(kindle.fspath)
     for subdir_name, kbook in kindle.items():

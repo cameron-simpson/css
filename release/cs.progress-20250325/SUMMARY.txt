@@ -1,0 +1,1 @@
+BaseProgress.iterbar: use @uses_runstate, accept a runstate parameter overridable by the cancelled param.

@@ -1,0 +1,2 @@
+Remove cs.py3 dependency, this module has not worked in python2 for quite a while.
+copy: drop use of positional parameters.

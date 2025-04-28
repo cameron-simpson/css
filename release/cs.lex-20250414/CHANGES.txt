@@ -1,0 +1,2 @@
+lib/python/cs/lex.py: cs.lex: obsolete split_remote_path(), supplanted by cs.fs.RemotePath.from_str()
+lib/python/cs/lex.py: cs.lex: stripped_dedent: docstring tweak

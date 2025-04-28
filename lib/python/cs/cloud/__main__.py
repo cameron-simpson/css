@@ -68,7 +68,7 @@ class CloudCommand(BaseCommand):
           Report the current settings.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     CAF = self.options.cloud_area
     print("Cloud area:")
     print("  cloud", CAF.cloud)

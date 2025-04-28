@@ -37,6 +37,12 @@
     rescan of the source file. I keep a shell alias `mv="fstags mv"`
     so this is routine for me.
 
+    A common "backup to remote" use case of mine is addressed by:
+
+        hashindex rsync src dst
+
+    which rearranges `dst` based on `src`, then uses rsync(1) to update `dst`.
+
     I have a backup script [`histbackup`](https://hg.sr.ht/~cameron-simpson/css/browse/bin/histbackup)
     which works by making a hard link tree of the previous backup
     and `rsync`ing into it.  It has long been subject to huge
@@ -58,7 +64,7 @@
 '''
 
 from collections import defaultdict
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from dataclasses import dataclass
 import errno
 from getopt import GetoptError
@@ -88,17 +94,23 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts, vprint
-from cs.context import contextif, reconfigure_file
+from cs.context import contextif
 from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
-from cs.fs import needdir, shortpath
+from cs.fs import needdir, RemotePath, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
-from cs.lex import r, split_remote_path
+from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, run
 from cs.resources import RunState, uses_runstate
-from cs.upd import above as above_upd, print, run_task  # pylint: disable=redefined-builtin
+from cs.upd import (
+    above as above_upd,
+    print,
+    run_task,  # pylint: disable=redefined-builtin
+    Upd,
+    uses_upd,
+)
 
 __version__ = '20241207-post'
 
@@ -142,18 +154,16 @@ def main(argv=None):
   return HashIndexCommand(argv).run()
 
 class HashIndexCommand(BaseCommand):
-  ''' A tool to generate indices of file content hashcodes
-      and to link or otherwise rearrange files to destinations based
-      on their hashcode.
+  ''' A tool to generate and use indices of file content hashcodes.
   '''
 
-  USAGE_FORMAT = r'''Usage: {cmd} subcommand...
-    Generate or process file content hash listings.'''
   # pylint: disable=use-dict-literal
   USAGE_KEYWORDS = dict(
       HASHNAME_DEFAULT=HASHNAME_DEFAULT,
       OUTPUT_FORMAT_DEFAULT=OUTPUT_FORMAT_DEFAULT,
   )
+
+  SUBCOMMAND_ARGV_DEFAULT = 'ls'
 
   @dataclass
   class Options(BaseCommand.Options):
@@ -188,9 +198,32 @@ class HashIndexCommand(BaseCommand):
       warning(f'{hashname=} not known: {e}')
       yield 1
     else:
-      with fstags:
-        with super().run_context(**kw):
+      with super().run_context(**kw):
+        with fstags:
           yield
+
+  @staticmethod
+  def poppathspec(
+      argv: List[str], name: str = 'dirspec', check_isdir=False
+  ) -> RemotePath:
+    ''' Pop a leading dirspec from `argv`, a filesystem path with
+        an optional leading `[user@]rhost:` prefix.
+        Return a `(host,fspath)` 2-tuple being the remote host (`None` if omitted)
+        and the filesystem path.
+        Raises `GetoptError` on a missing or invalid argument.
+    '''
+    if not argv:
+      raise GetoptError(f'missing {name}')
+    spec = argv.pop(0)
+    with Pfx("%s %r", name, spec):
+      dirspec = RemotePath.from_str(spec)
+      host, fspath = dirspec
+      if host is None:
+        if check_isdir and fspath != '-' and not isdirpath(fspath):
+          raise GetoptError(f'not a directory: {fspath!r}')
+      elif fspath == '-':
+        raise GetoptError(f'remote {fspath!r} not supported')
+    return dirspec
 
   #pylint: disable=too-many-locals
   @uses_runstate
@@ -218,61 +251,25 @@ class HashIndexCommand(BaseCommand):
     elif mode_count > 1:
       warning("only one of -1, -2 or -3 may be provided")
       badopts = True
-    if not argv:
-      warning("missing path1")
-      badopts = True
-      path1spec = None
-    else:
-      path1spec = argv.pop(0)
-      with Pfx("path1 %r", path1spec):
-        path1host, path1dir = split_remote_path(path1spec)
-        if path1host is None:
-          if path1dir != '-':
-            if not isdirpath(path1dir):
-              warning("not a directory")
-              badopts = True
-        elif path1dir == '-':
-          warning('remote "-" not supported')
-          badopts = True
-    if not argv:
-      warning("missing path2")
-      badopts = True
-      path2spec = None
-    else:
-      path2spec = argv.pop(0)
-      with Pfx("path2 %r", path2spec):
-        path2host, path2dir = split_remote_path(path2spec)
-        if path2host is None:
-          if path2dir != '-':
-            if not isdirpath(path2dir):
-              warning("not a directory")
-              badopts = True
-        elif path2dir == '-':
-          warning('remote "-" not supported')
-          badopts = True
+    path1 = self.poppathspec(argv, 'path1')
+    path2 = self.poppathspec(argv, 'path2')
     if argv:
       warning("extra arguments after path2: %r", argv)
       badopts = True
-    if path1spec == '-' and path2spec == '-':
+    if path1 == (None, '-') and path2 == (None, '-'):
       warning('path1 and path2 may not both be "-"')
       badopts = True
     if badopts:
       raise GetoptError('bad arguments')
-    with Pfx("path1 %r", path1spec):
+    with run_task(f'scan {path1}'):
       fspaths1_by_hashcode = defaultdict(list)
-      for hashcode, fspath in hashindex(
-          (path1host, path1dir),
-          relative=relative,
-      ):
+      for hashcode, fspath in hashindex(path1, relative=relative):
         runstate.raiseif()
         if hashcode is not None:
           fspaths1_by_hashcode[hashcode].append(fspath)
-    with Pfx("path2 %r", path2spec):
+    with run_task(f'scan {path2}'):
       fspaths2_by_hashcode = defaultdict(list)
-      for hashcode, fspath in hashindex(
-          (path2host, path2dir),
-          relative=relative,
-      ):
+      for hashcode, fspath in hashindex(path2, relative=relative):
         runstate.raiseif()
         if hashcode is not None:
           fspaths2_by_hashcode[hashcode].append(fspath)
@@ -300,156 +297,198 @@ class HashIndexCommand(BaseCommand):
       r=(
           'relative',
           ''' Emit relative paths in the listing.
-              This requires each path to be a directory.''',
+              This requires each command line path to be a directory.''',
       )
   )
   @uses_runstate
-  def cmd_ls(self, argv, *, runstate: RunState):
+  @uses_upd
+  def cmd_ls(self, argv, *, runstate: RunState, upd: Upd):
     ''' Usage: {cmd} [options...] [[host:]path...]
           Walk filesystem paths and emit a listing.
           The default path is the current directory.
+          In quiet mode (-q) the hash indicies are just updated
+          and nothing is printed.
     '''
     options = self.options
     output_format = options.output_format
+    quiet = options.quiet
     relative = options.relative
     if not argv:
       argv = ['.']
     xit = 0
-    for path in argv:
+    while argv:
       runstate.raiseif()
+      path = self.poppathspec(argv, '[host:]path')
       with Pfx(path):
-        rhost, lpath = split_remote_path(path)
-        if rhost is None:
-          if relative and not isdirpath(path):
+        if path.host is None:
+          if relative and not isdirpath(path.fspath):
             warning("not a directory and -r (relative) specified")
             xit = 1
             continue
-        for h, fspath in hashindex(
-            (rhost, lpath),
-            relative=relative,
-        ):
-          runstate.raiseif()
-          if h is not None:
-            print(output_format.format(hashcode=h, fspath=fspath))
+        current_dirpath = None
+        with run_task("scan") as proxy:
+          for h, fspath in hashindex(path, relative=relative):
+            runstate.raiseif()
+            dirpath = dirname(fspath)
+            if dirpath != current_dirpath:
+              proxy.text = shortpath(dirpath)
+              current_dirpath = dirpath
+            if h is not None:
+              quiet or print(output_format.format(hashcode=h, fspath=fspath))
     return xit
 
   @popopts(
-      mv='move_mode',
-      s='synmlink_mode',
+      ln=('link_mode', 'Hard link files instead of moving them.'),
+      s='symlink_mode',
   )
   @typechecked
   def cmd_rearrange(self, argv):
-    ''' Usage: {cmd} [options...] {{[[user@]host:]refdir|-}} [[user@]rhost:]targetdir [dstdir]
-          Rearrange files from targetdir into dstdir based on their positions in refdir.
-          Other arguments:
-            refdir      The reference directory, which may be local or remote
-                        or "-" indicating that a hash index will be read from
-                        standard input.
-            targetdir   The directory containing the files to be rearranged,
-                        which may be local or remote.
-            dstdir      Optional destination directory for the rearranged files.
-                        Default is the targetdir.
-                        It is taken to be on the same host as targetdir.
+    ''' Usage: {cmd} {{[[user@]host:]refdir|-}} [[user@]rhost:]srcdir [dstdir]
+          Rearrange files from srcdir into dstdir based on their positions in refdir.
+          Arguments:
+            refdir    The reference directory, which may be local or remote
+                      or "-" indicating that a hash index will be read from
+                      standard input.
+            srcdir    The directory containing the files to be rearranged,
+                      which may be local or remote.
+            dstdir    Optional destination directory for the rearranged files.
+                      Default is the srcdir.
     '''
     options = self.options
     badopts = False
     doit = options.doit
-    move_mode = options.move_mode
+    hashname = options.hashname
+    move_mode = not options.link_mode
     quiet = options.quiet
+    verbose = options.verbose or not quiet
     symlink_mode = options.symlink_mode
     if not argv:
       warning("missing refdir")
       badopts = True
-      refdir = None
+    elif argv[0] == '-':
+      argv.pop(0)
+      refdir = None  # read hashindex from standard input
     else:
-      refspec = argv.pop(0)
-      with Pfx("refdir %r", refspec):
-        refhost, refdir = split_remote_path(refspec)
-        if refhost is None:
-          if refdir != '-':
-            if not isdirpath(refdir):
-              warning("not a directory")
-              badopts = True
-        elif refdir == '-':
-          warning('remote "-" not supported')
-          badopts = True
-    if not argv:
-      warning("missing targetdir")
-      badopts = True
-      targetdir = None
-    else:
-      targetspec = argv.pop(0)
-      with Pfx("targetdir %r", targetspec):
-        targethost, targetdir = split_remote_path(targetspec)
-        if targethost is None:
-          if not isdirpath(targetdir):
-            warning("not a directory")
-            badopts = True
+      refdir = self.poppathspec(argv, 'refdir', check_isdir=True)
+    srcdir = self.poppathspec(argv, 'srcdir', check_isdir=True)
     if argv:
-      dstdir = argv.pop(0)
-      with Pfx("dstdir %r", dstdir):
-        if targethost is None and not isdirpath(dstdir):
-          warning("not a directory")
-          badopts = True
+      dstdir = self.poppathspec(argv, 'dstdir', check_isdir=True)
+      if dstdir.host != srcdir.host:
+        warning("srcdir host must be the same as dstdir host")
+        badopts = True
     else:
-      dstdir = targetdir
+      dstdir = srcdir
     if argv:
       warning("extra arguments: %r", argv)
       badopts = True
     if badopts:
       raise GetoptError('bad arguments')
-    # scan the reference directory
-    fspaths_by_hashcode = defaultdict(list)
     xit = 0
-    with run_task(f'hashindex {refspec}'):
-      for hashcode, fspath in hashindex(
-          (refhost, refdir),
-          relative=True,
-      ):
-        if hashcode is not None:
-          fspaths_by_hashcode[hashcode].append(fspath)
-    # rearrange the target directory.
-    with (nullcontext()
-          if refhost or targethost else run_task(f'rearrange {targetspec}')):
-      if targethost is None:
-        with contextif(
-            not quiet,
-            reconfigure_file,
-            sys.stdout,
-            line_buffering=True,
-        ):
-          rearrange(
-              targetdir,
-              fspaths_by_hashcode,
-              dstdir,
-              move_mode=move_mode,
-              symlink_mode=symlink_mode,
-          )
-      else:
-        # prepare the remote input
-        reflines = []
-        for hashcode, fspaths in fspaths_by_hashcode.items():
-          for fspath in fspaths:
-            reflines.append(f'{hashcode} {fspath}\n')
-        input_s = "".join(reflines)
-        xit = run_remote_hashindex(
-            targethost,
-            [
-                'rearrange',
-                not doit and '-n',
-                ('-h', options.hashname),
-                move_mode and '--mv',
-                symlink_mode and '-s',
-                '-',
-                targetdir,
-                dstdir,
-            ],
-            input=input_s,
-            text=True,
-            doit=True,  # we pass -n to the remote hashindex
-            quiet=False,
-        ).returncode
+    if refdir is None:
+      # read hash index from standard input
+      fspaths_by_hashcode = defaultdict(list)
+      for hashcode, fspath in read_hashindex(sys.stdin, hashname=hashname):
+        fspaths_by_hashcode[hashcode].append(fspath)
+    else:
+      # scan the reference directory
+      with run_task(f'scan refdir {refdir}'):
+        fspaths_by_hashcode = hashindex_map(refdir, relative=True)
+    if not fspaths_by_hashcode:
+      quiet or print("no files in refdir, nothing to rearrange")
+      return xit
+    # rearrange the source directory.
+    assert srcdir.host == dstdir.host
+    if srcdir.host is None:
+      # local srcdir and dstdir
+      rearrange(
+          srcdir.fspath,
+          fspaths_by_hashcode,
+          dstdir.fspath,
+          move_mode=move_mode,
+          symlink_mode=symlink_mode,
+          verbose=verbose,
+      )
+    else:
+      # remote srcdir and dstdir
+      xit = remote_rearrange(
+          srcdir.host,
+          srcdir.fspath,
+          dstdir.fspath,
+          fspaths_by_hashcode,
+          move_mode=move_mode,
+          symlink_mode=symlink_mode,
+          verbose=verbose,
+      )
     return xit
+
+  @uses_fstags
+  @popopts(
+      bwlimit_='Rsync bandwidth limit, passed to rsync.',
+      delete='Delete from dstdir, passed to rsync.',
+      partial='Keep partially transferred files, passed to rsync.',
+  )
+  def cmd_rsync(self, argv, *, fstags: FSTags):
+    ''' Usage: {cmd} [options] srcdir dstdir
+          Rearrange dstdir according to srcdir then rsync srcdir into dstdir.
+    '''
+    options = self.options
+    bwlimit = options.bwlimit
+    delete = options.delete
+    doit = options.doit
+    partial = options.partial
+    quiet = options.quiet
+    runstate = options.runstate
+    ssh_exe = options.ssh_exe
+    verbose = options.verbose
+    srcdir = self.poppathspec(argv, 'srcdir', check_isdir=True)
+    dstdir = self.poppathspec(argv, 'dstdir', check_isdir=True)
+    with run_task(f'scan srcdir {srcdir}'):
+      fspaths_by_hashcode = hashindex_map(srcdir, relative=True)
+    xit = 0
+    # rearrange the source directory.
+    with run_task(f'rearrange dstdir {dstdir}'):
+      if dstdir.host is None:
+        # local srcdir and dstdir
+        rearrange(
+            srcdir.fspath,
+            fspaths_by_hashcode,
+            dstdir.fspath,
+            move_mode=True,
+            symlink_mode=False,
+        )
+      else:
+        # remote srcdir and dstdir
+        xit = remote_rearrange(
+            dstdir.host,
+            srcdir.fspath,
+            dstdir.fspath,
+            fspaths_by_hashcode,
+            move_mode=True,
+            symlink_mode=False,
+        )
+    if xit == 0:
+      # rsync source to destination
+      with above_upd():
+        run(
+            [
+                'rsync',
+                not doit and '-n',
+                ('-e', ssh_exe),
+                not quiet and '-i',
+                verbose and '-v',
+                partial and '--partial',
+                bwlimit and ('--bwlimit', bwlimit),
+                doit and not quiet and sys.stderr.isatty() and '--progress',
+                '-ar',
+                delete and '--delete',
+                f'--exclude={fstags.tagsfile_basename}',
+                '--',
+                f'{srcdir}/',
+                f'{dstdir}/',
+            ],
+            doit=True,
+            quiet=quiet,
+        )
 
 @pfx
 @uses_fstags
@@ -503,46 +542,52 @@ def file_checksum(
   return hashcode
 
 @uses_cmd_options(hashname=None)
+@uses_runstate
 def hashindex(
-    fspath: Union[str, TextIOBase, Tuple[Union[None, str], str]],
+    src: Union[TextIOBase, RemotePath, str, Tuple[Union[None, str], str]],
     *,
     hashname: str,
     relative: bool = False,
+    runstate: RunState,
     **kw,
 ) -> Iterable[Tuple[Union[None, BaseHashCode], Union[None, str]]]:
   ''' Generator yielding `(hashcode,filepath)` 2-tuples
-      for the files in `fspath`, which may be a file or directory path.
-      Note that it yields `(None,filepath)` for files which cannot be accessed.
+      for the files in `src`, which may be a file or a `RemotePath`
+      or a `(host,fspath)` 2-tuple or a filesystem path.
+      Note that this yields `(None,filepath)` for files which cannot be accessed.
   '''
-  if isinstance(fspath, TextIOBase):
+  if isinstance(src, TextIOBase):
     # read hashindex from file
-    f = fspath
-    yield from read_hashindex(f, hashname=hashname, **kw)
+    yield from read_hashindex(src, hashname=hashname, **kw)
     return
-  if not isinstance(fspath, str):
-    # should be a 2-tuple
-    if fspath == (None, "-"):
-      yield from read_hashindex(sys.stdin, hashname=hashname, **kw)
-      return
-    rhost, rfspath = fspath
-    if rhost is not None:
-      # a remote fspath
-      yield from read_remote_hashindex(
-          rhost,
-          rfspath,
-          hashname=hashname,
-          relative=relative,
-          **kw,
-      )
-      return
-    # local fspath because rhost is None
-    fspath = rfspath
+  rhost, fspath = RemotePath.promote(src)
+  if rhost is None and fspath == '-':
+    # read hashindex from stdin
+    for item in read_hashindex(sys.stdin, hashname=hashname, **kw):
+      runstate.raiseif()
+      yield item
+    return
+  if rhost is not None:
+    # read hashindex from remote
+    if fspath == '-':
+      raise ValueError("cannot read remote stdin")
+    for item in read_remote_hashindex(
+        rhost,
+        fspath,
+        hashname=hashname,
+        relative=relative,
+        **kw,
+    ):
+      runstate.raiseif()
+      yield item
+    return
   # local hashindex
   if isfilepath(fspath):
     h = file_checksum(fspath, hashname=hashname)
     yield h, fspath
   elif isdirpath(fspath):
     for filepath in dir_filepaths(fspath):
+      runstate.raiseif()
       h = file_checksum(filepath, hashname=hashname)
       yield h, relpath(filepath, fspath) if relative else filepath
   else:
@@ -643,6 +688,7 @@ def read_remote_hashindex(
 
 @fmtdoc
 @uses_cmd_options(hashindex_exe='hashindex')
+@typechecked
 def run_remote_hashindex(
     rhost: str,
     argv,
@@ -670,10 +716,29 @@ def run_remote_hashindex(
         **subp_options,
     )
 
+@uses_cmd_options(hashname=None)
+def hashindex_map(dirpath: str,
+                  *,
+                  hashname: str,
+                  relative=False) -> dict[BaseHashCode, list[str]]:
+  ''' Construct a mapping of hashcodes to filesystem paths
+      by walking `dirpath`.
+  '''
+  fspaths_by_hashcode = defaultdict(list)
+  for hashcode, fspath in hashindex(dirpath, hashname=hashname,
+                                    relative=relative):
+    if hashcode is not None:
+      fspaths_by_hashcode[hashcode].append(fspath)
+  return fspaths_by_hashcode
+
+# TODO: use the functions from cs.fs ?
 @uses_fstags
 def dir_filepaths(dirpath: str, *, fstags: FSTags):
   ''' Generator yielding the filesystem paths of the files in `dirpath`.
   '''
+  if not isdirpath(dirpath):
+    raise ValueError(f'dir_filepaths: not a directory: {dirpath=}')
+  # TODO: use cs.fs.scandirtree (os.walk ignores errors)
   for subdirpath, dirnames, filenames in os.walk(dirpath):
     dirnames[:] = sorted(dirnames)
     for filename in sorted(filenames):
@@ -715,7 +780,7 @@ def dir_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
   )
 
-@uses_cmd_options(doit=True, hashname=None)
+@uses_cmd_options(doit=True, hashname=None, verbose=True)
 @uses_fstags
 @uses_runstate
 @require(
@@ -726,10 +791,11 @@ def dir_remap(
     lambda dstdirpath: dstdirpath is None or isdirpath(dstdirpath),
     'dstdirpath is not a directory'
 )
+@typechecked
 def rearrange(
     srcdirpath: str,
     rfspaths_by_hashcode,
-    dstdirpath=None,
+    dstdirpath: str | None = None,
     *,
     hashname: str,
     move_mode: bool = False,
@@ -737,6 +803,7 @@ def rearrange(
     doit: bool,
     fstags: FSTags,
     runstate: RunState,
+    verbose: bool,
 ):
   ''' Rearrange the files in `dirpath` according to the
       hashcode->[relpaths] `fspaths_by_hashcode`.
@@ -748,13 +815,18 @@ def rearrange(
       * `dstdirpath`: optional target directory for the rearranged files;
         defaults to `srcdirpath`, rearranging the files in place
       * `hashname`: the file content hash algorithm name
-      * `move_move`: move files instead of linking them
+      * `move_mode`: move files instead of linking them
       * `symlink_mode`: symlink files instead of linking them
       * `doit`: if true do the link/move/symlink, otherwise just print
   '''
-  with run_task(f'rearrange {shortpath(srcdirpath)}') as proxy:
-    if dstdirpath is None:
-      dstdirpath = srcdirpath
+  if dstdirpath is None:
+    dstdirpath = srcdirpath
+    task_label = f'rearrange {shortpath(srcdirpath)}'
+  elif dstdirpath == srcdirpath:
+    task_label = f'rearrange {shortpath(srcdirpath)}'
+  else:
+    task_label = f'rearrange {shortpath(srcdirpath)} into {shortpath(dstdirpath)}'
+  with run_task(task_label) as proxy:
     to_remove = set()
     for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode,
                                        hashname=hashname):
@@ -763,6 +835,7 @@ def rearrange(
         continue
       filename = basename(srcpath)
       if filename.startswith('.') or filename == fstags.tagsfile_basename:
+        # skip hidden or fstags files
         continue
       opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
       with Pfx(srcpath):
@@ -776,25 +849,30 @@ def rearrange(
           ##    "rdstpath:%r is not a clean subpath" % (rdstpath,)
           ##)
           if rsrcpath == rdstpath:
+            # already there, skip
             continue
           dstpath = joinpath(dstdirpath, rdstpath)
           if doit:
             needdir(dirname(dstpath), use_makedirs=True, log=warning)
+          # merge the src to the dst
+          # do a real move if there is only one rfspaths
+          # otherwise a link and then a later remove
           try:
             merge(
                 srcpath,
                 dstpath,
                 opname=opname,
                 hashname=hashname,
-                move_mode=False,  # we do our own remove below
+                move_mode=move_mode and len(rfspaths) == 1,
                 symlink_mode=symlink_mode,
                 fstags=fstags,
                 doit=doit,
+                verbose=True,
             )
           except FileExistsError as e:
             warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
           else:
-            if move_mode and rsrcpath not in rfspaths:
+            if move_mode and len(rfspaths) > 1 and rsrcpath not in rfspaths:
               if doit:
                 to_remove.add(srcpath)
     # purge the srcpaths last because we might want them multiple
@@ -802,6 +880,62 @@ def rearrange(
     if doit and to_remove:
       for srcpath in sorted(to_remove):
         pfx_call(os.remove, srcpath)
+
+@fmtdoc
+@uses_cmd_options(
+    doit=True,
+    hashindex_exe=HASHINDEX_EXE_DEFAULT,
+    hashname=HASHNAME_DEFAULT,
+    move_mode=True,
+    quiet=False,
+    symlink_mode=False,
+    verbose=False,
+)
+@typechecked
+def remote_rearrange(
+    rhost: str,
+    srcdir: str,
+    dstdir: str,
+    fspaths_by_hashcode: Mapping[BaseHashCode, List[str]],
+    *,
+    doit: bool,
+    hashindex_exe: str,
+    hashname: str,
+    move_mode: bool,
+    quiet: bool,
+    symlink_mode: bool,
+    verbose: bool,
+):
+  ''' Rearrange a remote directory `srcdir` on `rhost` into `dstdir`
+      on `rhost` according to the hashcode mapping `fspaths_by_hashcode`.
+  '''
+  # remote srcdir and dstdir
+  # prepare the remote input
+  reflines = []
+  for hashcode, fspaths in fspaths_by_hashcode.items():
+    for fspath in fspaths:
+      reflines.append(f'{hashcode} {fspath}\n')
+  input_s = "".join(reflines)
+  return run_remote_hashindex(
+      rhost,
+      [
+          'rearrange',
+          not doit and '-n',
+          ('-h', hashname),
+          quiet and '-q',
+          verbose and '-v',
+          not (move_mode or symlink_mode) and '--ln',
+          symlink_mode and '-s',
+          '-',
+          RemotePath.str(None, srcdir),
+          RemotePath.str(None, dstdir),
+      ],
+      hashindex_exe=hashindex_exe,
+      input=input_s,
+      text=True,
+      doit=True,  # we pass -n to the remote hashindex
+      quiet=False,
+  ).returncode
 
 @pfx
 @uses_fstags
@@ -865,6 +999,7 @@ def merge(
             "# identical content at",
             shortpath(dstpath),
             verbose=verbose,
+            flush=True,
         )
         if doit:
           pfx_call(os.remove, srcpath)

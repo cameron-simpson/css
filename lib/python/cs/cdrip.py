@@ -380,7 +380,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     options.popopts(argv, F_='codecs_spec', n='dry_run')
     disc = self.popdisc(argv, '.')
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     try:
       rip(
           self.device_id,
@@ -404,7 +404,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     '''
     disc = self.popdisc(argv, '.')
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     ##MB = options.mbdb
     ##with stackattrs(MB, dev_info=dev_info):

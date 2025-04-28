@@ -41,10 +41,12 @@ from os.path import splitext
 import sys
 from threading import RLock, Semaphore
 
-from youtube_dl import YoutubeDL
-from youtube_dl.utils import DownloadError
+##from youtube_dl import YoutubeDL
+##from youtube_dl.utils import DownloadError
+from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.excutils import logexc
 from cs.fstags import FSTags
 from cs.logutils import error, warning, LogTime
@@ -103,45 +105,28 @@ class YDLCommand(BaseCommand):
   ''' `ydl` command line implementation.
   '''
 
-  GETOPT_SPEC = 'fj:'
-  USAGE_FORMAT = '''Usage: {cmd} [-f] [-j jobs] {{URLs|-}}...
-    -f      Force download - do not use the cache.
-    -j jobs Number of jobs (downloads) to run in parallel.
-            Default: {DEFAULT_PARALLEL}'''
   USAGE_KEYWORDS = {
       'DEFAULT_PARALLEL': DEFAULT_PARALLEL,
   }
+  SUBCOMMAND_ARGV_DEFAULT = "dl"
 
   @dataclass
   class Options(BaseCommand.Options):
     parallel: int = DEFAULT_PARALLEL
     ydl_opts: dict = field(
-        default_factory=lambda: dict(logger=logging.getLogger())
+        default_factory=lambda: dict(logger=logging.getLogger(),)
     )
 
-  def apply_opts(self, opts):
-    ''' Command line main switches.
-    '''
-    options = self.options
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-f':
-          options.ydl_opts.update(cachedir=False)
-        elif opt == '-j':
-          with Pfx(val):
-            try:
-              options.parallel = int(val)
-            except ValueError as e:
-              # pylint: disable=raise-missing-from
-              raise GetoptError("invalid integer: %s" % (e,))
-            else:
-              if options.parallel < 1:
-                raise GetoptError("must be >= 1")
-        else:
-          raise NotImplementedError("unhandled option: %s=%s" % (opt, val))
+    COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+        f=('force', 'Force download - do not use the cache.'),
+        j=('parallel', 'Number of downloads to run in parallel.', int),
+    )
 
-  def main(self, argv):
-    ''' Command line main programme.
+  @popopts
+  def cmd_dl(self, argv):
+    ''' Usage: {cmd} URLs...
+          Download URLs.
     '''
     if not argv:
       raise GetoptError("missing URLs")

@@ -359,7 +359,7 @@ class FSM(DOTNodeMixin):
         Parameters:
         * `transitions`: optional mapping of *state*->*event*->*state*,
           default `cls.FSM_TRANSITIONS`
-        * `state`: optional current state name, a key of 
+        * `state`: optional current state name, a key of the transitions
         * `sep`: optional separator between "lines", default `'\n'`
         * `graph_name`: optional name for the graph, default the class name
         * `history`: optional event transition history

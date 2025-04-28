@@ -92,8 +92,7 @@ USAGE = '''Usage:
     -A  Automatic. Maintain a port forward to "foo" for each set
         flag PORTFWD_FOO_AUTO.
     -F  Ssh configuration file with clause for target.
-        Default from $PORTFWD_SSH_CONFIG,
-        otherwise ~/.ssh/config-pf, otherwise ~/.ssh/config.
+        Default from $PORTFWD_SSH_CONFIG, otherwise ~/.ssh/config.
     -n  No action. Recite final command.
     -x  Trace execution.
     -v  Verbose. Passed to ssh.
@@ -267,7 +266,7 @@ class Portfwd(FlaggedMixin):
     ''' Initialise the Portfwd.
 
         Parameters:
-        * `target`: the tunnel name, and also the name of the ssh configuration used
+        * `target`: the tunnel name
         * `ssh_config`: ssh configuration file if not the default
         * `conditions`: an iterable of `Condition`s
           which must hold before the tunnel is set up;
@@ -330,35 +329,33 @@ class Portfwd(FlaggedMixin):
   def ssh_argv(self, bare=False):
     ''' An ssh command line argument list.
 
-        `bare`: just to command and options, no trailing "--".
+        Parameters:
+        * `bare`: just the command and options, no trailing "--"
     '''
-    argv = ['ssh']
-    if self.verbose:
-      argv.append('-v')
-    if self.ssh_config:
-      argv.extend(['-F', self.ssh_config])
-    argv.extend(
-        [
-            '-N',
-            '-T',
-            '-o',
-            'ExitOnForwardFailure=yes',
-            '-o',
-            'PermitLocalCommand=yes',
-            '-o',
-            'LocalCommand=' + self.ssh_localcommand,
-        ]
-    )
-    if not bare:
-      argv.extend(['--', self.target])
-    return argv
+    return [
+        'ssh',
+        self.verbose and '-v',
+        self.ssh_config and ('-F', self.ssh_config),
+        '-N',
+        '-T',
+        ('-o', 'ExitOnForwardFailure=yes'),
+        ('-o', 'PermitLocalCommand=yes'),
+        ('-o', f'LocalCommand={self.ssh_localcommand}'),
+        not bare and ('--', self.ssh_clause_name),
+    ]
+
+  @property
+  def ssh_clause_name(self):
+    ''' The name of the ssh clause associated with `self.target`.
+    '''
+    return f'{self.target}-pf'
 
   def get_ssh_options(self):
     ''' Return a defaultdict(list) of `{option: values}`
         representing the ssh configuration.
     '''
     with Pfx("get_ssh_options(%r)", self.target):
-      argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
+      argv = self.ssh_argv(bare=True) + ['-G', '--', self.ssh_clause_name]
       P = pipefrom(argv, quiet=not self.verbose)
       options = defaultdict(list)
       parsed = [line.strip().split(None, 1) for line in P.stdout]
@@ -384,8 +381,7 @@ class Portfwd(FlaggedMixin):
     alert_argv = [
         'alert', '-g', alert_group, '-t', alert_title, '--', alert_message
     ]
-    shcmd = 'exec </dev/null; ' + shq(setflag_argv
-                                      ) + '; ' + shq(alert_argv) + ' &'
+    shcmd = f'exec </dev/null; {shq(setflag_argv)};{shq(alert_argv)} &'
     return shcmd
 
   def on_spawn(self):
@@ -591,9 +587,7 @@ class Portfwds(object):
     '''
     cfg = self._ssh_config
     if cfg is None:
-      cfg = envsub('$HOME/.ssh/config-pf')
-      if not pathexists(cfg):
-        cfg = envsub('$HOME/.ssh/config')
+      cfg = envsub('$HOME/.ssh/config')
     return cfg
 
   def resolve_target_spec(self, spec):

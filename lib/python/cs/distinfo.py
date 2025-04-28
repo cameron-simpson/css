@@ -39,7 +39,7 @@ import tomli_w
 from typeguard import typechecked
 
 from cs.ansi_colour import colourise
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.dateutils import isodate
 from cs.fs import atomic_directory, scandirpaths
@@ -284,7 +284,7 @@ def clean_release_entry(entry):
   lines = list(
       filter(
           lambda line: (
-              line and line != 'Summary:' and not line.
+              line.strip() and line != 'Summary:' and not line.
               startswith('Release information for ')
           ),
           entry.strip().split('\n')
@@ -390,7 +390,7 @@ class Module:
     try:
       M = pfx_call(importlib.import_module, self.name)
     except (ImportError, ModuleNotFoundError) as e:
-      warning("import fails: %s", e.msg_without_prefix)
+      warning("import fails: %s", e._)
       M = None
     except (NameError, SyntaxError) as e:
       warning("import fails: %s", e)
@@ -407,6 +407,11 @@ class Module:
   def isthirdparty(self):
     ''' Test whether this is a third party module.
     '''
+    if self.ismine():
+      return False
+    if hasattr(sys, 'stdlib_module_names'):
+      # what about removed batteries? just not use them?
+      return not self.isstdlib()
     M = self.module
     if M is None:
       return False
@@ -416,11 +421,16 @@ class Module:
   def isstdlib(self):
     ''' Test if this module exists in the stdlib.
     '''
-    if self.ismine():
-      return False
-    if self.isthirdparty():
-      return False
-    return True
+    try:
+      stdlib_module_names = sys.stdlib_module_names
+    except AttributeError:
+      if self.ismine():
+        return False
+      if self.isthirdparty():
+        return False
+      return True
+    else:
+      return self.name.split('.')[0] in stdlib_module_names
 
   @cached_property
   @pfx_method(use_str=True)
@@ -858,11 +868,16 @@ class Module:
         urls=dinfo.pop('urls'),
         classifiers=dinfo.pop('classifiers'),
     )
+    python_version = dinfo.pop('requires_python', None)
+    if python_version is not None:
+      projspec['requires_python'] = python_version
     version = dinfo.pop('version', None)
     if version:
       projspec['version'] = version
     if 'extra_requires' in dinfo:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
+    if 'python_requires' in dinfo:
+      projspec['requires-python'] = dinfo.pop('python_requires')
     package_dir = dinfo.pop('package_dir')
     dinfo_entry_points = dinfo.pop('entry_points', {})
     if dinfo_entry_points:
@@ -1509,17 +1524,23 @@ class CSReleaseCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = ['releases']
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-fqv] subcommand [subcommand-args...]
-      -f  Force. Sanity checks that would stop some actions normally
-          will not prevent them.
       -q  Quiet. Not verbose.
       -v  Verbose.
   '''
 
   @dataclass
   class Options(BaseCommand.Options):
-    cmd: str = 'cs-release'
-    force: bool = False
     release_message: str = None
+
+    COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+        f=(
+            'force',
+            ''' Force. Sanity checks that would stop some actions normally
+                will not prevent them.
+            ''',
+        )
+    )
 
     def stderr_isatty():
       ''' Test whether `sys.stderr` is a tty.
@@ -1644,7 +1665,7 @@ class CSReleaseCommand(BaseCommand):
     else:
       version = pkg.latest.version
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     with pkg.release_dir(vcs, vcstag,
@@ -1663,7 +1684,7 @@ class CSReleaseCommand(BaseCommand):
     if not is_dotted_identifier(pkg_name):
       raise GetoptError("invalid package name: %r" % (pkg_name,))
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = self.options.modules[pkg_name]
     pprint(pkg.compute_distinfo())
 
@@ -1688,7 +1709,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = self.options.modules[pkg_name]
     for files, firstline in pkg.log_since():
       files = [
@@ -1736,7 +1757,7 @@ class CSReleaseCommand(BaseCommand):
     else:
       changeset_hash = None
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     pkg = options.modules[pkg_name]
     if changeset_hash is None:
@@ -1769,7 +1790,7 @@ class CSReleaseCommand(BaseCommand):
     else:
       version = pkg.latest.version
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     with pkg.release_dir(
@@ -1812,30 +1833,35 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = self.options.modules[pkg_name]
     pyproject = pkg.compute_pyproject()
     sys.stdout.write(tomli_w.dumps(pyproject, multiline_strings=True))
 
+  @popopts(
+      a=(
+          'all_class_names',
+          '''' Document all public class members (default is just
+               __new__ and __init__ for the PyPI README.md file).''',
+      ),
+      raw='Do not format output with glow(1) on a tty.',
+  )
   def cmd_readme(self, argv):
     ''' Usage: {cmd} [-a] pkg_name
           Print out the package long_description.
-          -a  Document all public class members (default is just
-              __new__ and __init__ for the PyPI README.md file).
     '''
-    all_class_names = True  ## False
-    if argv and argv[0] == '-a':
-      all_class_names = True
-      argv.pop(0)
+    options = self.options
+    all_class_names = options.all_class_names
+    raw_mode = options.raw
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     pkg = options.modules[pkg_name]
     docs = pkg.compute_doc(all_class_names=all_class_names)
-    if sys.stdout.isatty():
+    if not raw_mode and sys.stdout.isatty():
       with ps_pipeto(['glow', '-', '-p']) as P:
         print(docs.long_description, file=P.stdin)
     else:
@@ -1844,19 +1870,19 @@ class CSReleaseCommand(BaseCommand):
   # pylint: disable=too-many-locals,too-many-return-statements
   # pylint: disable=too-many-branches,too-many-statements
   @uses_upd
+  @popopts(f='force', m_='release_message')
   def cmd_release(self, argv, *, upd):
     ''' Usage: {cmd} [-f] [-m release-message] pkg_name
           Issue a new release for the named package.
     '''
     options = self.options
-    options.popopts(argv, f='force', m_='release_message')
     force = options.force
     release_message = options.release_message
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = options.modules[pkg_name]
     vcs = options.vcs
     # issue new release tag
@@ -2022,7 +2048,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     pkg = self.options.modules[pkg_name]
     setup_cfg = pkg.compute_setup_cfg()
     setup_cfg.write(sys.stdout)
