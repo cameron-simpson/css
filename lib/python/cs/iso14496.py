@@ -1734,25 +1734,11 @@ class HDLRBoxBody(FullBoxBody2):
 add_body_subclass(ContainerBoxBody, b'minf', '8.4.4', 'Media Information')
 add_body_subclass(FullBoxBody, 'nmhd', '8.4.5.2', 'Null Media Header')
 
-class ELNGBoxBody(FullBoxBody):
-  ''' A ELNGBoxBody is a Extended Language Tag box - ISO14496 section 8.4.6.
+@boxbodyclass
+class ELNGBoxBody(FullBoxBody2):
+  ''' A `ELNGBoxBody` is a Extended Language Tag box - ISO14496 section 8.4.6.
   '''
-
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      extended_language=BinaryUTF8NUL,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `extended_language` field.
-    '''
-    super().parse_fields(bfr)
-    # extended language based on RFC4646
-    self.parse_field('extended_language', bfr, BinaryUTF8NUL)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.extended_language
+  extended_language: BinaryUTF8NUL
 
 add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
 
