@@ -2292,22 +2292,10 @@ class CO64BoxBody(FullBoxBody):
   ##    offsets.append(UInt64BE.from_buffer(bfr))
   ##  return offsets
 
-class DREFBoxBody(FullBoxBody):
+@boxbodyclass
+class DREFBoxBody(EntryCountListOfBoxes):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
   '''
-
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      entry_count=UInt32BE,
-      boxes=list,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `entry_count` and `boxes` fields.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('entry_count', bfr, UInt32BE)
-    self.parse_boxes(bfr, count=int(self.entry_count.value))
 
 add_body_subclass(ContainerBoxBody, b'udta', '8.10.1', 'User Data')
 
