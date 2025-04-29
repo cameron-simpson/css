@@ -1794,17 +1794,14 @@ class _SampleEntry(BoxBody):
   reserved_: 6
   data_reference_index: UInt16BE
 
+@boxbodyclass
 class BTRTBoxBody(BoxBody):
   ''' BitRateBoxBody - section 8.5.2.2.
   '''
+  bufferSizeDB: UInt32BE
+  maxBitrate: UInt32BE
+  avgBitRate: UInt32BE
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `bufferSizeDB`, `maxBitrate` and `avgBitrate` fields.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('bufferSizeDB', bfr, UInt32BE)
-    self.parse_field('maxBitrate', bfr, UInt32BE)
-    self.parse_field('avgBitRate', bfr, UInt32BE)
 
 add_body_subclass(
     _SampleTableContainerBoxBody, b'stdp', '8.5.3', 'Degradation Priority'
