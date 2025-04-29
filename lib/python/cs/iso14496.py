@@ -1807,6 +1807,13 @@ add_body_subclass(
     _SampleTableContainerBoxBody, b'stdp', '8.5.3', 'Degradation Priority'
 )
 
+@boxbodyclass
+class STSDBoxBody(BoxBody):
+  ''' A `STSDBoxBody` is a SampleDescriptionBoxBody - ISO14496 section 8.5.2.2.
+  '''
+  reserved_: 6  # 6 8-bit integers
+  data_reference_index: UInt16BE
+
 TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
 
 # pylint: disable=too-many-arguments
