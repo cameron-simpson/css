@@ -2299,16 +2299,11 @@ class DREFBoxBody(EntryCountListOfBoxes):
 
 add_body_subclass(ContainerBoxBody, b'udta', '8.10.1', 'User Data')
 
-class CPRTBoxBody(FullBoxBody):
+class CPRTBoxBody(FullBoxBody2):
   ''' A 'cprt' Copyright box - section 8.10.2.
   '''
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `language` and `notice` fields.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('language_packed', bfr, UInt16BE)
-    self.parse_field('notice', bfr, UTF8or16Field)
+  language_packed: UInt16BE
+  notice: UTF8or16Field
 
   @property
   def language(self):
@@ -2329,7 +2324,7 @@ class CPRTBoxBody(FullBoxBody):
         (ord(ch1) - 0x60) & 0x1f, ((ord(ch2) - 0x60) & 0x1f) << 5,
         ((ord(ch3) - 0x60) & 0x1f) << 10
     )
-    self.language_packed.value = packed
+    self.language_packed = packed
 
 class METABoxBody(FullBoxBody):
   ''' A 'meta' Meta BoxBody - section 8.11.1.
