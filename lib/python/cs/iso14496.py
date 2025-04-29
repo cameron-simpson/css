@@ -1787,16 +1787,12 @@ class EntryCountListOfBoxes(FullBoxBody2):
 class _SampleTableContainerBoxBody(EntryCountListOfBoxes):
   pass
 
+@boxbodyclass
 class _SampleEntry(BoxBody):
   ''' Superclass of Sample Entry boxes.
   '''
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `data_reference_inde` field.
-    '''
-    super().parse_fields(bfr)
-    self.add_field('reserved', bfr.take(6))
-    self.parse_field('data_reference_index', bfr, UInt16BE)
+  reserved_: 6
+  data_reference_index: UInt16BE
 
 class BTRTBoxBody(BoxBody):
   ''' BitRateBoxBody - section 8.5.2.2.
