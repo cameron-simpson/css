@@ -2714,27 +2714,12 @@ class VMHDBoxBody(FullBoxBody2):
   graphicsmode: UInt16BE
   opcolor: OpColor
 
-class SMHDBoxBody(FullBoxBody):
+@boxbodyclass
+class SMHDBoxBody(FullBoxBody2):
   ''' A 'smhd' Sound Media Headerbox - section 12.2.2.
   '''
-
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      balance=Int16BE,
-      reserved=UInt16BE,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `balance` field.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('balance', bfr, Int16BE)
-    self.parse_field('reserved', bfr, UInt16BE)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.balance
-    yield self.reserved
+  balance: Int16BE
+  reserved: UInt16BE
 
 def parse_tags(path, tag_prefix=None):
   ''' Parse the tags from `path`.
