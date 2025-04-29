@@ -2703,29 +2703,16 @@ class ILSTBoxBody(ContainerBoxBody):
           return getattr(self, subbox_attr)
     return super().__getattr__(attr)
 
-class VMHDBoxBody(FullBoxBody):
+OpColor = BinaryStruct('OpColor', '>HHH', 'red green blue')
+
+@boxbodyclass
+class VMHDBoxBody(FullBoxBody2):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
-
   OpColor = BinaryStruct('OpColor', '>HHH', 'red green blue')
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      graphicsmode=UInt16BE,
-      opcolor=OpColor,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `graphicsmode` and `opcolor` fields.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('graphicsmode', bfr, UInt16BE)
-    self.parse_field('opcolor', bfr, VMHDBoxBody.OpColor)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.graphicsmode
-    yield self.opcolor
+  graphicsmode: UInt16BE
+  opcolor: OpColor
 
 class SMHDBoxBody(FullBoxBody):
   ''' A 'smhd' Sound Media Headerbox - section 12.2.2.
