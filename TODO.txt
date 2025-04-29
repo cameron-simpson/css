@@ -1,3 +1,4 @@
+CornuCopyBuffer - is .offset the post buffer size? it should be the logic offset - pre-buffer - but the mp4 parsing suggests that it is not?
 cs.binary as_hexpat() class method for ImHex Hex Editor Hex Patterns, maybe a cs.hexpat modules later
 units - conciser transcribe function names
 cs.progress: @auto_progress - rename to @uses_progress?
