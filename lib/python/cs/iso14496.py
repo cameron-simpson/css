@@ -1840,10 +1840,15 @@ class BTRTBoxBody(BoxBody):
   maxBitrate: UInt32BE
   avgBitRate: UInt32BE
 
+@boxbodyclass
+class STDPBoxBody(FullBoxBody2):
+  ''' A `STDPBoxBody` is a DegradationPriorityBox - ISO14496 section 8.5.3.2.
+  '''
 
-add_body_subclass(
-    _SampleTableContainerBoxBody, b'stdp', '8.5.3', 'Degradation Priority'
-)
+  class PriorityList(ListOfBinary, item_type=UInt16BE):
+    pass
+
+  priority: PriorityList
 
 @boxbodyclass
 class STSDBoxBody(BoxBody):
