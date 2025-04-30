@@ -19,7 +19,7 @@ try:
 except ImportError:
   from typing import ByteString as Buffer
 from contextlib import closing, contextmanager
-from datetime import datetime
+from datetime import datetime, UTC
 from functools import cached_property
 from getopt import getopt, GetoptError
 import os
@@ -66,7 +66,7 @@ from cs.lex import (
     tabulate,
 )
 from cs.logutils import warning, debug
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx_call, pfx_method, XP
 from cs.tagset import TagSet, Tag
 from cs.threads import locked_property, ThreadState
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
@@ -518,12 +518,9 @@ class TimeStampMixin:
                       0xfffffffffffffffe, 0xffffffffffffffff):
       return None
     try:
-      dt = datetime.utcfromtimestamp(self.value)
+      dt = pfx_call(datetime.fromtimestamp, self.value, UTC)
     except (OverflowError, OSError) as e:
-      warning(
-          "%s.datetime: datetime.utcfromtimestamp(%s): %s, returning None",
-          type(self).__name__, self.value, e
-      )
+      warning("%s.datetime: returning None", type(self).__name__, e)
       return None
     return dt.replace(year=dt.year - 66)
 
