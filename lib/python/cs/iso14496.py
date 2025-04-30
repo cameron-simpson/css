@@ -1779,8 +1779,6 @@ class ELNGBoxBody(FullBoxBody2):
   '''
   extended_language: BinaryUTF8NUL
 
-add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
-
 class EntryCountListOfBoxes(FullBoxBody2):
   ''' An intermediate `FullBoxBody` subclass which contains more boxes
       whose number if specified with a leading `entry_count`
@@ -1857,6 +1855,8 @@ class STSDBoxBody(BoxBody):
   '''
   reserved_: 6  # 6 8-bit integers
   data_reference_index: UInt16BE
+
+add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
 
 TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
 
