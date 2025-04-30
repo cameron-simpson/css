@@ -1717,7 +1717,7 @@ class MDHDBoxBody(FullBoxBody):
       timescale=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
       language_short=UInt16BE,
-      pre_defined=UInt16BE,
+      pre_defined_=UInt16BE,
   )
 
   def parse_fields(self, bfr: CornuCopyBuffer):
@@ -1739,7 +1739,7 @@ class MDHDBoxBody(FullBoxBody):
     else:
       raise NotImplementedError(f'unsupported {self.version=}')
     self.parse_field('language_short', bfr, UInt16BE)
-    self.parse_field('pre_defined', bfr, UInt16BE)
+    self.parse_field('pre_defined_', bfr, UInt16BE)
 
   def transcribe(self):
     yield super().transcribe()
@@ -1748,7 +1748,7 @@ class MDHDBoxBody(FullBoxBody):
     yield self.timescale
     yield self.duration
     yield self.language_short
-    yield self.pre_defined
+    yield self.pre_defined_
 
   @property
   def language(self):
