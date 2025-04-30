@@ -2077,9 +2077,13 @@ def binclass(cls, kw_only=True):
       try:
         obj = getattr(data, attr)
       except AttributeError:
-        raise AttributeError(
-            f'{self.__class__.__name__}.{attr}: no entry in the dataclass instance (self._data)'
-        )
+        gsa = super().__getattr__
+        try:
+          return gsa(attr)
+        except AttributeError as e:
+          raise AttributeError(
+              f'{self.__class__.__name__}.{attr}: no entry in the dataclass instance (self._data) or via super().__getattr__'
+          ) from e
       # we have a dataclass instance attribute
       assert isinstance(
           obj, AbstractBinary
