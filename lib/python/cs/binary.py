@@ -962,26 +962,21 @@ class BinaryBytes(
       return cls(obj.transcribe())
     return super().promote(obj)
 
-class ListOfBinary(list, BinarySingleValue, value_type=Iterable):
+class ListOfBinary(list, AbstractBinary):
 
   # the AbstractBinary subclass of the items in the list
   LIST_ITEM_TYPE = None
 
   def __init_subclass__(cls, *, item_type):
-    super().__init_subclass__(value_type=Iterable)
+    super().__init_subclass__()
     cls.LIST_ITEM_TYPE = item_type
-
-  @property
-  def value(self):
-    ''' The `.value` is the list itself.
-    '''
-    return self
 
   @classmethod
   def parse(cls, bfr: CornuCopyBuffer, **scan_kw):
     ''' Scan instances of `cls.LIST_ITEM_TYPE` and return a new instance.
     '''
-    return cls(cls.LIST_ITEM_TYPE.scan(bfr, **scan_kw))
+    self = cls(cls.LIST_ITEM_TYPE.scan(bfr, **scan_kw))
+    return self
 
   def transcribe(self):
     return self
