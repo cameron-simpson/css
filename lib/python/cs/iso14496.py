@@ -1456,6 +1456,7 @@ class ContainerBoxBody(BoxBody):
   '''
   boxes: ListOfBoxes
 
+@boxbodyclass
 class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
       Decode the contained boxes.
