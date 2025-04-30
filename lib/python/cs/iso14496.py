@@ -1272,6 +1272,26 @@ class ListOfBoxes(ListOfBinary, item_type=Box):
   ''' A `ListOfBinary` containing `Box`es.
   '''
 
+  def __str__(self):
+    last_box_type = None
+    last_count = None
+    boxgroups = []
+    for box in self:
+      if last_box_type is None or last_box_type != box.type:
+        if last_box_type is not None:
+          boxgroups.append((box.box_type_s, last_count))
+        last_box_type = box.box_type
+        last_count = 1
+      else:
+        last_count += 1
+    if last_box_type is not None:
+      boxgroups.append((box.box_type_s, last_count))
+    type_listing = ",".join(
+        box_type_s if count == 1 else f'{box_type_s}[{count}]'
+        for box_type_s, count in boxgroups
+    )
+    return f'{self.__class__.__name__}:{len(self)}:{type_listing}'
+
 def add_body_subclass(superclass, box_type, section, desc):
   ''' Create and register a new `BoxBody` class that is simply a subclass of
       another.
