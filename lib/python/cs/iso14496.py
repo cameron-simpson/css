@@ -639,7 +639,7 @@ class BoxBody(SimpleBinary):
     if cls.__name__ == 'BinClass':
       # This came from the BinClass inside the @binclass decorator.
       # Because this subclasses BoxBody (because it subclasses cls, a BoxBody)
-      # we get it when made, before  it gets its __name__.
+      # we get it when made, before it gets its __name__.
       # Skip the registration here.
       pass
     else:
@@ -919,7 +919,7 @@ class Box(SimpleBinary):
     '''
     self = cls()
     header = self.header = BoxHeader.parse(bfr)
-    with Pfx("%s.parse", header.box_type):
+    with Pfx("%s[%s].parse", cls.__name__, header.box_type):
       length = header.box_size
       if length is Ellipsis:
         end_offset = Ellipsis
@@ -1493,8 +1493,8 @@ class MVHDBoxBody(FullBoxBody2):
     # parse the fixed fields from the superclass, FullBoxBody2
     parse_fields = super().parse_fields
     superfields = super()._datafieldtypes
-    ##parse_fields = FullBoxBody2.parse_fields
     field_values = parse_fields(bfr, superfields)
+    ##field_values = super().parse_fields(bfr)
     version = field_values['version'].value
     # obtain box data after version and flags decode
     if version == 0:
@@ -1705,6 +1705,7 @@ add_body_subclass(
 )
 add_body_subclass(ContainerBoxBody, 'mdia', '8.4.1', 'Media')
 
+# TODO: as for MVHD
 class MDHDBoxBody(FullBoxBody):
   ''' A MDHDBoxBody is a Media Header box - ISO14496 section 8.4.2.
   '''
@@ -1825,7 +1826,7 @@ class EntryCountListOfBoxes(FullBoxBody2):
     field_values = parse_fields(bfr, superfields)
     entry_count = cls.ENTRY_COUNT_TYPE.parse_value(bfr)
     field_values.update(boxes=ListOfBoxes.parse(bfr, count=entry_count))
-    self = trace(cls)(**field_values)
+    self = cls(**field_values)
     return self
 
   def transcribe(self):
@@ -2790,6 +2791,7 @@ def parse_tags(path, tag_prefix=None):
             tags = new_tags
           yield box, tags
 
+@parse_offsets
 def parse(o):
   ''' Return the `OverBox` from a source (str, int, bytes, file).
 
