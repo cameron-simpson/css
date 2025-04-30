@@ -1420,31 +1420,14 @@ class FREEBoxBody(BoxBody):
     if free_size > 0:
       yield bytes(free_size)
 
+@boxbodyclass
 class FTYPBoxBody(BoxBody):
   ''' An 'ftyp' File Type box - ISO14496 section 4.3.
       Decode the major_brand, minor_version and compatible_brands.
   '''
-
-  FIELD_TYPES = dict(
-      BoxBody.FIELD_TYPES,
-      major_brand=bytes,
-      minor_version=int,
-      brands_bs=bytes,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer, **kw):
-    ''' Gather the `major_brand`, `minor_version` and `brand_bs` fields.
-    '''
-    super().parse_fields(bfr, **kw)
-    self.major_brand = bfr.take(4)
-    self.minor_version = UInt32BE.parse_value(bfr)
-    self.brands_bs = b''.join(bfr)
-
-  @pfx_method
-  def transcribe(self):
-    yield self.major_brand
-    yield UInt32BE.transcribe_value(self.minor_version)
-    yield self.brands_bs
+  major_brand: 4
+  minor_version: UInt32BE
+  brands_bs: ...
 
   @property
   def compatible_brands(self):
