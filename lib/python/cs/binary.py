@@ -2095,7 +2095,6 @@ def binclass(cls, kw_only=True):
     def __setattr__(self, attr, value):
       ''' Set a data field from `value`.
       '''
-      assert attr != '_dataclass'
       cls = self.__class__
       if attr in cls._datafieldtypes:
         # dataclass attribute
@@ -2226,7 +2225,7 @@ def binclass(cls, kw_only=True):
           This default implementation calls `cls(**cls.parse_fields(bfr))`.
       '''
       parse_fields = cls.parse_fields
-      fields = trace(parse_fields)(bfr)
+      fields = parse_fields(bfr)
       return cls(**fields)
 
     @bcmethod
