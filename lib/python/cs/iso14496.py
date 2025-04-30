@@ -275,6 +275,7 @@ class MP4Command(BaseCommand):
   @popopts(
       with_data='Include the data components of boxes.',
       with_fields='Include a line for each box field.',
+      with_offsets='Include Box and Box body offsets in the dump.',
   )
   def cmd_scan(self, argv):
     ''' Usage: {cmd} [--with-data] [--with-fields] [{{-|filename}} [type_paths...]]
@@ -298,7 +299,11 @@ class MP4Command(BaseCommand):
         seen_paths = {path: False for path in type_paths}
         for topbox in Box.scan(bfr):
           if not type_paths:
-            topbox.dump(recurse=True, dump_fields=options.with_fields)
+            topbox.dump(
+                recurse=True,
+                dump_fields=options.with_fields,
+                dump_offsets=options.with_offsets,
+            )
           else:
             for type_path in type_paths:
               first_match = True
@@ -312,6 +317,7 @@ class MP4Command(BaseCommand):
                   topbox.dump(
                       recurse=True,
                       dump_fields=options.with_fields,
+                      dump_offsets=options.with_offsets,
                       indent='  '
                   )
                 else:
@@ -323,6 +329,7 @@ class MP4Command(BaseCommand):
                     subbox.dump(
                         recurse=True,
                         dump_fields=options.with_fields,
+                        dump_offsets=options.with_offsets,
                         indent='  '
                     )
       if type_paths:
@@ -1139,6 +1146,7 @@ class Box(SimpleBinary):
       indent='',
       subindent='  ',
       dump_fields=False,
+      dump_offsets=False,
       recurse=False,
       file=None
   ) -> List[Tuple[str, str]]:
@@ -1163,12 +1171,14 @@ class Box(SimpleBinary):
       # indent the subrows
       if dump_fields:
         field_indent = row_indent + subindent
-        for field_name in sorted(filter(lambda name: not name.startswith('_'),
-                                        body.__dict__.keys())):
-          if field_name.startswith('_'):
-            continue
-          if field_name == 'boxes' and recurse:
-            continue
+        for field_name in sorted(filter(
+            lambda name: all((
+                not name.startswith('_'),
+                (dump_offsets or name not in ('offset', 'end_offset')),
+                (not recurse or name not in ('boxes',)),
+            )),
+            body.__dict__.keys(),
+        )):
           field = getattr(body, field_name)
           table.append((f'{field_indent}.{field_name}', cropped_repr(field)))
     return table
