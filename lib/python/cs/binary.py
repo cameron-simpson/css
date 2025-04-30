@@ -2045,11 +2045,11 @@ def binclass(cls, kw_only=True):
       cls = self.__class__
       fieldnames = self._field_names
       if len(fieldnames) == 1:
-        return str(getattr(self, fieldnames[0]))
+        return str(getattr(self._data, fieldnames[0]))
       return "%s(%s)" % (
           self.__class__.__name__,
           ",".join(
-              f'{fieldname}={getattr(self,fieldname)}'
+              f'{fieldname}={getattr(self._data,fieldname)}'
               for fieldname in fieldnames
               if not fieldname.endswith('_')
           ),
