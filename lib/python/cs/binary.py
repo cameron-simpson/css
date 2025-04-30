@@ -154,7 +154,7 @@ from typing import (
     Union,
 )
 
-from typeguard import typechecked
+from typeguard import check_type, typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.deco import OBSOLETE, decorator, promote, Promotable, strable
@@ -771,10 +771,11 @@ def is_single_value(obj):
       This currently recognises `BinarySingleValue` instances
       and tuple based `AbstractBinary` instances of length 1.
   '''
-  return True if isinstance(obj, BinarySingleValue) else (
-      tuple.__len__(obj) == 1
-      if isinstance(obj, AbstractBinary) and isinstance(obj, tuple) else False
-  )
+  if isinstance(obj, BinarySingleValue):
+    return True
+  if isinstance(obj, AbstractBinary) and isinstance(obj, tuple):
+    return tuple.__len__(obj) == 1
+  return False
 
 class SimpleBinary(SimpleNamespace, AbstractBinary):
   ''' Abstract binary class based on a `SimpleNamespace`,
@@ -809,19 +810,11 @@ class BinarySingleValue(AbstractBinary, Promotable):
     super().__init_subclass__(**isc_kw)
     cls.VALUE_TYPE = value_type
 
-    @typechecked
-    def init(self, value: value_type):
-      ''' Initialise `self` with `value`.
-
-          This uses `@typeguard` to validate the type of `value` because
-          `isinstance(value,self.__class__.VALUE_TYPE)` raises a type error
-          if the type is a subscripts generic eg `List[Buffer]` etc.
-          Thus the cumbersome shuffle to install an `__init__` with
-          the right type annoation for `value`.
-      '''
-      self.value = value
-
-    cls.__init__ = init
+  def __init__(self, value):
+    ''' Initialise `self` with `value`.
+    '''
+    check_type(value, self.VALUE_TYPE)
+    self.value = value
 
   def __repr__(self):
     return "%s(%r)" % (
@@ -969,29 +962,24 @@ class BinaryBytes(
       return cls(obj.transcribe())
     return super().promote(obj)
 
-class ListOfBinary(list, BinarySingleValue, value_type=Iterable):
+class ListOfBinary(list, AbstractBinary):
 
   # the AbstractBinary subclass of the items in the list
   LIST_ITEM_TYPE = None
 
   def __init_subclass__(cls, *, item_type):
-    super().__init_subclass__(value_type=Iterable)
+    super().__init_subclass__()
     cls.LIST_ITEM_TYPE = item_type
 
-  @property
-  def value(self):
-    ''' The `.value` is the list itself.
-    '''
-    return self
-
+  @classmethod
   def parse(cls, bfr: CornuCopyBuffer, **scan_kw):
     ''' Scan instances of `cls.LIST_ITEM_TYPE` and return a new instance.
     '''
-    return cls(cls.LIST_ITEM_TYPE.scan(bfr, **scan_kw))
+    self = cls(cls.LIST_ITEM_TYPE.scan(bfr, **scan_kw))
+    return self
 
   def transcribe(self):
-    for item in self:
-      yield item.transcribe()
+    return self
 
 # TODO: can this just be ListOfBinary above?
 class BinaryListValues(AbstractBinary):
@@ -2057,11 +2045,11 @@ def binclass(cls, kw_only=True):
       cls = self.__class__
       fieldnames = self._field_names
       if len(fieldnames) == 1:
-        return str(getattr(self, fieldnames[0]))
+        return str(getattr(self._data, fieldnames[0]))
       return "%s(%s)" % (
           self.__class__.__name__,
           ",".join(
-              f'{fieldname}={getattr(self,fieldname)}'
+              f'{fieldname}={getattr(self._data,fieldname)}'
               for fieldname in fieldnames
               if not fieldname.endswith('_')
           ),
@@ -2089,9 +2077,13 @@ def binclass(cls, kw_only=True):
       try:
         obj = getattr(data, attr)
       except AttributeError:
-        raise AttributeError(
-            f'{self.__class__.__name__}.{attr}: no entry in the dataclass instance (self._data)'
-        )
+        gsa = super().__getattr__
+        try:
+          return gsa(attr)
+        except AttributeError as e:
+          raise AttributeError(
+              f'{self.__class__.__name__}.{attr}: no entry in the dataclass instance (self._data) or via super().__getattr__'
+          ) from e
       # we have a dataclass instance attribute
       assert isinstance(
           obj, AbstractBinary
@@ -2103,7 +2095,6 @@ def binclass(cls, kw_only=True):
     def __setattr__(self, attr, value):
       ''' Set a data field from `value`.
       '''
-      assert attr != '_dataclass'
       cls = self.__class__
       if attr in cls._datafieldtypes:
         # dataclass attribute
@@ -2233,7 +2224,8 @@ def binclass(cls, kw_only=True):
       ''' Parse an instance from `bfr`.
           This default implementation calls `cls(**cls.parse_fields(bfr))`.
       '''
-      fields = cls.parse_fields(bfr)
+      parse_fields = cls.parse_fields
+      fields = parse_fields(bfr)
       return cls(**fields)
 
     @bcmethod
