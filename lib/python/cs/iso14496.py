@@ -1071,6 +1071,9 @@ class Box(SimpleBinary):
       box_type_name = box_type_b.decode('ascii')
     except UnicodeDecodeError:
       box_type_name = repr(box_type_b)
+    else:
+      if not all(c.isprintable() for c in box_type_name):
+        box_type_name = repr(box_type_b)
     return box_type_name
 
   @property
