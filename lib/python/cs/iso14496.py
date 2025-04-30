@@ -1164,17 +1164,29 @@ class Box(SimpleBinary):
     for level, box, subboxes in self.walk(limit=(None if recurse else 0)):
       row_indent = indent + subindent * level
       body = box.body
-      table.append(
-          (
-              (
-                  f'{row_indent}{box.box_type_s}:{body.__class__.__name__}',
-                  body.__class__.__doc__.strip().split("\n")[0],
-              ) if dump_fields else (
-                  f'{row_indent}{box.box_type_s}',
-                  cutsuffix(str(body), '()'),
-              )
-          )
-      )
+      if body.__class__ is BoxBody:
+        box_desc = ''
+      else:
+        box_desc = body.__class__.__doc__.strip().split("\n")[0]
+      if dump_fields:
+        table.append(
+            (
+                f'{row_indent}{box.box_type_s}:{body.__class__.__name__}',
+                box_desc,
+            )
+        )
+      else:
+        box_content = str(body)
+        box_content__ = cutsuffix(box_content, '()')
+        if box_content__ is not box_content:
+          if box_desc:
+            box_content = f'{box_content__}: {box_desc}'
+          else:
+            box_content = box_content__
+        table.append((
+            f'{row_indent}{box.box_type_s}',
+            box_content,
+        ))
       # indent the subrows
       if dump_fields:
         field_indent = row_indent + subindent
