@@ -1986,7 +1986,7 @@ def binclass(cls, kw_only=True):
   @decorator
   def bcmethod(func):
     ''' A decorator for a `BinClass` method
-        to look first for a direct override in `cls`
+        to look first for a _direct_ override in `cls.__dict__`
         then to fall back to the `BinClass` method.
 
         Note that this resolution is done at `BinClass` definition
