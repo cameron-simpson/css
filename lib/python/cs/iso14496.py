@@ -297,12 +297,15 @@ class MP4Command(BaseCommand):
       with PARSE_MODE(discard_data=not options.with_data):
         rows = []
         seen_paths = {path: False for path in type_paths}
+        scan_table = []
         for topbox in Box.scan(bfr):
           if not type_paths:
-            topbox.dump(
-                recurse=True,
-                dump_fields=options.with_fields,
-                dump_offsets=options.with_offsets,
+            scan_table.extend(
+                topbox.dump_table(
+                    recurse=True,
+                    dump_fields=options.with_fields,
+                    dump_offsets=options.with_offsets,
+                )
             )
           else:
             for type_path in type_paths:
@@ -314,11 +317,13 @@ class MP4Command(BaseCommand):
                     print(type_path)
                     first_match = False
                     seen_paths[type_path] = True
-                  topbox.dump(
-                      recurse=True,
-                      dump_fields=options.with_fields,
-                      dump_offsets=options.with_offsets,
-                      indent='  '
+                  scan_table.extend(
+                      topbox.dump_table(
+                          recurse=True,
+                          dump_fields=options.with_fields,
+                          dump_offsets=options.with_offsets,
+                          indent='  '
+                      )
                   )
                 else:
                   for subbox in topbox.descendants(tail_types):
@@ -326,17 +331,20 @@ class MP4Command(BaseCommand):
                       print(type_path)
                       first_match = False
                       seen_paths[type_path] = True
-                    subbox.dump(
-                        recurse=True,
-                        dump_fields=options.with_fields,
-                        dump_offsets=options.with_offsets,
-                        indent='  '
+                    scan_table.extend(
+                        subbox.dump_table(
+                            recurse=True,
+                            dump_fields=options.with_fields,
+                            dump_offsets=options.with_offsets,
+                            indent='  '
+                        )
                     )
-      if type_paths:
-        for type_path in type_paths:
-          if not seen_paths[type_path]:
-            warning("no match for %r", type_path)
-            xit = 1
+    printt(*scan_table)
+    if type_paths:
+      for type_path in type_paths:
+        if not seen_paths[type_path]:
+          warning("no match for %r", type_path)
+          xit = 1
     return xit
 
   @popopts(tag_prefix_='Specify the tag prefix, default {TAG_PREFIX!r}.')
