@@ -1777,6 +1777,7 @@ add_body_subclass(FullBoxBody, 'nmhd', '8.4.5.2', 'Null Media Header')
 class ELNGBoxBody(FullBoxBody2):
   ''' A `ELNGBoxBody` is a Extended Language Tag box - ISO14496 section 8.4.6.
   '''
+  # extended language based on RFC4646
   extended_language: BinaryUTF8NUL
 
 class EntryCountListOfBoxes(FullBoxBody2):
@@ -2439,7 +2440,6 @@ class _ILSTTextSchema(
     value_type=str,
 ):
   pass
-
 
 def ILSTTextSchema(attribute_name):
   ''' Attribute name and type for ILST text schema.
