@@ -2637,6 +2637,12 @@ class ILSTBoxBody(ContainerBoxBody):
       }
   }
 
+  # make a mapping of schema long attribute names to (schema_code,schema)
+  SUBBOX_SCHEMA_BY_LONG_ATTRIBUTE = {
+      schema.attribute_name: (schema_code, schema)
+      for schema_code, schema in reversed(SUBBOX_SCHEMA.items())
+  }
+
   def __init__(self, **dcls_fields):
     super().__init__(**dcls_fields)
     self.tags = TagSet()
@@ -2715,18 +2721,20 @@ class ILSTBoxBody(ContainerBoxBody):
 
   def __getattr__(self, attr):
     # see if this is a schema long name
-    for schema_code, schema in self.SUBBOX_SCHEMA.items():
-      if schema.attribute_name == attr:
-        subbox_attr = schema_code.decode('iso8859-1').upper()
-        with Pfx(
-            "%s.%s: schema:%r: self.%s",
-            self.__class__.__name__,
-            attr,
-            schema_code,
-            subbox_attr,
-        ):
-          return getattr(self, subbox_attr)
-    return super().__getattr__(attr)
+    try:
+      schema_code, schema = self.SUBBOX_SCHEMA_BY_LONG_ATTRIBUTE[attr]
+    except KeyError:
+      # not a long attribute name
+      return super().__getattr__(attr)
+    subbox_attr = schema_code.decode('iso8859-1').upper()
+    with Pfx(
+        "%s.%s: schema:%r: self.%s",
+        self.__class__.__name__,
+        attr,
+        schema_code,
+        subbox_attr,
+    ):
+      return getattr(self, subbox_attr)
 
 OpColor = BinaryStruct('OpColor', '>HHH', 'red green blue')
 
