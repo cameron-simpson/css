@@ -2522,6 +2522,7 @@ class _ILSTUTF8Text(BinarySingleValue, value_type=str):
     '''
     return value.encode('utf-8')
 
+@boxbodyclass
 class ILSTBoxBody(ContainerBoxBody):
   ''' Apple iTunes Information List, container for iTunes metadata fields.
 
@@ -2534,12 +2535,6 @@ class ILSTBoxBody(ContainerBoxBody):
 
           https://github.com/sergiomb2/libmp4v2/wiki/iTunesMetadata
   '''
-
-  FIELD_TYPES = dict(
-      ContainerBoxBody.FIELD_TYPES,
-      tags=TagSet,
-  )
-  FIELD_TRANSCRIBERS = dict(tags=lambda _: None,)
 
   # the schema names are available as attributes
   SUBBOX_SCHEMA = {
@@ -2654,10 +2649,8 @@ class ILSTBoxBody(ContainerBoxBody):
       }
   }
 
-  # pylint: disable=attribute-defined-outside-init,too-many-locals
-  # pylint: disable=too-many-statements,too-many-branches
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    super().parse_fields(bfr)
+  def __init__(self, **dcls_fields):
+    super().__init__(**dcls_fields)
     self.tags = TagSet()
     for subbox in self.boxes:
       subbox_type = bytes(subbox.box_type)
