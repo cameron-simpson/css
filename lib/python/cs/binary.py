@@ -771,10 +771,11 @@ def is_single_value(obj):
       This currently recognises `BinarySingleValue` instances
       and tuple based `AbstractBinary` instances of length 1.
   '''
-  return True if isinstance(obj, BinarySingleValue) else (
-      tuple.__len__(obj) == 1
-      if isinstance(obj, AbstractBinary) and isinstance(obj, tuple) else False
-  )
+  if isinstance(obj, BinarySingleValue):
+    return True
+  if isinstance(obj, AbstractBinary) and isinstance(obj, tuple):
+    return tuple.__len__(obj) == 1
+  return False
 
 class SimpleBinary(SimpleNamespace, AbstractBinary):
   ''' Abstract binary class based on a `SimpleNamespace`,
