@@ -2368,43 +2368,34 @@ class CPRTBoxBody(FullBoxBody2):
     )
     self.language_packed = packed
 
-class METABoxBody(FullBoxBody):
+@boxbodyclass
+class METABoxBody(FullBoxBody2):
   ''' A 'meta' Meta BoxBody - section 8.11.1.
   '''
+  theHandler: Box
+  boxes: ListOfBoxes
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      theHandler=Box,
-      boxes=list,
-  )
 
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `theHandler` `Box` and gather the following Boxes as `boxes`.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('theHandler', bfr, Box)
-    ## we don't have a .parent yet - does this break the handler path?
-    ## self.theHandler.parent = self.parent
-    self.parse_boxes(bfr)
 
   @pfx_method
   def __getattr__(self, attr):
-    ''' Present the `ilst` attributes if present.
+    ''' Attributes not found on `self` in the normal way
+        are also looked up on the `.ILST` subbox
+        if there is one.
     '''
-    if attr != 'boxes':
-      try:
-        # direct attribute access
-        return super().__getattr__(attr)
-      except AttributeError as e:
-        # otherwise dereference through the .ilst subbox if present
-        ilst = super().__getattr__('ILST0')
-        if ilst is not None:
-          value = getattr(ilst, attr, None)
-          if value is not None:
-            return value
+    try:
+      # direct attribute access
+      return super().__getattr__(attr)
+    except AttributeError as e:
+      # otherwise dereference through the .ilst subbox if present
+      ilst = super().__getattr__('ILST0')
+      if ilst is not None:
+        value = getattr(ilst, attr, None)
+        if value is not None:
+          return value
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
 class _attr_schema(namedtuple('attributed_schema',
@@ -2437,7 +2428,6 @@ class _ILSTTextSchema(
     value_type=str,
 ):
   pass
-
 
 def ILSTTextSchema(attribute_name):
   ''' Attribute name and type for ILST text schema.
