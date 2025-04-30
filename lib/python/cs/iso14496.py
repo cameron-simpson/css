@@ -1515,15 +1515,10 @@ class MVHDBoxBody(FullBoxBody2):
     field_values.update(
         super().parse_fields(
             bfr,
-            # TODO: just pass a list of field names here
-            dict(
-                rate_long=Int32BE,
-                volume_short=Int16BE,
-                reserved1_=10,
-                matrix=Matrix9Long,
-                predefined1_=24,
-                next_track_id=UInt32BE,
-            )
+            [
+                'rate_long', 'volume_short', 'reserved1_', 'matrix',
+                'predefined1_', 'next_track_id'
+            ],
         )
     )
     return field_values
