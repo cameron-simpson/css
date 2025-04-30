@@ -616,9 +616,6 @@ class BoxBody(SimpleBinary):
   FIELD_TYPES = dict(offset=int, end_offset=int)
   SUBCLASSES_BY_BOXTYPE = {}
 
-  # class based default for .boxes for bodies with no subboxes
-  boxes = ()
-
   @classmethod
   def __init_subclass__(cls, bodyclass_name=None, doc=None):
     super().__init_subclass__()
@@ -711,6 +708,9 @@ class BoxBody(SimpleBinary):
           If there are zero matches, return `None`.
           Otherwise return the matching box.
     '''
+    # .boxes - pretend we have an empty .boxes if missing
+    if attr == 'boxes':
+      return ()
     # .TYPE - the sole item in self.boxes matching b'type'
     if len(attr) == 4 and attr.isupper():
       box, = getattr(self, f'{attr}s')
