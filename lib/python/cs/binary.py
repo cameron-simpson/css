@@ -20,30 +20,20 @@
     * buffer:
       an instance of `cs.buffer.CornuCopyBuffer`,
       which manages an iterable of bytes-like values
-      and has various useful methods;
-      it also has a few factory methods to make one from a variety of sources
-      such as bytes, iterables, binary files, `mmap`ped files,
-      TCP data streams, etc.
+      and has various useful methods for parsing.
     * chunk:
       a piece of binary data obeying the buffer protocol,
+      i.e. a `collections.abc.Buffer`;
       almost always a `bytes` instance or a `memoryview`,
       but in principle also things like `bytearray`.
 
-    There are 5 main classes on which an implementor should base their data structures:
-    * `BinaryStruct`: a factory for classes based
-      on a `struct.struct` format string with multiple values;
-      this also builds a `namedtuple` subclass
-    * `BinarySingleValue`: a base class for subclasses
-      parsing and transcribing a single value
-    * `BinaryMultiValue`: a base class for subclasses
-      parsing and transcribing multiple values
-      with no variation
-    * `SimpleBinary`: a base class for subclasses
-      with custom `.parse` and `.transcribe` methods,
-      for structures with variable fields
+    The `CornuCopyBuffer` is the basis for all parsing, as it manages
+    a variety of input sources such as files, memory, sockets etc.
+    It also has a factory methods to make one from a variety of sources
+    such as bytes, iterables, binary files, `mmap`ped files,
+    TCP data streams, etc.
 
-    Any the classes derived from the above inherit all the methods
-    of `AbstractBinary`.
+    All the binary classes subclass `AbstractBinary`,
     Amongst other things, this means that the binary transcription
     can be had simply from `bytes(instance)`,
     although there are more transcription methods provided
@@ -51,34 +41,155 @@
     It also means that all classes have `parse`* and `scan`* methods
     for parsing binary data streams.
 
+    The `.parse(cls,bfr)` class method reads binary data from a
+    buffer and returns an instance.
+
+    The `.transcribe(self)` method may be a regular function or a
+    generator which returns or yields things which can be transcribed
+    as bytes via the `flatten` function.
+    See the `AbstractBinary.transcribe` docstring for specifics; this might:
+    - return a `bytes`
+    - return an ASCII string
+    - be a generator which yields various values such as bytes,
+      ASCII strings, other `AbstractBinary` instances such as each
+      field (which get transcribed in turn) or an iterable of these
+      things
+
+    There are 6 main ways an implementor might base their data structures:
+    * `BinaryStruct`: a factory for classes based
+      on a `struct.struct` format string with multiple values;
+      this also builds a `namedtuple` subclass
+    * `@binclass`: a dataclass-like specification of a binary structure
+    * `BinarySingleValue`: a base class for subclasses
+      parsing and transcribing a single value, such as `UInt8` or
+      `BinaryUTF8NUL`
+    * `BinaryMultiValue`: a factory for subclasses
+      parsing and transcribing multiple values
+      with no variation
+    * `SimpleBinary`: a base class for subclasses
+      with custom `.parse` and `.transcribe` methods,
+      for structures with variable fields;
+      this makes a `SimpleNamespace` subclass
+
+    These can all be mixed as appropriate to your needs.
+
     You can also instantiate objects directly;
     there's no requirement for the source information to be binary.
 
     There are several presupplied subclasses for common basic types
     such as `UInt32BE` (an unsigned 32 bit big endian integer).
 
-    # Two Examples
+    ## Some Examples
 
-    Here are two examples drawn from `cs.iso14496`.
-    Like all the `Binary*` subclasses, parsing an instance from a
-    stream can be done like this:
-
-        m9 = Matrix9Long.parse(bfr)
-        print("m9.v3", m9.v3)
-
-        edit_list = ELSTBoxBody.parse(bfr)
-        print("edit list: entry_count =", edit_list.entry_count)
-
-    and writing its binary form to a file like this:
-
-        f.write(bytes(m9))
-        f.write(bytes(edit_list))
+    ### A `BinaryStruct`, from `cs.iso14496`
 
     A simple `struct` style definitiion for 9 longs:
 
         Matrix9Long = BinaryStruct(
             'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
         )
+
+    Per the `struct.struct` format string, this parses 9 big endian longs
+    and returns a `namedtuple` with 9 fields.
+    Like all the `AbstractBinary` subclasses, parsing an instance from a
+    stream can be done like this:
+
+        m9 = Matrix9Long.parse(bfr)
+        print("m9.v3", m9.v3)
+
+    and writing its binary form to a file like this:
+
+        f.write(bytes(m9))
+
+    ### A `@binclass`, also from `cs.iso14496`
+
+    For reasons to do with the larger MP4 parser this uses an extra
+    decorator `@boxbodyclass` which is just a shim for the `@binclass`
+    decorator with an addition step.
+
+        @boxbodyclass
+        class FullBoxBody2(BoxBody):
+          """ A common extension of a basic `BoxBody`, with a version and flags field.
+              ISO14496 section 4.2.
+          """
+          version: UInt8
+          flags0: UInt8
+          flags1: UInt8
+          flags2: UInt8
+
+          @property
+          def flags(self):
+            """ The flags value, computed from the 3 flag bytes.
+            """
+            return (self.flags0 << 16) | (self.flags1 << 8) | self.flags2
+
+    This has 4 fields, each an unsigned 8 bit value (one bytes),
+    and a property `.flags` which is the overall flags value for
+    the box header.
+
+    You should look at the source code for the `TKHDBoxBody` from
+    that module for an example of a `@binclass` with a variable
+    collection of fields based on an earlier `version` field value.
+
+    ### A `BinarySingleValue`, the `BSUInt` from thos module
+
+    The `BSUint` transcribes an unsigned integera of arbitrary size
+    as a big endian variable sizes sequence of bytes.
+    I understand this is the same scheme MIDI uses.
+
+    You can define a `BinarySingleValue` with conventional `.parse()`
+    and `.transribe()` methods but it is usually expedient to instead
+    provide `.parse_value()` and `transcribe_value()` methods, which
+    return or transcibe the core value (the unsigned integer in
+    this case).
+
+        class BSUInt(BinarySingleValue, value_type=int):
+          """ A binary serialised unsigned `int`.
+
+              This uses a big endian byte encoding where continuation octets
+              have their high bit set. The bits contributing to the value
+              are in the low order 7 bits.
+          """
+
+          @staticmethod
+          def parse_value(bfr: CornuCopyBuffer) -> int:
+            """ Parse an extensible byte serialised unsigned `int` from a buffer.
+
+                Continuation octets have their high bit set.
+                The value is big-endian.
+
+                This is the go for reading from a stream. If you already have
+                a bare bytes instance then the `.decode_bytes` static method
+                is probably most efficient;
+                there is of course the usual `AbstractBinary.parse_bytes`
+                but that constructs a buffer to obtain the individual bytes.
+            """
+            n = 0
+            b = 0x80
+            while b & 0x80:
+              b = bfr.byte0()
+              n = (n << 7) | (b & 0x7f)
+            return n
+
+          # pylint: disable=arguments-renamed
+          @staticmethod
+          def transcribe_value(n):
+            """ Encode an unsigned int as an entensible byte serialised octet
+                sequence for decode. Return the bytes object.
+            """
+            bs = [n & 0x7f]
+            n >>= 7
+            while n > 0:
+              bs.append(0x80 | (n & 0x7f))
+              n >>= 7
+            return bytes(reversed(bs))
+
+    ### A `BinaryMultiValue`
+
+    A `BinaryMultiValue` s a class factory for making a multi field
+    `AbstractBinary` from variable field descriptions.
+    You're probably better off using `@binclass` these days.
+    See the `BinaryMutliValue` docstring for details and an example.
 
     An MP4 ELST box:
 
@@ -130,8 +241,6 @@
     to collect addition fields for any box.  For this box it collectsa
     32 bit `entry_count` and then a list of that many edit entries.
     The transcription yields corresponding values.
-
-    # Module Contents
 '''
 
 from abc import ABC, abstractmethod, abstractclassmethod
@@ -1986,7 +2095,7 @@ def binclass(cls, kw_only=True):
   @decorator
   def bcmethod(func):
     ''' A decorator for a `BinClass` method
-        to look first for a direct override in `cls`
+        to look first for a _direct_ override in `cls.__dict__`
         then to fall back to the `BinClass` method.
 
         Note that this resolution is done at `BinClass` definition

@@ -1515,15 +1515,10 @@ class MVHDBoxBody(FullBoxBody2):
     field_values.update(
         super().parse_fields(
             bfr,
-            # TODO: just pass a list of field names here
-            dict(
-                rate_long=Int32BE,
-                volume_short=Int16BE,
-                reserved1_=10,
-                matrix=Matrix9Long,
-                predefined1_=24,
-                next_track_id=UInt32BE,
-            )
+            [
+                'rate_long', 'volume_short', 'reserved1_', 'matrix',
+                'predefined1_', 'next_track_id'
+            ],
         )
     )
     return field_values
@@ -1544,7 +1539,8 @@ class MVHDBoxBody(FullBoxBody2):
 
 add_body_subclass(ContainerBoxBody, 'trak', '8.3.1', 'Track')
 
-class TKHDBoxBody(FullBoxBody):
+@boxbodyclass
+class TKHDBoxBody(FullBoxBody2):
   ''' A 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
 
@@ -1552,67 +1548,69 @@ class TKHDBoxBody(FullBoxBody):
       'TKHDMatrix', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
   )
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      creation_time=(True, (TimeStamp32, TimeStamp64)),
-      modification_time=(True, (TimeStamp32, TimeStamp64)),
-      track_id=UInt32BE,
-      reserved1=UInt32BE,
-      duration=(True, (UInt32BE, UInt64BE)),
-      reserved2=UInt32BE,
-      reserved3=UInt32BE,
-      layer=Int16BE,
-      alternate_group=Int16BE,
-      volume=Int16BE,
-      reserved4=UInt16BE,
-      matrix=TKHDMatrix,
-      width=UInt32BE,
-      height=UInt32BE,
-  )
+  creation_time: Union[TimeStamp32, TimeStamp64]
+  modification_time: Union[TimeStamp32, TimeStamp64]
+  track_id: UInt32BE
+  reserved1_: UInt32BE
+  duration: Union[UInt32BE, UInt64BE]
+  reserved2_: UInt32BE
+  reserved3_: UInt32BE
+  layer: Int16BE
+  alternate_group: Int16BE
+  volume: Int16BE
+  reserved4_: UInt16BE
+  matrix: TKHDMatrix
+  width: UInt32BE
+  height: UInt32BE
 
-  def parse_fields(self, bfr: CornuCopyBuffer, **kw):
-    super().parse_fields(bfr, **kw)
+  @classmethod
+  def parse_fields(cls, bfr: CornuCopyBuffer) -> Mapping[str, AbstractBinary]:
+    X("{cls.__name__=} parse_fields")
+    # parse the fixed fields from the superclass, FullBoxBody2
+    parse_fields = super().parse_fields
+    superfields = super()._datafieldtypes
+    field_values = parse_fields(bfr, superfields)
+    ##field_values = super().parse_fields(bfr)
+    version = field_values['version'].value
     # obtain box data after version and flags decode
-    if self.version == 0:
-      self.parse_field('creation_time', bfr, TimeStamp32)
-      self.parse_field('modification_time', bfr, TimeStamp32)
-      self.parse_field('track_id', bfr, UInt32BE)
-      self.parse_field('reserved1', bfr, UInt32BE)
-      self.parse_field('duration', bfr, UInt32BE)
-    elif self.version == 1:
-      self.parse_field('creation_time', bfr, TimeStamp64)
-      self.parse_field('modification_time', bfr, TimeStamp64)
-      self.parse_field('track_id', bfr, UInt32BE)
-      self.parse_field('reserved1', bfr, UInt32BE)
-      self.parse_field('duration', bfr, UInt64BE)
+    if version == 0:
+      field_values.update(
+          super().parse_fields(
+              bfr,
+              dict(
+                  creation_time=TimeStamp32,
+                  modification_time=TimeStamp32,
+                  track_id=UInt32BE,
+                  reserved1_=UInt32BE,
+                  duration=UInt32BE,
+              )
+          )
+      )
+    elif version == 1:
+      field_values.update(
+          super().parse_fields(
+              bfr,
+              dict(
+                  creation_time=TimeStamp64,
+                  modification_time=TimeStamp64,
+                  track_id=UInt32BE,
+                  reserved1_=UInt32BE,
+                  duration=UInt64BE,
+              )
+          )
+      )
     else:
-      raise ValueError(f'TRHD: unsupported {self.version=}')
-    self.parse_field('reserved2', bfr, UInt32BE)
-    self.parse_field('reserved3', bfr, UInt32BE)
-    self.parse_field('layer', bfr, Int16BE)
-    self.parse_field('alternate_group', bfr, Int16BE)
-    self.parse_field('volume', bfr, Int16BE)
-    self.parse_field('reserved4', bfr, UInt16BE)
-    self.parse_field('matrix', bfr, TKHDBoxBody.TKHDMatrix)
-    self.parse_field('width', bfr, UInt32BE)
-    self.parse_field('height', bfr, UInt32BE)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.creation_time
-    yield self.modification_time
-    yield self.track_id
-    yield self.reserved1
-    yield self.duration
-    yield self.reserved2
-    yield self.reserved3
-    yield self.layer
-    yield self.alternate_group
-    yield self.volume
-    yield self.reserved4
-    yield self.matrix
-    yield self.width
-    yield self.height
+      raise ValueError(f'{cls.__name__}: unsupported {version=}')
+    field_values.update(
+        super().parse_fields(
+            bfr,
+            [
+                'reserved2_', 'reserved3_', 'layer', 'alternate_group',
+                'volume', 'reserved4_', 'matrix', 'width', 'height'
+            ],
+        )
+    )
+    return field_values
 
   @property
   def track_enabled(self):
@@ -2371,43 +2369,34 @@ class CPRTBoxBody(FullBoxBody2):
     )
     self.language_packed = packed
 
-class METABoxBody(FullBoxBody):
+@boxbodyclass
+class METABoxBody(FullBoxBody2):
   ''' A 'meta' Meta BoxBody - section 8.11.1.
   '''
+  theHandler: Box
+  boxes: ListOfBoxes
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      theHandler=Box,
-      boxes=list,
-  )
 
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `theHandler` `Box` and gather the following Boxes as `boxes`.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('theHandler', bfr, Box)
-    ## we don't have a .parent yet - does this break the handler path?
-    ## self.theHandler.parent = self.parent
-    self.parse_boxes(bfr)
 
   @pfx_method
   def __getattr__(self, attr):
-    ''' Present the `ilst` attributes if present.
+    ''' Attributes not found on `self` in the normal way
+        are also looked up on the `.ILST` subbox
+        if there is one.
     '''
-    if attr != 'boxes':
-      try:
-        # direct attribute access
-        return super().__getattr__(attr)
-      except AttributeError as e:
-        # otherwise dereference through the .ilst subbox if present
-        ilst = super().__getattr__('ILST0')
-        if ilst is not None:
-          value = getattr(ilst, attr, None)
-          if value is not None:
-            return value
+    try:
+      # direct attribute access
+      return super().__getattr__(attr)
+    except AttributeError as e:
+      # otherwise dereference through the .ilst subbox if present
+      ilst = super().__getattr__('ILST0')
+      if ilst is not None:
+        value = getattr(ilst, attr, None)
+        if value is not None:
+          return value
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
 class _attr_schema(namedtuple('attributed_schema',
@@ -2649,6 +2638,12 @@ class ILSTBoxBody(ContainerBoxBody):
       }
   }
 
+  # make a mapping of schema long attribute names to (schema_code,schema)
+  SUBBOX_SCHEMA_BY_LONG_ATTRIBUTE = {
+      schema.attribute_name: (schema_code, schema)
+      for schema_code, schema in reversed(SUBBOX_SCHEMA.items())
+  }
+
   def __init__(self, **dcls_fields):
     super().__init__(**dcls_fields)
     self.tags = TagSet()
@@ -2727,18 +2722,20 @@ class ILSTBoxBody(ContainerBoxBody):
 
   def __getattr__(self, attr):
     # see if this is a schema long name
-    for schema_code, schema in self.SUBBOX_SCHEMA.items():
-      if schema.attribute_name == attr:
-        subbox_attr = schema_code.decode('iso8859-1').upper()
-        with Pfx(
-            "%s.%s: schema:%r: self.%s",
-            self.__class__.__name__,
-            attr,
-            schema_code,
-            subbox_attr,
-        ):
-          return getattr(self, subbox_attr)
-    return super().__getattr__(attr)
+    try:
+      schema_code, schema = self.SUBBOX_SCHEMA_BY_LONG_ATTRIBUTE[attr]
+    except KeyError:
+      # not a long attribute name
+      return super().__getattr__(attr)
+    subbox_attr = schema_code.decode('iso8859-1').upper()
+    with Pfx(
+        "%s.%s: schema:%r: self.%s",
+        self.__class__.__name__,
+        attr,
+        schema_code,
+        subbox_attr,
+    ):
+      return getattr(self, subbox_attr)
 
 OpColor = BinaryStruct('OpColor', '>HHH', 'red green blue')
 
