@@ -288,6 +288,7 @@ DISTINFO = {
         'cs.lex',
         'cs.pfx',
         'cs.seq',
+        'typeguard',
     ],
     'python_requires':
     '>=3.6',
