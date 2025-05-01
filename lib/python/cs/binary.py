@@ -272,7 +272,7 @@ from cs.lex import cropped, cropped_repr, r, stripped_dedent, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20250501'
+__version__ = '20250501-post'
 
 DISTINFO = {
     'keywords': ["python3"],
