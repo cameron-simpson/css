@@ -33,7 +33,7 @@
     such as bytes, iterables, binary files, `mmap`ped files,
     TCP data streams, etc.
 
-    All the binary classes subclass `AbstractBinary`,
+    All the binary classes subclass `AbstractBinary`.
     Amongst other things, this means that the binary transcription
     can be had simply from `bytes(instance)`,
     although there are more transcription methods provided
@@ -131,9 +131,9 @@
     that module for an example of a `@binclass` with a variable
     collection of fields based on an earlier `version` field value.
 
-    ### A `BinarySingleValue`, the `BSUInt` from thos module
+    ### A `BinarySingleValue`, the `BSUInt` from this module
 
-    The `BSUint` transcribes an unsigned integera of arbitrary size
+    The `BSUint` transcribes an unsigned integer of arbitrary size
     as a big endian variable sizes sequence of bytes.
     I understand this is the same scheme MIDI uses.
 
@@ -189,7 +189,7 @@
     A `BinaryMultiValue` s a class factory for making a multi field
     `AbstractBinary` from variable field descriptions.
     You're probably better off using `@binclass` these days.
-    See the `BinaryMutliValue` docstring for details and an example.
+    See the `BinaryMultiValue` docstring for details and an example.
 
     An MP4 ELST box:
 
@@ -238,8 +238,8 @@
     flavours of edit entry structure and a property to return the
     suitable class based on the version field.  The `parse_fields()`
     method is called from the base `BoxBody` class' `parse()` method
-    to collect addition fields for any box.  For this box it collectsa
-    32 bit `entry_count` and then a list of that many edit entries.
+    to collect addition fields for any box.  For this box it collects
+    a 32 bit `entry_count` and then a list of that many edit entries.
     The transcription yields corresponding values.
 '''
 
@@ -465,7 +465,7 @@ def pt_spec(pt, name=None, value_type=None, as_repr=None, as_str=None):
   return PTValue
 
 class bs(bytes):
-  ''' A `bytes subclass with a compact `repr()`.
+  ''' A `bytes` subclass with a compact `repr()`.
   '''
 
   def __repr__(self):
@@ -1383,9 +1383,10 @@ def BinaryStruct(
 
   assert isinstance(struct_class, type)
   struct_class.__name__ = class_name
+  field_list_s = ",".join(f".{fieldname}" for fieldname in ield_names)
   struct_class.__doc__ = (
       f'''An `AbstractBinary` `namedtuple` which parses and transcribes
-          the struct format `{struct_format!r}` and presents the attributes {field_names!r}.
+          the struct format `{struct_format!r}` and presents the attributes {field_list_s}.
       '''
   )
   struct_class.struct = struct
