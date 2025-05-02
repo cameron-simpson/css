@@ -919,9 +919,11 @@ class Box(SimpleBinary):
 
   @classmethod
   @parse_offsets(report=True)
-  def parse(cls, bfr: CornuCopyBuffer):
+  def parse(cls, bfr: CornuCopyBuffer, body_type_for=None):
     ''' Decode a `Box` from `bfr` and return it.
     '''
+    if body_type_for is None:
+      body_type_for = BoxBody.for_box_type
     self = cls()
     header = self.header = BoxHeader.parse(bfr)
     with Pfx("%s[%s].parse", cls.__name__, header.box_type):
@@ -933,7 +935,7 @@ class Box(SimpleBinary):
       else:
         end_offset = self.offset + length
         bfr_tail = bfr.bounded(end_offset)
-      body_class = BoxBody.for_box_type(header.type)
+      body_class = body_type_for(header.type)
       body_offset = bfr_tail.offset
       self.body = body_class.parse(bfr_tail)
       # attach subBoxen to self
