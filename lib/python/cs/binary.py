@@ -1383,7 +1383,7 @@ def BinaryStruct(
 
   assert isinstance(struct_class, type)
   struct_class.__name__ = class_name
-  field_list_s = ",".join(f".{fieldname}" for fieldname in ield_names)
+  field_list_s = ",".join(f".{fieldname}" for fieldname in field_names)
   struct_class.__doc__ = (
       f'''An `AbstractBinary` `namedtuple` which parses and transcribes
           the struct format `{struct_format!r}` and presents the attributes {field_list_s}.
