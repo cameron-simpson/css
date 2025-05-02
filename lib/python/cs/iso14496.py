@@ -1044,12 +1044,13 @@ class Box(SimpleBinary):
 
   @contextmanager
   def reparse_buffer(self):
-    ''' Context manager for continuing a parse from the `unparsed` field.
+    ''' A context manager for continuing a `Box` parse from the `unparsed` field.
 
         Pops the final `unparsed` field from the `Box`,
-        yields a `CornuCopyBuffer` make from it,
+        yields a `CornuCopyBuffer` made from it,
         then pushes the `unparsed` field again
-        with the remaining contents of the buffer.
+        with the remaining contents of the buffer
+        after the reparse is done.
     '''
     unparsed = self.unparsed
     self.unparsed = []
