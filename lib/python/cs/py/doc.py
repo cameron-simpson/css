@@ -85,7 +85,7 @@ def module_doc(
       if obj_module is not module:
         # name imported from another module
         continue
-      docstring = getattr(obj, '__doc__', '').strip()
+      docstring = (getattr(obj, '__doc__', None) or '').strip()
       if not docstring:
         continue
       line1 = " ".join(
@@ -158,7 +158,7 @@ def module_doc(
                   indent("Usage: " + usage_text, "    "),
               )
           )
-        full_docs.append(doc_item(Mname, f'Class `{classname_etc}', obj_doc))
+        full_docs.append(doc_item(Mname, f'Class `{classname_etc}`', obj_doc))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order

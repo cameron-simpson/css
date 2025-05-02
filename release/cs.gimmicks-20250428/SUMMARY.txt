@@ -1,0 +1,1 @@
+Define Buffer from collections.abc.Buffer, or from typing.ByteString for older Pythons.
