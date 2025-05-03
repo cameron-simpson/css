@@ -323,7 +323,7 @@ class DocSite(SiteMap):
           # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
           (
               None,
-              r'.*(/|\\' + '|\\'.join(CACHE_SUFFIXES),
+              r'.*(/|\\' + '|\\'.join(CACHE_SUFFIXES) + ')',
           ),
           '{__}',
       ),
