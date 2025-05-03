@@ -40,7 +40,8 @@ class URLMatcher(Promotable):
 
   @cached_property
   def url_re(self):
-    return re.compile(self.url_regexp)
+    with Pfx('url_re( %s )', self.url_regexp):
+      return re.compile(self.url_regexp)
 
   @promote
   def match(
