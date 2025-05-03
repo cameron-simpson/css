@@ -436,17 +436,23 @@ class PilferCommand(BaseCommand):
       else:
         warning("not sitemap named %r", map_name)
         return 1
-      if argv:
-        for url in map(URL, argv):
-          print(url)
-          print("  key:", sitemap.url_key(url))
-      else:
+      if not argv:
         for pattern in sitemap.URL_KEY_PATTERNS:
           (domain_glob, path_re_s), format_s = pattern
           printt(
-              ('Format:', format_s),
-              ('  Domain:', domain_glob),
+              ('Domain:', '*' if domain_glob is None else domain_glob),
               ('  Path RE:', path_re_s),
+              ('  Format:', format_s),
           )
+        return 0
+      table = []
+      for url in argv:
+        with Pfx(url):
+          U = URL(url)
+          table.extend((
+              ("URL:", url),
+              ("  key:", sitemap.url_key(url)),
+          ),)
+      printt(*table)
 
 sys.exit(main(sys.argv))
