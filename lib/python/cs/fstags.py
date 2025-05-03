@@ -624,7 +624,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         r='recurse',
     )
     xit = 0
-    paths = argv or ['.']
+    paths = argv or ('.',)
     for path in paths:
       fullpath = realpath(path)
       for fspath in ((fullpath,)
@@ -765,7 +765,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise NotImplementedError("unsupported option")
     xit = 0
-    paths = argv or ['.']
+    paths = argv or ('.',)
     for path in paths:
       fullpath = realpath(path)
       for fspath in ((fullpath,) if directories_like_files else scandirpaths(
@@ -1872,7 +1872,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       *,
       state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ) -> "CachedValue":
-    ''' Return `CachedValue` managing the  `prefix.name` tag.
+    ''' Return a `CachedValue` managing the `prefix.name` tag.
     '''
     return CachedValue(self, prefix, name, state_func=state_func)
 
@@ -2007,7 +2007,7 @@ class TaggedPathSet:
   '''
 
   # the TaggedPaths
-  members: set[TaggedPath]
+  members: Set[TaggedPath]
   # mapping of (tag_name,tag_value) to TaggedPath
   _by_tag_name: Mapping[str, Set[TaggedPath]] = field(
       default_factory=lambda: defaultdict(set)

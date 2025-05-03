@@ -430,7 +430,7 @@ class Module:
         return False
       return True
     else:
-      return self.name in stdlib_module_names
+      return self.name.split('.')[0] in stdlib_module_names
 
   @cached_property
   @pfx_method(use_str=True)
@@ -868,6 +868,9 @@ class Module:
         urls=dinfo.pop('urls'),
         classifiers=dinfo.pop('classifiers'),
     )
+    python_version = dinfo.pop('requires_python', None)
+    if python_version is not None:
+      projspec['requires_python'] = python_version
     version = dinfo.pop('version', None)
     if version:
       projspec['version'] = version

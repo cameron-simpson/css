@@ -134,7 +134,7 @@ class VCS_Hg(VCS):
   def log_entries(self, *revs):
     ''' Return the log entry for the specified revision `rev`.
     '''
-    with trace(self._pipefrom)(
+    with self._pipefrom(
         'log',
         *(('-r', rev) for rev in revs),
         '--template',

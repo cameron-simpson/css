@@ -16,8 +16,9 @@ import traceback
 import typing
 
 from cs.gimmicks import warning
+from cs.typingutils import is_optional
 
-__version__ = '20250306-post'
+__version__ = '20250428-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -25,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks'],
+    'install_requires': ['cs.gimmicks', 'cs.typeutils'],
 }
 
 def ALL(func):
@@ -101,33 +102,39 @@ def decorator(deco):
   def decorate(func, *dargs, **dkwargs):
     ''' Final decoration when we have the function and the decorator arguments.
     '''
-    # decorate func
+    # First, collect the attributes of the function/class before deco() has at it.
+    func_doc = getattr(func, '__doc__', None) or ''
+    func_module = getattr(func, '__module__', None)
+    func_name = getattr(func, '__name__', str(func))
+    # Now decorate func.
     decorated = deco(func, *dargs, **dkwargs)
-    # catch mucked decorators which forget to return the new function
+    # Catch mucked decorators which forget to return the new function.
     assert decorated is not None, (
         "deco:%r(func:%r,...) -> None" % (deco, func)
     )
     if decorated is not func:
       # We got a wrapper function back, pretty up the returned wrapper.
-      # Try functools.update_wrapper, otherwise do stuff by hand.
       try:
-        from functools import update_wrapper  # pylint: disable=import-outside-toplevel
-        update_wrapper(decorated, func)
-      except (AttributeError, ImportError):
+        from functools import update_wrapper
+      except ImportError:
+        pass
+      else:
         try:
-          decorated.__name__ = getattr(func, '__name__', str(func))
+          update_wrapper(decorated, func)
         except AttributeError:
           pass
-        doc = getattr(func, '__doc__', None) or ''
-        try:
-          decorated.__doc__ = doc
-        except AttributeError:
-          warning("cannot set __doc__ on %r", decorated)
-        func_module = getattr(func, '__module__', None)
-        try:
-          decorated.__module__ = func_module
-        except AttributeError:
-          pass
+      try:
+        decorated.__name__ = func_name
+      except AttributeError:
+        pass
+      try:
+        decorated.__doc__ = func_doc
+      except AttributeError:
+        warning("cannot set __doc__ on %r", decorated)
+      try:
+        decorated.__module__ = func_module
+      except AttributeError:
+        pass
     return decorated
 
   def metadeco(*da, **dkw):
@@ -946,14 +953,10 @@ def promote(func, params=None, types=None):
     # recognise optional parameters and use their primary type
     optional = False
     if param.default is not Parameter.empty:
-      anno_origin = typing.get_origin(annotation)
-      anno_args = typing.get_args(annotation)
-      # recognise Optional[T], which becomes Union[T,None]
-      if (anno_origin is typing.Union and len(anno_args) == 2
-          and anno_args[-1] is type(None)):
+      opt_type = is_optional(annotation)
+      if opt_type:
         optional = True
-        annotation, _ = anno_args
-        optional = True
+        annotation = opt_type
     if types is not None and annotation not in types:
       continue
     try:
@@ -1102,6 +1105,5 @@ class Promotable:
       pass
     else:
       return from_type(obj, **from_t_kw)
-    raise TypeError(
-        f'{cls.__name__}.promote: cannot promote {obj.__class__.__name__}:{obj!r}'
-    )
+    # try instantiating the class with obj as its sole argument
+    return cls(obj)

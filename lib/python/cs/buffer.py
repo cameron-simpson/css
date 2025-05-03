@@ -18,11 +18,12 @@ import mmap
 from stat import S_ISREG
 import sys
 from threading import Lock, Thread
+from typing import List
 
 from cs.deco import Promotable
-from cs.gimmicks import r
+from cs.gimmicks import Buffer, r
 
-__version__ = '20250111-post'
+__version__ = '20250428-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -31,9 +32,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
-    'markers': [
-        'python_version>=3.3',  # for os.pread
-    ],
+    'requires_python':
+    '>=3.3',  # for os.pread
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
@@ -395,6 +395,22 @@ class CornuCopyBuffer(Promotable):
     return bfr
 
   @classmethod
+  def from_cli_filespec(cls, filespec: str, **kw):
+    ''' Return a `CornuCopyBuffer` fed from the supplied command
+        line file specification `filespec`.
+
+        If `filespec` is `"-"` return a buffer using `sys.stdin`,
+        otherwise treat it as a filename.
+
+        Note: the use of `sys.stdin` relies on `sys.stdin.fileno()`
+        because we need to do binary reads and `sys.stdin` is
+        normally in text mode.
+    '''
+    if filespec == '-':
+      return cls.from_fd(sys.stdin.fileno(), **kw)
+    return cls.from_filename(filespec, **kw)
+
+  @classmethod
   def from_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Return a `CornuCopyBuffer` fed from the supplied bytes `bs`
         starting at `offset` and ending after `length`.
@@ -620,7 +636,7 @@ class CornuCopyBuffer(Promotable):
     while size < len(self):
       self.extend(size, short_ok=True)
 
-  def takev(self, size, short_ok=False):
+  def takev(self, size, short_ok=False) -> List[Buffer]:
     ''' Return the next `size` bytes as a list of chunks
         (because the internal buffering is also a list of chunks).
         Other arguments are as for `.extend()`.
@@ -633,12 +649,9 @@ class CornuCopyBuffer(Promotable):
       # extend the buffered data
       self.extend(size, short_ok=short_ok)
       # post: the buffer is as big as it is going to get for this call
-    if size is Ellipsis:
+    if size is Ellipsis or size >= self.buflen:
       # take all the fetched data
-      taken = self.bufs
-      self.bufs = []
-    elif size >= self.buflen:
-      # take the whole buffer
+      # which should be all the data because of the .extend() above
       taken = self.bufs
       self.bufs = []
     else:
@@ -993,12 +1006,12 @@ class CornuCopyBuffer(Promotable):
   @classmethod
   def promote(cls, obj):
     ''' Promote `obj` to a `CornuCopyBuffer`,
-        used by the @cs.deco.promote` decorator.
+        used by the `@cs.deco.promote` decorator.
 
         Promotes:
         * `int`: assumed to be a file descriptor of a file open for binary read
         * `str`: assumed to be a filesystem pathname
-        * `bytes` and `bytes`like objects: data
+        * `bytes` and `bytes`like objects (`Buffer`s): binary data
         * has a `.read1` or `.read` method: assume a file open for binary read
         * iterable: assumed to be an iterable of `bytes`like objects
     '''
@@ -1008,7 +1021,7 @@ class CornuCopyBuffer(Promotable):
       return cls.from_fd(obj)
     if isinstance(obj, str):
       return cls.from_filename(obj)
-    if isinstance(obj, (bytes, bytearray, mmap.mmap, memoryview)):
+    if isinstance(obj, Buffer):
       return cls.from_bytes(obj)
     if hasattr(obj, 'read1') or hasattr(obj, 'read'):
       return cls.from_file(obj)

@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: format string fix
+lib/python/cs/cmdutils.py: cs.cmdutils: module docstring tweak

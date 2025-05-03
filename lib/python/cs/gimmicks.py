@@ -6,7 +6,7 @@ Gimmicks and hacks to make some of my other modules more robust and
 less demanding of others.
 '''
 
-__version__ = '20250323-post'
+__version__ = '20250428-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -20,6 +20,11 @@ DISTINFO = {
 
 # pylint: disable=wrong-import-position
 # pylint: disable=unnecessary-lambda-assignment
+
+try:
+  from collections.abc import Buffer
+except ImportError:
+  from typing import ByteString as Buffer
 
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import

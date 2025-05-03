@@ -15,7 +15,7 @@ import struct
 from tempfile import NamedTemporaryFile
 from typing import Tuple
 
-from cs.binary import BinaryMultiStruct, BinarySingleStruct
+from cs.binary import BinaryStruct, BinarySingleStruct
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.fileutils import datafrom
@@ -68,7 +68,7 @@ HEADER_DATA_SZ = HDR_EXTINFO_OFF + HDR_EXTINFO_SZ
 #     uchar       unused;
 # };
 #
-TVWizFileHeader = BinaryMultiStruct(
+TVWizFileHeader = BinaryStruct(
     'TVWizFileHeader',
     '<5HBBBB',
     'hidden1 hidden2 hidden3 hidden4 hidden5 lock media_type in_rec unused',
@@ -86,7 +86,7 @@ TVWizFileHeader = BinaryMultiStruct(
 #    sec
 #    last_offset
 #    followed by 8640 fileOff
-class TVWizTSPoint(BinaryMultiStruct(
+class TVWizTSPoint(BinaryStruct(
     'TVWizTSPoint',
     '<256s256sHHLHHQ',
     'service_name_bs0 event_name_bs0 mod_julian_date pad start last sec last_offset',
