@@ -441,6 +441,7 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
     content_bs = bs().join(takewhile(len, bss))
     method_name = f'content_{pattern_type.lower()}'
     for match in matches:
+      PR("for match", match)
       try:
         content_handler = getattr(match.sitemap, method_name)
       except AttributeError as e:
@@ -487,6 +488,7 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
   if hook_name == 'requestheaders':
     prefetch_flags = rq.headers.pop('x-prefetch', '').strip().split()
     if 'no' in prefetch_flags:
+      print("PREFETCH: has x-prefetch for", rq.url, ":", prefetch_flags)
       flow.x_prefetch_skip = True
   elif hook_name == 'responseheaders':
     if getattr(flow, 'x_prefetch_skip', False):
@@ -741,6 +743,8 @@ class MITMAddon:
 
       else:
         assert len(stream_funcs) > 1
+
+        # TODO: we don't do anything with stream_excs here!
 
         def stream(bs: bytes) -> Iterable[bytes]:
           ''' Run each `bytes` instance through all the stream functions.
