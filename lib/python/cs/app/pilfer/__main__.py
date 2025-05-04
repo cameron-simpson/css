@@ -233,6 +233,29 @@ class PilferCommand(BaseCommand):
         )
 
   @popopts
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd} URL
+          Fetch URL and dump information from it.
+    '''
+    if not argv:
+      raise GteoptError("missing URL")
+    url = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments after URL: {argv!r}')
+    options = self.options
+    P = options.pilfer
+    print(url)
+    U = URL(url)
+    rsp = P.GET(url)
+    printt(
+        ('GET response headers:',),
+        *[
+            (f'  {key}', value) for key, value in
+            sorted(rsp.headers.items(), key=lambda kv: kv[0].lower())
+        ],
+    )
+
+  @popopts
   def cmd_from(self, argv):
     ''' Usage: {cmd} source [pipeline-defns...]
           Scrape information from source.
