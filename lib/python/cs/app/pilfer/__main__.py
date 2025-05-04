@@ -418,41 +418,46 @@ class PilferCommand(BaseCommand):
           With a sitemap name (eg "docs"), list the sitemap.
           WIth additional URLs, print the key for each URL.
     '''
-    P = self.options.pilfer
+    options = self.options
+    P = options.pilfer
     xit = 0
     if not argv:
+      # list site maps
       printt(
           *[
               [pattern, str(sitemap)]
               for pattern, sitemap in self.options.pilfer.sitemaps
           ]
       )
+      return 0
+    # use a particular sitemap
+    map_name = argv.pop(0)
+    print("map_name", map_name)
+    for domain_glob, sitemap in P.sitemaps:
+      if map_name == sitemap.name:
+        break
     else:
-      map_name = argv.pop(0)
-      print("map_name", map_name)
-      for domain_glob, sitemap in P.sitemaps:
-        if map_name == sitemap.name:
-          break
-      else:
-        warning("not sitemap named %r", map_name)
-        return 1
-      if not argv:
-        for pattern in sitemap.URL_KEY_PATTERNS:
-          (domain_glob, path_re_s), format_s = pattern
-          printt(
-              ('Domain:', '*' if domain_glob is None else domain_glob),
-              ('  Path RE:', path_re_s),
-              ('  Format:', format_s),
-          )
-        return 0
-      table = []
-      for url in argv:
-        with Pfx(url):
-          U = URL(url)
-          table.extend((
-              ("URL:", url),
-              ("  key:", sitemap.url_key(url)),
-          ),)
-      printt(*table)
+      warning("no sitemap named %r", map_name)
+      return 1
+    if not argv:
+      # no URLs: recite the site map patterns
+      for pattern in sitemap.URL_KEY_PATTERNS:
+        (domain_glob, path_re_s), format_s = pattern
+        printt(
+            ('Domain:', '*' if domain_glob is None else domain_glob),
+            ('  Path RE:', path_re_s),
+            ('  Format:', format_s),
+        )
+      return 0
+    # match URLs against the sitemap
+    table = []
+    for url in argv:
+      with Pfx(url):
+        U = URL(url)
+        table.extend((
+            ("URL:", url),
+            ("  key:", sitemap.url_key(url)),
+        ),)
+    printt(*table)
 
 sys.exit(main(sys.argv))
