@@ -33,7 +33,7 @@ import shutil
 import stat
 import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
-from threading import Lock, RLock
+from threading import current_thread, Lock, RLock
 import time
 
 from cs.buffer import CornuCopyBuffer
@@ -600,7 +600,7 @@ def makelockfile(
     raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
   lockpath = path + ext
-  with Pfx("makelockfile: %r", lockpath):
+  with Pfx("makelockfile, thread %s: %r", current_thread().name, lockpath):
     while True:
       if runstate.cancelled:
         warning(
@@ -640,6 +640,10 @@ def makelockfile(
         time.sleep(sleep_for)
         continue
       else:
+        os.write(
+            lockfd,
+            b'pid %d Thread %r\n' % (os.getpid(), current_thread().name)
+        )
         break
     if keepopen:
       return lockpath, lockfd
