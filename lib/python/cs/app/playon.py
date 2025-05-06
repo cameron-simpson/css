@@ -343,7 +343,15 @@ class PlayOnCommand(BaseCommand):
               recording.ls()
             else:
               sem.acquire()  # pylint: disable=consider-using-with
-              Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
+              Rs.append(
+                  bg_result(
+                      _dl,
+                      dl_id,
+                      sem,
+                      _extra=dict(dl_id=dl_id),
+                      _name=f'playon dl {dl_id} {recording.name}',
+                  )
+              )
 
     if Rs:
       for R in report_results(Rs):
