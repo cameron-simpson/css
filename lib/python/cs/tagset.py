@@ -2342,7 +2342,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
           }
 
       in its class definition. Accesses to `artist.`* entities would
-      result in `ArtistTagSet` instances and access to other enitities
+      result in `ArtistTagSet` instances and access to other entities
       would result in ordinary `TagSet` instances.
   '''
 
@@ -3623,8 +3623,8 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
                   )
               )
               f.write('\n')
-      except OSError as e:
-        error("save_tagsets(%r) fails: %s", filepath, e)
+      except PermissionsError as e:
+        warning("save_tagsets(%r) fails: %s", filepath, e)
 
   def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.
