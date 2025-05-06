@@ -321,8 +321,8 @@ class PlayOnCommand(BaseCommand):
       with Pfx(arg):
         recording_ids = sqltags.recording_ids_from_str(arg)
         if not recording_ids:
-          warning("no recording ids")
-          xit = 1
+          if sys.stderr.isatty():
+            warning("no recording ids")
           continue
         for dl_id in recording_ids:
           recording = sqltags[dl_id]
