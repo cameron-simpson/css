@@ -396,8 +396,8 @@ class DockerRun:
     for inbase, infspath in self.input_map.items():
       mnt = joinpath(self.input_root, inbase)
       with Pfx("%r->%r", mnt, infspath):
-        docker_argv.extend(
-            [
+        docker_argv.append(
+            (
                 '--mount',
                 mount_escape(
                     'type=bind',
@@ -405,18 +405,18 @@ class DockerRun:
                     f'source={infspath}',
                     f'destination={mnt}',
                 ),
-            ]
+            ),
         )
     # mount the output directory
-    docker_argv.extend(
-        [
+    docker_argv.append(
+        (
             '--mount',
             mount_escape(
                 'type=bind',
                 f'source={abspath(self.output_hostdir)}',
                 f'destination={self.output_root}',
             ),
-        ]
+        ),
     )
     # if any named outputs exist, mount them inside /output
     for outbase, outfspath in self.output_map.items():
@@ -424,15 +424,15 @@ class DockerRun:
         continue
       mnt = joinpath(self.output_root, outbase)
       with Pfx("%r->%r", mnt, outfspath):
-        docker_argv.extend(
-            [
+        docker_argv.append(
+            (
                 '--mount',
                 mount_escape(
                     'type=bind',
                     f'source={outfspath}',
                     f'destination={mnt}',
                 ),
-            ]
+            ),
         )
     if self.as_root:
       entrypoint = argv.pop(0)
@@ -441,11 +441,11 @@ class DockerRun:
       uid = os.geteuid()
       gid = os.getegid()
       argv.insert(0, f'{uid}:{gid}')
-    docker_argv.extend(['--entrypoint', entrypoint])
+    docker_argv.append(('--entrypoint', entrypoint))
     docker_argv.append('--')
     docker_argv.append(self.image)
     docker_argv.extend(argv)
-    return run(docker_argv, doit=doit, quiet=quiet)
+    return run(docker_argv, doit=doit, quiet=quiet, fold=True)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
