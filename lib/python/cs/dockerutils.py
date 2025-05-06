@@ -169,7 +169,7 @@ class DockerUtilCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing image")
     DR.image = argv.pop(0)
-    with TemporaryDirectory(dir='.') as T:
+    with TemporaryDirectory(dir='.', prefix='.tmp-docker-run') as T:
       with stackattrs(DR, outputpath=T):
         DR.run(*argv, exe=options.docker_command)
 
