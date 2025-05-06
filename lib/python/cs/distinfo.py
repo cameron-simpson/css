@@ -361,6 +361,21 @@ class Module:
   ''' Metadata about a Python module/package.
   '''
 
+  # our names not forbidden by THIRD_PARTY_EXCLUSIONS
+  THIRD_PARTY_WHITELIST = 'cs.resources',
+
+  # create a mapping of third party names to their source
+  THIRD_PARTY_EXCLUSIONS = {}
+  for third_party_listpath in glob('3rd-party-conflicts/*'):
+    with Pfx(third_party_listpath):
+      with open(third_party_listpath) as f:
+        for lineno, line in enumerate(f, 1):
+          with Pfx(lineno):
+            pkgname = line.rstrip().replace('-', '_')
+            if not pkgname or pkgname.startswith('#'):
+              continue
+            THIRD_PARTY_EXCLUSIONS[pkgname] = (third_party_listpath, lineno)
+
   def __init__(self, name, modules):
     self.name = name
     self._module = None
@@ -1210,26 +1225,22 @@ class Module:
         each of which is either a string
         or a mapping of required package name to its problems.
     '''
+    cls = self.__class__
     problems = self._module_problems
     # TODO": lru_cache?
     if problems is not None:
       return problems
     problems = self._module_problems = []
     # check for conflicts with third parties
-    allowed_conflicts = ('cs.resources',)
-    if self.name not in allowed_conflicts:
-      for third_party_listpath in glob('3rd-party-conflicts/*'):
-        with Pfx(third_party_listpath):
-          with open(third_party_listpath) as f:
-            for lineno, line in enumerate(f, 1):
-              with Pfx(lineno):
-                line = line.rstrip().replace('-', '_')
-                if not line or line.startswith('#'):
-                  continue
-                if self.name == line:
-                  problems.append(
-                      f'name conflicts with {third_party_listpath}:{lineno}: {line!r}'
-                  )
+    if self.name not in cls.THIRD_PARTY_WHITELIST:
+      try:
+        third_party_listpath, lineno = cls.THIRD_PARTY_EXCLUSIONS[self.name]
+      except KeyError:
+        pass
+      else:
+        problems.append(
+            f'name conflicts with {third_party_listpath}:{lineno}: {line!r}'
+        )
     # see if this package has been marked "ok" as of a particular revision
     latest_ok_rev = self.pkg_tags.get('ok_revision')
     unreleased_logs = None
