@@ -563,7 +563,7 @@ def make_files_property(
 def makelockfile(
     path,
     *,
-    ext=None,
+    ext='.lock',
     poll_interval=None,
     timeout=None,
     runstate: RunState,
@@ -581,7 +581,7 @@ def makelockfile(
       * `path`: the base associated with the lock file,
         often the filesystem object whose access is being managed.
       * `ext`: the extension to the base used to construct the lockfile name.
-        Default: ".lock"
+        Default: `".lock"`
       * `timeout`: maximum time to wait before failing.
         Default: `None` (wait forever).
         Note that zero is an accepted value
@@ -596,8 +596,6 @@ def makelockfile(
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
-  if ext is None:
-    ext = '.lock'
   if timeout is not None and timeout < 0:
     raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
