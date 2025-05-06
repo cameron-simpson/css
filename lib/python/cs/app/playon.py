@@ -32,7 +32,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import fmtdoc, promote, Promotable, uses_quiet
+from cs.deco import fmtdoc, promote, Promotable, uses_quiet, uses_verbose
 from cs.fileutils import atomic_filename
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
@@ -1152,6 +1152,7 @@ class PlayOnAPI(HTTPServiceAPI):
   # pylint: disable=too-many-locals
   @pfx_method
   @uses_quiet
+  @uses_verbose
   @uses_runstate
   @typechecked
   def download(
@@ -1161,6 +1162,7 @@ class PlayOnAPI(HTTPServiceAPI):
       *,
       quiet: bool,
       runstate: RunState,
+      verbose: bool,
   ):
     ''' Download the file with `download_id` to `filename_basis`.
         Return the `TagSet` for the recording.
@@ -1206,7 +1208,7 @@ class PlayOnAPI(HTTPServiceAPI):
             total=dl_length,
             units_scale=BINARY_BYTES_SCALE,
             itemlenfunc=len,
-            report_print=not quiet,
+            report_print=not quiet if sys.stdout.isatty() else verbose,
         ):
           runstate.raiseif()
           offset = 0
