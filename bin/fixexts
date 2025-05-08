@@ -35,15 +35,15 @@ do
                                continue
                              }
   fi
-
-  prefext=`mime-ext "$type"` || { echo "$cmd: cannot look up preferred extension for $type" >&2
-                                 xit=1
-                                 continue
-                               }
-  [ -n "$prefext" ] || { echo "$cmd: no preferred extension for $type" >&2
-                         xit=1
-                         continue
-                       }
+  prefext=`mime-ext "$type"` || {
+    echo "$cmd: cannot look up preferred extension for $type" >&2
+    xit=1
+    continue
+  }
+  [ -n "$prefext" ] || {
+    # use the subtype from the mime type
+    prefext=$( expr "x$type" : 'x.*/\([^/][^/]*\)' )
+  }
 
   # see if ext is ok already
   fbase=`basename "$f"`
