@@ -13,8 +13,7 @@ usage="Usage: $cmd [-i type] [filenames...]
 
 itype=
 [ $# -gt 0 ] && [ "x$1" = x-i ] && { itype=$2; shift; shift; }
-
-[ $# = 0 ] && { [ -t 0 ] && echo "$cmd: reading filenames from stdin..." >&2; set -- `cat` || exit 1; }
+[ $# -gt 0 ] || set -- *
 
 xit=0
 
