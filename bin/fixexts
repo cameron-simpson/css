@@ -1,15 +1,17 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Examine the named files and attach correct extensions to misnamed ones.
 #	- Cameron Simpson <cs@cskk.id.au> 22feb1999
 #
-# Base entirely on file2mime and mime-ext now. - cameron 24jul2003
+# Based entirely on file2mime and mime-ext now. - cameron 24jul2003
 # Added "-i type" option to bypass file2mime. - cameron 19apr2005
 #
+#
+#set -u
 
 cmd=$0
 usage="Usage: $cmd [-i type] [filenames...]
-  -i type	Specify the MIME type instead of guessing from content."
+  -i type   Specify the MIME type instead of guessing from content."
 
 itype=
 [ $# -gt 0 ] && [ "x$1" = x-i ] && { itype=$2; shift; shift; }
@@ -19,21 +21,23 @@ xit=0
 
 for f
 do
-  [ -f "$f" ] || { echo "$cmd: $f: not a regular file" >&2
-                   xit=1; continue;
-                 }
-  [ -s "$f" ] || { echo "$cmd: $f: empty file!" >&2
-                   xit=1; continue;
-                 }
-
+  [ -f "$f" ] || {
+    echo "$cmd: $f: not a regular file, skipping" >&2
+    continue;
+  }
+  [ -s "$f" ] || {
+    echo "$cmd: $f: empty file, skipping" >&2
+    continue;
+  }
   if [ -n "$itype" ]
   then
     type=$itype
   else
-    type=`file2mime "$f"` || { echo "$cmd: can't deduce MIME type of \"$f\"" >&2
-                               xit=1
-                               continue
-                             }
+    type=`file2mime "$f"` || {
+      echo "$cmd: can't deduce MIME type of \"$f\"" >&2
+      xit=1
+      continue
+    }
   fi
   prefext=`mime-ext "$type"` || {
     echo "$cmd: cannot look up preferred extension for $type" >&2
