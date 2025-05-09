@@ -1,3 +1,4 @@
+tagset save: if permissionerror on the temp file, rewrite in place if possible?
 docker-caddy script
 dlog fwd local dlog sock through ssh, provide $DLOG_PIPEPATH through?
 CornuCopyBuffer - is .offset the post buffer size? it should be the logic offset - pre-buffer - but the mp4 parsing suggests that it is not?
