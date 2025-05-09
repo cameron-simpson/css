@@ -9,6 +9,7 @@
 
 from contextlib import contextmanager
 from functools import partial
+from queue import Queue, PriorityQueue, Empty as Queue_Empty
 import sys
 from threading import Timer, Lock, RLock, Thread
 import time
@@ -16,13 +17,11 @@ from typing import Any, Callable, Iterable
 
 from typeguard import typechecked
 
-from cs.deco import promote
 from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
 from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
-from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import (
     MultiOpenMixin,
     RunState,
@@ -34,13 +33,12 @@ from cs.resources import (
 from cs.result import CancellationError
 from cs.seq import seq, unrepeated
 
-__version__ = '20240412-post'
+__version__ = '20250426-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -48,13 +46,14 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
-        'cs.py3',
         'cs.resources',
+        'cs.result',
         'cs.seq',
+        'typeguard',
     ],
 }
 
-class QueueIterator(MultiOpenMixin):
+class QueueIterator(MultiOpenMixin, Iterable[Any]):
   ''' A `QueueIterator` is a wrapper for a `Queue`like object
       which presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
@@ -62,7 +61,7 @@ class QueueIterator(MultiOpenMixin):
 
   def __init__(self, q, name=None):
     if name is None:
-      name = "QueueIterator-%d" % (seq(),)
+      name = f'{self.__class__.__name__}-{seq()}'
     self.q = q
     self.name = name
     self.finalise_later = True
@@ -74,7 +73,7 @@ class QueueIterator(MultiOpenMixin):
     self.__lock = Lock()
 
   def __str__(self):
-    return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
+    return f'{self.__class__.__name__}({self.name!r},q={self.q})'
 
   @not_closed
   def put(self, item, *args, **kw):
@@ -120,16 +119,16 @@ class QueueIterator(MultiOpenMixin):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning("%s: Queue_Empty: %s", self, e)
+      warning("%s: queue.Empty: %s", self, e)
       self._put(self.sentinel)
       # pylint: disable=raise-missing-from
-      raise StopIteration("Queue_Empty: %s" % (e,))
+      raise StopIteration(f'{self}.get: queue.Empty: {e}') from e
     if item is self.sentinel:
       # sentinel consumed (clients won't see it, so we must)
       self.q.task_done()
       # put the sentinel back for other consumers
       self._put(self.sentinel)
-      raise StopIteration("SENTINEL")
+      raise StopIteration(f'{self}.get: SENTINEL')
     with self.__lock:
       self._item_count -= 1
     return item
@@ -143,7 +142,7 @@ class QueueIterator(MultiOpenMixin):
       return next(self)
     except StopIteration as e:
       # pylint: disable=raise-missing-from
-      raise Queue_Empty("got %s from %s" % (e, self))
+      raise Queue_Empty(f'{self}._get: {e}') from e
 
   def empty(self):
     ''' Test if the queue is empty.
@@ -183,6 +182,7 @@ class QueueIterator(MultiOpenMixin):
 
   def iter_batch(self, batch_size=1024):
     ''' A generator which yields batches of items from the queue.
+        The default `batch_size` is `1024`.
     '''
     while True:
       batch = self.next_batch(batch_size=batch_size, block_once=True)
@@ -307,7 +307,7 @@ class PushQueue(MultiOpenMixin, RunStateMixin):
   def __init__(
       self,
       name: str,
-      functor: Callable[Any, Iterable],
+      functor: Callable[[Any], Iterable],
       outQ,
       runstate: RunState,
   ):
@@ -362,7 +362,7 @@ class PushQueue(MultiOpenMixin, RunStateMixin):
 
 class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.
-      Calls to `.get()` raise `Queue_Empty`.
+      Calls to `.get()` raise `queue.Empty`.
   '''
 
   def __init__(self, blocking=False, name=None):
@@ -391,7 +391,7 @@ class NullQueue(MultiOpenMixin):
     '''
 
   def get(self):
-    ''' Get the next value. Always raises `Queue_Empty`.
+    ''' Get the next value. Always raises `queue.Empty`.
         If `.blocking,` delay until `.shutdown()`.
     '''
     if self.blocking:
@@ -702,7 +702,7 @@ class ListQueue:
 
 def get_batch(q, max_batch=128, *, poll_delay=0.01):
   ''' Get up to `max_batch` closely spaced items from the queue `q`.
-      Return the batch. Raise `Queue_Empty` if the first `q.get()` raises.
+      Return the batch. Raise `queue.Empty` if the first `q.get()` raises.
 
       Block until the first item arrives. While the batch's size is
       less that `max_batch` and there is another item available

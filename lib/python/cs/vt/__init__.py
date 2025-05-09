@@ -81,6 +81,10 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: System :: Filesystems",
     ],
+    'ext-modules': [{
+        'name': 'cs.vt._scan',
+        'sources': ['_scan.c']
+    }],
     'install_requires': [
         'cs.buffer',
         'cs.app.flag',
@@ -119,10 +123,10 @@ DISTINFO = {
         'lmdb',
     ],
     'entry_points': {
-        'console_scripts': [
-            'vt = cs.vt.__main__:main',
-            'mount.vtfs = cs.vt.__main__:mount_vtfs',
-        ],
+        'console_scripts': {
+            'vt': 'vt.__main__:main',
+            'mount.vtfs': 'vt.__main__:mount_vtfs',
+        },
     },
     'extras_requires': {
         'FUSE': ['llfuse'],

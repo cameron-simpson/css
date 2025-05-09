@@ -93,6 +93,7 @@ _help:
         @echo '_publish_hg        - publish to upstream repos'
         @echo '_release           - mark tip as new release'
         @echo '_remote            - rsync the Python tree to $$$(RSYNC_TARGET_PYTHON_ENVVAR)'
+        @echo '_synchome          - rsync the Python tree to $$HOME/lib/python/cs/'
         @echo '_tarball           - make a tarball of the tip'
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_test3             - do python 3 syntax checks and self tests'
@@ -105,8 +106,8 @@ _setup:
 _venv:
     set -uex \
     [ -d $(venv_dir) ] || { \
-        $(base_python) -m ensurepip \
-        $(base_pip) install -U pip wheel build ruff uv \
+        : SKIP $(base_python) -m ensurepip \
+        $(base_pip) install -U pip wheel build uv \
         $(uv) venv --python $(base_python) --seed $(venv_dir) \
     }
     uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
@@ -204,6 +205,9 @@ _push:
 
 _remote:
         set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$$(RSYNC_TARGET_PYTHON_ENVVAR)/"
+
+_synchome:
+        set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$HOME/lib/python/cs/"
 
 
 bin_suffixes = cs darwin

@@ -98,11 +98,8 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
     self.app = None
     super().__init__(parent)
     self.grid()
-    if fspaths is None:
-      fspaths = []
-    self.tagger = tagger
-    self._fspath = None
-    self._fspaths = fspaths
+    self.paths = TaggedPathSet(fspaths or ())
+    self.fspath = None
 
     # callback to define the widget's contents
     def select_path(_, path):
@@ -146,24 +143,6 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
 
-  @property
-  def fspaths(self):
-    ''' The current list of filesystem paths.
-    '''
-    return self._fspaths
-
-  @fspaths.setter
-  def fspaths(self, new_fspaths):
-    ''' Update the current list of filesystem paths.
-    '''
-    self._fspaths = list(new_fspaths)
-    if self.pathlist is not None:
-      self.pathlist.set_fspaths(self._fspaths)
-    if self.thumbsview is not None:
-      self.thumbsview.set_fspaths(self._fspaths)
-      self.thumbscanvas.after_idle(self.thumbscanvas.scroll_bbox_x)
-
-  @property
   def fspath(self):
     ''' The currently displayed filesystem path.
     '''
@@ -181,6 +160,25 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
     if self.thumbsview is not None:
       # scroll to new_fspath
       self.thumbsview.show_fspath(new_fspath)
+
+  @property
+  def fspaths(self):
+    ''' A list of the current filesystem paths.
+    '''
+    return sorted(path.fspath for path in self.paths)
+
+  @fspaths.setter
+  def fspaths(self, new_fspaths: Iterable[Union[str, TaggedPath]]):
+    ''' Update the current list of filesystem paths.
+    '''
+    self, paths.clear()
+    self.paths.update(new_fspaths)
+    fspaths = self.fspaths
+    if self.pathlist is not None:
+      self.pathlist.set_fspaths(fspaths)
+    if self.thumbsview is not None:
+      self.thumbsview.set_fspaths(fspaths)
+      self.thumbscanvas.after_idle(self.thumbscanvas.scroll_bbox_x)
 
 class TagValueStringVar(tk.StringVar):
   ''' A `StringVar` which holds a `Tag` value transcription.

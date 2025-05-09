@@ -711,7 +711,7 @@ class VTCmd(BaseCommand):
     '''
     xit = 0
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     config = self.options.config
     config_path = config.path
     if not existspath(config_path):

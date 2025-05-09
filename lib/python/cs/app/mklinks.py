@@ -28,7 +28,7 @@ from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.fileutils import common_path_prefix, shortpath
 from cs.hashindex import file_checksum
 from cs.logutils import status, warning, error
@@ -70,45 +70,34 @@ def main(argv=None):
   return MKLinksCmd(argv).run()
 
 class MKLinksCmd(BaseCommand):
-  ''' Main programme command line class.
+  ''' Hard link files with identical contents.
   '''
 
-  USAGE_FORMAT = r'''Usage: {cmd} paths...
-          Hard link files with identical contents.
-          -n    No action. Report proposed actions.'''
-
-  GETOPT_SPEC = 'n'
-
-  def apply_opt(self, opt, val):
-    ''' Apply command line option.
-    '''
-    if opt == '-n':
-      self.options.dry_run = True
-    else:
-      raise NotImplementedError("unhandled option")
-
-  @uses_runstate
-  def main(self, argv, *, runstate: RunState):
+  @popopts
+  def main(self, argv):
     ''' Usage: mklinks [-n] paths...
           Hard link files with identical contents.
-          -n    No action. Report proposed actions.
     '''
     if not argv:
       raise GetoptError("missing paths")
     options = self.options
+    runstate = options.runstate
+    xit = 0
     linker = Linker()
     with run_task("scan") as step:
       # scan the supplied paths
       for path in argv:
         runstate.raiseif()
-        if runstate.cancelled:
-          return 1
         step("scan " + path + ' ...')
         with Pfx(path):
-          linker.scan(path)
+          try:
+            linker.scan(path)
+          except OSError as e:
+            warning("scan fails: %s", e)
+            xit = 1
     with run_task("merge"):
       linker.merge(dry_run=options.dry_run)
-    return 0
+    return xit
 
 class FileInfo(object):
   ''' Information about a particular inode.
@@ -285,6 +274,8 @@ class Linker:
         runstate.raiseif()
         # order FileInfos by mtime (newest first) and then path
         FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
+        if len(FIs) < 2:
+          continue
         size = FIs[0].size
         with proxy.extend_prefix(f'size {size} '):
           for i, FI in enumerate(progressbar(FIs, f'size {size}')):

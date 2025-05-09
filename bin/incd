@@ -26,11 +26,12 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -P|-L)  pwd_opt=$1; shift ;;
+    -P|-L)  pwd_opt=$1 ;;
     --)     shift; break ;;
-    -?*)    echo "$cmd: unrecognisedoption: $1" >&2; badopts=1 ;;
+    -?*)    echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)      break ;;
   esac
+  shift
 done
 
 if [ $# = 0 ]

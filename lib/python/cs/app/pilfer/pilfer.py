@@ -1,49 +1,127 @@
 #!/usr/bin/env python3
 
+import asyncio
+from collections import defaultdict
+from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
+import copy
+from dataclasses import dataclass, field
+from fnmatch import fnmatch
+from functools import cached_property
+from itertools import zip_longest
 import os
 import os.path
+from os.path import (
+    abspath,
+    exists as existspath,
+    expanduser,
+    isabs as isabspath,
+    join as joinpath,
+)
+import shlex
 import sys
-from threading import Lock, RLock
+from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
+from types import SimpleNamespace as NS
+
+import requests
+from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
-from cs.deco import default_params, promote
+from cs.cmdutils import vprint
+from cs.deco import decorator, default_params, promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
+from cs.fs import HasFSPath, needdir
 from cs.later import Later, uses_later
-from cs.lex import r
-from cs.logutils import (debug, error, warning, exception, D)
-from cs.mappings import MappingChain, SeenSet
-from cs.naysync import afunc
-from cs.obj import copy as obj_copy
-from cs.pfx import Pfx
+from cs.logutils import (debug, error, warning, exception)
+from cs.mappings import mapped_property, SeenSet
+from cs.naysync import agen, amap, async_iter, StageMode
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
-from cs.queues import NullQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
 from cs.threads import locked, HasThreadState, ThreadState
+from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
+from .cache import ContentCache
 from .format import FormatMapping
+from .parse import import_name
+from .sitemap import SiteMap
 from .urls import hrefs, srcs
 
-from cs.debug import trace, X, r, s
+@decorator
+def one_to_many(func, fast=None, with_P=False, new_P=False):
+  ''' A decorator for one-to-many core functions for use as a stage function.
+      This produces an asynchronous generator which yields
+      `(result,Pilfer)` 2-tuples from a function expecting a single
+      item and producing an iterable of results.
 
-async def hrefs_sfunc(item_P):
-  item, P = item_P
-  urls = await afunc(lambda url: list(hrefs(url)))(item)
-  for url in urls:
-    yield url, P
+      Decorator parameters:
+      * `fast`: optional flag, passed to `@agen` when wrapping the function
+      * `with_P`: optional flag, default `False`: if true, pass
+        `item,Pilfer` to the function instead of just `item`
+      * `new_P`: optional glag, default `False`; if true then the
+        function yields `result,Pilfer` 2-tuples instead of just `result`
+  '''
+  ##func = trace(func)
+  if with_P:
+    wrapper = agen(lambda item, P: func(item, P=P), fast=fast)
+  else:
+    wrapper = agen(lambda item, _: func(item), fast=fast)
 
-async def srcs_sfunc(item_P):
-  item, P = item_P
-  urls = await afunc(lambda url: list(srcs(url)))(item)
-  for url in urls:
-    yield url, P
+  async def one_to_many_wrapper(item_P):
+    item, P = item_P
+    async for result in wrapper(item, P):
+      if new_P:
+        result_item, result_P = result
+        yield result_item, result_P
+      else:
+        yield result, P
 
-class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
+  return one_to_many_wrapper
+
+async def unseen_sfunc(
+    item_Ps: Iterable[Tuple[Any, "Pilfer"]],
+    *,
+    sig: Optional[Callable[Any, Any]] = None,
+    seen=None
+):
+  ''' Asynchronous generator yielding unseen items from a stream
+      of `(item,Pilfer)` 2-tuples.
+  '''
+  if sig is None:
+    sig = lambda item: item
+  if seen is None:
+    seen = set()
+  async for item, P in async_iter(item_Ps):
+    item_sig = sig(item)
+    if item_sig not in seen:
+      seen.add(item_sig)
+      yield item, P
+
+@dataclass
+class PseudoFlow:
+  ''' A class resembling `mitmproxy`'s `http.Flow` class in basic ways
+      so that I can use it with the pilfer.cache.ContentCache` class.
+  '''
+
+  request: requests.Request = None
+  response: requests.Response = None
+
+def cache_url(item_P):
+  ''' Pilfer base action for caching a UR.
+      Passes theough `item_P`, a 2-tuple of `(url,Pilfer)`.
+  '''
+  url, P = item_P
+  P.cache_url(url)
+  return item_P
+
+@dataclass
+class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
 
       Notable attributes include:
@@ -52,53 +130,77 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
       * `user_vars`: mapping of user variables for arbitrary use.
   '''
 
+  # class attribute holding the per-thread state stack
   perthread_state = ThreadState()
 
-  DEFAULT_ACTION_MAP = {
-      'hrefs': hrefs_sfunc,
-      'srcs': srcs_sfunc,
-  }
+  name: str = field(default_factory=lambda: f'Pilfer-{seq()}')
+  user_vars: Mapping[str, Any] = field(
+      default_factory=lambda: dict(_=None, save_dir='.')
+  )
+  flush_print: bool = False
+  do_trace: bool = False
+  flags: Mapping = field(default_factory=PolledFlags)
+  fspath: str = None
+  user_agent: str = 'Pilfer'
+  rcpaths: list[str] = field(default_factory=list)
+  url_opener: Any = field(default_factory=build_opener)
+  later: Later = field(default_factory=Later)
+  base_actions: Mapping[str, Any] = field(
+      default_factory=lambda: dict(
+          cache_url=one_to_many(cache_url, with_P=True),
+          hrefs=one_to_many(hrefs),
+          print=one_to_many(lambda item: (print(item), item)[-1:]),
+          srcs=one_to_many(srcs),
+          unseen=(unseen_sfunc, StageMode.STREAM),
+      )
+  )
+  content_cache: ContentCache = None
+  # for optional extra things hung on the Pilfer object
+  state: NS = field(default_factory=NS)
+  _diversion_tasks: dict = field(default_factory=dict)
 
   @uses_later
-  def __init__(self, item=None, later: Later = None):
-    self._name = 'Pilfer-%d' % (seq(),)
-    self.user_vars = {'_': item, 'save_dir': '.'}
-    self.flush_print = False
-    self.do_trace = False
-    self.flags = PolledFlags()
-    self._print_to = None
-    self._print_lock = Lock()
-    self.user_agent = None
+  def __post_init__(self, item=None, later: Later = None):
+    self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    self.url_opener.add_handler(HTTPCookieProcessor())
+    if self.fspath is None:
+      self.fspath = abspath(
+          os.environ.get('PILFERDIR')
+          or expanduser(self.rc_map[None]['var'] or '~/var/pilfer')
+      )
+      needdir(self.fspath) and vprint("made", self.shortpath)
+    if self.content_cache is None:
+      self.content_cache = ContentCache(
+          expanduser(self.rc_map[None]['cache'] or self.pathto('cache'))
+      )
     ##self._lock = Lock()
     self._lock = RLock()
-    self.rcs = []  # chain of PilferRC libraries
-    self.seensets = {}
-    self.diversions_map = {}  # global mapping of names to divert: pipelines
-    self.opener = build_opener()
-    self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
-    self.opener.add_handler(HTTPCookieProcessor())
-    self.later = later
 
   def __str__(self):
-    return "%s[%s]" % (self._name, self._)
+    return "%s[%s]" % (self.name, self._)
 
   __repr__ = __str__
+
+  def __enter_exit__(self):
+    ''' Run both the inherited context managers.
+    '''
+    for _ in zip_longest(
+        MultiOpenMixin.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self) if self.default else (),
+    ):
+      yield
 
   @contextmanager
   def startup_shutdown(self):
     with self.later:
-      yield
-
-  def copy(self, *a, **kw):
-    ''' Convenience function to shallow copy this `Pilfer` with modifications.
-    '''
-    return obj_copy(self, *a, **kw)
+      with self.content_cache:
+        yield
 
   @property
   def defaults(self):
     ''' Mapping for default values formed by cascading PilferRCs.
     '''
-    return MappingChain(mappings=[rc.defaults for rc in self.rcs])
+    return self.rc_map[None]
 
   @property
   def _(self):
@@ -108,8 +210,6 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
 
   @_.setter
   def _(self, value):
-    if value is not None and not isinstance(value, str):
-      raise TypeError(f'Pilfer._: expected string, received: {r(value)}')
     self.user_vars['_'] = value
 
   @property
@@ -117,6 +217,108 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
     ''' `self._` as a `URL` object.
     '''
     return URL.promote(self._)
+
+  @cached_property
+  def rc_map(self) -> Mapping[str | None, Mapping[str, str]]:
+    ''' A `defaultdict` containing the merged sections from
+        `self.rcpaths`, assembled in reverse order so that later
+        rc files are overridden by earlier rc files.
+
+        The unnamed sections are merged into the entry with key `None`.
+    '''
+    mapping = defaultdict(lambda: defaultdict(str))
+    for rcpath in reversed(self.rcpaths):
+      print("Pilfer.rc_map:", rcpath)
+      cfg = ConfigParser(allow_unnamed_section=True)
+      try:
+        pfx_call(cfg.read, rcpath)
+      except (FileNotFoundError, PermissionError) as e:
+        warning("ConfigParser.read(%r): %s", rcpath, e)
+        continue
+      msection = mapping[None]
+      for field_name, value in cfg[UNNAMED_SECTION].items():
+        msection[field_name] = value
+      for section_name, section in cfg.items():
+        msection = mapping[section_name]
+        for field_name, value in section.items():
+          msection[field_name] = value
+    return mapping
+
+  @cached_property
+  def action_map(self) -> Mapping[str, list[str]]:
+    ''' The mapping of action names to action specifications.
+    '''
+    actions = dict(self.base_actions)
+    for action_name, action_spec in self.rc_map['actions'].items():
+      with Pfx("[actions] %s = %s", action_name, action_spec):
+        actions[action_name] = pfx_call(shlex.split, action_spec)
+    return actions
+
+  @mapped_property
+  def pipe_specs(self, pipe_name):
+    ''' An on demand mapping of `pipe_name` to `PipeLineSpec`s
+        derived from `self.rc_map['pipes']`.
+    '''
+    from .pipelines import PipeLineSpec
+    pipe_spec = self.rc_map['pipes'][pipe_name]
+    return PipeLineSpec.from_str(pipe_spec)
+
+  @mapped_property
+  @locked
+  def diversions(self, diversion_name):
+    pipeline = self.pipe_specs[diversion_name].make_pipeline(self.pilfer)
+
+    async def discard():
+      ''' Discard the output of the diversion pipeline.
+      '''
+      async for _ in pipeline.outq:
+        ##print("diversion[%r} -> %s", diversion_name, _)
+        pass
+
+    self._diversion_tasks[diversion_name] = asyncio.create_task(discard())
+    return pipeline
+
+  async def close_diversions(self):
+    ''' An asynchronous generator which closes all the pipeline diversions
+        and yields each diversion name as its discard `Task` completes.
+    '''
+    diversions = self.diversions
+    diversion_names = list(diversions.keys())
+
+    async def close_diversion(diversion_name):
+      pipeline = diversions.pop(diversion_name)
+      await pipeline.close()
+      task = self._diversion_tasks.pop(diversion_name)
+      await task
+      return diversion_name
+
+    async for diversion_name in amap(
+        close_diversion,
+        diversion_names,
+        concurrent=True,
+        unordered=True,
+    ):
+      yield diversion_name
+
+  @cached_property
+  def seen_backing_paths(self):
+    ''' The mapping of seenset names to the text files holding their contents.
+    '''
+    return self.rc_map['seen']
+
+  @mapped_property
+  def seensets(self, name):
+    ''' An on demand mapping of seen set `name` to a `SeenSet`
+        derived from `self.rc_map['seen']`.
+    '''
+    backing_path = self.rc_map['seen'].get(name)
+    if backing_path is not None:
+      backing_path = envsub(backing_path)
+      if (not isabspath(backing_path) and not backing_path.startswith(
+          ('./', '../'))):
+        backing_basedir = envsub(self.defaults.get('seen_dir', '.'))
+        backing_path = joinpath(backing_basedir, backing_path)
+    return SeenSet(name, backing_path)
 
   def test_flags(self):
     ''' Evaluate the flags conjunction.
@@ -136,116 +338,17 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
         all_status = False
     return all_status
 
-  @locked
-  def seenset(self, name):
-    ''' Return the SeenSet implementing the named "seen" set.
-    '''
-    seen = self.seensets
-    if name not in seen:
-      backing_path = MappingChain(
-          mappings=[rc.seen_backing_paths for rc in self.rcs]
-      ).get(name)
-      if backing_path is not None:
-        backing_path = envsub(backing_path)
-        if (not os.path.isabs(backing_path)
-            and not backing_path.startswith('./')
-            and not backing_path.startswith('../')):
-          backing_basedir = self.defaults.get('seen_dir')
-          if backing_basedir is not None:
-            backing_basedir = envsub(backing_basedir)
-            backing_path = os.path.join(backing_basedir, backing_path)
-      seen[name] = SeenSet(name, backing_path)
-    return seen[name]
-
-  def seen(self, url, seenset='_'):
-    ''' Test if the named `url` has been seen.
+  def seen(self, item, seenset='_'):
+    ''' Test if `item` has been seen.
         The default seenset is named `'_'`.
     '''
-    return url in self.seenset(seenset)
+    return item in self.seensets[seenset]
 
-  def see(self, url, seenset='_'):
-    ''' Mark a `url` as seen.
+  def see(self, item, seenset='_'):
+    ''' Mark an `item` as seen.
         The default seenset is named `'_'`.
     '''
-    self.seenset(seenset).add(url)
-
-  @property
-  @locked
-  def diversions(self):
-    ''' The current list of named diversions.
-    '''
-    return list(self.diversions_map.values())
-
-  @property
-  @locked
-  def diversion_names(self):
-    ''' The current list of diversion names.
-    '''
-    return list(self.diversions_map.keys())
-
-  @property
-  @locked
-  @logexc
-  def open_diversion_names(self):
-    ''' The current list of open named diversions.
-    '''
-    names = []
-    for divname in self.diversion_names:
-      div = self.diversion(divname)
-      if not div.closed:
-        names.append(divname)
-    return names
-
-  @logexc
-  def quiesce_diversions(self):
-    D("%s.quiesce_diversions...", self)
-    while True:
-      D("%s.quiesce_diversions: LOOP: pass over diversions...", self)
-      for div in self.diversions:
-        D("%s.quiesce_diversions: check %s ...", self, div)
-        div.counter.check()
-        D("%s.quiesce_diversions: quiesce %s ...", self, div)
-        div.quiesce()
-      D("%s.quiesce_diversions: now check that they are all quiet...", self)
-      quiet = True
-      for div in self.diversions:
-        if div.counter:
-          D("%s.quiesce_diversions: NOT QUIET: %s", self, div)
-          quiet = False
-          break
-      if quiet:
-        D("%s.quiesce_diversions: all quiet!", self)
-        return
-
-  @locked
-  def diversion(self, pipe_name):
-    ''' Return the diversion named `pipe_name`.
-        A diversion embodies a pipeline of the specified name.
-        There is only one of a given name in the shared state.
-        They are instantiated at need.
-    '''
-    diversions = self.diversions_map
-    if pipe_name not in diversions:
-      spec = self.pipes.get(pipe_name)
-      if spec is None:
-        raise KeyError(
-            "no diversion named %r and no pipe specification found" %
-            (pipe_name,)
-        )
-      pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
-      if errors:
-        for err in errors:
-          error(err)
-        raise KeyError(
-            "invalid pipe specification for diversion named %r" % (pipe_name,)
-        )
-      name = "DIVERSION:%s" % (pipe_name,)
-      outQ = NullQueue(name=name, blocking=True)
-      outQ.open()  # open outQ so it can be closed at the end of the pipeline
-      div = pipeline(self.later, pipe_funcs, name=name, outQ=outQ)
-      div.open()  # will be closed in main program shutdown
-      diversions[pipe_name] = div
-    return diversions[pipe_name]
+    self.seensets[seenset].add(item)
 
   @logexc
   def pipe_through(self, pipe_name, inputs):
@@ -260,11 +363,12 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
   def pipe_from_spec(self, pipe_name, name=None):
     ''' Create a new pipeline from the specification named `pipe_name`.
     '''
+    from .pipelines import PipeLineSpec
     if isinstance(pipe_name, PipeLineSpec):
       spec = pipe_name
       pipe_name = str(spec)
     else:
-      spec = self.pipes.get(pipe_name)
+      spec = self.pipe_specs.get(pipe_name)
       if spec is None:
         raise ValueError(f'no pipe specification named {pipe_name!r}')
     if name is None:
@@ -277,23 +381,79 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
         raise ValueError('invalid pipe specification')
     return pipeline(self.later, pipe_funcs, name=name, inputs=inputs)
 
-  def _rc_pipespecs(self):
-    for rc in self.rcs:
-      yield rc.pipe_specs
+  @cached_property
+  @pfx_method
+  def sitemaps(self) -> List[Tuple[str, SiteMap]]:
+    ''' A list of `(pattern,SiteMap)` 2-tuples for matching URLs to `SiteMap`s.
 
-  @property
-  def pipes(self):
-    return MappingChain(get_mappings=self._rc_pipespecs)
+        The entries take the form:
 
-  def _rc_action_maps(self):
-    X("self.rcs = %r", self.rcs)
-    for rc in self.rcs:
-      yield rc.action_map
-    yield self.DEFAULT_ACTION_MAP
+            host-pattern = name:module:class
 
-  @property
-  def action_map(self):
-    return MappingChain(get_mappings=self._rc_action_maps)
+        The `host-pattern` is a glob style pattern as for `fnmatch`.
+        Site maps matching multiple hosts should generally include
+        the URL hostname in the URL key.
+        An additional pattern for the same `module:class` can just be `name`.
+
+        Example:
+
+            docs.python.org = docs:cs.app.pilfer.sitemap:DocSite
+            docs.mitmproxy.org = docs
+            *.readthedocs.io = docs
+    '''
+    named = {}
+    map_list = []
+    for pattern, sitemap_spec in self.rc_map['sitemaps'].items():
+      with Pfx("%s = %s", pattern, sitemap_spec):
+        try:
+          map_name, map_spec = sitemap_spec.split(':', 1)
+        except ValueError:
+          # no colon - plain map name
+          try:
+            sitemap = named[sitemap_spec]
+          except KeyError:
+            warning("ignore unknown bare sitwemap name: %r", sitemap_spec)
+            continue
+        else:
+          if map_name in named:
+            warning("ignore previously seen map name: %r", map_name)
+            continue
+          try:
+            map_class = import_name(map_spec)
+          except ImportError as e:
+            warning(e._)
+            continue
+          sitemap = map_class(name=map_name)
+          named[map_name] = sitemap
+        # TODO: precompile glob style pattern to regexp?
+        map_list.append((pattern, sitemap))
+    return map_list
+
+  @promote
+  def sitemaps_for(self, url: URL):
+    ''' Generator yielding sitemaps which match the `url`.
+    '''
+    hostname = url.hostname
+    for pattern, sitemap in self.sitemaps:
+      if fnmatch(hostname, pattern):
+        yield sitemap
+
+  def sitemap_for(self, url: str | URL):
+    ''' Return the first sitemap which matches the `url`, or `None`.
+    '''
+    for sitemap in self.sitemaps_for(url):
+      return sitemap
+    return None
+
+  @promote
+  def url_matches(self, url: URL, pattern_type: str, *, extra=None):
+    ''' Scan `self.sitemaps_for(url)` for patterns matching the URL.
+        Yield `SiteMapPatternMatch` instances for each match.
+    '''
+    for sitemap in self.sitemaps_for(url):
+      patterns = getattr(sitemap, f'{pattern_type}_PATTERNS', None)
+      if patterns:
+        yield from sitemap.matches(url, patterns, extra=extra)
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
@@ -306,18 +466,12 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
       if self.flush_print:
         file.flush()
 
-  ##@require(lambda kw: all(isinstance(v, str) for v in kw))
-  def set_user_vars(self, **kw):
-    ''' Update self.user_vars from the keyword arguments.
+  def copy_with_vars(self, **update_vars):
+    ''' Make a copy of `self` with copied `.user_vars`, update the
+        vars and return the copied `Pilfer`.
     '''
-    self.user_vars.update(kw)
-
-  def copy_with_vars(self, **kw):
-    ''' Make a copy of `self` with copied .user_vars, update the
-        vars and return the copied Pilfer.
-    '''
-    P = self.copy('user_vars')
-    P.set_user_vars(**kw)
+    P = copy.replace(self, vars=dict(self.user_vars))
+    P.user_vars.update(update_vars)
     return P
 
   def print_url_string(self, U, **kw):
@@ -346,7 +500,7 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
     with Pfx("save_url(%s)", U):
       save_dir = self.save_dir
       if saveas is None:
-        saveas = os.path.join(save_dir, U.basename)
+        saveas = joinpath(save_dir, U.basename)
         if saveas.endswith('/'):
           saveas += 'index.html'
       if saveas == '-':
@@ -356,8 +510,9 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
           with os.fdopen(outfd, 'wb') as outfp:
             outfp.write(content)
       else:
+        # TODO: use atomic_filename
         with Pfx(saveas):
-          if not overwrite and os.path.exists(saveas):
+          if not overwrite and existspath(saveas):
             warning("file exists, not saving")
           else:
             content = U.content
@@ -388,11 +543,38 @@ class Pilfer(HasThreadState, MultiOpenMixin, RunStateMixin):
     return FormatMapping(self, U=U).format(s)
 
   def set_user_var(self, k, value, U, raw=False):
+    raise RuntimeError("how is this used?")
     if not raw:
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
 
-  # Note: this method is _last_ because otherwise it it shadows the
+  def cache_keys_for_url(self, url, *, extra=None):
+    cache = self.content_cache
+    cache_keys = []
+    for match in self.url_matches(url, pattern_type='URL_KEY', extra=extra):
+      url_key = match.format_arg(extra=extra)
+      cache_keys.append(cache.cache_key_for(match.sitemap, url_key))
+    return cache_keys
+
+  @promote
+  def cache_url(self, url: URL, mode='missing', *, extra=None):
+    ''' Cache the content of `url` in the cache if missing/updated
+        as indicated by `mode`.
+        Return a mapping of each cache key to the cached metadata.
+    '''
+    matches = list(self.url_matches(url, pattern_type='URL_KEY', extra=extra))
+    if not matches:
+      print("cache_url: no matches for", url)
+      return
+    cache = self.content_cache
+    with cache:
+      cache_keys = [
+          cache.cache_key_for(match.sitemap, match.format_arg(extra=extra))
+          for match in matches
+      ]
+      return cache.cache_url(url, cache_keys, mode=mode)
+
+  # Note: this method is _last_ because otherwise it shadows the
   # @promote decorator, used on earlier methods.
   @classmethod
   def promote(cls, P):

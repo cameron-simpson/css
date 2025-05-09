@@ -1,3 +1,32 @@
+tagset save: if permissionerror on the temp file, rewrite in place if possible?
+docker-caddy script
+dlog fwd local dlog sock through ssh, provide $DLOG_PIPEPATH through?
+CornuCopyBuffer - is .offset the post buffer size? it should be the logic offset - pre-buffer - but the mp4 parsing suggests that it is not?
+cs.binary as_hexpat() class method for ImHex Hex Editor Hex Patterns, maybe a cs.hexpat modules later
+units - conciser transcribe function names
+cs.progress: @auto_progress - rename to @uses_progress?
+cs.cmdutils: support --no-thing options with no arg
+hashindex: make default rearrange mode mv ?
+distinfo: strip #doctest: +ELLIPSIS
+cs.cmdutils: accept popopts(long_name=(....),short="long_name") sharing a common opt spec
+hashindex check - check hashindex ls style output against files
+cs.cmdutils subcommand help should still recite the common options
+wpr - do not import the osx stuff if we're not updating the spaces - it takes forever
+exract the make-a-dir-of-images from wpr as a tool
+RunState pause state and effects, Event to block for it?
+fstags - can we store tags for directories in the dir .fstags, requires a state maybe we already do that? migrate - if isdir and no tags in the dir fstags get them from the parent
+default: sqlite worker - use the queue get_batch mode to collect requests, open sqlite db in bursts
+default: generic sqlite dbm with thread worker to be pulled from ContentCache, into a dbmutils or mappings class
+cs.urlutils: URL: use cs.rfc2616.content_type, content_length
+default: cs.debug.stack_dump vs cs.py/stack.stack_dump
+ContextManagerMixin: document robust recipe for classws which subclass 2 or more classes which subclass ContextManagerMixin, see cs.Later.Later for example
+cs.rfc2616: use cornucopybuffer, update read_chunked
+spaces: try using tilde in spaces_pathfor (tried it, does not work with ~/ or /~/)
+spaces: wpr RENEW to scan the spaces configs for the random directories?
+PipeLineSpec.make_stage_funcs: each input (item,P) should become (item,P=P.copy_with_vars(_=item)) so as to have its own set of variables
+default: wpr RENEW, fast mode
+RunState.__enter__exit__: also set runstate.cancel to the asyncio event loop SIGINT handler?
+cs.binary: generate .5 manpage entries from classes? maybe just those built from struct formats initially
 setvar: not expanding leading $MANPATH etc
 bin-cs/brew: pass all HOMEBREW_* envvars through to brewexe
 cs.jsonutils: merge the various JSON utility functions?

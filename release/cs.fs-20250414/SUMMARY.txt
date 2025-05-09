@@ -1,0 +1,2 @@
+HasFSPath: provide an __lt__ method which compares the .fspath attributes to facilitate sorting.
+New RemotePath(host,fspath) namedtuple subclass for [host:]fspath path specifications.
