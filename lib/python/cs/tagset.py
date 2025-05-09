@@ -3623,7 +3623,7 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
                   )
               )
               f.write('\n')
-      except PermissionsError as e:
+      except PermissionError as e:
         warning("save_tagsets(%r) fails: %s", filepath, e)
 
   def save(self, extra_types=None, prune=False):
