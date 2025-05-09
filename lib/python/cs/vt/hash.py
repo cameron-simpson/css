@@ -57,7 +57,8 @@ class HasDotHashclassMixin:
     '''
     return self.hashclass.hashname
 
-class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
+class HashCodeField(BinarySingleValue, HasDotHashclassMixin,
+                    value_type=BaseHashCode):
   ''' Binary transcription of hashcodes.
   '''
 
