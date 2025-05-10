@@ -484,7 +484,7 @@ class Block(Transcriber, ABC, prefix=None):
         )
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
 
-class BlockRecord(BinarySingleValue):
+class BlockRecord(BinarySingleValue, value_type=Block):
   ''' Support for binary parsing and transcription of blockrefs.
   '''
 
