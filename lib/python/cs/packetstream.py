@@ -1035,7 +1035,7 @@ class BaseRequest(AbstractBinary):
       Approach 1 does not necessarily need a distinct class;
       a binary class can often be constructed in the class header.
       For example, the `cs.vt.stream.AddRequest` payload is an `int`
-      representing the hash class and the data to add. The class
+      representing the hash class and then the data to add. The class
       header looks like this:
 
           class AddRequest(
@@ -1068,9 +1068,9 @@ class BaseRequest(AbstractBinary):
         A typical implementation looks like this:
 
             def fulfil(self, context):
-                return context.come_method(params...)
+                return context.some_method(params...)
 
-        where `params` come from the request attributes.
+        where the `params` come from the request attributes.
     '''
     raise NotImplementedError
 
