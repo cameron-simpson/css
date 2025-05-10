@@ -19,7 +19,7 @@ try:
 except ImportError:
   from typing import ByteString as Buffer
 from contextlib import closing, contextmanager
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from functools import cached_property
 from getopt import getopt, GetoptError
 import os
@@ -526,7 +526,7 @@ class TimeStampMixin:
                       0xfffffffffffffffe, 0xffffffffffffffff):
       return None
     try:
-      dt = pfx_call(datetime.fromtimestamp, self.value, UTC)
+      dt = pfx_call(datetime.fromtimestamp, self.value, timezone.utc)
     except (OverflowError, OSError) as e:
       warning("%s.datetime: returning None", type(self).__name__, e)
       return None
@@ -2376,10 +2376,8 @@ class METABoxBody(FullBoxBody2):
   theHandler: Box
   boxes: ListOfBoxes
 
-
   def __iter__(self):
     return iter(self.boxes)
-
 
   @pfx_method
   def __getattr__(self, attr):
