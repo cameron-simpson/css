@@ -57,42 +57,6 @@ class HasDotHashclassMixin:
     '''
     return self.hashclass.hashname
 
-class HashCodeField(BinarySingleValue, HasDotHashclassMixin,
-                    value_type=BaseHashCode):
-  ''' Binary transcription of hashcodes.
-  '''
-
-  @property
-  def hashcode(self):
-    ''' The value named `.hashcode`.
-    '''
-    return self.value
-
-  @property
-  def hashclass(self):
-    ''' The hash class comes from the hash code.
-    '''
-    return self.value.hashclass
-
-  @staticmethod
-  def parse_value(bfr):
-    ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
-    '''
-    hashenum = BSUInt.parse_value(bfr)
-    hashcls = HashCode.by_hashenum[hashenum]
-    return hashcls.from_hashbytes(bfr.take(hashcls.hashlen))
-
-  # pylint: disable=arguments-renamed
-  @staticmethod
-  def transcribe_value(hashcode):
-    ''' Serialise a hashcode.
-    '''
-    yield BSUInt.transcribe_value(hashcode.hashenum)
-    yield hashcode
-
-decode_buffer = HashCodeField.parse_value
-decode = HashCodeField.parse_value_from_bytes
-
 class HashCode(
     BaseHashCode,
     Transcriber,
@@ -309,6 +273,42 @@ class HashCodeType(type, Promotable):
     if isclass(obj) and issubclass(obj, HashCode):
       return obj
     return super().promote(obj)
+
+class HashCodeField(BinarySingleValue, HasDotHashclassMixin,
+                    value_type=HashCode):
+  ''' Binary transcription of hashcodes.
+  '''
+
+  @property
+  def hashcode(self):
+    ''' The value named `.hashcode`.
+    '''
+    return self.value
+
+  @property
+  def hashclass(self):
+    ''' The hash class comes from the hash code.
+    '''
+    return self.value.hashclass
+
+  @staticmethod
+  def parse_value(bfr):
+    ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
+    '''
+    hashenum = BSUInt.parse_value(bfr)
+    hashcls = HashCode.by_hashenum[hashenum]
+    return hashcls.from_hashbytes(bfr.take(hashcls.hashlen))
+
+  # pylint: disable=arguments-renamed
+  @staticmethod
+  def transcribe_value(hashcode):
+    ''' Serialise a hashcode.
+    '''
+    yield BSUInt.transcribe_value(hashcode.hashenum)
+    yield hashcode
+
+decode_buffer = HashCodeField.parse_value
+decode = HashCodeField.parse_value_from_bytes
 
 class HashCodeUtilsMixin:
   ''' Utility methods for classes which use `HashCode`s as keys.
