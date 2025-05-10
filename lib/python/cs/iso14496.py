@@ -650,6 +650,9 @@ class BoxBody(SimpleBinary):
     else:
       BoxBody._register_subclass_boxtypes(cls)
 
+  def __init__(self, *ns_a, **ns_kw):
+    super().__init__(*ns_a, _parsed_field_names=[], **ns_kw)
+
   @staticmethod
   def _register_subclass_boxtypes(cls, prior_cls=None):
     # update the mapping of box_type to BoxBody subclass
@@ -759,7 +762,6 @@ class BoxBody(SimpleBinary):
         Subclasses implement a `parse_fields` method to parse additional fields.
     '''
     self = cls()
-    self._parsed_field_names = []
     self.parse_fields(bfr)
     return self
 
