@@ -33,7 +33,7 @@ import shutil
 import stat
 import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
-from threading import Lock, RLock
+from threading import current_thread, Lock, RLock
 import time
 
 from cs.buffer import CornuCopyBuffer
@@ -563,7 +563,7 @@ def make_files_property(
 def makelockfile(
     path,
     *,
-    ext=None,
+    ext='.lock',
     poll_interval=None,
     timeout=None,
     runstate: RunState,
@@ -581,7 +581,7 @@ def makelockfile(
       * `path`: the base associated with the lock file,
         often the filesystem object whose access is being managed.
       * `ext`: the extension to the base used to construct the lockfile name.
-        Default: ".lock"
+        Default: `".lock"`
       * `timeout`: maximum time to wait before failing.
         Default: `None` (wait forever).
         Note that zero is an accepted value
@@ -596,13 +596,11 @@ def makelockfile(
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
-  if ext is None:
-    ext = '.lock'
   if timeout is not None and timeout < 0:
     raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
   lockpath = path + ext
-  with Pfx("makelockfile: %r", lockpath):
+  with Pfx("makelockfile, thread %s: %r", current_thread().name, lockpath):
     while True:
       if runstate.cancelled:
         warning(
@@ -642,6 +640,10 @@ def makelockfile(
         time.sleep(sleep_for)
         continue
       else:
+        os.write(
+            lockfd,
+            b'pid %d Thread %r\n' % (os.getpid(), current_thread().name)
+        )
         break
     if keepopen:
       return lockpath, lockfd
@@ -1587,6 +1589,7 @@ def lines_of(fp, partials=None):
 @contextmanager
 def atomic_filename(
     filename,
+    *,
     exists_ok=False,
     placeholder=False,
     dir=None,

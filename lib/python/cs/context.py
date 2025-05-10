@@ -563,8 +563,10 @@ class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
       running the first and second steps of a single `__enter_exit__` generator method.
 
-      *Note*: the `__enter_exit__` method is _not_ a context manager,
-      but a short generator method.
+      *Note*: the `__enter_exit__` method _is not a context manager_,
+      it is a short generator method.
+      Its first `yield` is the normal `yield` for a context manager.
+      A second `yield` may be used to indicate that an exception was handled.
 
       This makes it easy to use context managers inside `__enter_exit__`
       as the setup/teardown process, for example:

@@ -118,6 +118,9 @@ _venv:
     if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
     then  $(trace) $(venv_pip) install -r "$$pip_reqs" \
     fi
+    if [ -n "$${VENV_EXTRAS:-}" ] \
+    then  $(trace) $(uv) pip install -p '$(venv_python)' $$VENV_EXTRAS \
+    fi
 
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)

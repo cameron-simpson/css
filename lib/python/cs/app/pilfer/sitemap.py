@@ -40,7 +40,8 @@ class URLMatcher(Promotable):
 
   @cached_property
   def url_re(self):
-    return re.compile(self.url_regexp)
+    with Pfx('url_re( %s )', self.url_regexp):
+      return re.compile(self.url_regexp)
 
   @promote
   def match(
@@ -97,7 +98,7 @@ class SiteMap(Promotable):
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
       clause in the configuration file, see the `Pilfer.sitemaps`
-      property for specific.
+      property for specifics.
 
       Example:
 
@@ -322,7 +323,7 @@ class DocSite(SiteMap):
           # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
           (
               None,
-              r'.*(/|\\' + '|\\'.join(CACHE_SUFFIXES),
+              r'.*(/|\\' + '|\\'.join(CACHE_SUFFIXES) + ')',
           ),
           '{__}',
       ),
@@ -375,3 +376,17 @@ class Wikipedia(SiteMap):
     if key is not None:
       key = f'{cutsuffix(url.hostname, ".wikipedia.org")}/{key}'
     return key
+
+@dataclass
+class Docker(SiteMap):
+
+  URL_KEY_PATTERNS = [
+      # https://registry-1.docker.io/v2/linuxserver/ffmpeg/blobs/sha256:6e04116828ac8a3a5f3297238a6f2d0246440a95c9827d87cafe43067e9ccc5d
+      (
+          (
+              'registry-*.docker.io',
+              r'/v2/.*/blobs/[^/]+:[^/]+$',
+          ),
+          'blobs/{__}',
+      ),
+  ]

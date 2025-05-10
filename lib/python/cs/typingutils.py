@@ -5,7 +5,7 @@
 
 from typing import get_args, get_origin, TypeVar, Union
 
-__version__ = '20250428-post'
+__version__ = '20250503-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -28,7 +28,7 @@ def is_optional(annotation):
   except ValueError:
     # an Optional is [type,None]
     return None
-  if none is not None:
+  if none is not None and none is not type(None):
     # [type1,type2] is not an Optional
     return None
   return t

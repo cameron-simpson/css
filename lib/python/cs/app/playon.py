@@ -32,7 +32,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import fmtdoc, promote, Promotable, uses_quiet
+from cs.deco import fmtdoc, promote, Promotable, uses_quiet, uses_verbose
 from cs.fileutils import atomic_filename
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
@@ -321,8 +321,8 @@ class PlayOnCommand(BaseCommand):
       with Pfx(arg):
         recording_ids = sqltags.recording_ids_from_str(arg)
         if not recording_ids:
-          warning("no recording ids")
-          xit = 1
+          if sys.stderr.isatty():
+            warning("no recording ids")
           continue
         for dl_id in recording_ids:
           recording = sqltags[dl_id]
@@ -343,7 +343,15 @@ class PlayOnCommand(BaseCommand):
               recording.ls()
             else:
               sem.acquire()  # pylint: disable=consider-using-with
-              Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
+              Rs.append(
+                  bg_result(
+                      _dl,
+                      dl_id,
+                      sem,
+                      _extra=dict(dl_id=dl_id),
+                      _name=f'playon dl {dl_id} {recording.name}',
+                  )
+              )
 
     if Rs:
       for R in report_results(Rs):
@@ -1144,6 +1152,7 @@ class PlayOnAPI(HTTPServiceAPI):
   # pylint: disable=too-many-locals
   @pfx_method
   @uses_quiet
+  @uses_verbose
   @uses_runstate
   @typechecked
   def download(
@@ -1153,6 +1162,7 @@ class PlayOnAPI(HTTPServiceAPI):
       *,
       quiet: bool,
       runstate: RunState,
+      verbose: bool,
   ):
     ''' Download the file with `download_id` to `filename_basis`.
         Return the `TagSet` for the recording.
@@ -1198,7 +1208,7 @@ class PlayOnAPI(HTTPServiceAPI):
             total=dl_length,
             units_scale=BINARY_BYTES_SCALE,
             itemlenfunc=len,
-            report_print=not quiet,
+            report_print=not quiet if sys.stdout.isatty() else verbose,
         ):
           runstate.raiseif()
           offset = 0

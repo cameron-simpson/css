@@ -200,14 +200,6 @@ case "$op" in
       badopts=1
     fi
     ;;
-  rc)
-    rc_all=
-    [ $# = 0 ] || { [ "x$1" = x-a ] && { rc_all=1; shift; }; }
-    [ $# = 0 ] || {
-      echo "$cmd: $op: extra arguments: $*" >&2
-      badopts=1
-    }
-    ;;
   pick-new-prefix-session-remote)
     if [ $# = 0 ]
     then
@@ -236,6 +228,15 @@ case "$op" in
       echo "$cmd: $op: extra arguments after remote-host: $*" >&2
       badopts=1
     fi
+    ;;
+  rc)
+    # rc [-a]
+    rc_all=
+    [ $# = 0 ] || { [ "x$1" = x-a ] && { rc_all=1; shift; }; }
+    [ $# = 0 ] || {
+      echo "$cmd: $op: extra arguments: $*" >&2
+      badopts=1
+    }
     ;;
   recite-function-remote)
     if [ $# -gt 0 ]
