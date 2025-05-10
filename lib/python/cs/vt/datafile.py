@@ -229,7 +229,7 @@ class DataFile(FSPathBasedSingleton, MultiOpenMixin):
     if rf is None:
       # open our own file for the scan
       with pfx_call(open, self.fspath, 'rb') as rf:
-        yield from scanfrom(offset, rf=rf, with_offsets=with_offsets)
+        yield from self.scanfrom(offset, rf=rf, with_offsets=with_offsets)
       return
     if offset > 0:
       rf.seek(offset, SEEK_SET)
