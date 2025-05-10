@@ -98,7 +98,7 @@ class SiteMap(Promotable):
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
       clause in the configuration file, see the `Pilfer.sitemaps`
-      property for specific.
+      property for specifics.
 
       Example:
 
