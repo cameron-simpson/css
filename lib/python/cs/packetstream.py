@@ -460,7 +460,7 @@ class PacketConnection(MultiOpenMixin):
                               report_print=True):
                   later.wait_outstanding()
             with run_task("%s: close sendQ, wait for sender" % (self,),
-                          report_print=True):
+                          report_print=2.0):
               self._sendQ.close(enforce_final_close=True)
               self._send_thread.join()
             if not self._sendQ.empty():
@@ -490,7 +490,7 @@ class PacketConnection(MultiOpenMixin):
                     self,
                     self._recv_thread.name,
                 ),
-                report_print=True,
+                report_print=2.0,
             ):
               self._recv_thread.join()
           finally:
