@@ -990,6 +990,7 @@ class PacketConnection(MultiOpenMixin):
             sendf.flush()
       self.trace_log("::: END SEND LOOP %s", self)
       self.EOF_Packet.write(sendf, flush=True, log=self.trace_log)
+      sendf.flush()
 
 class BaseRequest(AbstractBinary):
   ''' A base class for request classes to use with `HasPacketConnection`.
