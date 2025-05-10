@@ -26,6 +26,7 @@ from cs.lex import (
     get_dotted_identifier,
     is_identifier,
     printt,
+    skipwhite,
 )
 import cs.logutils
 from cs.logutils import debug, error, warning
@@ -38,7 +39,7 @@ from . import (
     DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
     DEFAULT_MITM_LISTEN_PORT
 )
-from .parse import get_action_args, import_name
+from .parse import get_action_args, get_delim_regexp, import_name
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 
@@ -232,6 +233,29 @@ class PilferCommand(BaseCommand):
         )
 
   @popopts
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd} URL
+          Fetch URL and dump information from it.
+    '''
+    if not argv:
+      raise GteoptError("missing URL")
+    url = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments after URL: {argv!r}')
+    options = self.options
+    P = options.pilfer
+    print(url)
+    U = URL(url)
+    rsp = P.GET(url)
+    printt(
+        ('GET response headers:',),
+        *[
+            (f'  {key}', value) for key, value in
+            sorted(rsp.headers.items(), key=lambda kv: kv[0].lower())
+        ],
+    )
+
+  @popopts
   def cmd_from(self, argv):
     ''' Usage: {cmd} source [pipeline-defns...]
           Scrape information from source.
@@ -334,6 +358,10 @@ class PilferCommand(BaseCommand):
     mitm_addon = MITMAddon()
     for action in argv:
       with Pfx("action %r", action):
+        hook_names = None
+        args = []
+        kwargs = {}
+        url_regexps = []
         name, offset = get_dotted_identifier(action)
         if not name:
           warning("no action name")
@@ -360,32 +388,44 @@ class PilferCommand(BaseCommand):
             warning("cannot import %r: %s", action[:offset], e._)
             bad_actions = True
             continue
-        # :params
-        if action.startswith(':', offset):
-          offset += 1
-          args, kwargs, offset = get_action_args(action, offset, '@')
-        else:
-          args = []
-          kwargs = {}
-        # @hook,...
-        if action.startswith('@', offset):
-          offset += 1
-          end_hooks = action.find(':', offset)
-          if end_hooks == -1:
-            hook_names = action[offset:].split(',')
-            offset = len(action)
-          else:
-            hook_names = action[offset:end_hooks].split(',')
-            offset = end_hooks
-        else:
-          hook_names = None
-        if offset < len(action):
-          warning("unparsed text: %r", action[offset:])
-          bad_actions = True
-          continue
+        # gather @hooks and :params suffixes
+        while offset < len(action):
+          print("action", action, offset)
+          with Pfx("offset %d", offset):
+            # :params
+            if action.startswith(':', offset):
+              offset += 1
+              a, kw, offset = get_action_args(action, offset, '@')
+              args.extend(a)
+              kwargs.update(kw)
+            # @hook,...
+            elif action.startswith('@', offset):
+              offset += 1
+              # TODO: gather commas separated identifiers
+              end_hooks = action.find(':', offset)
+              if end_hooks == -1:
+                hook_names = action[offset:].split(',')
+                offset = len(action)
+              else:
+                hook_names = action[offset:end_hooks].split(',')
+                offset = end_hooks
+            # ~ /url-regexp/
+            elif action.startswith('~', offset):
+              offset = skipwhite(action, offset + 1)
+              regexp, offset = get_delim_regexp(action, offset)
+              url_regexps.append(regexp)
+            else:
+              warning("unparsed text: %r", action[offset:])
+              bad_actions = True
+              break
         try:
           pfx_call(
-              mitm_addon.add_action, hook_names, mitm_action, args, kwargs
+              mitm_addon.add_action,
+              hook_names,
+              mitm_action,
+              args,
+              kwargs,
+              url_regexps=url_regexps,
           )
         except ValueError as e:
           warning("invalid action spec: %s", e)
@@ -401,35 +441,46 @@ class PilferCommand(BaseCommand):
           With a sitemap name (eg "docs"), list the sitemap.
           WIth additional URLs, print the key for each URL.
     '''
-    P = self.options.pilfer
+    options = self.options
+    P = options.pilfer
     xit = 0
     if not argv:
+      # list site maps
       printt(
           *[
               [pattern, str(sitemap)]
               for pattern, sitemap in self.options.pilfer.sitemaps
           ]
       )
+      return 0
+    # use a particular sitemap
+    map_name = argv.pop(0)
+    print("map_name", map_name)
+    for domain_glob, sitemap in P.sitemaps:
+      if map_name == sitemap.name:
+        break
     else:
-      map_name = argv.pop(0)
-      print("map_name", map_name)
-      for domain_glob, sitemap in P.sitemaps:
-        if map_name == sitemap.name:
-          break
-      else:
-        warning("not sitemap named %r", map_name)
-        return 1
-      if argv:
-        for url in map(URL, argv):
-          print(url)
-          print("  key:", sitemap.url_key(url))
-      else:
-        for pattern in sitemap.URL_KEY_PATTERNS:
-          (domain_glob, path_re_s), format_s = pattern
-          printt(
-              ('Format:', format_s),
-              ('  Domain:', domain_glob),
-              ('  Path RE:', path_re_s),
-          )
+      warning("no sitemap named %r", map_name)
+      return 1
+    if not argv:
+      # no URLs: recite the site map patterns
+      for pattern in sitemap.URL_KEY_PATTERNS:
+        (domain_glob, path_re_s), format_s = pattern
+        printt(
+            ('Domain:', '*' if domain_glob is None else domain_glob),
+            ('  Path RE:', path_re_s),
+            ('  Format:', format_s),
+        )
+      return 0
+    # match URLs against the sitemap
+    table = []
+    for url in argv:
+      with Pfx(url):
+        U = URL(url)
+        table.extend((
+            ("URL:", url),
+            ("  key:", sitemap.url_key(url)),
+        ),)
+    printt(*table)
 
 sys.exit(main(sys.argv))

@@ -1589,6 +1589,7 @@ def lines_of(fp, partials=None):
 @contextmanager
 def atomic_filename(
     filename,
+    *,
     exists_ok=False,
     placeholder=False,
     dir=None,

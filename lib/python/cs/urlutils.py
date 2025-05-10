@@ -258,26 +258,14 @@ class URL(HasThreadState, Promotable):
   def soup(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    if self._soup is not None:
-      return self._soup
-    try:
-      text = self.text
-      if self.content_type == 'text/html':
-        parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
-      else:
-        parser_names = ('lxml', 'xml')
-      try:
-        soup = BeautifulSoup(text, 'html5lib')
-        ##soup = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
-      except Exception as e:
-        exception(
-            "%s: .parsed: BeautifulSoup(text,html5lib) fails: %s", self, e
-        )
-        raise
-      self._soup = soup
-      return soup
-    except:
-      raise
+    text = self.text
+    if self.content_type == 'text/html':
+      parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
+    else:
+      parser_names = ('lxml', 'xml')
+    ##soup = BeautifulSoup(text, 'html5lib')
+    soup = pfx_call(BeautifulSoup, text, list(parser_names))
+    return soup
 
   def feedparsed(self):
     ''' A parse of the content via the feedparser module.
