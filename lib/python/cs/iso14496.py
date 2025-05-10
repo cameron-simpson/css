@@ -1289,15 +1289,16 @@ class ListOfBoxes(ListOfBinary, item_type=Box):
     last_count = None
     boxgroups = []
     for box in self:
-      if last_box_type is None or last_box_type != box.type:
+      box_type = box.box_type_s
+      if last_box_type is None or last_box_type != box_type:
         if last_box_type is not None:
-          boxgroups.append((box.box_type_s, last_count))
-        last_box_type = box.box_type
+          boxgroups.append((last_box_type, last_count))
+        last_box_type = box_type
         last_count = 1
       else:
         last_count += 1
     if last_box_type is not None:
-      boxgroups.append((box.box_type_s, last_count))
+      boxgroups.append((last_box_type, last_count))
     type_listing = ",".join(
         box_type_s if count == 1 else f'{box_type_s}[{count}]'
         for box_type_s, count in boxgroups
