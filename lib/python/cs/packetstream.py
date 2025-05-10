@@ -992,7 +992,7 @@ class PacketConnection(MultiOpenMixin):
       self.EOF_Packet.write(sendf, flush=True, log=self.trace_log)
       sendf.flush()
 
-class BaseRequest(AbstractBinary):
+class BaseRequest:
   ''' A base class for request classes to use with `HasPacketConnection`.
 
       This is a mixin aimed at `*Binary` classes representing the
