@@ -809,7 +809,7 @@ class DataDir(FilesDir):
     with self._lock:
       WDFstate = self.WDFstate
       with WDFstate.datafile as df:
-        DR, file_offset, length = df.append(data)
+        (DR, file_offset, length), = df.extend([data])
       index_entry = FileDataIndexEntry(
           filenum=WDFstate.filenum,
           data_offset=file_offset + DR.data_offset,
