@@ -375,3 +375,17 @@ class Wikipedia(SiteMap):
     if key is not None:
       key = f'{cutsuffix(url.hostname, ".wikipedia.org")}/{key}'
     return key
+
+@dataclass
+class Docker(SiteMap):
+
+  URL_KEY_PATTERNS = [
+      # https://registry-1.docker.io/v2/linuxserver/ffmpeg/blobs/sha256:6e04116828ac8a3a5f3297238a6f2d0246440a95c9827d87cafe43067e9ccc5d
+      (
+          (
+              'registry-*.docker.io',
+              r'/v2/.*/blobs/[^/]+:[^/]+$',
+          ),
+          'blobs/{__}',
+      ),
+  ]
