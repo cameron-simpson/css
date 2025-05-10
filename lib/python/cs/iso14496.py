@@ -1057,8 +1057,10 @@ class Box(SimpleBinary):
     unparsed = self.unparsed
     self.unparsed = []
     bfr = CornuCopyBuffer(unparsed)
-    yield bfr
-    self.unparsed = list(bfr)
+    try:
+      yield bfr
+    finally:
+      self.unparsed = list(bfr)
 
   @property
   def box_type(self):
