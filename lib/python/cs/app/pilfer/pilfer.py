@@ -198,13 +198,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
   @property
   def defaults(self):
-    ''' Mapping for default values formed by cascading PilferRCs.
+    ''' Mapping for default values formed by cascading `PilferRC`s.
     '''
     return self.rc_map[None]
 
   @property
   def _(self):
-    ''' Shortcut to this Pilfer's user_vars['_'] entry - the current item value.
+    ''' Shortcut to this `Pilfer`'s `user_vars['_']` entry - the current item value.
     '''
     return self.user_vars['_']
 
