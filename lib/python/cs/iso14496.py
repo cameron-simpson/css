@@ -2124,9 +2124,9 @@ class STSZBoxBody(FullBoxBody):
     ''' Gather the `sample_size`, `sample_count`, and `entry_sizes` fields.
     '''
     super().parse_fields(bfr)
-    self.sample_size = UInt32BE.parse(bfr)
+    self.parse_field('sample_size', bfr, UInt32BE)
     sample_size = self.sample_size.value
-    self.sample_count = UInt32BE.parse(bfr)
+    self.parse_field('sample_count', bfr, UInt32BE)
     sample_count = self.sample_count.value
     if sample_size == 0:
       # a zero sample size means that each sample's individual size
