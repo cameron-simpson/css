@@ -177,6 +177,8 @@ case "$op" in
       badopts=1
     fi
     ;;
+  exec )
+    ;;
   ls | list-sessions)
     ;;
   pick-new-prefix-session)
@@ -386,6 +388,41 @@ case "$op" in
   down)  do_tmux select-pane -D ;;
   left)  do_tmux select-pane -L ;;
   right) do_tmux select-pane -R ;;
+  exec)
+    # execute the specified tmux session
+    # start initial tmux sessions; just the named ones of names specified
+    # obtains definitions from $HOME/.tmrc
+    cd
+    if [ ! -f "$tmrc" ]
+    then
+      echo "$cmd: $op: no tmrc: $tmrc" >&2
+      exit 1
+    fi
+    tmrc \
+    | \
+    {
+      xit=0
+      matched=
+      while read -r session_name shcmd
+      do
+        if [ $# -gt 0 ]
+        then
+          case " $* " in
+            *" $session_name "*)
+              ;;
+            *)continue
+              ;;
+          esac
+        fi
+        matched=1
+        [ -n "$shcmd" ] || shcmd='exec $SHELL'
+        set -x
+        exec sh -c "set -x; $shcmd"
+      done
+      echo "$cmd: $op: no sessions matched" >&2
+      xit=1
+    }
+    ;;
   ls | list-sessions)
     # no tmux? use scr
     have_tmux || exec $trace scr
