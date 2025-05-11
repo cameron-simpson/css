@@ -14,14 +14,10 @@ ISO make the standard available here:
 
 from base64 import b64encode, b64decode
 from collections import namedtuple
-try:
-  from collections.abc import Buffer
-except ImportError:
-  from typing import ByteString as Buffer
 from contextlib import closing, contextmanager
 from datetime import datetime, UTC
 from functools import cached_property
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import os
 import sys
 from typing import Iterable, List, Mapping, Tuple, Union
@@ -42,7 +38,6 @@ from cs.binary import (
     BinaryUTF8NUL,
     BinaryUTF16NUL,
     SimpleBinary,
-    BinaryListValues,
     BinaryStruct,
     BinaryMultiValue,
     BinarySingleValue,
@@ -56,6 +51,7 @@ from cs.cmdutils import BaseCommand, popopts
 from cs.deco import decorator
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
+from cs.gimmicks import Buffer
 from cs.imageutils import sixel_from_image_bytes
 from cs.lex import (
     cropped_repr,
@@ -63,7 +59,6 @@ from cs.lex import (
     get_identifier,
     get_decimal_value,
     printt,
-    tabulate,
 )
 from cs.logutils import warning, debug
 from cs.pfx import Pfx, pfx_call, pfx_method, XP
@@ -296,7 +291,7 @@ class MP4Command(BaseCommand):
         return 1
       with PARSE_MODE(discard_data=not options.with_data):
         rows = []
-        seen_paths = {path: False for path in type_paths}
+        seen_paths = dict.fromkeys(type_paths, False)
         scan_table = []
         for topbox in Box.scan(bfr):
           if not type_paths:
@@ -1259,7 +1254,7 @@ class Box(SimpleBinary):
         tags.update(meta_box.tagset(), prefix=box_prefix + '.meta')
       udta_box = self.UDTA0
       if udta_box:
-        pass  # X("UDTA?")
+        # X("UDTA?")
         udta_meta_box = udta_box.META0
         if udta_meta_box:
           ilst_box = udta_meta_box.ILST0
@@ -1575,7 +1570,6 @@ class TKHDBoxBody(FullBoxBody2):
 
   @classmethod
   def parse_fields(cls, bfr: CornuCopyBuffer) -> Mapping[str, AbstractBinary]:
-    X("{cls.__name__=} parse_fields")
     # parse the fixed fields from the superclass, FullBoxBody2
     parse_fields = super().parse_fields
     superfields = super()._datafieldtypes
@@ -2194,7 +2188,7 @@ class STZ2BoxBody(FullBoxBody):
     self.entry_sizes = entry_sizes
 
   def transcribe(self):
-    ''' transcribe the STZ2BoxBody.
+    ''' Transcribe the STZ2BoxBody.
     '''
     yield super().transcribe()
     yield self.reserved
@@ -2388,10 +2382,8 @@ class METABoxBody(FullBoxBody2):
   theHandler: Box
   boxes: ListOfBoxes
 
-
   def __iter__(self):
     return iter(self.boxes)
-
 
   @pfx_method
   def __getattr__(self, attr):
@@ -2402,7 +2394,7 @@ class METABoxBody(FullBoxBody2):
     try:
       # direct attribute access
       return super().__getattr__(attr)
-    except AttributeError as e:
+    except AttributeError:
       # otherwise dereference through the .ilst subbox if present
       ilst = super().__getattr__('ILST0')
       if ilst is not None:
@@ -2657,7 +2649,6 @@ class ILSTBoxBody(ContainerBoxBody):
   }
 
   @classmethod
-  @trace
   def parse_fields(cls, bfr: CornuCopyBuffer):
     ''' An ILST body is a list of `Box`es, each of which is a container for data `Box`es.
     regardless of its ostensible type field.
@@ -2702,46 +2693,43 @@ class ILSTBoxBody(ContainerBoxBody):
               attribute_name = f'{mean_box.text}.{name_box.text}'
               setattr(subbox, attribute_name, value)
               tags.add(attribute_name, value)
+        # single data box
+        elif not inner_boxes:
+          warning("no inner boxes, expected 1 data box")
         else:
-          # single data box
-          if not inner_boxes:
-            warning("no inner boxes, expected 1 data box")
-          else:
-            data_box, = inner_boxes
-            with data_box.reparse_buffer() as databfr:
-              data_box.parse_field('n1', databfr, UInt32BE)
-              data_box.parse_field('n2', databfr, UInt32BE)
-              subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
-              if subbox_schema is None:
-                bs = databfr.take(...)
-                ##warning("%r: no schema, stashing bytes %r", subbox_type, bs)
-                data_box.add_field(
-                    'subbox__' + subbox_type.decode('ascii'), bs
-                )
-              else:
-                attribute_name, binary_cls = subbox_schema
-                with Pfx("%s=%s", attribute_name, binary_cls):
-                  try:
-                    data_box.parse_field(attribute_name, databfr, binary_cls)
-                  except (ValueError, TypeError) as e:
-                    warning("decode fails: %s", e)
+          data_box, = inner_boxes
+          with data_box.reparse_buffer() as databfr:
+            data_box.parse_field('n1', databfr, UInt32BE)
+            data_box.parse_field('n2', databfr, UInt32BE)
+            subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
+            if subbox_schema is None:
+              bs = databfr.take(...)
+              ##warning("%r: no schema, stashing bytes %r", subbox_type, bs)
+              data_box.add_field('subbox__' + subbox_type.decode('ascii'), bs)
+            else:
+              attribute_name, binary_cls = subbox_schema
+              with Pfx("%s=%s", attribute_name, binary_cls):
+                try:
+                  data_box.parse_field(attribute_name, databfr, binary_cls)
+                except (ValueError, TypeError) as e:
+                  warning("decode fails: %s", e)
+                else:
+                  # also annotate the subbox and the tags
+                  value = getattr(data_box, attribute_name)
+                  setattr(subbox, attribute_name, value)
+                  if isinstance(value, BinarySingleValue):
+                    tag_value = value.value
+                  elif isinstance(value, tuple) and len(value) == 1:
+                    tag_value, = value
                   else:
-                    # also annotate the subbox and the tags
-                    value = getattr(data_box, attribute_name)
-                    setattr(subbox, attribute_name, value)
-                    if isinstance(value, BinarySingleValue):
-                      tag_value = value.value
-                    elif isinstance(value, tuple) and len(value) == 1:
-                      tag_value, = value
-                    else:
-                      tag_value = value
-                    if isinstance(tag_value, bytes):
-                      tags.add(
-                          attribute_name,
-                          b64encode(tag_value).decode('ascii')
-                      )
-                    else:
-                      tags.add(attribute_name, tag_value)
+                    tag_value = value
+                  if isinstance(tag_value, bytes):
+                    tags.add(
+                        attribute_name,
+                        b64encode(tag_value).decode('ascii')
+                    )
+                  else:
+                    tags.add(attribute_name, tag_value)
     # TODO: what about the tags? extract them later with a property?
     return dict(boxes=subboxes)
 
