@@ -1169,7 +1169,9 @@ class Box(SimpleBinary):
       recurse=False,
       file=None
   ) -> List[Tuple[str, str]]:
-    ''' Dump this `Box` 
+    ''' Dump this `Box` as a table of descriptions.
+        Return a list of `(title,description)` 2-tuples
+        suitable for use with `cs.lex.printt()`.
     '''
     if table is None:
       table = []
@@ -2782,36 +2784,6 @@ def parse_tags(path, tag_prefix=None):
             new_tags.update(Tag(tag, prefix=tag_prefix) for tag in tags)
             tags = new_tags
           yield box, tags
-
-@parse_offsets
-def parse(o):
-  ''' Return the `OverBox` from a source (str, int, bytes, file).
-
-      The leading `o` parameter may be one of:
-      * `str`: a filesystem file pathname
-      * `int`: a OS file descriptor
-      * `bytes`: a `bytes` object
-      * `file`: if not `int` or `str` the presumption
-        is that this is a file-like object
-
-      Keyword arguments are as for `OverBox.from_buffer`.
-  '''
-  fd = None
-  if isinstance(o, str):
-    fd = os.open(o, os.O_RDONLY)
-    bfr = CornuCopyBuffer.from_fd(fd)
-  elif isinstance(o, int):
-    bfr = CornuCopyBuffer.from_fd(o)
-  elif isinstance(o, bytes):
-    bfr = CornuCopyBuffer.from_bytes([o])
-  else:
-    bfr = CornuCopyBuffer.from_file(o)
-  over_box = OverBox.parse(bfr)
-  if bfr.bufs:
-    warning("unparsed data in bfr: %r", list(map(len, bfr.bufs)))
-  if fd is not None:
-    os.close(fd)
-  return over_box
 
 # pylint: disable=too-many-locals,too-many-branches
 def report(box, indent='', fp=None, indent_incr=None):
