@@ -2654,10 +2654,19 @@ class ILSTBoxBody(ContainerBoxBody):
       for schema_code, schema in reversed(SUBBOX_SCHEMA.items())
   }
 
-  def __init__(self, **dcls_fields):
-    super().__init__(**dcls_fields)
-    self.tags = TagSet()
-    for subbox in self.boxes:
+  @classmethod
+  @trace
+  def parse_fields(cls, bfr: CornuCopyBuffer):
+    ''' An ILST body is a list of `Box`es, each of which is a container for data `Box`es.
+    regardless of its ostensible type field.
+        The meaning of the sbuboxes depends on the ILST box type field.
+
+        Therefore we always scan the subboxes as plain `BoxBody` boxes,
+        then parse their meaning once loaded.
+    '''
+    subboxes = list(Box.scan(bfr, body_type_for=lambda _: BoxBody))
+    tags = TagSet()
+    for subbox in subboxes:
       subbox_type = bytes(subbox.box_type)
       with Pfx("subbox %r", subbox_type):
         with subbox.reparse_buffer() as subbfr:
@@ -2669,26 +2678,28 @@ class ILSTBoxBody(ContainerBoxBody):
           assert mean_box.box_type == b'mean'
           assert name_box.box_type == b'name'
           with mean_box.reparse_buffer() as meanbfr:
-            mean_box.parse_field_value('n1', meanbfr, UInt32BE)
-            mean_box.parse_field_value('text', meanbfr, _ILSTUTF8Text)
+            mean_box.parse_field('n1', meanbfr, UInt32BE)
+            mean_box.parse_field('text', meanbfr, _ILSTUTF8Text)
           with Pfx("mean %r", mean_box.text):
             with name_box.reparse_buffer() as namebfr:
-              name_box.parse_field_value('n1', namebfr, UInt32BE)
-              name_box.parse_field_value('text', namebfr, _ILSTUTF8Text)
+              name_box.parse_field('n1', namebfr, UInt32BE)
+              name_box.parse_field('text', namebfr, _ILSTUTF8Text)
             with Pfx("name %r", name_box.text):
               with data_box.reparse_buffer() as databfr:
-                data_box.parse_field_value('n1', databfr, UInt32BE)
-                data_box.parse_field_value('n2', databfr, UInt32BE)
-                data_box.parse_field_value('text', databfr, _ILSTUTF8Text)
+                data_box.parse_field('n1', databfr, UInt32BE)
+                data_box.parse_field('n2', databfr, UInt32BE)
+                data_box.parse_field('text', databfr, _ILSTUTF8Text)
               value = data_box.text
-              subsubbox_schema = self.SUBSUBBOX_SCHEMA.get(mean_box.text, {})
-              decoder = subsubbox_schema.get(name_box.text)
+              subsubbox_schema = cls.SUBSUBBOX_SCHEMA.get(
+                  mean_box.text.value, {}
+              )
+              decoder = subsubbox_schema.get(name_box.text.value)
               if decoder is not None:
                 value = decoder(value)
               # annotate the subbox and the ilst
               attribute_name = f'{mean_box.text}.{name_box.text}'
               setattr(subbox, attribute_name, value)
-              self.tags.add(attribute_name, value)
+              tags.add(attribute_name, value)
         else:
           # single data box
           if not inner_boxes:
@@ -2696,9 +2707,9 @@ class ILSTBoxBody(ContainerBoxBody):
           else:
             data_box, = inner_boxes
             with data_box.reparse_buffer() as databfr:
-              data_box.parse_field_value('n1', databfr, UInt32BE)
-              data_box.parse_field_value('n2', databfr, UInt32BE)
-              subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
+              data_box.parse_field('n1', databfr, UInt32BE)
+              data_box.parse_field('n2', databfr, UInt32BE)
+              subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
                 bs = databfr.take(...)
                 ##warning("%r: no schema, stashing bytes %r", subbox_type, bs)
@@ -2723,12 +2734,14 @@ class ILSTBoxBody(ContainerBoxBody):
                     else:
                       tag_value = value
                     if isinstance(tag_value, bytes):
-                      self.tags.add(
+                      tags.add(
                           attribute_name,
                           b64encode(tag_value).decode('ascii')
                       )
                     else:
-                      self.tags.add(attribute_name, tag_value)
+                      tags.add(attribute_name, tag_value)
+    # TODO: what about the tags? extract them later with a property?
+    return dict(boxes=subboxes)
 
   def __getattr__(self, attr):
     # see if this is a schema long name
