@@ -611,7 +611,8 @@ class BoxHeader(BinaryMultiValue('BoxHeader', {
     return UUID(bytes=self.user_type)
 
 class BoxBody(SimpleBinary):
-  ''' Abstract basis for all `Box` bodies.
+  ''' The basis for all `Box` bodies.
+      This base class does not parse any of the body content.
   '''
 
   FIELD_TYPES = dict(offset=int, end_offset=int)
@@ -775,7 +776,7 @@ class BoxBody(SimpleBinary):
         from what gets transcribed.
     '''
     instance = binary_cls.parse(bfr)
-    self.add_field('_' + field_name + '__Binary', instance)
+    self.add_field(f'_{field_name}__Binary', instance)
     setattr(self, field_name, instance.value)
 
   def parse_field(self, field_name, bfr: CornuCopyBuffer, binary_cls):
