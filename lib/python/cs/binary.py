@@ -929,7 +929,8 @@ class BinarySingleValue(AbstractBinary, Promotable):
   def __repr__(self):
     return "%s(%r)" % (
         type(self).__name__,
-        getattr(self, 'value', f'<NO-{self.__class__.__name__}.value>')
+        getattr(self, 'value', None)
+        or f'<NO-{self.__class__.__name__}.value>',
     )
 
   def __str__(self):
