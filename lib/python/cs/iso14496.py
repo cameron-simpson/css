@@ -2454,14 +2454,23 @@ def ILSTUInt8Schema(attribute_name):
   return _attr_schema(attribute_name, UInt8)
 
 # class to decode n/total as a pair of UInt32BE values
-_ILSTAofBSchema = BinaryMultiValue(
-    'ILSTAofBSchema', dict(n=UInt32BE, total=UInt32BE)
-)
+@binclass
+class ILSTAofB:
+  n: UInt32BE
+  total: UInt32BE
+
+  def __str__(self):
+    total_s = "..." if self.total == 0 else str(self.total)
+    return f'{self.n}/{total_s}'
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self}'
+
 
 def ILSTAofBSchema(attribute_name):
   ''' Attribute name and type for ILST "A of B" schema.
   '''
-  return _attr_schema(attribute_name, _ILSTAofBSchema)
+  return _attr_schema(attribute_name, ILSTAofB)
 
 # class to decode bytes as UTF-8 of ISO8601 datetime string
 _ILSTISOFormatSchema = pt_spec(
