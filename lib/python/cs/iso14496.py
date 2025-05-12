@@ -1189,6 +1189,7 @@ class Box(SimpleBinary):
         box_content = str(body)
         box_content__ = cutsuffix(box_content, '()')
         if box_content__ is not box_content:
+          # there are fields in the brackets
           if box_desc:
             box_content = f'{box_content__}: {box_desc}'
           else:
@@ -1197,8 +1198,8 @@ class Box(SimpleBinary):
             f'{row_indent}{box.box_type_s}',
             box_content,
         ))
-      # indent the subrows
       if dump_fields:
+        # indent the subrows
         field_indent = row_indent + subindent
         for field_name in sorted(filter(
             lambda name: all((
@@ -2468,6 +2469,8 @@ _ILSTISOFormatSchema = pt_spec(
     ),
     name='ILSTISOFormatSchema',
     value_type=datetime,
+    ##as_str=lambda self: self.value.isoformat(sep='T', timespec='seconds'),
+    ##as_repr=lambda self: self.value.isoformat(sep='T', timespec='seconds'),
 )
 
 def ILSTISOFormatSchema(attribute_name):
@@ -2714,8 +2717,9 @@ class ILSTBoxBody(ContainerBoxBody):
               data_box.parse_field('n2', databfr, UInt32BE)
               subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
+                # no specific schema, just stash the bytes
                 bs = databfr.take(...)
-                ##warning("%r: no schema, stashing bytes %r", subbox_type, bs)
+                warning("%r: no schema, stashing bytes %r", subbox_type, bs)
                 data_box.add_field(
                     'subbox__' + subbox_type.decode('ascii'), bs
                 )
