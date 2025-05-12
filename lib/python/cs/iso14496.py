@@ -818,12 +818,15 @@ class BoxBody(SimpleBinary):
         self._parsed_field_names,
     )
 
-  def parse_boxes(self, bfr: CornuCopyBuffer, **box_scan_kw):
+  def parse_boxes(
+      self, bfr: CornuCopyBuffer, field_name='boxes', **box_scan_kw
+  ):
     ''' Utility method to parse the remainder of the buffer as a
-        sequence of `Box`es.
+        sequence of `Box`es and to save them as the attribute named by `field_name`<
+        default `".boxes"`.
     '''
-    self.boxes = list(Box.scan(bfr, **box_scan_kw))
-    self._parsed_field_names.append('boxes')
+    setattr(self, field_name, list(Box.scan(bfr, **box_scan_kw)))
+    self._parsed_field_names.append(field_name)
 
   @classmethod
   def boxbody_type_from_class(cls):
@@ -2466,7 +2469,6 @@ class ILSTAofB:
 
   def __repr__(self):
     return f'{self.__class__.__name__}:{self}'
-
 
 def ILSTAofBSchema(attribute_name):
   ''' Attribute name and type for ILST "A of B" schema.
