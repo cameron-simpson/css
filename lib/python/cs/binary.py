@@ -2152,6 +2152,7 @@ def binclass(cls, kw_only=True):
           self._data, field_types=self.FIELD_TYPES
       )
 
+    @bcmethod
     def __str__(self):
       cls = self.__class__
       fieldnames = self._field_names
@@ -2166,6 +2167,7 @@ def binclass(cls, kw_only=True):
           ),
       )
 
+    @bcmethod
     def __repr__(self):
       cls = self.__class__
       data = self.__dict__.get('_data')
