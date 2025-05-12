@@ -2742,12 +2742,15 @@ class ILSTBoxBody(ContainerBoxBody):
                   except (ValueError, TypeError) as e:
                     warning("decode fails: %s", e)
                   else:
-                    data_attr = gettar(data_box, attribute_name)
+                    data_attr = getattr(data_box, attribute_name)
                     tag_value = data_attr.value if is_single_value(
                         data_attr
                     ) else data_attr
                   if isinstance(tag_value, bytes):
-                    tags.add(attribute_name, b64encode(tag_value).decode('ascii'))
+                    tags.add(
+                        attribute_name,
+                        b64encode(tag_value).decode('ascii')
+                    )
                   else:
                     tags.add(attribute_name, tag_value)
     # TODO: what about the tags? extract them later with a property?
