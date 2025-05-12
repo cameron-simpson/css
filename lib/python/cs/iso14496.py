@@ -2675,87 +2675,94 @@ class ILSTBoxBody(ContainerBoxBody):
         Therefore we always scan the subboxes as plain `BoxBody` boxes,
         then parse their meaning once loaded.
     '''
-    # scan in the member Boxes, ignoring their box types
-    subboxes = list(Box.scan(bfr, body_type_for=lambda _: BoxBody))
     tags = TagSet()
+    # scan in the member Boxes, ignoring their box type fields
+    subboxes = list(Box.scan(bfr, body_type_for=lambda _: BoxBody))
     # process each member by looking up its `box_type` in SUBSUBBOX_SCHEMA
     for subbox in subboxes:
       subbox_type = bytes(subbox.box_type)
       with Pfx("subbox %r", subbox_type):
         # first, parse the contained "data" subboxes
         with subbox.reparse_buffer() as subbfr:
-          subbox.parse_boxes(subbfr)
-        inner_boxes = list(subbox.boxes)
+          data_boxes = list(Box.scan(subbfr, body_type_for=lambda _: BoxBody))
+        for i, data_box in enumerate(data_boxes):
+          if data_box.box_type != b'data':
+            warning(
+                "data_boxes[%d].box_type is not b'data': got %r", i,
+                data_box.box_type
+            )
         if subbox_type == b'----':
           # 3 boxes: mean, name, value
-          mean_box, name_box, data_box = inner_boxes
+          #
+          # The mean Box.
+          mean_box = data_boxes.pop(0)
           assert mean_box.box_type == b'mean'
+          subbox.add_field('mean', mean_box)
+          with mean_box.reparse_buffer() as meanbfr:
+            mean_box.parse_field('_n1', meanbfr, UInt32BE)
+            mean_box.parse_field('text', meanbfr, _ILSTUTF8Text)
+          mean_value = mean_box.text.value
+          subsubbox_schema = cls.SUBSUBBOX_SCHEMA.get(mean_value, {})
+          #
+          # The name Box.
+          name_box = data_boxes.pop(0)
           assert name_box.box_type == b'name'
-          with Pfx("parse mean_box"):
-            with mean_box.reparse_buffer() as meanbfr:
-              mean_box.parse_field('n1', meanbfr, UInt32BE)
-              mean_box.parse_field('text', meanbfr, _ILSTUTF8Text)
-            # the schema name, for use with SUBSUBBOX_SCHEMA
-            mean_value = mean_box.text.value
-            with Pfx("mean %r, parse name_box", mean_box.text):
-              with name_box.reparse_buffer() as namebfr:
-                name_box.parse_field('n1', namebfr, UInt32BE)
-                name_box.parse_field('text', namebfr, _ILSTUTF8Text)
-              # the decoder name, a field in the schema
-              name_value = name_box.text.value
-              with Pfx("name %r, parse_data_box", name_box.text):
-                with data_box.reparse_buffer() as databfr:
-                  data_box.parse_field('n1', databfr, UInt32BE)
-                  data_box.parse_field('n2', databfr, UInt32BE)
-                  data_box.parse_field('text', databfr, _ILSTUTF8Text)
-                data_value = data_box.text.value
-                subsubbox_schema = cls.SUBSUBBOX_SCHEMA.get(mean_value, {})
-                decoder = subsubbox_schema.get(name_value)
-                if decoder is not None:
-                  data_value = pfx_call(decoder, data_value)
-                # annotate the subbox and the ilst
-                attribute_name = f'{mean_box.text}.{name_box.text}'
-                setattr(subbox, attribute_name, data_value)
-                tags.add(attribute_name, data_value)
-        # single data box
-        elif not inner_boxes:
-          warning("no inner boxes, expected 1 data box")
+          subbox.add_field('name', name_box)
+          with name_box.reparse_buffer() as namebfr:
+            name_box.parse_field('_n1', namebfr, UInt32BE)
+            name_box.parse_field('text', namebfr, _ILSTUTF8Text)
+          name_value = name_box.text.value
+          #
+          # The data Box.
+          data_box = data_boxes.pop(0)
+          assert data_box.box_type == b'data'
+          subbox.add_field('data', data_box)
+          with data_box.reparse_buffer() as databfr:
+            data_box.parse_field('_n1', databfr, UInt32BE)
+            data_box.parse_field('_n2', databfr, UInt32BE)
+            data_box.parse_field('text', databfr, _ILSTUTF8Text)
+          # decode the data value
+          data_value = data_box.text.value
+          decoder = subsubbox_schema.get(name_value)
+          if decoder is not None:
+            data_value = pfx_call(decoder, data_value)
+          # annotate the subbox and the ilst
+          attribute_name = f'{mean_box.text}.{name_box.text}'
+          setattr(subbox, attribute_name, data_value)
+          tags.add(attribute_name, data_value)
         else:
-          # single data box
-          if not inner_boxes:
-            warning("no inner boxes, expected 1 data box")
-          else:
-            data_box, = inner_boxes
-            with data_box.reparse_buffer() as databfr:
-              data_box.parse_field('n1', databfr, UInt32BE)
-              data_box.parse_field('n2', databfr, UInt32BE)
-              subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
-              if subbox_schema is None:
-                # no specific schema, just stash the bytes
-                bs = databfr.take(...)
-                warning("%r: no schema, stashing bytes %r", subbox_type, bs)
-                data_box.add_field(
-                    'subbox__' + subbox_type.decode('ascii'), bs
-                )
-              else:
-                attribute_name, binary_cls = subbox_schema
-                with Pfx("%s=%s", attribute_name, binary_cls):
-                  try:
-                    data_box.parse_field(attribute_name, databfr, binary_cls)
-                  except (ValueError, TypeError) as e:
-                    warning("decode fails: %s", e)
-                  else:
-                    data_attr = getattr(data_box, attribute_name)
-                    tag_value = data_attr.value if is_single_value(
-                        data_attr
-                    ) else data_attr
-                  if isinstance(tag_value, bytes):
-                    tags.add(
-                        attribute_name,
-                        b64encode(tag_value).decode('ascii')
-                    )
-                  else:
-                    tags.add(attribute_name, tag_value)
+          # Other boxes have a single data subbox.
+          data_box = data_boxes.pop(0)
+          assert data_box.box_type == b'data'
+          with data_box.reparse_buffer() as databfr:
+            data_box.parse_field('_n1', databfr, UInt32BE)
+            data_box.parse_field('_n2', databfr, UInt32BE)
+            subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
+            if subbox_schema is None:
+              # no specific schema, just stash the bytes
+              bs = databfr.take(...)
+              warning("no schema, stashing bytes %s", cropped_repr(bs))
+              subbox.add_field(f'subbox__{subbox_type.decode("ascii")}', bs)
+            else:
+              attribute_name, binary_cls = subbox_schema
+              with Pfx("%s:%s", attribute_name, binary_cls):
+                try:
+                  subbox.parse_field(attribute_name, databfr, binary_cls)
+                except (ValueError, TypeError) as e:
+                  warning("decode fails: %s", e)
+                else:
+                  data_attr = getattr(subbox, attribute_name)
+                  tag_value = data_attr.value if is_single_value(
+                      data_attr
+                  ) else data_attr
+                if isinstance(tag_value, bytes):
+                  # record bytes in base64 in the Tag
+                  tag_value = b64encode(tag_value).decode('ascii')
+                tags.add(attribute_name, tag_value)
+        # Any trailing Boxes.
+        if data_boxes:
+          subbox.add_field('extra_boxes', data_boxes)
+          warning("%d unexpected extra boxes: %r", len(data_boxes), data_boxes)
     # TODO: what about the tags? extract them later with a property?
     return dict(boxes=subboxes)
 
