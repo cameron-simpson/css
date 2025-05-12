@@ -2405,8 +2405,10 @@ class METABoxBody(FullBoxBody2):
           return value
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
-class _attr_schema(namedtuple('attributed_schema',
-                              'attribute_name schema_class')):
+class _attr_schema(namedtuple('_attr_schema', 'attribute_name schema_class')):
+  ''' A `(attribute_name,schema_class)` 2-tuple
+      associating a long `attribute_name` with an `AbstractBinary`.
+  '''
 
   def __repr__(self):
     return f'schema({self.attribute_name}={self.schema_class.__name__})'
