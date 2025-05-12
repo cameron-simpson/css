@@ -903,6 +903,16 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
               super().__init__(field1=field1, field2=field2)
   '''
 
+  def __str__(self, attr_names=None):
+    if attr_names is None:
+      attr_names = sorted(
+          attr for attr in self.__dict__ if not attr.startswith('_')
+      )
+    fields_s = ",".join(
+        f'{attr}={getattr(self,attr,None)}' for attr in attr_names
+    )
+    return f'{self.__class__.__name__}({fields_s})'
+
 class BinarySingleValue(AbstractBinary, Promotable):
   ''' A representation of a single value as the attribute `.value`.
 
