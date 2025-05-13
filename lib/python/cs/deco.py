@@ -26,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks', 'cs.typeutils'],
+    'install_requires': ['cs.gimmicks', 'cs.typingutils'],
 }
 
 def ALL(func):
