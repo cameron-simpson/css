@@ -483,8 +483,23 @@ def print_argv(
     file=None,
     fold=False,
     print=None,
+    as_str=str,
 ):
-  ''' Print an indented possibly folded command line.
+  r'''Print an indented possibly folded command line.
+
+      Parameters:
+      * `argv`: the arguments to print
+      * `indent0`: optional indent for the first argument
+      * `indent`: optional per line indent if `fold` is true
+      * `subindent`: optional additional indent for the second and
+        following lines, default `"  "`
+      * `end`: optional line ending, default `"\n"`
+      * `file`: optional output file, default `sys.stdout`
+      * `fold`: optional fold mode, default `False`;
+        if true then arguments are laid out over multiple lines
+      * `print`: optional `print` callable, default `builtins.print`
+      * `as_str`: optional callable to convert arguments to strings, default `str`;
+        this can be `None` to avoid conversion
   '''
   if indent0 is None:
     indent0 = indent
@@ -495,6 +510,8 @@ def print_argv(
   pr_argv = []
   was_opt = False
   for i, arg in enumerate(argv):
+    if as_str is not None:
+      arg = as_str(arg)
     if i == 0:
       pr_argv.append(indent0)
       was_opt = False
