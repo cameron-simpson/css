@@ -1,3 +1,4 @@
+cs.distutils - check validity of cs.* install_requires names
 print_argv short str() its arguments - maybe only if they are pathlib.path?
 ListQueue: use a deque double eneded queue
 tagset save: if permissionerror on the temp file, rewrite in place if possible?
