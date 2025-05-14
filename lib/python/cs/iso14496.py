@@ -280,16 +280,13 @@ class MP4Command(BaseCommand):
     options = self.options
     if not argv:
       argv = ['-']
-    filespec = argv.pop(0)
-    type_paths = list(argv)
     xit = 0
+    filespec, bfr = self.pop_buffer(argv)
+    if bfr is None:
+      return 1
+    type_paths = list(argv)
     with Pfx("%r", filespec):
       print(filespec)
-      try:
-        bfr = CornuCopyBuffer.from_cli_filespec(filespec)
-      except FileNotFoundError as e:
-        warning("scannot scan: %s", e)
-        return 1
       with PARSE_MODE(discard_data=not options.with_data):
         rows = []
         seen_paths = dict.fromkeys(type_paths, False)
