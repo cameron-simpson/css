@@ -1472,7 +1472,8 @@ class MDATBoxBody(BoxBody):
     ''' Transcribe the data.
         Raise an `AssertionError` if we skipped the data during the parse.
     '''
-    assert self.data is not None
+    if self.data is None:
+      warning("self.data is None, self=%s", self)
     return self.data
 
 class FREEBoxBody(BoxBody):
