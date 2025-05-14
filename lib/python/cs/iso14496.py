@@ -2794,6 +2794,7 @@ class ILSTBoxBody(ContainerBoxBody):
             data_value = pfx_call(decoder, data_value)
           # annotate the subbox and the ilst
           attribute_name = f'{mean_box.text}.{name_box.text}'
+          setattr(subbox, 'attribute_name', attribute_name)
           setattr(subbox, attribute_name, data_value)
         else:
           # Other boxes have a single data subbox.
@@ -2829,6 +2830,8 @@ class ILSTBoxBody(ContainerBoxBody):
                 if isinstance(tag_value, bytes):
                   # record bytes in base64 in the Tag
                   tag_value = b64encode(tag_value).decode('ascii')
+                setattr(subbox, 'attribute_name', attribute_name)
+                setattr(subbox, attribute_name, tag_value)
         # Any trailing Boxes.
         if data_boxes:
           subbox.add_field('extra_boxes', data_boxes)
