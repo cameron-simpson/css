@@ -1300,12 +1300,11 @@ class Box(SimpleBinary):
   def walk(self,
            *,
            level=0,
-           limit=None) -> Iterable[Tuple["Box", List["Box"]]]:
+           limit=None) -> Iterable[Tuple[int, "Box", List["Box"]]]:
     ''' Walk this `Box` hierarchy.
 
-        Yields the starting box and its children as `(level,self,subboxes)`
-        and then yields `(level+1,subbox,subsubboxes)` for each child in turn,
-        recursing into the subboxes.
+        Yield `(level,self,subboxes)` 3-tuples starting with the top box (`self`)
+        and recursing into its subboxes.
 
         As with `os.walk`, the returned `subboxes` list
         may be modified in place to prune or reorder the subsequent walk.
