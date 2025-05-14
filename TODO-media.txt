@@ -1,3 +1,4 @@
+FIELD_TYPES should use Optional or Union instead of the False,type 2-tuples
 mp4 grep for subtitles, mp4 crop to extract a snippet of video
 static JPEG to MJPEG converter/streamer
 cs.cdrip: discid tag is a row id, needs to be the libdiscid value
