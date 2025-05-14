@@ -1223,6 +1223,84 @@ class Box(SimpleBinary):
     '''
     printt(*self.dump_table(**dump_table_kw), file=file)
 
+  # pylint: disable=too-many-locals,too-many-branches
+  def report_table(
+      self,
+      table=None,
+      indent='',
+      subindent='  ',
+  ):
+    ''' Report some human friendly information as a table.
+        Return a list of `(title,description)` 2-tuples
+        suitable for use with `cs.lex.printt()`.
+    '''
+    if table is None:
+      table = []
+    indent2 = indent + subindent
+    box_type = self.box_type_s
+    if box_type == 'ftyp':
+      table.append(
+          (
+              f'{indent}File type',
+              f'File type: {self.major_brand}, brands={self.brands_bs}'
+          )
+      )
+    elif box_type == 'free':
+      table.tappend((f'{indent}Free space', geek(len(self))))
+    elif box_type == 'mdat':
+      table.append((f'{indent}Media data', geek(len(self.body))))
+    elif box_type == 'moov':
+      mvhd = self.MVHD
+      table.append(
+          (
+              f'{indent}Movie',
+              ", ".join(
+                  (
+                      f'timescale={mvhd.timescale}',
+                      f'duration={mvhd.duration}',
+                      f'next_track_id={mvhd.next_track_id}',
+                  )
+              ),
+          )
+      )
+      for moov_box in self:
+        box_type = moov_box.box_type_s
+        if box_type == 'mvhd':
+          continue
+        moov_box.report_table(table, indent=indent2, subindent=subindent)
+    elif box_type == 'trak':
+      trak = self
+      edts = trak.EDTS0
+      mdia = trak.MDIA
+      mdhd = mdia.MDHD
+      tkhd = trak.TKHD
+      table.append((f'{indent}Track', f'duration={tkhd.duration}'))
+      table.append((f'{indent2}EDTS', ('No EDTS' if edts is None else edts)))
+      duration_s = transcribe_time(mdhd.duration.value / mdhd.timescale.value)
+      table.append(
+          (
+              f'{indent2}Media',
+              f'duration={duration_s} language={mdhd.language}'
+          )
+      )
+      for tbox in trak:
+        tbox_type = tbox.box_type_s
+        if tbox_type in ('edts', 'mdia', 'tkhd'):
+          continue
+        tbox.report_table(table, indent=indent2, subindent=subindent)
+    else:
+      box_s = str(self)
+      if len(box_s) > 58:
+        box_s = box_s[:55] + '...'
+      table.append((f'{indent}{box_type}', box_s))
+    return table
+
+  def report(self, file=None, **report_table_kw):
+    ''' Report on this `Box` to `file` (default `sys.stdout` per `cs.lex.printt`.
+        Other keyword paramaters are passed to `Box.report_table`.
+    '''
+    printt(*self.report_table(**report_table_kw), file=file)
+
   def walk(self,
            *,
            level=0,
