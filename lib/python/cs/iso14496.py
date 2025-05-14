@@ -736,6 +736,9 @@ class BoxBody(SimpleBinary):
       )
     return super().__str__(attr_names)
 
+  def __len__(self):
+    return self.end_offset - self.offset
+
   def __iter__(self):
     yield from self.boxes
 
@@ -877,6 +880,11 @@ class Box(SimpleBinary):
     return s
 
   __repr__ = __str__
+
+  def __bool__(self):
+    ''' A `Box` is always true, prevents implied call of `len()` for truthiness.
+    '''
+    return True
 
   def __getattr__(self, attr):
     ''' If there is no direct attribute from `SimpleBinary.__getattr__`,
