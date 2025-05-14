@@ -2748,7 +2748,6 @@ class ILSTBoxBody(ContainerBoxBody):
         Therefore we always scan the subboxes as plain `BoxBody` boxes,
         then parse their meaning once loaded.
     '''
-    tags = TagSet()
     # scan in the member Boxes, ignoring their box type fields
     subboxes = list(Box.scan(bfr, body_type_for=lambda _: BoxBody))
     # process each member by looking up its `box_type` in SUBSUBBOX_SCHEMA
@@ -2802,7 +2801,6 @@ class ILSTBoxBody(ContainerBoxBody):
           # annotate the subbox and the ilst
           attribute_name = f'{mean_box.text}.{name_box.text}'
           setattr(subbox, attribute_name, data_value)
-          tags.add(attribute_name, data_value)
         else:
           # Other boxes have a single data subbox.
           data_box = data_boxes.pop(0)
@@ -2831,12 +2829,10 @@ class ILSTBoxBody(ContainerBoxBody):
                 if isinstance(tag_value, bytes):
                   # record bytes in base64 in the Tag
                   tag_value = b64encode(tag_value).decode('ascii')
-                tags.add(attribute_name, tag_value)
         # Any trailing Boxes.
         if data_boxes:
           subbox.add_field('extra_boxes', data_boxes)
           warning("%d unexpected extra boxes: %r", len(data_boxes), data_boxes)
-    # TODO: what about the tags? extract them later with a property?
     return dict(boxes=subboxes)
 
   def __getattr__(self, attr):
