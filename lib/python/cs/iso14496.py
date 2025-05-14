@@ -2757,12 +2757,6 @@ class ILSTBoxBody(ContainerBoxBody):
         # first, parse the contained "data" subboxes
         with subbox.reparse_buffer() as subbfr:
           data_boxes = list(Box.scan(subbfr, body_type_for=lambda _: BoxBody))
-        for i, data_box in enumerate(data_boxes):
-          if data_box.box_type != b'data':
-            warning(
-                "data_boxes[%d].box_type is not b'data': got %r", i,
-                data_box.box_type
-            )
         if subbox_type == b'----':
           # 3 boxes: mean, name, value
           #
@@ -2803,6 +2797,12 @@ class ILSTBoxBody(ContainerBoxBody):
           setattr(subbox, attribute_name, data_value)
         else:
           # Other boxes have a single data subbox.
+          for i, data_box in enumerate(data_boxes):
+            if data_box.box_type != b'data':
+              warning(
+                  "data_boxes[%d].box_type is not b'data': got %r", i,
+                  data_box.box_type
+              )
           data_box = data_boxes.pop(0)
           assert data_box.box_type == b'data'
           with data_box.reparse_buffer() as databfr:
