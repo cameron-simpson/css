@@ -2855,6 +2855,12 @@ class ILSTBoxBody(ContainerBoxBody):
     ):
       return getattr(self, subbox_attr)
 
+  def metatags(self):
+    for subbox in self.boxes:
+      return TagSet(
+          **{subbox.attribute_name: getattr(subbox, subbox.attribute_name)}
+      )
+
 OpColor = BinaryStruct('OpColor', '>HHH', 'red green blue')
 
 @boxbodyclass
