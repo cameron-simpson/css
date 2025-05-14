@@ -1322,35 +1322,34 @@ class Box(SimpleBinary):
             level=level + 1, limit=(None if limit is None else limit - 1)
         )
 
-  def metatags(self):
-    ''' Return a `TagSet` containing metadata for this box.
+  def metatags(self) -> TagSet:
+    ''' Return a `TagSet` containing direct metadata for this box.
+        This default implementation returns an empty `TagSet`.
     '''
-    with Pfx("metatags(%r)", self.box_type):
-      box_prefix = self.box_type_s
-      tags = TagSet()
-      meta_box = self.META0
-      if meta_box:
-        tags.update(meta_box.tagset(), prefix=box_prefix + '.meta')
-      udta_box = self.UDTA0
-      if udta_box:
-        # X("UDTA?")
-        udta_meta_box = udta_box.META0
-        if udta_meta_box:
-          ilst_box = udta_meta_box.ILST0
-          if ilst_box:
-            tags.update(ilst_box.tags, prefix=box_prefix + '.udta.meta.ilst')
-      else:
-        pass  # X("NO UDTA")
-      ##dump_box(self, crop_length=None)
-      return tags
+    return TagSet()
 
-  def gather_metadata(self):
+  def gather_metadata(self, prepath='') -> Iterable[Tuple[str, "Box", TagSet]]:
     ''' Walk the `Box` hierarchy looking for metadata.
-        Yield `(Box,TagSet)` for each `b'moov'` or `b'trak'` `Box`.
+        Yield `(box_path,Box,TagSet)` 3-tuples for each `Box`
+        with a nonempty `.metatags`.
     '''
-    for _, box, _ in self.walk():
-      if box.box_type in (b'moov', b'trak'):
-        yield box, box.metatags()
+    path = f'{prepath}.{self.box_type_s}' if prepath else self.box_type_s
+    tags = self.metatags()
+    if tags:
+      yield path, self, tags
+    for subbox in self.boxes:
+      yield from subbox.gather_metadata(path)
+
+  def merged_metadata(self) -> TagSet:
+    ''' Return a `TagSet` containing the merged metadata from this `Box` down.
+    '''
+    tags = TagSet()
+    for path, box, tags in self.gather_metadata():
+      for tag_name, tag_value in tags.items():
+        merged_name = f'{path}.{tag_name}'
+        assert merged_name not in tags
+        tags[merged_name] = tag_value
+    return tags
 
 # patch us in
 Box.FIELD_TYPES['parent'] = (False, (type(None), Box))
