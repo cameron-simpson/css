@@ -235,37 +235,28 @@ class MP4Command(BaseCommand):
     if not argv:
       argv = ['-']
     xit = 0
-    for spec in argv:
-      with Pfx(spec):
-        if spec == '-':
-          parsee = sys.stdin.fileno()
+    first = True
+    for filespec, bfr in self.pop_buffers(argv):
+      if bfr is None:
+        continue
+      with Pfx(filespec):
+        if first:
+          first = False
         else:
-          parsee = spec
+          print()
+        print(filespec)
+        table = []
         with PARSE_MODE(discard_data=True):
-          over_box = parse(parsee)
-        print(spec + ":")
-        for top_box in over_box:
-          for box, tags in top_box.gather_metadata():
-            if tags:
-              print(' ', box.box_type_path, str(len(tags)) + ':')
-              for tag in tags:
-                with Pfx(tag.name):
-                  if tag.name == 'moov.udta.meta.ilst.cover':
-                    image_bs = b64decode(tag.value)
-                    if sys.stdout.isatty():
-                      print(f'    {tag.name}:')
-                      with open(sixel_from_image_bytes(image_bs),
-                                'rb') as sixelf:
-                        print(sixelf.read().decode('ascii'))
-                    else:
-                      print(f'    {tag.name}: {image_bs[:32]!r}...')
-                  else:
-                    try:
-                      print('   ', tag)
-                    except TypeError as e:
-                      warning("cannot print: %s", e)
-                      xit = 1
-                      print('   ', tag.name, '=', repr(tag.value))
+          for box in Box.scan(bfr):
+            box.report_table(table)
+            for subbox, tags in box.gather_metadata():
+              if not tags:
+                table.append((f'  {box.box_type_s}', 'No metadata.'))
+              else:
+                table.append((f'  {box.box_type_s}',))
+                for tag_name, tag_value in tags.items():
+                  table.append((f'    {tag_name}', tag_value))
+        trace(printt)(*table)
     return xit
 
   @popopts(
