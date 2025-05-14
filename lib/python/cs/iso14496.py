@@ -1824,7 +1824,7 @@ class MDHDBoxBody(FullBoxBody):
   def language(self):
     ''' The ISO 639‐2/T language code as decoded from the packed form.
     '''
-    language_short = self.language_short
+    language_short = self.language_short.value
     return bytes(
         [
             x + 0x60 for x in (
