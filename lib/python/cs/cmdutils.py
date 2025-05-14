@@ -54,10 +54,13 @@ import shlex
 from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 import sys
 from textwrap import dedent
-from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
+from typing import (
+    Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
+)
 
 from typeguard import typechecked
 
+from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
 from cs.deco import decorator, OBSOLETE, uses_cmd_options
 from cs.lex import (
@@ -1678,6 +1681,43 @@ class BaseCommand:
       if unpop_on_error:
         argv.insert(0, arg0)
       raise
+
+  @staticmethod
+  def pop_buffers(
+      argv: List[str]
+  ) -> Iterable[Tuple[str, Optional[CornuCopyBuffer]]]:
+    ''' A generator yielding `(filespec,CornuCopyBuffer)` 2-tuples
+        for each string in `argv` specifying a file.
+        The name `"-"` means the standard input (`sys.stdin`).
+        If a file is missing or stdin is a tty the yielded buffer is `None`.
+        Filespecs are consumed from `argv` one at a time, so ceasing
+        iteration of the generator leaves the tail of argv unconsumed.
+    '''
+    while argv:
+      filespec = argv.pop(0)
+      with Pfx(filespec):
+        if filespec == '-' and sys.stdin.isatty():
+          warning('stdin is a tty, not reading from it')
+          bfr = None
+        else:
+          try:
+            bfr = CornuCopyBuffer.from_cli_filespec(filespec)
+          except FileNotFoundError as e:
+            warning("not found: %s", e)
+            bfr = None
+      yield filespec, bfr
+
+  @classmethod
+  def pop_buffer(cls,
+                 argv: List[str]) -> Tuple[str, Optional[CornuCopyBuffer]]:
+    ''' Return a `(filespec,CornuCopyBuffer)` 2-tuple
+        from thw first string in `argv`.
+        The name `"-"` means the standard input (`sys.stdin`).
+        If the file is missing or stdin is a tty the yielded buffer is `None`.
+    '''
+    for filespec, bfr in cls.pop_buffers(argv):
+      return filespec, bfr
+    raise GetoptError("missing filespec, expected \"-\" or filesystem path")
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
