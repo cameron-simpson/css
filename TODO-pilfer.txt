@@ -1,3 +1,4 @@
+sitemaps: an @on(selector....) instead of the opaque pattern stuff in use presently, flexible generator/return types etc
 expose the site-by-sitemap stuff etc as methods on sitemaps?
 multiple @listen ? could listen on localhost and fleet2-wg
 autoreload modified sitemaps if modified and syntax ok?
