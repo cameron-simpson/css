@@ -9,10 +9,12 @@ from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
 from itertools import zip_longest
+import json
 import os
 import os.path
 from os.path import (
     abspath,
+    dirname,
     exists as existspath,
     expanduser,
     isabs as isabspath,
@@ -30,10 +32,12 @@ from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
+from cs.context import stackattrs
 from cs.deco import decorator, default_params, promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
-from cs.fs import HasFSPath, needdir
+from cs.fileutils import atomic_filename
+from cs.fs import HasFSPath, needdir, validate_rpath
 from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
