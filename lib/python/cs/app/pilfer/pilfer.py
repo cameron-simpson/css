@@ -120,6 +120,69 @@ def cache_url(item_P):
   P.cache_url(url)
   return item_P
 
+class PilferSession(MultiOpenMixin, HasFSPath):
+  ''' A proxy for a `requests.Session` which loads and saves state.
+  '''
+
+  @typechecked
+  def __init__(self, *, P: "Pilfer", key: str, **rqsession_kw):
+    if os.sep in key:
+      raise ValueError(f'forbidden {os.sep=} in {key=}')
+    validate_rpath(key)
+    self.pilfer = P
+    self.key = key
+    self._session = None
+
+  def __getattr__(self, attr):
+    # proxies unknown attributes to the internal requests.Session isntance
+    return getattr(self._session, attr)
+
+  @property
+  def fspath(self):
+    ''' The filesystem path of the session state directory.
+    '''
+    return self.pilfer.pathto(joinpath('sessions', self.key))
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Load the cookie state from its state file, and save on exit.
+    '''
+    with requests.Session() as session:
+      with stackattrs(self, _session=session):
+        self.load_cookies()
+        try:
+          yield self
+        finally:
+          self.save_cookies()
+
+  @property
+  def cookiespath(self):
+    ''' The filesystem path of the cookies save file.
+    '''
+    return self.pathto('cookies.json')
+
+  def load_cookies(self):
+    ''' Read any saved cookies from `self.cookiespath` and update `self.cookies`.
+    '''
+    try:
+      with trace(open)(self.cookiespath) as f:
+        d = json.load(f)
+    except FileNotFoundError:
+      # no saved cookies
+      pass
+    else:
+      self.cookies.update(d)
+
+  def save_cookies(self):
+    ''' Save `self.cookies` to `self.cookiespath`.
+    '''
+    cookiespath = self.cookiespath
+    cookies_dirpath = dirname(cookiespath)
+    needdir(cookies_dirpath)
+    with trace(atomic_filename)(cookiespath, mode='w', exists_ok=True) as f:
+      json.dump(self.cookies.get_dict(), f, indent=2)
+      f.write('\n')
+
 @dataclass
 class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
