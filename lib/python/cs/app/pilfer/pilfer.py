@@ -291,6 +291,70 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return URL.promote(self._)
 
+  def GET(
+      self,
+      url: str | URL,
+      *,
+      session: Optional[PilferSession] = None,
+      **get_kw,
+  ) -> requests.Response:
+    ''' Fetch `url` using the `GET` method, return a `requests.Response`.
+
+        If `session` is not supplied, `self.session` will be used.
+        Other keyword arguments are passed to `session.get`.
+    '''
+    if session is None:
+      session = self.session
+    return session.get(str(url), **get_kw)
+
+  def HEAD(
+      self,
+      url: str | URL,
+      *,
+      session: Optional[PilferSession] = None,
+      **head_kw,
+  ) -> requests.Response:
+    ''' Fetch `url` using the `HEAD` method, return a `requests.Response`.
+
+        If `session` is not supplied, `self.default_session` will be used.
+        Other keyword arguments are passed to `session.head`.
+    '''
+    if session is None:
+      session = self.default_session
+    return session.head(str(url), **head_kw)
+
+  def OPTIONS(
+      self,
+      url: str | URL,
+      *,
+      session: Optional[PilferSession] = None,
+      **options_kw,
+  ) -> requests.Response:
+    ''' Fetch `url` using the `OPTIONS` method, return a `requests.Response`.
+
+        If `session` is not supplied, `self.default_session` will be used.
+        Other keyword arguments are passed to `session.options`.
+    '''
+    if session is None:
+      session = self.default_session
+    return session.options(str(url), **options_kw)
+
+  def POST(
+      self,
+      url: str | URL,
+      *,
+      session: Optional[PilferSession] = None,
+      **post_kw,
+  ) -> requests.Response:
+    ''' Fetch `url` using the `POST` method, return a `requests.Response`.
+
+        If `session` is not supplied, `self.default_session` will be used.
+        Other keyword arguments are passed to `session.post`.
+    '''
+    if session is None:
+      session = self.default_session
+    return session.post(str(url), **post_kw)
+
   @cached_property
   def rc_map(self) -> Mapping[str | None, Mapping[str, str]]:
     ''' A `defaultdict` containing the merged sections from
