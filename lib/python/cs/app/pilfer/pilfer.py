@@ -218,6 +218,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       )
   )
   content_cache: ContentCache = None
+  # a session for storing cookies etc
+  session: PilferSession = None
   # for optional extra things hung on the Pilfer object
   state: NS = field(default_factory=NS)
   _diversion_tasks: dict = field(default_factory=dict)
@@ -236,6 +238,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       self.content_cache = ContentCache(
           expanduser(self.rc_map[None]['cache'] or self.pathto('cache'))
       )
+    if self.session is None:
+      self.session = PilferSession(P=self, key='_')
     ##self._lock = Lock()
     self._lock = RLock()
 
@@ -247,11 +251,12 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   def __enter_exit__(self):
     ''' Run both the inherited context managers.
     '''
-    for _ in zip_longest(
-        MultiOpenMixin.__enter_exit__(self),
-        HasThreadState.__enter_exit__(self) if self.default else (),
-    ):
-      yield
+    with self.session:
+      for _ in zip_longest(
+          MultiOpenMixin.__enter_exit__(self),
+          HasThreadState.__enter_exit__(self) if self.default else (),
+      ):
+        yield
 
   @contextmanager
   def startup_shutdown(self):
