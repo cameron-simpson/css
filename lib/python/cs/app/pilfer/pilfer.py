@@ -219,7 +219,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   )
   content_cache: ContentCache = None
   # a session for storing cookies etc
-  session: PilferSession = None
+  session: str | PilferSession = None
   # for optional extra things hung on the Pilfer object
   state: NS = field(default_factory=NS)
   _diversion_tasks: dict = field(default_factory=dict)
@@ -227,6 +227,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   @uses_later
   def __post_init__(self, item=None, later: Later = None):
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    # TODO: should this be in the PilferSession? find out how it is used
     self.url_opener.add_handler(HTTPCookieProcessor())
     if self.fspath is None:
       self.fspath = abspath(
@@ -238,8 +239,12 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       self.content_cache = ContentCache(
           expanduser(self.rc_map[None]['cache'] or self.pathto('cache'))
       )
+    # default session named '_'
     if self.session is None:
-      self.session = PilferSession(P=self, key='_')
+      self.session = '_'
+    # promote string to session named by the string
+    if isinstance(self.session, str):
+      self.session = PilferSession(P=self, key=self.session)
     ##self._lock = Lock()
     self._lock = RLock()
 
