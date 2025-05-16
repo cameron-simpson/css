@@ -15,6 +15,7 @@ try:
 except ImportError:
   pass
 
+from bs4 import BeautifulSoup, NavigableString
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
@@ -32,6 +33,7 @@ import cs.logutils
 from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
+from cs.queues import ListQueue
 from cs.resources import uses_runstate
 from cs.urlutils import URL
 
@@ -254,6 +256,45 @@ class PilferCommand(BaseCommand):
             sorted(rsp.headers.items(), key=lambda kv: kv[0].lower())
         ],
     )
+    content_type, *_ = map(str.strip, rsp.headers['content-type'].split(';'))
+    if content_type == 'text/html':
+      soup = pfx_call(BeautifulSoup, rsp.text, 'html5lib')
+    else:
+      soup = None
+      warning(f'no dump facility for {content_type=}')
+    if soup is not None:
+      table = []
+      q = ListQueue([('', soup.head), ('', soup.body)])
+      for indent, tag in q:
+        subindent = indent + '  '
+        if isinstance(tag, NavigableString):
+          table.append(('', str(tag).strip()))
+          continue
+        # sorted copy of the attributes
+        attrs = dict(sorted(tag.attrs.items()))
+        label = tag.name
+        # pop off the id attribute if present, include in the label
+        try:
+          id_attr = attrs.pop('id')
+        except KeyError:
+          pass
+        else:
+          label += f' #{id_attr}'
+        children = list(tag.children)
+        if not attrs and len(children) == 1 and isinstance(children[0],
+                                                           NavigableString):
+          desc = str(children[0].strip())
+        else:
+          desc = " ".join(
+              f'{attr}={value!r}' for attr, value in attrs.items()
+          ) if attrs else ''
+          for index, subtag in enumerate(children):
+            q.insert(index, (subindent, subtag))
+        table.append((
+            f'{indent}{label}',
+            desc,
+        ))
+      printt(*table)
 
   @popopts
   def cmd_from(self, argv):
