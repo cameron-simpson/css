@@ -163,19 +163,20 @@ class PilferSession(MultiOpenMixin, HasFSPath):
   def cookiespath(self):
     ''' The filesystem path of the cookies save file.
     '''
-    return self.pathto('cookies.json')
+    return self.pathto('cookies.ndjson')
 
   def load_cookies(self):
     ''' Read any saved cookies from `self.cookiespath` and update `self.cookies`.
     '''
+    cookies = self.cookies
+    errors = []
     try:
       with trace(open)(self.cookiespath) as f:
-        d = json.load(f)
+        for d in scan_ndjson(f, error_list=errors):
+          self.add_morsel(morsel(**d))
     except FileNotFoundError:
       # no saved cookies
       pass
-    else:
-      self.cookies.update(d)
 
   def save_cookies(self):
     ''' Save `self.cookies` to `self.cookiespath`.
@@ -183,9 +184,12 @@ class PilferSession(MultiOpenMixin, HasFSPath):
     cookiespath = self.cookiespath
     cookies_dirpath = dirname(cookiespath)
     needdir(cookies_dirpath)
-    with trace(atomic_filename)(cookiespath, mode='w', exists_ok=True) as f:
-      json.dump(self.cookies.get_dict(), f, indent=2)
-      f.write('\n')
+    with atomic_filename(cookiespath, mode='w', exists_ok=True) as f:
+      for cookie in self.cookies:
+        m = self.cookie_as_morsel(cookie)
+        d = dict(name=m.key, value=m.value)
+        d.update(dict(m))
+        dump_ndjson(d, f)
 
 @dataclass
 class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
