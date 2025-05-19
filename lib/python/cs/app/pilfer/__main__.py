@@ -267,8 +267,11 @@ class PilferCommand(BaseCommand):
       q = ListQueue([('', soup.head), ('', soup.body)])
       for indent, tag in q:
         subindent = indent + '  '
+        # TODO: looks like commants are also NavigableStrings, intercept here
         if isinstance(tag, NavigableString):
-          table.append(('', str(tag).strip()))
+          text = str(tag).strip()
+          if text:
+            table.append(('', text))
           continue
         # sorted copy of the attributes
         attrs = dict(sorted(tag.attrs.items()))
