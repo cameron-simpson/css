@@ -165,6 +165,45 @@ class PilferSession(MultiOpenMixin, HasFSPath):
     '''
     return self.pathto('cookies.ndjson')
 
+  @property
+  def cookies(self):
+    ''' The cookie jar from the underlying `Session`.
+    '''
+    return self._session.cookies
+
+  @staticmethod
+  def cookie_as_morsel(cookie) -> Morsel:
+    ''' Return a `http.cookies.Morsel` representing a cookie
+        from `self.cookies`.
+    '''
+    ##pprint(cookie.__dict__)
+    return morsel(
+        name=cookie.name,
+        value=cookie.value,
+        domain=cookie.domain,
+        path=cookie.path,
+        expires=cookie.expires,
+        httponly=cookie._rest.get('HttpOnly', False),
+        samesite=False,
+        secure=cookie.secure,
+    )
+
+  def add_morsel(self, morsel: Morsel):
+    ''' Set the cookie from an `http.cookies.Morsel` instance.
+    '''
+    md = dict(morsel)
+    self.cookies.set(
+        morsel.key,
+        morsel.value,
+        comment=md['comment'],
+        domain=md['domain'],
+        path=md['path'],
+        expires=md['expires'],
+        rfc2109=True,
+        secure=md['secure'],
+        version=md['version'] or 0,
+    )
+
   def load_cookies(self):
     ''' Read any saved cookies from `self.cookiespath` and update `self.cookies`.
     '''
