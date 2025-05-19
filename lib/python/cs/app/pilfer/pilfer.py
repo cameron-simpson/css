@@ -8,6 +8,7 @@ import copy
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
+from http.cookies import Morsel, SimpleCookie
 from itertools import zip_longest
 import json
 import os
@@ -23,6 +24,7 @@ from os.path import (
 import shlex
 import sys
 from threading import RLock
+import time
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
 from types import SimpleNamespace as NS
@@ -42,6 +44,7 @@ from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
+from cs.ndjson import dump_ndjson, scan_ndjson, write_ndjson
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
@@ -52,6 +55,7 @@ from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
 from .cache import ContentCache
+from .cookies import morsel, read_firefox_cookies
 from .format import FormatMapping
 from .parse import import_name
 from .sitemap import SiteMap
