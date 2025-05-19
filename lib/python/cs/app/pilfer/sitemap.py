@@ -21,6 +21,10 @@ from cs.urlutils import URL
 from bs4 import BeautifulSoup
 from typeguard import typechecked
 
+def default_Pilfer():
+  from .pilfer import Pilfer
+  return Pilfer.default()
+
 @dataclass
 class URLMatcher(Promotable):
   ''' A class for matching a `URL` against a `(hostname_fnmatch,url_regexp)` pair.
@@ -117,13 +121,7 @@ class SiteMap(Promotable):
   ) -> "SiteMap":
     ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
     '''
-    if P is None:
-      from .pilfer import Pilfer
-      P = Pilfer.default()
-      if P is None:
-        raise ValueError(
-            f'{cls.__name__}.from_str({sitemap_name!r}): no Pilfer to search for sitemaps'
-        )
+    P = P or default_Pilfer()
     for name, sitemap in P.sitemaps:
       if name == sitemap_name:
         return sitemap
@@ -255,9 +253,7 @@ class SiteMap(Promotable):
         - `"hrefs"`: all the anchor `href` values
         - `"srcs"`: all the anchor `src` values
     '''
-    from .pilfer import Pilfer
-    if P is None:
-      P = Pilfer.default()
+    P = P or default_Pilfer()
     if not isinstance(P, Pilfer):
       print("NO PILFER")
       breakpoint()
