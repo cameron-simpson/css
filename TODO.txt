@@ -1,3 +1,4 @@
+printt: output formats - csv, html, md1 does this even make sense?
 TagSet ontologies - make it easy to define ontology type information and to set it
 cs.distutils - check validity of cs.* install_requires names
 print_argv short str() its arguments - maybe only if they are pathlib.path?
