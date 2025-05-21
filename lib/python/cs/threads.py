@@ -337,12 +337,13 @@ def bg(
       * `pre_enter_objects`: an optional iterable of objects which
         should be entered using `with`
 
-      If `pre_enter_objects` is supplied, these objects will be
-      entered before the `Thread` is started and exited when the
+      If `pre_enter_objects` is supplied, these context manager
+      objects will be entered using `with` via the `closeall()`
+      function before the `Thread` is started and exited when the
       `Thread` target function ends.
       If the `Thread` is _not_ started (`no_start=True`, very
-      unusual) then it will be the caller's responsibility to manage
-      to entered objects.
+      unusual) then the objects will still be entered and it will
+      be the caller's responsibility to manage the entered objects.
   '''
   if name is None:
     name = funcname(func)
