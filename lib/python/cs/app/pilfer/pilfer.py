@@ -214,7 +214,7 @@ class PilferSession(MultiOpenMixin, HasFSPath):
     cookies = self.cookies
     errors = []
     try:
-      with trace(open)(self.cookiespath) as f:
+      with open(self.cookiespath) as f:
         for d in scan_ndjson(f, error_list=errors):
           self.add_morsel(morsel(**d))
     except FileNotFoundError:
