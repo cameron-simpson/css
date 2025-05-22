@@ -478,6 +478,9 @@ class SiteMap(Promotable):
               case _:
                 warning("unhandled prefetch arg")
 
+# expose the @on decorator globally
+on = SiteMap.on
+
 # Some presupplied site maps.
 
 @dataclass
