@@ -214,6 +214,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
+from cs.context import withall
 from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable
 from cs.edit import edit_strings, edit as edit_lines
@@ -2833,12 +2834,9 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Open all the sub`TagSets` and close on exit.
     '''
     subs = list(self._subtagsetses)
-    for subtagsets in subs:
-      subtagsets.open()
-    with super().startup_shutdown():
-      yield
-    for subtagsets in subs:
-      subtagsets.close()
+    with withall(subs):
+      with super().startup_shutdown():
+        yield
 
   @classmethod
   @pfx_method(with_args=True)
