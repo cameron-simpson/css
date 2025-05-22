@@ -737,9 +737,17 @@ def _withall(obj_it):
       yield from _withall(obj_it)
 
 @contextmanager
-def withall(objs):
+def withall(*objs):
   ''' Enter every object `obj` in `objs` except those which are `None`
       using `with obj:`, then yield.
+
+      Example:
+
+          with withall(
+              db1,
+              db2,
+          ):
+              ... work with db1 and db2 ...
   '''
   yield from _withall(obj for obj in objs if obj is not None)
 
