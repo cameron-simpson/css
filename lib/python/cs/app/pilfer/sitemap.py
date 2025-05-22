@@ -496,6 +496,7 @@ class SiteMap(Promotable):
         - `"hrefs"`: all the anchor `href` values
         - `"srcs"`: all the anchor `src` values
     '''
+    from .pilfer import Pilfer
     P = P or default_Pilfer()
     if not isinstance(P, Pilfer):
       print("NO PILFER")
