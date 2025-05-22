@@ -343,6 +343,35 @@ class SiteMap(Promotable):
         yield method, matched
         continue
 
+  @pfx_method
+  @promote
+  def grok(self, on_state: OnState, P: "Pilfer" = None):
+    ''' Call each method matching `on_state` with the `on_state`.
+        Return a list of `(method,match_tags,grokked)` 3-tuples being:
+        - a reference to the fired grok method
+        - the match `TagSet` derived from matching that method
+        - the result of calling the method, often a `TagSet`
+        Exceptions are gathered and, if any, an `ExceptionGroup` is raised
+        (unless there's just one, it which case it is raised directly).
+    '''
+    P = P or default_Pilfer()
+    results = []
+    excs = []
+    for method, match_tags in self.on_matches(on_state):
+      try:
+        grokked = method(self, on_state, match_tags)
+      except Exception as e:
+        warning(f'failed call to {method=}: {e}')
+        excs.append(e)
+      else:
+        results.append((method, match_tags, grokked))
+    if excs:
+      if len(excs) == 1:
+        raise excs[0]
+      else:
+        raise ExceptionGroup(f'exceptions grokking {on_state=}', excs)
+    return results
+
   def matches(
       self,
       url: URL,
