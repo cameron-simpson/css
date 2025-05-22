@@ -2713,6 +2713,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       As a example, consider the tag `colour=blue`.
       Meta information about `blue` is obtained via the ontology,
       which has an entry for the colour `blue`.
+
       We adopt the convention that the type is just the tag name,
       so we obtain the metadata by calling `ontology.metadata(tag)`
       or alternatively `ontology.metadata(tag.name,tag.value)`
@@ -2720,9 +2721,10 @@ class TagsOntology(SingletonMixin, BaseTagSets):
 
       The ontology itself is based around `TagSets` and effectively the call
       `ontology.metadata('colour','blue')`
-      would look up the `TagSet` named `colour.blue` in the underlying `Tagsets`.
+      would look up the `TagSet` named `colour.blue` in the ontology.
 
       For a self contained dataset this means that it can be its own ontology.
+
       For tags associated with arbitrary objects
       such as the filesystem tags maintained by `cs.fstags`
       the ontology would be a separate tags collection stored in a central place.
@@ -2735,19 +2737,23 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         describing the type named *typename*;
         really this is just more metadata where the "type name" is `type`
 
-      Metadata are `TagSets` instances describing particular values of a type.
-      For example, some metadata for the `Tag` `colour="blue"`:
+      Metadata are `TagSet` instances describing particular values of a type.
+      For example, the metadata `TagSet` for the `Tag` `colour="blue"`:
 
-          colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
+          colour.blue
+            url="https://en.wikipedia.org/wiki/Blue"
+            wavelengths="450nm-495nm"
 
       Some metadata associated with the `Tag` `actor="Scarlett Johansson"`:
 
-          actor.scarlett_johansson role=["Black Widow (Marvel)"]
-          character.marvel.black_widow fullname=["Natasha Romanov"]
+          actor.scarlett_johansson
+            role=["Black Widow (Marvel)"]
+          character.marvel.black_widow
+            fullname=["Natasha Romanov"]
 
       The tag values are lists above because an actor might play many roles, etc.
 
-      There's a convention for converting human descriptions
+      There's a default convention for converting human descriptions
       such as the role string `"Black Widow (Marvel)"` to its metadata.
       * the value `"Black Widow (Marvel)"` if converted to a key
         by the ontology method `value_to_tag_name`;
