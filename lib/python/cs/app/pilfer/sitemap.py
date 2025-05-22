@@ -306,6 +306,43 @@ class SiteMap(Promotable):
     cond_attr.append(conditions)
     return method
 
+  @classmethod
+  @promote
+  def on_matches(cls, on_state: OnState):
+    ''' A generator yielding methods matched by `on_state`.
+    '''
+    for method_name in dir(cls):
+      try:
+        method = getattr(cls, method_name)
+      except AttributeError:
+        continue
+      try:
+        conditions = method.on_conditions
+      except AttributeError:
+        continue
+      matched = TagSet()
+      for condition in conditions:
+        for test in condition:
+          with Pfx("on_matches: test %r vs %s", method_name, test):
+            try:
+              test_result = test(on_state)
+            except Exception as e:
+              warning("exception in test: %s", e)
+              raise
+            # test ran, examine result
+            if test_result is None or test_result is False:
+              # failure
+              break
+            # success
+            if test_result is not True:
+              # should be a mapping, update the matched TagSet
+              for k, v in test_result.items():
+                matched[k] = v
+      else:
+        # no test failed
+        yield method, matched
+        continue
+
   def matches(
       self,
       url: URL,
