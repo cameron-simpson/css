@@ -22,7 +22,6 @@ FIREFOX_COOKIE_SQL_COLUMNS = (
     'isPartitionedAttributeSet'
 )
 
-@trace
 def morsel(name: str, value: Any, **morsel_kw) -> Morsel:
   ''' A factory to make a new `http.cookies.Morsel` from scratch.
   '''
@@ -40,7 +39,6 @@ class FirefoxCookie(namedtuple('FirefoxCookie', FIREFOX_COOKIE_SQL_COLUMNS)):
       `cookies.sqlite` database's `moz_cookies` table.
   '''
 
-  @trace
   def as_Morsel(self) -> Morsel:
     ''' Return `self` as an `http.cookies.Morsel`.
     '''
