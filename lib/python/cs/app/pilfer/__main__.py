@@ -349,6 +349,27 @@ class PilferCommand(BaseCommand):
     asyncio.run(run())
 
   @popopts
+  def cmd_grok(self, argv):
+    ''' Usage: {cmd} URL
+          Call every matching @on method for sitemaps matching URL.
+    '''
+    if not argv:
+      raise GteoptError("missing URL")
+    url = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments after URL: {argv!r}')
+    options = self.options
+    P = options.pilfer
+    print(url)
+    table = [(url,)]
+    for method, match_tags, grokked in P.grok(url):
+      table.append((f'  {method}', "\n".join(map(str, sorted(match_tags)))))
+      if grokked is not None:
+        for k, v in grokked.items():
+          table.append((f'  {k}', v))
+    printt(*table)
+
+  @popopts
   def cmd_mitm(self, argv):
     ''' Usage: {cmd} [@[address]:port] action[:params...][@hook,...]...
           Run a mitmproxy for traffic filtering.
