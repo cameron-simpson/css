@@ -633,6 +633,16 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       return sitemap
     return None
 
+  @pfx_method
+  @promote
+  def grok(self, url: URL):
+    ''' Parse information from `url` by applying all matching methods from the site maps.
+        Yield `(method,match_tags,grokked)` 3-tuples.
+    '''
+    with self:
+      for sitemap in self.sitemaps_for(url):
+        yield from sitemap.grok(url)
+
   @promote
   def url_matches(self, url: URL, pattern_type: str, *, extra=None):
     ''' Scan `self.sitemaps_for(url)` for patterns matching the URL.
