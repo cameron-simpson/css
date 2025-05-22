@@ -222,6 +222,90 @@ class SiteMap(Promotable):
         f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
     )
 
+  @staticmethod
+  @decorator
+  def on(method, *patterns, **patterns_kw):
+    ''' A decorator for handler methods.
+
+        Its parameters indicate the conditions under which this method
+        will be fired; all must be true.
+        Each use of the decorator appends its combination of
+        conditions on the method's `.on_conditions` attribute.
+
+        Other parameters have the following meanings:
+        - the values in `patterns` may be strings or callables;
+          strings are considered globs to match against the hostname
+          if they contain no slashes or regular expressions to match
+          against the URL path otherwise - a leading slash anchors
+          the regexp against the start of the path;
+          callables are called with the `flow` and may make any test against it
+        - the `patterns_kw` name various attributes of the `flow` or
+          the `flow.response` or `flow.request` (when there's no response
+          yet); their values may be strings or callables
+
+        Example:
+
+            @on('docs.pytho.org', '/3/library/(?P<module_name>[^/]+).html$')
+            def cache_module_html(
+                self,     # the SiteMap instance
+                url,      # the URL
+                flow,     # the mitmproxy Flow
+                P:Pilfer, # the current Pilfer context
+            ):
+                P.cache(flow, '{flow.requs
+    '''
+    assert not patterns_kw, "not yet implemented"
+    conditions = []
+    for pattern in patterns:
+      with Pfx(f'pattern={r(pattern)}'):
+        condition = None
+        if isinstance(pattern, str):
+          if '/' in pattern:
+            # a path match
+            regexp = pfx_call(re.compile, pattern)
+            if pattern.startswith('/'):
+              # match at the start of the path
+              condition = (
+                  lambda regexp: (
+                      lambda on_state:
+                      (m := pfx_call(regexp.match, on_state.url.path)
+                       ) and m.groupdict()
+                  )
+              )(
+                  regexp
+              )
+            else:
+              # match anywhere
+              condition = (
+                  lambda regexp: (
+                      lambda on_state:
+                      (m := pfx_call(regexp.search, on_state.url.path)
+                       ) and m.groupdict()
+                  )
+              )(
+                  regexp
+              )
+          else:
+            # filename glob on the URL host
+            condition = (
+                lambda pattern: (
+                    lambda on_state:
+                    pfx_call(fnmatch, on_state.url.hostname, pattern)
+                )
+            )(
+                pattern
+            )
+        else:
+          raise RuntimeError
+        assert condition is not None
+        conditions.append(condition)
+    try:
+      cond_attr = method.on_conditions
+    except AttributeError:
+      cond_attr = method.on_conditions = []
+    cond_attr.append(conditions)
+    return method
+
   def matches(
       self,
       url: URL,
