@@ -8,17 +8,20 @@ from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
 import re
+from types import SimpleNamespace
 from typing import Iterable, Mapping, Optional
 
 from cs.binary import bs
-from cs.deco import promote, Promotable
-from cs.lex import cutsuffix
+from cs.deco import decorator, promote, Promotable
+from cs.lex import cutsuffix, r
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.rfc2616 import content_type
+from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
+from mitmproxy.flow import Flow
 from typeguard import typechecked
 
 def default_Pilfer():
@@ -78,6 +81,96 @@ class URLMatcher(Promotable):
     except (TypeError, ValueError):
       return super().promote(obj)
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
+
+@dataclass
+class OnState(SimpleNamespace, Promotable):
+
+  ##@trace
+  @promote
+  def __init__(self, **ns_kw):
+    ''' Initialise `self` from the keyword parameters.
+
+        The end result is that we have `.flow`, `.request`,
+        `.response` and `.url` attributes, which may be `None`
+        if omitted.
+        Some of these have computed defaults if omitted:
+        - `.request` and `.response` are obtained from `.flow`
+        - `.url` is obtained from `.request.url`
+    '''
+    super().__init__(**ns_kw)
+    extra_attrs = self.__dict__.keys() - ('flow', 'request', 'response', 'url')
+    if extra_attrs:
+      raise ValueError(f'unexpected attributes supplied: {extra_attrs}')
+
+  def __str__(self):
+    attr_listing = ",".join(
+        f'{attr}={value}' for attr, value in self.__dict__.items()
+    )
+    return f'{self.__class__.__name__}({attr_listing})'
+
+  __repr__ = __str__
+
+  def __getattr__(self, attr):
+    if attr[0].isalpha():
+      return getattr(self.url, attr)
+    raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
+  @classmethod
+  def from_str(cls, url_s: str):
+    ''' Promote a `str` URL to a `OnState`.
+    '''
+    return cls(url=URL(url_s))
+
+  @classmethod
+  def from_URL(cls, url: URL):
+    ''' Promote a `URL` URL to a `OnState`.
+    '''
+    return cls(url=url)
+
+  @classmethod
+  def from_Flow(cls, flow: Flow):
+    ''' Promote a `Flow` to a `OnState`.
+    '''
+    return cls(flow=flow)
+
+  @cached_property
+  def url(self) -> URL:
+    X("%s: .url()...", self)
+    return URL(self.response.url)
+
+  @cached_property
+  def response_headers(self):
+    ''' Cached response headers.
+        Does a `HEAD` of the URL if there is no `self.response`;
+        this sets `self.response` as a side effect.
+    '''
+    if not self.response:
+      self.response = self.url.HEAD()
+    return self.response.headers
+
+  @cached_property
+  def content_type(self) -> str:
+    ''' The base `Content-Type`, eg `'text/html'`.
+        Does a `HEAD` of the URL if there is no `self.response`.
+    '''
+    return content_type(self.repsonse_headers)
+
+  @cached_property
+  @typechecked
+  def content(self) -> str:
+    ''' The text content of the URL.
+        Does a `GET` of the URL if there is no `self.response.content`.
+    '''
+    content = self.response and self.response.content
+    if content is None:
+      content = self.url.GET().content
+    return content
+
+  @cached_property
+  def soup(self):
+    ''' A `BeautifulSoup` of `self.content`.
+    '''
+    return BeautifulSoup(self.content, 'html.parser')
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
