@@ -18,7 +18,7 @@ import typing
 from cs.gimmicks import warning
 from cs.typingutils import is_optional
 
-__version__ = '20250428-post'
+__version__ = '20250513-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -26,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks', 'cs.typeutils'],
+    'install_requires': ['cs.gimmicks', 'cs.typingutils'],
 }
 
 def ALL(func):

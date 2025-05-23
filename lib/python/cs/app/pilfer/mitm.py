@@ -349,7 +349,6 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   url = URL(rq.url)
   rsp = flow.response
   PR(rq)
-  if hook_name == 'requestheaders':
   if hook_name in ('requestheaders', 'responseheaders'):
     sitemap = P.sitemap_for(url)
     if sitemap is None:

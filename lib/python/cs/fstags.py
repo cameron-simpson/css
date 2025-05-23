@@ -19,7 +19,7 @@ r'''Simple filesystem based file tagging
 
     Tags are stored in the file `.fstags` in each directory;
     there is a line for each entry in the directory
-    consisting of the directory entry name and the associated tags.
+    consisting of the directory entry name and its associated tags.
 
     Programmatically one creates an `FSTags` instance and accesses
     the `TagSet`s for whichever filesystem paths are of interest:
@@ -49,15 +49,15 @@ r'''Simple filesystem based file tagging
     obtained from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
 
-        series-name sf series_title="Series Full Name"
+          series-name sf series_title="Series Full Name"
 
     * tag file `/path/to/series-name/.fstags`:
 
-      season-02 season=2
+          season-02 season=2
 
     * tag file `/path/to/series-name/season-02/.fstags`:
 
-      episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"
+          episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"
 
     ## `fstags` Examples ##
 

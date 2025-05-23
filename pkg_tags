@@ -34,7 +34,7 @@ cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657eca
 cs.curlytplt
 cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
 cs.debug pypi.release="20250325" ok_revision="4b1017effb33726b53ec441d68a67e1f2fd9ea8a" features={"20230613":["patch_builtins"],"20241005":["CS_DEBUG_TRACE","abrk","log_via_print"]}
-cs.deco pypi.release="20250428" ok_revision="4622ee33810e5a11b258b90e1a175ba280c1d655" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"],"20241109":["uses_doit","uses_force","uses_quiet","uses_verbose"],"20250306":["attr"]}
+cs.deco pypi.release="20250513" ok_revision="58c2de56034774f7f563aecb994e40b90f00246c" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"],"20241109":["uses_doit","uses_force","uses_quiet","uses_verbose"],"20250306":["attr"]}
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
 cs.djutils ok_revision=a3397b32d6df1d7c07c9530c905da6dfc303b8fa features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"],"20241222":["options_settings"],"20250111":["model_batches_qs"],"20250213":["model_instances"]} pypi.release="20250219"
 cs.dockerutils ok_revision=f846ece6e9f9353b443df14f81512ae6438681e6 pypi.release="20240519" features={"20240305":["DockerRun__network"]}
@@ -78,7 +78,7 @@ cs.pop3 ok_revision="64592a92c8db0e90cf818f6ccf415f6cfb53c90d" pypi.release="202
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.prgress
 cs.progress pypi.release="20250412" ok_revision=d943ffe8feb7bd893a3ef7cca8c144041cee6bbe features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"],"20250306":["Progress__qbar"],"20250412":["fix_progressbar_no_tty"]}
-cs.psutils pypi.release="20250108.1" ok_revision=e30b06bec323b666f3cde7ff67750104d46839e8 features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"],"20241206":["run__remote"],"20250108":["run__fold"]}
+cs.psutils pypi.release="20250513" ok_revision=be91b550b3dba0e68b96be8810a8e0c509add7ba features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"],"20241206":["run__remote"],"20250108":["run__fold"],"20250513":["print_argv__as_str"]}
 cs.py.doc pypi.release="20250426" ok_revision=f3ab8e29f48276fe14775575f12e06c5263880e1
 cs.py.func pypi.release="20240630" ok_revision="0dd7f10b229df7807892a255ae6983d2136b819e" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
 cs.py.modules pypi.release="20241122" ok_revision="494204872267e1baa6abbc034af40932ae28a095" features={"20220606":["import_extra"]}

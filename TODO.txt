@@ -1,3 +1,10 @@
+cs.units: decompose to return a Decomposed with a nice __str__
+printt: output formats - csv, html, md1 does this even make sense?
+TagSet ontologies - make it easy to define ontology type information and to set it
+cs.distutils - check validity of cs.* install_requires names
+print_argv short str() its arguments - maybe only if they are pathlib.path?
+ListQueue: use a deque double eneded queue
+tagset save: if permissionerror on the temp file, rewrite in place if possible?
 docker-caddy script
 dlog fwd local dlog sock through ssh, provide $DLOG_PIPEPATH through?
 CornuCopyBuffer - is .offset the post buffer size? it should be the logic offset - pre-buffer - but the mp4 parsing suggests that it is not?
