@@ -280,7 +280,7 @@ def human_bytes(n):
   '''
   return UnitScale('human_bytes').decompose(n)
 
-def human_time(n, scale=None):
+def human_time(n):
   ''' Decompose a nonnegative integer `n` into human time (hours etc).
   '''
   return UnitScale('human_time').decompose(n)
