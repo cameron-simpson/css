@@ -539,7 +539,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
     tags = cls(_ontology=ontology)
     offset = skipwhite(tags_s)
     while offset < len(tags_s):
-      tag, offset = Tag.from_str2(
+      tag, offset = Tag.parse(
           tags_s, offset, ontology=ontology, extra_types=extra_types
       )
       tags.add(tag, verbose=verbose)
@@ -1462,13 +1462,79 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   def __str__(self):
     ''' Encode `name` and `value`.
+        A "bare" `Tag` (`self.value is None`) is just its name.
+        Otherwise `{self.name}={self.transcribe_value(self.value)}`.
     '''
     name = self.name
     value = self.value
     if value is None:
       return name
-    value_s = self.transcribe_value(value)
-    return name + '=' + value_s
+    return f'{name}={self.transcribe_value(value)}'
+
+  @classmethod
+  def from_str(cls, s, ontology=None, fallback_parse=None):
+    ''' Parse `s` as a `Tag` definition.
+        This is the inverse of `Tag.__str__`, and a shim for `Tag.parse`
+        which checks that the entire string is consumed.
+    '''
+    with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
+      tag, post_offset = cls.parse(
+          s, ontology=ontology, fallback_parse=fallback_parse
+      )
+      if post_offset < len(s):
+        raise ValueError(
+            "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
+        )
+      return tag
+
+  @classmethod
+  def parse(
+      cls,
+      s,
+      offset=0,
+      *,
+      ontology=None,
+      **parse_value_kw,
+  ):
+    ''' Parse tag_name[=value] from `s` at `offset`, return `(Tag,post_offset)`.
+
+        Parameters:
+        * `s`: the string to parse
+        * `offset`: optional offset of the parse start, default `0`
+        * `ontology`: optional `TagsOntology` to associate with the `Tag`
+
+        Other keyword arguments are passed to `Tag.parse_value`.
+    '''
+    with Pfx("%s.from_str2(%s)", cls.__name__, cropped_repr(s[offset:])):
+      name, offset = cls.parse_name(s, offset)
+      with Pfx(name):
+        if offset < len(s):
+          sep = s[offset]
+          if sep.isspace():
+            value = None
+          elif sep == '=':
+            offset += 1
+            value, offset = cls.parse_value(
+                s,
+                offset,
+                **parse_value_kw,
+            )
+          else:
+            name_end, offset = get_nonwhite(s, offset)
+            name += name_end
+            value = None
+            ##warning("bad separator %r, adjusting tag to %r" % (sep, name))
+        else:
+          value = None
+      return cls(name, value, ontology=ontology), offset
+
+  # the old name
+  @classmethod
+  @OBSOLETE("Tag.parse")
+  def from_str2(cls, *a, **kw):
+    ''' Obsolete name for `Tag.parse`.
+    '''
+    return cls.parse(*a, **kw)
 
   @classmethod
   def transcribe_value(cls, value, extra_types=None, json_options=None):
@@ -1515,20 +1581,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return encoder.encode(jsonable(value, {}))
 
   @classmethod
-  def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
-    ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
-    '''
-    with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
-      tag, post_offset = cls.from_str2(
-          s, offset=offset, ontology=ontology, fallback_parse=fallback_parse
-      )
-      if post_offset < len(s):
-        raise ValueError(
-            "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
-        )
-      return tag
-
-  @classmethod
   def from_arg(cls, arg, offset=0, ontology=None):
     ''' Parse a `Tag` from the string `arg` at `offset` (default `0`).
         where `arg` is known to be entirely composed of the value,
@@ -1564,42 +1616,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if self.name != other_tag.name:
       return False
     return other_tag.value is None or self.value == other_tag.value
-
-  @classmethod
-  def from_str2(
-      cls,
-      s,
-      offset=0,
-      *,
-      ontology=None,
-      extra_types=None,
-      fallback_parse=None
-  ):
-    ''' Parse tag_name[=value], return `(Tag,offset)`.
-    '''
-    with Pfx("%s.from_str2(%s)", cls.__name__, cropped_repr(s[offset:])):
-      name, offset = cls.parse_name(s, offset)
-      with Pfx(name):
-        if offset < len(s):
-          sep = s[offset]
-          if sep.isspace():
-            value = None
-          elif sep == '=':
-            offset += 1
-            value, offset = cls.parse_value(
-                s,
-                offset,
-                extra_types=extra_types,
-                fallback_parse=fallback_parse
-            )
-          else:
-            name_end, offset = get_nonwhite(s, offset)
-            name += name_end
-            value = None
-            ##warning("bad separator %r, adjusting tag to %r" % (sep, name))
-        else:
-          value = None
-      return cls(name, value, ontology=ontology), offset
 
   # pylint: disable=too-many-branches
   @classmethod
