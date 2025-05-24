@@ -207,7 +207,7 @@ from pprint import pformat
 import re
 import sys
 import time
-from typing import Mapping, Optional, Tuple, Union
+from typing import Iterable, Mapping, Optional, Tuple, Union
 from uuid import UUID, uuid4
 
 from icontract import require
@@ -2323,7 +2323,7 @@ class TagSetPrefixView(FormatableMixin):
     return self._tags.get(self._prefix)
 
 class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
-  ''' Base class for collections of `TagSet` instances
+  ''' The base class for collections of `TagSet` instances
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
       Examples of this include:
@@ -2587,18 +2587,18 @@ class MappingTagSets(BaseTagSets):
   def get(self, name: str, default=None):
     return self.mapping.get(name, default)
 
-  def __setitem__(self, name, te):
+  def __setitem__(self, name: str, te):
     ''' Save `te` in the backend under the key `name`.
     '''
     self.mapping[name] = te
 
-  def __delitem__(self, name):
+  def __delitem__(self, name: str):
     ''' Delete the `TagSet` named `name`.
     '''
     del self.mapping[name]
 
   @typechecked
-  def keys(self, *, prefix: Optional[str] = None):
+  def keys(self, *, prefix: Optional[str] = None) -> Iterable[str]:
     ''' Return an iterable of the keys commencing with `prefix`
         or all keys if `prefix` is `None`.
     '''
