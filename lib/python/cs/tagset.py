@@ -453,7 +453,7 @@ class _FormatStringTagProxy:
 @has_format_attributes
 class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
              Promotable):
-  ''' A setlike class associating a set of tag names with values.
+  ''' A setlike class collection of `Tag`s.
 
       This actually subclasses `dict`, so a `TagSet` is a direct
       mapping of tag names to values.
@@ -531,7 +531,10 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
 
   @classmethod
   def from_str(cls, tags_s, *, ontology=None, extra_types=None, verbose=None):
-    ''' Create a new `TagSet` from some text, a whitespace separated list of `Tag`s.
+    ''' Create a new `TagSet` from a line of text.
+        The line consists of a whitespace separated list of `Tag`s.
+
+        This is the inverse of `TagSet.__str__`.
     '''
     tags = cls(_ontology=ontology)
     offset = skipwhite(tags_s)
@@ -1229,7 +1232,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
   @classmethod
   def from_csvrow(cls, csvrow):
     ''' Construct a `TagSet` from a CSV row like that from
-        `TagSet.csvrow`, being `unixtime,id,name,tags...`.
+        `TagSet.csvrow`, being `unixtime,id,name,tag[,tag,...]`.
     '''
     with Pfx("%s.from_csvrow", cls.__name__):
       te_unixtime, te_id, te_name = csvrow[:3]
@@ -1316,9 +1319,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
 
 @has_format_attributes
 class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
-  ''' A `Tag` has a `.name` (`str`) and a `.value`
-      and an optional `.ontology`.
-
+  ''' A name/value pair.
+      Each `Tag` has a `.name` (`str`), a `.value` and an optional `.ontology`.
       The `name` must be a dotted identifier.
 
       Terminology:
