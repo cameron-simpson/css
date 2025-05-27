@@ -447,7 +447,7 @@ case "$op" in
     echo "$session_name"
     ;;
   rc)
-    tmrc
+    tmrc ${1+"$@"}
     ;;
   recite-function-remote)
     # recite a shell function for accessing remote sessions,
