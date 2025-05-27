@@ -90,9 +90,9 @@ from typing import Iterable, List, Mapping, Optional, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, popopts, vprint
+from cs.cmdutils import BaseCommand, popopts, qprint
 from cs.context import contextif
-from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
+from cs.deco import fmtdoc, uses_quiet, uses_cmd_options
 from cs.fs import needdir, RemotePath, remove_protecting, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
@@ -783,7 +783,7 @@ def dir_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
   )
 
-@uses_cmd_options(doit=True, hashname=None, verbose=True)
+@uses_cmd_options(doit=True, hashname=None, quiet=True)
 @uses_fstags
 @uses_runstate
 @require(
@@ -807,7 +807,7 @@ def rearrange(
     doit: bool,
     fstags: FSTags,
     runstate: RunState,
-    verbose: bool,
+    quiet: bool,
 ):
   ''' Rearrange the files in `dirpath` according to the
       hashcode->[relpaths] `fspaths_by_hashcode`.
@@ -873,7 +873,7 @@ def rearrange(
                   symlink_mode=symlink_mode,
                   fstags=fstags,
                   doit=doit,
-                  verbose=True,
+                  quiet=quiet,
               )
             except FileExistsError as e:
               warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
@@ -900,7 +900,6 @@ def rearrange(
     once=False,
     quiet=False,
     symlink_mode=False,
-    verbose=False,
 )
 @typechecked
 def remote_rearrange(
@@ -916,7 +915,6 @@ def remote_rearrange(
     once: bool,
     quiet: bool,
     symlink_mode: bool,
-    verbose: bool,
 ):
   ''' Rearrange a remote directory `srcdir` on `rhost` into `dstdir`
       on `rhost` according to the hashcode mapping `fspaths_by_hashcode`.
@@ -936,7 +934,6 @@ def remote_rearrange(
           ('-h', hashname),
           once and '-1',
           quiet and '-q',
-          verbose and '-v',
           not (move_mode or symlink_mode) and '--ln',
           symlink_mode and '-s',
           '-',
@@ -952,7 +949,7 @@ def remote_rearrange(
 
 @pfx
 @uses_fstags
-@uses_verbose
+@uses_quiet
 @require(
     lambda move_mode, symlink_mode: not (move_mode and symlink_mode),
     'move_mode and symlink_mode may not both be true'
@@ -967,7 +964,7 @@ def merge(
     symlink_mode=False,
     doit=False,
     fstags: FSTags,
-    verbose: bool,
+    quiet: bool,
 ) -> bool:
   ''' Merge `srcpath` to `dstpath`, _preserving `dstpath` if present_.
       Return `True` if something was done, `False` if this was a no-op.
@@ -998,12 +995,12 @@ def merge(
   assert not symlink_mode
   if not existspath(dstpath):
     # link or move to dstpath
-    vprint(
+    qprint(
         opname,
         shortpath(srcpath),
         "->",
         shortpath(dstpath),
-        verbose=verbose,
+        quiet=quiet,
         flush=True,
     )
     if doit:
@@ -1020,12 +1017,12 @@ def merge(
       # we're done
       return False
     # Remove srcpath.
-    vprint(
+    qprint(
         "remove",
         shortpath(srcpath),
         "# same file as",
         shortpath(dstpath),
-        verbose=verbose,
+        quiet=quiet,
         flush=True,
     )
     if doit:
@@ -1043,13 +1040,13 @@ def merge(
   # same content
   if not move_mode:
     # Link dstpath to srcpath.
-    vprint(
+    qprint(
         "link",
         shortpath(dstpath),
         "to",
         shortpath(srcpath),
         "# same content",
-        verbose=verbose,
+        quiet=quiet,
         flush=True,
     )
     if doit:
@@ -1058,12 +1055,12 @@ def merge(
       fstags[srcpath].update(fstags[dstpath])
     return True
   # Remove srcpath.
-  vprint(
+  qprint(
       "remove",
       shortpath(srcpath),
       "# identical content at",
       shortpath(dstpath),
-      verbose=verbose,
+      quiet=quiet,
       flush=True,
   )
   if doit:
