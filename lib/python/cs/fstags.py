@@ -1603,6 +1603,8 @@ class FSTags(MultiOpenMixin):
       remove=True,
   ):
     ''' Move (or link or symlink) `srcpath` to `dstpath`.
+        It is an error if `dstpath` already exists.
+        Note that a move uses a hardlink+rename and will not work across filesystems.
 
         Parameters:
         * `srcpath`: the source filesystem path
@@ -1615,7 +1617,9 @@ class FSTags(MultiOpenMixin):
       pfx_call(os.symlink, abspath(srcpath), dstpath)
       self[dstpath].update(self[srcpath])
     else:
+      # we link+remove instead of rename because link fails if dstpath exists
       self.link(srcpath, dstpath)
+      self[dstpath].update(self[srcpath])
       if remove:
         pfx_call(os.remove, srcpath)
 
