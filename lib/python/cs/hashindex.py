@@ -105,9 +105,7 @@ from cs.upd import (
     above as above_upd,
     print,
     run_task,  # pylint: disable=redefined-builtin
-    Upd,
-    uses_upd,
-)
+    )
 
 __version__ = '20241207-post'
 
@@ -300,8 +298,7 @@ class HashIndexCommand(BaseCommand):
       )
   )
   @uses_runstate
-  @uses_upd
-  def cmd_ls(self, argv, *, runstate: RunState, upd: Upd):
+  def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [options...] [[host:]path...]
           Walk filesystem paths and emit a listing.
           The default path is the current directory.
@@ -405,6 +402,7 @@ class HashIndexCommand(BaseCommand):
           srcdir.fspath,
           fspaths_by_hashcode,
           dstdir.fspath,
+          doit=doit,
           move_mode=move_mode,
           once=once,
           symlink_mode=symlink_mode,
