@@ -2063,6 +2063,13 @@ def qvprint(*print_a, quiet, verbose, **print_kw):
   if verbose and not quiet:
     print(*print_a, **print_kw)
 
+def qprint(*print_a, **qvprint_kw):
+  ''' Call `print()` if `not options.quiet`.
+      This is a compatibility shim for `qvprint()` with `verbose=not
+      quiet` and `quiet=False`.
+  '''
+  return qvprint(*print_a, verbose=not quiet, quiet=False, **qvprint_kw)
+
 def vprint(*print_a, **qvprint_kw):
   ''' Call `print()` if `options.verbose`.
       This is a compatibility shim for `qvprint()` with `quiet=False`.
