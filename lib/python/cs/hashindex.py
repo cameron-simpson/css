@@ -849,33 +849,40 @@ def rearrange(
           ##assert is_valid_rpath(rsrcpath), (
           ##    "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
           ##)
-          if rsrcpath == rdstpath:
-            # already there, skip
-            continue
-          dstpath = joinpath(dstdirpath, rdstpath)
-          if doit:
-            needdir(dirname(dstpath), use_makedirs=True, log=warning)
-          # merge the src to the dst
-          # do a real move if there is only one rfspaths
-          # otherwise a link and then a later remove
-          try:
-            merge(
-                srcpath,
-                dstpath,
-                opname=opname,
-                hashname=hashname,
-                move_mode=move_mode and len(rfspaths) == 1,
-                symlink_mode=symlink_mode,
-                fstags=fstags,
-                doit=doit,
-                verbose=True,
-            )
-          except FileExistsError as e:
-            warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
-          else:
-            if move_mode and len(rfspaths) > 1 and rsrcpath not in rfspaths:
-              if doit:
-                to_remove.add(srcpath)
+          proxy.text = rsrcpath
+          for rdstpath in rfspaths:
+            ##assert is_valid_rpath(rdstpath), (
+            ##    "rdstpath:%r is not a clean subpath" % (rdstpath,)
+            ##)
+            if rsrcpath == rdstpath:
+              # already there, skip
+              continue
+            dstpath = joinpath(dstdirpath, rdstpath)
+            if doit:
+              needdir(dirname(dstpath), use_makedirs=True, log=warning)
+            # merge the src to the dst
+            try:
+              merged = merge(
+                  srcpath,
+                  dstpath,
+                  opname=opname,
+                  hashname=hashname,
+                  move_mode=move_mode and len(rfspaths) == 1,
+                  symlink_mode=symlink_mode,
+                  fstags=fstags,
+                  doit=doit,
+                  verbose=True,
+              )
+            except FileExistsError as e:
+              warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
+            else:
+              if move_mode and len(rfspaths) > 1 and rsrcpath not in rfspaths:
+                if doit:
+                  to_remove.add(srcpath)
+            if merged and once:
+              raise StopIteration
+    except StopIteration:
+      pass
     # purge the srcpaths last because we might want them multiple
     # times during the main loop (files with the same hashcode)
     if doit and to_remove:
@@ -888,6 +895,7 @@ def rearrange(
     hashindex_exe=HASHINDEX_EXE_DEFAULT,
     hashname=HASHNAME_DEFAULT,
     move_mode=True,
+    once=False,
     quiet=False,
     symlink_mode=False,
     verbose=False,
@@ -903,6 +911,7 @@ def remote_rearrange(
     hashindex_exe: str,
     hashname: str,
     move_mode: bool,
+    once: bool,
     quiet: bool,
     symlink_mode: bool,
     verbose: bool,
@@ -923,6 +932,7 @@ def remote_rearrange(
           'rearrange',
           not doit and '-n',
           ('-h', hashname),
+          once and '-1',
           quiet and '-q',
           verbose and '-v',
           not (move_mode or symlink_mode) and '--ln',
@@ -957,60 +967,104 @@ def merge(
     doit=False,
     fstags: FSTags,
     verbose: bool,
-):
-  ''' Merge `srcpath` to `dstpath`.
+) -> bool:
+  ''' Merge `srcpath` to `dstpath`, _preserving `dstpath` if present_.
+      Return `True` if something was done, `False` if this was a no-op.
 
+      This is aimed at situations such as merging downloads with
+      an existing corpus, which might have hard links etc, so
+      `dstpath` is the important half of the pair.
+
+      NB: `symlink_mode` is currently disabled.
+
+      If 'dstpath' exists, checksum their contents and raise
+      `FileExistsError` if they differ.
       If `dstpath` does not exist, move/link/symlink `srcpath` to `dstpath`.
-      Otherwise checksum their contents and raise `FileExistsError` if they differ.
+      This also merges the fstags from `srcpath` to `dstpath`.
+
+      Otherwise the files have the same content, merge while preserving `dstpath`.
   '''
+  if symlink_mode:
+    raise RuntimeError("symlink_mode disabled for now, untrusted")
   if opname is None:
     opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
   if dstpath == srcpath:
-    return
-  if symlink_mode:
-    # check for existing symlink
-    sympath = abspath(srcpath)
-    try:
-      dstsympath = os.readlink(dstpath)
-    except FileNotFoundError:
-      pass
-    except OSError as e:
-      if e.errno == errno.EINVAL:
-        # not a symlink
-        raise FileExistsError(f'dstpath {dstpath!r} not a symlink: {e}') from e
-      raise
-    else:
-      if dstsympath == sympath:
-        # identical symlinks, just update the tags
-        fstags[dstpath].update(fstags[srcpath])
-        return
-      raise FileExistsError(
-          f'dstpath {dstpath!r} already exists as a symlink to {dstsympath!r}'
-      )
-  elif existspath(dstpath):
-    if (samefile(srcpath, dstpath)
-        or (file_checksum(dstpath, hashname=hashname) == file_checksum(
-            srcpath, hashname=hashname))):
-      # same content - update tags and remove source
-      if doit:
-        fstags[dstpath].update(fstags[srcpath])
-      if move_mode and realpath(srcpath) != realpath(dstpath):
-        vprint(
-            "remove",
-            shortpath(srcpath),
-            "# identical content at",
-            shortpath(dstpath),
-            verbose=verbose,
-            flush=True,
-        )
-        if doit:
-          pfx_call(os.remove, srcpath)
-      return
+    # fast no-op
+    return False
+  if not existspath(srcpath):
+    # fast failure
+    raise FileNotFoundError(srcpath)
+  assert not symlink_mode
+  if not existspath(dstpath):
+    # link or move to dstpath
+    vprint(
+        opname,
+        shortpath(srcpath),
+        "->",
+        shortpath(dstpath),
+        verbose=verbose,
+        flush=True,
+    )
+    if doit:
+      # safe rename - link to dst them remove src
+      needdir(dirname(dstpath))
+      pfx_call(os.link, srcpath, dstpath)
+      fstags[dstpath].update(fstags[srcpath])
+      pfx_call(os.remove, srcpath)
+    return True
+  if samefile(srcpath, dstpath):
+    # links to same file, merge the tags from srcpath -> dstpath
+    fstags[dstpath].update(fstags[srcpath])
+    if not move_mode:
+      # we're done
+      return False
+    # Remove srcpath.
+    vprint(
+        "remove",
+        shortpath(srcpath),
+        "# same file as",
+        shortpath(dstpath),
+        verbose=verbose,
+        flush=True,
+    )
+    if doit:
+      remove_protecting(srcpath, dstpath)
+    return True
+  # distinct files, compare their contents
+  srchashcode = file_checksum(srcpath, hashname=hashname)
+  dsthashcode = file_checksum(dstpath, hashname=hashname)
+  if srchashcode != dsthashcode:
     # different content, fail
     raise FileExistsError(
-        f'dstpath {dstpath!r} already exists with different hashcode'
+        'dstpath already exists with different content hashcode'
+        f': {srchashcode=} != {dsthashcode=}'
     )
-  vprint(opname, shortpath(srcpath), shortpath(dstpath), verbose=verbose)
+  # same content
+  if not move_mode:
+    # Link dstpath to srcpath.
+    vprint(
+        "link",
+        shortpath(dstpath),
+        "to",
+        shortpath(srcpath),
+        "# same content",
+        verbose=verbose,
+        flush=True,
+    )
+    if doit:
+      remove_protecting(srcpath, dstpath)
+      pfx_call(os.link, dstpath, srcpath)
+      fstags[srcpath].update(fstags[dstpath])
+    return True
+  # Remove srcpath.
+  vprint(
+      "remove",
+      shortpath(srcpath),
+      "# identical content at",
+      shortpath(dstpath),
+      verbose=verbose,
+      flush=True,
+  )
   if doit:
     remove_protecting(srcpath, dstpath)
   return True
