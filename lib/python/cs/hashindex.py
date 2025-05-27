@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' A command and utility functions for making listings of file content hashcodes
+r'''A command and utility functions for making listings of file content hashcodes
     and manipulating directory trees based on such a hash index.
 
     This largely exists to solve my "what has changed remotely?" or
@@ -56,7 +56,7 @@
     remote location and copy them to a transfer drive for carrying
     to the remote site when opportune. Example:
 
-        hashindex comm -1 -o '{fspath}' src rhost:dst \\
+        hashindex comm -1 -o '{fspath}' src rhost:dst \
         | rsync -a --files-from=- src/ xferdir/
 
     I've got a script [`pref-xfer`](https://hg.sr.ht/~cameron-simpson/css/browse/bin-cs/prep-xfer)
@@ -188,6 +188,8 @@ class HashIndexCommand(BaseCommand):
   @contextmanager
   @uses_fstags
   def run_context(self, *, fstags: FSTags, **kw):
+    ''' Sanity check the hashname, open the fstags.
+    '''
     hashname = self.options.hashname
     try:
       pfx_call(BaseHashCode.hashclass, hashname)
@@ -948,7 +950,6 @@ def remote_rearrange(
       quiet=False,
   ).returncode
 
-@trace
 @pfx
 @uses_fstags
 @uses_verbose
