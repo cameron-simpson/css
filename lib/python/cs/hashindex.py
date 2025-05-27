@@ -66,12 +66,10 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-import errno
 from getopt import GetoptError
 from io import TextIOBase
 import os
 from os.path import (
-    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -80,7 +78,6 @@ from os.path import (
     isfile as isfilepath,
     islink,
     join as joinpath,
-    realpath,
     relpath,
     samefile,
 )
@@ -96,7 +93,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand, popopts, vprint
 from cs.context import contextif
 from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
-from cs.fs import needdir, RemotePath, shortpath
+from cs.fs import needdir, RemotePath, remove_protecting, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.lex import r
@@ -338,6 +335,7 @@ class HashIndexCommand(BaseCommand):
     return xit
 
   @popopts(
+      _1=('once', 'Rearrange only one file.'),
       ln=('link_mode', 'Hard link files instead of moving them.'),
       s='symlink_mode',
   )
@@ -359,6 +357,7 @@ class HashIndexCommand(BaseCommand):
     doit = options.doit
     hashname = options.hashname
     move_mode = not options.link_mode
+    once = options.once
     quiet = options.quiet
     verbose = options.verbose or not quiet
     symlink_mode = options.symlink_mode
@@ -405,6 +404,7 @@ class HashIndexCommand(BaseCommand):
           fspaths_by_hashcode,
           dstdir.fspath,
           move_mode=move_mode,
+          once=once,
           symlink_mode=symlink_mode,
           verbose=verbose,
       )
@@ -416,6 +416,7 @@ class HashIndexCommand(BaseCommand):
           dstdir.fspath,
           fspaths_by_hashcode,
           move_mode=move_mode,
+          once=once,
           symlink_mode=symlink_mode,
           verbose=verbose,
       )
@@ -799,6 +800,7 @@ def rearrange(
     *,
     hashname: str,
     move_mode: bool = False,
+    once: bool = False,
     symlink_mode=False,
     doit: bool,
     fstags: FSTags,
@@ -828,25 +830,24 @@ def rearrange(
     task_label = f'rearrange {shortpath(srcdirpath)} into {shortpath(dstdirpath)}'
   with run_task(task_label) as proxy:
     to_remove = set()
-    for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode,
-                                       hashname=hashname):
-      runstate.raiseif()
-      if not rfspaths:
-        continue
-      filename = basename(srcpath)
-      if filename.startswith('.') or filename == fstags.tagsfile_basename:
-        # skip hidden or fstags files
-        continue
-      opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
-      with Pfx(srcpath):
-        rsrcpath = relpath(srcpath, srcdirpath)
-        ##assert is_valid_rpath(rsrcpath), (
-        ##    "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
-        ##)
-        proxy.text = rsrcpath
-        for rdstpath in rfspaths:
-          ##assert is_valid_rpath(rdstpath), (
-          ##    "rdstpath:%r is not a clean subpath" % (rdstpath,)
+    try:
+      for srcpath, rfspaths in dir_remap(
+          srcdirpath,
+          rfspaths_by_hashcode,
+          hashname=hashname,
+      ):
+        runstate.raiseif()
+        if not rfspaths:
+          continue
+        filename = basename(srcpath)
+        if filename.startswith('.') or filename == fstags.tagsfile_basename:
+          # skip hidden or fstags files
+          continue
+        opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
+        with Pfx(srcpath):
+          rsrcpath = relpath(srcpath, srcdirpath)
+          ##assert is_valid_rpath(rsrcpath), (
+          ##    "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
           ##)
           if rsrcpath == rdstpath:
             # already there, skip
@@ -937,6 +938,7 @@ def remote_rearrange(
       quiet=False,
   ).returncode
 
+@trace
 @pfx
 @uses_fstags
 @uses_verbose
@@ -1010,9 +1012,8 @@ def merge(
     )
   vprint(opname, shortpath(srcpath), shortpath(dstpath), verbose=verbose)
   if doit:
-    pfx_call(
-        fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode
-    )
+    remove_protecting(srcpath, dstpath)
+  return True
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
