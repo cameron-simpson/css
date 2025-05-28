@@ -712,10 +712,14 @@ def with_self(method, get_context_from_self=None):
   ''' A decorator to run a method inside `with self:` for classes
       which need to be "held open"/"marked as in use" while the
       method runs.
+
+      The optional `get_context_from_self` parameter may be a
+      callable to obtain the required context manager from `self`;
+      the default is to just use `with self`.
   '''
 
   def with_self_wrapper(self, *a, **kw):
-    with get_context(self) if get_context else self:
+    with get_context_from_self(self) if get_context_from_self else self:
       return method(self, *a, **kw)
 
   return with_self_wrapper
@@ -733,9 +737,17 @@ def _withall(obj_it):
       yield from _withall(obj_it)
 
 @contextmanager
-def withall(objs):
+def withall(*objs):
   ''' Enter every object `obj` in `objs` except those which are `None`
       using `with obj:`, then yield.
+
+      Example:
+
+          with withall(
+              db1,
+              db2,
+          ):
+              ... work with db1 and db2 ...
   '''
   yield from _withall(obj for obj in objs if obj is not None)
 

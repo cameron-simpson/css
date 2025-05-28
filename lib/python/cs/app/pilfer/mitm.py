@@ -15,14 +15,13 @@ import sys
 from threading import Thread
 from typing import Any, Callable, Iterable, Mapping, Optional
 
+from icontract import require
 from mitmproxy import ctx, http
 import mitmproxy.addons.dumper
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
 from mitmproxy.tools.dump import DumpMaster
-
-from icontract import require
 import requests
 from typeguard import typechecked
 
@@ -212,7 +211,7 @@ def process_stream(
 @typechecked
 def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
   ''' If the flow has no content-length or the length is at least
-      threshold, put the lfow into streaming mode.
+      threshold, put the flow into streaming mode.
   '''
   assert hook_name == 'responseheaders'
   assert not flow.response.stream

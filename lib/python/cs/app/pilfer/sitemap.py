@@ -8,18 +8,25 @@ from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
 import re
+from types import SimpleNamespace
 from typing import Iterable, Mapping, Optional
 
 from cs.binary import bs
-from cs.deco import promote, Promotable
-from cs.lex import cutsuffix
+from cs.deco import decorator, promote, Promotable
+from cs.lex import cutsuffix, r
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.rfc2616 import content_type
+from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
+from mitmproxy.flow import Flow
 from typeguard import typechecked
+
+def default_Pilfer():
+  from .pilfer import Pilfer
+  return Pilfer.default()
 
 @dataclass
 class URLMatcher(Promotable):
@@ -75,6 +82,96 @@ class URLMatcher(Promotable):
       return super().promote(obj)
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
 
+@dataclass
+class OnState(SimpleNamespace, Promotable):
+
+  ##@trace
+  @promote
+  def __init__(self, **ns_kw):
+    ''' Initialise `self` from the keyword parameters.
+
+        The end result is that we have `.flow`, `.request`,
+        `.response` and `.url` attributes, which may be `None`
+        if omitted.
+        Some of these have computed defaults if omitted:
+        - `.request` and `.response` are obtained from `.flow`
+        - `.url` is obtained from `.request.url`
+    '''
+    super().__init__(**ns_kw)
+    extra_attrs = self.__dict__.keys() - ('flow', 'request', 'response', 'url')
+    if extra_attrs:
+      raise ValueError(f'unexpected attributes supplied: {extra_attrs}')
+
+  def __str__(self):
+    attr_listing = ",".join(
+        f'{attr}={value}' for attr, value in self.__dict__.items()
+    )
+    return f'{self.__class__.__name__}({attr_listing})'
+
+  __repr__ = __str__
+
+  def __getattr__(self, attr):
+    if attr[0].isalpha():
+      return getattr(self.url, attr)
+    raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
+  @classmethod
+  def from_str(cls, url_s: str):
+    ''' Promote a `str` URL to a `OnState`.
+    '''
+    return cls(url=URL(url_s))
+
+  @classmethod
+  def from_URL(cls, url: URL):
+    ''' Promote a `URL` URL to a `OnState`.
+    '''
+    return cls(url=url)
+
+  @classmethod
+  def from_Flow(cls, flow: Flow):
+    ''' Promote a `Flow` to a `OnState`.
+    '''
+    return cls(flow=flow)
+
+  @cached_property
+  def url(self) -> URL:
+    X("%s: .url()...", self)
+    return URL(self.response.url)
+
+  @cached_property
+  def response_headers(self):
+    ''' Cached response headers.
+        Does a `HEAD` of the URL if there is no `self.response`;
+        this sets `self.response` as a side effect.
+    '''
+    if not self.response:
+      self.response = self.url.HEAD()
+    return self.response.headers
+
+  @cached_property
+  def content_type(self) -> str:
+    ''' The base `Content-Type`, eg `'text/html'`.
+        Does a `HEAD` of the URL if there is no `self.response`.
+    '''
+    return content_type(self.repsonse_headers)
+
+  @cached_property
+  @typechecked
+  def content(self) -> str:
+    ''' The text content of the URL.
+        Does a `GET` of the URL if there is no `self.response.content`.
+    '''
+    content = self.response and self.response.content
+    if content is None:
+      content = self.url.GET().content
+    return content
+
+  @cached_property
+  def soup(self):
+    ''' A `BeautifulSoup` of `self.content`.
+    '''
+    return BeautifulSoup(self.content, 'html.parser')
+
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
   ''' A pattern match result:
@@ -117,19 +214,163 @@ class SiteMap(Promotable):
   ) -> "SiteMap":
     ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
     '''
-    if P is None:
-      from .pilfer import Pilfer
-      P = Pilfer.default()
-      if P is None:
-        raise ValueError(
-            f'{cls.__name__}.from_str({sitemap_name!r}): no Pilfer to search for sitemaps'
-        )
+    P = P or default_Pilfer()
     for name, sitemap in P.sitemaps:
       if name == sitemap_name:
         return sitemap
     raise ValueError(
         f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
     )
+
+  @staticmethod
+  @decorator
+  def on(method, *patterns, **patterns_kw):
+    ''' A decorator for handler methods.
+
+        Its parameters indicate the conditions under which this method
+        will be fired; all must be true.
+        Each use of the decorator appends its combination of
+        conditions on the method's `.on_conditions` attribute.
+
+        Other parameters have the following meanings:
+        - the values in `patterns` may be strings or callables;
+          strings are considered globs to match against the hostname
+          if they contain no slashes or regular expressions to match
+          against the URL path otherwise - a leading slash anchors
+          the regexp against the start of the path;
+          callables are called with the `flow` and may make any test against it
+        - the `patterns_kw` name various attributes of the `flow` or
+          the `flow.response` or `flow.request` (when there's no response
+          yet); their values may be strings or callables
+
+        Example:
+
+            @on('docs.pytho.org', '/3/library/(?P<module_name>[^/]+).html$')
+            def cache_module_html(
+                self,     # the SiteMap instance
+                url,      # the URL
+                flow,     # the mitmproxy Flow
+                P:Pilfer, # the current Pilfer context
+            ):
+                P.cache(flow, '{flow.requs
+    '''
+    assert not patterns_kw, "not yet implemented"
+    conditions = []
+    for pattern in patterns:
+      with Pfx(f'pattern={r(pattern)}'):
+        condition = None
+        if isinstance(pattern, str):
+          if '/' in pattern:
+            # a path match
+            regexp = pfx_call(re.compile, pattern)
+            if pattern.startswith('/'):
+              # match at the start of the path
+              condition = (
+                  lambda regexp: (
+                      lambda on_state:
+                      (m := pfx_call(regexp.match, on_state.url.path)
+                       ) and m.groupdict()
+                  )
+              )(
+                  regexp
+              )
+            else:
+              # match anywhere
+              condition = (
+                  lambda regexp: (
+                      lambda on_state:
+                      (m := pfx_call(regexp.search, on_state.url.path)
+                       ) and m.groupdict()
+                  )
+              )(
+                  regexp
+              )
+          else:
+            # filename glob on the URL host
+            condition = (
+                lambda pattern: (
+                    lambda on_state:
+                    pfx_call(fnmatch, on_state.url.hostname, pattern)
+                )
+            )(
+                pattern
+            )
+        else:
+          raise RuntimeError
+        assert condition is not None
+        conditions.append(condition)
+    try:
+      cond_attr = method.on_conditions
+    except AttributeError:
+      cond_attr = method.on_conditions = []
+    cond_attr.append(conditions)
+    return method
+
+  @classmethod
+  @promote
+  def on_matches(cls, on_state: OnState):
+    ''' A generator yielding methods matched by `on_state`.
+    '''
+    for method_name in dir(cls):
+      try:
+        method = getattr(cls, method_name)
+      except AttributeError:
+        continue
+      try:
+        conditions = method.on_conditions
+      except AttributeError:
+        continue
+      matched = TagSet()
+      for condition in conditions:
+        for test in condition:
+          with Pfx("on_matches: test %r vs %s", method_name, test):
+            try:
+              test_result = test(on_state)
+            except Exception as e:
+              warning("exception in test: %s", e)
+              raise
+            # test ran, examine result
+            if test_result is None or test_result is False:
+              # failure
+              break
+            # success
+            if test_result is not True:
+              # should be a mapping, update the matched TagSet
+              for k, v in test_result.items():
+                matched[k] = v
+      else:
+        # no test failed
+        yield method, matched
+        continue
+
+  @pfx_method
+  @promote
+  def grok(self, on_state: OnState, P: "Pilfer" = None):
+    ''' Call each method matching `on_state` with the `on_state`.
+        Return a list of `(method,match_tags,grokked)` 3-tuples being:
+        - a reference to the fired grok method
+        - the match `TagSet` derived from matching that method
+        - the result of calling the method, often a `TagSet`
+        Exceptions are gathered and, if any, an `ExceptionGroup` is raised
+        (unless there's just one, it which case it is raised directly).
+    '''
+    P = P or default_Pilfer()
+    results = []
+    excs = []
+    for method, match_tags in self.on_matches(on_state):
+      try:
+        grokked = method(self, on_state, match_tags)
+      except Exception as e:
+        warning(f'failed call to {method=}: {e}')
+        excs.append(e)
+      else:
+        results.append((method, match_tags, grokked))
+    if excs:
+      if len(excs) == 1:
+        raise excs[0]
+      else:
+        raise ExceptionGroup(f'exceptions grokking {on_state=}', excs)
+    return results
 
   def matches(
       self,
@@ -256,8 +497,7 @@ class SiteMap(Promotable):
         - `"srcs"`: all the anchor `src` values
     '''
     from .pilfer import Pilfer
-    if P is None:
-      P = Pilfer.default()
+    P = P or default_Pilfer()
     if not isinstance(P, Pilfer):
       print("NO PILFER")
       breakpoint()
@@ -304,6 +544,9 @@ class SiteMap(Promotable):
                   )
               case _:
                 warning("unhandled prefetch arg")
+
+# expose the @on decorator globally
+on = SiteMap.on
 
 # Some presupplied site maps.
 
