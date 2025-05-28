@@ -1,0 +1,6 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: clarify and slightly improve the leading argument processing
+lib/python/cs/cmdutils.py: cs.cmdutils: add a comment
+lib/python/cs/cmdutils.py: merge main -> media
+lib/python/cs/cmdutils.py: cs.cmdutils: new qprint() which prints if not quiet a bit like vprint(), which prints if verbose and not quiet
+lib/python/cs/cmdutils.py: cs.cmdutils: qprint(), vprint(): update argument handling
+lib/python/cs/cmdutils.py: cs.cmdutils: qprint(): specify omitted quiet parameter
