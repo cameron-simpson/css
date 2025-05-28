@@ -59,7 +59,7 @@ from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
 from typeguard import typechecked
 
 from cs.context import stackattrs
-from cs.deco import decorator, OBSOLETE, uses_cmd_options
+from cs.deco import decorator, OBSOLETE, uses_cmd_options, uses_quiet
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -2063,18 +2063,24 @@ def qvprint(*print_a, quiet, verbose, **print_kw):
   if verbose and not quiet:
     print(*print_a, **print_kw)
 
+@uses_quiet
 def qprint(*print_a, **qvprint_kw):
   ''' Call `print()` if `not options.quiet`.
       This is a compatibility shim for `qvprint()` with `verbose=not
       quiet` and `quiet=False`.
   '''
-  return qvprint(*print_a, verbose=not quiet, quiet=False, **qvprint_kw)
+  qvprint_kw.update(
+      quiet=False,
+      verbose=not quiet,
+  )
+  return qvprint(*print_a, **qvprint_kw)
 
 def vprint(*print_a, **qvprint_kw):
   ''' Call `print()` if `options.verbose`.
       This is a compatibility shim for `qvprint()` with `quiet=False`.
   '''
-  return qvprint(*print_a, quiet=False, **qvprint_kw)
+  qvprint_kw.update(quiet=False)
+  return qvprint(*print_a, **qvprint_kw)
 
 if __name__ == '__main__':
 
