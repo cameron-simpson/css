@@ -107,7 +107,7 @@ from cs.upd import (
     run_task,  # pylint: disable=redefined-builtin
 )
 
-__version__ = '20241207-post'
+__version__ = '20250528'
 
 DISTINFO = {
     'keywords': ["python3"],
