@@ -61,6 +61,7 @@ DISTINFO = {
         'cs.deco',
         'cs.logutils',
         'cs.py.func',
+        'cs.queues',
         'cs.resources',
         'cs.seq',
         'cs.units',
@@ -77,7 +78,7 @@ DEFAULT_THROUGHPUT_WINDOW = 5
 DEFAULT_UPDATE_PERIOD = 0.3
 
 @functools.total_ordering
-class BaseProgress(object):
+class BaseProgress:
   ''' The base class for `Progress` and `OverProcess`
       with various common methods.
 
@@ -835,7 +836,7 @@ class Progress(BaseProgress):
     positions = self._positions
     # scan for first item still in time window,
     # never discard the last 2 positions
-    for ndx in range(0, len(positions) - 1):
+    for ndx in range(len(positions) - 1):
       posn = positions[ndx]
       if posn.time >= oldest:
         # this is the first element to keep, discard preceeding (if any)
@@ -876,8 +877,7 @@ class Progress(BaseProgress):
       return None
     now = time.time()
     time0 = now - time_window
-    if time0 < self.start_time:
-      time0 = self.start_time
+    time0 = max(time0, self.start_time)
     # lowest time and position
     # low_time will be time0
     # low_pos will be the matching position, probably interpolated
