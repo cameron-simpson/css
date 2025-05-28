@@ -105,7 +105,7 @@ from cs.upd import (
     above as above_upd,
     print,
     run_task,  # pylint: disable=redefined-builtin
-    )
+)
 
 __version__ = '20241207-post'
 
@@ -392,7 +392,7 @@ class HashIndexCommand(BaseCommand):
       with run_task(f'scan refdir {refdir}'):
         fspaths_by_hashcode = hashindex_map(refdir, relative=True)
     if not fspaths_by_hashcode:
-      quiet or print("no files in refdir, nothing to rearrange")
+      qprint("no files in refdir, nothing to rearrange")
       return xit
     # rearrange the source directory.
     assert srcdir.host == dstdir.host
@@ -405,8 +405,8 @@ class HashIndexCommand(BaseCommand):
           doit=doit,
           move_mode=move_mode,
           once=once,
+          quiet=quiet,
           symlink_mode=symlink_mode,
-          verbose=verbose,
       )
     else:
       # remote srcdir and dstdir
@@ -417,8 +417,8 @@ class HashIndexCommand(BaseCommand):
           fspaths_by_hashcode,
           move_mode=move_mode,
           once=once,
+          quiet=quiet,
           symlink_mode=symlink_mode,
-          verbose=verbose,
       )
     return xit
 
