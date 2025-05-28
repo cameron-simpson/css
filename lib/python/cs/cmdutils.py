@@ -2064,7 +2064,7 @@ def qvprint(*print_a, quiet, verbose, **print_kw):
     print(*print_a, **print_kw)
 
 @uses_quiet
-def qprint(*print_a, **qvprint_kw):
+def qprint(*print_a, quiet: bool, **qvprint_kw):
   ''' Call `print()` if `not options.quiet`.
       This is a compatibility shim for `qvprint()` with `verbose=not
       quiet` and `quiet=False`.
