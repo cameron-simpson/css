@@ -225,7 +225,7 @@ from cs.lex import (
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
     has_format_attributes, format_attribute, FStr, r, s
 )
-from cs.logutils import setup_logging, warning, error, ifverbose
+from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
@@ -246,6 +246,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils>=20210404',
+        'cs.context',
         'cs.dateutils',
         'cs.deco',
         'cs.edit',
@@ -304,7 +305,6 @@ def tag_or_tag_value(func, no_self=False):
           tag = Tag('size', 9)
           tags.add(tag)
   '''
-
   if no_self:
 
     # pylint: disable=keyword-arg-before-vararg
@@ -1391,6 +1391,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       ontology: Optional["TagsOntology"] = None,
       prefix: Optional[str] = None
   ):
+    ''' Create a `Tag`.
+    '''
     # simple case: name is a str: make a new Tag
     if isinstance(name, str):
       # (name[,value[,ontology][,prefix]]) => Tag
@@ -1413,7 +1415,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       value = tag.value
     except AttributeError:
       # pylint: disable=raise-missing-from
-      # noqa: B904
       raise ValueError("tag has no .value attribute")
     if isinstance(tag, Tag):
       # already a Tag subtype, see if the ontology needs updating or the name was changed
@@ -1879,7 +1880,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       return self.typedata['key_type']
     except KeyError:
       # pylint: disable=raise-missing-from
-      # noqa: B904
       raise AttributeError('key_type')
 
   @property
@@ -1892,7 +1892,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       return self.typedata['member_type']
     except KeyError:
       # pylint: disable=raise-missing-from
-      # noqa: B904
       raise AttributeError('member_type')
 
 class TagSetCriterion(Promotable):
@@ -2585,6 +2584,8 @@ class MappingTagSets(BaseTagSets):
     self.mapping = mapping
 
   def get(self, name: str, default=None):
+    ''' Get `name` or `default`.
+    '''
     return self.mapping.get(name, default)
 
   def __setitem__(self, name: str, te):
@@ -2960,35 +2961,34 @@ class TagsOntology(SingletonMixin, BaseTagSets):
             '''
             return match + subtype_name
 
+      # not a prefix
+
+      elif '*' in match:
+
+        def match_func(type_name):
+          ''' Glob `type_name` match, return `type_name` unchanged.
+            '''
+          if fnmatch(type_name, match):
+            return type_name
+          return None
+
+        # TODO: define unmatch_func is there is exactly 1 asterisk
+        unmatch_func = None
+
       else:
-        # not a prefix
 
-        if '*' in match:
-
-          def match_func(type_name):
-            ''' Glob `type_name` match, return `type_name` unchanged.
+        def match_func(type_name):
+          ''' Fixed string exact `type_name` match, return `type_name` unchanged.
             '''
-            if fnmatch(type_name, match):
-              return type_name
-            return None
+          if type_name == match:
+            return type_name
+          return None
 
-          # TODO: define unmatch_func is there is exactly 1 asterisk
-          unmatch_func = None
-
-        else:
-
-          def match_func(type_name):
-            ''' Fixed string exact `type_name` match, return `type_name` unchanged.
+        def unmatch_func(subtype_name):
+          ''' Fixed string match
             '''
-            if type_name == match:
-              return type_name
-            return None
-
-          def unmatch_func(subtype_name):
-            ''' Fixed string match
-            '''
-            assert subtype_name == match
-            return subtype_name
+          assert subtype_name == match
+          return subtype_name
 
     else:
 
@@ -3725,6 +3725,8 @@ class TagsOntologyCommand(BaseCommand):
 
   @contextmanager
   def run_context(self):
+    ''' Open `self.options.ontology` during commands.
+    '''
     with super().run_context():
       with self.options.ontology:
         yield
