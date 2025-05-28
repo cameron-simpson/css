@@ -34,7 +34,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20250528'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'description':
