@@ -1,0 +1,2 @@
+Some refactors and small fixes.
+Tag: rename Tag.from_str2 to Tag.parse, drop offset parameter of Tag.from_str.
