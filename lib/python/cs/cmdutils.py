@@ -89,7 +89,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
-        'cs.deco',
+        'cs.deco>=decorator__attrs',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
