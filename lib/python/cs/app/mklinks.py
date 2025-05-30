@@ -36,8 +36,8 @@ from cs.fileutils import shortpath
 from cs.fs import HasFSPath
 from cs.hashindex import HASHNAME_DEFAULT, file_checksum, merge
 from cs.logutils import warning
-from cs.progress import progressbar
 from cs.pfx import Pfx, pfx, pfx_method
+from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
 from cs.seq import first
 from cs.upd import run_task  # pylint: disable=redefined-builtin
@@ -54,12 +54,15 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils>=20210404',
+        'cs.deco',
         'cs.fileutils>=20200914',
+        'cs.fs',
         'cs.hashindex',
         'cs.logutils',
         'cs.pfx',
         'cs.progress>=20200718.3',
-        'cs.units',
+        'cs.resources',
+        'cs.seq',
         'cs.upd>=20200914',
     ],
     'entry_points': {
