@@ -9,7 +9,7 @@ cs.app.flag pypi.release="20201228" ok_revision="8d880199ddcb60a456ee67bc162cb45
 cs.app.maildb pypi.release=20160828
 cs.app.mailfiler pypi.release="20200719"
 cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447af3df5566ae33"
-cs.app.mklinks pypi.release="20221228" ok_revision="25db918d3d95925205dd361638d2ddb9f279f52c"
+cs.app.mklinks pypi.release="20221228" ok_revision="8b21fa308ec9885daad556336bd3e4e20ea60c2c"
 cs.app.myke ok_revision="1027faacf36b6c49eaa58dae48345ddf7db6558a" pypi.release="20240316.1"
 cs.app.osx.defaults ok_revision=c4bf6397de9e224c88cb14cffa7cb06db960b74c pypi.release="20250108" features={"20250108":["cachedmethod"]}
 cs.app.osx.misc ok_revision=a8db5e27f6d608f7bad1854b0c06aa31338fa544 features={"20240622":["macos_version"]} pypi.release="20240622.1"
