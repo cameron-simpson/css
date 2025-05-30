@@ -768,9 +768,8 @@ class SubCommand:
         if common_subcmds:
           subusage_listing.append(indent(common_subcmds_line))
         subusage_listing.extend(map(indent, subusages))
-      else:
-        if common_subcmds:
-          subusage_listing.append(common_subcmds_line)
+      elif common_subcmds:
+        subusage_listing.append(common_subcmds_line)
     if subusage_listing:
       subusage = "\n".join(subusage_listing)
       usage = f'{usage}\n{indent(subusage)}'
