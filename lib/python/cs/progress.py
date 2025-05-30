@@ -40,7 +40,7 @@ from cs.queues import IterableQueue, QueueIterator
 from cs.resources import RunState, uses_runstate
 from cs.seq import seq
 from cs.units import (
-    transcribe_time,
+    human_time,
     transcribe as transcribe_units,
     BINARY_BYTES_SCALE,
     DECIMAL_SCALE,
@@ -342,7 +342,7 @@ class BaseProgress:
       if remaining:
         remaining = int(remaining)
       if remaining is not None:
-        rightv.append('ETA ' + transcribe_time(remaining))
+        rightv.append(f'ETA {human_time(remaining)}')
     if self.total is not None and self.total > 0:
       leftv.append(self.text_pos_of_total())
     else:
