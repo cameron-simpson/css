@@ -32,7 +32,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import fmtdoc, promote, Promotable, uses_quiet
+from cs.deco import fmtdoc, promote, Promotable, uses_quiet, uses_verbose
 from cs.fileutils import atomic_filename
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
@@ -49,6 +49,7 @@ from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
+from cs.rfc2616 import content_length
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.tagset import TagSet
@@ -320,8 +321,8 @@ class PlayOnCommand(BaseCommand):
       with Pfx(arg):
         recording_ids = sqltags.recording_ids_from_str(arg)
         if not recording_ids:
-          warning("no recording ids")
-          xit = 1
+          if sys.stderr.isatty():
+            warning("no recording ids")
           continue
         for dl_id in recording_ids:
           recording = sqltags[dl_id]
@@ -342,7 +343,15 @@ class PlayOnCommand(BaseCommand):
               recording.ls()
             else:
               sem.acquire()  # pylint: disable=consider-using-with
-              Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
+              Rs.append(
+                  bg_result(
+                      _dl,
+                      dl_id,
+                      sem,
+                      _extra=dict(dl_id=dl_id),
+                      _name=f'playon dl {dl_id} {recording.name}',
+                  )
+              )
 
     if Rs:
       for R in report_results(Rs):
@@ -1143,6 +1152,7 @@ class PlayOnAPI(HTTPServiceAPI):
   # pylint: disable=too-many-locals
   @pfx_method
   @uses_quiet
+  @uses_verbose
   @uses_runstate
   @typechecked
   def download(
@@ -1152,6 +1162,7 @@ class PlayOnAPI(HTTPServiceAPI):
       *,
       quiet: bool,
       runstate: RunState,
+      verbose: bool,
   ):
     ''' Download the file with `download_id` to `filename_basis`.
         Return the `TagSet` for the recording.
@@ -1188,15 +1199,16 @@ class PlayOnAPI(HTTPServiceAPI):
       dl_rsp = requests.get(
           dl_url, auth=RequestsNoAuth(), cookies=jar, stream=True
       )
-      dl_length = int(dl_rsp.headers['Content-Length'])
-      with pfx_call(atomic_filename, filename, mode='wb') as f:
+      dl_length = content_length(dl_rsp.headers)
+      assert dl_length is not None
+      with pfx_call(atomic_filename, filename, mode='xb') as f:
         for chunk in progressbar(
             dl_rsp.iter_content(chunk_size=131072),
             label=filename,
             total=dl_length,
             units_scale=BINARY_BYTES_SCALE,
             itemlenfunc=len,
-            report_print=not quiet,
+            report_print=not quiet if sys.stdout.isatty() else verbose,
         ):
           runstate.raiseif()
           offset = 0

@@ -40,14 +40,14 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import fmtdoc, decorator, Promotable
+from cs.deco import fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20250323-post'
+__version__ = '20250428-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -177,7 +177,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
           X("foo = %s", s(foo))
   '''
   # pylint: disable=redefined-outer-name
-  o_s = repr(o) if use_repr else str(o)
+  o_s = cropped_repr(o) if use_repr else str(o)
   if max_length is not None:
     o_s = cropped(o_s, max_length)
   s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
@@ -412,12 +412,15 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
+# TODO: add an optional detab=n parameter?
 def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
       strip the supplied string `s`, pull off the leading line,
       dedent the rest, put back the leading line.
+
+      This is a lot like the `inspect.cleandoc()` function.
 
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
@@ -1146,8 +1149,10 @@ def as_lines(chunks, partials=None):
 
 # pylint: disable=redefined-outer-name
 def cutprefix(s, prefix):
-  ''' Strip a `prefix` from the front of `s`.
+  ''' Remove `prefix` from the front of `s` if present.
       Return the suffix if `s.startswith(prefix)`, else `s`.
+      As with `str.startswith`, `prefix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching prefix from the tuple will be removed.
 
       Example:
 
@@ -1158,15 +1163,30 @@ def cutprefix(s, prefix):
           'abc.def'
           >>> cutprefix(abc_def, '.zzz') is abc_def
           True
+          >>> cutprefix('this_that', ('this', 'thusly'))
+          '_that'
+          >>> cutprefix('thusly_that', ('this', 'thusly'))
+          '_that'
   '''
   if prefix and s.startswith(prefix):
+    if isinstance(prefix, tuple):
+      # a tuple of str
+      for pfx in prefix:
+        if s.startswith(pfx):
+          return s[len(pfx):]
+      # no match, return the original object
+      return s
+    # a str
     return s[len(prefix):]
+  # no match, return the original object
   return s
 
 # pylint: disable=redefined-outer-name
 def cutsuffix(s, suffix):
-  ''' Strip a `suffix` from the end of `s`.
+  ''' Remove `suffix` from the end of `s` if present.
       Return the prefix if `s.endswith(suffix)`, else `s`.
+      As with `str.endswith`, `suffix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching suffix from the tuple will be removed.
 
       Example:
 
@@ -1177,9 +1197,22 @@ def cutsuffix(s, suffix):
           'abc.def'
           >>> cutsuffix(abc_def, '.zzz') is abc_def
           True
+          >>> cutsuffix('this_that', ('that', 'tother'))
+          'this_'
+          >>> cutsuffix('this_tother', ('that', 'tother'))
+          'this_'
   '''
   if suffix and s.endswith(suffix):
+    if isinstance(suffix, tuple):
+      # a tuple of str
+      for sfx in suffix:
+        if s.endswith(sfx):
+          return s[:-len(sfx)]
+      # no match, return the original object
+      return s
+    # a str
     return s[:-len(suffix)]
+  # no match, return the original object
   return s
 
 def common_prefix(*strs):
@@ -1357,23 +1390,17 @@ def snakecase(camelcased):
     strs.append(c)
   return ''.join(strs)
 
+@OBSOLETE('cs.fs.RemotePath.from_str')
 def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   ''' Split a path with an optional leading `[user@]rhost:` prefix
       into the prefix and the remaining path.
       `None` is returned for the prefix is there is none.
       This is useful for things like `rsync` targets etc.
+
+      OBSOLETE, use `cs.fs.RemotePath.from_str` instead.
   '''
-  ssh_target = None
-  # check for [user@]rhost
-  try:
-    prefix, suffix = remotepath.split(':', 1)
-  except ValueError:
-    pass
-  else:
-    if prefix and '/' not in prefix:
-      ssh_target = prefix
-      remotepath = suffix
-  return ssh_target, remotepath
+  from cs.fs import RemotePath
+  return RemotePath.from_str(remotepath)
 
 def tabulate(*rows, sep='  '):
   r''' A generator yielding lines of values from `rows` aligned in columns.

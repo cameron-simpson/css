@@ -19,7 +19,7 @@ r'''Simple filesystem based file tagging
 
     Tags are stored in the file `.fstags` in each directory;
     there is a line for each entry in the directory
-    consisting of the directory entry name and the associated tags.
+    consisting of the directory entry name and its associated tags.
 
     Programmatically one creates an `FSTags` instance and accesses
     the `TagSet`s for whichever filesystem paths are of interest:
@@ -49,15 +49,15 @@ r'''Simple filesystem based file tagging
     obtained from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
 
-        series-name sf series_title="Series Full Name"
+          series-name sf series_title="Series Full Name"
 
     * tag file `/path/to/series-name/.fstags`:
 
-      season-02 season=2
+          season-02 season=2
 
     * tag file `/path/to/series-name/season-02/.fstags`:
 
-      episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"
+          episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"
 
     ## `fstags` Examples ##
 
@@ -149,7 +149,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20241122-post'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -624,7 +624,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         r='recurse',
     )
     xit = 0
-    paths = argv or ['.']
+    paths = argv or ('.',)
     for path in paths:
       fullpath = realpath(path)
       for fspath in ((fullpath,)
@@ -765,7 +765,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise NotImplementedError("unsupported option")
     xit = 0
-    paths = argv or ['.']
+    paths = argv or ('.',)
     for path in paths:
       fullpath = realpath(path)
       for fspath in ((fullpath,) if directories_like_files else scandirpaths(
@@ -1603,6 +1603,8 @@ class FSTags(MultiOpenMixin):
       remove=True,
   ):
     ''' Move (or link or symlink) `srcpath` to `dstpath`.
+        It is an error if `dstpath` already exists.
+        Note that a move uses a hardlink+rename and will not work across filesystems.
 
         Parameters:
         * `srcpath`: the source filesystem path
@@ -1615,7 +1617,9 @@ class FSTags(MultiOpenMixin):
       pfx_call(os.symlink, abspath(srcpath), dstpath)
       self[dstpath].update(self[srcpath])
     else:
+      # we link+remove instead of rename because link fails if dstpath exists
       self.link(srcpath, dstpath)
+      self[dstpath].update(self[srcpath])
       if remove:
         pfx_call(os.remove, srcpath)
 
@@ -1872,7 +1876,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       *,
       state_func: Optional[Callable[[str], Mapping[str, Any]]] = None,
   ) -> "CachedValue":
-    ''' Return `CachedValue` managing the  `prefix.name` tag.
+    ''' Return a `CachedValue` managing the `prefix.name` tag.
     '''
     return CachedValue(self, prefix, name, state_func=state_func)
 
@@ -2007,7 +2011,7 @@ class TaggedPathSet:
   '''
 
   # the TaggedPaths
-  members: set[TaggedPath]
+  members: Set[TaggedPath]
   # mapping of (tag_name,tag_value) to TaggedPath
   _by_tag_name: Mapping[str, Set[TaggedPath]] = field(
       default_factory=lambda: defaultdict(set)

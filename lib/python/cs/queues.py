@@ -33,7 +33,7 @@ from cs.resources import (
 from cs.result import CancellationError
 from cs.seq import seq, unrepeated
 
-__version__ = '20250306-post'
+__version__ = '20250426-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -307,7 +307,7 @@ class PushQueue(MultiOpenMixin, RunStateMixin):
   def __init__(
       self,
       name: str,
-      functor: Callable[Any, Iterable],
+      functor: Callable[[Any], Iterable],
       outQ,
       runstate: RunState,
   ):

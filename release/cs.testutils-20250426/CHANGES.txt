@@ -1,0 +1,2 @@
+lib/python/cs/testutils.py: cs.testutils: simple self test in "main" mode
+lib/python/cs/testutils.py: cs.testutils: import cs.debug for thread_dump()

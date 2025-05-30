@@ -8,11 +8,14 @@ import copy
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
+from http.cookies import Morsel, SimpleCookie
 from itertools import zip_longest
+import json
 import os
 import os.path
 from os.path import (
     abspath,
+    dirname,
     exists as existspath,
     expanduser,
     isabs as isabspath,
@@ -21,6 +24,7 @@ from os.path import (
 import shlex
 import sys
 from threading import RLock
+import time
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
 from types import SimpleNamespace as NS
@@ -30,14 +34,17 @@ from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
+from cs.context import stackattrs
 from cs.deco import decorator, default_params, promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
-from cs.fs import HasFSPath, needdir
+from cs.fileutils import atomic_filename
+from cs.fs import HasFSPath, needdir, validate_rpath
 from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
+from cs.ndjson import dump_ndjson, scan_ndjson, write_ndjson
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
@@ -48,6 +55,7 @@ from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
 from .cache import ContentCache
+from .cookies import morsel, read_firefox_cookies
 from .format import FormatMapping
 from .parse import import_name
 from .sitemap import SiteMap
@@ -120,6 +128,112 @@ def cache_url(item_P):
   P.cache_url(url)
   return item_P
 
+class PilferSession(MultiOpenMixin, HasFSPath):
+  ''' A proxy for a `requests.Session` which loads and saves state.
+  '''
+
+  @typechecked
+  def __init__(self, *, P: "Pilfer", key: str, **rqsession_kw):
+    if os.sep in key:
+      raise ValueError(f'forbidden {os.sep=} in {key=}')
+    validate_rpath(key)
+    self.pilfer = P
+    self.key = key
+    self._session = None
+
+  def __getattr__(self, attr):
+    # proxies unknown attributes to the internal requests.Session isntance
+    return getattr(self._session, attr)
+
+  @property
+  def fspath(self):
+    ''' The filesystem path of the session state directory.
+    '''
+    return self.pilfer.pathto(joinpath('sessions', self.key))
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Load the cookie state from its state file, and save on exit.
+    '''
+    with requests.Session() as session:
+      with stackattrs(self, _session=session):
+        self.load_cookies()
+        try:
+          yield self
+        finally:
+          self.save_cookies()
+
+  @property
+  def cookiespath(self):
+    ''' The filesystem path of the cookies save file.
+    '''
+    return self.pathto('cookies.ndjson')
+
+  @property
+  def cookies(self):
+    ''' The cookie jar from the underlying `Session`.
+    '''
+    return self._session.cookies
+
+  @staticmethod
+  def cookie_as_morsel(cookie) -> Morsel:
+    ''' Return a `http.cookies.Morsel` representing a cookie
+        from `self.cookies`.
+    '''
+    ##pprint(cookie.__dict__)
+    return morsel(
+        name=cookie.name,
+        value=cookie.value,
+        domain=cookie.domain,
+        path=cookie.path,
+        expires=cookie.expires,
+        httponly=cookie._rest.get('HttpOnly', False),
+        samesite=False,
+        secure=cookie.secure,
+    )
+
+  def add_morsel(self, morsel: Morsel):
+    ''' Set the cookie from an `http.cookies.Morsel` instance.
+    '''
+    md = dict(morsel)
+    self.cookies.set(
+        morsel.key,
+        morsel.value,
+        comment=md['comment'],
+        domain=md['domain'],
+        path=md['path'],
+        expires=md['expires'],
+        rfc2109=True,
+        secure=md['secure'],
+        version=md['version'] or 0,
+    )
+
+  def load_cookies(self):
+    ''' Read any saved cookies from `self.cookiespath` and update `self.cookies`.
+    '''
+    cookies = self.cookies
+    errors = []
+    try:
+      with open(self.cookiespath) as f:
+        for d in scan_ndjson(f, error_list=errors):
+          self.add_morsel(morsel(**d))
+    except FileNotFoundError:
+      # no saved cookies
+      pass
+
+  def save_cookies(self):
+    ''' Save `self.cookies` to `self.cookiespath`.
+    '''
+    cookiespath = self.cookiespath
+    cookies_dirpath = dirname(cookiespath)
+    needdir(cookies_dirpath)
+    with atomic_filename(cookiespath, mode='w', exists_ok=True) as f:
+      for cookie in self.cookies:
+        m = self.cookie_as_morsel(cookie)
+        d = dict(name=m.key, value=m.value)
+        d.update(dict(m))
+        dump_ndjson(d, f)
+
 @dataclass
 class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   ''' State for the pilfer app.
@@ -155,6 +269,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       )
   )
   content_cache: ContentCache = None
+  # a session for storing cookies etc
+  session: str | PilferSession = None
   # for optional extra things hung on the Pilfer object
   state: NS = field(default_factory=NS)
   _diversion_tasks: dict = field(default_factory=dict)
@@ -162,6 +278,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   @uses_later
   def __post_init__(self, item=None, later: Later = None):
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    # TODO: should this be in the PilferSession? find out how it is used
     self.url_opener.add_handler(HTTPCookieProcessor())
     if self.fspath is None:
       self.fspath = abspath(
@@ -173,6 +290,12 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       self.content_cache = ContentCache(
           expanduser(self.rc_map[None]['cache'] or self.pathto('cache'))
       )
+    # default session named '_'
+    if self.session is None:
+      self.session = '_'
+    # promote string to session named by the string
+    if isinstance(self.session, str):
+      self.session = PilferSession(P=self, key=self.session)
     ##self._lock = Lock()
     self._lock = RLock()
 
@@ -184,11 +307,12 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   def __enter_exit__(self):
     ''' Run both the inherited context managers.
     '''
-    for _ in zip_longest(
-        MultiOpenMixin.__enter_exit__(self),
-        HasThreadState.__enter_exit__(self) if self.default else (),
-    ):
-      yield
+    with self.session:
+      for _ in zip_longest(
+          MultiOpenMixin.__enter_exit__(self),
+          HasThreadState.__enter_exit__(self) if self.default else (),
+      ):
+        yield
 
   @contextmanager
   def startup_shutdown(self):
@@ -198,13 +322,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
   @property
   def defaults(self):
-    ''' Mapping for default values formed by cascading PilferRCs.
+    ''' Mapping for default values formed by cascading `PilferRC`s.
     '''
     return self.rc_map[None]
 
   @property
   def _(self):
-    ''' Shortcut to this Pilfer's user_vars['_'] entry - the current item value.
+    ''' Shortcut to this `Pilfer`'s `user_vars['_']` entry - the current item value.
     '''
     return self.user_vars['_']
 
@@ -217,6 +341,70 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     ''' `self._` as a `URL` object.
     '''
     return URL.promote(self._)
+
+  def GET(
+      self,
+      url: str | URL,
+      *,
+      session: Optional[PilferSession] = None,
+      **get_kw,
+  ) -> requests.Response:
+    ''' Fetch `url` using the `GET` method, return a `requests.Response`.
+
+        If `session` is not supplied, `self.session` will be used.
+        Other keyword arguments are passed to `session.get`.
+    '''
+    if session is None:
+      session = self.session
+    return session.get(str(url), **get_kw)
+
+  def HEAD(
+      self,
+      url: str | URL,
+      *,
+      session: Optional[PilferSession] = None,
+      **head_kw,
+  ) -> requests.Response:
+    ''' Fetch `url` using the `HEAD` method, return a `requests.Response`.
+
+        If `session` is not supplied, `self.default_session` will be used.
+        Other keyword arguments are passed to `session.head`.
+    '''
+    if session is None:
+      session = self.default_session
+    return session.head(str(url), **head_kw)
+
+  def OPTIONS(
+      self,
+      url: str | URL,
+      *,
+      session: Optional[PilferSession] = None,
+      **options_kw,
+  ) -> requests.Response:
+    ''' Fetch `url` using the `OPTIONS` method, return a `requests.Response`.
+
+        If `session` is not supplied, `self.default_session` will be used.
+        Other keyword arguments are passed to `session.options`.
+    '''
+    if session is None:
+      session = self.default_session
+    return session.options(str(url), **options_kw)
+
+  def POST(
+      self,
+      url: str | URL,
+      *,
+      session: Optional[PilferSession] = None,
+      **post_kw,
+  ) -> requests.Response:
+    ''' Fetch `url` using the `POST` method, return a `requests.Response`.
+
+        If `session` is not supplied, `self.default_session` will be used.
+        Other keyword arguments are passed to `session.post`.
+    '''
+    if session is None:
+      session = self.default_session
+    return session.post(str(url), **post_kw)
 
   @cached_property
   def rc_map(self) -> Mapping[str | None, Mapping[str, str]]:
@@ -444,6 +632,16 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     for sitemap in self.sitemaps_for(url):
       return sitemap
     return None
+
+  @pfx_method
+  @promote
+  def grok(self, url: URL):
+    ''' Parse information from `url` by applying all matching methods from the site maps.
+        Yield `(method,match_tags,grokked)` 3-tuples.
+    '''
+    with self:
+      for sitemap in self.sitemaps_for(url):
+        yield from sitemap.grok(url)
 
   @promote
   def url_matches(self, url: URL, pattern_type: str, *, extra=None):

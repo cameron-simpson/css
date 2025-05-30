@@ -2397,8 +2397,8 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
     db_url: str = None
 
     COMMON_OPT_SPECS = dict(
-        db=('db_url', 'SQLTags database URL.'),
         **BaseCommand.Options.COMMON_OPT_SPECS,
+        db=('db_url', 'SQLTags database URL.'),
     )
 
   @cached_property

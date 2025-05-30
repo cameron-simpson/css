@@ -1,0 +1,2 @@
+with_self: fix reference to the get_context_from_self parameter.
+with_all: BREAKING: receive the objects as *objs, not objs, easier to use and read.

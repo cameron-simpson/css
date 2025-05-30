@@ -15,14 +15,13 @@ import sys
 from threading import Thread
 from typing import Any, Callable, Iterable, Mapping, Optional
 
+from icontract import require
 from mitmproxy import ctx, http
 import mitmproxy.addons.dumper
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
 from mitmproxy.tools.dump import DumpMaster
-
-from icontract import require
 import requests
 from typeguard import typechecked
 
@@ -73,7 +72,7 @@ def process_stream(
       The `Flow.response.stream` attribute can be set to a callable
       which accepts a `bytes` instance as its sole callable;
       this provides no context to the stream processor.
-      You can keep context my preparing that callable with a closure,
+      You can keep context by preparing that callable with a closure,
       but often it is clearer to write a generator which accepts
       an iterable of `bytes` and yields `bytes`. This function
       enables that.
@@ -106,7 +105,9 @@ def process_stream(
           ):
               # put the flow into streaming mode, changing nothing
               flow.response.stream = process_stream(
-                  lambda bss: bss, f'stream {flow.request}', content_length=length
+                  lambda bss: bss,
+                  f'stream {flow.request}',
+                  content_length=length,
               )
   '''
   if name is None:
@@ -152,7 +153,7 @@ def process_stream(
     consumer = copy_to_sink
 
   def filter_data(Qin, Qout):
-    ''' consume `data_Q` via the `consumer()` function, yield `bytes` istances.
+    ''' Consume `Qin` (from the `consumer()` generator), put to `Qout`.
       '''
     try:
       for obs in consumer(Qin):
@@ -210,7 +211,7 @@ def process_stream(
 @typechecked
 def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
   ''' If the flow has no content-length or the length is at least
-      threshold, put the lfow into streaming mode.
+      threshold, put the flow into streaming mode.
   '''
   assert hook_name == 'responseheaders'
   assert not flow.response.stream
@@ -348,28 +349,30 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
   url = URL(rq.url)
   rsp = flow.response
   PR(rq)
-  if hook_name == 'requestheaders':
+  if hook_name in ('requestheaders', 'responseheaders'):
     sitemap = P.sitemap_for(url)
     if sitemap is None:
-      PR("no site map")
+      PR("  no site map for URL")
     else:
-      PR("sitemap", sitemap)
+      PR(
+          "  URL sitemap",
+          sitemap,
+      )
     print("  Request Headers:")
     printt(
         *[(key, value) for key, value in sorted(rq.headers.items())],
         indent="    ",
     )
-    if rq.method == "GET":
-      q = url.query_dict()
-      if False and q:
-        print("  Query:")
-        printt(
-            *[(param, repr(value)) for param, value in sorted(q.items())],
-            indent="    ",
-        )
-    elif rq.method == "POST":
-      if False and rq.urlencoded_form:
-        print("  Query:")
+    q = url.query_dict()
+    if q:
+      print("  URL query part:")
+      printt(
+          *[(param, repr(value)) for param, value in sorted(q.items())],
+          indent="    ",
+      )
+    if rq.method == "POST":
+      if rq.urlencoded_form:
+        print("  POST query:")
         printt(
             *[
                 (param, repr(value))
@@ -377,16 +380,14 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
             ],
             indent="    ",
         )
-  elif hook_name == 'responseheaders':
+  if hook_name == 'responseheaders':
     print("  Response Headers:")
     printt(
         *[(key, value) for key, value in sorted(rsp.headers.items())],
         indent="    ",
     )
-  elif hook_name == 'response':
+  if hook_name == 'response':
     PR("  Content:", len(flow.response.content))
-  else:
-    PR("  no action for hook", hook_name)
 
 @require(lambda flow: not flow.response.stream)
 @typechecked
@@ -438,6 +439,7 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
     content_bs = bs().join(takewhile(len, bss))
     method_name = f'content_{pattern_type.lower()}'
     for match in matches:
+      PR("for match", match)
       try:
         content_handler = getattr(match.sitemap, method_name)
       except AttributeError as e:
@@ -484,6 +486,7 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
   if hook_name == 'requestheaders':
     prefetch_flags = rq.headers.pop('x-prefetch', '').strip().split()
     if 'no' in prefetch_flags:
+      print("PREFETCH: has x-prefetch for", rq.url, ":", prefetch_flags)
       flow.x_prefetch_skip = True
   elif hook_name == 'responseheaders':
     if getattr(flow, 'x_prefetch_skip', False):
@@ -584,13 +587,16 @@ class MITMAddon:
       hook_action: MITMHookAction,
       args,
       kwargs,
+      url_regexps=(),
   ):
     ''' Add a `MITMHookAction` to a list of hooks for `hook_name`.
     '''
     if hook_names is None:
       hook_names = hook_action.default_hooks
     for hook_name in hook_names:
-      self.hook_map[hook_name].append((hook_action, args, kwargs))
+      self.hook_map[hook_name].append(
+          (hook_action, args, kwargs, list(url_regexps))
+      )
 
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
@@ -647,7 +653,7 @@ class MITMAddon:
       flow.runstate.stop()
 
   @pfx_method
-  def call_hooks_for(self, hook_name: str, *mitm_hook_a, **mitm_hook_kw):
+  def call_hooks_for(self, hook_name: str, flow, *mitm_hook_a, **mitm_hook_kw):
     ''' This calls all the actions for the specified `hook_name`.
     '''
     # look up the actions when we're called
@@ -658,10 +664,22 @@ class MITMAddon:
     excs = []
     # for collating any .stream functions
     stream_funcs = []
-    for i, (action, action_args, action_kwargs) in enumerate(hook_actions):
+    for i, (
+        action,
+        action_args,
+        action_kwargs,
+        url_regexps,
+    ) in enumerate(hook_actions):
+      if url_regexps:
+        for regexp in url_regexps:
+          if regexp.search(flow.request.url):
+            break
+        else:
+          print("SKIP", action, "does not match URL", flow.request.url)
+          continue
       if hook_name == 'responseheaders':
         flow = mitm_hook_a[0]
-        # note the initial state of the .steam attribute
+        # note the initial state of the .stream attribute
         stream0 = flow.response.stream
         assert not stream0, \
             f'expected falsey flow.response.stream, got {flow.response.stream=}'
@@ -670,6 +688,7 @@ class MITMAddon:
             action,
             *action_args,
             hook_name,
+            flow,
             *mitm_hook_a,
             **action_kwargs,
             **mitm_hook_kw,
@@ -722,6 +741,8 @@ class MITMAddon:
 
       else:
         assert len(stream_funcs) > 1
+
+        # TODO: we don't do anything with stream_excs here!
 
         def stream(bs: bytes) -> Iterable[bytes]:
           ''' Run each `bytes` instance through all the stream functions.

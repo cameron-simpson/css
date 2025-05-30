@@ -3,7 +3,7 @@
 import copy
 import re
 from string import whitespace
-from typing import Iterable
+from typing import Iterable, Tuple
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -593,6 +593,22 @@ def parse_action(action, do_trace):
     func = func_args
   return sig, func
 
+def get_delim_regexp(s, offset) -> Tuple[re.Pattern, int]:
+  ''' Parse a delimited regexp such as /foo/.
+  '''
+  if offset == len(s):
+    raise SyntaxError("missing regexp delimter")
+  re_delim = s[offset]
+  offset += 1
+  end_offset = s.find(re_delim, offset)
+  if end_offset == -1:
+    raise SyntaxError(f'missing closing regexp delimiter {re_delim!r}')
+  assert end_offset > offset
+  regexp_s = s[offset:end_offset]
+  offset = end_offset + 1
+  regexp = pfx_call(re.compile, regexp_s)
+  return regexp, offset
+
 def get_action_args(action, offset, delim=None):
   ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
       return `(args,kwargs,offset)`.
@@ -642,17 +658,7 @@ def get_action_args(action, offset, delim=None):
       # ~ /regexp/
       elif action.startswith('~', offset):
         offset1 = skipwhite(action, offset + 1)
-        if offset1 == len(action):
-          raise SyntaxError("missing regexp delimter after tilde")
-        re_delim = action[offset1]
-        offset = offset1 + 1
-        end_offset = action.find(re_delim, offset)
-        if end_offset == -1:
-          raise SyntaxError(f'missing closing regexp delimiter {re_delim!r}')
-        assert end_offset > offset
-        regexp_s = action[offset:end_offset]
-        offset = end_offset + 1
-        arg = pfx_call(re.compile, regexp_s)
+        arg, offset = get_delim_regexp(action, offset1)
       else:
         # nonwhitespace etc
         arg, offset = get_other_chars(action, offset, other_chars)
