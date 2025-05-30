@@ -266,7 +266,7 @@ class OptionSpec:
       field_name = spec0[1:]
       if needs_arg:
         raise ValueError(
-            f'field name {field_name!r} expects an aegument'
+            f'field name {field_name!r} expects an argument'
             ': inverted options only make sense for Boolean options'
         )
       field_default = True
@@ -1105,10 +1105,11 @@ def popopts(cmd_method, **opt_specs_kw):
       inside the method.
   '''
 
-  def popopts_cmd_method_wrapper(self, argv, *method_a, **method_kw):
+  def _popopts_cmd_method_wrapper(self, argv, *method_a, **method_kw):
     self.options.popopts(argv, **opt_specs_kw)
     return cmd_method(self, argv, *method_a, **method_kw)
 
+  wrapper_attrs = {}
   if opt_specs_kw:
     # patch the cmd_method usage text
     pre_usage, usage_format, post_usage = split_usage(cmd_method.__doc__ or '')
@@ -1122,10 +1123,11 @@ def popopts(cmd_method, **opt_specs_kw):
               )
           )
       )
-    cmd_method.__doc__ = f'{pre_usage}\n\n{usage_format}\n\n{post_usage}'.strip(
-    )
+      wrapper_attrs.update(
+          __doc__=f'{pre_usage}\n\n{usage_format}\n\n{post_usage}'.strip(),
+      )
 
-  return popopts_cmd_method_wrapper
+  return _popopts_cmd_method_wrapper, wrapper_attrs
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
