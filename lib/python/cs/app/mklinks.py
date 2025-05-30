@@ -12,11 +12,11 @@ mklinks: tool for finding and hardlinking identical files
 
 Mklinks walks supplied paths looking for files with the same content,
 based on a cryptographic checksum of their content. It hardlinks
-all such files found, keeping the newest version.
+all such files found, keeping the oldest version.
 
 Unlike some rather naive tools out there, mklinks only compares
-files with other files of the same size, and is hardlink aware - a
-partially hardlinked tree is processed efficiently and correctly.
+files with other files of the same size, and is hardlink aware;
+a partially hardlinked tree is processed efficiently and correctly.
 '''
 
 from collections import defaultdict
