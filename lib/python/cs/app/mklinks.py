@@ -42,7 +42,7 @@ from cs.resources import RunState, uses_runstate
 from cs.seq import first
 from cs.upd import run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20221228-post'
+__version__ = '20250530'
 
 DISTINFO = {
     'description':
