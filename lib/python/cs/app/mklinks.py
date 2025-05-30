@@ -72,9 +72,9 @@ DISTINFO = {
 def main(argv=None):
   ''' CLI for `mklinks`.
   '''
-  return MKLinksCmd(argv).run()
+  return MKLinksCommand(argv).run()
 
-class MKLinksCmd(BaseCommand):
+class MKLinksCommand(BaseCommand):
   ''' Hard link files with identical contents.
   '''
 
