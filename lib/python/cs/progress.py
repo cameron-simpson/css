@@ -33,7 +33,7 @@ from typing import Callable, Optional
 from icontract import ensure
 from typeguard import typechecked
 
-from cs.deco import decorator, fmtdoc, uses_quiet
+from cs.deco import decorator, fmtdoc, uses_verbose
 from cs.logutils import debug, exception
 from cs.py.func import funcname
 from cs.queues import IterableQueue, QueueIterator
@@ -387,7 +387,7 @@ class BaseProgress:
 
   # pylint: disable=blacklisted-name,too-many-arguments
   @contextmanager
-  @uses_quiet
+  @uses_verbose
   @uses_upd
   @fmtdoc
   def bar(
@@ -402,7 +402,7 @@ class BaseProgress:
       insert_pos=1,
       poll: Optional[Callable[["BaseProgress"], None]] = None,
       update_period=DEFAULT_UPDATE_PERIOD,
-      quiet: bool,
+      verbose: bool,
       upd: Upd,
   ):
     ''' A context manager to create and withdraw a progress bar.
@@ -448,7 +448,7 @@ class BaseProgress:
     if label is None:
       label = self.name
     if report_print is None:
-      report_print = not quiet
+      report_print = verbose
     if statusfunc is None:
 
       def statusfunc(P, label, width):
