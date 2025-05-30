@@ -932,6 +932,8 @@ class BaseCommandOptions(HasThreadState):
          where `opt` is as from `opt,val` from `getopt()`
          and `opt_spec` is the associated `OptionSpec` instance
     '''
+    if common_opt_specs is None:
+      common_opt_specs = cls.COMMON_OPT_SPECS
     opt_spec_cls = cls.opt_spec_class
     shortopts = ''
     longopts = []
@@ -939,12 +941,13 @@ class BaseCommandOptions(HasThreadState):
     # gather up the option specifications and make getopt arguments
     for opt_k, opt_specs in ChainMap(
         opt_specs_kw,
-        cls.COMMON_OPT_SPECS if common_opt_specs is None else common_opt_specs,
+        common_opt_specs,
     ).items():
       with Pfx("opt_spec[%r]=%r", opt_k, opt_specs):
         opt_spec = opt_spec_cls.from_opt_kw(opt_k, opt_specs)
         if opt_spec.getopt_opt in getopt_spec_map:
-          raise ValueError(f'repeated spec for {opt_spec.getopt_opt}')
+          # keep the earlier definition
+          continue
         getopt_spec_map[opt_spec.getopt_opt] = opt_spec
         # update the arguments for getopt()
         shortopts += opt_spec.getopt_short
