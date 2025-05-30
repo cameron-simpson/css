@@ -966,6 +966,7 @@ def merge(
 ) -> bool:
   ''' Merge `srcpath` to `dstpath`, _preserving `dstpath` if present_.
       Return `True` if something was done, `False` if this was a no-op.
+      Raise `FileExistsError` if `dstpath` exists with different content.
 
       This is aimed at situations such as merging downloads with
       an existing corpus, which might have hard links etc, so
