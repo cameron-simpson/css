@@ -2064,9 +2064,9 @@ class TaggedPathSet:
         This removes `path` from the main set and the indices.
     '''
     self.members.discard(path)
-    for paths in self.__by_tag_name.values():
+    for paths in self._by_tag_name.values():
       paths.discard(path)
-    for paths in self.__by_tag_values.values():
+    for paths in self._by_tag_value.values():
       paths.discard(path)
 
   @promote
