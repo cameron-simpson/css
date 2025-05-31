@@ -110,6 +110,7 @@ from typing import (
     Any,
     Callable,
     Iterable,
+    List,
     Mapping,
     Optional,
     Set,
@@ -135,6 +136,7 @@ from cs.lex import (
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.seq import unrepeated
 from cs.tagset import (
     Tag,
     TagSet,
@@ -2014,7 +2016,8 @@ class TaggedPathSet:
   '''
 
   # the TaggedPaths
-  members: Set[TaggedPath]
+  members: Set[TaggedPath] = field(default_factory=set)
+  _insert_order: List[TaggedPath] = field(default_factory=list)
   # mapping of (tag_name,tag_value) to TaggedPath
   _by_tag_name: Mapping[str, Set[TaggedPath]] = field(
       default_factory=lambda: defaultdict(set)
@@ -2029,6 +2032,7 @@ class TaggedPathSet:
     ''' Clear the set.
     '''
     self.members.clear()
+    self_insert_order = []
     self._by_tag_name = defaultdict(set)
     self._by_tag_value = defaultdict(set)
 
@@ -2039,6 +2043,8 @@ class TaggedPathSet:
         This indexes its _current_ tag names and values.
         To reindex a path, add it again.
     '''
+    if path not in self.members:
+      self._insert_order.append(path)
     # forget it
     self.discard(path)
     # then add it and reindex it
@@ -2091,7 +2097,13 @@ class TaggedPathSet:
     return set(path for path in paths if path in self)
 
   def __iter__(self):
-    return iter(self.members)
+    ''' Iterate over the paths in insert order.
+    '''
+    with self._lock:
+      iterpaths = list(unrepeated(self._insert_order))
+    for path in iterpaths:
+      if path in self.members:
+        yield path
 
   @locked
   def update(self, paths: Iterable[Union[str, TaggedPath]]):
@@ -2099,6 +2111,17 @@ class TaggedPathSet:
     '''
     for path in paths:
       self.add(path)
+
+  @promote
+  def find(self, path: TaggedPath):
+    ''' Return the index of `path` in the set.
+        Return `-1` if the path is not present.
+    '''
+    if path in self:
+      for i, p in enumerate(self):
+        if p == path:
+          return i
+    return -1
 
 class FSTagsTagFile(TagFile, HasFSTagsMixin):
   ''' A `FSTagsTagFile` indexing `TagSet`s for file paths
