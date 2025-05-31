@@ -429,7 +429,7 @@ class HashIndexCommand(BaseCommand):
       partial='Keep partially transferred files, passed to rsync.',
   )
   def cmd_rsync(self, argv, *, fstags: FSTags):
-    ''' Usage: {cmd} [options] srcdir dstdir
+    ''' Usage: {cmd} [options] srcdir dstdir [rsync-options...]
           Rearrange dstdir according to srcdir then rsync srcdir into dstdir.
     '''
     options = self.options
@@ -443,6 +443,7 @@ class HashIndexCommand(BaseCommand):
     verbose = options.verbose
     srcdir = self.poppathspec(argv, 'srcdir', check_isdir=True)
     dstdir = self.poppathspec(argv, 'dstdir', check_isdir=True)
+    rsync_opts = argv
     with run_task(f'scan srcdir {srcdir}'):
       fspaths_by_hashcode = hashindex_map(srcdir, relative=True)
     xit = 0
@@ -483,6 +484,7 @@ class HashIndexCommand(BaseCommand):
                 '-ar',
                 delete and '--delete',
                 f'--exclude={fstags.tagsfile_basename}',
+                *rsync_opts,
                 '--',
                 f'{srcdir}/',
                 f'{dstdir}/',
