@@ -504,55 +504,37 @@ class ImageButton(_ImageWidget, tk.Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
-class _FSPathsMixin:
+class HasTaggedPathSet:
   ''' A mixin with methods for maintaining a list of filesystem paths.
+      This maintains a `.taggedpaths` attribute holding a `TaggedPathSet`.
   '''
 
-  def __init__(self, canonical=None, display=None):
-    if canonical is None:
-      canonical = abspath
-    if display is None:
-      display = shortpath
-    self.__canonical = canonical
-    self.__display = display
-    self.__index_by_canonical = {}
-    self.__index_by_display = {}
+  def __init__(
+      self,
+      paths: Union[TaggedPathSet, Iterable[Union[str, TaggedPath]]] = None,
+      display=None,
+  ):
+    ''' Initialise `self.taggedpaths`, which is a property.
 
-  def __clear(self):
-    self.__index_by_canonical.clear()
-    self.__index_by_display.clear()
-
-  def set_fspaths(self, new_fspaths):
-    ''' Update the canonical and display index mappings.
-        Return a list of the display paths.
+        Parameters:
+        * `paths`: used to intialise `.taggedpaths`, optional; an existing
+          `TaggedPathSet` or an iterable of `str` or `TaggedPath`
+        * `display`: optional callable computing the friendly form of a path,
+          default `cs.fs.shortpath`
     '''
-    fspaths = list(new_fspaths)
-    display_paths = []
-    self.__clear()
-    for i, fspath in enumerate(fspaths):
-      cpath = self.__canonical(fspath)
-      dpath = self.__display(fspath)
-      display_paths.append(dpath)
-      self.__index_by_canonical[cpath] = i
-      self.__index_by_display[dpath] = i
-    return display_paths
+    if isinstance(paths, TaggedPathSet):
+      self.__dict__['taggedpaths'] = paths
+    else:
+      self.__dict__['taggedpaths'] = TaggedPathSet()
+      if paths:
+        self.taggedpaths.update(paths)
+    self.display = display or shortpath
 
-  @pfx_method
-  def index_by_path(self, path):
-    ''' Return the index for path via its display or canonical forms,
-        or `None` if no match.
+  def display_paths(self):
+    ''' Return a list of the friendly form of each path.
     '''
-    dpath = self.__display(path)
-    try:
-      index = self.__index_by_display[dpath]
-    except KeyError:
-      cpath = self.__canonical(path)
-      try:
-        index = self.__index_by_canonical[cpath]
-      except KeyError:
-        warning("no index found, tried display=%r, canonical=%r", dpath, cpath)
-        index = None
-    return index
+    display = self.display
+    return [display(path.fspath) for path in self.taggedpaths]
 
 class PathList_Listbox(Listbox, _FSPathsMixin):
   ''' A `Listbox` displaying filesystem paths.
