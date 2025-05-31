@@ -20,7 +20,7 @@ from os.path import (
     samefile,
 )
 from threading import RLock
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from icontract import require
 from typeguard import typechecked
@@ -147,7 +147,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       except FileNotFoundError:
         return ()
 
-  @uses_cmd_options(hashname=None, modes=None, doit=None, force=False)
+  @uses_cmd_options(hashname=None, modes=RULE_MODES, doit=None, force=False)
   @uses_fstags
   @require(lambda filename: filename and '/' not in filename)
   @typechecked
@@ -159,10 +159,10 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       hashname: str,
       doit: bool,
       force: bool,
-      modes=RULE_MODES,
+      modes: Sequence[str],
   ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
-        Return the list of `RuleResult`s for matches `Rule`s.
+        Return the list of `RuleResult`s for matched `Rule`s.
     '''
     fspath = self.pathto(filename)
     tagged = fstags[fspath]
@@ -199,7 +199,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
             case TagChange(add_remove=False) as change:
               vprint("  -", change.tag)
             case _:
-              warning("ignoring unsupported action {r(action)}")
+              warning(f'ignoring unsupported action {r(action)}')
         if rule.quick:
           break
     return matched_results
