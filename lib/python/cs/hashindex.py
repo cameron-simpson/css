@@ -455,6 +455,7 @@ class HashIndexCommand(BaseCommand):
             srcdir.fspath,
             fspaths_by_hashcode,
             dstdir.fspath,
+            doit=doit,
             move_mode=True,
             symlink_mode=False,
         )
@@ -465,6 +466,7 @@ class HashIndexCommand(BaseCommand):
             dstdir.fspath,
             dstdir.fspath,
             fspaths_by_hashcode,
+            doit=doit,
             move_mode=True,
             symlink_mode=False,
         )
@@ -489,7 +491,7 @@ class HashIndexCommand(BaseCommand):
                 f'{srcdir}/',
                 f'{dstdir}/',
             ],
-            doit=True,
+            doit=True,  # let rsync -n do this
             quiet=quiet,
         )
 
