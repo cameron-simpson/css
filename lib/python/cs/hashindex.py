@@ -461,7 +461,7 @@ class HashIndexCommand(BaseCommand):
         # remote srcdir and dstdir
         xit = remote_rearrange(
             dstdir.host,
-            srcdir.fspath,
+            dstdir.fspath,
             dstdir.fspath,
             fspaths_by_hashcode,
             move_mode=True,
