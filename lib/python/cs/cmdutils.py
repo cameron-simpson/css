@@ -41,6 +41,7 @@ except ImportError:
 
 from getopt import getopt, GetoptError
 from inspect import isclass
+from itertools import chain
 import os
 from os.path import basename
 from pprint import pformat
@@ -938,10 +939,8 @@ class BaseCommandOptions(HasThreadState):
     longopts = []
     getopt_spec_map = {}
     # gather up the option specifications and make getopt arguments
-    for opt_k, opt_specs in ChainMap(
-        opt_specs_kw,
-        common_opt_specs,
-    ).items():
+    for opt_k, opt_specs in chain(opt_specs_kw.items(),
+                                  common_opt_specs.items()):
       with Pfx("opt_spec[%r]=%r", opt_k, opt_specs):
         opt_spec = opt_spec_cls.from_opt_kw(opt_k, opt_specs)
         if opt_spec.getopt_opt in getopt_spec_map:
