@@ -1,0 +1,2 @@
+lib/python/cs/hashindex.py: cs.hashindex: merge: document raising FileExistsError for dstpath with different content
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rsync: the remote_rearrange() call should rearrange dstdir into dstdir
