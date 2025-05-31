@@ -50,7 +50,7 @@ cs.fsm ok_revision=b05a07abe155bbb10776c7a8ee7aaeba13177a13 pypi.release="202501
 cs.fstags pypi.release="20250528" ok_revision="4a5f0b31e4f5695ddad441df958520bf5afebc43" features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"],"20240422":["fix_fstags__repr"],"20240709":["CachedValue"],"20250528":["TaggedPathSet"]}
 cs.gimmicks ok_revision=e3a39d35d32d5baa1566f6e6250b27a4e55432b9 pypi.release="20250428" features={"20211208":["TimeoutError"],"20220429":["devnull"],"20230212":["gimmick_r","gimmick_s"],"20230331":["open_append"],"20250428":["Buffer"]}
 cs.gvutils ok_revision="4c81e06630110ce18f0422ece389d623cbc1bfaf" pypi.release="20230816" features={"20220805.1":["DOTNodeMixin"],"20220827":["gvprint_capture","gvprint_dataurl"],"20220827.1":["dataurl_encoding"],"20221207":["gvsvg"]}
-cs.hashindex ok_revision="682882d3b28e4fdf43b18066887f205cb4027d9d" pypi.release="20250528" features={"20240216":["read_remote_hashindex","run_remote_hashindex"],"20240709":["blake3"],"20250528":["HashIndexCommand__cmd_rsync","hashindex_map","remote_rearrange"]}
+cs.hashindex ok_revision="682882d3b28e4fdf43b18066887f205cb4027d9d" pypi.release="20250531" features={"20240216":["read_remote_hashindex","run_remote_hashindex"],"20240709":["blake3"],"20250528":["HashIndexCommand__cmd_rsync","hashindex_map","remote_rearrange"]}
 cs.hashutils ok_revision="2030d99fdf99da2d111ecdf71841b9fbc55bbfac" pypi.release="20250414.1" features={"20240412":["BaseHashCode__get_hashfunc","blake3"],"20250414":["BLAKE3"]}
 cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280d3f"
 cs.id3 pypi.release="20211208" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
