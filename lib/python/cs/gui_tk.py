@@ -194,7 +194,13 @@ def imgof(
         pfx_call(im2.save, dstpath, FMT)
 
   convsize = re_size or size
-  return convof(path, f'{fmt}/{convsize[0]}x{convsize[1]}', resize, ext=fmt)
+  return convof(
+      path,
+      f'{fmt}/{convsize[0]}x{convsize[1]}',
+      resize,
+      ext=fmt,
+      force=force,
+  )
 
 def pngfor(path, **imgof_kw):
   ''' Call `imgof` specifying PNG output.
