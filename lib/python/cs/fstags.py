@@ -1668,6 +1668,9 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   def __str__(self):
     return Tag.transcribe_value(str(self.fspath)) + ' ' + str(self.all_tags)
 
+  def __hash__(self):
+    return hash(self.fspath)
+
   def __lt__(self, other):
     return HasFSPath.__lt__(self, other)
 
