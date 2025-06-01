@@ -448,9 +448,9 @@ def OBSOLETE(func, suggestion=None):
 
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
-  doc = "OBSOLETE " + funcname
+  doc = "OBSOLETE version of " + funcname
   if suggestion:
-    doc += ' suggestion: ' + suggestion
+    doc += ', suggestion: ' + suggestion
   return OBSOLETE_func_wrapper, dict(
       __name__=f'@OBSOLETE({funcname})',
       __doc__=f'{doc}\n\n{funcdoc}',
