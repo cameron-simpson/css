@@ -449,11 +449,12 @@ def OBSOLETE(func, suggestion=None):
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
   doc = "OBSOLETE " + funcname
-  func.__doc__ = doc + '\n\n' + funcdoc
   if suggestion:
     doc += ' suggestion: ' + suggestion
-  OBSOLETE_func_wrapper.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  return OBSOLETE_func_wrapper
+  return OBSOLETE_func_wrapper, dict(
+      __name__=f'@OBSOLETE({funcname})',
+      __doc__=f'{doc}\n\n{funcdoc}',
+  )
 
 @OBSOLETE(suggestion='cs.cache.cachedmethod')
 def cached(*a, **kw):
