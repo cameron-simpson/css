@@ -285,7 +285,7 @@ def human_time(n):
   '''
   return UnitScale('human_time').decompose(n)
 
-decompose_time = OBSOLETE('human_time(n)')
+decompose_time = OBSOLETE('human_time(n)')(human_time)
 
 # pylint: disable=too-many-arguments
 @promote
