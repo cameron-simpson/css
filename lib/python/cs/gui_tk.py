@@ -20,7 +20,7 @@ from os.path import (
 import platform
 import tkinter as tk
 from tkinter import Tk, ttk
-from typing import Iterable, List
+from typing import Iterable, List, Union
 from uuid import uuid4
 
 from icontract import require, ensure
@@ -29,8 +29,9 @@ from typeguard import typechecked
 
 from cs.cache import convof
 from cs.cmdutils import BaseCommand
+from cs.deco import Promotable, promote
 from cs.fs import needdir, shortpath
-from cs.fstags import FSTags
+from cs.fstags import FSTags, TaggedPath, TaggedPathSet, uses_fstags
 from cs.hashutils import SHA256
 from cs.lex import cutprefix
 from cs.logutils import warning
@@ -128,7 +129,7 @@ def image_size(path, *, fstags: FSTags):
         size = tagged['pil.size'] = im.size
         tagged['mime_type'] = 'image/' + im.format.lower()
     except UnidentifiedImageError as e:
-      warning("unhandled image: %s", e)
+      warning(f'image_size({path!r}): unhandled image: {e}')
       size = tagged['pil.size'] = None
   if size is not None:
     size = tuple(size)
@@ -338,7 +339,7 @@ class _Widget(ABC):
         return False
       try:
         p = p.parent
-      except AttributeError as e:
+      except AttributeError:
         break
     assert hasattr(p, 'state'), "no .state on %s" % (p,)
     return p.state() == 'normal'
