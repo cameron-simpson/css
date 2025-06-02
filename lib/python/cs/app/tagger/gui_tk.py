@@ -53,7 +53,6 @@ def run(tagger: Tagger, parent=None, *, runstate: RunState, **widget_kw):
   ''' Create a `TaggerWidget` for `tagger` and run the GUI until
       the runstate is cancelled.
     '''
-  root = tk.Tk()
   widget = trace(TaggerWidget)(
       parent,
       tagger=tagger,
