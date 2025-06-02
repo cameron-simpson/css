@@ -677,19 +677,19 @@ class TagValueStringVar(tk.StringVar):
     ''' Return the value derived from the contents via `Tag.parse_value`.
         An attempt is made to cope with unparsed values.
     '''
-    s = super().get()
+    value0 = super().get()
     try:
-      value, offset = pfx_call(Tag.parse_value, s)
+      value, offset = pfx_call(Tag.parse_value, value0)
     except ValueError as e:
       warning(str(e))
-      value = s
+      value = value0
     else:
-      if offset < len(s):
-        warning("unparsed: %r", s[offset:])
+      if offset < len(value0):
+        warning("unparsed: %r", value0[offset:])
         if isinstance(value, str):
-          value += s[offset:]
+          value += value0[offset:]
         else:
-          value = s
+          value = value0
     return value
 
 class EditValueWidget(Frame):
