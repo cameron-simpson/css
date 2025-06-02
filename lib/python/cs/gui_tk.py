@@ -552,12 +552,14 @@ class HasTaggedPathSet:
       This maintains a `.taggedpaths` attribute holding a `TaggedPathSet`.
   '''
 
+  @promote
   def __init__(
       self,
-      paths: Union[TaggedPathSet, Iterable[Union[str, TaggedPath]]] = None,
+      paths: TaggedPathSetVar = None,
+      *,
       display=None,
   ):
-    ''' Initialise `self.taggedpaths`, which is a property.
+    ''' Initialise `self.pathsvar`.
 
         Parameters:
         * `paths`: used to intialise `.taggedpaths`, optional; an existing
@@ -565,13 +567,35 @@ class HasTaggedPathSet:
         * `display`: optional callable computing the friendly form of a path,
           default `cs.fs.shortpath`
     '''
-    if isinstance(paths, TaggedPathSet):
-      self.__dict__['taggedpaths'] = paths
-    else:
-      self.__dict__['taggedpaths'] = TaggedPathSet()
-      if paths:
-        self.taggedpaths.update(paths)
-    self.display = display or shortpath
+    if paths is None:
+      paths = TaggedPathSetVar(paths=paths, display=display)
+    elif display is not None:
+      paths.display - display
+    self.pathsvar = paths
+
+  @property
+  def taggedpaths(self):
+    ''' The `TaggedPathSet` instance.
+    '''
+    return self.pathsvar.taggedpaths
+
+  @property
+  def fspaths(self):
+    ''' A list of the filesystem paths.
+    '''
+    return [path.fspath for path in self.taggedpaths]
+
+  @fspaths.setter
+  def fspaths(self, new_fspaths):
+    ''' Setting `.fspaths` calls `self.set(new_fspaths)`.
+    '''
+    self.set(new_fspaths)
+
+  @property
+  def display(self):
+    ''' The display function.
+    '''
+    return self.pathsvar.display
 
   def display_paths(self):
     ''' Return a list of the friendly form of each path.
@@ -580,6 +604,11 @@ class HasTaggedPathSet:
     return [display(path.fspath) for path in self.taggedpaths]
 
 class PathList_Listbox(Listbox, _FSPathsMixin):
+  def set(self, paths):
+    ''' Set the `paths`.
+    '''
+    self.pathsvar.set(paths)
+
   ''' A `Listbox` displaying filesystem paths.
   '''
 
