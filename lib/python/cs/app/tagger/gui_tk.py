@@ -70,7 +70,7 @@ def run(tagger: Tagger, parent=None, *, runstate: RunState, **widget_kw):
       with runstate:
         widget.lift()
         widget.focus()
-        root.mainloop()
+        widget.mainloop()
 
 class TaggerGUICommand(BaseTkCommand):
 
