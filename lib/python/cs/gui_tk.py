@@ -5,22 +5,18 @@
 '''
 
 from abc import ABC
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from contextlib import contextmanager
 import os
 from os.path import (
-    abspath,
     basename,
     expanduser,
-    isdir as isdirpath,
-    isfile as isfilepath,
-    join as joinpath,
     splitext,
 )
 import platform
 import tkinter as tk
 from tkinter import Tk, ttk
-from typing import Iterable, List, Union
+from typing import Iterable, List
 from uuid import uuid4
 
 from icontract import require, ensure
@@ -30,9 +26,8 @@ from typeguard import typechecked
 from cs.cache import convof
 from cs.cmdutils import BaseCommand
 from cs.deco import Promotable, promote
-from cs.fs import needdir, shortpath
+from cs.fs import shortpath
 from cs.fstags import FSTags, TaggedPath, TaggedPathSet, uses_fstags
-from cs.hashutils import SHA256
 from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_method, pfx_call
@@ -41,7 +36,6 @@ from cs.tagset import Tag
 
 from cs.lex import r
 from cs.x import X
-from cs.py.stack import caller
 
 is_darwin = platform.system() == "Darwin"
 
@@ -522,7 +516,6 @@ class TaggedPathSetVar(tk.Variable, Promotable):
       paths = TaggedPathSet()
     self.taggedpaths = paths
 
-  @trace
   def get_str(self):
     ''' Get the current display paths in the expected `('v1',...)` form.
     '''
@@ -783,7 +776,7 @@ class ThumbNailScrubber(Frame, HasTaggedPathSet):
     HasTaggedPathSet.__init__(self, paths)
     Frame.__init__(self, parent, **frame_kw)
     self.command = command
-    self.make_subwidget = trace(
+    self.make_subwidget = (
         lambda i, fspath: ImageButton(
             self,
             path=fspath,
