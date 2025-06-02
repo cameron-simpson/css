@@ -2011,7 +2011,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       )
 
 @dataclass
-class TaggedPathSet:
+class TaggedPathSet(Promotable):
   ''' A set of `TaggedPath` instances also indexed by their `Tag`s.
   '''
 
@@ -2122,6 +2122,18 @@ class TaggedPathSet:
         if p == path:
           return i
     return -1
+
+  @classmethod
+  def promote(cls, paths):
+    ''' Promote an iterable to a `TaggedPathSet`.
+    '''
+    if isinstance(paths, cls):
+      self = paths
+    else:
+      self = cls()
+      if paths is not None:
+        self.update(paths)
+    return self
 
 class FSTagsTagFile(TagFile, HasFSTagsMixin):
   ''' A `FSTagsTagFile` indexing `TagSet`s for file paths
