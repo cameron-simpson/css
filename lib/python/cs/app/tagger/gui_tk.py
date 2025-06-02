@@ -61,11 +61,12 @@ def run(tagger: Tagger, parent=None, *, runstate: RunState, **widget_kw):
   )
   widget.grid()
 
-  def onsig(signum, frame):
-    root.after_idle(root.quit)
-
-  runstate.notify_cancel.add(lambda _: root.quit())
-  with stack_signals(SIGINT, onsig, additional=True):
+  runstate.notify_cancel.add(lambda _: widget.after_idle(widget.quit))
+  with stack_signals(
+      SIGINT,
+      lambda signum, frame: runstate.cancel(),
+      additional=True,
+  ):
     with run_task(f'{widget} mainloop'):
       with runstate:
         widget.lift()
