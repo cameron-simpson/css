@@ -603,71 +603,58 @@ class HasTaggedPathSet:
     display = self.display
     return [display(path.fspath) for path in self.taggedpaths]
 
-class PathList_Listbox(Listbox, _FSPathsMixin):
   def set(self, paths):
     ''' Set the `paths`.
     '''
     self.pathsvar.set(paths)
 
+class PathList_Listbox(Listbox, HasTaggedPathSet):
   ''' A `Listbox` displaying filesystem paths.
   '''
 
+  @promote
   @typechecked
-  def __init__(self, parent, pathlist: List[str], *, command, **kw):
-    super().__init__(parent, **kw)
-    _FSPathsMixin.__init__(self)
+  def __init__(
+      self, parent, paths: TaggedPathSetVar = None, *, command, **listbox_kw
+  ):
+    HasTaggedPathSet.__init__(self, paths=paths)
+    Listbox.__init__(self, parent, listvariable=self.pathsvar, **listbox_kw)
     self.command = command
-    self.pathlist = pathlist
-    self.display_paths = list(map(shortpath, pathlist))
-    self._list_state = None
     self.bind('<Button-1>', self._clicked)
 
   def _clicked(self, event):
-    nearest = self.nearest(event.y)
-    self.command(nearest, expanduser(self.display_paths[nearest]))
-
-  @pfx_method
-  def set_fspaths(self, new_fspaths):
-    ''' Update the filesystem paths.
+    ''' Call `self.command(nearest_index, self.fspaths[nearest_index])`.
     '''
-    self.display_paths = super().set_fspaths(new_fspaths)
-    list_state = getattr(self, '_list_state', None)
-    if list_state is None:
-      list_state = self._list_state = tk.StringVar(value=self.display_paths)
-      self.config(listvariable=list_state)
-    list_state.set(self.display_paths)
+    nearest = self.nearest(event.y)
+    self.command(nearest, self.fspaths[nearest])
+
+  def _update_display(self):
+    ''' Update the displayed list, to be called when `self.taggedpaths` is modified.
+    '''
+    display_paths = self.display_paths()
+    self.pathsvar.set(' '.join(display_paths))
     if self.fixed_width is None:
       self.config(
-          width=(
-              max(map(len, self.display_paths)) if self.display_paths else 0
-          ) + 10
+          width=(max(map(len, display_paths)) if display_paths else 0) + 10
       )
-    return self.display_paths
 
-  @property
-  def pathlist(self):
-    ''' Return the currently displayed path list.
-    '''
-    return self.display_paths
-
-  @pathlist.setter
-  def pathlist(self, new_paths: Iterable[str]):
-    ''' Update the path list.
-    '''
-    self.set_fspaths(new_paths)
+  def setpaths(self, paths):
+    self.pathsvar.set(paths)
 
   @pfx_method
-  def show_fspath(self, fspath, select=False):
+  @promote
+  def show_fspath(self, fspath: TaggedPath, select=False):
     ''' Adjust the list box so that `fspath` is visible.
     '''
-    index = self.index_by_path(fspath)
-    if index is None:
-      warning("cannot show this path")
-    else:
-      self.see(index)
-      if select:
-        self.selection_clear(0, len(self.display_paths) - 1)
-        self.selection_set(index)
+    paths = self.taggedpaths
+    if fspath not in paths:
+      paths.add(fspath)
+      self._update_display()
+    index = paths.find(fspath)
+    self.see(index)
+    if select:
+      self.selection_clear(0, len(self.taggedpaths) - 1)
+      self.selection_set(index)
 
 class TagValueStringVar(tk.StringVar):
   ''' A `StringVar` which holds a `Tag` value transcription.
