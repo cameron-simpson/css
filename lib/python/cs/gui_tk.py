@@ -505,6 +505,48 @@ class ImageButton(_ImageWidget, tk.Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
+class TaggedPathSetVar(tk.Variable, Promotable):
+  ''' A subclass for `tk.StringVar` maintaining a `TaggedPathSet`.
+  '''
+
+  @promote
+  @typechecked
+  def __init__(self, paths: TaggedPathSet = None, *, display=None):
+    ''' Initialise the `TaggedPathSetVar`.
+        If the optional `paths` is supplied, use that as the backing store.
+    '''
+    super().__init__()
+    self.display = display or shortpath
+    if paths is None:
+      paths = TaggedPathSet()
+    self.taggedpaths = paths
+
+  @trace
+  def get_str(self):
+    ''' Get the current display paths in the expected `('v1',...)` form.
+    '''
+    return ''.join(
+        '(',
+        ','.join(repr(self.display(path.fspath)) for path in self.taggedpaths),
+        ')',
+    )
+
+  def set(self, new_paths=Iterable[str]):
+    ''' Update the list of paths.
+    '''
+    paths = self.taggedpaths
+    paths.clear()
+    paths.update(new_paths)
+    super().set(' '.join(self.display(path.fspath) for path in paths))
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote an object to a `TaggedPathSet`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    return cls(paths=obj)
+
 class HasTaggedPathSet:
   ''' A mixin with methods for maintaining a list of filesystem paths.
       This maintains a `.taggedpaths` attribute holding a `TaggedPathSet`.
