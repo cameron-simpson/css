@@ -778,44 +778,30 @@ class ThumbNailScrubber(Frame, HasTaggedPathSet):
   THUMB_X = 64
   THUMB_Y = 64
 
-  def __init__(self, parent, fspaths: List[str], *, command, **frame_kw):
+  def __init__(self, parent, paths: List[str], *, command, **frame_kw):
+    HasTaggedPathSet.__init__(self, paths)
     Frame.__init__(self, parent, **frame_kw)
-    HasTaggedPathSet.__init__(self, fspaths)
     self.command = command
-    self.make_subwidget = (
-        lambda i, path: ImageButton(
+    self.make_subwidget = trace(
+        lambda i, fspath: ImageButton(
             self,
-            path=expanduser(path),
-            command=lambda i=i, path=path: self.command(i, expanduser(path)),
+            path=fspath,
+            command=lambda i=i, path=fspath: self.command(i, path),
             fixed_size=(self.THUMB_X, self.THUMB_Y),
         )
     )
-    self.fspaths = fspaths
 
-  def set_fspaths(self, new_fspaths):
-    ''' Update the list of filesystem paths.
+  def set(self, new_fspaths):
+    ''' Setting new filesystem paths updates `.pathsvar` and remakes
+        the thumbnail widgets.
     '''
-    paths = self.taggedpaths
-    paths.clear()
-    paths.update(new_fspaths)
+    super().set(new_fspaths)
     display_paths = self.display_paths()
     for child in list(self.grid_slaves()):
       child.grid_remove()
     for i, display_path in enumerate(display_paths):
       thumbnail = self.make_subwidget(i, display_path)
       thumbnail.grid(column=i, row=0)
-
-  @property
-  def fspaths(self):
-    ''' The list of filesystem paths.
-    '''
-    return [path.fspath for path in self.taggedpaths]
-
-  @fspaths.setter
-  def fspaths(self, new_paths):
-    ''' Set the list of filesystem paths.
-    '''
-    self.set_fspaths(new_paths)
 
   @pfx_method
   def show_fspath(self, fspath):
