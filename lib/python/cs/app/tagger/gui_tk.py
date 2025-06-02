@@ -49,13 +49,13 @@ def main(argv=None):
   return TaggerGUICommand(argv).run()
 
 @uses_runstate
-def run(tagger: Tagger, *, runstate: RunState, **widget_kw):
+def run(tagger: Tagger, parent=None, *, runstate: RunState, **widget_kw):
   ''' Create a `TaggerWidget` for `tagger` and run the GUI until
       the runstate is cancelled.
     '''
   root = tk.Tk()
-  widget = TaggerWidget(
-      None,  ##root,
+  widget = trace(TaggerWidget)(
+      parent,
       tagger=tagger,
       fixed_size=(1024, 800),
       **widget_kw,
