@@ -55,7 +55,12 @@ def run(tagger: Tagger, *, runstate: RunState, **widget_kw):
       the runstate is cancelled.
     '''
   root = trace(tk.Tk)()
-  widget = TaggerWidget(root, tagger=tagger, **widget_kw)
+  widget = TaggerWidget(
+      None,  ##root,
+      tagger=tagger,
+      fixed_size=(1024, 800),
+      **widget_kw,
+  )
   widget.grid()
 
   def onsig(signum, frame):
@@ -445,9 +450,9 @@ class PathView(LabelFrame):
   ''' A preview of a filesystem path.
   '''
 
-  def __init__(self, parent, fspath=None, *, tagger, **kw):
-    kw.setdefault('text', fspath or 'NONE')
-    super().__init__(parent, **kw)
+  def __init__(self, parent, fspath=None, *, tagger: Tagger, **labelframe_kw):
+    labelframe_kw.setdefault('text', fspath or 'NONE')
+    super().__init__(parent, **labelframe_kw)
     self._fspath = fspath
     self.tagger = tagger
     # path->set(suggested_tags)
