@@ -5,18 +5,20 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from getopt import GetoptError
 import platform
 from signal import SIGINT
 import sys
 import tkinter as tk
+from typing import Iterable, Union
 
 from icontract import require, ensure
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommandOptions
 from cs.context import stackattrs, stack_signals
+from cs.deco import promote
 from cs.fs import shortpath, HasFSPath
+from cs.fstags import FSTags, uses_fstags, TaggedPath, TaggedPathSet
 from cs.gui_tk import (
     BaseTkCommand,
     _Widget,
@@ -24,10 +26,12 @@ from cs.gui_tk import (
     Canvas,
     EditValueWidget,
     Frame,
+    HasTaggedPathSet,
     ImageWidget,
     LabelFrame,
     PathList_Listbox,
     Scrollbar,
+    TaggedPathSetVar,
     ThumbNailScrubber,
 )
 from cs.logutils import warning
@@ -200,19 +204,19 @@ class TagValueStringVar(tk.StringVar):
     ''' Return the value derived from the contents via `Tag.parse_value`.
         An attempt is made to cope with unparsed values.
     '''
-    s = super().get()
+    text = super().get()
     try:
-      value, offset = pfx_call(Tag.parse_value, s)
+      value, offset = pfx_call(Tag.parse_value, text)
     except ValueError as e:
       warning(str(e))
-      value = s
+      value = text
     else:
-      if offset < len(s):
-        warning("unparsed: %r", s[offset:])
+      if offset < len(text):
+        warning("unparsed: %r", text[offset:])
         if isinstance(value, str):
-          value += s[offset:]
+          value += text[offset:]
         else:
-          value = s
+          value = text
     return value
 
 # pylint: disable=too-many-ancestors
