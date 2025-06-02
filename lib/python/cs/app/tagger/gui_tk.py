@@ -9,7 +9,6 @@ import platform
 from signal import SIGINT
 import sys
 import tkinter as tk
-from typing import Iterable, Union
 
 from icontract import require, ensure
 from typeguard import typechecked
@@ -18,7 +17,7 @@ from cs.cmdutils import BaseCommandOptions
 from cs.context import stackattrs, stack_signals
 from cs.deco import promote
 from cs.fs import shortpath, HasFSPath
-from cs.fstags import FSTags, uses_fstags, TaggedPath, TaggedPathSet
+from cs.fstags import FSTags, uses_fstags
 from cs.gui_tk import (
     BaseTkCommand,
     _Widget,
@@ -35,7 +34,7 @@ from cs.gui_tk import (
     ThumbNailScrubber,
 )
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.pfx import pfx, pfx_call, pfx_method
 from cs.resources import RunState, uses_runstate
 from cs.tagset import Tag, TagSet
 from cs.upd import run_task
@@ -54,7 +53,7 @@ def run(tagger: Tagger, *, runstate: RunState, **widget_kw):
   ''' Create a `TaggerWidget` for `tagger` and run the GUI until
       the runstate is cancelled.
     '''
-  root = trace(tk.Tk)()
+  root = tk.Tk()
   widget = TaggerWidget(
       None,  ##root,
       tagger=tagger,
@@ -70,9 +69,9 @@ def run(tagger: Tagger, *, runstate: RunState, **widget_kw):
   with stack_signals(SIGINT, onsig, additional=True):
     with run_task(f'{widget} mainloop'):
       with runstate:
-        trace(widget.lift)()
-        trace(widget.focus)()
-        trace(root.mainloop)()
+        widget.lift()
+        widget.focus()
+        root.mainloop()
 
 class TaggerGUICommand(BaseTkCommand):
 
