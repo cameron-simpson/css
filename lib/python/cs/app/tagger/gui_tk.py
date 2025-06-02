@@ -84,22 +84,31 @@ class TaggerGUICommand(BaseTkCommand):
     '''
     tagger = self.options.tagger
     runstate = self.options.runstate
-    trace(run)(tagger, runstate=runstate, fspaths=argv)
+    run(tagger, runstate=runstate, paths=argv)
 
 # pylint: disable=too-many-ancestors,too-many-instance-attributes
-class TaggerWidget(_Widget, tk.Frame, HasFSPath):
-  ''' A `Frame` widget for a `Tagger`.
+class TaggerWidget(_Widget, tk.Frame, HasFSPath, HasTaggedPathSet):
+  ''' A `Frame` widget for tagging paths.
   '''
 
   WIDGET_FOREGROUND = None
 
+  @promote
   @uses_tagger
-  def __init__(self, parent, *, tagger, fspaths=None):
+  def __init__(
+      self,
+      parent,
+      *,
+      tagger: Tagger,
+      paths: TaggedPathSetVar = None,
+      **widget_kw,
+  ):
     self.app = None
-    super().__init__(parent)
+    self.tagger = tagger
+    HasTaggedPathSet.__init__(self, paths=paths)
+    super().__init__(parent, **widget_kw)
+    self._fspath = None
     self.grid()
-    self.paths = TaggedPathSet(fspaths or ())
-    self.fspath = None
 
     # callback to define the widget's contents
     def select_path(_, path):
@@ -107,7 +116,7 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
 
     pathlist = self.pathlist = PathList_Listbox(
         self,
-        self.fspaths,
+        paths=self.pathsvar,
         command=select_path,
     )
     pathview = self.pathview = PathView(self, tagger=self.tagger)
@@ -123,7 +132,7 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
 
     thumbsview = self.thumbsview = ThumbNailScrubber(
         thumbscanvas,
-        self.fspaths,
+        paths=self.pathsvar,
         command=select_path,
     )
     thumbscanvas.create_window(
@@ -143,6 +152,7 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
 
+  @property
   def fspath(self):
     ''' The currently displayed filesystem path.
     '''
@@ -150,6 +160,8 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
 
   @fspath.setter
   def fspath(self, new_fspath):
+    ''' Set the currently displayed filesystem path.
+    '''
     self._fspath = new_fspath
     if self.pathview is not None:
       # display new_fspath
@@ -161,24 +173,11 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
       # scroll to new_fspath
       self.thumbsview.show_fspath(new_fspath)
 
-  @property
-  def fspaths(self):
-    ''' A list of the current filesystem paths.
+  def set(self, new_fspaths):
+    ''' Update the paths and scroll the thumbnail scrubber.
     '''
-    return sorted(path.fspath for path in self.paths)
-
-  @fspaths.setter
-  def fspaths(self, new_fspaths: Iterable[Union[str, TaggedPath]]):
-    ''' Update the current list of filesystem paths.
-    '''
-    self, paths.clear()
-    self.paths.update(new_fspaths)
-    fspaths = self.fspaths
-    if self.pathlist is not None:
-      self.pathlist.set_fspaths(fspaths)
-    if self.thumbsview is not None:
-      self.thumbsview.set_fspaths(fspaths)
-      self.thumbscanvas.after_idle(self.thumbscanvas.scroll_bbox_x)
+    super().set(new_fspaths)
+    self.thumbscanvas.after_idle(self.thumbscanvas.scroll_bbox_x)
 
 class TagValueStringVar(tk.StringVar):
   ''' A `StringVar` which holds a `Tag` value transcription.
