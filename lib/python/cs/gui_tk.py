@@ -113,13 +113,12 @@ def ispng(pathname):
   '''
   return splitext(basename(pathname))[1].lower() == '.png'
 
-_fstags = FSTags()
-
-def image_size(path):
+@uses_fstags
+def image_size(path, *, fstags: FSTags):
   ''' Return the pixel size of the image file at `path`
       as an `(dx,dy)` tuple, or `None` if the contents cannot be parsed.
   '''
-  tagged = _fstags[path]
+  tagged = fstags[path]
   try:
     size = tagged['pil.size']
   except KeyError:
@@ -136,6 +135,7 @@ def image_size(path):
   return size
 
 @pfx
+@uses_fstags
 def imgof(
     path,
     max_size=None,
@@ -143,6 +143,7 @@ def imgof(
     min_size=None,
     fmt='png',
     force=False,
+    fstags: FSTags,
 ):
   ''' Create a version of the image at `path`,
       scaled to fit within some size constraints.
@@ -162,7 +163,7 @@ def imgof(
     max_size = 1920, 1080
   if min_size is None:
     min_size = max_size[0] // 2, max_size[1] // 2
-  tagged = _fstags[path]
+  tagged = fstags[path]
   path = tagged.fspath
   size = image_size(path)
   if size is None:
@@ -267,14 +268,14 @@ class _Widget(ABC):
 
   ##@pfx_method
   @typechecked
-  def __init__(self, parent, *a, key=None, fixed_size=None, **kw):
+  def __init__(self, parent, *tk_a, key=None, fixed_size=None, **tk_kw):
     # apply the type(self).WIDGET_* defaults if not present
     for attr in dir(self):
       K = cutprefix(attr, 'WIDGET_')
       if K is not attr:
         v = getattr(self, attr)
         if v is not None:
-          kw.setdefault(K.lower(), v)
+          tk_kw.setdefault(K.lower(), v)
     ##X("CALLER = %s", caller())
     ##X("type(self)=%r", type(self))
     ##X("type(parent)=%s", type(parent))
@@ -283,18 +284,18 @@ class _Widget(ABC):
     ##    "%s: _Widget.__init__: super().__init__(parent=%s,*a=%r,**kw=%r)...",
     ##    type(self), r(parent), a, kw
     ##)
-    super().__init__(parent, *a, **kw)
     if fixed_size is None:
       fixed_size = (None, None)
     self.__parent = parent
     self.fixed_size = fixed_size
     if self.fixed_width is not None:
-      kw.update(width=self.fixed_width)
+      tk_kw.update(width=self.fixed_width)
     if self.fixed_height is not None:
-      kw.update(height=self.fixed_height)
+      tk_kw.update(height=self.fixed_height)
     if key is None:
       key = uuid4()
     self.key = key
+    super().__init__(parent, *tk_a, **tk_kw)
 
   @property
   def parent(self):
