@@ -325,22 +325,16 @@ class _Widget(ABC):
     ##    (self, self.winfo_ismapped(), self, self.winfo_viewable())
     ##)
     if not self.winfo_ismapped() or not self.winfo_viewable():
-      return None
+      return False
     g = WidgetGeometry.of(self)
-    overlap = None
     p = self.parent
-    while p:
-      # compare geometry
+    while p is not None:
       pg = WidgetGeometry.of(p)
       overlap = g.overlap(pg)
       if not overlap:
         return False
-      try:
-        p = p.parent
-      except AttributeError:
-        break
-    assert hasattr(p, 'state'), "no .state on %s" % (p,)
-    return p.state() == 'normal'
+      p = p.parent
+    return True
 
 # local shims for the tk and ttk widgets
 BaseButton = tk.Button
