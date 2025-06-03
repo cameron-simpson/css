@@ -2071,15 +2071,18 @@ class TaggedPathSet(Promotable):
 
   @promote
   @locked
-  def __contains__(self, path: TaggedPath):
-    return path in self.members
-
-  @promote
-  @locked
   def remove(self, path: TaggedPath):
     if path not in self:
       raise KeyError
     self.discard(path)
+
+  @promote
+  @locked
+  def __contains__(self, path: TaggedPath):
+    return path in self.members
+
+  def __len__(self):
+    return len(self.members)
 
   @locked
   def __getitem__(self, key: Union[str, Tuple[str, Any], Tag]):
@@ -2104,6 +2107,12 @@ class TaggedPathSet(Promotable):
     for path in iterpaths:
       if path in self.members:
         yield path
+
+  @property
+  def fspaths(self):
+    ''' A list of the filesystem paths.
+    '''
+    return [path.fspath for path in self]
 
   @locked
   def update(self, paths: Iterable[Union[str, TaggedPath]]):
