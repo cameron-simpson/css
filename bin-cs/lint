@@ -128,7 +128,7 @@ do
             $trace ruff check \
               --output-format=concise \
               "--target-version=$RUFF_PYTHON_VERSION" \
-              "$lintfile" | egrep -i '\[\*\]|undefined|unused' && xit=1
+              "$lintfile" | egrep -i '\[\*\]|syntaxerror|undefined|unused' && xit=1
           else
             $trace ruff check \
               --output-format=concise \
