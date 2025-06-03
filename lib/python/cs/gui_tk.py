@@ -498,8 +498,8 @@ class ImageButton(_ImageWidget, tk.Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
-class TaggedPathSetVar(tk.Variable, Promotable):
-  ''' A subclass for `tk.Variable` maintaining a `TaggedPathSet`.
+class TaggedPathSetVar(tk.StringVar, Promotable):
+  ''' A subclass for `tk.StringVar` maintaining a `TaggedPathSet`.
   '''
 
   @promote
@@ -508,13 +508,14 @@ class TaggedPathSetVar(tk.Variable, Promotable):
     ''' Initialise the `TaggedPathSetVar`.
         If the optional `paths` is supplied, use that as the backing store.
     '''
-    super().__init__()
     self.display = display or shortpath
     if paths is None:
       paths = TaggedPathSet()
     self.taggedpaths = paths
+    super().__init__()
+    self.set(paths.fspaths)
 
-  def get_str(self):
+  def get(self):
     ''' Get the current display paths in the expected `('v1',...)` form.
     '''
     return ''.join(
