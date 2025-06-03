@@ -52,7 +52,7 @@ def main(argv=None):
 def run(tagger: Tagger, parent=None, *, runstate: RunState, **widget_kw):
   ''' Create a `TaggerWidget` for `tagger` and run the GUI until
       the runstate is cancelled.
-    '''
+  '''
   widget = trace(TaggerWidget)(
       parent,
       tagger=tagger,
@@ -74,9 +74,11 @@ def run(tagger: Tagger, parent=None, *, runstate: RunState, **widget_kw):
         widget.mainloop()
 
 class TaggerGUICommand(BaseTkCommand):
+  ''' The "tagger gui" subcommand implementation.
+  '''
 
   @dataclass
-  class Options(BaseCommandOptions, HasFSPath):
+  class Options(BaseTkCommand.Options, HasFSPath):
     fspath: str = '.'
 
   @contextmanager
