@@ -824,7 +824,7 @@ class ProgressVar(tk.DoubleVar, Promotable):
       return obj
     return cls(obj)
 
-class ProgressBar(ttk.ProgressBar):
+class ProgressBar(ttk.Progressbar):
   ''' A `ttk.ProgressBar` with an associated `cs.progress.Progress` instance.
   '''
 
