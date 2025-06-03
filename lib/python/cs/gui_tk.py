@@ -31,6 +31,7 @@ from cs.fstags import FSTags, TaggedPath, TaggedPathSet, uses_fstags
 from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_method, pfx_call
+from cs.progress import Progress
 from cs.resources import RunState, uses_runstate
 from cs.tagset import Tag
 
@@ -805,3 +806,63 @@ class ThumbNailScrubber(Frame, HasTaggedPathSet):
     ''' TODO: bring the correspnding thumbnail into view.
     '''
     warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
+
+class ProgressVar(tk.DoubleVar, Promotable):
+  ''' A subclass of `tk.DoubleVar` maintaining a `cs.progress.Progress`.
+  '''
+
+  @promote
+  @typechecked
+  def __init__(self, progress: Progress):
+    self.progress = progress
+
+  def set(self, position):
+    ''' Setting the control variable updates the `Progress` instance.
+    '''
+    self.progress.position = position
+    super().set(position)
+
+  def promote(cls, obj):
+    ''' Promote a `Progress` to a `ProgressVar`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    return cls(obj)
+
+class ProgressBar(ttk.ProgressBar):
+  ''' A `ttk.ProgressBar` with an associated `cs.progress.Progress` instance.
+  '''
+
+  @promote
+  def __init__(
+      self,
+      parent,
+      variable: ProgressVar,
+      *,
+      maximum=None,
+      mode=None,
+      **ttkp_options,
+  ):
+    if variable is None:
+      variable = ProgressVar(Progress(total=maximum))
+    progress = variable.progress
+    if maximum is None:
+      maximum = progress.total
+    if mode is None:
+      mode = 'indeterminate' if progress.total is None else 'determinate'
+    self.progressvar = variable
+    super().__init__(
+        parent, maximum=maximum, mode=mode, variable=variable, **ttkp_options
+    )
+
+  @property
+  def progress(self):
+    ''' The underlying `Progress` instance.
+    '''
+    return self.progressvar.progress
+
+  def step(self, delta=1.0):
+    ''' Bump the underlying `Progress.position`, then call `ttk.ProgressBar.step(delta)`.
+    '''
+    self.progress.position += delta
+    super().step(delta)
