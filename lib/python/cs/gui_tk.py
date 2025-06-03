@@ -151,7 +151,10 @@ def imgof(
       * `force`: optional flag (default `False`)
         to force recreation of the PNG version and associated cache entry
   '''
-  assert '/' not in fmt
+  if len(fmt) == 0 or '/' in fmt or '.' in fmt:
+    raise ValueError(
+        f'{fmt=} must be a nonempty string containing no slashes or dots'
+    )
   FMT = fmt.upper()
   fmt = fmt.lower()
   if max_size is None:
@@ -501,7 +504,7 @@ class ImageButton(_ImageWidget, tk.Button):
   '''
 
 class TaggedPathSetVar(tk.Variable, Promotable):
-  ''' A subclass for `tk.StringVar` maintaining a `TaggedPathSet`.
+  ''' A subclass for `tk.Variable` maintaining a `TaggedPathSet`.
   '''
 
   @promote
