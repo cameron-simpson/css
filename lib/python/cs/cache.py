@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 ''' A few caching data structures and other lossy things with capped sizes.
 '''
@@ -25,9 +25,9 @@ import time
 from typing import Any, Callable, Mapping, Optional
 
 from cs.context import stackattrs, withif
-from cs.deco import decorator, fmtdoc
+from cs.deco import decorator, fmtdoc, uses_verbose
 from cs.fileutils import atomic_filename, DEFAULT_POLL_INTERVAL, FileState
-from cs.fs import needdir, HasFSPath, validate_rpath
+from cs.fs import needdir, HasFSPath, shortpath, validate_rpath
 from cs.gimmicks import warning
 from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.lex import r, s
@@ -517,6 +517,7 @@ class ConvCache(HasFSPath):
     hashname, hashhex = str(content_key).split(':', 1)
     return joinpath(hashname, *splitoff(hashhex, 2, 2))
 
+  @uses_verbose
   @require(lambda conv_subpath: not isabspath(conv_subpath))
   def convof(
       self,
@@ -526,6 +527,7 @@ class ConvCache(HasFSPath):
       *,
       ext=None,
       force=False,
+      verbose: bool,
   ) -> str:
     ''' Return the filesystem path of the cached conversion of
         `srcpath` via `conv_func`.
@@ -555,6 +557,8 @@ class ConvCache(HasFSPath):
     dstdirpath = dirname(dstpath)
     needdir(dstdirpath, use_makedirs=True)
     if force or not existspath(dstpath):
+      if verbose:
+        print('write', shortpath(dstpath), '<-', shortpath(srcpath))
       with Pfx('<%s %s >%s', srcpath, conv_func, dstpath):
         with atomic_filename(
             dstpath,

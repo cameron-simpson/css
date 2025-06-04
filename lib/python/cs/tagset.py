@@ -1478,7 +1478,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         This is the inverse of `Tag.__str__`, and a shim for `Tag.parse`
         which checks that the entire string is consumed.
     '''
-    with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
+    with Pfx("%s.from_str(%r,...)", cls.__name__, s):
       tag, post_offset = cls.parse(
           s, ontology=ontology, fallback_parse=fallback_parse
       )

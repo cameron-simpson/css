@@ -110,6 +110,7 @@ from typing import (
     Any,
     Callable,
     Iterable,
+    List,
     Mapping,
     Optional,
     Set,
@@ -135,6 +136,7 @@ from cs.lex import (
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.seq import unrepeated
 from cs.tagset import (
     Tag,
     TagSet,
@@ -1668,6 +1670,9 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   def __str__(self):
     return Tag.transcribe_value(str(self.fspath)) + ' ' + str(self.all_tags)
 
+  def __hash__(self):
+    return hash(self.fspath)
+
   def __lt__(self, other):
     return HasFSPath.__lt__(self, other)
 
@@ -2006,12 +2011,13 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
       )
 
 @dataclass
-class TaggedPathSet:
+class TaggedPathSet(Promotable):
   ''' A set of `TaggedPath` instances also indexed by their `Tag`s.
   '''
 
   # the TaggedPaths
-  members: Set[TaggedPath]
+  members: Set[TaggedPath] = field(default_factory=set)
+  _insert_order: List[TaggedPath] = field(default_factory=list)
   # mapping of (tag_name,tag_value) to TaggedPath
   _by_tag_name: Mapping[str, Set[TaggedPath]] = field(
       default_factory=lambda: defaultdict(set)
@@ -2026,6 +2032,7 @@ class TaggedPathSet:
     ''' Clear the set.
     '''
     self.members.clear()
+    self_insert_order = []
     self._by_tag_name = defaultdict(set)
     self._by_tag_value = defaultdict(set)
 
@@ -2036,6 +2043,8 @@ class TaggedPathSet:
         This indexes its _current_ tag names and values.
         To reindex a path, add it again.
     '''
+    if path not in self.members:
+      self._insert_order.append(path)
     # forget it
     self.discard(path)
     # then add it and reindex it
@@ -2055,15 +2064,10 @@ class TaggedPathSet:
         This removes `path` from the main set and the indices.
     '''
     self.members.discard(path)
-    for paths in self.__by_tag_name.values():
+    for paths in self._by_tag_name.values():
       paths.discard(path)
-    for paths in self.__by_tag_values.values():
+    for paths in self._by_tag_value.values():
       paths.discard(path)
-
-  @promote
-  @locked
-  def __contains__(self, path: TaggedPath):
-    return path in self.members
 
   @promote
   @locked
@@ -2071,6 +2075,14 @@ class TaggedPathSet:
     if path not in self:
       raise KeyError
     self.discard(path)
+
+  @promote
+  @locked
+  def __contains__(self, path: TaggedPath):
+    return path in self.members
+
+  def __len__(self):
+    return len(self.members)
 
   @locked
   def __getitem__(self, key: Union[str, Tuple[str, Any], Tag]):
@@ -2088,7 +2100,19 @@ class TaggedPathSet:
     return set(path for path in paths if path in self)
 
   def __iter__(self):
-    return iter(self.members)
+    ''' Iterate over the paths in insert order.
+    '''
+    with self._lock:
+      iterpaths = list(unrepeated(self._insert_order))
+    for path in iterpaths:
+      if path in self.members:
+        yield path
+
+  @property
+  def fspaths(self):
+    ''' A list of the filesystem paths.
+    '''
+    return [path.fspath for path in self]
 
   @locked
   def update(self, paths: Iterable[Union[str, TaggedPath]]):
@@ -2096,6 +2120,29 @@ class TaggedPathSet:
     '''
     for path in paths:
       self.add(path)
+
+  @promote
+  def find(self, path: TaggedPath):
+    ''' Return the index of `path` in the set.
+        Return `-1` if the path is not present.
+    '''
+    if path in self:
+      for i, p in enumerate(self):
+        if p == path:
+          return i
+    return -1
+
+  @classmethod
+  def promote(cls, paths):
+    ''' Promote an iterable to a `TaggedPathSet`.
+    '''
+    if isinstance(paths, cls):
+      self = paths
+    else:
+      self = cls()
+      if paths is not None:
+        self.update(paths)
+    return self
 
 class FSTagsTagFile(TagFile, HasFSTagsMixin):
   ''' A `FSTagsTagFile` indexing `TagSet`s for file paths

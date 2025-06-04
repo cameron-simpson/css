@@ -1069,7 +1069,8 @@ def promote(func, params=None, types=None):
 
 # pylint: disable=too-few-public-methods
 class Promotable:
-  ''' A mixin class which supports the `@promote` decorator.
+  ''' A mixin class which supports the `@promote` decorator
+      by providing a default `.promote(cls,obj)` class method.
   '''
 
   @classmethod
