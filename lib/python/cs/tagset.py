@@ -1591,8 +1591,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         to gather then entire tail of the supplied string `arg`.
     '''
     return cls.from_str(
-        arg,
-        offset=offset,
+        arg[offset:],
         ontology=ontology,
         fallback_parse=lambda s, offset: (s[offset:], len(s))
     )
