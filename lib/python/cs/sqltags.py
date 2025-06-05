@@ -61,7 +61,7 @@ from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
@@ -2466,6 +2466,7 @@ class SQLTagsCommand(BaseSQLTagsCommand):
   ''' `sqltags` main command line utility.
   '''
 
+  @popopts(l='long_mode')
   def cmd_list(self, argv):
     ''' Usage: {cmd} [entity-names...]
           List entities and their tags.
@@ -2473,10 +2474,7 @@ class SQLTagsCommand(BaseSQLTagsCommand):
     xit = 0
     sqltags = self.sqltags
     options = self.options
-    sqltags = options.sqltags
-    long_mode = False
-    if argv and argv[0] == '-l':
-      long_mode = True
+    long_mode = options.long_mode
     if not argv:
       if long_mode:
         for name, tags in sorted(sqltags.items()):
