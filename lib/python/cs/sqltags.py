@@ -2013,7 +2013,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     '''
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    orm = self.options.sqltags.orm
+    orm = self.sqltags.orm
     db_url = orm.db_url
     if db_url.startswith("sqlite://"):
       db_fspath = orm.db_fspath
@@ -2028,7 +2028,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           Edit the entities specified by criteria.
     '''
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     badopts = False
     tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
@@ -2059,7 +2059,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           * tags: a column per Tag
     '''
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     export_format = 'csv'
     badopts = False
     opts, argv = getopt(argv, 'F:')
@@ -2107,7 +2107,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
                       Default: {FIND_OUTPUT_FORMAT_DEFAULT}
     '''
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     badopts = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
     opts, argv = getopt(argv, 'o:')
@@ -2154,7 +2154,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         TODO: should this be a transaction so that an import is all or nothing?
     '''
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     badopts = False
     update_mode = False
     opts, argv = getopt(argv, 'u')
@@ -2185,7 +2185,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     '''
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    self.options.sqltags.init()
+    self.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
   def cmd_log(self, argv):
@@ -2268,7 +2268,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       raise GetoptError("bad invocation")
     xit = 0
     use_stdin = cmdline_headline == '-'
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     for lineno, headline in enumerate((sys.stdin if use_stdin else
                                        (cmdline_headline,))):
       with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))):
@@ -2325,7 +2325,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       if subcmd == 'define_schema':
         if argv:
           raise GetoptError(f'extra arguments: {argv!r}')
-        self.options.sqltags.orm.define_schema()
+        self.sqltags.orm.define_schema()
       else:
         raise GetoptError("unrecognised subcommand")
 
@@ -2361,7 +2361,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       names = [name]
     xit = 0
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     with stackattrs(state, verbose=True):
       for name in names:
         with Pfx(name):
@@ -2414,10 +2414,7 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
 
   @cached_property
   def sqltags(self):
-    options = self.options
-    db_url = options.db_url
-    if db_url is None:
-      db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
+    db_url = self.options.db_url
     return self.TAGSETS_CLASS(db_url)
 
   @contextmanager
@@ -2474,6 +2471,7 @@ class SQLTagsCommand(BaseSQLTagsCommand):
           List entities and their tags.
     '''
     xit = 0
+    sqltags = self.sqltags
     options = self.options
     sqltags = options.sqltags
     long_mode = False
