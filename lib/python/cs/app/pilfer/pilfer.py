@@ -34,7 +34,7 @@ from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.deco import decorator, default_params, promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
@@ -50,6 +50,7 @@ from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
+from cs.sqltags import SQLTags
 from cs.threads import locked, HasThreadState, ThreadState
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
@@ -255,6 +256,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   do_trace: bool = False
   flags: Mapping = field(default_factory=PolledFlags)
   fspath: str = None
+  sqltags_db_url: str = None
   user_agent: str = 'Pilfer'
   rcpaths: list[str] = field(default_factory=list)
   url_opener: Any = field(default_factory=build_opener)
@@ -316,9 +318,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
   @contextmanager
   def startup_shutdown(self):
+    ''' Open the `Later` work queue, the `SQLTags` if specified,
+        the content cache.
+    '''
     with self.later:
-      with self.content_cache:
-        yield
+      with contextif(self.sqltags):
+        with self.content_cache:
+          yield
 
   @property
   def defaults(self):
@@ -335,6 +341,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   @_.setter
   def _(self, value):
     self.user_vars['_'] = value
+
+  @cached_property
+  def sqltags(self):
+    ''' A reference to the `SQLTags` knowledge base
+        if `self.sqltags_db_url` is not `None`.
+    '''
+    return SQLTags(self.sqltags_db_url) if self.sqltags_db_url else None
 
   @property
   def url(self):
