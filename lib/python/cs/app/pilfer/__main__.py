@@ -35,6 +35,7 @@ import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
 from cs.resources import uses_runstate
+from cs.sqltags import SQLTags
 from cs.urlutils import URL
 
 from . import (
@@ -101,6 +102,7 @@ class PilferCommand(BaseCommand):
     )
     jobs: int = DEFAULT_JOBS
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
+    db_url: str = None
 
     @property
     def configpaths(self):
@@ -146,12 +148,18 @@ class PilferCommand(BaseCommand):
     with super().run_context():
       later = Later(self.options.jobs)
       with later:
-        pilfer = Pilfer(later=later, rcpaths=options.configpaths)
+        pilfer = Pilfer(
+            later=later,
+            rcpaths=options.configpaths,
+            sqltags_db_url=options.db_url,
+        )
         with pilfer:
           with stackattrs(
               self.options,
               later=later,
               pilfer=pilfer,
+              sqltags=pilfer.sqltags,
+              db_url=pilfer.sqltags.db_url,
           ):
             yield
 
