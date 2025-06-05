@@ -279,19 +279,37 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
   @uses_later
   def __post_init__(self, item=None, later: Later = None):
+    ''' Initialise various defaults if not initially provided.
+
+        The follow things are set up:
+        * a `NetrcHTTPPasswordMgr` is supplied as an `HTTPBasicAuthHandler`
+        * `.fspath`: `$PILFERDIR` or the `var` defaults setting or `~/var/pilfer`
+        * `.content_cache`: the `cache` defaults setting or the `cache` subdirectory
+        * `.sqltags_db_url`: `$PILFER_SQLTAGS` or the `sqltags` defaults setting
+    '''
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     # TODO: should this be in the PilferSession? find out how it is used
     self.url_opener.add_handler(HTTPCookieProcessor())
     if self.fspath is None:
       self.fspath = abspath(
           os.environ.get('PILFERDIR')
-          or expanduser(self.rc_map[None]['var'] or '~/var/pilfer')
+          or expanduser(self.defaults['var'] or '~/var/pilfer')
       )
       needdir(self.fspath) and vprint("made", self.shortpath)
     if self.content_cache is None:
       self.content_cache = ContentCache(
-          expanduser(self.rc_map[None]['cache'] or self.pathto('cache'))
+          expanduser(self.defaults['cache'] or self.pathto('cache'))
       )
+    if self.sqltags_db_url is None:
+      sqltags_db_url = os.environ.get('PILFER_SQLTAGS') or None
+      if sqltags_db_url is None:
+        sqltags_db_url = self.defaults['sqltags'] or None
+        if sqltags_db_url is not None:
+          if sqltags_db_url.startswith('~/'):
+            sqltags_db_url = expanduser(sqltags_db_url)
+          elif not sqltags_db_url.startswith(('/', 'file://', 'memory:')):
+            sqltags_db_url = self.pathto(sqltags_db_url)
+      self.sqltags_db_url = sqltags_db_url
     # default session named '_'
     if self.session is None:
       self.session = '_'
