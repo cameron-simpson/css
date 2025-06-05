@@ -1574,9 +1574,17 @@ class SQLTagSet(SingletonMixin, TagSet):
     return children
 
 # pylint: disable=too-many-ancestors
-class SQLTags(BaseTagSets, Promotable):
+class SQLTags(SingletonMixin, BaseTagSets, Promotable):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
+
+  @classmethod
+  def _singleton_key(cls, db_url=None, ontology=None):
+    ''' The filesystem path for the `db_url` or `None`.
+    '''
+    if not db_url:
+      db_url = cls.infer_db_url()
+    return SQLTagsORM.fspath_for_db_url(db_url)
 
   @pfx_method
   def TagSetClass(self, *, name, **kw):
@@ -1594,6 +1602,9 @@ class SQLTags(BaseTagSets, Promotable):
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
   )
   def __init__(self, db_url=None, ontology=None):
+    if hasattr(self, 'orm'):
+      # we are already set up
+      return
     if not db_url:
       db_url = self.infer_db_url()
     self.orm = SQLTagsORM(db_url=db_url)
@@ -1826,7 +1837,7 @@ class SQLTags(BaseTagSets, Promotable):
 
         Parameters:
         * `envvar`: environment variable to specify a default,
-          default from `DBURL_ENVVAR` (`{DBURL_ENVVAR}`).
+          default from `DBURL_ENVVAR` i.e. from `${DBURL_ENVVAR}`.
         * `default_path`: optional default db URL if no environment
           variable, default from `DBURL_DEFAULT` (`{DBURL_DEFAULT}`).
     '''
