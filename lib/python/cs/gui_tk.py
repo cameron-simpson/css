@@ -16,7 +16,7 @@ from os.path import (
 import platform
 import tkinter as tk
 from tkinter import Tk, ttk
-from typing import Iterable, List
+from typing import Callable, Iterable, List
 from uuid import uuid4
 
 from icontract import require, ensure
@@ -500,6 +500,8 @@ class ImageButton(_ImageWidget, tk.Button):
 
 class TaggedPathSetVar(tk.StringVar, Promotable):
   ''' A subclass for `tk.StringVar` maintaining a `TaggedPathSet`.
+
+      The underlying `TaggPathSet` is available as `.taggedpaths`.
   '''
 
   @promote
@@ -542,7 +544,13 @@ class TaggedPathSetVar(tk.StringVar, Promotable):
 
 class HasTaggedPathSet:
   ''' A mixin with methods for maintaining a list of filesystem paths.
-      This maintains a `.taggedpaths` attribute holding a `TaggedPathSet`.
+
+      The following attributes are provided:
+      * `.display`: the display function for presenting a filesystem path
+      * `.fspaths`: a list of the filesystem paths in `.taggedpaths`;
+        this may be be assigned to to update the set
+      * `.pathsvar`: the underlying control variable
+      * `.taggedpaths`: the backing `TaggedPathSet`
   '''
 
   @promote
@@ -555,20 +563,20 @@ class HasTaggedPathSet:
     ''' Initialise `self.pathsvar`.
 
         Parameters:
-        * `paths`: used to intialise `.taggedpaths`, optional; an existing
-          `TaggedPathSet` or an iterable of `str` or `TaggedPath`
         * `display`: optional callable computing the friendly form of a path,
           default `cs.fs.shortpath`
+        * `paths`: used to intialise `.taggedpaths`, optional; an existing
+          `TaggedPathSet` or an iterable of `str` or `TaggedPath`
     '''
     if paths is None:
       paths = TaggedPathSetVar(paths=paths, display=display)
     elif display is not None:
-      paths.display - display
+      paths.display = display
     self.pathsvar = paths
 
   @property
   def taggedpaths(self):
-    ''' The `TaggedPathSet` instance.
+    ''' The underlying `TaggedPathSet` instance.
     '''
     return self.pathsvar.taggedpaths
 
@@ -582,7 +590,7 @@ class HasTaggedPathSet:
   def fspaths(self, new_fspaths):
     ''' Setting `.fspaths` calls `self.set(new_fspaths)`.
     '''
-    self.set(new_fspaths)
+    self.pathsvar.set(new_fspaths)
 
   @property
   def display(self):
@@ -596,11 +604,6 @@ class HasTaggedPathSet:
     display = self.display
     return [display(path.fspath) for path in self.taggedpaths]
 
-  def set(self, paths):
-    ''' Set the `paths`.
-    '''
-    self.pathsvar.set(paths)
-
 class PathList_Listbox(Listbox, HasTaggedPathSet):
   ''' A `Listbox` displaying filesystem paths.
   '''
@@ -608,9 +611,15 @@ class PathList_Listbox(Listbox, HasTaggedPathSet):
   @promote
   @typechecked
   def __init__(
-      self, parent, paths: TaggedPathSetVar = None, *, command, **listbox_kw
+      self,
+      parent,
+      paths: TaggedPathSetVar = None,
+      *,
+      command,
+      display=None,
+      **listbox_kw
   ):
-    HasTaggedPathSet.__init__(self, paths=paths)
+    HasTaggedPathSet.__init__(self, paths=paths, display=display)
     Listbox.__init__(self, parent, listvariable=self.pathsvar, **listbox_kw)
     self.command = command
     self.bind('<Button-1>', self._clicked)
