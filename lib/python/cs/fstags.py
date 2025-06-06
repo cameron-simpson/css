@@ -2032,7 +2032,7 @@ class TaggedPathSet(Promotable):
     ''' Clear the set.
     '''
     self.members.clear()
-    self_insert_order = []
+    self._insert_order = []
     self._by_tag_name = defaultdict(set)
     self._by_tag_value = defaultdict(set)
 
