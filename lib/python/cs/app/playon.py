@@ -707,7 +707,7 @@ class Recording(SQLTagSet):
 
 @dataclass
 class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
-  ''' A `SeriesEpisodeInfo` with a `from_Recording()` factory method to build 
+  ''' A `SeriesEpisodeInfo` with a `from_Recording()` factory method to build
       one from a PlayOn `Recording` instead or other mapping with `playon.*` keys.
   '''
 
