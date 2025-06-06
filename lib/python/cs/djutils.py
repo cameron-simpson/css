@@ -51,7 +51,7 @@ if (settings._wrapped is djf_empty
   settings.configure()
 
 class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
-  ''' A subclass of `cs.cmdutils.SubCOmmand` with additional support
+  ''' A subclass of `cs.cmdutils.SubCommand` with additional support
       for Django's `BaseCommand`.
   '''
 
