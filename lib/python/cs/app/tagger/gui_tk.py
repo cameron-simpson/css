@@ -9,6 +9,7 @@ import platform
 from signal import SIGINT
 import sys
 import tkinter as tk
+from typing import Callable
 
 from icontract import require, ensure
 from typeguard import typechecked
@@ -110,14 +111,15 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath, HasTaggedPathSet):
       parent,
       *,
       tagger: Tagger,
+      display: Callable[[str], str] = None,
       paths: TaggedPathSetVar = None,
       **widget_kw,
   ):
     self.app = None
     self.tagger = tagger
-    HasTaggedPathSet.__init__(self, paths=paths)
+    HasTaggedPathSet.__init__(self, paths=paths, display=display)
     super().__init__(parent, **widget_kw)
-    self._fspath = None
+    self._fspath = None  # the selected path
     self.grid()
 
     # callback to define the widget's contents
@@ -158,6 +160,11 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath, HasTaggedPathSet):
     self.columnconfigure(1, weight=8)
     self.columnconfigure(2, weight=1)
     self.rowconfigure(0, weight=1)
+
+    # set the path listing overtly
+    fspaths = paths.taggedpaths.fspaths
+    paths.set(fspaths)
+    self.fspath = fspaths[0]
 
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
