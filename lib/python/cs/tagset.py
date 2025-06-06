@@ -1561,7 +1561,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       if isinstance(value, type_):
         value_s = to_str(value)
         # should be nonwhitespace
-        if get_nonwhite(value_s)[0] != value_s:
+        leading_nonwhite, _ = get_nonwhite(value_s)
+        if leading_nonwhite != value_s:
           raise ValueError(
               "to_str(%r) => %r: contains whitespace" % (value, value_s)
           )
