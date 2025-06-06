@@ -10,7 +10,6 @@
 
 from dataclasses import dataclass, field
 from inspect import isclass
-from itertools import chain
 import os
 import sys
 from typing import Iterable, List, Mapping
@@ -326,14 +325,28 @@ def model_batches_qs(
 def model_instances(
     model: Model,
     field_name='pk',
+    prefetch_related=None,
+    select_related=None,
     **mbqs_kw,
 ) -> Iterable[Model]:
   ''' A generator yielding Model instances.
       This is a wrapper for `model_batches_qs` and accepts the same arguments.
+      If you need to extend the `QuerySet`s beyond what the
+      `model_batches_qs` parameters support it may be better to use
+      that and extend each returned `QuerySet`.
+
+      Additional parameters beyond those for `model_batches_qs`:
+      * `prefetch_related`: an optional list of fields to apply to
+        each query with `.prefetch_related()`
+      * `select_related`: an optional list of fields to apply to
+        each query with `.select_related()`
 
       Efficient behaviour requires the field to be indexed.
       Correct behaviour requires the field values to be unique.
   '''
-  return chain.from_iterable(
-      model_batches_qs(model, field_name=field_name, **mbqs_kw)
-  )
+  for batch_qs in model_batches_qs(model, field_name=field_name, **mbqs_kw):
+    if prefetch_related is not None:
+      batch_qs = batch_qs.prefetch_related(*select_related)
+    if select_related is not None:
+      batch_qs = batch_qs.select_related(*select_related)
+    yield from batch_qs
