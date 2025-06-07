@@ -432,7 +432,7 @@ class _Widget:
 
   ##@pfx_method
   @typechecked
-  def __init__(self, parent, *tk_a, key=None, fixed_size=None, **tk_kw):
+  def __init__(self, parent, key=None, fixed_size=None, **tk_kw):
     # apply the type(self).WIDGET_* defaults if not present
     for attr in dir(self):
       K = cutprefix(attr, 'WIDGET_')
@@ -451,7 +451,7 @@ class _Widget:
     if key is None:
       key = uuid4()
     self.key = key
-    super().__init__(parent, *tk_a, **tk_kw)
+    super().__init__(parent, **tk_kw)
 
   @property
   def parent(self):
