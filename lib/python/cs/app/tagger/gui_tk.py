@@ -200,11 +200,11 @@ class TagValueStringVar(tk.StringVar):
   ''' A `StringVar` which holds a `Tag` value transcription.
   '''
 
-  def __init__(self, value, **kw):
+  def __init__(self, value, **sv_kw):
     ''' Initialise the `TagValueStringVar` with `value`.
         Keyword arguments are passed to `tk.StringVar.__init__`.
     '''
-    super().__init__(master=None, value=None, **kw)
+    super().__init__(master=None, value=None, **sv_kw)
     self.set(value)
 
   def set(self, value):
@@ -239,7 +239,14 @@ class TagWidget(Frame):
 
   @typechecked
   def __init__(
-      self, parent, tags: TagSet, tag: Tag, *, tagger, alt_values=None, **kw
+      self,
+      parent,
+      tags: TagSet,
+      tag: Tag,
+      *,
+      tagger,
+      alt_values=None,
+      **frame_kw
   ):
     ''' Initialise a `TagWidget`.
 
@@ -259,7 +266,7 @@ class TagWidget(Frame):
       alt_values = set(tagger.ont_values(tag.name))
     else:
       alt_values = set(alt_values)
-    super().__init__(parent, **kw)
+    super().__init__(parent, **frame_kw)
     self.tags = tags
     self.tag = tag
     self.alt_values = alt_values
@@ -324,8 +331,8 @@ class _TagsView(_Widget):
   ''' A view of some `Tag`s.
   '''
 
-  def __init__(self, parent, *, get_tag_widget=None, **kw):
-    super().__init__(parent, **kw)
+  def __init__(self, parent, *, get_tag_widget=None, **w_kw):
+    super().__init__(parent, **w_kw)
     # the working TagSet, distinct from those supplied
     self.tags = TagSet()
     # a function to get Tag suggestions from a Tag name
@@ -354,9 +361,9 @@ class TagsView(_TagsView, LabelFrame):
   ''' A view of some `Tag`s.
   '''
 
-  def __init__(self, parent, *, tagger, **kw):
-    kw.setdefault('text', 'Tags')
-    super().__init__(parent, **kw)
+  def __init__(self, parent, *, tagger, **labelframe_kw):
+    labelframe_kw.setdefault('text', 'Tags')
+    super().__init__(parent, **labelframe_kw)
     self.tagger = tagger
     self.set_tags(())
     # mapping of tag name to widgets
@@ -380,11 +387,12 @@ class TagsView(_TagsView, LabelFrame):
       w.grid_forget()
       widget.grid(**grid_info)
     else:
-      # insert the new widget
+      # Insert the new widget.
       # ... by forgetting them all and appending
       # because it looks like you can't insert into a grid
-      # or make a gap
-      # find the insertion row
+      # or make a gap.
+      #
+      # Find the insertion row.
       for row, gridded_name in enumerate(self._tag_names):
         if gridded_name > tag_name:
           break
@@ -416,7 +424,7 @@ class TagsView(_TagsView, LabelFrame):
       del self._tag_widgets[tag_name]
       w.grid_remove()
 
-  def tag_widget(self, tag, alt_values=None, **kw):
+  def tag_widget(self, tag, alt_values=None, **tagwidget_kw):
     ''' Create a new `TagWidget` for the `Tag` `tag`.
     '''
     return TagWidget(
@@ -425,7 +433,7 @@ class TagsView(_TagsView, LabelFrame):
         tag,
         tagger=self.tagger,
         alt_values=alt_values,
-        **kw,
+        **tagwidget_kw,
     )
 
   def set_tags(self, tags, get_suggested_tag_values=None, bg_tags=None):
@@ -473,7 +481,6 @@ class PathView(LabelFrame):
         fixed_size=(1920, 1080),
     )
     self.preview.grid(column=0, row=0)
-
     self.tagsview = TagsView(
         self,
         tagger=tagger,
