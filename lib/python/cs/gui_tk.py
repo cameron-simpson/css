@@ -824,14 +824,17 @@ class EditValueWidget(Frame):
           value = value_s
     return value
 
-class ThumbNailScrubber(Frame, HasTaggedPathSet):
+class ThumbNailScrubber(Frame, HasFSPathVar, HasTaggedPathSet):
   ''' A row of thumbnails for a list of filesystem paths.
   '''
 
   THUMB_X = 64
   THUMB_Y = 64
 
-  def __init__(self, parent, paths: List[str], *, command, **frame_kw):
+  def __init__(
+      self, parent, paths: List[str], *, command, fspath=None, **frame_kw
+  ):
+    HasFSPathVar.__init__(self, fspath)
     HasTaggedPathSet.__init__(self, paths)
     Frame.__init__(self, parent, **frame_kw)
     self.command = command
@@ -844,23 +847,21 @@ class ThumbNailScrubber(Frame, HasTaggedPathSet):
         )
     )
 
-  def set(self, new_fspaths):
-    ''' Setting new filesystem paths updates `.pathsvar` and remakes
-        the thumbnail widgets.
+  @pfx_method
+  def on_fspath(self, varname, fspath, mode):
+    ''' TODO: bring the correspnding thumbnail into view.
     '''
-    super().set(new_fspaths)
+    warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
+
+  def on_fspaths(self, varname, fspaths_s, mode):
+    ''' When `.fspaths` is modified we remake the thumbnails.
+    '''
     display_paths = self.display_paths()
     for child in list(self.grid_slaves()):
       child.grid_remove()
     for i, display_path in enumerate(display_paths):
       thumbnail = self.make_subwidget(i, display_path)
       thumbnail.grid(column=i, row=0)
-
-  @pfx_method
-  def show_fspath(self, fspath):
-    ''' TODO: bring the correspnding thumbnail into view.
-    '''
-    warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
 
 class ProgressVar(tk.DoubleVar, Promotable):
   ''' A subclass of `tk.DoubleVar` maintaining a `cs.progress.Progress`.
