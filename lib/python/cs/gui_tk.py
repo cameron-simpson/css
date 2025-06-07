@@ -260,7 +260,173 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
     over_y, over_dy = over
     return type(self)(over_x, over_y, over_dx, over_dy)
 
-class _Widget(ABC):
+#####################################################################
+# Control variable classes and mixins.
+#
+
+class HasFSPathVar(HasFSPath):
+  ''' A mixin for widgets with a control variable driving their `.fspath` property.
+  '''
+
+  def __init__(self, *, fspathvar: tk.StringVar = None):
+    ''' Initialise the mixin.
+        An optional control variable may be supplied as `fspathvar`.
+    '''
+    if fspathvar is None:
+      fspathvar = tk.StringVar()
+    self.fspathvar = fspathvar
+
+  def on_fspath(self, varname, value, mode):
+    ''' Subclasses needing extra behaviour when the `.fspath` is
+        changed should override this method.
+    '''
+
+  @property
+  def fspath(self):
+    ''' The current the filesystem path.
+    '''
+    return self.fspathvar.get() or None
+
+  @fspath.setter
+  def fspath(self, new_fspath: str):
+    ''' Set the filesystem path.
+    '''
+    self.fspathvar.set(new_fspath)
+
+  @property
+  @uses_fstags
+  def taggedpath(self, *, fstags: FSTags) -> Union[TaggedPath, None]:
+    ''' The `TaggedPath` for `self.fspath`.
+    '''
+    fspath = self.fspath
+    if fspath is None:
+      return None
+    return fstags[fspath]
+
+class TaggedPathSetVar(tk.StringVar, Promotable):
+  ''' A subclass for `tk.StringVar` maintaining a `TaggedPathSet`.
+
+      The underlying `TaggPathSet` is available as `.taggedpaths`.
+  '''
+
+  @promote
+  @typechecked
+  def __init__(self, paths: TaggedPathSet = None, *, display=None):
+    ''' Initialise the `TaggedPathSetVar`.
+        If the optional `paths` is supplied, use that as the backing store.
+    '''
+    self.display = display or shortpath
+    if paths is None:
+      paths = TaggedPathSet()
+    self.taggedpaths = paths
+    super().__init__()
+    self.set(paths.fspaths)
+
+  def get(self):
+    ''' Get the current display paths in the expected `('v1',...)` form.
+    '''
+    return ''.join(
+        (
+            '(',
+            ','.join(
+                repr(self.display(path.fspath))
+                for path in self.taggedpaths
+            ),
+            ')',
+        )
+    )
+
+  def set(self, new_paths=Iterable[str]):
+    ''' Update the list of paths.
+    '''
+    paths = self.taggedpaths
+    paths.clear()
+    paths.update(new_paths)
+    super().set([self.display(path.fspath) for path in paths])
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote an object to a `TaggedPathSet`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    return cls(paths=obj)
+
+class HasTaggedPathSet:
+  ''' A mixin with methods for maintaining a list of filesystem paths.
+
+      The following attributes are provided:
+      * `.display`: the display function for presenting a filesystem path
+      * `.fspaths`: a list of the filesystem paths in `.taggedpaths`;
+        this may be be assigned to to update the set
+      * `.pathsvar`: the underlying control variable
+      * `.taggedpaths`: the backing `TaggedPathSet`
+  '''
+
+  @promote
+  def __init__(
+      self,
+      paths: TaggedPathSetVar = None,
+      *,
+      display=None,
+  ):
+    ''' Initialise `self.pathsvar`.
+
+        Parameters:
+        * `display`: optional callable computing the friendly form of a path,
+          default `cs.fs.shortpath`
+        * `paths`: used to intialise `.taggedpaths`, optional; an existing
+          `TaggedPathSet` or an iterable of `str` or `TaggedPath`
+    '''
+    if paths is None:
+      paths = TaggedPathSetVar(paths=paths, display=display)
+    elif display is not None:
+      paths.display = display
+    self.pathsvar = paths
+    paths.trace_add("write", self.on_fspaths)
+
+  def on_fspaths(self, varname, value, mode):
+    ''' Subclasses should override this method if they need extra
+        actions if `.fspaths` is modified.
+    '''
+
+  @property
+  def taggedpaths(self):
+    ''' The underlying `TaggedPathSet` instance.
+    '''
+    return self.pathsvar.taggedpaths
+
+  @property
+  def fspaths(self):
+    ''' A list of the filesystem paths.
+    '''
+    return [path.fspath for path in self.taggedpaths]
+
+  @fspaths.setter
+  def fspaths(self, new_fspaths):
+    ''' Setting `.fspaths` calls `self.set(new_fspaths)`.
+    '''
+    self.pathsvar.set(new_fspaths)
+
+  @property
+  def display(self):
+    ''' The display function.
+    '''
+    return self.pathsvar.display
+
+  def display_paths(self):
+    ''' Return a list of the friendly form of each path.
+    '''
+    display = self.display
+    return [display(path.fspath) for path in self.taggedpaths]
+
+#####################################################################
+# Widgets.
+#
+
+class _Widget:
+  ''' A base widget providing various common features.
+  '''
 
   WIDGET_BACKGROUND = 'black'
   WIDGET_FOREGROUND = 'white'
@@ -497,112 +663,6 @@ class ImageWidget(_ImageWidget, Label):
 class ImageButton(_ImageWidget, tk.Button):
   ''' An image button which can show anything Pillow can read.
   '''
-
-class TaggedPathSetVar(tk.StringVar, Promotable):
-  ''' A subclass for `tk.StringVar` maintaining a `TaggedPathSet`.
-
-      The underlying `TaggPathSet` is available as `.taggedpaths`.
-  '''
-
-  @promote
-  @typechecked
-  def __init__(self, paths: TaggedPathSet = None, *, display=None):
-    ''' Initialise the `TaggedPathSetVar`.
-        If the optional `paths` is supplied, use that as the backing store.
-    '''
-    self.display = display or shortpath
-    if paths is None:
-      paths = TaggedPathSet()
-    self.taggedpaths = paths
-    super().__init__()
-    self.set(paths.fspaths)
-
-  def get(self):
-    ''' Get the current display paths in the expected `('v1',...)` form.
-    '''
-    return ''.join(
-        '(',
-        ','.join(repr(self.display(path.fspath)) for path in self.taggedpaths),
-        ')',
-    )
-
-  def set(self, new_paths=Iterable[str]):
-    ''' Update the list of paths.
-    '''
-    paths = self.taggedpaths
-    paths.clear()
-    paths.update(new_paths)
-    super().set(' '.join(self.display(path.fspath) for path in paths))
-
-  @classmethod
-  def promote(cls, obj):
-    ''' Promote an object to a `TaggedPathSet`.
-    '''
-    if isinstance(obj, cls):
-      return obj
-    return cls(paths=obj)
-
-class HasTaggedPathSet:
-  ''' A mixin with methods for maintaining a list of filesystem paths.
-
-      The following attributes are provided:
-      * `.display`: the display function for presenting a filesystem path
-      * `.fspaths`: a list of the filesystem paths in `.taggedpaths`;
-        this may be be assigned to to update the set
-      * `.pathsvar`: the underlying control variable
-      * `.taggedpaths`: the backing `TaggedPathSet`
-  '''
-
-  @promote
-  def __init__(
-      self,
-      paths: TaggedPathSetVar = None,
-      *,
-      display=None,
-  ):
-    ''' Initialise `self.pathsvar`.
-
-        Parameters:
-        * `display`: optional callable computing the friendly form of a path,
-          default `cs.fs.shortpath`
-        * `paths`: used to intialise `.taggedpaths`, optional; an existing
-          `TaggedPathSet` or an iterable of `str` or `TaggedPath`
-    '''
-    if paths is None:
-      paths = TaggedPathSetVar(paths=paths, display=display)
-    elif display is not None:
-      paths.display = display
-    self.pathsvar = paths
-
-  @property
-  def taggedpaths(self):
-    ''' The underlying `TaggedPathSet` instance.
-    '''
-    return self.pathsvar.taggedpaths
-
-  @property
-  def fspaths(self):
-    ''' A list of the filesystem paths.
-    '''
-    return [path.fspath for path in self.taggedpaths]
-
-  @fspaths.setter
-  def fspaths(self, new_fspaths):
-    ''' Setting `.fspaths` calls `self.set(new_fspaths)`.
-    '''
-    self.pathsvar.set(new_fspaths)
-
-  @property
-  def display(self):
-    ''' The display function.
-    '''
-    return self.pathsvar.display
-
-  def display_paths(self):
-    ''' Return a list of the friendly form of each path.
-    '''
-    display = self.display
-    return [display(path.fspath) for path in self.taggedpaths]
 
 class PathList_Listbox(Listbox, HasTaggedPathSet):
   ''' A `Listbox` displaying filesystem paths.
