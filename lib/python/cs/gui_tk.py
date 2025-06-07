@@ -36,7 +36,6 @@ from cs.resources import RunState, uses_runstate
 from cs.tagset import Tag
 
 from cs.lex import r
-from cs.x import X
 
 is_darwin = platform.system() == "Darwin"
 
@@ -441,14 +440,6 @@ class _Widget:
         v = getattr(self, attr)
         if v is not None:
           tk_kw.setdefault(K.lower(), v)
-    ##X("CALLER = %s", caller())
-    ##X("type(self)=%r", type(self))
-    ##X("type(parent)=%s", type(parent))
-    ##X("parent=%s", r(parent))
-    ##X(
-    ##    "%s: _Widget.__init__: super().__init__(parent=%s,*a=%r,**kw=%r)...",
-    ##    type(self), r(parent), a, kw
-    ##)
     if fixed_size is None:
       fixed_size = (None, None)
     self.__parent = parent
