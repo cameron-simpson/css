@@ -341,13 +341,14 @@ def model_instances(
   ''' A generator yielding `Model` instances.
       This is a wrapper for `model_batches_qs` and accepts the same arguments,
       and some additional parameters.
-      If `yield_base_qs` is true (default `False`), yield the base
-      `QuerySet` ahead of the model instances; this can be useful
-      for a count or other preanalysis.
 
       If you need to extend the `QuerySet`s beyond what the
       `model_batches_qs` parameters support it may be better to use
       that and extend each returned `QuerySet`.
+
+      If `yield_base_qs` is true (default `False`), yield the base
+      `QuerySet` ahead of the model instances; this can be useful
+      for a count or other preanalysis.
 
       Additional parameters beyond those for `model_batches_qs`:
       * `prefetch_related`: an optional list of fields to apply to
