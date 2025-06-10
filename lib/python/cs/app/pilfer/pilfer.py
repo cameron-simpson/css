@@ -367,6 +367,25 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return SQLTags(self.sqltags_db_url) if self.sqltags_db_url else None
 
+  def load_browser_cookies(
+      self, jar: Optional[RequestsCookieJar] = None
+  ) -> RequestsCookieJar:
+    ''' Load the live browser cookies into `jar`.
+        If `jar` is omitted a new `RequestsCookieJar` will be made.
+        Return the updated cookie jar.
+
+        The browser cookies are obtained from the file named by
+        `self.defaults['browser-cookies']`; currently this is
+        expected to be a firefox `cookies.sqlite` database.
+    '''
+    if jar is None:
+      jar = RequestsCookieJar()
+    cookies_db = self.defaults['browser-cookies'] or None
+    if cookies_db is not None:
+      for ffcookie in read_firefox_cookies(expanduser(cookies_db)):
+        ffcookie.add_to_jar(jar)
+    return jar
+
   @property
   def url(self):
     ''' `self._` as a `URL` object.
