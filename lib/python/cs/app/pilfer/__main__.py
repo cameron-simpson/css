@@ -169,8 +169,8 @@ class PilferCommand(BaseCommand):
         Return `(PipeLineSpec,new_argv_offset)`.
 
         A pipeline specification is specified by a leading argument of the
-        form `'pipe_name:{'`, followed by arguments defining functions for the
-        pipeline, and a terminating argument of the form `'}'`.
+        form *pipe_name*`:{`, followed by arguments defining functions for the
+        pipeline, and a terminating argument of the form `}`.
 
         Note: this syntax works well with traditional Bourne shells.
         Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
@@ -248,7 +248,7 @@ class PilferCommand(BaseCommand):
           Fetch URL and dump information from it.
     '''
     if not argv:
-      raise GteoptError("missing URL")
+      raise GetoptError("missing URL")
     url = argv.pop(0)
     if argv:
       raise GetoptError(f'extra arguments after URL: {argv!r}')
@@ -362,7 +362,7 @@ class PilferCommand(BaseCommand):
           Call every matching @on method for sitemaps matching URL.
     '''
     if not argv:
-      raise GteoptError("missing URL")
+      raise GetoptError("missing URL")
     url = argv.pop(0)
     if argv:
       raise GetoptError(f'extra arguments after URL: {argv!r}')
