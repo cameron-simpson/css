@@ -53,6 +53,20 @@ class FirefoxCookie(namedtuple('FirefoxCookie', FIREFOX_COOKIE_SQL_COLUMNS)):
         secure=self.isSecure,
     )
 
+  def add_to_jar(self, jar):
+    ''' Add this cookie to a `CookieJar`.
+    '''
+    jar.set(
+        self.name,
+        self.value,
+        domain=self.host,
+        expires=self.expiry,
+        ##httponly=self.isHttpOnly,
+        path=self.path,
+        ##samesite=self.sameSite,
+        secure=self.isSecure,
+    )
+
 def read_firefox_cookies(cookie_dbpath) -> List[FirefoxCookie]:
   ''' Read the current cookie values from `cookie_dbpath`,
       return a list of `FirefoxCookie` instances.
