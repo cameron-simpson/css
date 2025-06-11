@@ -22,6 +22,7 @@ from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
 from mitmproxy.flow import Flow
+import requests
 from typeguard import typechecked
 
 def default_Pilfer():
@@ -151,17 +152,20 @@ class FlowState(NS, Promotable):
     X("%s: .url()...", self)
     return URL(self.response.url)
 
-  @cached_property
-  def response(self):
-    ''' Cached response object, obtained from `self.url.HEAD()` if unspecified.
+  @uses_Pilfer
+  def GET(self, P: "Pilfer", **get_kw) -> requests.Response:
+    ''' Do a `GET` of `self.url` via the ambient `Pilfer`, return the `requests.Response`.
+        This also updates `self.response`.
     '''
-    return self.url.HEAD()
+    rsp = self.response = P.GET(self.url, **get_kw)
+    return rsp
 
   @cached_property
-  def response_headers(self):
-    ''' Cached response headers i.e. `self.response.headers`.
+  @uses_Pilfer
+  def response(self, P: "Pilfer"):
+    ''' Cached response object, obtained from `self.url.HEAD()` if unspecified.
     '''
-    return self.response.headers
+    return P.HEAD()
 
   @cached_property
   def content_type(self) -> str:
