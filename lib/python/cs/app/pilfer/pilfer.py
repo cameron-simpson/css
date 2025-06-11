@@ -392,69 +392,55 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return URL.promote(self._)
 
-  def GET(
+  def request(
       self,
       url: str | URL,
       *,
       session: Optional[PilferSession] = None,
-      **get_kw,
+      headers=None,
+      method='GET',
+      **rq_kw,
   ) -> requests.Response:
-    ''' Fetch `url` using the `GET` method, return a `requests.Response`.
+    ''' Fetch `url` using method (default `'GET'`), return a `requests.Response`.
 
-        If `session` is not supplied, `self.session` will be used.
-        Other keyword arguments are passed to `session.get`.
+        Parameters:
+        * `session`: an optional `requests.Session` instance, default `self.session`
+        * `headers`: optional additional headers to use, updating those from `self.headers()`
+        * `method`: the HTTP method to use, default `'GET'`
+        Other keyword arguments are passed to the `session` request method.
     '''
     if session is None:
       session = self.session
-    return session.get(str(url), **get_kw)
+    hdrs = self.headers()
+    if headers is not None:
+      hdrs.update(headers)
+    return pfx_call(
+        getattr(session, method.lower()), str(url), headers=hdrs, **rq_kw
+    )
 
-  def HEAD(
-      self,
-      url: str | URL,
-      *,
-      session: Optional[PilferSession] = None,
-      **head_kw,
-  ) -> requests.Response:
+  def GET(self, url: str | URL, **rq_kw):
+    ''' Fetch `url` using the `GET` method, return a `requests.Response`.
+        This is a shim for `Pilfer.request`.
+    '''
+    return self.request(url, method='GET', **rq_kw)
+
+  def HEAD(self, url: str | URL, **rq_kw):
     ''' Fetch `url` using the `HEAD` method, return a `requests.Response`.
-
-        If `session` is not supplied, `self.default_session` will be used.
-        Other keyword arguments are passed to `session.head`.
+        This is a shim for `Pilfer.request`.
     '''
-    if session is None:
-      session = self.default_session
-    return session.head(str(url), **head_kw)
+    return self.request(url, method='HEAD', **rq_kw)
 
-  def OPTIONS(
-      self,
-      url: str | URL,
-      *,
-      session: Optional[PilferSession] = None,
-      **options_kw,
-  ) -> requests.Response:
+  def OPTIONS(self, url: str | URL, **rq_kw):
     ''' Fetch `url` using the `OPTIONS` method, return a `requests.Response`.
-
-        If `session` is not supplied, `self.default_session` will be used.
-        Other keyword arguments are passed to `session.options`.
+        This is a shim for `Pilfer.request`.
     '''
-    if session is None:
-      session = self.default_session
-    return session.options(str(url), **options_kw)
+    return self.request(url, method='OPTIONS', **rq_kw)
 
-  def POST(
-      self,
-      url: str | URL,
-      *,
-      session: Optional[PilferSession] = None,
-      **post_kw,
-  ) -> requests.Response:
+  def POST(self, url: str | URL, **rq_kw):
     ''' Fetch `url` using the `POST` method, return a `requests.Response`.
-
-        If `session` is not supplied, `self.default_session` will be used.
-        Other keyword arguments are passed to `session.post`.
+        This is a shim for `Pilfer.request`.
     '''
-    if session is None:
-      session = self.default_session
-    return session.post(str(url), **post_kw)
+    return self.request(url, method='POST', **rq_kw)
 
   @cached_property
   def rc_map(self) -> Mapping[str | None, Mapping[str, str]]:
