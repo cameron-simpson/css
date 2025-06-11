@@ -482,6 +482,26 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           msection[field_name] = value
     return mapping
 
+  @trace(retval=True)
+  def normalise_header(self, header_name):
+    ''' Return a header name in normalised form for use _in a request_.
+    '''
+    return '-'.join(
+        (
+            word.title()
+            for word in header_name.lower().replace('_', '-').split('-')
+        )
+    )
+
+  def headers(self):
+    ''' Make a `dict` holding headers to send with a request,
+        obtained from the `[headers]` rc file section.
+    '''
+    hdrs = {}
+    for header_name, value in self.rc_map['headers'].items():
+      hdrs[self.normalise_header(header_name)] = value
+    return hdrs
+
   @cached_property
   def action_map(self) -> Mapping[str, list[str]]:
     ''' The mapping of action names to action specifications.
