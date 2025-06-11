@@ -25,8 +25,22 @@ from mitmproxy.flow import Flow
 from typeguard import typechecked
 
 def default_Pilfer():
+  ''' Obtain the ambient `Pilfer` instance via a late import.
+  '''
   from .pilfer import Pilfer
   return Pilfer.default()
+
+@decorator
+def uses_Pilfer(func):
+  ''' Set the optional `P:Pilfer` parameter via a late import.
+  '''
+
+  def func_with_Pilfer(*a, P: "Pilfer" = None, **kw):
+    if P is None:
+      P = default_Pilfer()
+    return func(*a, P=P, **kw)
+
+  return func_with_Pilfer
 
 @dataclass
 class URLMatcher(Promotable):
@@ -157,12 +171,11 @@ class FlowState(NS, Promotable):
     return content_type(self.repsonse_headers)
 
   @cached_property
-  def content(self, *, P: "Pilfer" = None) -> str:
+  @uses_Pilfer
+  def content(self, *, P: "Pilfer") -> str:
     ''' The text content of the URL.
         Does a `GET` of the URL if there is no `self.response.content`.
     '''
-    if P is None:
-      P = default_Pilfer()
     content = self.response and self.response.content
     if content is None:
       content = P.GET(self.url).content
@@ -211,12 +224,10 @@ class SiteMap(Promotable):
   URL_KEY_PATTERNS = ()
 
   @classmethod
-  def from_str(
-      cls, sitemap_name: str, *, P: Optional["Pilfer"] = None
-  ) -> "SiteMap":
+  @uses_Pilfer
+  def from_str(cls, sitemap_name: str, *, P: "Pilfer") -> "SiteMap":
     ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
     '''
-    P = P or default_Pilfer()
     for name, sitemap in P.sitemaps:
       if name == sitemap_name:
         return sitemap
@@ -347,7 +358,8 @@ class SiteMap(Promotable):
 
   @pfx_method
   @promote
-  def grok(self, flowstate: FlowState, P: "Pilfer" = None):
+  @uses_Pilfer
+  def grok(self, flowstate: FlowState, P: "Pilfer"):
     ''' Call each method matching `flowstate` with the `flowstate`.
         Return a list of `(method,match_tags,grokked)` 3-tuples being:
         - a reference to the fired grok method
@@ -356,7 +368,6 @@ class SiteMap(Promotable):
         Exceptions are gathered and, if any, an `ExceptionGroup` is raised
         (unless there's just one, it which case it is raised directly).
     '''
-    P = P or default_Pilfer()
     results = []
     excs = []
     for method, match_tags in self.on_matches(flowstate):
@@ -480,13 +491,15 @@ class SiteMap(Promotable):
     return match.format_arg(extra=extra)
 
   @typechecked
+  @uses_Pilfer
+  @uses_Pilfer
   def content_prefetch(
       self,
       match: SiteMapPatternMatch,
       flow,
       content_bs: bs,
       *,
-      P: Optional = None,
+      P: "Pilfer",
   ):
     ''' The generic prefetch handler.
 
@@ -498,11 +511,6 @@ class SiteMap(Promotable):
         - `"hrefs"`: all the anchor `href` values
         - `"srcs"`: all the anchor `src` values
     '''
-    from .pilfer import Pilfer
-    P = P or default_Pilfer()
-    if not isinstance(P, Pilfer):
-      print("NO PILFER")
-      breakpoint()
     rq = flow.request
     rsp = flow.response
     url = rq.url
