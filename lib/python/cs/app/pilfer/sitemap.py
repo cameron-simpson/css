@@ -138,13 +138,15 @@ class OnState(NS, Promotable):
     return URL(self.response.url)
 
   @cached_property
-  def response_headers(self):
-    ''' Cached response headers.
-        Does a `HEAD` of the URL if there is no `self.response`;
-        this sets `self.response` as a side effect.
+  def response(self):
+    ''' Cached response object, obtained from `self.url.HEAD()` if unspecified.
     '''
-    if not self.response:
-      self.response = self.url.HEAD()
+    return self.url.HEAD()
+
+  @cached_property
+  def response_headers(self):
+    ''' Cached response headers i.e. `self.response.headers`.
+    '''
     return self.response.headers
 
   @cached_property
