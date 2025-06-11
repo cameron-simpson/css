@@ -124,10 +124,7 @@ class FlowState(NS, Promotable):
 
   __repr__ = __str__
 
-  def __getattr__(self, attr):
-    if attr[0].isalpha():
-      return getattr(self.url, attr)
-    raise AttributeError(f'{self.__class__.__name__}.{attr}')
+  # NB: no __getattr__, it preemptys @cached_property
 
   @classmethod
   def from_str(cls, url_s: str):
