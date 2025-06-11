@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
 import re
-from types import SimpleNamespace
+from types import SimpleNamespace as NS
 from typing import Iterable, Mapping, Optional
 
 from cs.binary import bs
@@ -82,8 +82,7 @@ class URLMatcher(Promotable):
       return super().promote(obj)
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
 
-@dataclass
-class OnState(SimpleNamespace, Promotable):
+class OnState(NS, Promotable):
 
   ##@trace
   @promote
