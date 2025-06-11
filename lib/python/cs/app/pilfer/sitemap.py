@@ -189,7 +189,34 @@ class FlowState(NS, Promotable):
     if self.content_type == 'text/html':
       return BeautifulSoup(self.content, 'html.parser')
     return None
+
+  @cached_property
+  def meta(self):
+    ''' The meta information from this page's body head meta tags.
+        Return an object with the following attriubutes:
+        - `.tags`: the `meta` tags with `name` attributes
+        - `.properties`: the `meta` tags with `property` attributes
+        - `.http_equiv`: the `meta` tags with `http-equiv` attributes
     '''
+    meta_tags = TagSet()
+    meta_properties = TagSet()
+    meta_http_equiv = TagSet()
+    soup = self.soup
+    if soup is not None:
+      for tag in soup.head:
+        if isinstance(tag, str):
+          if tag.strip(): warning("SKIP HEAD tag %r", tag)
+          continue
+        if tag_name := tag.get('name'):
+          meta_tags[tag_name] = tag['content']
+        if prop_name := tag.get('property'):
+          # TODO: array properties
+          meta_properties[prop_name] = tag['content']
+        if http_equiv := tag.get('http-equiv'):
+          meta_http_equiv[http_equiv] = tag['content']
+    return NS(
+        tags=meta_tags, properties=meta_properties, http_equiv=meta_http_equiv
+    )
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
