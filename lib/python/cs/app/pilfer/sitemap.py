@@ -169,7 +169,7 @@ class FlowState(NS, Promotable):
     ''' The base `Content-Type`, eg `'text/html'`.
         Does a `HEAD` of the URL if there is no `self.response`.
     '''
-    return content_type(self.repsonse_headers)
+    return self.url.content_type
 
   @cached_property
   @uses_Pilfer
