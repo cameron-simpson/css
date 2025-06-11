@@ -269,7 +269,10 @@ class SiteMap(Promotable):
   @staticmethod
   @decorator
   def on(method, *patterns, **patterns_kw):
-    ''' A decorator for handler methods.
+    ''' A decorator for handler methods which specifies conditions
+        which must match for this handler to be called.
+        This decorator may be applied multiple times
+        if the handler method should match various flows.
 
         Its parameters indicate the conditions under which this method
         will be fired; all must be true.
@@ -354,6 +357,11 @@ class SiteMap(Promotable):
   @promote
   def on_matches(cls, flowstate: FlowState):
     ''' A generator yielding methods matched by `flowstate`.
+
+        The matching methods are identified by consulting the
+        conditions in the method's `.on_conditions` attribute,
+        normally defined by applying the `@on` decorator to the
+        method.
     '''
     for method_name in dir(cls):
       try:
@@ -388,8 +396,8 @@ class SiteMap(Promotable):
         continue
 
   @pfx_method
-  @promote
   @uses_Pilfer
+  @promote
   def grok(self, flowstate: FlowState, P: "Pilfer"):
     ''' Call each method matching `flowstate` with the `flowstate`.
         Return a list of `(method,match_tags,grokked)` 3-tuples being:
@@ -522,7 +530,6 @@ class SiteMap(Promotable):
     return match.format_arg(extra=extra)
 
   @typechecked
-  @uses_Pilfer
   @uses_Pilfer
   def content_prefetch(
       self,
