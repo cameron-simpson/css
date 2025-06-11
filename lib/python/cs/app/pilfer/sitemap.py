@@ -184,9 +184,12 @@ class FlowState(NS, Promotable):
 
   @cached_property
   def soup(self):
-    ''' A `BeautifulSoup` of `self.content`.
+    ''' A `BeautifulSoup` of `self.content` for `text/html`, otherwise `None`.
     '''
-    return BeautifulSoup(self.content, 'html.parser')
+    if self.content_type == 'text/html':
+      return BeautifulSoup(self.content, 'html.parser')
+    return None
+    '''
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
