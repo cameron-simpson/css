@@ -82,7 +82,7 @@ class URLMatcher(Promotable):
       return super().promote(obj)
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
 
-class OnState(NS, Promotable):
+class FlowState(NS, Promotable):
 
   ##@trace
   @promote
@@ -116,19 +116,19 @@ class OnState(NS, Promotable):
 
   @classmethod
   def from_str(cls, url_s: str):
-    ''' Promote a `str` URL to a `OnState`.
+    ''' Promote a `str` URL to a `FlowState`.
     '''
     return cls(url=URL(url_s))
 
   @classmethod
   def from_URL(cls, url: URL):
-    ''' Promote a `URL` URL to a `OnState`.
+    ''' Promote a `URL` URL to a `FlowState`.
     '''
     return cls(url=url)
 
   @classmethod
   def from_Flow(cls, flow: Flow):
-    ''' Promote a `Flow` to a `OnState`.
+    ''' Promote a `Flow` to a `FlowState`.
     '''
     return cls(flow=flow)
 
@@ -347,7 +347,7 @@ class SiteMap(Promotable):
 
   @pfx_method
   @promote
-  def grok(self, on_state: OnState, P: "Pilfer" = None):
+  def grok(self, on_state: FlowState, P: "Pilfer" = None):
     ''' Call each method matching `on_state` with the `on_state`.
         Return a list of `(method,match_tags,grokked)` 3-tuples being:
         - a reference to the fired grok method

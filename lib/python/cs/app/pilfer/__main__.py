@@ -45,6 +45,7 @@ from . import (
 from .parse import get_action_args, get_delim_regexp, import_name
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
+from .sitemap import FlowState
 
 def main(argv=None):
   ''' Pilfer command line function.
