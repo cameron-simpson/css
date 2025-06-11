@@ -269,8 +269,8 @@ class SiteMap(Promotable):
               # match at the start of the path
               condition = (
                   lambda regexp: (
-                      lambda on_state:
-                      (m := pfx_call(regexp.match, on_state.url.path)
+                      lambda flowstate:
+                      (m := pfx_call(regexp.match, flowstate.url.path)
                        ) and m.groupdict()
                   )
               )(
@@ -280,8 +280,8 @@ class SiteMap(Promotable):
               # match anywhere
               condition = (
                   lambda regexp: (
-                      lambda on_state:
-                      (m := pfx_call(regexp.search, on_state.url.path)
+                      lambda flowstate:
+                      (m := pfx_call(regexp.search, flowstate.url.path)
                        ) and m.groupdict()
                   )
               )(
@@ -291,8 +291,8 @@ class SiteMap(Promotable):
             # filename glob on the URL host
             condition = (
                 lambda pattern: (
-                    lambda on_state:
-                    pfx_call(fnmatch, on_state.url.hostname, pattern)
+                    lambda flowstate:
+                    pfx_call(fnmatch, flowstate.url.hostname, pattern)
                 )
             )(
                 pattern
@@ -310,8 +310,8 @@ class SiteMap(Promotable):
 
   @classmethod
   @promote
-  def on_matches(cls, on_state: OnState):
-    ''' A generator yielding methods matched by `on_state`.
+  def on_matches(cls, flowstate: FlowState):
+    ''' A generator yielding methods matched by `flowstate`.
     '''
     for method_name in dir(cls):
       try:
@@ -327,7 +327,7 @@ class SiteMap(Promotable):
         for test in condition:
           with Pfx("on_matches: test %r vs %s", method_name, test):
             try:
-              test_result = test(on_state)
+              test_result = test(flowstate)
             except Exception as e:
               warning("exception in test: %s", e)
               raise
@@ -347,8 +347,8 @@ class SiteMap(Promotable):
 
   @pfx_method
   @promote
-  def grok(self, on_state: FlowState, P: "Pilfer" = None):
-    ''' Call each method matching `on_state` with the `on_state`.
+  def grok(self, flowstate: FlowState, P: "Pilfer" = None):
+    ''' Call each method matching `flowstate` with the `flowstate`.
         Return a list of `(method,match_tags,grokked)` 3-tuples being:
         - a reference to the fired grok method
         - the match `TagSet` derived from matching that method
@@ -359,9 +359,9 @@ class SiteMap(Promotable):
     P = P or default_Pilfer()
     results = []
     excs = []
-    for method, match_tags in self.on_matches(on_state):
+    for method, match_tags in self.on_matches(flowstate):
       try:
-        grokked = method(self, on_state, match_tags)
+        grokked = method(self, flowstate, match_tags)
       except Exception as e:
         warning(f'failed call to {method=}: {e}')
         excs.append(e)
@@ -371,7 +371,7 @@ class SiteMap(Promotable):
       if len(excs) == 1:
         raise excs[0]
       else:
-        raise ExceptionGroup(f'exceptions grokking {on_state=}', excs)
+        raise ExceptionGroup(f'exceptions grokking {flowstate=}', excs)
     return results
 
   def matches(
