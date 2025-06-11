@@ -30,6 +30,7 @@ from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Unio
 from types import SimpleNamespace as NS
 
 import requests
+from requests.cookies import RequestsCookieJar
 from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
