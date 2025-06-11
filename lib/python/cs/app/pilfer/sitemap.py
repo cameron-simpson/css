@@ -157,14 +157,15 @@ class OnState(NS, Promotable):
     return content_type(self.repsonse_headers)
 
   @cached_property
-  @typechecked
-  def content(self) -> str:
+  def content(self, *, P: "Pilfer" = None) -> str:
     ''' The text content of the URL.
         Does a `GET` of the URL if there is no `self.response.content`.
     '''
+    if P is None:
+      P = default_Pilfer()
     content = self.response and self.response.content
     if content is None:
-      content = self.url.GET().content
+      content = P.GET(self.url).content
     return content
 
   @cached_property
