@@ -203,10 +203,18 @@ class URL(HasThreadState, Promotable):
 
   @property
   @unattributable
-  def content_type(self):
-    ''' The URL content MIME type.
+  def content_type_full(self):
+    ''' The URL content MIME type from the `Content-Type` header.
     '''
     return self.headers['content-type']
+
+  @property
+  @unattributable
+  def content_type(self):
+    ''' The base URL content MIME type from the `Content-Type` header.
+        Example: `'text/html'`
+    '''
+    return self.content_type_full.split(';')[0].strip().lower()
 
   @property
   @unattributable
