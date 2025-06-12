@@ -126,6 +126,7 @@ class PilferCommand(BaseCommand):
             'Flags which must be true for operation to continue.',
             lambda s: s.replace(',', ' ').split(),
         ),
+        load_cookies='Load the browser cookie state into the Pilfer seesion.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
@@ -162,6 +163,8 @@ class PilferCommand(BaseCommand):
               sqltags=pilfer.sqltags,
               db_url=pilfer.sqltags.db_url,
           ):
+            if self.options.load_cookies:
+              pilfer.load_browser_cookies(pilfer.session.cookies)
             yield
 
   @staticmethod
