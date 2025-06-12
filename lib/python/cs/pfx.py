@@ -337,9 +337,9 @@ class Pfx(object):
       ##  current_prefix, text.__class__, text, sys.exc_info())
       return text
     return (
-        current_prefix + DEFAULT_SEPARATOR +
-        ustr(text, errors='replace'
-             ).replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
+        current_prefix + DEFAULT_SEPARATOR + ustr(text, errors='replace')
+        # removed, makes messages unreadable
+        ##replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
     )
 
   @classmethod
