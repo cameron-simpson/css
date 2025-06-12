@@ -261,6 +261,7 @@ class PilferCommand(BaseCommand):
     print(url)
     U = URL(url)
     rsp = P.GET(url)
+    state = FlowState(url=U, response=rsp)
     printt(
         ('GET response headers:',),
         *[
@@ -268,13 +269,27 @@ class PilferCommand(BaseCommand):
             sorted(rsp.headers.items(), key=lambda kv: kv[0].lower())
         ],
     )
-    content_type, *_ = map(str.strip, rsp.headers['content-type'].split(';'))
-    if content_type == 'text/html':
-      soup = pfx_call(BeautifulSoup, rsp.text, 'html5lib')
+    soup = state.soup
+    if soup is None:
+      print("no soup for content_type", state.content_type)
     else:
-      soup = None
-      warning(f'no dump facility for {content_type=}')
-    if soup is not None:
+      meta = state.meta
+      if meta.tags:
+        printt(
+            ['Tags:'],
+            *(
+                [f'  {tag_name}', tag_value]
+                for tag_name, tag_value in sorted(meta.tags.items())
+            ),
+        )
+      if meta.properties:
+        printt(
+            ['Properties:'],
+            *(
+                [f'  {tag_name}', tag_value]
+                for tag_name, tag_value in sorted(meta.properties.items())
+            ),
+        )
       table = []
       q = ListQueue([('', soup.head), ('', soup.body)])
       for indent, tag in q:
