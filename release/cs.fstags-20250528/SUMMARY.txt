@@ -1,0 +1,2 @@
+New TaggedPathSet implementing a set of TaggedPaths.
+FSTags.mv: link then remove to avoid tromping dstpath.

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 ''' Parser for tagger rules.
+
+    The rule syntax is described in the `Rule.from_str` docstring.
 '''
 
 from abc import ABC, abstractmethod
@@ -374,7 +376,7 @@ class MoveAction(_Action):
         move_mode=True,
         symlink_mode=False,
         doit=doit,
-        verbose=not quiet,
+        quiet=quiet,
     )
     return (target_fspath,)
 
@@ -569,7 +571,7 @@ class Rule(Promotable):
               force=force,
           )
         except Exception as e:
-          warning("action failed: %s", s(e))
+          warning("action failed (%s): %s", e.__class__.__name__, e)
           result.failed.append(e)
         else:
           for side_effect in side_effects:

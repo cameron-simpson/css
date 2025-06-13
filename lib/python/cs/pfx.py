@@ -61,7 +61,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20250308-post'
+__version__ = '20250613-post'
 
 DISTINFO = {
     'description':
@@ -337,9 +337,9 @@ class Pfx(object):
       ##  current_prefix, text.__class__, text, sys.exc_info())
       return text
     return (
-        current_prefix + DEFAULT_SEPARATOR +
-        ustr(text, errors='replace'
-             ).replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
+        current_prefix + DEFAULT_SEPARATOR + ustr(text, errors='replace')
+        # removed, makes messages unreadable
+        ##replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
     )
 
   @classmethod

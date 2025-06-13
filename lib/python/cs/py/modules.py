@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 
-''' Convenience functions related to modules and importing.
+''' Convenience functions related to modules, packages and importing.
 '''
 
 import importlib
@@ -35,8 +35,11 @@ def import_module_name(module_name, name=None, sys_path=None, lock=None):
       * `module_name`: the module name to import.
       * `name`: optional name within the module whose value is returned;
         if `name` is `None`, return the module itself.
-      * `sys_path`optional list array of paths to use as `sys.path` during the import.
+      * `sys_path`optional list of paths to use as `sys.path` during the import.
       * `lock`: an optional lock to hold during the import (recommended).
+
+      *Warning*: `sys.path` is modified for the duration of this function,
+      which may affect concurrent applications.
   '''
   with contextif(lock):
     if sys_path is None:
@@ -76,7 +79,7 @@ def import_module_from_file(module_name, source_file, sys_path=None):
       the module instance is not inserted into `sys.modules`.
 
       *Warning*: `sys.path` is modified for the duration of this function,
-      which may affect multithreaded applications.
+      which may affect concurrent applications.
   '''
   if sys_path is None:
     sys_path = sys.path
@@ -116,6 +119,7 @@ def module_names(M):
 
 # TODO: use the AST module to do a real parse?
 # pylint: disable=too-many-branches
+@pfx
 def direct_imports(src_filename, module_name):
   ''' Crudely parse `src_filename` for `import` statements.
       Return the set of directly imported module names.
@@ -125,51 +129,50 @@ def direct_imports(src_filename, module_name):
       This is a very simple minded source parse.
   '''
   subnames = set()
-  with Pfx(src_filename):
-    with open(src_filename, encoding='utf-8') as codefp:
-      for lineno, line in enumerate(codefp, 1):
-        line = line.strip()
-        with Pfx("%d: %s", lineno, line):
-          if line.startswith('import ') or line.startswith('from '):
-            # quick hack to strip trailing "; second-statement"
-            try:
-              line, _ = line.split(';', 1)
-            except ValueError:
-              pass
-            words = line.split()
-            if not words:
+  with open(src_filename, encoding='utf-8') as codefp:
+    for lineno, line in enumerate(codefp, 1):
+      line = line.strip()
+      with Pfx("%d: %s", lineno, line):
+        if line.startswith('import ') or line.startswith('from '):
+          # quick hack to strip trailing "; second-statement"
+          try:
+            line, _ = line.split(';', 1)
+          except ValueError:
+            pass
+          words = line.split()
+          if not words:
+            continue
+          word0 = words[0]
+          if word0 not in ('from', 'import'):
+            continue
+          if len(words) < 2:
+            continue
+          if word0 == 'from' and (len(words) < 4 or words[2] != 'import'):
+            continue
+          subimport = words[1]
+          if subimport.startswith('.'):
+            # relative import, resolve against module_name
+            subimport0 = subimport
+            module_parts = module_name.split('.')
+            while subimport.startswith('.'):
+              module_parts = module_parts[:-1]
+              subimport = subimport[1:]
+            if not module_parts:
+              # walked off the top of the path
+              warning(
+                  "import %r walked out of the module %r", subimport0,
+                  module_name
+              )
               continue
-            word0 = words[0]
-            if word0 not in ('from', 'import'):
-              continue
-            if len(words) < 2:
-              continue
-            if word0 == 'from' and (len(words) < 4 or words[2] != 'import'):
-              continue
-            subimport = words[1]
-            if subimport.startswith('.'):
-              # relative import, resolve against module_name
-              subimport0 = subimport
-              module_parts = module_name.split('.')
-              while subimport.startswith('.'):
-                module_parts = module_parts[:-1]
-                subimport = subimport[1:]
-              if not module_parts:
-                # walked off the top of the path
-                warning(
-                    "import %r walked out of the module %r", subimport0,
-                    module_name
-                )
-                continue
-              module_parts.append(subimport or '__init__')
-              subimport = '.'.join(module_parts)
-            if subimport == module_name:
-              # HACK: simplistic parse finding ourself in a docstring
-              continue
-            if not is_dotted_identifier(subimport):
-              warning("ignoring %r, not a dotted identifier", subimport)
-              continue
-            subnames.add(subimport)
+            module_parts.append(subimport or '__init__')
+            subimport = '.'.join(module_parts)
+          if subimport == module_name:
+            # HACK: simplistic parse finding ourself in a docstring
+            continue
+          if not is_dotted_identifier(subimport):
+            warning("ignoring %r, not a dotted identifier", subimport)
+            continue
+          subnames.add(subimport)
   return subnames
 
 def import_extra(extra_package_name, distinfo):

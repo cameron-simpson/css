@@ -21,7 +21,7 @@ from typing import Tuple
 from cs.deco import OBSOLETE, Promotable, promote
 from cs.lex import get_chars, get_decimal, r, skipwhite
 
-__version__ = '20220311-post'
+__version__ = '20250601-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -285,7 +285,7 @@ def human_time(n):
   '''
   return UnitScale('human_time').decompose(n)
 
-decompose_time = OBSOLETE('human_time(n)')
+decompose_time = OBSOLETE('human_time(n)')(human_time)
 
 # pylint: disable=too-many-arguments
 @promote

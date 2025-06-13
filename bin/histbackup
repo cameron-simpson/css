@@ -510,7 +510,7 @@ dohashindex()
     /* | ./* | ../* ) ;;
     *) _dhi_dst=./$_dhi_dst ;;
   esac
-  $trace hashindex rearrange -e "$sshcmd" --mv -- "$_dhi_src" "$_dhi_dst"
+  $trace hashindex rearrange -e "$sshcmd" -- "$_dhi_src" "$_dhi_dst"
 }
 
 if [ $reflink ]
