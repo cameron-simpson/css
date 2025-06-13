@@ -32,7 +32,7 @@ def default_Pilfer():
   return Pilfer.default()
 
 @decorator
-def uses_Pilfer(func):
+def uses_pilfer(func):
   ''' Set the optional `P:Pilfer` parameter via a late import.
   '''
 
@@ -149,7 +149,7 @@ class FlowState(NS, Promotable):
     X("%s: .url()...", self)
     return URL(self.response.url)
 
-  @uses_Pilfer
+  @uses_pilfer
   def GET(self, P: "Pilfer", **get_kw) -> requests.Response:
     ''' Do a `GET` of `self.url` via the ambient `Pilfer`, return the `requests.Response`.
         This also updates `self.response`.
@@ -158,7 +158,7 @@ class FlowState(NS, Promotable):
     return rsp
 
   @cached_property
-  @uses_Pilfer
+  @uses_pilfer
   def response(self, P: "Pilfer"):
     ''' Cached response object, obtained from `self.url.HEAD()` if unspecified.
     '''
@@ -172,7 +172,7 @@ class FlowState(NS, Promotable):
     return self.url.content_type
 
   @cached_property
-  @uses_Pilfer
+  @uses_pilfer
   def content(self, *, P: "Pilfer") -> str:
     ''' The text content of the URL.
         Does a `GET` of the URL if there is no `self.response.content`.
@@ -255,7 +255,7 @@ class SiteMap(Promotable):
   URL_KEY_PATTERNS = ()
 
   @classmethod
-  @uses_Pilfer
+  @uses_pilfer
   def from_str(cls, sitemap_name: str, *, P: "Pilfer") -> "SiteMap":
     ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
     '''
@@ -396,7 +396,7 @@ class SiteMap(Promotable):
         continue
 
   @pfx_method
-  @uses_Pilfer
+  @uses_pilfer
   @promote
   def grok(self, flowstate: FlowState, P: "Pilfer"):
     ''' Call each method matching `flowstate` with the `flowstate`.
@@ -530,7 +530,6 @@ class SiteMap(Promotable):
     return match.format_arg(extra=extra)
 
   @typechecked
-  @uses_Pilfer
   def content_prefetch(
       self,
       match: SiteMapPatternMatch,
