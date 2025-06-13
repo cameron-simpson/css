@@ -387,12 +387,17 @@ class PilferCommand(BaseCommand):
     options = self.options
     P = options.pilfer
     print(url)
-    table = [(url,)]
+    table = []
     for method, match_tags, grokked in P.grok(url):
-      table.append((f'  {method}', "\n".join(map(str, sorted(match_tags)))))
+      table.append(
+          (
+              f'  {method.__qualname__}',
+              "\n".join(map(str, sorted(match_tags)))
+          )
+      )
       if grokked is not None:
         for k, v in grokked.items():
-          table.append((f'  {k}', v))
+          table.append((f'    {k}', v))
     printt(*table)
 
   @popopts
