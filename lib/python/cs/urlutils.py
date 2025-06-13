@@ -201,14 +201,15 @@ class URL(HasThreadState, Promotable):
     r = self.HEAD_response
     return r.headers
 
-  @property
+  # TODO: use functions from cs.rfc2616? they do return an email.BaseHeader :-(
+  @cached_property
   @unattributable
   def content_type_full(self):
     ''' The URL content MIME type from the `Content-Type` header.
     '''
     return self.headers['content-type']
 
-  @property
+  @cached_property
   @unattributable
   def content_type(self):
     ''' The base URL content MIME type from the `Content-Type` header.
