@@ -227,6 +227,18 @@ class FlowState(NS, Promotable):
         tags=meta_tags, properties=meta_properties, http_equiv=meta_http_equiv
     )
 
+  @cached_property
+  def links(self):
+    ''' A `defaultdict(list)` mapping `link` `rel=` values a list of `link` tags.
+    '''
+    links_by_rel = defaultdict(list)
+    soup = self.soup
+    if soup is not None:
+      for link in soup.find_all('link'):
+        for rel in link.attrs.get('rel', ('',)):
+          links_by_rel[rel].append(link)
+    return links_by_rel
+
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
   ''' A pattern match result:
