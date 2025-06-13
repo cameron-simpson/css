@@ -297,7 +297,7 @@ class SiteMap(Promotable):
 
         Its parameters indicate the conditions under which this method
         will be fired; all must be true.
-        Each use of the decorator appends its combination of
+        Each use of the decorator appends its conjunction of
         conditions on the method's `.on_conditions` attribute.
 
         Other parameters have the following meanings:
@@ -307,9 +307,9 @@ class SiteMap(Promotable):
           against the URL path otherwise - a leading slash anchors
           the regexp against the start of the path;
           callables are called with the `flow` and may make any test against it
-        - the `patterns_kw` name various attributes of the `flow` or
-          the `flow.response` or `flow.request` (when there's no response
-          yet); their values may be strings or callables
+        - the `patterns_kw` is a mapping of `match_kw` key or `flowstate` attribute
+          to either the required value or a callable to test that value
+
 
         Example:
 
@@ -322,7 +322,6 @@ class SiteMap(Promotable):
             ):
                 P.cache(flow, '{flow.requs
     '''
-    assert not patterns_kw, "not yet implemented"
     conditions = []
     for pattern in patterns:
       with Pfx(f'pattern={r(pattern)}'):
@@ -367,6 +366,7 @@ class SiteMap(Promotable):
           raise RuntimeError
         assert condition is not None
         conditions.append(condition)
+    conditions.extend(patterns_kw.items())
     try:
       cond_attr = method.on_conditions
     except AttributeError:
