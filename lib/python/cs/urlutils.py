@@ -44,7 +44,7 @@ from cs.deco import promote, Promotable
 from cs.excutils import unattributable
 from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.rfc2616 import datetime_from_http_date
 from cs.seq import skip_map
 from cs.threads import locked, ThreadState, HasThreadState
@@ -267,13 +267,12 @@ class URL(HasThreadState, Promotable):
   def soup(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    text = self.text
     if self.content_type == 'text/html':
       parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
     else:
       parser_names = ('lxml', 'xml')
     ##soup = BeautifulSoup(text, 'html5lib')
-    soup = pfx_call(BeautifulSoup, text, list(parser_names))
+    soup = pfx_call(BeautifulSoup, self.text, list(parser_names))
     return soup
 
   def feedparsed(self):
