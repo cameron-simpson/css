@@ -60,7 +60,7 @@ from .cache import ContentCache
 from .cookies import morsel, read_firefox_cookies
 from .format import FormatMapping
 from .parse import import_name
-from .sitemap import SiteMap
+from .sitemap import FlowState, SiteMap
 from .urls import hrefs, srcs
 
 @decorator
@@ -696,9 +696,11 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     ''' Parse information from `url` by applying all matching methods from the site maps.
         Yield `(method,match_tags,grokked)` 3-tuples.
     '''
+    flowstate = FlowState(url)
+    flowstate.GET()
     with self:
       for sitemap in self.sitemaps_for(url):
-        yield from sitemap.grok(url)
+        yield from sitemap.grok(flowstate)
 
   @promote
   def url_matches(self, url: URL, pattern_type: str, *, extra=None):
