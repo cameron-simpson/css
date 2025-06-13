@@ -214,6 +214,8 @@ class FlowState(NS, Promotable):
         if isinstance(tag, str):
           if tag.strip(): warning("SKIP HEAD tag %r", tag)
           continue
+        if tag.name != 'meta':
+          continue
         if tag_name := tag.get('name'):
           meta_tags[tag_name] = tag['content']
         if prop_name := tag.get('property'):
