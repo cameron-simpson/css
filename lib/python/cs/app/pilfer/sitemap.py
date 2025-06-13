@@ -101,7 +101,7 @@ class FlowState(NS, Promotable):
 
   ##@trace
   @promote
-  def __init__(self, **ns_kw):
+  def __init__(self, url: URL, **ns_kw):
     ''' Initialise `self` from the keyword parameters.
 
         The end result is that we have `.flow`, `.request`,
@@ -111,7 +111,7 @@ class FlowState(NS, Promotable):
         - `.request` and `.response` are obtained from `.flow`
         - `.url` is obtained from `.request.url`
     '''
-    super().__init__(**ns_kw)
+    super().__init__(url=url, **ns_kw)
     extra_attrs = self.__dict__.keys() - ('flow', 'request', 'response', 'url')
     if extra_attrs:
       raise ValueError(f'unexpected attributes supplied: {extra_attrs}')
@@ -152,17 +152,18 @@ class FlowState(NS, Promotable):
   @uses_pilfer
   def GET(self, P: "Pilfer", **get_kw) -> requests.Response:
     ''' Do a `GET` of `self.url` via the ambient `Pilfer`, return the `requests.Response`.
-        This also updates `self.response`.
+        This also updates `self.request` and `self.response`.
     '''
     rsp = self.response = P.GET(self.url, **get_kw)
+    self.request = rsp.request
     return rsp
 
   @cached_property
   @uses_pilfer
   def response(self, P: "Pilfer"):
-    ''' Cached response object, obtained from `self.url.HEAD()` if unspecified.
+    ''' Cached response object, obtained via `Pilfer.HEAD` if needed.
     '''
-    return P.HEAD()
+    return P.HEAD(self.url)
 
   @cached_property
   def content_type(self) -> str:
