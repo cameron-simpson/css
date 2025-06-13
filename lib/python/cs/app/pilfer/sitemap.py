@@ -142,7 +142,12 @@ class FlowState(NS, Promotable):
   def from_Flow(cls, flow: Flow):
     ''' Promote a `Flow` to a `FlowState`.
     '''
-    return cls(flow=flow)
+    return cls(
+        flow=flow,
+        request=flow.request,
+        response=flow.response,
+        url=flow.request.url,
+    )
 
   @cached_property
   def url(self) -> URL:
