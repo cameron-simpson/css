@@ -178,7 +178,8 @@ class FlowState(NS, Promotable):
     ''' The text content of the URL.
         Does a `GET` of the URL if there is no `self.response.content`.
     '''
-    content = self.response and self.response.content
+    rsp = self.response
+    content = rsp and rsp.content
     if content is None:
       content = P.GET(self.url).content
     return content
