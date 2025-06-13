@@ -36,6 +36,7 @@ from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
 from cs.resources import uses_runstate
 from cs.sqltags import SQLTags
+from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
@@ -256,17 +257,15 @@ class PilferCommand(BaseCommand):
     url = argv.pop(0)
     if argv:
       raise GetoptError(f'extra arguments after URL: {argv!r}')
-    options = self.options
-    P = options.pilfer
     print(url)
-    U = URL(url)
-    rsp = P.GET(url)
-    state = FlowState(url=U, response=rsp)
+    state = FlowState(url=url)
+    state.GET()
     printt(
-        ('GET response headers:',),
+        (f'{state.request.method} response headers:',),
         *[
-            (f'  {key}', value) for key, value in
-            sorted(rsp.headers.items(), key=lambda kv: kv[0].lower())
+            (f'  {key}', value) for key, value in sorted(
+                state.response.headers.items(), key=lambda kv: kv[0].lower()
+            )
         ],
     )
     soup = state.soup
@@ -315,7 +314,7 @@ class PilferCommand(BaseCommand):
                                                            NavigableString):
           desc = str(children[0].strip())
         else:
-          desc = " ".join(
+          desc = "\n".join(
               f'{attr}={value!r}' for attr, value in attrs.items()
           ) if attrs else ''
           for index, subtag in enumerate(children):
