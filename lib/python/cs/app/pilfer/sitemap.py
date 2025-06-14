@@ -594,6 +594,7 @@ class SiteMap(Promotable):
       return None
     return match.format_arg(extra=extra)
 
+  @uses_pilfer
   @typechecked
   def content_prefetch(
       self,
