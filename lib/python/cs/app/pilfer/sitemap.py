@@ -3,13 +3,13 @@
 ''' Base class for site maps.
 '''
 
-from collections import ChainMap, namedtuple
+from collections import ChainMap, defaultdict, namedtuple
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from functools import cached_property
 import re
 from types import SimpleNamespace as NS
-from typing import Iterable, Mapping, Optional
+from typing import Callable, Iterable, Mapping, Optional, Tuple
 
 from cs.binary import bs
 from cs.deco import decorator, promote, Promotable
@@ -375,14 +375,27 @@ class SiteMap(Promotable):
     return method
 
   @classmethod
+  @pfx_method
   @promote
-  def on_matches(cls, flowstate: FlowState):
-    ''' A generator yielding methods matched by `flowstate`.
+  def on_matches(
+      cls,
+      flowstate: FlowState,
+      **match_kw,
+  ) -> Iterable[Tuple[Callable, TagSet]]:
+    ''' A generator yielding `(method,matched)` 2-tuples for  matched
+        by `flowstate` and `match_kw`, being the matching method
+        and a `TagSet` of values obtained during the match test.
 
         The matching methods are identified by consulting the
-        conditions in the method's `.on_conditions` attribute,
-        normally defined by applying the `@on` decorator to the
-        method.
+        conditions in the method's `.on_conditions` attribute, a
+        list of conjunctions normally defined by applying the `@on`
+        decorator to the method.
+        A `(method,matched)` 2-tuple is yielded for each matching conjunction.
+
+        Note that this means the same methods may be yielded multiple
+        times if different conjunctions match (eg multiple matching
+        `@on` decorators); this is because each condition may provide
+        different `matched` match results.
     '''
     for method_name in dir(cls):
       try:
@@ -392,29 +405,57 @@ class SiteMap(Promotable):
       try:
         conditions = method.on_conditions
       except AttributeError:
+        # no conditions, skip
         continue
       matched = TagSet()
-      for condition in conditions:
-        for test in condition:
-          with Pfx("on_matches: test %r vs %s", method_name, test):
-            try:
-              test_result = test(flowstate)
-            except Exception as e:
-              warning("exception in test: %s", e)
-              raise
-            # test ran, examine result
-            if test_result is None or test_result is False:
-              # failure
-              break
-            # success
-            if test_result is not True:
-              # should be a mapping, update the matched TagSet
-              for k, v in test_result.items():
-                matched[k] = v
-      else:
-        # no test failed
+      for conjunction in conditions:
+        with Pfx("match %r", conjunction):
+          for condition in conjunction:
+            with Pfx("test %r", condition):
+              try:
+                # a 2-tuple of name and value/value_test()?
+                test_name, test_value = condition
+              except ValueError:
+                # should be a callable to test against the flowstate
+                for test in condition:
+                  with Pfx("on_matches: test %r vs %s", method_name, test):
+                    try:
+                      test_result = test(flowstate)
+                    except Exception as e:
+                      warning("exception in test: %s", e)
+                      raise
+                    # test ran, examine result
+                    if test_result is None or test_result is False:
+                      # failure
+                      break
+                    # success
+                    if test_result is not True:
+                      # should be a mapping, update the matched TagSet
+                      for k, v in test_result.items():
+                        matched[k] = v
+              else:
+                # a 2-tuple of name and value/value_test()?
+                try:
+                  value = match_kw[test_name]
+                except KeyError:
+                  try:
+                    value = getattr(flowstate, test_name)
+                  except AttributeError as e:
+                    warning(
+                        "no %s.%s attribute: %s", flowstate.__class__.__name__,
+                        test_name, e
+                    )
+                    # consider the test failed
+                    break
+                  if callable(value):
+                    if not value(flowstate):
+                      break
+                  else:
+                    if value != test_value:
+                      break
+          else:
+            # no test failed
         yield method, matched
-        continue
 
   @pfx_method
   @uses_pilfer
