@@ -31,7 +31,9 @@ def morsel(name: str, value: Any, **morsel_kw) -> Morsel:
   morsel = cookies[name]
   for k, v in morsel_kw.items():
     morsel[k] = v
-  morsel['max-age'] = morsel['expires'] - time.time()
+  expires = morsel.get('expires')
+  if expires:
+    morsel['max-age'] = expires - time.time()
   return morsel
 
 class FirefoxCookie(namedtuple('FirefoxCookie', FIREFOX_COOKIE_SQL_COLUMNS)):
