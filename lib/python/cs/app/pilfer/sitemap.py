@@ -468,6 +468,9 @@ class SiteMap(Promotable):
         - the result of calling the method, often a `TagSet`
         Exceptions are gathered and, if any, an `ExceptionGroup` is raised
         (unless there's just one, it which case it is raised directly).
+
+        Each matching method is called as `method(self:SiteMap,flowstate,match_tags)`.
+        Its return is the `grokked` result, often a `TagSet`.
     '''
     results = []
     excs = []
