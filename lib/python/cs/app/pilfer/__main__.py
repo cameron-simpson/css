@@ -272,23 +272,52 @@ class PilferCommand(BaseCommand):
     if soup is None:
       print("no soup for content_type", state.content_type)
     else:
+      table = []
+      title = soup.head.title
+      if title:
+        table.append(["Title:", title.string])
       meta = state.meta
       if meta.tags:
-        printt(
-            ['Tags:'],
-            *(
-                [f'  {tag_name}', tag_value]
-                for tag_name, tag_value in sorted(meta.tags.items())
-            ),
+        table.extend(
+            (
+                ['Tags:'],
+                *(
+                    [f'  {tag_name}', tag_value]
+                    for tag_name, tag_value in sorted(meta.tags.items())
+                ),
+            )
         )
       if meta.properties:
-        printt(
-            ['Properties:'],
-            *(
-                [f'  {tag_name}', tag_value]
-                for tag_name, tag_value in sorted(meta.properties.items())
-            ),
+        table.extend(
+            (
+                ['Properties:'],
+                *(
+                    [f'  {tag_name}', tag_value]
+                    for tag_name, tag_value in sorted(meta.properties.items())
+                ),
+            )
         )
+      links_by_rel = state.links
+      if links_by_rel:
+        table.extend(
+            (
+                ["Links:"], *(
+                    [
+                        f'  {rel}',
+                        "\n".join(
+                            sorted(
+                                f'{link.attrs["href"]} {link.attrs.get("type","")}'
+                                for link in links
+                                if link.attrs['href']
+                            )
+                        ),
+                    ]
+                    for rel, links in sorted(links_by_rel.items())
+                )
+            )
+        )
+      printt(*table)
+      print("Content:", state.content_type)
       table = []
       q = ListQueue([('', soup.head), ('', soup.body)])
       for indent, tag in q:
