@@ -547,7 +547,7 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
       for bs in bss:
         T.write(bs)
 
-  rsp.stream = process_stream(
+  flow.response.stream = consume_stream(
       save,
       f'{flow.request}: save {flow.response.headers["content-type"]} -> {save_as!r}',
       content_length=content_length(rsp.headers),
