@@ -717,7 +717,6 @@ class MITMAddon:
           print("SKIP", action, "does not match URL", flow.request.url)
           continue
       if hook_name == 'responseheaders':
-        flow = mitm_hook_a[0]
         # note the initial state of the .stream attribute
         stream0 = flow.response.stream
         assert not stream0, \
