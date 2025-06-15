@@ -701,8 +701,8 @@ class MITMAddon:
       return
     # any exceptions from the actions
     excs = []
-    # for collating any .stream functions
-    stream_funcs = []
+    # for collating any .stream functions during responseheaders
+    stream_funcs = [] if hook_name == 'responseheaders' else None
     for i, (
         action,
         action_args,
@@ -716,7 +716,7 @@ class MITMAddon:
         else:
           print("SKIP", action, "does not match URL", flow.request.url)
           continue
-      if hook_name == 'responseheaders':
+      if stream_funcs is not None:
         # note the initial state of the .stream attribute
         stream0 = flow.response.stream
         assert not stream0, \
@@ -734,15 +734,19 @@ class MITMAddon:
       except Exception as e:
         warning("exception calling hook_action[%d]: %s", i, e)
         excs.append(e)
-      if hook_name == 'responseheaders':
+      if stream_funcs is not None:
         # If the .stream attribute was modified, append it to the
         # stream functions and reset the .stream attribute.
         stream = flow.response.stream
-        if stream is not stream0:
+        if stream is stream0:
+          # unchanged
+          ##print(f'flow.response.stream is {stream0=}')
+          pass
+        else:
           if stream:
             stream_funcs.append(stream)
           flow.response.stream = stream0
-    if hook_name == 'responseheaders' and stream_funcs:
+    if stream_funcs:
       # After the actions have run, define the stream attribute
       # to run whatever stream functions were applied.
       #
@@ -757,8 +761,10 @@ class MITMAddon:
       # attribute so that the "response" action has a valid
       # `.content` to access.
       #
+      assert hook_name == 'responseheaders'
       if self.hook_map['response']:
-        # collate the final stream into a raw_content bytes instance
+        # We have hooks for the response, so add a stream handler to
+        # collate the final stream into a raw_content bytes instance.
         content_bss = []
 
         def content_stream(bs: bytes) -> bytes:
