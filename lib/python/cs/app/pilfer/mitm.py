@@ -61,7 +61,7 @@ def process_stream(
     progress_name: Optional[str] = None,
     *,
     content_length: Optional[int] = None,
-    is_filter: bool = False,
+    is_filter: bool,
     name: Optional[str] = None,
     runstate: Optional[RunState] = None,
     P: Pilfer,
@@ -69,26 +69,31 @@ def process_stream(
   ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
       Return a callable to set as the `flow.response.stream` in the caller.
 
+      Normally this is called via `filter_stream()` or `consume_stream()`.
+
       The `Flow.response.stream` attribute can be set to a callable
       which accepts a `bytes` instance as its sole callable;
       this provides no context to the stream processor.
       You can keep context by preparing that callable with a closure,
       but often it is clearer to write a generator which accepts
       an iterable of `bytes` and yields `bytes`. This function
-      enables that.
+      enables the latter.
+
+      *Note that* calling this function actually constructs various
+      queues and dispatches worker `Thread`s to process them, so
+      it should only be called when the `consumer` is about to be
+      actioned.
+      Normally this would be when actually setting `flowe.response.stream`.
 
       Parameters:
       * `consumer`: a callable accepting an iterable of `bytes` instances;
-        if `is_filter` (default `False`) then this is expected to
-        return an iterable of `bytes`, otherwise it is expected to
-        be a sink
+        if `is_filter` then this is expected to return an iterable of
+        `bytes`, otherwise it is expected to be a sink
       * `progress_name`: optional progress bar name, default `None`;
         do not present a progress bar if `None`
       * `content_length`: optional expected length of the data stream,
         typically supplied from the response 'Content-Length` header
-      * `is_filter`: optional flag, default `False`;
-        if true then `consumer` is expected to return a iterable of `bytes`,
-        otherwise it is treated as a sink
+      * `is_filter`: whether `consumer` is a filter (`True`) or a sink (`False`)
       * `name`: an optional string to name the worker `Thread`,
         default from `progress_name` or the name of `consumer`
 
@@ -103,11 +108,12 @@ def process_stream(
           if ( flow.request.method in ('GET',)
                and (length is None or length >= threshold)
           ):
-              # put the flow into streaming mode, changing nothing
+              # put the flow into streaming mode, changing no content
               flow.response.stream = process_stream(
                   lambda bss: bss,
                   f'stream {flow.request}',
                   content_length=length,
+                  is_filter=True,
               )
   '''
   if name is None:
@@ -126,6 +132,8 @@ def process_stream(
   if runstate is not None:
 
     def cancel_Qs(rs: RunState):
+      ''' Callback to close the data and process queues on cancel.
+      '''
       print(rs, "CANCELLED, close queues")
       data_Q.close()
       if progress_Q is not None:
@@ -137,24 +145,29 @@ def process_stream(
     # wrap a sink function in a change-nothing filter
     sink_Q = IterableQueue(name=f'{name} -> consumer-sink')
 
-    def copy_to_sink(bss):
+    def copy_to_sink(bss: Iterqble[bytes]) -> Iterable[bytes]:
+      ''' A generator to copy the data to the consumer (on sink_Q)
+          and to yield it unchanged.
+      '''
       try:
         for bs in bss:
-          sink_Q.put(bs)
-          yield bs
+          sink_Q.put(bs)  # data -> consumer
+          yield bs  # data -> output
       finally:
         sink_Q.close()
 
+    # dispatch a Thread consuming sink_Q -> consumer
     P.bg(
         partial(consumer, sink_Q),
-        name=f'{name}: sink_Q -> consumer (sink)',
+        name=f'{name}: sink_Q -> consumer:{consumer.__name__} (sink)',
         enter_objects=True,
     )
+    # use the copying filter as the consumer function
     consumer = copy_to_sink
 
   def filter_data(Qin, Qout):
     ''' Consume `Qin` (from the `consumer()` generator), put to `Qout`.
-      '''
+    '''
     try:
       for obs in consumer(Qin):
         Qout.put(obs)
@@ -162,8 +175,8 @@ def process_stream(
       Qout.close()
 
   # dispatch a worker Thread to consume data_Q and put results on post_Q
-  data_Q = IterableQueue(name=f'{name} -> consumer')
-  post_Q = IterableQueue(name=f'{name} <- consumer')
+  data_Q = IterableQueue(name=f'{name} -> consumer:{consumer.__name__}')
+  post_Q = IterableQueue(name=f'{name} <- consumer:{consumer.__name__}')
   Thread(
       target=filter_data,
       args=(data_Q, post_Q),
@@ -175,8 +188,8 @@ def process_stream(
         Yield chunks from the `post_Q`.
     '''
     if len(bs) == 0:
+      # end of input: shut down the streams and collect the entire post_Q
       try:
-        # end of input = shut down the streams and collect the entire post_Q
         data_Q.close()
         if progress_Q is not None:
           progress_Q.close()
@@ -187,24 +200,50 @@ def process_stream(
       finally:
         # EOF
         yield b''
-    else:
-      if data_Q.closed:
-        if len(bs) > 0:
-          warning(
-              "discarding %d bytes after close of data_Q:%s", len(bs),
-              data_Q.name
-          )
-      else:
-        data_Q.put(bs)
-        if progress_Q is not None:
-          progress_Q.put(bs)
-        # yield any ready data from post_Q
-        while not post_Q.empty():
-          obs = next(post_Q)
-          if len(bs) > 0:
-            yield obs
+      return
+    if data_Q.closed:
+      # we've closed the output queue, report discarded data
+      if len(bs) > 0:
+        warning(
+            "discarding %d bytes after close of data_Q:%s",
+            len(bs),
+            data_Q.name,
+        )
+      return
+    # copy to the output queue, copy to the process queue
+    data_Q.put(bs)
+    if progress_Q is not None:
+      progress_Q.put(bs)
+    # yield any ready data from post_Q
+    while not post_Q.empty():
+      obs = next(post_Q)
+      if len(bs) > 0:
+        yield obs
 
   return copy_bs
+
+@typechecked
+def filter_stream(
+    consumer: Callable[Iterable[bytes], Iterable[bytes]],
+    progress_name: Optional[str] = None,
+    **ps_args,
+) -> Callable[bytes, bytes]:
+  ''' A shim for `process_stream` where the `consumer` processes
+      an iterable of `bytes` and returns an iterable of `bytes`,
+      typicaly a generator yielding `bytes`.
+  '''
+  return process_stream(consumer, progress_name, is_filter=True, **ps_args)
+
+@typechecked
+def consume_stream(
+    consumer: Callable[Iterable[bytes], None],
+    progress_name: Optional[str] = None,
+    **ps_args,
+) -> Callable[bytes, bytes]:
+  ''' A shim for `process_stream` where the `consumer` processes
+      an iterable of `bytes` and returns nothing.
+  '''
+  return process_stream(consumer, progress_name, is_filter=False, **ps_args)
 
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
@@ -219,7 +258,7 @@ def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
   if (flow.request.method in ('GET',)
       and (length is None or length >= threshold)):
     # put the flow into streaming mode, changing nothing
-    flow.response.stream = process_stream(
+    flow.response.stream = filter_stream(
         lambda bss: bss,
         ##f'stream {flow.request}',
         content_length=length,
@@ -277,7 +316,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           # we are at the response headers
           # and will stream the content to the cache file
           assert hook_name == "responseheaders"
-          rsp.stream = process_stream(
+          rsp.stream = consume_stream(
               lambda bss: cache.cache_response(
                   url,
                   cache_keys,
@@ -462,7 +501,7 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
         warning("match function %s fails: %e", match.pattern_arg, e)
         raise
 
-  flow.response.stream = process_stream(
+  flow.response.stream = consume_stream(
       gather_content, f'gather content for {pattern_type}'
   )
 
