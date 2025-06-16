@@ -30,6 +30,7 @@ from cs.cmdutils import vprint
 from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
+from cs.gimmicks import Buffer
 from cs.lex import printt, r, s, tabulate
 from cs.logutils import warning
 from cs.naysync import amap, IterableAsyncQueue
@@ -46,6 +47,7 @@ from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
 from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 from .prefetch import URLFetcher
+from .sitemap import FlowState
 
 if sys.stdout.isatty():
   print = upd_print
@@ -543,6 +545,27 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
+def patch_soup(hook_name, flow, *, P: Pilfer = None):
+  flowstate = FlowState.from_Flow(flow)
+
+  def process_soup(bss: Iterable[bytes]) -> Iterable[bytes]:
+    content_bs = b''.join(bss)
+    # TODO: consult the content_type full for charset
+    flowstate.content = content_bs.decode('utf-8')
+    P.run_matches(flowstate, 'soup', 'patch*soup')
+    # TODO: consult the content_type full for charset
+    yield str(flowstate.soup).encode('utf-8')
+
+  flow.response.stream = filter_stream(
+      process_soup,
+      f'{flow.request}: patch_soup',
+      content_length=content_length(flow.response.headers),
+      runstate=flow.runstate,
+  )
+
+@attr(default_hooks=('responseheaders',))
+@uses_pilfer
+@typechecked
 def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
   rsp = flow.response
   save_as = pfx_call(P.format_string, save_as_format, flow.request.url)
@@ -566,6 +589,7 @@ class MITMHookAction(Promotable):
       'cache': cached_flow,
       'dump': dump_flow,
       'prefetch': prefetch_urls,
+      'soup': patch_soup,
       'print': print_rq,
       'save': save_stream,
       'stream': stream_flow,
