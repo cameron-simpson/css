@@ -478,11 +478,11 @@ class bs(bytes):
 
   @classmethod
   def promote(cls, obj):
-    ''' Promote `bytes` or `memoryview` to a `bs`.
+    ''' Promote a `Buffer` (eg `bytes` or `memoryview`) to a `bs`.
     '''
     if isinstance(obj, cls):
       return obj
-    if isinstance(obj, (bytes, memoryview)):
+    if isinstance(obj, Buffer):
       return cls(obj)
     raise TypeError(f'{cls.__name__}.promote({obj.__class__}): cannot promote')
 
