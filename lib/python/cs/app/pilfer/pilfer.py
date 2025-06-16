@@ -8,9 +8,8 @@ import copy
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
-from http.cookies import Morsel, SimpleCookie
+from http.cookies import Morsel
 from itertools import zip_longest
-import json
 import os
 import os.path
 from os.path import (
@@ -24,9 +23,8 @@ from os.path import (
 import shlex
 import sys
 from threading import RLock
-import time
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 from types import SimpleNamespace as NS
 
 import requests
@@ -45,7 +43,7 @@ from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
-from cs.ndjson import dump_ndjson, scan_ndjson, write_ndjson
+from cs.ndjson import dump_ndjson, scan_ndjson
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
@@ -472,10 +470,10 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     ''' Return a header name in normalised form for use _in a request_.
     '''
     return '-'.join(
-        (
+
             word.title()
             for word in header_name.lower().replace('_', '-').split('-')
-        )
+
     )
 
   def headers(self):
