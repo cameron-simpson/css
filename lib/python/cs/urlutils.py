@@ -271,7 +271,6 @@ class URL(HasThreadState, Promotable):
       parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
     else:
       parser_names = ('lxml', 'xml')
-    ##soup = BeautifulSoup(text, 'html5lib')
     soup = pfx_call(BeautifulSoup, self.text, list(parser_names))
     return soup
 
