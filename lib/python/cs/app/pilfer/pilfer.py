@@ -77,7 +77,6 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
       * `new_P`: optional glag, default `False`; if true then the
         function yields `result,Pilfer` 2-tuples instead of just `result`
   '''
-  ##func = trace(func)
   if with_P:
     wrapper = agen(lambda item, P: func(item, P=P), fast=fast)
   else:
@@ -469,7 +468,6 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           msection[field_name] = value
     return mapping
 
-  @trace(retval=True)
   def normalise_header(self, header_name):
     ''' Return a header name in normalised form for use _in a request_.
     '''
@@ -832,7 +830,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     matches = list(self.url_matches(url, pattern_type='URL_KEY', extra=extra))
     if not matches:
       print("cache_url: no matches for", url)
-      return
+      return None
     cache = self.content_cache
     with cache:
       cache_keys = [
