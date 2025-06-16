@@ -810,33 +810,72 @@ class MITMAddon:
           # TODO: we really need to think a bit harder about EOF
           # or exception from a stage.
           stream_excs = []
-          bss = [bs]
-          for stream_func in stream_funcs:
-            # feed bss through the stream function, collect results for the next function
-            obss = []
+          at_EOF = len(bs) == 0
+          if at_EOF:
+            bss = []
+          else:
+            bss = [bs]
+          try:
+            # Feed the bytes from bss through each of stream_funcs.
+            # Pass the resulting blocks through the next stream function.
+            # We start with a single block, but each stage may produce
+            # multiple blocks for use by the subsequent stages.
+            for stream_func in stream_funcs:
+              # Feed bss through the stream function, collect its
+              # results for use by the next stage.
+              # Because a stage function might return a bytes or an
+              # iterable of bytes we promote each result to an iterable
+              # of bytes and combine them for the next pass.
+              obsses = []  # list of iterables, one per bs in bss
+              for bs in bss:
+                try:
+                  obss = stream_func(bs)
+                except Exception as e:
+                  warning(
+                      "exception calling hook_action stream_func %s: %s",
+                      funccite(stream_func), e
+                  )
+                  stream_excs.append(e)
+                  # processing broken, pass the bytes unchanged
+                  obss = [bs]
+                # we expect a bytes or an iterable of bytes
+                if isinstance(obss, Buffer):
+                  # promote to iterable
+                  obss = [obss]
+                obsses.append(obss)
+                if at_EOF:
+                  # send EOF to each stage
+                  try:
+                    obss = stream_func(b'')
+                  except Exception as e:
+                    warning(
+                        "exception calling hook_action stream_func %s: %s",
+                        funccite(stream_func), e
+                    )
+                    stream_excs.append(e)
+                    # processing broken, pass the bytes unchanged
+                    obss = [bs]
+                  # we expect a bytes or an iterable of bytes
+                  if isinstance(obss, Buffer):
+                    # promote to iterable
+                    obss = [obss]
+                  obsses.append(obss)
+              # prepare the iterable of bytes for the next stage function
+              bss = chain(*obsses)
+            # end of stages: yield the nonempty results
             for bs in bss:
-              try:
-                obs = stream_func(bs)
-              except Exception as e:
-                warning(
-                    "exception calling hook_action stream_func %s: %s",
-                    funccite(stream_func), e
-                )
-                stream_excs.append(e)
-                ##breakpoint()
-              else:
-                if isinstance(obs, bytes):
-                  obss.append(obs)
-                else:
-                  obss.extend(obs)
-            bss = obss
-          if excs:
-            if len(excs) == 1:
-              raise excs[0]
-            raise ExceptionGroup(
-                f'multiple exceptions running actions for .{hook_name}', excs
-            )
-          return bss
+              if len(bs) > 0:
+                yield bs
+          finally:
+            if excs:
+              if len(excs) == 1:
+                raise excs[0]
+              raise ExceptionGroup(
+                  f'multiple exceptions running actions for .{hook_name}', excs
+              )
+            if at_EOF:
+              # send the final EOF
+              yield b''
 
       flow.response.stream = stream
 
