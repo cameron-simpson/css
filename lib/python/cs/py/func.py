@@ -80,9 +80,9 @@ def func_a_kw_fmt(func, *a, **kw):
   av = [
       func if isinstance(func, str) else getattr(func, '__name__', str(func))
   ]
-  afv = ['%r'] * len(a)
+  afv = ['%.20r'] * len(a)
   av.extend(a)
-  afv.extend(['%s=%r'] * len(kw))
+  afv.extend(['%s=%.20r'] * len(kw))
   for kv in kw.items():
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
