@@ -140,7 +140,6 @@ def process_stream(
     def cancel_Qs(rs: RunState):
       ''' Callback to close the data and process queues on cancel.
       '''
-      print(rs, "CANCELLED, close queues")
       data_Q.close()
       if progress_Q is not None:
         progress_Q.close()
@@ -267,7 +266,7 @@ def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
     # put the flow into streaming mode, changing nothing
     flow.response.stream = filter_stream(
         lambda bss: bss,
-        ##f'stream {flow.request}',
+        f'stream {flow.request.url}',
         content_length=length,
         runstate=flow.runstate,
     )
@@ -673,7 +672,6 @@ class MITMAddon:
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
     '''
-    ##print("MITMAddon.__getattr__", repr(hook_name))
     prefix = f'{self.__class__.__name__}.{hook_name}'
     with Pfx(prefix):
       if hook_name in ('addons', 'add_log', 'clientconnect',
@@ -733,7 +731,7 @@ class MITMAddon:
     if not hook_actions:
       return
     # any exceptions from the actions
-    excs = []
+    prep_excs = []
     # for collating any .stream functions during responseheaders
     stream_funcs = [] if hook_name == 'responseheaders' else None
     for i, (
@@ -766,16 +764,12 @@ class MITMAddon:
         )
       except Exception as e:
         warning("exception calling hook_action[%d]: %s", i, e)
-        excs.append(e)
+        prep_excs.append(e)
       if stream_funcs is not None:
         # If the .stream attribute was modified, append it to the
         # stream functions and reset the .stream attribute.
         stream = flow.response.stream
-        if stream is stream0:
-          # unchanged
-          ##print(f'flow.response.stream is {stream0=}')
-          pass
-        else:
+        if stream is not stream0:
           if stream:
             stream_funcs.append(stream)
           flow.response.stream = stream0
@@ -819,13 +813,9 @@ class MITMAddon:
         stream_funcs.append(content_stream)
 
       if len(stream_funcs) == 1:
-
         stream, = stream_funcs
-
       else:
         assert len(stream_funcs) > 1
-
-        # TODO: we don't do anything with stream_excs here!
 
         def stream(bs: bytes) -> Iterable[bytes]:
           ''' Run each `bytes` instance through all the stream functions.
@@ -891,11 +881,12 @@ class MITMAddon:
               if len(bs) > 0:
                 yield bs
           finally:
-            if excs:
-              if len(excs) == 1:
-                raise excs[0]
+            if stream_excs:
+              if len(stream_excs) == 1:
+                raise stream_excs[0]
               raise ExceptionGroup(
-                  f'multiple exceptions running actions for .{hook_name}', excs
+                  f'multiple exceptions running actions for .{hook_name}',
+                  stream_excs
               )
             if at_EOF:
               # send the final EOF
@@ -903,11 +894,11 @@ class MITMAddon:
 
       flow.response.stream = stream
 
-    if excs:
-      if len(excs) == 1:
-        raise excs[0]
+    if prep_excs:
+      if len(prep_excs) == 1:
+        raise prep_excs[0]
       raise ExceptionGroup(
-          f'multiple exceptions running actions for .{hook_name}', excs
+          f'multiple exceptions running actions for .{hook_name}', prep_excs
       )
 
 @uses_pilfer
