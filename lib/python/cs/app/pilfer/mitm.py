@@ -8,7 +8,7 @@ from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
 from inspect import isgeneratorfunction
-from itertools import takewhile
+from itertools import chain, takewhile
 import os
 from signal import SIGINT
 import sys
@@ -65,25 +65,29 @@ def process_stream(
     name: Optional[str] = None,
     runstate: Optional[RunState] = None,
     P: Pilfer,
-) -> Callable[bytes, bytes]:
-  ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from the flow.
+) -> Callable[bytes, Iterable[bytes]]:
+  ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from a flow.
       Return a callable to set as the `flow.response.stream` in the caller.
 
       Normally this is called via `filter_stream()` or `consume_stream()`.
 
+      The returned callable accepts a single `bytes` (some chunk
+      from the URL content stream) and yields an iterable of `bytes`;
+      this is acceptable as a `Flow.response.stream`.
+
       The `Flow.response.stream` attribute can be set to a callable
       which accepts a `bytes` instance as its sole callable;
       this provides no context to the stream processor.
-      You can keep context by preparing that callable with a closure,
-      but often it is clearer to write a generator which accepts
-      an iterable of `bytes` and yields `bytes`. This function
-      enables the latter.
+      You can keep context from one chunk to the next by preparing
+      that callable with a closure, but often it is clearer to write
+      a generator which accepts an iterable of `bytes` and yields
+      `bytes`. This function enables the latter.
 
       *Note that* calling this function actually constructs various
       queues and dispatches worker `Thread`s to process them, so
       it should only be called when the `consumer` is about to be
       actioned.
-      Normally this would be when actually setting `flowe.response.stream`.
+      Normally this would be when actually setting `flow.response.stream`.
 
       Parameters:
       * `consumer`: a callable accepting an iterable of `bytes` instances;
@@ -143,9 +147,9 @@ def process_stream(
 
   if not is_filter:
     # wrap a sink function in a change-nothing filter
-    sink_Q = IterableQueue(name=f'{name} -> consumer-sink')
+    sink_Q = IterableQueue(name=f'{name} -> consumer-sink:{conumer.__name__}')
 
-    def copy_to_sink(bss: Iterqble[bytes]) -> Iterable[bytes]:
+    def copy_to_sink(bss: Iterable[bytes]) -> Iterable[bytes]:
       ''' A generator to copy the data to the consumer (on sink_Q)
           and to yield it unchanged.
       '''
@@ -219,6 +223,7 @@ def process_stream(
       obs = next(post_Q)
       if len(bs) > 0:
         yield obs
+    return
 
   return copy_bs
 
