@@ -7,22 +7,20 @@ import asyncio
 from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
-from inspect import isgeneratorfunction
 from itertools import chain, takewhile
 import os
 from signal import SIGINT
 import sys
 from threading import Thread
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import Callable, Iterable, Optional
 
 from icontract import require
-from mitmproxy import ctx, http
+from mitmproxy import http
 import mitmproxy.addons.dumper
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
 from mitmproxy.tools.dump import DumpMaster
-import requests
 from typeguard import typechecked
 
 from cs.binary import bs
@@ -31,15 +29,14 @@ from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
 from cs.gimmicks import Buffer
-from cs.lex import printt, r, s, tabulate
+from cs.lex import printt
 from cs.logutils import warning
-from cs.naysync import amap, IterableAsyncQueue
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue
 from cs.resources import RunState, uses_runstate
-from cs.rfc2616 import content_length, content_type
+from cs.rfc2616 import content_length
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
@@ -355,7 +352,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       assert hook_name == 'requestheaders'
       try:
         cache_key, md, content_bs = cache.find_content(cache_keys)
-      except KeyError as e:
+      except KeyError:
         # nothing cached
         PR("not cached, pass through")
         # we want to cache this, remove headers which can return a 304 Not Modified
@@ -487,7 +484,7 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
       PR("for match", match)
       try:
         content_handler = getattr(match.sitemap, method_name)
-      except AttributeError as e:
+      except AttributeError:
         warning(
             "no %s on match.sitemap of %s",
             f'{match.sitemap.__class__.__name__}.{method_name}',
