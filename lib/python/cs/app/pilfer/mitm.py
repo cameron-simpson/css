@@ -148,7 +148,7 @@ def process_stream(
 
   if not is_filter:
     # wrap a sink function in a change-nothing filter
-    sink_Q = IterableQueue(name=f'{name} -> consumer-sink:{conumer.__name__}')
+    sink_Q = IterableQueue(name=f'{name} -> consumer-sink:{consumer.__name__}')
 
     def copy_to_sink(bss: Iterable[bytes]) -> Iterable[bytes]:
       ''' A generator to copy the data to the consumer (on sink_Q)
