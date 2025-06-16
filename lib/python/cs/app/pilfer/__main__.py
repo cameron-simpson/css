@@ -308,7 +308,7 @@ class PilferCommand(BaseCommand):
                             sorted(
                                 f'{link.attrs["href"]} {link.attrs.get("type","")}'
                                 for link in links
-                                if link.attrs['href']
+                                if link.attrs.get('href')
                             )
                         ),
                     ]
