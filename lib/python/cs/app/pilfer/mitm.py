@@ -771,6 +771,12 @@ class MITMAddon:
       # `.content` to access.
       #
       assert hook_name == 'responseheaders'
+      # Streaming may change the size of the content, drop the Content-Length header;
+      # wget at least is confused if it's longer than the content.
+      try:
+        del flow.response.headers['content-length']
+      except KeyError:
+        pass
       if self.hook_map['response']:
         # We have hooks for the response, so add a stream handler to
         # collate the final stream into a raw_content bytes instance.
