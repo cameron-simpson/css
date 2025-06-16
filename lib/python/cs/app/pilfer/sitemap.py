@@ -99,7 +99,6 @@ class URLMatcher(Promotable):
 
 class FlowState(NS, Promotable):
 
-  ##@trace
   @promote
   def __init__(self, url: URL, **ns_kw):
     ''' Initialise `self` from the keyword parameters.
@@ -354,6 +353,7 @@ class SiteMap(Promotable):
               )
           else:
             # filename glob on the URL host
+            # this indirection is to avoid the lambda pattern binding to the closure
             condition = (
                 lambda pattern: (
                     lambda flowstate:
@@ -454,8 +454,8 @@ class SiteMap(Promotable):
                     if value != test_value:
                       break
           else:
-            # no test failed
-        yield method, matched
+            # no test failed, this is a match
+            yield method, matched
 
   @pfx_method
   @promote
