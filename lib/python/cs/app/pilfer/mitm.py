@@ -797,7 +797,7 @@ class MITMAddon:
         pass
       if self.hook_map['response']:
         # We have hooks for the response, so add a stream handler to
-        # collate the final stream into a raw_content bytes instance.
+        # collate the final stream into a raw content bytes instance.
         content_bss = []
 
         def content_stream(bs: bytes) -> bytes:
