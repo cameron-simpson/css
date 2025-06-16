@@ -10,12 +10,8 @@ from getopt import GetoptError
 from pprint import pformat
 import sys
 from typing import Iterable
-try:
-  import xml.etree.cElementTree as ElementTree
-except ImportError:
-  pass
 
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import NavigableString
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
@@ -34,9 +30,6 @@ from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
-from cs.resources import uses_runstate
-from cs.sqltags import SQLTags
-from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
@@ -133,8 +126,7 @@ class PilferCommand(BaseCommand):
     )
 
   @contextmanager
-  @uses_runstate
-  def run_context(self, *, runstate):
+  def run_context(self):
     ''' Apply the `options.runstate` to the main `Pilfer`.
     '''
     options = self.options
@@ -605,7 +597,7 @@ class PilferCommand(BaseCommand):
         table.extend((
             ("URL:", url),
             ("  key:", sitemap.url_key(url)),
-        ),)
+        ))
     printt(*table)
 
 sys.exit(main(sys.argv))
