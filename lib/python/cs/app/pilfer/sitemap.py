@@ -458,6 +458,53 @@ class SiteMap(Promotable):
         yield method, matched
 
   @pfx_method
+  @promote
+  def run_matches(
+      self,
+      flowstate: FlowState,
+      flowattr: Optional[str] = None,
+      methodglob: Optional[str] = None,
+      **match_kw,
+  ):
+    ''' Run all the methods in this `SiteMap` whose `.on_conditions`
+        match `flowstate` and ``match_kw`, as matched by `SiteMap.on_matches`.
+
+        Parameters:
+        * `flowstate`: the `FlowState` on which to match
+        * `flowattr`: an optional attribute name of the `flowstate`
+        * `methodglob`: an optional filename glob constraining the chosen method names
+        * `match_kw`: the `on_match` keyword arguments which must match
+
+        Each `method` is called as `method(self,flowstate,match_tags)`
+        where `method` and `match_tags` were yielded from
+        `on_matches(flowstate,**match_kw)`.
+
+        If `flowattr` is not `None`, `getattr(flowstate,flowattr)`
+        is passed as an additional positional parameter and if the
+        method result is not `None` then the result is set as an
+        updated value on `flowstate`.
+    '''
+    for method, match_tags in self.on_matches(flowstate, **match_kw):
+      if methodglob is not None and not fnmatch(method.__name__, methodglob):
+        continue
+      with Pfx("call %s", method.__qualname__):
+        try:
+          if flowattr is None:
+            result = method(self, flowstate, match_tags)
+          else:
+            attrvalue = pfx_call(getattr, flowstate, flowattr)
+            result = method(self, flowstate, match_tags, attrvalue)
+        except Exception as e:
+          warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
+        else:
+          if attrvalue is None:
+            if result is not None:
+              warning("discarding returned value: %s", r(result))
+          else:
+            if result is not None:
+              pfx_call(setattr, flowstate, flowattr, result)
+
+  @pfx_method
   @uses_pilfer
   @promote
   def grok(self, flowstate: FlowState, P: "Pilfer"):
