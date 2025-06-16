@@ -690,6 +690,16 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       return sitemap
     return None
 
+  @promote
+  @typechecked
+  def run_matches(self, flowstate: FlowState, *rm_a, **rm_kw):
+    ''' Call `SiteMap.run_matches(flowstate,*rm_a,**rm_kw)`
+        for each `SiteMap` from `self.sitemaps_for(flowstate.url)`.
+        Arguments are as for `SiteMap.run_matches`.
+    '''
+    for sitemap in self.sitemaps_for(flowstate.url):
+      pfx_call(sitemap.run_matches, flowstate, *rm_a, **rm_kw)
+
   @pfx_method
   @promote
   def grok(self, url: URL):
