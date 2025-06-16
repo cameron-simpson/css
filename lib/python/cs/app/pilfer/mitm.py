@@ -592,9 +592,11 @@ class MITMHookAction(Promotable):
     '''
     name, args, kwargs, offset = get_name_and_args(hook_spec)
     if not name:
-      raise ValueError(f'expected dotted identifier: {hook_spec!r}')
+      raise ValueError(f'expected dotted identifier: {hook_spec=}')
     if offset < len(hook_spec):
-      raise ValueError(f'unparsed text after params: {hook_spec[offset:]!r}')
+      raise ValueError(
+          f'unparsed text after params: {hook_spec[offset:]!r} in {hook_spec=}'
+      )
     try:
       action = cls.HOOK_SPEC_MAP[name]
     except KeyError as e:
@@ -604,6 +606,8 @@ class MITMHookAction(Promotable):
     return cls(action=action, args=args, kwargs=kwargs)
 
   def __call__(self, *a, **kw):
+    ''' Calling a hook action calls its action with the supplied arguments.
+    '''
     return self.action(*self.args, *a, **self.kwargs, **kw)
     return pfx_call(self.action, *self.args, *a, **self.kwargs, **kw)
 
@@ -617,7 +621,7 @@ class MITMHookAction(Promotable):
 
 class MITMAddon:
   ''' A mitmproxy addon class which collects multiple actions per
-      hook and calls them all in order.
+      hook and calls each in order.
   '''
 
   def __init__(self):
@@ -795,7 +799,10 @@ class MITMAddon:
 
         def stream(bs: bytes) -> Iterable[bytes]:
           ''' Run each `bytes` instance through all the stream functions.
+              Return an iterable of `bytes` emenating from the final function.
           '''
+          # TODO: we really need to think a bit harder about EOF
+          # or exception from a stage.
           stream_excs = []
           bss = [bs]
           for stream_func in stream_funcs:
