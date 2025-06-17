@@ -525,43 +525,25 @@ class SiteMap(Promotable):
           else:
             if result is not None:
               pfx_call(setattr, flowstate, flowattr, result)
-
-  @pfx_method
-  @uses_pilfer
-  @promote
-  def grok(self, flowstate: FlowState, P: "Pilfer"):
-    ''' Grok the fullness of this `flowstate`, deriving information.
-        Usually this involves consulting the URL contents.
-
-        The calls each method matching `flowstate` with the `flowstate`
-        and match tags, and returns a list of `(method,match_tags,grokked)`
-        3-tuples being:
-        - a reference to the fired grok method
-        - the match `TagSet` derived from matching that method
-        - the result of calling the method, often a `TagSet`
-        Exceptions are gathered and, if any, an `ExceptionGroup` is raised
-        (unless there's just one, it which case it is raised directly).
           yield method, match_tags, result
 
-        Each matching method is called as `method(self:SiteMap,flowstate,match_tags)`.
-        Its return is the `grokked` result, often a `TagSet`.
+  @trace
+  @pfx_method
+  @promote
+  def grok(
+      self,
+      flowstate: FlowState,
+      flowattr: Optional[str] = None,
+      **run_match_kw,
+  ) -> Iterable[Tuple[Callable, TagSet, Any]]:
+    ''' A generator to grok the fullness of this `flowstate`, deriving information.
+        Usually this involves consulting the URL contents.
+        This is a shim for `SiteMap.run_matches` calling any matching
+        methods named `grok_*`.
+        Yield `(method,match_tags,result)` 3-tuples from each method called.
+        Usually the `result` is a `TagSet`.
     '''
-    results = []
-    excs = []
-    for method, match_tags in self.on_matches(flowstate):
-      try:
-        grokked = method(self, flowstate, match_tags)
-      except Exception as e:
-        warning(f'failed call to {method=}: {e}')
-        excs.append(e)
-      else:
-        results.append((method, match_tags, grokked))
-    if excs:
-      if len(excs) == 1:
-        raise excs[0]
-      else:
-        raise ExceptionGroup(f'exceptions grokking {flowstate=}', excs)
-    return results
+    yield from self.run_matches(flowstate, flowattr, 'grok_*', **run_match_kw)
 
   def matches(
       self,
