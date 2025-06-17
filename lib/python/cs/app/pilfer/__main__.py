@@ -309,6 +309,21 @@ class PilferCommand(BaseCommand):
             )
         )
       printt(*table)
+    table = []
+    for i, (method, match_tags,
+            grokked) in enumerate(self.options.pilfer.grok(state)):
+      if i == 0:
+        table.append(['Grokked:'])
+      table.append(
+          (
+              f'  {method.__qualname__}',
+              "\n".join(map(str, sorted(match_tags)))
+          )
+      )
+      if grokked is not None:
+        for k, v in grokked.items():
+          table.append((f'    {k}', v))
+    printt(*table)
     if soup is not None and self.options.soup:
       print("Content:", state.content_type)
       table = []
