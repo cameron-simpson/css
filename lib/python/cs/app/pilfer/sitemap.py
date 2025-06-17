@@ -150,7 +150,8 @@ class FlowState(NS, Promotable):
 
   @cached_property
   def url(self) -> URL:
-    X("%s: .url()...", self)
+    ''' The URL, obtained from `self.response.url` if missing.
+    '''
     return URL(self.response.url)
 
   @uses_pilfer
