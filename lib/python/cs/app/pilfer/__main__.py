@@ -239,7 +239,7 @@ class PilferCommand(BaseCommand):
             )
         )
 
-  @popopts
+  @popopts(soup='Dump the page soup, normally omitted.')
   def cmd_dump(self, argv):
     ''' Usage: {cmd} URL
           Fetch URL and dump information from it.
@@ -309,42 +309,45 @@ class PilferCommand(BaseCommand):
             )
         )
       printt(*table)
-      print("Content:", state.content_type)
-      table = []
-      q = ListQueue([('', soup.head), ('', soup.body)])
-      for indent, tag in q:
-        subindent = indent + '  '
-        # TODO: looks like commants are also NavigableStrings, intercept here
-        if isinstance(tag, NavigableString):
-          text = str(tag).strip()
-          if text:
-            table.append(('', text))
-          continue
-        # sorted copy of the attributes
-        attrs = dict(sorted(tag.attrs.items()))
-        label = tag.name
-        # pop off the id attribute if present, include in the label
-        try:
-          id_attr = attrs.pop('id')
-        except KeyError:
-          pass
-        else:
-          label += f' #{id_attr}'
-        children = list(tag.children)
-        if not attrs and len(children) == 1 and isinstance(children[0],
-                                                           NavigableString):
-          desc = str(children[0].strip())
-        else:
-          desc = "\n".join(
-              f'{attr}={value!r}' for attr, value in attrs.items()
-          ) if attrs else ''
-          for index, subtag in enumerate(children):
-            q.insert(index, (subindent, subtag))
-        table.append((
-            f'{indent}{label}',
-            desc,
-        ))
-      printt(*table)
+      if self.options.soup:
+        print("Content:", state.content_type)
+        table = []
+        q = ListQueue([('', soup.head), ('', soup.body)])
+        for indent, tag in q:
+          subindent = indent + '  '
+          # TODO: looks like commants are also NavigableStrings, intercept here
+          if isinstance(tag, NavigableString):
+            text = str(tag).strip()
+            if text:
+              table.append(('', text))
+            continue
+          if tag.name == 'script':
+            continue
+          # sorted copy of the attributes
+          attrs = dict(sorted(tag.attrs.items()))
+          label = tag.name
+          # pop off the id attribute if present, include in the label
+          try:
+            id_attr = attrs.pop('id')
+          except KeyError:
+            pass
+          else:
+            label += f' #{id_attr}'
+          children = list(tag.children)
+          if not attrs and len(children) == 1 and isinstance(children[0],
+                                                             NavigableString):
+            desc = str(children[0].strip())
+          else:
+            desc = "\n".join(
+                f'{attr}={value!r}' for attr, value in attrs.items()
+            ) if attrs else ''
+            for index, subtag in enumerate(children):
+              q.insert(index, (subindent, subtag))
+          table.append((
+              f'{indent}{label}',
+              desc,
+          ))
+        printt(*table)
 
   @popopts
   def cmd_from(self, argv):
