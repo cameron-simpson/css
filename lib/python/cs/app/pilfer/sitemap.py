@@ -9,7 +9,7 @@ from fnmatch import fnmatch
 from functools import cached_property
 import re
 from types import SimpleNamespace as NS
-from typing import Callable, Iterable, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
 
 from cs.binary import bs
 from cs.deco import decorator, promote, Promotable
@@ -471,9 +471,8 @@ class SiteMap(Promotable):
                   if callable(value):
                     if not value(flowstate):
                       break
-                  else:
-                    if value != test_value:
-                      break
+                  elif value != test_value:
+                    break
           else:
             # no test failed, this is a match
             yield method, matched
@@ -522,9 +521,8 @@ class SiteMap(Promotable):
           if flowattr is None:
             if result is not None:
               warning("discarding returned value: %s", r(result))
-          else:
-            if result is not None:
-              pfx_call(setattr, flowstate, flowattr, result)
+          elif result is not None:
+            pfx_call(setattr, flowstate, flowattr, result)
           yield method, match_tags, result
 
   @trace
