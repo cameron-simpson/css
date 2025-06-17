@@ -486,9 +486,10 @@ class SiteMap(Promotable):
       flowattr: Optional[str] = None,
       methodglob: Optional[str] = None,
       **match_kw,
-  ):
+  ) -> Iterable[Tuple[Callable, TagSet, Any]]:
     ''' Run all the methods in this `SiteMap` whose `.on_conditions`
         match `flowstate` and ``match_kw`, as matched by `SiteMap.on_matches`.
+        Yield `(method,match_tags,result)` 3-tuples from each method called.
 
         Parameters:
         * `flowstate`: the `FlowState` on which to match
@@ -518,7 +519,7 @@ class SiteMap(Promotable):
         except Exception as e:
           warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
         else:
-          if attrvalue is None:
+          if flowattr is None:
             if result is not None:
               warning("discarding returned value: %s", r(result))
           else:
@@ -540,6 +541,7 @@ class SiteMap(Promotable):
         - the result of calling the method, often a `TagSet`
         Exceptions are gathered and, if any, an `ExceptionGroup` is raised
         (unless there's just one, it which case it is raised directly).
+          yield method, match_tags, result
 
         Each matching method is called as `method(self:SiteMap,flowstate,match_tags)`.
         Its return is the `grokked` result, often a `TagSet`.
