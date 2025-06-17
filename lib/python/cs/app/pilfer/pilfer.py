@@ -688,13 +688,21 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
   @promote
   @typechecked
-  def run_matches(self, flowstate: FlowState, *rm_a, **rm_kw):
-    ''' Call `SiteMap.run_matches(flowstate,*rm_a,**rm_kw)`
+  def run_matches(
+      self,
+      flowstate: FlowState,
+      *run_match_a,
+      **run_match_kw,
+  ) -> Iterable[Tuple[Callable, TagSet, Any]]:
+    ''' A generator to call `SiteMap.run_matches(flowstate,*run_match_a,**run_match_kw)`
         for each `SiteMap` from `self.sitemaps_for(flowstate.url)`.
         Arguments are as for `SiteMap.run_matches`.
+        Yield `(method,match_tags,result)` 3-tuples from each method called.
     '''
     for sitemap in self.sitemaps_for(flowstate.url):
-      pfx_call(sitemap.run_matches, flowstate, *rm_a, **rm_kw)
+      yield from pfx_call(
+          sitemap.run_matches, flowstate, *run_match_a, **run_match_kw
+      )
 
   @pfx_method
   @promote
