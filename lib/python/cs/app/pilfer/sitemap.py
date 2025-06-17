@@ -524,10 +524,7 @@ class SiteMap(Promotable):
         except Exception as e:
           warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
         else:
-          if flowattr is None:
-            if result is not None:
-              warning("discarding returned value: %s", r(result))
-          elif result is not None:
+          if flowattr is not None and result is not None:
             pfx_call(setattr, flowstate, flowattr, result)
           yield method, match_tags, result
 
