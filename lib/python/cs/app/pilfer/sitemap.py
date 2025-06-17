@@ -257,17 +257,40 @@ class SiteMapPatternMatch(namedtuple(
 
 @dataclass
 class SiteMap(Promotable):
-  ''' A base class for site maps.
+  ''' A base dataclass for site maps.
+
+      A `SiteMap` embodies domain specific knowledge about a
+      particular website, or collection of websites.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
       clause in the configuration file, see the `Pilfer.sitemaps`
       property for specifics.
 
-      Example:
+      A pilferrc configuration example:
 
+          [sitemaps]
           docs.python.org = docs:cs.app.pilfer.sitemap:DocSite
           docs.mitmproxy.org = docs
           *.readthedocs.io = docs
+
+      This says that websites whose domain matches `docs.python.org`,
+      `docs.mitmproxy.org` or the filename glob `*readthedocs.io`
+      are associated with the `SiteMap` referred to as `docs` whose
+      definition comes from the `DocSite` class from the module
+      `cs.app.pilfer.sitemap`. The `DocSite` class will be a subclass
+      of this `SiteMap` class.
+
+      `SiteMap`s have a few class attributes:
+      * `URL_KEY_PATTERNS`: this is a list of `(match,keyformat)`
+        2-tuples specifying cache keys for caching URL contents; the
+        `pilfer mitm ... cache` filter consults these to decide what
+        URLs to cache.
+        See the `SiteMap.url_key` method.
+      * `PREFETCH_PATTERNS`: this is a list of `(match,keyformat)`
+        2-tuples specifying prefetch URLs for a URL's contents; the
+        `pilfer mitm ... prefetch` filter consults these to decide what
+        URLs to queue for prefetching.
+        See the `SiteMap.content_prefetch` method.
   '''
 
   name: str
@@ -508,8 +531,12 @@ class SiteMap(Promotable):
   @uses_pilfer
   @promote
   def grok(self, flowstate: FlowState, P: "Pilfer"):
-    ''' Call each method matching `flowstate` with the `flowstate`.
-        Return a list of `(method,match_tags,grokked)` 3-tuples being:
+    ''' Grok the fullness of this `flowstate`, deriving information.
+        Usually this involves consulting the URL contents.
+
+        The calls each method matching `flowstate` with the `flowstate`
+        and match tags, and returns a list of `(method,match_tags,grokked)`
+        3-tuples being:
         - a reference to the fired grok method
         - the match `TagSet` derived from matching that method
         - the result of calling the method, often a `TagSet`
