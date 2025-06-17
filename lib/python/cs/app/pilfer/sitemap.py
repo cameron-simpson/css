@@ -586,22 +586,21 @@ class SiteMap(Promotable):
     for match_to, arg in patterns:
       matcher = URLMatcher.promote(match_to)
       if (match := matcher.match(url, extra=extra)) is not None:
-        mapping = dict(
-            (
-                (attr, getattr(url, attr)) for attr in (
-                    'basename',
-                    'cleanpath',
-                    'cleanrpath',
-                    'dirname',
-                    'domain',
-                    'hostname',
-                    'netloc',
-                    'path',
-                    'port',
-                    'scheme',
-                )
+        mapping = {
+            attr: getattr(url, attr)
+            for attr in (
+                'basename',
+                'cleanpath',
+                'cleanrpath',
+                'dirname',
+                'domain',
+                'hostname',
+                'netloc',
+                'path',
+                'port',
+                'scheme',
             )
-        )
+        }
         # set _ to the url.path, __ to histname/path
         mapping.update(
             _=url.cleanrpath,
