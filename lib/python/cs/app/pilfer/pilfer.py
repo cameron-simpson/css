@@ -50,6 +50,7 @@ from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
 from cs.sqltags import SQLTags
+from cs.tagset import TagSet
 from cs.threads import locked, HasThreadState, ThreadState
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
@@ -470,10 +471,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     ''' Return a header name in normalised form for use _in a request_.
     '''
     return '-'.join(
-
-            word.title()
-            for word in header_name.lower().replace('_', '-').split('-')
-
+        word.title()
+        for word in header_name.lower().replace('_', '-').split('-')
     )
 
   def headers(self):
