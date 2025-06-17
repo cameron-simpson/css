@@ -438,24 +438,22 @@ class SiteMap(Promotable):
               try:
                 # a 2-tuple of name and value/value_test()?
                 test_name, test_value = condition
-              except ValueError:
-                # should be a callable to test against the flowstate
-                for test in condition:
-                  with Pfx("on_matches: test %r vs %s", method_name, test):
-                    try:
-                      test_result = test(flowstate)
-                    except Exception as e:
-                      warning("exception in test: %s", e)
-                      raise
-                    # test ran, examine result
-                    if test_result is None or test_result is False:
-                      # failure
-                      break
-                    # success
-                    if test_result is not True:
-                      # should be a mapping, update the matched TagSet
-                      for k, v in test_result.items():
-                        matched[k] = v
+              except (TypeError, ValueError):
+                with Pfx("on_matches: test %r vs %s", method_name, condition):
+                  try:
+                    test_result = condition(flowstate)
+                  except Exception as e:
+                    warning("exception in condition: %s", e)
+                    raise
+                  # test ran, examine result
+                  if test_result is None or test_result is False:
+                    # failure
+                    break
+                  # success
+                  if test_result is not True:
+                    # should be a mapping, update the matched TagSet
+                    for k, v in test_result.items():
+                      matched[k] = v
               else:
                 # a 2-tuple of name and value/value_test()?
                 try:
