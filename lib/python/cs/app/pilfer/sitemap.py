@@ -210,7 +210,7 @@ class FlowState(NS, Promotable):
     meta_http_equiv = TagSet()
     soup = self.soup
     if soup is not None:
-      for tag in soup.head:
+      for tag in soup.head.descendants:
         if isinstance(tag, str):
           if tag.strip(): warning("SKIP HEAD tag %r", tag)
           continue
@@ -219,8 +219,13 @@ class FlowState(NS, Promotable):
         if tag_name := tag.get('name'):
           meta_tags[tag_name] = tag['content']
         if prop_name := tag.get('property'):
-          # TODO: array properties
-          meta_properties[prop_name] = tag['content']
+          current = meta_properties.get(prop_name)
+          if current is None:
+            meta_properties[prop_name] = tag['content']
+          elif isinstance(current, list):
+            meta_properties[prop_name].append(tag['content'])
+          else:
+            meta_properties[prop_name] = [current, tag['content']]
         if http_equiv := tag.get('http-equiv'):
           meta_http_equiv[http_equiv] = tag['content']
     return NS(
