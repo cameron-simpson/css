@@ -173,9 +173,9 @@ class FlowState(NS, Promotable):
   @cached_property
   def content_type(self) -> str:
     ''' The base `Content-Type`, eg `'text/html'`.
-        Does a `HEAD` of the URL if there is no `self.response`.
     '''
-    return self.url.content_type
+    return self.response.headers.get('content-type',
+                                     '').split(';')[0].strip() or None
 
   @cached_property
   @uses_pilfer
