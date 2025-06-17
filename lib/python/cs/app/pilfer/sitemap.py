@@ -714,6 +714,33 @@ class SiteMap(Promotable):
               case _:
                 warning("unhandled prefetch arg")
 
+  @uses_pilfer
+  def update_tagset_from_meta(
+      self,
+      te: str | TagSet,
+      flowstate: FlowState,
+      *,
+      P: "Pilfer",
+      **update_kw,
+  ):
+    ''' Update a `TagSet` from `flowstate.meta`.
+        Return the `TagSet`.
+
+        If `te` is a string, obtain the `TagSet` from `P.sqltags[te]`,
+        thus the need to return the `TagSet`.
+
+        This sets the `TagSet`'s `.properties` to
+        `flowstate.meta.properties` and the `.meta` to
+        `flowstate.meta.tags`.
+    '''
+    # promote a tagset name to an SQLTagSet from P.sqltags
+    if isinstance(te, str):
+      te = P.sqltags[te]
+    te.meta = flowstate.meta.tags
+    te.properties = flowstate.meta.properties
+    te.update(**update_kw)
+    return te
+
 # expose the @on decorator globally
 on = SiteMap.on
 
