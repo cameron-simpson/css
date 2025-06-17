@@ -548,7 +548,9 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
     content_bs = b''.join(bss)
     # TODO: consult the content_type full for charset
     flowstate.content = content_bs.decode('utf-8')
-    P.run_matches(flowstate, 'soup', 'patch*soup')
+    # update the flowstate.soup
+    for _ in P.run_matches(flowstate, 'soup', 'patch*soup'):
+      pass
     # TODO: consult the content_type full for charset
     yield str(flowstate.soup).encode('utf-8')
 
