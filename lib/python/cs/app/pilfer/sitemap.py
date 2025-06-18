@@ -221,16 +221,26 @@ class FlowState(NS, Promotable):
           continue
         if tag.name != 'meta':
           continue
+        tag_content = tag.get('content')
+        if not tag_content:
+          continue
         if tag_name := tag.get('name'):
-          meta_tags[tag_name] = tag['content']
+          meta_tags[tag_name] = tag_content
         if prop_name := tag.get('property'):
+          try:
+            tag_content = datetime.fromisoformat(tag_content)
+          except ValueError:
+            try:
+              tag_content = int(tag_content)
+            except ValueError:
+              pass
           current = meta_properties.get(prop_name)
           if current is None:
-            meta_properties[prop_name] = tag['content']
+            meta_properties[prop_name] = tag_content
           elif isinstance(current, list):
-            meta_properties[prop_name].append(tag['content'])
+            meta_properties[prop_name].append(tag_content)
           else:
-            meta_properties[prop_name] = [current, tag['content']]
+            meta_properties[prop_name] = [current, tag_content]
         if http_equiv := tag.get('http-equiv'):
           meta_http_equiv[http_equiv] = tag['content']
     return NS(
