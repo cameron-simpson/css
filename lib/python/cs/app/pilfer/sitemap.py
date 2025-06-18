@@ -155,11 +155,16 @@ class FlowState(NS, Promotable):
     return URL(self.response.url)
 
   @uses_pilfer
-  def GET(self, P: "Pilfer", **get_kw) -> requests.Response:
-    ''' Do a `GET` of `self.url` via the ambient `Pilfer`, return the `requests.Response`.
+  def GET(self, P: "Pilfer", **rq_kw) -> requests.Response:
+    ''' Do a `PilferGET` of `self.url` return the `requests.Response`.
         This also updates `self.request` and `self.response`.
     '''
-    rsp = self.response = P.GET(self.url, **get_kw)
+    rsp = self.response = P.GET(self.url, **rq_kw)
+    # forget any derived cache values
+    try:
+      del self.soup
+    except AttributeError:
+      pass
     self.request = rsp.request
     return rsp
 
