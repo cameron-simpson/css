@@ -217,7 +217,7 @@ class FlowState(NS, Promotable):
     if soup is not None:
       for tag in soup.head.descendants:
         if isinstance(tag, str):
-          if tag.strip(): warning("SKIP HEAD tag %r", tag)
+          if tag.strip(): warning("SKIP HEAD tag %r", tag[:40])
           continue
         if tag.name != 'meta':
           continue
