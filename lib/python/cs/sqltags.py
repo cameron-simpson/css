@@ -1461,6 +1461,8 @@ class SQLTagSet(SingletonMixin, TagSet):
       return None
     if isinstance(value, (int, str, float)):
       return value
+    if isinstance(value, datetime):
+      return value.isoformat()
     # mapping?
     if (isinstance(value, Mapping)
         or hasattr(value, 'items') and callable(value.items)):
