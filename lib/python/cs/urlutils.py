@@ -207,7 +207,10 @@ class URL(HasThreadState, Promotable):
   def content_type_full(self):
     ''' The URL content MIME type from the `Content-Type` header.
     '''
-    return self.headers['content-type']
+    try:
+      return self.headers['content-type']
+    except KeyError as e:
+      warning("%s.content_type_full", self)
 
   @cached_property
   @unattributable
