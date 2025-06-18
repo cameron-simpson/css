@@ -216,7 +216,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import withall
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable
+from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable, uses_verbose
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
@@ -887,8 +887,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
     '''
     super().__setitem__(tag_name, value)
 
+  @uses_verbose
   @tag_or_tag_value
-  def set(self, tag_name, value, *, verbose=None):
+  def set(self, tag_name, value, *, verbose: bool):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
     '''
@@ -899,11 +900,16 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
         if old_value is not value and old_value != value:
           # report different values
           tag = Tag(tag_name, value, ontology=self.ontology)
-          msg = (
-              "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
-              (tag, old_value)
-          )
-          ifverbose(verbose, msg)
+          if verbose:
+            try:
+              tag_s = str(tag)
+            except TypeError:
+              tag_s = repr(tag)
+            msg = (
+                f'+ {tag_s}'
+                if old_value is None else f'+ {tag_s} (was {old_value!r})'
+            )
+            ifverbose(verbose, msg)
     self._set(tag_name, value)
 
   # "set" mode
