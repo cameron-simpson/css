@@ -30,6 +30,7 @@ from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
+from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
@@ -322,7 +323,7 @@ class PilferCommand(BaseCommand):
       )
       if grokked is not None:
         for k, v in grokked.items():
-          table.append((f'    {k}', v))
+          table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
     printt(*table)
     if soup is not None and self.options.soup:
       print("Content:", state.content_type)
