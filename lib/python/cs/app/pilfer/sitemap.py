@@ -182,7 +182,7 @@ class FlowState(NS, Promotable):
     return self.response.headers.get('content-type',
                                      '').split(';')[0].strip() or None
 
-  @cached_property
+  @property
   @uses_pilfer
   def content(self, *, P: "Pilfer") -> str:
     ''' The text content of the URL.
@@ -191,8 +191,8 @@ class FlowState(NS, Promotable):
     rsp = self.response
     content = rsp and rsp.content
     if content is None:
-      content = P.GET(self.url).content
-    return content
+      self.GET()
+    return self.response.content
 
   @cached_property
   def soup(self):
