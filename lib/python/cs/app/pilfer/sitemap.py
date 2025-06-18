@@ -763,6 +763,31 @@ class SiteMap(Promotable):
     '''
     return None
 
+  @on
+  @promote
+  def grok_default(
+      self,
+      flowstate: FlowState,
+      match_tags: Optional[Mapping[str, Any]] = None,
+  ) -> TagSet:
+    ''' A default low level grok function
+        which stores a page's meta tags and properties
+        on the page's primary entity.
+        Returns the entity, a `TagSet`.
+    '''
+    te_key = self.entity_key(flowstate, **(match_tags or {}))
+    if te_key is None:
+      # just return the metadata
+      return TagSet(
+          meta=flowstate.meta.tags,
+          properties=flowstate.meta.properties,
+      )
+    te = self.update_tagset_from_meta(
+        te_key,
+        flowstate,
+    )
+    return te
+
 # expose the @on decorator globally
 on = SiteMap.on
 
