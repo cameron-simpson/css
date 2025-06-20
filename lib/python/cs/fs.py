@@ -720,7 +720,7 @@ def remove_protecting(rmpath, safepath):
     tfd, temppath = pfx_call(
         mkstemp,
         dir=dirname(safepath),
-        prefix=f'.safelink--{basename(safepath)}--',
+        prefix=f'.safelink--{basename(safepath)[:80]}--',
     )
     os.close(tfd)
     pfx_call(os.remove, temppath)

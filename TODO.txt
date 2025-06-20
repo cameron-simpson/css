@@ -1,3 +1,4 @@
+stack_dump does not work given an exception
 pydoc: short summary of methods for classes, like we do for the module as a whole
 cs.units: decompose to return a Decomposed with a nice __str__
 printt: output formats - csv, html, md1 does this even make sense?

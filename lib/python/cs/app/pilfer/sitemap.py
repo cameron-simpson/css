@@ -544,7 +544,6 @@ class SiteMap(Promotable):
             pfx_call(setattr, flowstate, flowattr, result)
           yield method, match_tags, result
 
-  @trace
   @pfx_method
   @promote
   def grok(

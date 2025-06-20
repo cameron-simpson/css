@@ -155,7 +155,8 @@ class PilferCommand(BaseCommand):
               later=later,
               pilfer=pilfer,
               sqltags=pilfer.sqltags,
-              db_url=pilfer.sqltags.db_url,
+              # TODO: this feels clumsy
+              db_url=pilfer.sqltags and pilfer.sqltags.db_url,
           ):
             if self.options.load_cookies:
               pilfer.load_browser_cookies(pilfer.session.cookies)

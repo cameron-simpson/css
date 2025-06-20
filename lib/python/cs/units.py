@@ -33,7 +33,7 @@ DISTINFO = {
     'install_requires': ['cs.deco', 'cs.lex'],
 }
 
-@dataclass(slots=True)
+@dataclass  ## newer than some pythons I use ## (slots=True)
 class UnitStep:
   ''' A scale step for a unit scale.
       The last `UnitStep` in a scale should have `factor=0`.
