@@ -44,7 +44,7 @@ from cs.deco import promote, Promotable
 from cs.excutils import unattributable
 from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.rfc2616 import datetime_from_http_date
 from cs.seq import skip_map
 from cs.threads import locked, ThreadState, HasThreadState
@@ -201,12 +201,24 @@ class URL(HasThreadState, Promotable):
     r = self.HEAD_response
     return r.headers
 
-  @property
+  # TODO: use functions from cs.rfc2616? they do return an email.BaseHeader :-(
+  @cached_property
+  @unattributable
+  def content_type_full(self):
+    ''' The URL content MIME type from the `Content-Type` header.
+    '''
+    try:
+      return self.headers['content-type']
+    except KeyError as e:
+      warning("%s.content_type_full", self)
+
+  @cached_property
   @unattributable
   def content_type(self):
-    ''' The URL content MIME type.
+    ''' The base URL content MIME type from the `Content-Type` header.
+        Example: `'text/html'`
     '''
-    return self.headers['content-type']
+    return self.content_type_full.split(';')[0].strip().lower()
 
   @property
   @unattributable
@@ -258,13 +270,11 @@ class URL(HasThreadState, Promotable):
   def soup(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    text = self.text
     if self.content_type == 'text/html':
       parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
     else:
       parser_names = ('lxml', 'xml')
-    ##soup = BeautifulSoup(text, 'html5lib')
-    soup = pfx_call(BeautifulSoup, text, list(parser_names))
+    soup = pfx_call(BeautifulSoup, self.text, list(parser_names))
     return soup
 
   def feedparsed(self):

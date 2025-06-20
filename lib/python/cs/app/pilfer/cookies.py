@@ -31,7 +31,9 @@ def morsel(name: str, value: Any, **morsel_kw) -> Morsel:
   morsel = cookies[name]
   for k, v in morsel_kw.items():
     morsel[k] = v
-  morsel['max-age'] = morsel['expires'] - time.time()
+  expires = morsel.get('expires')
+  if expires:
+    morsel['max-age'] = expires - time.time()
   return morsel
 
 class FirefoxCookie(namedtuple('FirefoxCookie', FIREFOX_COOKIE_SQL_COLUMNS)):
@@ -50,6 +52,20 @@ class FirefoxCookie(namedtuple('FirefoxCookie', FIREFOX_COOKIE_SQL_COLUMNS)):
         httponly=self.isHttpOnly,
         path=self.path,
         samesite=self.sameSite,
+        secure=self.isSecure,
+    )
+
+  def add_to_jar(self, jar):
+    ''' Add this cookie to a `CookieJar`.
+    '''
+    jar.set(
+        self.name,
+        self.value,
+        domain=self.host,
+        expires=self.expiry,
+        ##httponly=self.isHttpOnly,
+        path=self.path,
+        ##samesite=self.sameSite,
         secure=self.isSecure,
     )
 

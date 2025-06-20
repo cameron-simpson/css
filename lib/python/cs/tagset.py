@@ -216,7 +216,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import withall
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable
+from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable, uses_verbose
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
@@ -383,7 +383,7 @@ def jsonable(obj, converted: dict):
   if t in (int, float, str, bool):
     # return unchanged - no need to record the convobj
     return obj
-  # see if the objects has a for_json() method
+  # see if the object has a for_json() method
   try:
     for_json = obj.for_json
   except AttributeError:
@@ -410,7 +410,7 @@ def jsonable(obj, converted: dict):
     else:
       if it is obj:
         raise TypeError(
-            f'jsoanble({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
+            f'jsonable({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
         )
       # convert to list
       converted[id(obj)] = convobj = []
@@ -654,7 +654,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
     ''' Support access to dotted name attributes.
 
         The following attribute accesses are supported:
-        - an attrbute from a superclass
+        - an attribute from a superclass
         - a `Tag` whose name is `attr`; return its value
         - the value of `self.auto_infer(attr)` if that does not raise `ValueError`
         - if `self.ontology`, try {type}_{field} and {type}_{field}s
@@ -794,7 +794,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
 
         The `__init__` methods of subclasses should do something like this
         (from `TagSet.__init__`)
-        to set up the ordinary instance attributes
+        to set up additional ordinary instance attributes
         which are not to be treated as `Tag`s:
 
             self.__dict__.update(id=_id, ontology=_ontology, modified=False)
@@ -887,8 +887,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
     '''
     super().__setitem__(tag_name, value)
 
+  @uses_verbose
   @tag_or_tag_value
-  def set(self, tag_name, value, *, verbose=None):
+  def set(self, tag_name, value, *, verbose: bool):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
     '''
@@ -899,11 +900,16 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
         if old_value is not value and old_value != value:
           # report different values
           tag = Tag(tag_name, value, ontology=self.ontology)
-          msg = (
-              "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
-              (tag, old_value)
-          )
-          ifverbose(verbose, msg)
+          if verbose:
+            try:
+              tag_s = str(tag)
+            except TypeError:
+              tag_s = repr(tag)
+            msg = (
+                f'+ {tag_s}'
+                if old_value is None else f'+ {tag_s} (was {old_value!r})'
+            )
+            ifverbose(verbose, msg)
     self._set(tag_name, value)
 
   # "set" mode
@@ -1562,7 +1568,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       if isinstance(value, type_):
         value_s = to_str(value)
         # should be nonwhitespace
-        if get_nonwhite(value_s)[0] != value_s:
+        leading_nonwhite, _ = get_nonwhite(value_s)
+        if leading_nonwhite != value_s:
           raise ValueError(
               "to_str(%r) => %r: contains whitespace" % (value, value_s)
           )
@@ -1846,7 +1853,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return ont.basetype(self.name)
 
   @format_attribute
-  def metadata(self, *, ontology=None, convert=None):
+  def metadata(self, *, ontology=None, convert=None) -> "TagSet":
     ''' Fetch the metadata information about this specific tag value,
         derived through the `ontology` from the tag name and value.
         The default `ontology` is `self.ontology`.
@@ -1864,7 +1871,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return ont.metadata(self, convert=convert)
 
   @property
-  def meta(self):
+  def meta(self) -> "TagSet":
     ''' Shortcut property for the metadata `TagSet`.
     '''
     return self.metadata()
@@ -2785,11 +2792,24 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       This requires type information about a `role`.
       Here are some type definitions supporting the above metadata:
 
-          type.person type=str description="A person."
-          type.actor type=person description="An actor's stage name."
-          type.character type=str description="A person in a story."
-          type.role type_name=character description="A character role in a performance."
-          type.cast type=dict key_type=actor member_type=role description="Cast members and their roles."
+          type.person
+            type=str
+            description="A person."
+          type.actor
+            type=person
+            description="An actor's stage name."
+          type.character
+            type=str
+            description="A person in a story."
+          type.role
+            type_name=character
+            description="A character role in a performance."
+
+          type.cast
+            type=dict
+            key_type=actor
+            member_type=role
+            description="Cast members and their roles."
 
       The basic types have their Python names: `int`, `float`, `str`, `list`,
       `dict`, `date`, `datetime`.
@@ -2813,7 +2833,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       Accessing type data and metadata:
 
       A `TagSet` may have a reference to a `TagsOntology` as `.ontology`
-      and so also do any of its `Tag`s.
+      and so also does any of its `Tag`s.
   '''
 
   # A mapping of base type named to Python types.

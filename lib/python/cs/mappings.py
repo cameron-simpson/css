@@ -1682,7 +1682,7 @@ def change_mapping(mapping, key, value, mapping_name="mapping"):
           change_mapping(tags, field_name, field_value, "tags")
   '''
   if key in mapping:
-    if mapping[key] == value:
+    if mapping[key] != value:
       warning("%s[%r]: %r -> %r", mapping_name, key, mapping[key], value)
       mapping[key] = value
   else:

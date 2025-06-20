@@ -10,12 +10,8 @@ from getopt import GetoptError
 from pprint import pformat
 import sys
 from typing import Iterable
-try:
-  import xml.etree.cElementTree as ElementTree
-except ImportError:
-  pass
 
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import NavigableString
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
@@ -34,7 +30,7 @@ from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
-from cs.resources import uses_runstate
+from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
@@ -44,6 +40,7 @@ from . import (
 from .parse import get_action_args, get_delim_regexp, import_name
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
+from .sitemap import FlowState
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -101,6 +98,7 @@ class PilferCommand(BaseCommand):
     )
     jobs: int = DEFAULT_JOBS
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
+    db_url: str = None
 
     @property
     def configpaths(self):
@@ -123,13 +121,13 @@ class PilferCommand(BaseCommand):
             'Flags which must be true for operation to continue.',
             lambda s: s.replace(',', ' ').split(),
         ),
+        load_cookies='Load the browser cookie state into the Pilfer seesion.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
 
   @contextmanager
-  @uses_runstate
-  def run_context(self, *, runstate):
+  def run_context(self):
     ''' Apply the `options.runstate` to the main `Pilfer`.
     '''
     options = self.options
@@ -146,13 +144,21 @@ class PilferCommand(BaseCommand):
     with super().run_context():
       later = Later(self.options.jobs)
       with later:
-        pilfer = Pilfer(later=later, rcpaths=options.configpaths)
+        pilfer = Pilfer(
+            later=later,
+            rcpaths=options.configpaths,
+            sqltags_db_url=options.db_url,
+        )
         with pilfer:
           with stackattrs(
               self.options,
               later=later,
               pilfer=pilfer,
+              sqltags=pilfer.sqltags,
+              db_url=pilfer.sqltags.db_url,
           ):
+            if self.options.load_cookies:
+              pilfer.load_browser_cookies(pilfer.session.cookies)
             yield
 
   @staticmethod
@@ -161,8 +167,8 @@ class PilferCommand(BaseCommand):
         Return `(PipeLineSpec,new_argv_offset)`.
 
         A pipeline specification is specified by a leading argument of the
-        form `'pipe_name:{'`, followed by arguments defining functions for the
-        pipeline, and a terminating argument of the form `'}'`.
+        form *pipe_name*`:{`, followed by arguments defining functions for the
+        pipeline, and a terminating argument of the form `}`.
 
         Note: this syntax works well with traditional Bourne shells.
         Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
@@ -234,35 +240,93 @@ class PilferCommand(BaseCommand):
             )
         )
 
-  @popopts
+  @popopts(soup='Dump the page soup, normally omitted.')
   def cmd_dump(self, argv):
     ''' Usage: {cmd} URL
           Fetch URL and dump information from it.
     '''
     if not argv:
-      raise GteoptError("missing URL")
+      raise GetoptError("missing URL")
     url = argv.pop(0)
     if argv:
       raise GetoptError(f'extra arguments after URL: {argv!r}')
-    options = self.options
-    P = options.pilfer
     print(url)
-    U = URL(url)
-    rsp = P.GET(url)
+    state = FlowState(url=url)
+    state.GET()
     printt(
-        ('GET response headers:',),
+        (f'{state.request.method} response headers:',),
         *[
-            (f'  {key}', value) for key, value in
-            sorted(rsp.headers.items(), key=lambda kv: kv[0].lower())
+            (f'  {key}', value) for key, value in sorted(
+                state.response.headers.items(), key=lambda kv: kv[0].lower()
+            )
         ],
     )
-    content_type, *_ = map(str.strip, rsp.headers['content-type'].split(';'))
-    if content_type == 'text/html':
-      soup = pfx_call(BeautifulSoup, rsp.text, 'html5lib')
+    soup = state.soup
+    if soup is None:
+      print("no soup for content_type", state.content_type)
     else:
-      soup = None
-      warning(f'no dump facility for {content_type=}')
-    if soup is not None:
+      table = []
+      title = soup.head.title
+      if title:
+        table.append(["Title:", title.string])
+      meta = state.meta
+      if meta.tags:
+        table.extend(
+            (
+                ['Tags:'],
+                *(
+                    [f'  {tag_name}', tag_value]
+                    for tag_name, tag_value in sorted(meta.tags.items())
+                ),
+            )
+        )
+      if meta.properties:
+        table.extend(
+            (
+                ['Properties:'],
+                *(
+                    [f'  {tag_name}', tag_value]
+                    for tag_name, tag_value in sorted(meta.properties.items())
+                ),
+            )
+        )
+      links_by_rel = state.links
+      if links_by_rel:
+        table.extend(
+            (
+                ["Links:"], *(
+                    [
+                        f'  {rel}',
+                        "\n".join(
+                            sorted(
+                                f'{link.attrs["href"]} {link.attrs.get("type","")}'
+                                for link in links
+                                if link.attrs.get('href')
+                            )
+                        ),
+                    ]
+                    for rel, links in sorted(links_by_rel.items())
+                )
+            )
+        )
+      printt(*table)
+    table = []
+    for i, (method, match_tags,
+            grokked) in enumerate(self.options.pilfer.grok(state)):
+      if i == 0:
+        table.append(['Grokked:'])
+      table.append(
+          (
+              f'  {method.__qualname__}',
+              "\n".join(map(str, sorted(match_tags)))
+          )
+      )
+      if grokked is not None:
+        for k, v in grokked.items():
+          table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
+    printt(*table)
+    if soup is not None and self.options.soup:
+      print("Content:", state.content_type)
       table = []
       q = ListQueue([('', soup.head), ('', soup.body)])
       for indent, tag in q:
@@ -272,6 +336,8 @@ class PilferCommand(BaseCommand):
           text = str(tag).strip()
           if text:
             table.append(('', text))
+          continue
+        if tag.name == 'script':
           continue
         # sorted copy of the attributes
         attrs = dict(sorted(tag.attrs.items()))
@@ -288,7 +354,7 @@ class PilferCommand(BaseCommand):
                                                            NavigableString):
           desc = str(children[0].strip())
         else:
-          desc = " ".join(
+          desc = "\n".join(
               f'{attr}={value!r}' for attr, value in attrs.items()
           ) if attrs else ''
           for index, subtag in enumerate(children):
@@ -354,19 +420,24 @@ class PilferCommand(BaseCommand):
           Call every matching @on method for sitemaps matching URL.
     '''
     if not argv:
-      raise GteoptError("missing URL")
+      raise GetoptError("missing URL")
     url = argv.pop(0)
     if argv:
       raise GetoptError(f'extra arguments after URL: {argv!r}')
     options = self.options
     P = options.pilfer
     print(url)
-    table = [(url,)]
+    table = []
     for method, match_tags, grokked in P.grok(url):
-      table.append((f'  {method}', "\n".join(map(str, sorted(match_tags)))))
+      table.append(
+          (
+              f'  {method.__qualname__}',
+              "\n".join(map(str, sorted(match_tags)))
+          )
+      )
       if grokked is not None:
         for k, v in grokked.items():
-          table.append((f'  {k}', v))
+          table.append((f'    {k}', v))
     printt(*table)
 
   @popopts
@@ -545,7 +616,7 @@ class PilferCommand(BaseCommand):
         table.extend((
             ("URL:", url),
             ("  key:", sitemap.url_key(url)),
-        ),)
+        ))
     printt(*table)
 
 sys.exit(main(sys.argv))

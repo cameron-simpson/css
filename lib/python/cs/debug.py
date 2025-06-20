@@ -707,11 +707,12 @@ def trace(
       if exception:
         xlog_kw = {}
         if xlog is X:
-          xlog_kw['colour'] = 'red'
+          xlog_kw['colour'] = 'white'  ## 'red'
         xlog(
-            "%sRAISE  %s => %s at %gs",
+            "%sRAISE  %s => %s:%s at %gs",
             old_indent,
             log_cite,
+            e.__class__.__name__,
             e,
             end_time - start_time,
             **xlog_kw,

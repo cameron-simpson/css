@@ -845,6 +845,11 @@ class BaseCommandOptions(HasThreadState):
 
   perthread_state = ThreadState()
 
+  def __post_init__(self):
+    ''' A empty base post `__init__` method so that all subclasses'
+        `__post_init__`s  can call their `super().__post_init__`.
+    '''
+
   def as_dict(self):
     ''' Return the options as a `dict`.
         This contains all the public attributes of `self`.

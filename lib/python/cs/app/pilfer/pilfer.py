@@ -8,9 +8,8 @@ import copy
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from functools import cached_property
-from http.cookies import Morsel, SimpleCookie
+from http.cookies import Morsel
 from itertools import zip_longest
-import json
 import os
 import os.path
 from os.path import (
@@ -24,17 +23,17 @@ from os.path import (
 import shlex
 import sys
 from threading import RLock
-import time
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 from types import SimpleNamespace as NS
 
 import requests
+from requests.cookies import RequestsCookieJar
 from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
-from cs.context import stackattrs
+from cs.context import contextif, stackattrs
 from cs.deco import decorator, default_params, promote
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
@@ -44,12 +43,14 @@ from cs.later import Later, uses_later
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
-from cs.ndjson import dump_ndjson, scan_ndjson, write_ndjson
+from cs.ndjson import dump_ndjson, scan_ndjson
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import seq
+from cs.sqltags import SQLTags
+from cs.tagset import TagSet
 from cs.threads import locked, HasThreadState, ThreadState
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
@@ -58,7 +59,7 @@ from .cache import ContentCache
 from .cookies import morsel, read_firefox_cookies
 from .format import FormatMapping
 from .parse import import_name
-from .sitemap import SiteMap
+from .sitemap import FlowState, SiteMap
 from .urls import hrefs, srcs
 
 @decorator
@@ -75,7 +76,6 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
       * `new_P`: optional glag, default `False`; if true then the
         function yields `result,Pilfer` 2-tuples instead of just `result`
   '''
-  ##func = trace(func)
   if with_P:
     wrapper = agen(lambda item, P: func(item, P=P), fast=fast)
   else:
@@ -255,6 +255,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   do_trace: bool = False
   flags: Mapping = field(default_factory=PolledFlags)
   fspath: str = None
+  sqltags_db_url: str = None
   user_agent: str = 'Pilfer'
   rcpaths: list[str] = field(default_factory=list)
   url_opener: Any = field(default_factory=build_opener)
@@ -277,19 +278,37 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
   @uses_later
   def __post_init__(self, item=None, later: Later = None):
+    ''' Initialise various defaults if not initially provided.
+
+        The follow things are set up:
+        * a `NetrcHTTPPasswordMgr` is supplied as an `HTTPBasicAuthHandler`
+        * `.fspath`: `$PILFERDIR` or the `var` defaults setting or `~/var/pilfer`
+        * `.content_cache`: the `cache` defaults setting or the `cache` subdirectory
+        * `.sqltags_db_url`: `$PILFER_SQLTAGS` or the `sqltags` defaults setting
+    '''
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     # TODO: should this be in the PilferSession? find out how it is used
     self.url_opener.add_handler(HTTPCookieProcessor())
     if self.fspath is None:
       self.fspath = abspath(
           os.environ.get('PILFERDIR')
-          or expanduser(self.rc_map[None]['var'] or '~/var/pilfer')
+          or expanduser(self.defaults['var'] or '~/var/pilfer')
       )
       needdir(self.fspath) and vprint("made", self.shortpath)
     if self.content_cache is None:
       self.content_cache = ContentCache(
-          expanduser(self.rc_map[None]['cache'] or self.pathto('cache'))
+          expanduser(self.defaults['cache'] or self.pathto('cache'))
       )
+    if self.sqltags_db_url is None:
+      sqltags_db_url = os.environ.get('PILFER_SQLTAGS') or None
+      if sqltags_db_url is None:
+        sqltags_db_url = self.defaults['sqltags'] or None
+        if sqltags_db_url is not None:
+          if sqltags_db_url.startswith('~/'):
+            sqltags_db_url = expanduser(sqltags_db_url)
+          elif not sqltags_db_url.startswith(('/', 'file://', 'memory:')):
+            sqltags_db_url = self.pathto(sqltags_db_url)
+      self.sqltags_db_url = sqltags_db_url
     # default session named '_'
     if self.session is None:
       self.session = '_'
@@ -316,9 +335,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
   @contextmanager
   def startup_shutdown(self):
+    ''' Open the `Later` work queue, the `SQLTags` if specified,
+        the content cache.
+    '''
     with self.later:
-      with self.content_cache:
-        yield
+      with contextif(self.sqltags):
+        with self.content_cache:
+          yield
 
   @property
   def defaults(self):
@@ -336,75 +359,87 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   def _(self, value):
     self.user_vars['_'] = value
 
+  @cached_property
+  def sqltags(self):
+    ''' A reference to the `SQLTags` knowledge base
+        if `self.sqltags_db_url` is not `None`.
+    '''
+    return SQLTags(self.sqltags_db_url) if self.sqltags_db_url else None
+
+  def load_browser_cookies(
+      self, jar: Optional[RequestsCookieJar] = None
+  ) -> RequestsCookieJar:
+    ''' Load the live browser cookies into `jar`.
+        If `jar` is omitted a new `RequestsCookieJar` will be made.
+        Return the updated cookie jar.
+
+        The browser cookies are obtained from the file named by
+        `self.defaults['browser-cookies']`; currently this is
+        expected to be a firefox `cookies.sqlite` database.
+    '''
+    if jar is None:
+      jar = RequestsCookieJar()
+    cookies_db = self.defaults['browser-cookies'] or None
+    if cookies_db is not None:
+      for ffcookie in read_firefox_cookies(expanduser(cookies_db)):
+        ffcookie.add_to_jar(jar)
+    return jar
+
   @property
   def url(self):
     ''' `self._` as a `URL` object.
     '''
     return URL.promote(self._)
 
-  def GET(
+  def request(
       self,
       url: str | URL,
       *,
       session: Optional[PilferSession] = None,
-      **get_kw,
+      headers=None,
+      method='GET',
+      **rq_kw,
   ) -> requests.Response:
-    ''' Fetch `url` using the `GET` method, return a `requests.Response`.
+    ''' Fetch `url` using method (default `'GET'`), return a `requests.Response`.
 
-        If `session` is not supplied, `self.session` will be used.
-        Other keyword arguments are passed to `session.get`.
+        Parameters:
+        * `session`: an optional `requests.Session` instance, default `self.session`
+        * `headers`: optional additional headers to use, updating those from `self.headers()`
+        * `method`: the HTTP method to use, default `'GET'`
+        Other keyword arguments are passed to the `session` request method.
     '''
     if session is None:
       session = self.session
-    return session.get(str(url), **get_kw)
+    hdrs = self.headers()
+    if headers is not None:
+      hdrs.update(headers)
+    return pfx_call(
+        getattr(session, method.lower()), str(url), headers=hdrs, **rq_kw
+    )
 
-  def HEAD(
-      self,
-      url: str | URL,
-      *,
-      session: Optional[PilferSession] = None,
-      **head_kw,
-  ) -> requests.Response:
+  def GET(self, url: str | URL, **rq_kw):
+    ''' Fetch `url` using the `GET` method, return a `requests.Response`.
+        This is a shim for `Pilfer.request`.
+    '''
+    return self.request(url, method='GET', **rq_kw)
+
+  def HEAD(self, url: str | URL, **rq_kw):
     ''' Fetch `url` using the `HEAD` method, return a `requests.Response`.
-
-        If `session` is not supplied, `self.default_session` will be used.
-        Other keyword arguments are passed to `session.head`.
+        This is a shim for `Pilfer.request`.
     '''
-    if session is None:
-      session = self.default_session
-    return session.head(str(url), **head_kw)
+    return self.request(url, method='HEAD', **rq_kw)
 
-  def OPTIONS(
-      self,
-      url: str | URL,
-      *,
-      session: Optional[PilferSession] = None,
-      **options_kw,
-  ) -> requests.Response:
+  def OPTIONS(self, url: str | URL, **rq_kw):
     ''' Fetch `url` using the `OPTIONS` method, return a `requests.Response`.
-
-        If `session` is not supplied, `self.default_session` will be used.
-        Other keyword arguments are passed to `session.options`.
+        This is a shim for `Pilfer.request`.
     '''
-    if session is None:
-      session = self.default_session
-    return session.options(str(url), **options_kw)
+    return self.request(url, method='OPTIONS', **rq_kw)
 
-  def POST(
-      self,
-      url: str | URL,
-      *,
-      session: Optional[PilferSession] = None,
-      **post_kw,
-  ) -> requests.Response:
+  def POST(self, url: str | URL, **rq_kw):
     ''' Fetch `url` using the `POST` method, return a `requests.Response`.
-
-        If `session` is not supplied, `self.default_session` will be used.
-        Other keyword arguments are passed to `session.post`.
+        This is a shim for `Pilfer.request`.
     '''
-    if session is None:
-      session = self.default_session
-    return session.post(str(url), **post_kw)
+    return self.request(url, method='POST', **rq_kw)
 
   @cached_property
   def rc_map(self) -> Mapping[str | None, Mapping[str, str]]:
@@ -431,6 +466,23 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         for field_name, value in section.items():
           msection[field_name] = value
     return mapping
+
+  def normalise_header(self, header_name):
+    ''' Return a header name in normalised form for use _in a request_.
+    '''
+    return '-'.join(
+        word.title()
+        for word in header_name.lower().replace('_', '-').split('-')
+    )
+
+  def headers(self):
+    ''' Make a `dict` holding headers to send with a request,
+        obtained from the `[headers]` rc file section.
+    '''
+    hdrs = {}
+    for header_name, value in self.rc_map['headers'].items():
+      hdrs[self.normalise_header(header_name)] = value
+    return hdrs
 
   @cached_property
   def action_map(self) -> Mapping[str, list[str]]:
@@ -633,15 +685,40 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       return sitemap
     return None
 
+  @promote
+  @typechecked
+  def run_matches(
+      self,
+      flowstate: FlowState,
+      *run_match_a,
+      **run_match_kw,
+  ) -> Iterable[Tuple[Callable, TagSet, Any]]:
+    ''' A generator to call `SiteMap.run_matches(flowstate,*run_match_a,**run_match_kw)`
+        for each `SiteMap` from `self.sitemaps_for(flowstate.url)`.
+        Arguments are as for `SiteMap.run_matches`.
+        Yield `(method,match_tags,result)` 3-tuples from each method called.
+    '''
+    for sitemap in self.sitemaps_for(flowstate.url):
+      yield from pfx_call(
+          sitemap.run_matches, flowstate, *run_match_a, **run_match_kw
+      )
+
   @pfx_method
   @promote
-  def grok(self, url: URL):
-    ''' Parse information from `url` by applying all matching methods from the site maps.
+  def grok(
+      self,
+      flowstate: FlowState,
+      flowattr: Optional[str] = None,
+      **grok_kw,
+  ) -> Iterable[Tuple[Callable, TagSet, Any]]:
+    ''' Parse information from `flowstate.url` by applying all
+        matching methods from the site maps.
         Yield `(method,match_tags,grokked)` 3-tuples.
+        This is a shim for `SiteMap.grok`.
     '''
     with self:
-      for sitemap in self.sitemaps_for(url):
-        yield from sitemap.grok(url)
+      for sitemap in self.sitemaps_for(flowstate.url):
+        yield from sitemap.grok(flowstate, flowattr, **grok_kw)
 
   @promote
   def url_matches(self, url: URL, pattern_type: str, *, extra=None):
@@ -763,7 +840,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     matches = list(self.url_matches(url, pattern_type='URL_KEY', extra=extra))
     if not matches:
       print("cache_url: no matches for", url)
-      return
+      return None
     cache = self.content_cache
     with cache:
       cache_keys = [

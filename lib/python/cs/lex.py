@@ -16,11 +16,12 @@ raising `ValueError` on failed tokenisation.
 
 import binascii
 from dataclasses import dataclass
+from datetime import date, datetime
 from functools import partial
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from pprint import pformat
+from pprint import pformat, PrettyPrinter
 import re
 from string import (
     ascii_letters,
@@ -1402,7 +1403,7 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   from cs.fs import RemotePath
   return RemotePath.from_str(remotepath)
 
-def tabulate(*rows, sep='  '):
+def tabulate(*rows, sep='  ', ppcls=None):
   r''' A generator yielding lines of values from `rows` aligned in columns.
 
       Each row in rows is a list of strings. Non-`str` objects are
@@ -1427,15 +1428,30 @@ def tabulate(*rows, sep='  '):
           two      cols
           >>>
   '''
+  if ppcls is None:
+
+    class ppcls(PrettyPrinter):
+      ''' A `PrettyPrinter` subclass which presents `date` and
+          `datetime` as ISO8601 strings.
+      '''
+
+      def format(self, obj, *fmt_a):
+        ''' Use ISO8601 for `date` and `datetime` objects.
+        '''
+        if isinstance(obj, date):
+          return date.isoformat()
+        if isinstance(obj, datetime):
+          return obj.isoformat(' ')
+        return super().format(obj, *fmt_a)
+
+  ppr = ppcls(compact=True, sort_dicts=True)
   if not rows:
     # avoids max of empty list
     return
   # promote all table cells to str via pformat
   rows = [
-      [
-          (cell if isinstance(cell, str) else pformat(cell, compact=True))
-          for cell in row
-      ]
+      [(cell if isinstance(cell, str) else ppr.pformat(cell))
+       for cell in row]
       for row in rows
   ]
   # pad short rows with empty columns
