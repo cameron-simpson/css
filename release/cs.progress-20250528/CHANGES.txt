@@ -1,0 +1,9 @@
+lib/python/cs/progress.py: cs.progress: progressbar: refactor with early return
+lib/python/cs/progress.py: cs.progress: update module docstring
+lib/python/cs/progress.py: cs.progress: just invoke the ticker with Thread(...).start() directly instead of via cs.threads.bg()
+lib/python/cs/progress.py: cs.progress: give the ticker function a private name, streamlie its setup
+lib/python/cs/progress.py: cs.progress: progressbar: also run the progress bar if report_print is true in order to get the report
+lib/python/cs/progress.py: cs.progress: docstring updates
+lib/python/cs/progress.py: cs.progress: fix Thread invocation
+lib/python/cs/progress.py: cs.progress: formatting
+lib/python/cs/progress.py: cs.progress: update DISTINFO, clean a little lint

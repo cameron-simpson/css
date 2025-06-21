@@ -27,6 +27,7 @@ from cs.context import stackattrs
 from cs.deco import promote
 from cs.fs import HasFSPath, needdir, shortpath, validate_rpath
 from cs.hashutils import BaseHashCode
+from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.progress import progressbar
@@ -478,7 +479,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       return md_map
 
 if __name__ == '__main__':
-  sitemap = SiteMap()
+  sitemap = SiteMap("demo")
   sitemap.url_key = lambda self, url: url.replace('/', '_')
   cache = ContentCache(fspath='content')
   cache.cache_response('foo', sitemap)

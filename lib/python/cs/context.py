@@ -21,7 +21,7 @@ from typing import Callable, Iterable
 from cs.deco import decorator
 from cs.gimmicks import error
 
-__version__ = '20250412-post'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -563,8 +563,10 @@ class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
       running the first and second steps of a single `__enter_exit__` generator method.
 
-      *Note*: the `__enter_exit__` method is _not_ a context manager,
-      but a short generator method.
+      *Note*: the `__enter_exit__` method _is not a context manager_,
+      it is a short generator method.
+      Its first `yield` is the normal `yield` for a context manager.
+      A second `yield` may be used to indicate that an exception was handled.
 
       This makes it easy to use context managers inside `__enter_exit__`
       as the setup/teardown process, for example:
@@ -710,10 +712,14 @@ def with_self(method, get_context_from_self=None):
   ''' A decorator to run a method inside `with self:` for classes
       which need to be "held open"/"marked as in use" while the
       method runs.
+
+      The optional `get_context_from_self` parameter may be a
+      callable to obtain the required context manager from `self`;
+      the default is to just use `with self`.
   '''
 
   def with_self_wrapper(self, *a, **kw):
-    with get_context(self) if get_context else self:
+    with get_context_from_self(self) if get_context_from_self else self:
       return method(self, *a, **kw)
 
   return with_self_wrapper
@@ -731,9 +737,17 @@ def _withall(obj_it):
       yield from _withall(obj_it)
 
 @contextmanager
-def withall(objs):
+def withall(*objs):
   ''' Enter every object `obj` in `objs` except those which are `None`
       using `with obj:`, then yield.
+
+      Example:
+
+          with withall(
+              db1,
+              db2,
+          ):
+              ... work with db1 and db2 ...
   '''
   yield from _withall(obj for obj in objs if obj is not None)
 

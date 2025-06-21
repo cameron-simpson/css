@@ -258,6 +258,36 @@ class ORM(MultiOpenMixin, ABC):
       supporting nested open/close sequences and use as a context manager.
   '''
 
+  @staticmethod
+  def norm_db_url(db_url: str) -> str:
+    ''' Promote a `/`*path*`.sqlite` filesystem path to an `sqlite:///` URL.
+        Return other strings unchanged.
+    '''
+    if db_url.startswith('/') and db_url.endswith('.sqlite'):
+      db_url = f'sqlite:///{db_url}'
+    return db_url
+
+  @classmethod
+  def fspath_for_db_url(cls, db_url):
+    ''' Return the filesystem path for a `db_url`, or `None`.
+        This extracts the path from `sqlite:///` URLs.
+    '''
+    db_url = cls.norm_db_url(db_url)
+    db_fspath = cutprefix(db_url, 'sqlite:///')
+    if db_fspath is db_url:
+      # unchanged - no leading "sqlite:///"
+      if db_url.startswith(('/', './', '../')) or '://' not in db_url:
+        # turn filesystenm pathnames into SQLite db URLs
+        db_fspath = abspath(db_url)
+        db_url = 'sqlite:///' + db_url
+      else:
+        # no fs path
+        db_fspath = None
+    else:
+      # starts with sqlite:///, we have the db_fspath from the cutprefix
+      pass
+    return db_fspath
+
   @pfx_method
   def __init__(self, db_url, serial_sessions=None):
     ''' Initialise the ORM.
@@ -273,20 +303,8 @@ class ORM(MultiOpenMixin, ABC):
         Instead we use the `serial_sessions` option to obtain a
         mutex before allocating a session.
     '''
-    db_fspath = cutprefix(db_url, 'sqlite:///')
-    if db_fspath is db_url:
-      # unchanged - no leading "sqlite:///"
-      if db_url.startswith(('/', './', '../')) or '://' not in db_url:
-        # turn filesystenm pathnames into SQLite db URLs
-        db_fspath = abspath(db_url)
-        db_url = 'sqlite:///' + db_url
-      else:
-        # no fs path
-        db_fspath = None
-    else:
-      # starts with sqlite:///, we have the db_fspath from the cutprefix
-      pass
-    self.db_url = db_url
+    db_fspath = self.fspath_for_db_url(db_url)
+    self.db_url = db_url = self.norm_db_url(db_url)
     self.db_fspath = db_fspath
     is_sqlite = db_url.startswith('sqlite://')
     if serial_sessions is None:

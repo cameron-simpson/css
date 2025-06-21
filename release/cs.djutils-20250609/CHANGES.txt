@@ -1,0 +1,2 @@
+lib/python/cs/djutils.py: cs.djutils: fix docstring typo
+lib/python/cs/djutils.py: cs.djutils: model_batches_qs,model_instances: new yield_base_qs=False parameter to yield the base QuerySet ahead f the results

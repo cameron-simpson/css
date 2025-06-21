@@ -33,7 +33,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20250306-post'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'description':
@@ -1663,3 +1663,27 @@ def mapped_property(method, cached=True):
       return cache.keys()
 
   return cached_property(lambda self: MappedProperty(self))
+
+def change_mapping(mapping, key, value, mapping_name="mapping"):
+  ''' A trite function to set `mapping[key]=value` which issues a
+      warning if the key is already present with a different value.
+
+      Functionally this is just:
+
+          mapping[key] = value
+
+      The optional `mapping_name` parameter may be used to provide
+      a name for the mapping for use in the warning. The default
+      is just `"mapping"`.
+
+      Example:
+
+          # update tags, expecting field_name to be a new key
+          change_mapping(tags, field_name, field_value, "tags")
+  '''
+  if key in mapping:
+    if mapping[key] != value:
+      warning("%s[%r]: %r -> %r", mapping_name, key, mapping[key], value)
+      mapping[key] = value
+  else:
+    mapping[key] = value

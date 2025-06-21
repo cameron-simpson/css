@@ -10,11 +10,8 @@ from getopt import GetoptError
 from pprint import pformat
 import sys
 from typing import Iterable
-try:
-  import xml.etree.cElementTree as ElementTree
-except ImportError:
-  pass
 
+from bs4 import NavigableString
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
@@ -26,21 +23,24 @@ from cs.lex import (
     get_dotted_identifier,
     is_identifier,
     printt,
+    skipwhite,
 )
 import cs.logutils
 from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
-from cs.resources import uses_runstate
+from cs.queues import ListQueue
+from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
     DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
     DEFAULT_MITM_LISTEN_PORT
 )
-from .parse import get_action_args, import_name
+from .parse import get_action_args, get_delim_regexp, import_name
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
+from .sitemap import FlowState
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -98,6 +98,7 @@ class PilferCommand(BaseCommand):
     )
     jobs: int = DEFAULT_JOBS
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
+    db_url: str = None
 
     @property
     def configpaths(self):
@@ -120,13 +121,13 @@ class PilferCommand(BaseCommand):
             'Flags which must be true for operation to continue.',
             lambda s: s.replace(',', ' ').split(),
         ),
+        load_cookies='Load the browser cookie state into the Pilfer seesion.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
 
   @contextmanager
-  @uses_runstate
-  def run_context(self, *, runstate):
+  def run_context(self):
     ''' Apply the `options.runstate` to the main `Pilfer`.
     '''
     options = self.options
@@ -143,13 +144,22 @@ class PilferCommand(BaseCommand):
     with super().run_context():
       later = Later(self.options.jobs)
       with later:
-        pilfer = Pilfer(later=later, rcpaths=options.configpaths)
+        pilfer = Pilfer(
+            later=later,
+            rcpaths=options.configpaths,
+            sqltags_db_url=options.db_url,
+        )
         with pilfer:
           with stackattrs(
               self.options,
               later=later,
               pilfer=pilfer,
+              sqltags=pilfer.sqltags,
+              # TODO: this feels clumsy
+              db_url=pilfer.sqltags and pilfer.sqltags.db_url,
           ):
+            if self.options.load_cookies:
+              pilfer.load_browser_cookies(pilfer.session.cookies)
             yield
 
   @staticmethod
@@ -158,8 +168,8 @@ class PilferCommand(BaseCommand):
         Return `(PipeLineSpec,new_argv_offset)`.
 
         A pipeline specification is specified by a leading argument of the
-        form `'pipe_name:{'`, followed by arguments defining functions for the
-        pipeline, and a terminating argument of the form `'}'`.
+        form *pipe_name*`:{`, followed by arguments defining functions for the
+        pipeline, and a terminating argument of the form `}`.
 
         Note: this syntax works well with traditional Bourne shells.
         Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
@@ -231,6 +241,131 @@ class PilferCommand(BaseCommand):
             )
         )
 
+  @popopts(soup='Dump the page soup, normally omitted.')
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd} URL
+          Fetch URL and dump information from it.
+    '''
+    if not argv:
+      raise GetoptError("missing URL")
+    url = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments after URL: {argv!r}')
+    print(url)
+    state = FlowState(url=url)
+    state.GET()
+    printt(
+        (f'{state.request.method} response headers:',),
+        *[
+            (f'  {key}', value) for key, value in sorted(
+                state.response.headers.items(), key=lambda kv: kv[0].lower()
+            )
+        ],
+    )
+    soup = state.soup
+    if soup is None:
+      print("no soup for content_type", state.content_type)
+    else:
+      table = []
+      title = soup.head.title
+      if title:
+        table.append(["Title:", title.string])
+      meta = state.meta
+      if meta.tags:
+        table.extend(
+            (
+                ['Tags:'],
+                *(
+                    [f'  {tag_name}', tag_value]
+                    for tag_name, tag_value in sorted(meta.tags.items())
+                ),
+            )
+        )
+      if meta.properties:
+        table.extend(
+            (
+                ['Properties:'],
+                *(
+                    [f'  {tag_name}', tag_value]
+                    for tag_name, tag_value in sorted(meta.properties.items())
+                ),
+            )
+        )
+      links_by_rel = state.links
+      if links_by_rel:
+        table.extend(
+            (
+                ["Links:"], *(
+                    [
+                        f'  {rel}',
+                        "\n".join(
+                            sorted(
+                                f'{link.attrs["href"]} {link.attrs.get("type","")}'
+                                for link in links
+                                if link.attrs.get('href')
+                            )
+                        ),
+                    ]
+                    for rel, links in sorted(links_by_rel.items())
+                )
+            )
+        )
+      printt(*table)
+    table = []
+    for i, (method, match_tags,
+            grokked) in enumerate(self.options.pilfer.grok(state)):
+      if i == 0:
+        table.append(['Grokked:'])
+      table.append(
+          (
+              f'  {method.__qualname__}',
+              "\n".join(map(str, sorted(match_tags)))
+          )
+      )
+      if grokked is not None:
+        for k, v in grokked.items():
+          table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
+    printt(*table)
+    if soup is not None and self.options.soup:
+      print("Content:", state.content_type)
+      table = []
+      q = ListQueue([('', soup.head), ('', soup.body)])
+      for indent, tag in q:
+        subindent = indent + '  '
+        # TODO: looks like commants are also NavigableStrings, intercept here
+        if isinstance(tag, NavigableString):
+          text = str(tag).strip()
+          if text:
+            table.append(('', text))
+          continue
+        if tag.name == 'script':
+          continue
+        # sorted copy of the attributes
+        attrs = dict(sorted(tag.attrs.items()))
+        label = tag.name
+        # pop off the id attribute if present, include in the label
+        try:
+          id_attr = attrs.pop('id')
+        except KeyError:
+          pass
+        else:
+          label += f' #{id_attr}'
+        children = list(tag.children)
+        if not attrs and len(children) == 1 and isinstance(children[0],
+                                                           NavigableString):
+          desc = str(children[0].strip())
+        else:
+          desc = "\n".join(
+              f'{attr}={value!r}' for attr, value in attrs.items()
+          ) if attrs else ''
+          for index, subtag in enumerate(children):
+            q.insert(index, (subindent, subtag))
+        table.append((
+            f'{indent}{label}',
+            desc,
+        ))
+      printt(*table)
+
   @popopts
   def cmd_from(self, argv):
     ''' Usage: {cmd} source [pipeline-defns...]
@@ -279,6 +414,32 @@ class PilferCommand(BaseCommand):
         print("CLOSED DIVERSION", diversion_name)
 
     asyncio.run(run())
+
+  @popopts
+  def cmd_grok(self, argv):
+    ''' Usage: {cmd} URL
+          Call every matching @on method for sitemaps matching URL.
+    '''
+    if not argv:
+      raise GetoptError("missing URL")
+    url = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments after URL: {argv!r}')
+    options = self.options
+    P = options.pilfer
+    print(url)
+    table = []
+    for method, match_tags, grokked in P.grok(url):
+      table.append(
+          (
+              f'  {method.__qualname__}',
+              "\n".join(map(str, sorted(match_tags)))
+          )
+      )
+      if grokked is not None:
+        for k, v in grokked.items():
+          table.append((f'    {k}', v))
+    printt(*table)
 
   @popopts
   def cmd_mitm(self, argv):
@@ -334,6 +495,10 @@ class PilferCommand(BaseCommand):
     mitm_addon = MITMAddon()
     for action in argv:
       with Pfx("action %r", action):
+        hook_names = None
+        args = []
+        kwargs = {}
+        url_regexps = []
         name, offset = get_dotted_identifier(action)
         if not name:
           warning("no action name")
@@ -360,32 +525,44 @@ class PilferCommand(BaseCommand):
             warning("cannot import %r: %s", action[:offset], e._)
             bad_actions = True
             continue
-        # :params
-        if action.startswith(':', offset):
-          offset += 1
-          args, kwargs, offset = get_action_args(action, offset, '@')
-        else:
-          args = []
-          kwargs = {}
-        # @hook,...
-        if action.startswith('@', offset):
-          offset += 1
-          end_hooks = action.find(':', offset)
-          if end_hooks == -1:
-            hook_names = action[offset:].split(',')
-            offset = len(action)
-          else:
-            hook_names = action[offset:end_hooks].split(',')
-            offset = end_hooks
-        else:
-          hook_names = None
-        if offset < len(action):
-          warning("unparsed text: %r", action[offset:])
-          bad_actions = True
-          continue
+        # gather @hooks and :params suffixes
+        while offset < len(action):
+          print("action", action, offset)
+          with Pfx("offset %d", offset):
+            # :params
+            if action.startswith(':', offset):
+              offset += 1
+              a, kw, offset = get_action_args(action, offset, '@')
+              args.extend(a)
+              kwargs.update(kw)
+            # @hook,...
+            elif action.startswith('@', offset):
+              offset += 1
+              # TODO: gather commas separated identifiers
+              end_hooks = action.find(':', offset)
+              if end_hooks == -1:
+                hook_names = action[offset:].split(',')
+                offset = len(action)
+              else:
+                hook_names = action[offset:end_hooks].split(',')
+                offset = end_hooks
+            # ~ /url-regexp/
+            elif action.startswith('~', offset):
+              offset = skipwhite(action, offset + 1)
+              regexp, offset = get_delim_regexp(action, offset)
+              url_regexps.append(regexp)
+            else:
+              warning("unparsed text: %r", action[offset:])
+              bad_actions = True
+              break
         try:
           pfx_call(
-              mitm_addon.add_action, hook_names, mitm_action, args, kwargs
+              mitm_addon.add_action,
+              hook_names,
+              mitm_action,
+              args,
+              kwargs,
+              url_regexps=url_regexps,
           )
         except ValueError as e:
           warning("invalid action spec: %s", e)
@@ -401,35 +578,46 @@ class PilferCommand(BaseCommand):
           With a sitemap name (eg "docs"), list the sitemap.
           WIth additional URLs, print the key for each URL.
     '''
-    P = self.options.pilfer
+    options = self.options
+    P = options.pilfer
     xit = 0
     if not argv:
+      # list site maps
       printt(
           *[
               [pattern, str(sitemap)]
               for pattern, sitemap in self.options.pilfer.sitemaps
           ]
       )
+      return 0
+    # use a particular sitemap
+    map_name = argv.pop(0)
+    print("map_name", map_name)
+    for domain_glob, sitemap in P.sitemaps:
+      if map_name == sitemap.name:
+        break
     else:
-      map_name = argv.pop(0)
-      print("map_name", map_name)
-      for domain_glob, sitemap in P.sitemaps:
-        if map_name == sitemap.name:
-          break
-      else:
-        warning("not sitemap named %r", map_name)
-        return 1
-      if argv:
-        for url in map(URL, argv):
-          print(url)
-          print("  key:", sitemap.url_key(url))
-      else:
-        for pattern in sitemap.URL_KEY_PATTERNS:
-          (domain_glob, path_re_s), format_s = pattern
-          printt(
-              ('Format:', format_s),
-              ('  Domain:', domain_glob),
-              ('  Path RE:', path_re_s),
-          )
+      warning("no sitemap named %r", map_name)
+      return 1
+    if not argv:
+      # no URLs: recite the site map patterns
+      for pattern in sitemap.URL_KEY_PATTERNS:
+        (domain_glob, path_re_s), format_s = pattern
+        printt(
+            ('Domain:', '*' if domain_glob is None else domain_glob),
+            ('  Path RE:', path_re_s),
+            ('  Format:', format_s),
+        )
+      return 0
+    # match URLs against the sitemap
+    table = []
+    for url in argv:
+      with Pfx(url):
+        U = URL(url)
+        table.extend((
+            ("URL:", url),
+            ("  key:", sitemap.url_key(url)),
+        ))
+    printt(*table)
 
 sys.exit(main(sys.argv))

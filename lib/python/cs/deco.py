@@ -18,7 +18,7 @@ import typing
 from cs.gimmicks import warning
 from cs.typingutils import is_optional
 
-__version__ = '20250428-post'
+__version__ = '20250601-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -26,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks', 'cs.typeutils'],
+    'install_requires': ['cs.gimmicks', 'cs.typingutils'],
 }
 
 def ALL(func):
@@ -73,9 +73,22 @@ def fmtdoc(func):
   return func
 
 def decorator(deco):
-  ''' Wrapper for decorator functions to support optional arguments.
+  ''' A decorator for decorator functions to support optional arguments
+      and also to allow specifying additional attributes to apply
+      to the decorated function.
 
-      The actual decorator function ends up being called as:
+      The decorated function is updated by `functools.update_wrapper`
+      and also has its `__name__` and `__doc__` set to those from
+      before the decoration.
+
+      The return of such a decorator is _usually_ the conventional
+      decorated function, but may alternatively be a `(decorated,attrs)`
+      2-tuple where `attrs` is a mapping of additional attributes
+      to apply to `decorated`.
+      This allows overriding the restored `__name__` and `__doc__`
+      from above, and potentially other useful attributes.
+
+      The actual decorator function (eg `mydeco`) ends up being called as:
 
           mydeco(func, *da, **dkw)
 
@@ -108,10 +121,13 @@ def decorator(deco):
     func_name = getattr(func, '__name__', str(func))
     # Now decorate func.
     decorated = deco(func, *dargs, **dkwargs)
+    # accept either the a function or a (function,attrmap) 2-tuple
+    try:
+      decorated, func_attrs = decorated
+    except TypeError:
+      func_attrs = {}
     # Catch mucked decorators which forget to return the new function.
-    assert decorated is not None, (
-        "deco:%r(func:%r,...) -> None" % (deco, func)
-    )
+    assert decorated is not None, f'@decorator @{deco=} of {func=} returned None'
     if decorated is not func:
       # We got a wrapper function back, pretty up the returned wrapper.
       try:
@@ -135,6 +151,9 @@ def decorator(deco):
         decorated.__module__ = func_module
       except AttributeError:
         pass
+    # apply any func_attrs
+    for attr, value in func_attrs.items():
+      setattr(decorated, attr, value)
     return decorated
 
   def metadeco(*da, **dkw):
@@ -429,12 +448,13 @@ def OBSOLETE(func, suggestion=None):
 
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
-  doc = "OBSOLETE " + funcname
-  func.__doc__ = doc + '\n\n' + funcdoc
+  doc = "OBSOLETE version of " + funcname
   if suggestion:
-    doc += ' suggestion: ' + suggestion
-  OBSOLETE_func_wrapper.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  return OBSOLETE_func_wrapper
+    doc += ', suggestion: ' + suggestion
+  return OBSOLETE_func_wrapper, dict(
+      __name__=f'@OBSOLETE({funcname})',
+      __doc__=f'{doc}\n\n{funcdoc}',
+  )
 
 @OBSOLETE(suggestion='cs.cache.cachedmethod')
 def cached(*a, **kw):
@@ -1049,7 +1069,8 @@ def promote(func, params=None, types=None):
 
 # pylint: disable=too-few-public-methods
 class Promotable:
-  ''' A mixin class which supports the `@promote` decorator.
+  ''' A mixin class which supports the `@promote` decorator
+      by providing a default `.promote(cls,obj)` class method.
   '''
 
   @classmethod

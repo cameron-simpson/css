@@ -659,7 +659,7 @@ def trace(
     retval=False,
     exception=True,
     use_pformat=False,
-    with_caller=False,
+    with_caller=True,
     with_pfx=False,
     xlog=None,
 ):
@@ -671,7 +671,7 @@ def trace(
       * `exception`: trace raised exceptions, default `True`
       * `use_pformat`: present the return value using
         `pformat` instead of `repr`, default `False`
-      * `with_caller`: include the caller if this function, default `False`
+      * `with_caller`: include the caller if this function, default `True`
       * `with_pfx`: include the current `Pfx` prefix, default `False`
   '''
 
@@ -692,11 +692,11 @@ def trace(
     else:
       xlog = X
     log_cite = citation
-    if with_caller:
-      log_cite = log_cite + "from[%s]" % (caller(),)
     if call:
       fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
       xlog("%sCALL   " + fmt, _trace_state.indent, *av)
+      if with_caller:
+        xlog("%s  FROM %s", _trace_state.indent, caller(-4))
     old_indent = _trace_state.indent
     _trace_state.indent += '  '
     start_time = time.time()
@@ -707,11 +707,12 @@ def trace(
       if exception:
         xlog_kw = {}
         if xlog is X:
-          xlog_kw['colour'] = 'red'
+          xlog_kw['colour'] = 'white'  ## 'red'
         xlog(
-            "%sRAISE  %s => %s at %gs",
+            "%sRAISE  %s => %s:%s at %gs",
             old_indent,
             log_cite,
+            e.__class__.__name__,
             e,
             end_time - start_time,
             **xlog_kw,

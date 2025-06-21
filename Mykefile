@@ -118,6 +118,9 @@ _venv:
     if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
     then  $(trace) $(venv_pip) install -r "$$pip_reqs" \
     fi
+    if [ -n "$${VENV_EXTRAS:-}" ] \
+    then  $(trace) $(uv) pip install -p '$(venv_python)' $$VENV_EXTRAS \
+    fi
 
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
@@ -247,14 +250,14 @@ _publish_ezos:
 
 _publish_git:
         for repo in $(git_repos) \
-        do  pfx "$$repo" hg-gitup -a -f -x "$$repo" \
+        do  pfx "$$repo" set-x hg-gitup -a -f -x "$$repo" \
         done
         @echo 'changes visible at $(www_bitbucket)/branch/'"$$(vcs branch)"
         @echo 'code visible at $(www_github)'
 
 _publish_hg:
         for repo in $(hg_repos) \
-        do  pfx "$$repo" hg push --new-branch -r tip "$$repo" & \
+        do  pfx "$$repo" set-x hg push --new-branch -r tip "$$repo" & \
         done \
         wait
         @echo 'changes visible at $(www_sr_ht)'

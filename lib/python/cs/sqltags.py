@@ -61,7 +61,7 @@ from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
@@ -1461,6 +1461,8 @@ class SQLTagSet(SingletonMixin, TagSet):
       return None
     if isinstance(value, (int, str, float)):
       return value
+    if isinstance(value, datetime):
+      return value.isoformat()
     # mapping?
     if (isinstance(value, Mapping)
         or hasattr(value, 'items') and callable(value.items)):
@@ -1574,9 +1576,17 @@ class SQLTagSet(SingletonMixin, TagSet):
     return children
 
 # pylint: disable=too-many-ancestors
-class SQLTags(BaseTagSets, Promotable):
+class SQLTags(SingletonMixin, BaseTagSets, Promotable):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
+
+  @classmethod
+  def _singleton_key(cls, db_url=None, ontology=None):
+    ''' The filesystem path for the `db_url` or `None`.
+    '''
+    if not db_url:
+      db_url = cls.infer_db_url()
+    return SQLTagsORM.fspath_for_db_url(db_url)
 
   @pfx_method
   def TagSetClass(self, *, name, **kw):
@@ -1594,6 +1604,9 @@ class SQLTags(BaseTagSets, Promotable):
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
   )
   def __init__(self, db_url=None, ontology=None):
+    if hasattr(self, 'orm'):
+      # we are already set up
+      return
     if not db_url:
       db_url = self.infer_db_url()
     self.orm = SQLTagsORM(db_url=db_url)
@@ -1826,7 +1839,7 @@ class SQLTags(BaseTagSets, Promotable):
 
         Parameters:
         * `envvar`: environment variable to specify a default,
-          default from `DBURL_ENVVAR` (`{DBURL_ENVVAR}`).
+          default from `DBURL_ENVVAR` i.e. from `${DBURL_ENVVAR}`.
         * `default_path`: optional default db URL if no environment
           variable, default from `DBURL_DEFAULT` (`{DBURL_DEFAULT}`).
     '''
@@ -2002,7 +2015,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     '''
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    orm = self.options.sqltags.orm
+    orm = self.sqltags.orm
     db_url = orm.db_url
     if db_url.startswith("sqlite://"):
       db_fspath = orm.db_fspath
@@ -2017,7 +2030,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           Edit the entities specified by criteria.
     '''
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     badopts = False
     tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
@@ -2048,7 +2061,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           * tags: a column per Tag
     '''
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     export_format = 'csv'
     badopts = False
     opts, argv = getopt(argv, 'F:')
@@ -2096,7 +2109,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
                       Default: {FIND_OUTPUT_FORMAT_DEFAULT}
     '''
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     badopts = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
     opts, argv = getopt(argv, 'o:')
@@ -2143,7 +2156,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         TODO: should this be a transaction so that an import is all or nothing?
     '''
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     badopts = False
     update_mode = False
     opts, argv = getopt(argv, 'u')
@@ -2174,7 +2187,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     '''
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    self.options.sqltags.init()
+    self.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
   def cmd_log(self, argv):
@@ -2257,7 +2270,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       raise GetoptError("bad invocation")
     xit = 0
     use_stdin = cmdline_headline == '-'
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     for lineno, headline in enumerate((sys.stdin if use_stdin else
                                        (cmdline_headline,))):
       with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))):
@@ -2314,7 +2327,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       if subcmd == 'define_schema':
         if argv:
           raise GetoptError(f'extra arguments: {argv!r}')
-        self.options.sqltags.orm.define_schema()
+        self.sqltags.orm.define_schema()
       else:
         raise GetoptError("unrecognised subcommand")
 
@@ -2350,7 +2363,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       names = [name]
     xit = 0
     options = self.options
-    sqltags = options.sqltags
+    sqltags = self.sqltags
     with stackattrs(state, verbose=True):
       for name in names:
         with Pfx(name):
@@ -2403,10 +2416,7 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
 
   @cached_property
   def sqltags(self):
-    options = self.options
-    db_url = options.db_url
-    if db_url is None:
-      db_url = options.db_url = self.TAGSETS_CLASS.infer_db_url()
+    db_url = self.options.db_url
     return self.TAGSETS_CLASS(db_url)
 
   @contextmanager
@@ -2458,16 +2468,15 @@ class SQLTagsCommand(BaseSQLTagsCommand):
   ''' `sqltags` main command line utility.
   '''
 
+  @popopts(l='long_mode')
   def cmd_list(self, argv):
     ''' Usage: {cmd} [entity-names...]
           List entities and their tags.
     '''
     xit = 0
+    sqltags = self.sqltags
     options = self.options
-    sqltags = options.sqltags
-    long_mode = False
-    if argv and argv[0] == '-l':
-      long_mode = True
+    long_mode = options.long_mode
     if not argv:
       if long_mode:
         for name, tags in sorted(sqltags.items()):

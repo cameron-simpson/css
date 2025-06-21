@@ -74,26 +74,30 @@ ignore = [
     "C408", # Unnecessary `dict()` call (rewrite as a literal)
     "COM812", # Trailing comma missing
     "D105", # Missing docstring in magic method
+    "D107", # Missing docstring in `__init__`
     "D200", # One-line docstring should fit on one line
     "D203", # incorrect-blank-line-before-class
+    "D204", # 1 blank line required after class docstring
     "D205", # blank line required between summary line and description
     "D208", # Docstring is over-indented
     "D210", # No whitespaces allowed surrounding docstring text
-    "D405", # Section name should be properly capitalized
     "D212", # multi-line-summary-first-line
     "D213", # Multi-line docstring summary should start at the second line
     "D214", # Section is over-indented
     "D300", # Use triple double quotes
     "D400", # First line should end with a period
     "D401", # First line of docstring should be in imperative mood
+    "D405", # Section name should be properly capitalized
     "D406", # Section name should end with a newline
     "D407", # Missing dashed underline after section
     "D411", # Missing blank line before section
     "D412", # No blank lines allowed between a section header and its content
     "D413", # Missing blank line after last section
     "D415", # First line should end with a period, question mark, or exclamation point
+    "D416", # Section name should end with a colon
     "E731",
     "I001", # Import block is un-sorted or un-formatted
+    "SIM108", # Use ternary operator
     "SIM117", # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "T201", # `print` found
     "TRY003", # Avoid specifying long messages outside the exception class
