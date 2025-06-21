@@ -45,6 +45,9 @@ from typing import (
 )
 from uuid import UUID
 
+from typeguard import typechecked
+
+from cs.buffer import CornuCopyBuffer
 from cs.deco import decorator, Promotable
 from cs.gimmicks import warning
 from cs.lex import (
@@ -214,30 +217,48 @@ class Transcriber(Promotable):  ##, ABC):
     return ','.join(tokens)
 
   @classmethod
+  @typechecked  # TODO: remove, too expensive for final use
   @pfx_method
   def parse(
       cls,
-      s: str,
+      src: str | CornuCopyBuffer,
       offset: int = 0,
       *,
       expected_cls: Optional[Type] = None,
   ) -> Tuple[Any, int]:
-    ''' Parse an object from the string `s` starting at `offset`.
-        Return the object and the new offset.
+    ''' Parse an object `src`, which may be a string starting at `offset`
+        or a `CornuCopyBuffer` for parsing binary.
+        For a string, return the parsed object and the new offset.
+        For a buffer, return the parsed object directly.
 
         Parameters:
-        * `s`: the source string
-        * `offset`: optional string offset, default 0
+        * `src`: the source string or buffer
+        * `offset`: optional string offset, default `0`
         * `expected_cls`: optional; if provided, require an instance of `expected_cls`
 
         If `parse` is called via a subclass of `Transcriber` and
-        `expected_cls` omitted then it defaults to the subclass,
+        `expected_cls` is omitted then it defaults to the subclass,
         so that:
 
             _Dirent.parse(s)
 
         will ensure that some instance of `_Dirent` is found.
     '''
+    # divert binary parse to theAbstractBinary superclass .parse method
+    if isinstance(src, CornuCopyBuffer):
+      if offset != 0:
+        raise ValueError(
+            f'nonzero {offset=} supplied with CornuCopyBuffer src:{type(src)}'
+        )
+      # parse the binary object
+      obj = super().parse(src)
+      if expected_cls is not None and not isinstance(obj, expected_cls):
+        raise ValueError(
+            f'unexpected object type at {offset=}: expected {expected_cls=} but got {r(obj)}'
+        )
+      return obj
+    assert isinstance(src, str)
+    s = src
     if expected_cls is Any:
       expected_cls = None
     elif expected_cls is None and cls is not Transcriber:
@@ -286,9 +307,7 @@ class Transcriber(Promotable):  ##, ABC):
           raise ValueError("missing closing '}' at offset %d" % (offset,))
         offset += 1
     else:
-      raise ValueError(
-          f'parse error at offset {offset}: {s[offset:offset+16]!r}'
-      )
+      raise ValueError(f'parse error at {offset=}: {s[offset:offset+16]!r}')
     if expected_cls is not None and not isinstance(obj, expected_cls):
       raise ValueError(
           f'unexpected object type at offset {offset}: expected {expected_cls} but got {r(obj)}'
