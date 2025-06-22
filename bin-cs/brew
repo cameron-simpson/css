@@ -12,16 +12,18 @@ set -ue
 
 setx=:
 late_setx='set -x'
+default_homebrewpath=/opt/homebrew ## $HOME/var/homebrew
+default_homebrewcore=$HOME/src/homebrew-core
 
 [ $# -gt 0 ] && [ "x$1" = x-x ] && { setx='set -x' late_setx=:; shift; }
 
 $setx
 
 # git clone of git@github.com:Homebrew/brew
-homebrewpath=${CS_HOMEBREW:-$HOME/var/homebrew}
+homebrewpath=${CS_HOMEBREW:-$default_homebrewpath}
 homebrewpath_git=git@github.com:Homebrew/brew
 # git clone of git@github.com:Homebrew/homebrew-core
-homebrewcore=${CS_HOMEBREW_CORE:-$HOME/src/homebrew-core}
+homebrewcore=${CS_HOMEBREW_CORE:-$default_homebrewcore}
 homebrewcore_git=git@github.com:Homebrew/homebrew-core
 
 [ -d "$homebrewcore" ] || \
