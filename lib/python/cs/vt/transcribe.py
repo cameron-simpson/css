@@ -83,7 +83,7 @@ class Transcribable(Promotable):  ##, ABC):
       Transcribables implement the following methods:
       * `str_inner(T)`: to transcribe the inner part of *prefix*`{`*inner*`}` as a string
       * `parse_inner(T,s,offset,*,stopchar='}',prefix=None)`:
-        to parse this class up to `stopchar`.
+        to parse an inner transcription of this class up to `stopchar`.
 
       Optional attribute:
       * `str_prefix`:
