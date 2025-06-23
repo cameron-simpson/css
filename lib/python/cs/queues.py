@@ -53,10 +53,11 @@ DISTINFO = {
     ],
 }
 
-class QueueIterator(MultiOpenMixin, Iterable[Any]):
+class QueueIterator(Iterable[Any]):
   ''' A `QueueIterator` is a wrapper for a `Queue`like object
       which presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
+      It does present a `.close` method.
   '''
 
   def __init__(self, q, name=None):
@@ -64,16 +65,22 @@ class QueueIterator(MultiOpenMixin, Iterable[Any]):
       name = f'{self.__class__.__name__}-{seq()}'
     self.q = q
     self.name = name
-    self.finalise_later = True
     self.sentinel = Sentinel(
         "%s:%s:SENTINEL" % (self.__class__.__name__, name)
     )
     # count of non-sentinel items
     self._item_count = 0
+    self.closed = False
     self.__lock = Lock()
 
   def __str__(self):
     return f'{self.__class__.__name__}({self.name!r},q={self.q})'
+
+  def close(self):
+    with self.__lock:
+      if not self.closed:
+        self.q.put(self.sentinel)
+        self.closed = True
 
   @not_closed
   def put(self, item, *args, **kw):
@@ -81,30 +88,15 @@ class QueueIterator(MultiOpenMixin, Iterable[Any]):
         Warn if the queue is closed.
         Raises `ValueError` if `item` is the sentinel.
     '''
-    if self.closed:
-      with PfxCallInfo():
-        warning("%r.put: all closed: item=%s", self, item)
-      raise ClosedError("QueueIterator closed")
-    if item is self.sentinel:
-      raise ValueError("put(sentinel)")
-    self._put(item, *args, **kw)
     with self.__lock:
+      if self.closed:
+        with PfxCallInfo():
+          warning("%r.put: all closed: item=%s", self, item)
+        raise ClosedError("QueueIterator closed")
+      if item is self.sentinel:
+        raise ValueError("put(sentinel)")
+      self.q.put(item, *args, **kw)
       self._item_count += 1
-
-  def _put(self, item, *args, **kw):
-    ''' Direct call to `self.q.put()` with no checks.
-    '''
-    return self.q.put(item, *args, **kw)
-
-  @contextmanager
-  def startup_shutdown(self):
-    ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
-        on the final close.
-    '''
-    try:
-      yield
-    finally:
-      self._put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -120,29 +112,20 @@ class QueueIterator(MultiOpenMixin, Iterable[Any]):
       item = q.get()
     except Queue_Empty as e:
       warning("%s: queue.Empty: %s", self, e)
-      self._put(self.sentinel)
+      q.put(self.sentinel)
       # pylint: disable=raise-missing-from
       raise StopIteration(f'{self}.get: queue.Empty: {e}') from e
     if item is self.sentinel:
       # sentinel consumed (clients won't see it, so we must)
-      self.q.task_done()
+      q.task_done()
       # put the sentinel back for other consumers
-      self._put(self.sentinel)
+      q.put(self.sentinel)
       raise StopIteration(f'{self}.get: SENTINEL')
     with self.__lock:
       self._item_count -= 1
     return item
 
   next = __next__
-
-  def _get(self):
-    ''' Calls the inner queue's `.get` via `.__next__`; can break other users' iterators.
-    '''
-    try:
-      return next(self)
-    except StopIteration as e:
-      # pylint: disable=raise-missing-from
-      raise Queue_Empty(f'{self}._get: {e}') from e
 
   def empty(self):
     ''' Test if the queue is empty.
@@ -195,12 +178,12 @@ def IterableQueue(capacity=0, name=None):
       Note that the returned queue is already open
       and needs a close.
   '''
-  return QueueIterator(Queue(capacity), name=name).open()
+  return QueueIterator(Queue(capacity), name=name)
 
 def IterablePriorityQueue(capacity=0, name=None):
   ''' Factory to create an iterable `PriorityQueue`.
   '''
-  return QueueIterator(PriorityQueue(capacity), name=name).open()
+  return QueueIterator(PriorityQueue(capacity), name=name)
 
 class Channel(object):
   ''' A zero-storage data passage.
