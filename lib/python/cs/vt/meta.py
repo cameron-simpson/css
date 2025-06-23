@@ -19,7 +19,7 @@ from cs.logutils import error, warning
 from cs.threads import locked
 from cs.x import X
 from . import RLock
-from .transcribe import Transcriber
+from .transcribe import Transcribable
 
 DEFAULT_DIR_ACL = 'o:rwx-'
 DEFAULT_FILE_ACL = 'o:rw-x'
@@ -208,7 +208,7 @@ def xattrs_from_bytes(bs, offset=0):
 
 # This is a direct dict subclass for memory efficiency.
 # pylnt: disable=too-many-public-methods,too-many-instance-attributes
-class Meta(dict, Transcriber, prefix='M'):
+class Meta(dict, Transcribable, prefix='M'):
   ''' Inode metadata: times, permissions, ownership etc.
 
       This is a dictionary with the following keys:
@@ -274,11 +274,11 @@ class Meta(dict, Transcriber, prefix='M'):
     )
     return d
 
-  def transcribe_inner(self) -> str:
+  def str_inner(self) -> str:
     ''' Transcribe the Meta.
     '''
     d = self._as_dict()
-    return self.transcribe_mapping_inner(d)
+    return self.str_mapping_inner(d)
 
   # pylint: disable=too-many-arguments
   @classmethod

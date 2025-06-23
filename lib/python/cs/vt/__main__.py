@@ -89,7 +89,7 @@ from .scan import (
 )
 from .server import serve_tcp, serve_socket
 from .store import DataDirStore
-from .transcribe import Transcriber
+from .transcribe import Transcribable
 from .uri import VTURI
 
 RANDOM_DEV = '/dev/urandom'
@@ -602,7 +602,7 @@ class VTCmd(BaseCommand):
     for arg in argv:
       with Pfx(arg):
         try:
-          o, offset = Transcriber.parse(arg)
+          o, offset = Transcribable.parse(arg)
         except ValueError as e:
           error("does not seem to be a transcription: %s", e)
           xit = 1
@@ -1045,7 +1045,7 @@ class VTCmd(BaseCommand):
       except ValueError:
         # try an object transcription eg "D{...}"
         try:
-          obj, offset = Transcriber.parse(pushable_spec)
+          obj, offset = Transcribable.parse(pushable_spec)
         except ValueError:
           # fall back: relative path to .vtd file
           if pushable_spec.endswith('.vtd') and isfilepath(pushable_spec):

@@ -19,7 +19,7 @@ from cs.lex import get_identifier
 from cs.resources import MultiOpenMixin
 
 from .pushpull import missing_hashcodes
-from .transcribe import Transcriber
+from .transcribe import Transcribable
 
 HASHNAME_DEFAULT = 'blake3'
 HASHNAME_ENVVAR = 'VT_HASHNAME'
@@ -59,7 +59,7 @@ class HasDotHashclassMixin:
 
 class HashCode(
     BaseHashCode,
-    Transcriber,
+    Transcribable,
     hashname=None,
     hashfunc=None,
     prefix='H',
@@ -103,7 +103,7 @@ class HashCode(
     )
 
   def __str__(self):
-    return type(self).transcribe_obj(self)
+    return type(self).str_obj(self)
 
   def __repr__(self):
     return f'{self.hashname}:{self.hex()}'
@@ -188,7 +188,7 @@ class HashCode(
     hashbytes = bytes.fromhex(hexpart)
     return hashclass.from_hashbytes(hashbytes)
 
-  def transcribe_inner(self) -> str:
+  def str_inner(self) -> str:
     return f'{self.hashname}:{self.hex()}'
 
   @classmethod

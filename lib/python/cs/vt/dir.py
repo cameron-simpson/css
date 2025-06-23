@@ -37,7 +37,7 @@ from .file import RWBlockFile
 from .hash import io_fail
 from .meta import Meta, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
 from .paths import path_split, DirLike, FileLike
-from .transcribe import Transcriber, hexify
+from .transcribe import Transcribable, hexify
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -63,7 +63,7 @@ class DirentFlags(IntFlag):
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
   EXTENDED = 0x20  # extended BSData field
 
-class _Dirent(Transcriber, prefix=None):
+class _Dirent(Transcribable, prefix=None):
   ''' Incomplete base class for *`Dirent` objects.
 
       Special notes:
@@ -205,14 +205,14 @@ class _Dirent(Transcriber, prefix=None):
     '''
     return id(self)
 
-  def transcribe_inner(self, attrs=None) -> str:
+  def str_inner(self, attrs=None) -> str:
     ''' Transcribe the inner components of the `Dirent` as text.
     '''
     if attrs is None:
       attrs = {}
     tokens = []
     if self.name and self.name != '.':
-      tokens.append(self.transcribe_obj(self.name))
+      tokens.append(self.str_obj(self.name))
       tokens.append(':')
     if type(self) is _Dirent:
       attrs['type'] = self.type
@@ -227,7 +227,7 @@ class _Dirent(Transcriber, prefix=None):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
       attrs['prev_dirent_blockref'] = prev_blockref
-    tokens.append(self.transcribe_mapping_inner(attrs))
+    tokens.append(self.str_mapping_inner(attrs))
     return ''.join(tokens)
 
   @classmethod
@@ -500,10 +500,10 @@ class InvalidDirent(_Dirent, prefix='INVALIDDirent'):
     '''
     return self.chunk
 
-  def transcribe_inner(self) -> str:
+  def str_inner(self) -> str:
     ''' Transcribe the inner components of this InvalidDirent's transcription.
     '''
-    return super().transcribe_inner({'chunks': self.chunk})
+    return super().str_inner({'chunks': self.chunk})
 
 class SymlinkDirent(_Dirent, prefix='SymLink'):
   ''' A symbolic link.
