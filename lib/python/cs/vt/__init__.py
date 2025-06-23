@@ -81,6 +81,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: System :: Filesystems",
     ],
+    'python_requires':
+    '>=3.10',
     'ext-modules': [{
         'name': 'cs.vt._scan',
         'sources': ['_scan.c']
@@ -130,6 +132,7 @@ DISTINFO = {
     },
     'extras_requires': {
         'FUSE': ['llfuse'],
+        'httpd': ['flask'],
         'plotting': ['cs.mplutils'],
     },
 }
