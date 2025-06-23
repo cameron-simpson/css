@@ -332,12 +332,14 @@ def flatten(transcription) -> Iterable[bytes]:
   if transcription is None:
     pass
   elif hasattr(transcription, 'transcribe'):
+    # an object which can transcribe itself in a flattenable way
+    # includes all AbstractBinary instances
     yield from flatten(transcription.transcribe())
   elif isinstance(transcription, Buffer):
-    if transcription:
+    if len(transcription) > 0:
       yield transcription
   elif isinstance(transcription, str):
-    if transcription:
+    if len(transcription) > 0::
       yield transcription.encode('ascii')
   else:
     for item in transcription:
