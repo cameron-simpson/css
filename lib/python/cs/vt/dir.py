@@ -22,6 +22,7 @@ from typeguard import typechecked
 
 from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
+from cs.lex import r
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx, pfx_method
 from cs.py.stack import stack_dump
@@ -99,10 +100,10 @@ class _Dirent(Transcriber, prefix=None):
         * `uuid`: optional identifying UUID;
           *note*: for `IndirectDirent`s this is a reference to another
           `Dirent`'s UUID.
-        * `parent`: optional parent Dirent
-        * `prev_dirent_blockref`: optional Block whose contents are the binary
-          transcription of this Dirent's previous state - another
-          Dirent
+        * `parent`: optional parent `Dirent`
+        * `prev_dirent_blockref`: optional `Block` whose contents are the binary
+          transcription of this `Dirent`'s previous state - another
+          `Dirent`
     '''
     with Pfx("_Dirent(type_=%s,name=%r,...)", type_, name):
       if not isinstance(type_, int):
@@ -162,8 +163,8 @@ class _Dirent(Transcriber, prefix=None):
   # TODO: remove all uses of _Dirent.from_bytes
   @staticmethod
   def from_bytes(data, offset=0):
-    ''' Factory to extract a Dirent from binary data at `offset` (default 0).
-        Returns the Dirent and the new offset.
+    ''' Factory to extract a `Dirent` from binary data at `offset` (default 0).
+        Returns the `Dirent` and the new offset.
     '''
     return DirentRecord.parse_value_from_bytes(data, offset=offset)
 
@@ -180,20 +181,19 @@ class _Dirent(Transcriber, prefix=None):
     return True
 
   def ingest_extended_data(self, extended_data):
-    ''' The basic _Dirent subclasses do not use extended data.
+    ''' The basic `_Dirent` subclasses do not use extended data.
     '''
     if extended_data:
       raise ValueError(
-          "expected extended_data to be None or empty, got: %r" %
-          (extended_data,)
+          f'expected extended_data to be None or empty, got: {r(extended_data)}'
       )
 
   def get_extended_data(self):
-    ''' The basic _Dirent subclasses do not use extended data.
+    ''' The basic `_Dirent` subclasses do not use extended data.
     '''
     return None
 
-  def __bytes__(self):
+  def __bytes__(self) -> bytes:
     ''' Serialise this Dirent to bytes.
     '''
     return bytes(DirentRecord(self))
@@ -790,21 +790,21 @@ class Dir(_Dirent, DirLike, prefix='D'):
 
       Special attributes:
       * `changed`:
-        Starts False, becomes true if this or any subdirectory gets changed
-        or has a file opened; stays True from then on.
-        This accepts an ongoing compute cost for .block to avoid
-        setting the flag on every file.write etc.
+        Starts `False`, becomes true if this or any subdirectory gets changed
+        or has a file opened; stays `True` from then on.
+        This accepts an ongoing compute cost for `.block` to avoid
+        setting the flag on every file `.write` etc.
   '''
 
-  def __init__(self, name, block=None, **kw):
+  def __init__(self, name, block=None, **dirent_kw):
     ''' Initialise this directory.
 
         Parameters:
-        * `meta`: meta information
-        * `parent`: parent Dir
-        * `block`: pre-existing Block with initial Dir content
+        * `name`: the name of this `Dir`
+        * `parent`: parent `Dir`
+        Other keyword arguments are as for `_Dirent.__init__`.
     '''
-    _Dirent.__init__(self, DirentType.DIR, name, **kw)
+    _Dirent.__init__(self, DirentType.DIR, name, **dirent_kw)
     if block is None:
       self._block = None
       self._entries = {}
