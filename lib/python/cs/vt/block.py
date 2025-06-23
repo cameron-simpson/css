@@ -627,7 +627,8 @@ class BlockRecord(BinarySingleValue, value_type=Block):
     else:
       raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
     block_bs = b''.join(flatten_transcription(transcription))
-    return BSData(block_bs).transcribe()
+    # wrap it all in a BSData
+    return bytes(BSData(block_bs))
 
 class HashCodeBlock(Block, prefix='B'):
   ''' A Block reference based on a Store hashcode.
