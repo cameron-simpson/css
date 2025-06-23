@@ -223,10 +223,10 @@ class Inode(Transcribable, NS, prefix='Ino'):
 
   @classmethod
   def parse_inner(cls, s, offset, stopchar, prefix):
-    if prefix != cls.transcribe_prefix:
+    if prefix != cls.str_prefix:
       raise ValueError(
           "expected prefix=%r, got: %r" % (
-              cls.transcribe_prefix,
+              cls.str_prefix,
               prefix,
           )
       )

@@ -86,7 +86,7 @@ class Transcribable(Promotable):  ##, ABC):
         to parse this class up to `stopchar`.
 
       Optional attribute:
-      * `transcribe_prefix`:
+      * `str_prefix`:
         the default prefix for the "prefix{....}" markers.
   '''
 

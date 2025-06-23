@@ -535,7 +535,7 @@ class IndirectDirent(_Dirent, prefix='Indirect'):
       `Dirent` requires dereferencing through a `FileSystem`.
   '''
 
-  transcribe_prefix = 'Indirect'
+  str_prefix = 'Indirect'
 
   def __init__(self, name, uuid, meta=None, block=None):
     if block is not None:
