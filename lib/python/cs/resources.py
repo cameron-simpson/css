@@ -135,7 +135,8 @@ class _MultiOpenMixinOpenCloseState:
               self.opens_from[frame_key]
           )
         return opens, retval
-      opens -= 1
+      else:
+        opens -= 1
       self.opens = opens
       if opens == 0:
         ##INACTIVE##self.tcm_dump(MultiOpenMixin)
