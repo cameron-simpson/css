@@ -294,6 +294,7 @@ class Transcriber(Promotable):  ##, ABC):
           prefix_cls = cls.class_by_prefix.get(prefix)
           if prefix_cls is None:
             raise ValueError("prefix not registered")
+          # call parse_inner after the {
           with Pfx("prefix_cls=%s", prefix_cls.__name__):
             obj, offset = prefix_cls.parse_inner(
                 s, offset, stopchar='}', prefix=prefix
