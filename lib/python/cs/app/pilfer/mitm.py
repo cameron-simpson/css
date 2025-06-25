@@ -52,201 +52,33 @@ if sys.stdout.isatty():
 # monkey patch so that Dumper.echo calls the desired print()
 mitmproxy.addons.dumper.print = print
 
-##@require(lambda consumer, is_sink: is_sink or isgeneratorfunction(consumer))
-@uses_pilfer
-@typechecked
-def process_stream(
-    consumer: Callable[Iterable[bytes], Iterable[bytes] | None],
-    progress_name: Optional[str] = None,
-    *,
-    content_length: Optional[int] = None,
-    is_filter: bool,
-    name: Optional[str] = None,
-    runstate: Optional[RunState] = None,
-    P: Pilfer,
-) -> Callable[bytes, Iterable[bytes]]:
-  ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from a flow.
-      Return a callable to set as the `flow.response.stream` in the caller.
-
-      Normally this is called via `filter_stream()` or `consume_stream()`.
-
-      The returned callable accepts a single `bytes` (some chunk
-      from the URL content stream) and yields an iterable of `bytes`;
-      this is acceptable as a `Flow.response.stream`.
-
-      The `Flow.response.stream` attribute can be set to a callable
-      which accepts a `bytes` instance as its sole callable;
-      this provides no context to the stream processor.
-      You can keep context from one chunk to the next by preparing
-      that callable with a closure, but often it is clearer to write
-      a generator which accepts an iterable of `bytes` and yields
-      `bytes`. This function enables the latter.
-
-      *Note that* calling this function actually constructs various
-      queues and dispatches worker `Thread`s to process them, so
-      it should only be called when the `consumer` is about to be
-      actioned.
-      Normally this would be when actually setting `flow.response.stream`.
-
-      Parameters:
-      * `consumer`: a callable accepting an iterable of `bytes` instances;
-        if `is_filter` then this is expected to return an iterable of
-        `bytes`, otherwise it is expected to be a sink
-      * `progress_name`: optional progress bar name, default `None`;
-        do not present a progress bar if `None`
-      * `content_length`: optional expected length of the data stream,
-        typically supplied from the response 'Content-Length` header
-      * `is_filter`: whether `consumer` is a filter (`True`) or a sink (`False`)
-      * `name`: an optional string to name the worker `Thread`,
-        default from `progress_name` or the name of `consumer`
-
-      For example, here is the stream setting from `stream_flow`,
-      which inserts a pass through stream for responses above a
-      certain size (its purpose is essentially to switch mitmproxy
-      from its default "consume all and produce `.content`" mode
-      to a streaming mode, important if this is being used as a real
-      web browsing proxy):
-
-          length = content_length(flow.response.headers)
-          if ( flow.request.method in ('GET',)
-               and (length is None or length >= threshold)
-          ):
-              # put the flow into streaming mode, changing no content
-              flow.response.stream = process_stream(
-                  lambda bss: bss,
-                  f'stream {flow.request}',
-                  content_length=length,
-                  is_filter=True,
-              )
-  '''
-  if name is None:
-    name = progress_name or funccite(consumer)
-  if progress_name is None:
-    progress_Q = None
-  else:
-    progress_Q = Progress(
-        progress_name,
-        total=content_length,
-    ).qbar(
-        itemlenfunc=len,
-        incfirst=True,
-        report_print=print,
-    )
-  if runstate is not None:
-
-    def cancel_Qs(rs: RunState):
-      ''' Callback to close the data and process queues on cancel.
-      '''
-      data_Q.close()
-      if progress_Q is not None:
-        progress_Q.close()
-
-    runstate.notify_cancel.add(cancel_Qs)
-
-  if not is_filter:
-    # wrap a sink function in a change-nothing filter
-    sink_Q = IterableQueue(name=f'{name} -> consumer-sink:{consumer.__name__}')
-
-    def copy_to_sink(bss: Iterable[bytes]) -> Iterable[bytes]:
-      ''' A generator to copy the data to the consumer (on sink_Q)
-          and to yield it unchanged.
-      '''
-      try:
-        for bs in bss:
-          sink_Q.put(bs)  # data -> consumer
-          yield bs  # data -> output
-      finally:
-        sink_Q.close()
-
-    # dispatch a Thread consuming sink_Q -> consumer
-    P.bg(
-        partial(consumer, sink_Q),
-        name=f'{name}: sink_Q -> consumer:{consumer.__name__} (sink)',
-        enter_objects=True,
-    )
-    # use the copying filter as the consumer function
-    consumer = copy_to_sink
-
-  def filter_data(Qin, Qout):
-    ''' Consume `Qin` (from the `consumer()` generator), put to `Qout`.
-    '''
-    try:
-      for obs in consumer(Qin):
-        Qout.put(obs)
-    finally:
-      Qout.close()
-
-  # dispatch a worker Thread to consume data_Q and put results on post_Q
-  data_Q = IterableQueue(name=f'{name} -> consumer:{consumer.__name__}')
-  post_Q = IterableQueue(name=f'{name} <- consumer:{consumer.__name__}')
-  Thread(
-      target=filter_data,
-      args=(data_Q, post_Q),
-      name=f'{name}: data_Q -> consumer -> post_Q',
-  ).start()
-
-  def copy_bs(bs: bytes) -> Iterable[bytes]:
-    ''' Copy `bs` to the `data_Q` and also to the `progress_Q` if not `None`.
-        Yield chunks from the `post_Q`.
-    '''
-    if len(bs) == 0:
-      # end of input: shut down the streams and collect the entire post_Q
-      try:
-        data_Q.close()
-        if progress_Q is not None:
-          progress_Q.close()
-        # yield the remaining data from post_Q
-        for obs in post_Q:
-          if len(obs) > 0:
-            yield obs
-      finally:
-        # EOF
-        yield b''
-      return
-    if data_Q.closed:
-      # we've closed the output queue, report discarded data
-      if len(bs) > 0:
-        warning(
-            "discarding %d bytes after close of data_Q:%s",
-            len(bs),
-            data_Q.name,
-        )
-      return
-    # copy to the output queue, copy to the process queue
-    data_Q.put(bs)
-    if progress_Q is not None:
-      progress_Q.put(bs)
-    # yield any ready data from post_Q
-    while not post_Q.empty():
-      obs = next(post_Q)
-      if len(bs) > 0:
-        yield obs
-    return
-
-  return copy_bs
-
-@typechecked
-def filter_stream(
-    consumer: Callable[Iterable[bytes], Iterable[bytes]],
-    progress_name: Optional[str] = None,
-    **ps_args,
-) -> Callable[bytes, bytes]:
-  ''' A shim for `process_stream` where the `consumer` processes
-      an iterable of `bytes` and returns an iterable of `bytes`,
-      typicaly a generator yielding `bytes`.
-  '''
-  return process_stream(consumer, progress_name, is_filter=True, **ps_args)
-
-@typechecked
 def consume_stream(
-    consumer: Callable[Iterable[bytes], None],
-    progress_name: Optional[str] = None,
-    **ps_args,
-) -> Callable[bytes, bytes]:
-  ''' A shim for `process_stream` where the `consumer` processes
-      an iterable of `bytes` and returns nothing.
+    consumer: Callable[Iterable[bytes], None], name=None, *, gen_attrs=None
+):
+  ''' Wrap `consumer` in a generator function suitable for use by a `StreamChain`.
+      Return the generator.
+      If the optional `getattrs` are supplied, set them as attributes
+      on the returned generator function.
   '''
-  return process_stream(consumer, progress_name, is_filter=False, **ps_args)
+
+  # TODO: use progress_name?
+
+  def consumer_gen(bss: Iterable[bytes]) -> Iterable[bytes]:
+    ''' A generator suitable as a `Flow` stream.
+       This consumees `bss`, copying it to `consumer` via an iterable
+       queue, and yielding it unchanged.
+    '''
+    consumeq, _ = WorkerQueue(consumer, name=name)
+    try:
+      for bs in bss:
+        consumeq.put(bs)
+        yield bs
+    finally:
+      consumeq.close()
+
+  if gen_attrs:
+    attr(consumer_gen, **gen_attrs)
+  return consumer_gen
 
 class StreamChain:
   ''' A single use callable wrapper for a chain of `Flow` stream functions.
