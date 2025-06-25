@@ -754,7 +754,10 @@ class MITMAddon:
       except Exception as e:
         warning("exception calling hook_action[%d]: %s", i, e)
         prep_excs.append(e)
-      if stream_funcs is not None:
+      if stream_funcs is None:
+        ##PR("stream_funcs is None")
+        pass
+      else:
         # If the .stream attribute was modified, append it to the
         # stream functions and reset the .stream attribute.
         stream = flow.response.stream
