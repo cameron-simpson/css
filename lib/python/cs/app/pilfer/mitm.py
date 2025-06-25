@@ -7,6 +7,7 @@ import asyncio
 from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
+from inspect import isgeneratorfunction
 from itertools import chain, takewhile
 import os
 from signal import SIGINT
@@ -104,7 +105,7 @@ class StreamChain:
   def __init__(self, stream_funcs: Iterable[Callable]):
     bs_funcs = []
     for func in stream_funcs:
-      if isgenerator(func):
+      if isgeneratorfunction(func):
         func = self.func_from_generator(func)
       # TODO: can we inspect the function to ensure it accepts a single `Buffer`?
       bs_funcs.append(func)
