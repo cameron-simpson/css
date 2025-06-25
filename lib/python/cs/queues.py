@@ -205,7 +205,7 @@ def WorkerQueue(worker, capacity=0, name=None, args=(), kwargs=None):
   q = IterableQueue(capacity=capacity, name=name)
   try:
     T = Thread(
-        target=trace(worker, retval=True),
+        target=worker,
         args=[q, *args],
         kwargs=kwargs,
         name=f'{name} WorkerQueue'
