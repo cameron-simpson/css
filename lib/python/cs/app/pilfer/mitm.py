@@ -102,7 +102,16 @@ class StreamChain:
 
   # TODO: optional progress bar - overall and per stream func
   @typechecked
-  def __init__(self, stream_funcs: Iterable[Callable]):
+  def __init__(
+      self,
+      stream_funcs: Iterable[Callable],
+      *,
+      progress_name: Optional[str] = None
+  ):
+    progress_name = None  # DEBUG
+    self.progress_name = progress_name
+    self.progressQ = None
+    self.queues = []
     bs_funcs = []
     for func in stream_funcs:
       if not callable(func):
@@ -112,7 +121,23 @@ class StreamChain:
       # TODO: can we inspect the function to ensure it accepts a single `Buffer`?
       bs_funcs.append(func)
     self.stream_funcs = bs_funcs
-    self.queues = []
+    if progress_name:
+
+      def progress_worker(q):
+        for _ in progressbar(q, self.progress_name, itemlenfunc=len):
+          pass
+
+      self.progressQ = IterableQueue(name=self.progress_name)
+      self.queues.append(self.progressQ)
+      Thread(
+          name=f'{self.progress_name} progressbar worker',
+          target=progress_worker,
+          args=(self.progressQ,),
+      ).start()
+
+  def __del__(self):
+    for q in self.queues:
+      q.close()
 
   def func_from_generator(
       self, genfunc: Callable[Iterable[bytes], Iterable[bytes]]
