@@ -259,26 +259,6 @@ class StreamChain:
       if at_EOF:
         yield b''
 
-@attr(default_hooks=('responseheaders',))
-@uses_pilfer
-@typechecked
-def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
-  ''' If the flow has no content-length or the length is at least
-      threshold, put the flow into streaming mode.
-  '''
-  assert hook_name == 'responseheaders'
-  assert not flow.response.stream
-  length = content_length(flow.response.headers)
-  if (flow.request.method in ('GET',)
-      and (length is None or length >= threshold)):
-    # put the flow into streaming mode, changing nothing
-    flow.response.stream = filter_stream(
-        lambda bss: bss,
-        f'stream {flow.request.url}',
-        content_length=length,
-        runstate=flow.runstate,
-    )
-
 @attr(default_hooks=('requestheaders',))
 def print_rq(hook_name, flow):
   rq = flow.request
@@ -601,7 +581,6 @@ class MITMHookAction(Promotable):
       'soup': patch_soup,
       'print': print_rq,
       'save': save_stream,
-      'stream': stream_flow,
   }
 
   action: Callable
