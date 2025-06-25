@@ -233,9 +233,9 @@ class StreamChain:
         There will never be a spurious `b''` in the pre-EOF stream.
         A spurious `b''` from the stream functions will be discarded.
     '''
+    at_EOF = len(bs0) == 0
+    bss = () if at_EOF else (bs0,)
     try:
-      at_EOF = len(bs0) == 0
-      bss = () if at_EOF else (bs0,)
       stream_excs = []
       for stream_func in self.stream_funcs:
         obss = []
@@ -255,13 +255,9 @@ class StreamChain:
             self.progressQ.put(bs)
       if stream_excs:
         raise ExceptionGroup(f'exceptions running {self}', stream_excs)
+    finally:
       if at_EOF:
         yield b''
-    except Exception:
-      # shut down all the queues so that the worker threads complete
-      for q in self.queues:
-        q.close()
-      raise
 
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
