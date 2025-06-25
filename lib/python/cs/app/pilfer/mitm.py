@@ -227,28 +227,32 @@ class StreamChain:
     return obss
 
   @pfx_method
-  def __call__(self, bs: bytes) -> Iterable[bytes]:
+  def __call__(self, bs0: bytes) -> Iterable[bytes]:
     ''' Process a single input `bytes`, and yield partial output.
         There will always be a final `b''` to indicate EOF.
         There will never be a spurious `b''` in the pre-EOF stream.
         A spurious `b''` from the stream functions will be discarded.
     '''
     try:
-      at_EOF = len(bs) == 0
-      bss = () if at_EOF else (bs,)
+      at_EOF = len(bs0) == 0
+      bss = () if at_EOF else (bs0,)
       stream_excs = []
       for stream_func in self.stream_funcs:
         obss = []
         for bs in bss:
           if len(bs) == 0:
-            # skip empty bytes, we will supply a find bytes later if at_EOF
+            # skip empty bytes, we will supply a final bytes later if at_EOF
             continue
           obss.extend(self.call_stream_func(stream_func, bs, stream_excs))
         if at_EOF:
           # pass the final EOF indicator
           obss.extend(self.call_stream_func(stream_func, b'', stream_excs))
         bss = obss
-      yield from (bs for bs in bss if len(bs) > 0)
+      for bs in bss:
+        if len(bs) > 0:
+          yield bs
+          if self.progressQ:
+            self.progressQ.put(bs)
       if stream_excs:
         raise ExceptionGroup(f'exceptions running {self}', stream_excs)
       if at_EOF:
