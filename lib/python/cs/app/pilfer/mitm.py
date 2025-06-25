@@ -35,7 +35,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import Progress
 from cs.py.func import funccite, func_a_kw
-from cs.queues import IterableQueue
+from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
 from cs.rfc2616 import content_length
 from cs.upd import print as upd_print
@@ -144,46 +144,57 @@ class StreamChain:
   ):
     ''' Convert a generator accepting an iterable of `bytes` into
         a conventional stream function.
-        Note that this _dispatches_ a worker `Thread`.
+        Note that this dispatches a worker `Thread`.
     '''
-    # a generator accepting an iterable of bytes and yielding bytes
-    genQ = IterableQueue()  # TODO: a size limit?
-    self.queues.append(genQ)
-    outQ = IterableQueue()
-    self.queues.append(outQ)
 
-    def worker():
-      ''' A worker to consume the input queue `genQ` and to place
-          resulting data onto the queue `outQ`.
+    def worker(qin, qout):
+      ''' A worker to consume the input queue `qin` and to place
+          resulting data onto the queue `qout`.
       '''
       try:
-        for bs in genfunc(genQ):
+        obss = genfunc(qin)
+        if self.progress_name:
+          obss = progressbar(
+              obss,
+              f'{self.progress_name} -> {getattr(genfunc,"desc",genfunc.__name__)}',
+              itemlenfunc=len,
+          )
+        for bs in obss:
           if len(bs) > 0:
-            outQ.put(bs)
+            qout.put(bs)
       finally:
-        outQ.close()
+        qout.close()
 
     def bs_func(bs: bytes) -> Iterable[bytes]:
       ''' Receive a `bytes`, put it on the queue consumed by the generator.
           Yield waiting `bytes`es from the queue emitted from the generator.
       '''
+      assert isinstance(bs, bytes)
       at_EOF = len(bs) == 0
       if at_EOF:
+        # close the generator input then yield all the output
         genQ.close()
+        for bs in outQ:
+          assert isinstance(bs, bytes)
+          if len(bs) > 0:
+            yield bs
       else:
+        # send bs to the generator and then yield any ready data
         genQ.put(bs)
-      # collect waiting data
-      while not outQ.empty:
-        bs = outQ.get()
-        if len(bs) > 0:
-          yield bs
+        while not outQ.empty:
+          bs = outQ.get()
+          assert isinstance(bs, bytes)
+          if len(bs) > 0:
+            yield bs
       if at_EOF:
         yield b''
 
-    Thread(
-        name=f'{self.__class__.__name__} worker for {funccite(genfunc)}',
-        target=worker,
-    ).start()
+    outQ = IterableQueue()
+    self.queues.append(outQ)
+    # dispatch the worker, obtain genQ
+    genQ, _ = WorkerQueue(worker, args=(outQ,), name=self.progress_name)
+    self.queues.append(genQ)
+    # return the per-bytes submitter
     return bs_func
 
   @typechecked
