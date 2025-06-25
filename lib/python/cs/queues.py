@@ -76,6 +76,9 @@ class QueueIterator(Iterable[Any]):
   def __str__(self):
     return f'{self.__class__.__name__}({self.name!r},q={self.q})'
 
+  def __repr__(self):
+    return str(self)
+
   def close(self):
     with self.__lock:
       if not self.closed:
