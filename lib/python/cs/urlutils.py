@@ -102,8 +102,6 @@ class URL(HasThreadState, Promotable):
     self._lock = RLock()
     self._parts = None
     self._info = None
-    self._soup = soup
-    self._text = text
     self.flush()
 
   def __str__(self):
@@ -183,14 +181,12 @@ class URL(HasThreadState, Promotable):
     '''
     return self.GET_response.content
 
-  @property
+  @cached_property
   @unattributable
   def text(self) -> str:
     ''' The URL decoded content as a string.
     '''
-    if self._text is None:
-      self._text = self.GET_response.text
-    return self._text
+    return self.GET_response.text
 
   @property
   @unattributable
@@ -274,7 +270,7 @@ class URL(HasThreadState, Promotable):
       parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
     else:
       parser_names = ('lxml', 'xml')
-    soup = pfx_call(BeautifulSoup, self.text, list(parser_names))
+    soup = pfx_call(BeautifulSoup, self.text, 'lxml')  ## list(parser_names))
     return soup
 
   def feedparsed(self):
