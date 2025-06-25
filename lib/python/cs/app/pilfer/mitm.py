@@ -248,6 +248,146 @@ def consume_stream(
   '''
   return process_stream(consumer, progress_name, is_filter=False, **ps_args)
 
+class StreamChain:
+  ''' A single use callable wrapper for a chain of `Flow` stream functions.
+      A new `StreamChain` should be contructed when setting a `Flow`'s
+      `.response.stream` attribute, as it keeps state.
+
+      Each stream function is either a callable accepting `bytes`
+      and returning:
+      - a `bytes`, for a `bytes`->`bytes` filter
+      - an iterable of `bytes`
+      - `None`, for a filter which merely inspects its inputs;
+        (this last is an additional mode beyond the default `Flow` support, 
+        and the initial `bytes` argument is passed through by this class)
+      or a generator accepting an iterable of `bytes` and yielding `bytes`.
+
+      Note that the generator support means that a callable accepting
+      a single `bytes` can never be supplied as a generator, it
+      must be an ordinary function returning an iterable of `bytes`.
+  '''
+
+  # TODO: optional progress bar - overall and per stream func
+  @typechecked
+  def __init__(self, stream_funcs: Iterable[Callable]):
+    bs_funcs = []
+    for func in stream_funcs:
+      if isgenerator(func):
+        func = self.func_from_generator(func)
+      # TODO: can we inspect the function to ensure it accepts a single `Buffer`?
+      bs_funcs.append(func)
+    self.stream_funcs = bs_funcs
+    self.queues = []
+
+  def func_from_generator(
+      self, genfunc: Callable[Iterable[bytes], Iterable[bytes]]
+  ):
+    ''' Convert a generator accepting an iterable of `bytes` into
+        a conventional stream function.
+        Note that this _dispatches_ a worker `Thread`.
+    '''
+    # a generator accepting an iterable of bytes and yielding bytes
+    genQ = IterableQueue()  # TODO: a size limit?
+    self.queues.append(genQ)
+    outQ = IterableQueue()
+    self.queues.append(outQ)
+
+    def worker():
+      ''' A worker to consume the input queue `genQ` and to place
+          resulting data onto the queue `outQ`.
+      '''
+      try:
+        for bs in genfunc(genQ):
+          if len(bs) > 0:
+            outQ.put(bs)
+      finally:
+        outQ.close()
+
+    def bs_func(bs: bytes) -> Iterable[bytes]:
+      ''' Receive a `bytes`, put it on the queue consumed by the generator.
+          Yield waiting `bytes`es from the queue emitted from the generator.
+      '''
+      at_EOF = len(bs) == 0
+      if at_EOF:
+        genQ.close()
+      else:
+        genQ.put(bs)
+      # collect waiting data
+      while not outQ.empty:
+        bs = outQ.get()
+        if len(bs) > 0:
+          yield bs
+      if at_EOF:
+        yield b''
+
+    Thread(
+        name=f'{self.__class__.__name__} worker for {funccite(genfunc)}',
+        target=worker,
+    ).start()
+    return bs_func
+
+  @typechecked
+  def call_stream_func(
+      self,
+      stream_func: Callable[bytes, bytes | Iterable[bytes] | None],
+      bs: bytes,
+      stream_excs: list[Exception],
+  ) -> Iterable[bytes]:
+    ''' Call a single strream function with a `bytes`.
+        Return an iterable of `bytes`.
+        If the function raises an exception, append the exception
+        to `stream_excs` and return the original `bytes`
+        unchanged.
+    '''
+    try:
+      obss = stream_func(bs)
+    except Exception as e:
+      warning("exception calling stream_func %s: %s", funccite(stream_func), e)
+      stream_excs.append(e)
+      # processing broken, pass the bytes unchanged
+      obss = [bs]
+    # we expect a bytes or an iterable of bytes or None
+    if obss is None:
+      # pass the bytes through unchanged
+      obss = [bs]
+    elif isinstance(obss, Buffer):
+      # promote to an iterable of bytes
+      obss = [obss]
+    return obss
+
+  @pfx_method
+  def __call__(self, bs: bytes) -> Iterable[bytes]:
+    ''' Process a single input `bytes`, and yield partial output.
+        There will always be a final `b''` to indicate EOF.
+        There will never be a spurious `b''` in the pre-EOF stream.
+        A spurious `b''` from the stream functions will be discarded.
+    '''
+    try:
+      at_EOF = len(bs) == 0
+      bss = () if at_EOF else (bs,)
+      stream_excs = []
+      for stream_func in self.stream_funcs:
+        obss = []
+        for bs in bss:
+          if len(bs) == 0:
+            # skip empty bytes, we will supply a find bytes later if at_EOF
+            continue
+          obss.extend(self.call_stream_func(stream_func, bs, stream_excs))
+        if at_EOF:
+          # pass the final EOF indicator
+          obss.extend(self.call_stream_func(stream_func, b'', stream_excs))
+        bss = obss
+      yield from (bs for bs in bss if len(bs) > 0)
+      if stream_excs:
+        raise ExceptionGroup(f'exceptions running {self}', stream_excs)
+      if at_EOF:
+        yield b''
+    except Exception:
+      # shut down all the queues so that the worker threads complete
+      for q in self.queues:
+        q.close()
+      raise
+
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
@@ -811,87 +951,7 @@ class MITMAddon:
 
         stream_funcs.append(content_stream)
 
-      if len(stream_funcs) == 1:
-        stream, = stream_funcs
-      else:
-        assert len(stream_funcs) > 1
-
-        def stream(bs: bytes) -> Iterable[bytes]:
-          ''' Run each `bytes` instance through all the stream functions.
-              Return an iterable of `bytes` emenating from the final function.
-          '''
-          # TODO: we really need to think a bit harder about EOF
-          # or exception from a stage.
-          stream_excs = []
-          at_EOF = len(bs) == 0
-          if at_EOF:
-            bss = []
-          else:
-            bss = [bs]
-          try:
-            # Feed the bytes from bss through each of stream_funcs.
-            # Pass the resulting blocks through the next stream function.
-            # We start with a single block, but each stage may produce
-            # multiple blocks for use by the subsequent stages.
-            for stream_func in stream_funcs:
-              # Feed bss through the stream function, collect its
-              # results for use by the next stage.
-              # Because a stage function might return a bytes or an
-              # iterable of bytes we promote each result to an iterable
-              # of bytes and combine them for the next pass.
-              obsses = []  # list of iterables, one per bs in bss
-              for bs in bss:
-                try:
-                  obss = stream_func(bs)
-                except Exception as e:
-                  warning(
-                      "exception calling hook_action stream_func %s: %s",
-                      funccite(stream_func), e
-                  )
-                  stream_excs.append(e)
-                  # processing broken, pass the bytes unchanged
-                  obss = [bs]
-                # we expect a bytes or an iterable of bytes
-                if isinstance(obss, Buffer):
-                  # promote to iterable
-                  obss = [obss]
-                obsses.append(obss)
-                if at_EOF:
-                  # send EOF to each stage
-                  try:
-                    obss = stream_func(b'')
-                  except Exception as e:
-                    warning(
-                        "exception calling hook_action stream_func %s: %s",
-                        funccite(stream_func), e
-                    )
-                    stream_excs.append(e)
-                    # processing broken, pass the bytes unchanged
-                    obss = [bs]
-                  # we expect a bytes or an iterable of bytes
-                  if isinstance(obss, Buffer):
-                    # promote to iterable
-                    obss = [obss]
-                  obsses.append(obss)
-              # prepare the iterable of bytes for the next stage function
-              bss = chain(*obsses)
-            # end of stages: yield the nonempty results
-            for bs in bss:
-              if len(bs) > 0:
-                yield bs
-          finally:
-            if stream_excs:
-              if len(stream_excs) == 1:
-                raise stream_excs[0]
-              raise ExceptionGroup(
-                  f'multiple exceptions running actions for .{hook_name}',
-                  stream_excs
-              )
-            if at_EOF:
-              # send the final EOF
-              yield b''
-
-      flow.response.stream = stream
+      flow.response.stream = StreamChain(stream_funcs)
 
     if prep_excs:
       if len(prep_excs) == 1:
