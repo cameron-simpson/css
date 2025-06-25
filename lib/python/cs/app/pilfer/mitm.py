@@ -29,11 +29,12 @@ from cs.cmdutils import vprint
 from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
+from cs.fs import shortpath
 from cs.gimmicks import Buffer
 from cs.lex import printt
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
-from cs.progress import Progress
+from cs.progress import Progress, progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
@@ -273,7 +274,10 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       If there is a `flow.response`, update the cache.
   '''
   assert P is not None
-  PR = lambda *a: print('CACHED_FLOW', hook_name, flow.request, *a)
+  PR = lambda *a: print(
+      'CACHED_FLOW', hook_name, flow.request.method, flow.request.url, *a
+  )
+  PR()
   rq = flow.request
   if rq.method not in ('GET', 'HEAD'):
     PR(rq.method, "is not GET or HEAD")
@@ -287,6 +291,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   # extra values for use
   extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
   cache_keys = P.cache_keys_for_url(url, extra=extra)
+  PR("cache_keys", cache_keys)
   if not cache_keys:
     PR("no URL keys")
     return
@@ -307,8 +312,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         # response from upstream, update the cache
         PR("to cache, cache_keys", ", ".join(cache_keys))
         if rsp.content is None:
-          # we are at the response headers
-          # and will stream the content to the cache file
+          # We are at the response headers
+          # and will stream the content to the cache file.
           assert hook_name == "responseheaders"
           rsp.stream = consume_stream(
               lambda bss: cache.cache_response(
@@ -321,9 +326,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   decoded=False,
                   runstate=flow.runstate,
               ),
-              f'cache {cache_keys}',
-              content_length=content_length(rsp.headers),
-              runstate=flow.runstate,
+              name=f'cache {cache_keys}',
+              gen_attrs=dict(content_length=content_length(rsp.headers)),
           )
         else:
           # we are at the completed response
