@@ -188,6 +188,34 @@ def IterablePriorityQueue(capacity=0, name=None):
   '''
   return QueueIterator(PriorityQueue(capacity), name=name)
 
+def WorkerQueue(worker, capacity=0, name=None, args=(), kwargs=None):
+  ''' Create an `IterableQueue` and start a worker `Thread` to consume it.
+      Return a `(queue,Thread)` 2-tuple.
+      The caller must close the queue.
+
+      Parameters:
+      * `worker`: the function to consume the queue
+      * `capacity`: optional, passed to `IterableQueue`
+      * `name`: optional, passed to `IterableQueue` and used in the `Thread` name
+      * `args`: optional additional positional arguments for `worker` after the queue
+      * `kwargs`: optional keyword arguments for the worker
+  '''
+  if name is None:
+    name = worker.__name__
+  q = IterableQueue(capacity=capacity, name=name)
+  try:
+    T = Thread(
+        target=trace(worker, retval=True),
+        args=[q, *args],
+        kwargs=kwargs,
+        name=f'{name} WorkerQueue'
+    )
+    T.start()
+  except Exception:
+    q.close()
+    raise
+  return q, T
+
 class Channel(object):
   ''' A zero-storage data passage.
       Unlike a `Queue`, `put(item)` blocks waiting for the matching `get()`.
