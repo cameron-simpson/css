@@ -105,6 +105,8 @@ class StreamChain:
   def __init__(self, stream_funcs: Iterable[Callable]):
     bs_funcs = []
     for func in stream_funcs:
+      if not callable(func):
+        raise ValueError(f'{func=} is not callable')
       if isgeneratorfunction(func):
         func = self.func_from_generator(func)
       # TODO: can we inspect the function to ensure it accepts a single `Buffer`?
