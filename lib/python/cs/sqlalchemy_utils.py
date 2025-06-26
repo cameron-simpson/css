@@ -373,26 +373,14 @@ class ORM(MultiOpenMixin, ABC):
   @contextmanager
   def startup_shutdown(self):
     ''' Default startup/shutdown context manager.
-
-        This base method operates a lockfile to manage concurrent access
-        by other programmes (which would also need to honour this file).
-        If you actually expect this to be common
-        you should try to keep the `ORM` "open" as briefly as possible.
-        The lock file is only operated if `self.db_fspath`,
-        currently set only for filesystem SQLite database URLs.
+        This updates the database schema on first use.
     '''
-    with contextif(
-        bool(self.db_fspath),
-        lockfile,
-        self.db_fspath,
-        poll_interval=2,
-    ):
-      # make sure that the db tables are up to date
-      if self.__first_use:
-        with self.sqla_state.auto_session() as session:
-          self.Base.metadata.create_all(bind=self.engine)
-        self.__first_use = False
-      yield
+    # make sure that the db tables are up to date
+    if self.__first_use:
+      with self.sqla_state.auto_session() as session:
+        self.Base.metadata.create_all(bind=self.engine)
+      self.__first_use = False
+    yield
 
   @property
   def engine(self):
@@ -425,33 +413,43 @@ class ORM(MultiOpenMixin, ABC):
     return sessionmaker
 
   @contextmanager
+  def serialif(self):
+    ''' A context manager to serialise sessions if `self.serial_sessions`.
+    '''
+    if self.serial_sessions:
+      existing_session = self.sqla_state.session
+      if existing_session is not None:
+        T = current_thread()
+        raise RuntimeError(
+            f'Thread:{T.ident}:{T.name}'
+            f': this Thread already has an ORM session: {existing_session}'
+        )
+      with self._serial_sessions_lock:
+        with contextif(
+            bool(self.db_fspath),
+            lockfile,
+            self.db_fspath,
+            poll_interval=2,
+        ):
+          yield
+    else:
+      yield
+
+  @contextmanager
   @pfx_method(use_str=True)
   def orchestrated_session(self):
-    ''' Orchestrate a new session for this `Thread`,
-        honouring `self.serial_session`.
+    ''' A context manager to orchestrate a *new* session for this `Thread`,
+        honouring `self.serial_session` and yielding the new `Session`.
     '''
     orm_state = self.sqla_state
     with self:
-      if self.serial_sessions:
-        if orm_state.session is not None:
-          T = current_thread()
-          tid = "Thread:%d:%s" % (T.ident, T.name)
-          raise RuntimeError(
-              "%s: this Thread already has an ORM session: %s" % (
-                  tid,
-                  orm_state.session,
-              )
-          )
-        with self._serial_sessions_lock:
-          new_session = self._sessionmaker()
+      with self.serialif():
+        new_session = self._sessionmaker()
+        try:
           with new_session.begin_nested():
             yield new_session
+        finally:
           new_session.close()
-      else:
-        new_session = self._sessionmaker()
-        with new_session.begin_nested():
-          yield new_session
-        new_session.close()
 
   @property
   def default_session(self):
