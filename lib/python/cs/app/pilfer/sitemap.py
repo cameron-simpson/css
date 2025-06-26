@@ -702,7 +702,7 @@ class SiteMap(Promotable):
     return match.format_arg(extra=extra)
 
   @uses_pilfer
-  @typechecked
+  ##@typechecked # we don't import Pilfer (circular)
   def content_prefetch(
       self,
       match: SiteMapPatternMatch,
