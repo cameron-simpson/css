@@ -253,7 +253,7 @@ class ORM(MultiOpenMixin, ABC):
   ''' A convenience base class for an ORM class.
 
       This defines a `.Base` attribute which is a new `DeclarativeBase`
-      and provides various Session related convenience methods.
+      and provides various `Session` related convenience methods.
       It is also a `MultiOpenMixin` subclass
       supporting nested open/close sequences and use as a context manager.
   '''
@@ -292,6 +292,11 @@ class ORM(MultiOpenMixin, ABC):
   def __init__(self, db_url, serial_sessions=None):
     ''' Initialise the ORM.
 
+        The `db_url` is any database URL of the form `dbtype://...`.
+        It may also be an absolute filesystem path, starting with
+        `/` and ending in `.sqlite`. This is transformed into an
+        `sqlite:///fspath` URL.
+
         If `serial_sessions` is true (default `True` for SQLite, `False` otherwise)
         then allocate a lock to serialise session allocation.
         This might be chosen with SQL backends which do not support
@@ -303,20 +308,17 @@ class ORM(MultiOpenMixin, ABC):
         Instead we use the `serial_sessions` option to obtain a
         mutex before allocating a session.
     '''
-    db_fspath = self.fspath_for_db_url(db_url)
-    self.db_url = db_url = self.norm_db_url(db_url)
-    self.db_fspath = db_fspath
-    is_sqlite = db_url.startswith('sqlite://')
+    self.db_url = self.norm_db_url(db_url)
+    self.db_fspath = self.fspath_for_db_url(self.db_url)
+    is_sqlite = self.db_url.startswith('sqlite://')
     if serial_sessions is None:
-      # serial SQLite sessions
+      # serial SQLite sessions by default
       serial_sessions = is_sqlite
     elif not serial_sessions:
       if is_sqlite:
         warning(
-            "serial_sessions specified as %r, but is_sqlite=%s:"
-            " this may cause trouble with multithreaded use",
-            serial_sessions,
-            is_sqlite,
+            f'{serial_sessions=} but {is_sqlite=}'
+            '; this may cause trouble with concurrent use'
         )
     self.serial_sessions = serial_sessions or is_sqlite
     self.Base = declarative_base()
@@ -328,7 +330,6 @@ class ORM(MultiOpenMixin, ABC):
     else:
       self._engine = None
       self._sessionmaker_raw = None
-    self.db_url = db_url
     self.engine_keywords = dict(
         ##case_sensitive=True,
         echo='SQL' in map(str.upper,
@@ -457,9 +458,9 @@ class ORM(MultiOpenMixin, ABC):
     return self.sqla_state.session
 
 def orm_auto_session(method):
-  ''' Decorator to run a method in a session derived from `self.orm`
+  ''' A decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
-      Intended to assist classes with a `.orm` attribute.
+      This is intended to assist classes with a `.orm` attribute.
 
       See `with_session` for details.
   '''
