@@ -455,13 +455,14 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
   '''
   # TODO: avoid prefetched from prefecthed URLs, do not prefetch multiple times
   PR = lambda *a: print(
-      'PROCESS_CONTENT', pattern_type, hook_name, flow.request, *a
+      'PROCESS_CONTENT', pattern_type, hook_name, flow.request.method, flow.
+      request.url, *a
   )
   rq = flow.request
-  url = URL(rq.url)
   if rq.method != "GET":
     PR("not a GET, ignoring")
     return
+  url = URL(rq.url)
   matches = list(P.url_matches(url, pattern_type))
   if not matches:
     # nothing to do
