@@ -49,27 +49,44 @@ def ALL(func):
   return func
 
 def fmtdoc(func):
-  ''' Decorator to replace a function's docstring with that string
-      formatted against the function's module `__dict__`.
+  ''' A decorator to format a function's docstring.
+      This replaces the docstring with that string
+      formatted against the function's module `__dict__`
+      using `str.format_map`.
 
-      This supports simple formatted docstrings:
+      A quirk of `format_map` allows us to also support:
+      * `{`*name*`=}`: the f-string `{`*name*`=}` notation
+      * `{`*name*`==}`: the f-string `{`*name*`=}` notation
+        with the function module name prefixed
 
-          ENVVAR_NAME = 'FUNC_DEFAULT'
+      This supports simple formatted docstrings. Example:
+
+          FUNC_ENVVAR = 'FUNC_SETTING
+          FUNC_DEFAUlT = 12
 
           @fmtdoc
           def func():
-              """Do something with os.environ[{ENVVAR_NAME}]."""
-              print(os.environ[ENVVAR_NAME])
+              """
+              Do something with the environment variable `${FUNC_ENVVAR}`.
+              The default if no `${FUNC_ENVVAR}` comes from `{FUNC_DEFAUlT==}`.
+              """
+              print(os.environ.get(FUNC_ENVVAR, FUNC_DEFAUlT))
 
       This gives `func` this docstring:
 
-          Do something with os.environ[FUNC_DEFAULT].
+          Do something with the environment variable `$FUNC_SETTING`.
+          The default if no `$FUNC_SETTING` comes from `module.func.FUNC_DEFAUlT=12`.
 
       *Warning*: this decorator is intended for wiring "constants"
       into docstrings, not for dynamic values. Use for other types
       of values should be considered with trepidation.
   '''
-  func.__doc__ = func.__doc__.format(**sys.modules[func.__module__].__dict__)
+  fmtmap = dict(**sys.modules[func.__module__].__dict__)
+  # bodge in support for {name=}
+  for name, value in list(fmtmap.items()):
+    fmtmap[f'{name}='] = f'{name}={value!r}'
+    fmtmap[f'{name}=='] = f'{func.__module__}.{name}={value!r}'
+  func.__doc__ = func.__doc__.format_map(fmtmap)
   return func
 
 def decorator(deco):
@@ -101,15 +118,18 @@ def decorator(deco):
           def mydeco(func, *da, arg2=None):
             ... decorate func subject to the values of da and arg2
 
-          # mydeco called with defaults
+          # @mydeco called with defaults
           @mydeco
           def func1(...):
             ...
 
-          @ mydeco called with nondefault arguments
+          # @mydeco called with nondefault arguments
           @mydeco('foo', arg2='bah')
           def func2(...):
             ...
+
+      The `@mydeco` decorator itself is then written as though the
+      arguments were always supplied.
   '''
 
   def decorate(func, *dargs, **dkwargs):
