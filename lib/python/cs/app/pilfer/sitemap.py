@@ -13,7 +13,7 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
 
 from cs.binary import bs
-from cs.deco import decorator, promote, Promotable
+from cs.deco import decorator, fmtdoc, promote, Promotable
 from cs.lex import cutsuffix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -25,6 +25,11 @@ from bs4 import BeautifulSoup
 from mitmproxy.flow import Flow
 import requests
 from typeguard import typechecked
+
+from cs.debug import trace, X, r, s, pprint
+
+# The default HTML parser chosen by BeautifulSoup.
+BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
 
 def default_Pilfer():
   ''' Obtain the ambient `Pilfer` instance via a late import.
@@ -99,10 +104,23 @@ class URLMatcher(Promotable):
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
 
 class FlowState(NS, Promotable):
+  ''' An object with some resemblance to a `mitmproxy` `Flow` object
+      with various utility properties and methods.
+      It may be initialised from lesser such as just a URL.
+  '''
 
+  @fmtdoc
   @promote
   def __init__(self, url: URL, **ns_kw):
     ''' Initialise `self` from the keyword parameters.
+
+        Accepted parameters:
+        - `bs4parser`: the desires BeautifulSoup parser,
+          default from `{BS4_PARSER_DEFAULT==}`.
+        - `flow`: a `mitmproxy` `Flow` instance
+        - `request`: a `Request` instance
+        - `response`: a `Response` instance
+        - `url`; a URL
 
         The end result is that we have `.flow`, `.request`,
         `.response` and `.url` attributes, which may be `None`
@@ -112,7 +130,13 @@ class FlowState(NS, Promotable):
         - `.url` is obtained from `.request.url`
     '''
     super().__init__(url=url, **ns_kw)
-    extra_attrs = self.__dict__.keys() - ('flow', 'request', 'response', 'url')
+    extra_attrs = self.__dict__.keys() - (
+        'bs4parser',
+        'flow',
+        'request',
+        'response',
+        'url',
+    )
     if extra_attrs:
       raise ValueError(f'unexpected attributes supplied: {extra_attrs}')
 
@@ -148,6 +172,15 @@ class FlowState(NS, Promotable):
         response=flow.response,
         url=flow.request.url,
     )
+
+  @cached_property
+  @fmtdoc
+  def bs4parser(self):
+    ''' The beautifulSoup parser name.
+        The default comes from `{BS4_PARSER_DEFAULT==}`.
+    '''
+    # TODO: envvar? Pilfer config setting?
+    return BS4_PARSER_DEFAULT
 
   @cached_property
   def url(self) -> URL:
