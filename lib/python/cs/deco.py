@@ -74,13 +74,19 @@ def fmtdoc(func):
 
       This gives `func` this docstring:
 
-          Do something with os.environ[FUNC_DEFAULT].
+          Do something with the environment variable `$FUNC_SETTING`.
+          The default if no `$FUNC_SETTING` comes from `module.func.FUNC_DEFAUlT=12`.
 
       *Warning*: this decorator is intended for wiring "constants"
       into docstrings, not for dynamic values. Use for other types
       of values should be considered with trepidation.
   '''
-  func.__doc__ = func.__doc__.format(**sys.modules[func.__module__].__dict__)
+  fmtmap = dict(**sys.modules[func.__module__].__dict__)
+  # bodge in support for {name=}
+  for name, value in list(fmtmap.items()):
+    fmtmap[f'{name}='] = f'{name}={value!r}'
+    fmtmap[f'{name}=='] = f'{func.__module__}.{name}={value!r}'
+  func.__doc__ = func.__doc__.format_map(fmtmap)
   return func
 
 def decorator(deco):
