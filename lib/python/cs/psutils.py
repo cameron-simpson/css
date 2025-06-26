@@ -364,7 +364,7 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
       * `argv`: the sequence of arguments to distribute; this may not be empty
       * `post_argv`: optional, the sequence of trailing arguments
       * `max_argv`: optional, the maximum length of each distributed
-        argument list, default from `MAX_ARGV`: `{MAX_ARGV}`
+        argument list, default from `{MAX_ARGV==}`
       * `encode`: default `False`.
         If true, encode the argv sequences into bytes for accurate tallying.
         If `encode` is a Boolean,
