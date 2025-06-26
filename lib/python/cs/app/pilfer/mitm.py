@@ -550,14 +550,10 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
     # update the flowstate.soup
     for _ in P.run_matches(flowstate, 'soup', 'patch*soup'):
       pass
-    # TODO: consult the content_type full for charset
+    # TODO: consult the content_type_full for charset
     yield str(flowstate.soup).encode('utf-8')
 
-  flow.response.stream = filter_stream(
-      process_soup,
-      f'{flow.request}: patch_soup',
-      content_length=content_length(flow.response.headers),
-      runstate=flow.runstate,
+  flow.response.stream = attr(process_soup, desc='patch soup')
   )
 
 @attr(default_hooks=('responseheaders',))
