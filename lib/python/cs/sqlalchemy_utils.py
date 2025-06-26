@@ -27,7 +27,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
-from cs.threads import ThreadState
+from cs.threads import NRLock, ThreadState
 
 ##def CHECK():
 ##  ''' Debug function to check for open sqltags.sqlite files,
@@ -326,7 +326,9 @@ class ORM(MultiOpenMixin, ABC):
         orm=self, engine=None, sessionmaker=None, session=None
     )
     if serial_sessions:
-      self._serial_sessions_lock = Lock()
+      self._serial_sessions_lock = NRLock(
+          f'ORM:{self} session serialiser lock'
+      )
     else:
       self._engine = None
       self._sessionmaker_raw = None
