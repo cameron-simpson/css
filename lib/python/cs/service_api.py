@@ -18,6 +18,7 @@ from typing import Mapping, Set
 
 from icontract import require
 import requests
+from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
 
 from cs.deco import promote
 from cs.fstags import FSTags, uses_fstags
@@ -210,7 +211,7 @@ class HTTPServiceAPI(ServiceAPI):
       rsp.encoding = _response_encoding
     try:
       return rsp.json()
-    except JSONDecodeError as e:
+    except (JSONDecodeError, RequestsJSONDecodeError) as e:
       warning("response is not JSON: %s\n%r", e, rsp)
       raise
 
