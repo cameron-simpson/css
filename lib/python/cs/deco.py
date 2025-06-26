@@ -118,15 +118,18 @@ def decorator(deco):
           def mydeco(func, *da, arg2=None):
             ... decorate func subject to the values of da and arg2
 
-          # mydeco called with defaults
+          # @mydeco called with defaults
           @mydeco
           def func1(...):
             ...
 
-          @ mydeco called with nondefault arguments
+          # @mydeco called with nondefault arguments
           @mydeco('foo', arg2='bah')
           def func2(...):
             ...
+
+      The `@mydeco` decorator itself is then written as though the
+      arguments were always supplied.
   '''
 
   def decorate(func, *dargs, **dkwargs):
