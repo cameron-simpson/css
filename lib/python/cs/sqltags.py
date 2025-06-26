@@ -1488,7 +1488,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     ''' Normalise `Tag` values for storage via SQL.
         Preserve things directly expressable in JSON.
         Convert other values via `to_js_str`.
-        Return `PolyValue` for use with the SQL rows.
+        Return a `PolyValue` for use with the SQL rows.
     '''
     if tag_value is None:
       return PolyValue(None, None, None)
