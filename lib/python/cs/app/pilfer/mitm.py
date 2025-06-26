@@ -591,12 +591,7 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
       for bs in bss:
         T.write(bs)
 
-  flow.response.stream = consume_stream(
-      save,
-      f'{flow.request}: save {flow.response.headers["content-type"]} -> {save_as!r}',
-      content_length=content_length(rsp.headers),
-      runstate=flow.runstate,
-  )
+  flow.response.stream = attr(save, desc=f'save->{shortpath(save_as)!r}')
 
 @dataclass
 class MITMHookAction(Promotable):
