@@ -1439,10 +1439,10 @@ def tabulate(*rows, sep='  ', ppcls=None):
         ''' Use ISO8601 for `date` and `datetime` objects.
         '''
         if isinstance(obj, date):
-          return date.isoformat()
+          return obj.isoformat(), True, False
         if isinstance(obj, datetime):
-          return obj.isoformat(' ')
         return super().format(obj, *fmt_a)
+          return obj.isoformat(' '), True, False
 
   ppr = ppcls(compact=True, sort_dicts=True)
   if not rows:
