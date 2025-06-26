@@ -1441,8 +1441,8 @@ def tabulate(*rows, sep='  ', ppcls=None):
         if isinstance(obj, date):
           return obj.isoformat(), True, False
         if isinstance(obj, datetime):
-        return super().format(obj, *fmt_a)
           return obj.isoformat(' '), True, False
+        return super().format(obj, *fmt_a)
 
   ppr = ppcls(compact=True, sort_dicts=True)
   if not rows:
