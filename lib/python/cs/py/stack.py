@@ -103,7 +103,7 @@ def frames(source=None, limit=None):
     except AttributeError:
       # does it looks like an exception?
       try:
-        tb_frame = source.__traceback__
+        tb_frame = source.__traceback__.tb_frame
       except AttributeError:
         pass
     if tb_frame is None:
