@@ -467,13 +467,16 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
     # nothing to do
     return
 
-  def gather_content(bss):
+  def gather_content(bss: Iterable[bytes]) -> None:
     ''' Gather the content of the URL.
         At the end, process the content against each match.
         We do not use the `response` hook because that would gather
         content for all URLs instead of just those of interest.
     '''
-    content_bs = bs().join(takewhile(len, bss))
+    bss2 = []
+    for bs in bss:
+      yield bs
+    content_bs = b''.join(bss2)
     method_name = f'content_{pattern_type.lower()}'
     for match in matches:
       PR("for match", match)
@@ -499,8 +502,8 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
         warning("match function %s fails: %e", match.pattern_arg, e)
         raise
 
-  flow.response.stream = consume_stream(
-      gather_content, f'gather content for {pattern_type}'
+  flow.response.stream = attr(
+      gather_content, desc=f'gather content for {pattern_type}'
   )
 
 @attr(default_hooks=(
