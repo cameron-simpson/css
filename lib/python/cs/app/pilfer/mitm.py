@@ -554,6 +554,29 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
     yield str(flowstate.soup).encode('utf-8')
 
   flow.response.stream = attr(process_soup, desc='patch soup')
+
+@attr(default_hooks=('responseheaders',))
+@uses_pilfer
+@typechecked
+def grok_flow(hook_name, flow, *, P: Pilfer = None):
+  ''' Grok the fullness of a `Flow`.
+  '''
+  flowstate = FlowState.from_Flow(flow)
+  # ignore URLs for which there is no SiteMap
+  if not any(P.sitemaps_for(flowstate.url)):
+    return
+
+  @trace
+  def grok_stream(bss: Iterable[bytes]):
+    content_bs = b''.join(bss)
+    # TODO: consult the content_type_full for charset
+    flowstate.content = content_bs.decode('utf-8')
+    # update the flowstate.soup
+    for _ in P.grok(flowstate):
+      pass
+
+  flow.response.stream = consume_stream(
+      grok_stream, gen_attrs=dict(desc='grok')
   )
 
 @attr(default_hooks=('responseheaders',))
@@ -581,6 +604,7 @@ class MITMHookAction(Promotable):
   HOOK_SPEC_MAP = {
       'cache': cached_flow,
       'dump': dump_flow,
+      'grok': grok_flow,
       'prefetch': prefetch_urls,
       'soup': patch_soup,
       'print': print_rq,
