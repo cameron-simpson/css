@@ -49,17 +49,28 @@ def ALL(func):
   return func
 
 def fmtdoc(func):
-  ''' Decorator to replace a function's docstring with that string
-      formatted against the function's module `__dict__`.
+  ''' A decorator to format a function's docstring.
+      This replaces the docstring with that string
+      formatted against the function's module `__dict__`
+      using `str.format_map`.
 
-      This supports simple formatted docstrings:
+      A quirk of `format_map` allows us to also support:
+      * `{`*name*`=}`: the f-string `{`*name*`=}` notation
+      * `{`*name*`==}`: the f-string `{`*name*`=}` notation
+        with the function module name prefixed
 
-          ENVVAR_NAME = 'FUNC_DEFAULT'
+      This supports simple formatted docstrings. Example:
+
+          FUNC_ENVVAR = 'FUNC_SETTING
+          FUNC_DEFAUlT = 12
 
           @fmtdoc
           def func():
-              """Do something with os.environ[{ENVVAR_NAME}]."""
-              print(os.environ[ENVVAR_NAME])
+              """
+              Do something with the environment variable `${FUNC_ENVVAR}`.
+              The default if no `${FUNC_ENVVAR}` comes from `{FUNC_DEFAUlT==}`.
+              """
+              print(os.environ.get(FUNC_ENVVAR, FUNC_DEFAUlT))
 
       This gives `func` this docstring:
 
