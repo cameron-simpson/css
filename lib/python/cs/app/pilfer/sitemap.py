@@ -189,17 +189,26 @@ class FlowState(NS, Promotable):
     return URL(self.response.url)
 
   @uses_pilfer
-  def GET(self, P: "Pilfer", **rq_kw) -> requests.Response:
-    ''' Do a `PilferGET` of `self.url` return the `requests.Response`.
-        This also updates `self.request` and `self.response`.
+  @promote
+  def GET(self, P: "Pilfer", url: URL = None, **rq_kw) -> requests.Response:
+    ''' Do a `Pilfer.GET` of `self.url` and return the `requests.Response`.
+        This also updates `self.request` and `self.response`
+        and clears `self.content` and `self.soup` (meaning they
+        will be rederived on next access).
     '''
-    rsp = self.response = P.GET(self.url, **rq_kw)
+    if url is None:
+      url = self.url
+    else:
+      self.url = url
+    rsp = self.response = P.GET(url, **rq_kw)
     # forget any derived cache values
-    try:
-      del self.soup
-    except AttributeError:
-      pass
+    for attr in 'content', 'soup':
+      try:
+        delattr(self, attr)
+      except AttributeError:
+        pass
     self.request = rsp.request
+    self.url = url
     return rsp
 
   @cached_property
