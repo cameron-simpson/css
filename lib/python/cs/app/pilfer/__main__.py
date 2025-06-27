@@ -252,25 +252,26 @@ class PilferCommand(BaseCommand):
     if argv:
       raise GetoptError(f'extra arguments after URL: {argv!r}')
     print(url)
-    state = FlowState(url=url)
-    state.GET()
+    flowstate = FlowState(url=url)
+    flowstate.GET()  # implicit these days, but let's be overt about failure
     printt(
-        (f'{state.request.method} response headers:',),
+        (f'{flowstate.request.method} response headers:',),
         *[
             (f'  {key}', value) for key, value in sorted(
-                state.response.headers.items(), key=lambda kv: kv[0].lower()
+                flowstate.response.headers.items(),
+                key=lambda kv: kv[0].lower()
             )
         ],
     )
-    soup = state.soup
+    soup = flowstate.soup
     if soup is None:
-      print("no soup for content_type", state.content_type)
+      print("no soup for content_type", flowstate.content_type)
     else:
       table = []
       title = soup.head.title
       if title:
         table.append(["Title:", title.string])
-      meta = state.meta
+      meta = flowstate.meta
       if meta.tags:
         table.extend(
             (
@@ -291,7 +292,7 @@ class PilferCommand(BaseCommand):
                 ),
             )
         )
-      links_by_rel = state.links
+      links_by_rel = flowstate.links
       if links_by_rel:
         table.extend(
             (
@@ -313,7 +314,7 @@ class PilferCommand(BaseCommand):
       printt(*table)
     table = []
     for i, (method, match_tags,
-            grokked) in enumerate(self.options.pilfer.grok(state)):
+            grokked) in enumerate(self.options.pilfer.grok(flowstate)):
       if i == 0:
         table.append(['Grokked:'])
       table.append(
@@ -327,7 +328,7 @@ class PilferCommand(BaseCommand):
           table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
     printt(*table)
     if soup is not None and self.options.soup:
-      print("Content:", state.content_type)
+      print("Content:", flowstate.content_type)
       table = []
       q = ListQueue([('', soup.head), ('', soup.body)])
       for indent, tag in q:
