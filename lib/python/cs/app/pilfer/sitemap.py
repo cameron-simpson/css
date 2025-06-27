@@ -214,9 +214,9 @@ class FlowState(NS, Promotable):
   @cached_property
   @uses_pilfer
   def response(self, P: "Pilfer"):
-    ''' Cached response object, obtained via `Pilfer.HEAD` if needed.
+    ''' Cached response object, obtained via `self.GET()` if needed.
     '''
-    return P.HEAD(self.url)
+    return self.GET()
 
   @cached_property
   def content_type(self) -> str:
