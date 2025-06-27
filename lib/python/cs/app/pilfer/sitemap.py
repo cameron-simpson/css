@@ -261,34 +261,38 @@ class FlowState(NS, Promotable):
     meta_http_equiv = TagSet()
     soup = self.soup
     if soup is not None:
-      for tag in soup.head.descendants:
-        if isinstance(tag, str):
-          ##if tag.strip(): warning("SKIP HEAD tag %r", tag[:40])
-          continue
-        if tag.name != 'meta':
-          continue
-        tag_content = tag.get('content')
-        if not tag_content:
-          continue
-        if tag_name := tag.get('name'):
-          meta_tags[tag_name] = tag_content
-        if prop_name := tag.get('property'):
-          try:
-            tag_content = datetime.fromisoformat(tag_content)
-          except ValueError:
+      if soup.head is None:
+        warning("no HEAD tag")
+        print(soup)
+      else:
+        for tag in soup.head.descendants:
+          if isinstance(tag, str):
+            ##if tag.strip(): warning("SKIP HEAD tag %r", tag[:40])
+            continue
+          if tag.name != 'meta':
+            continue
+          tag_content = tag.get('content')
+          if not tag_content:
+            continue
+          if tag_name := tag.get('name'):
+            meta_tags[tag_name] = tag_content
+          if prop_name := tag.get('property'):
             try:
-              tag_content = int(tag_content)
+              tag_content = datetime.fromisoformat(tag_content)
             except ValueError:
-              pass
-          current = meta_properties.get(prop_name)
-          if current is None:
-            meta_properties[prop_name] = tag_content
-          elif isinstance(current, list):
-            meta_properties[prop_name].append(tag_content)
-          else:
-            meta_properties[prop_name] = [current, tag_content]
-        if http_equiv := tag.get('http-equiv'):
-          meta_http_equiv[http_equiv] = tag['content']
+              try:
+                tag_content = int(tag_content)
+              except ValueError:
+                pass
+            current = meta_properties.get(prop_name)
+            if current is None:
+              meta_properties[prop_name] = tag_content
+            elif isinstance(current, list):
+              meta_properties[prop_name].append(tag_content)
+            else:
+              meta_properties[prop_name] = [current, tag_content]
+          if http_equiv := tag.get('http-equiv'):
+            meta_http_equiv[http_equiv] = tag['content']
     return NS(
         tags=meta_tags, properties=meta_properties, http_equiv=meta_http_equiv
     )
