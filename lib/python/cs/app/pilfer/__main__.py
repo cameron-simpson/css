@@ -438,7 +438,13 @@ class PilferCommand(BaseCommand):
       )
       if grokked is not None:
         for k, v in grokked.items():
-          table.append((f'    {k}', v))
+          try:
+            items = v.items()
+          except AttributeError:
+            table.append((f'    {k}', v))
+          else:
+            for i, (vk, vv) in enumerate(sorted(items)):
+              table.append([f'    {k}' if i == 0 else '', vk, vv])
     printt(*table)
 
   @popopts
