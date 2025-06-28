@@ -711,8 +711,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       flowattr: Optional[str] = None,
       **grok_kw,
   ) -> Iterable[Tuple[Callable, TagSet, Any]]:
-    ''' Parse information from `flowstate.url` by applying all
-        matching methods from the site maps.
+    ''' A generator to parse information from `flowstate.url` by
+        applying all matching methods from the site maps.
         Yield `(method,match_tags,grokked)` 3-tuples.
         This is a shim for `SiteMap.grok`.
     '''
