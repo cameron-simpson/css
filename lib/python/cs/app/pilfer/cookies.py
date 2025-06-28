@@ -16,10 +16,22 @@ from cs.debug import trace, X, pprint
 
 # column names from the firefox sqlite3 database
 FIREFOX_COOKIE_SQL_COLUMNS = (
-    'id', 'originAttributes', 'name', 'value', 'host', 'path', 'expiry',
-    'lastAccessed', 'creationTime', 'isSecure', 'isHttpOnly',
-    'inBrowserElement', 'sameSite', 'rawSameSite', 'schemeMap',
-    'isPartitionedAttributeSet'
+    'id',
+    'originAttributes',
+    'name',
+    'value',
+    'host',
+    'path',
+    'expiry',
+    'lastAccessed',
+    'creationTime',
+    'isSecure',
+    'isHttpOnly',
+    'inBrowserElement',
+    'sameSite',
+    ##'rawSameSite',
+    'schemeMap',
+    'isPartitionedAttributeSet',
 )
 
 def morsel(name: str, value: Any, **morsel_kw) -> Morsel:
