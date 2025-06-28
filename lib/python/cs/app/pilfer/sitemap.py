@@ -816,9 +816,9 @@ class SiteMap(Promotable):
               case _:
                 warning("unhandled prefetch arg")
 
+  @staticmethod
   @uses_pilfer
   def update_tagset_from_meta(
-      self,
       te: str | TagSet,
       flowstate: FlowState,
       *,
