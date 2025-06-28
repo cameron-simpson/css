@@ -578,6 +578,22 @@ class PilferCommand(BaseCommand):
       raise GetoptError("invalid action specifications")
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
 
+  def cmd_patch(self, argv):
+    ''' Usage: {cmd} URL
+          Patch the soup for URL and recite the result to the output.
+    '''
+    if not argv:
+      raise GetoptError("missing URL")
+    url = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    flowstate = FlowState(url=url)
+    # Patch the soup of a URL by calling all SiteMap.patch_soup_* methods.
+    for method, match_tags, result in self.options.pilfer.run_matches(
+        flowstate, 'soup', 'patch_soup_*'):
+      print(method, match_tags)
+    print(flowstate.soup)
+
   def cmd_sitemap(self, argv):
     ''' Usage: {cmd} [sitemap|domain [URL...]]
           List or query the site maps from the config.
