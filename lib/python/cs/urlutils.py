@@ -640,7 +640,8 @@ class URL(HasThreadState, Promotable):
         `str` is promoted directly to `cls(obj)`.
         `(url,referer)` is promoted to `cls(url,referer=referer)`.
     '''
-    if isinstance(obj, cls):
+    # TODO: can the None check comes from Promotable.promote?
+    if obj is None or isinstance(obj, cls):
       return obj
     if isinstance(obj, str):
       return cls(obj)

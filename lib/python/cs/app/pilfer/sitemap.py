@@ -8,25 +8,26 @@ from dataclasses import dataclass
 from datetime import datetime
 from fnmatch import fnmatch
 from functools import cached_property
+from itertools import zip_longest
 import re
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 
 from cs.binary import bs
-from cs.deco import decorator, fmtdoc, promote, Promotable
-from cs.lex import cutsuffix, r
+from cs.deco import decorator, default_params, fmtdoc, promote, Promotable
+from cs.lex import cutsuffix, get_nonwhite, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.resources import MultiOpenMixin
 from cs.rfc2616 import content_type
 from cs.tagset import TagSet
+from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag as BS4Tag
 from mitmproxy.flow import Flow
 import requests
-from typeguard import typechecked
-
-from cs.debug import trace, X, r, s, pprint
 
 # The default HTML parser chosen by BeautifulSoup.
 BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
@@ -48,6 +49,24 @@ def uses_pilfer(func):
     return func(*a, P=P, **kw)
 
   return func_with_Pilfer
+
+def parse_img_srcset(srcset, offset=0) -> Mapping[str, List[str]]:
+  ''' Parse an `IMG` tag `srcset` attribute into a mapping of URL to conditions.
+  '''
+  mapping = defaultdict(list)
+  offset = skipwhite(srcset, offset)
+  while offset < len(srcset):
+    url, offset = get_nonwhite(srcset, offset)
+    offset = skipwhite(srcset, offset)
+    try:
+      condition, srcset = srcset[offset:].split(',', 1)
+      offset = skipwhite(srcset)
+    except ValueError:
+      condition = srcset[offset:].rstrip()
+      offset = len(srcset)
+
+    mapping[url].append(condition)
+  return mapping
 
 @dataclass
 class URLMatcher(Promotable):
@@ -103,11 +122,14 @@ class URLMatcher(Promotable):
       return super().promote(obj)
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
 
-class FlowState(NS, Promotable):
+class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   ''' An object with some resemblance to a `mitmproxy` `Flow` object
       with various utility properties and methods.
       It may be initialised from lesser such as just a URL.
   '''
+
+  # class attribute holding the per-thread state stack
+  perthread_state = ThreadState()
 
   @fmtdoc
   @promote
@@ -147,6 +169,16 @@ class FlowState(NS, Promotable):
     return f'{self.__class__.__name__}({attr_listing})'
 
   __repr__ = __str__
+
+  def __enter_exit__(self):
+    ''' Run both the inherited context managers.
+    '''
+    with self.session:
+      for _ in zip_longest(
+          MultiOpenMixin.__enter_exit__(self),
+          HasThreadState.__enter_exit__(self) if self.default else (),
+      ):
+        yield
 
   # NB: no __getattr__, it preemptys @cached_property
 
@@ -189,25 +221,34 @@ class FlowState(NS, Promotable):
     return URL(self.response.url)
 
   @uses_pilfer
-  def GET(self, P: "Pilfer", **rq_kw) -> requests.Response:
-    ''' Do a `PilferGET` of `self.url` return the `requests.Response`.
-        This also updates `self.request` and `self.response`.
+  @promote
+  def GET(self, P: "Pilfer", url: URL = None, **rq_kw) -> requests.Response:
+    ''' Do a `Pilfer.GET` of `self.url` and return the `requests.Response`.
+        This also updates `self.request` and `self.response`
+        and clears `self.content` and `self.soup` (meaning they
+        will be rederived on next access).
     '''
-    rsp = self.response = P.GET(self.url, **rq_kw)
+    if url is None:
+      url = self.url
+    else:
+      self.url = url
+    rsp = self.response = P.GET(url, **rq_kw)
     # forget any derived cache values
-    try:
-      del self.soup
-    except AttributeError:
-      pass
+    for attr in 'content', 'soup':
+      try:
+        delattr(self, attr)
+      except AttributeError:
+        pass
     self.request = rsp.request
+    self.url = url
     return rsp
 
   @cached_property
   @uses_pilfer
   def response(self, P: "Pilfer"):
-    ''' Cached response object, obtained via `Pilfer.HEAD` if needed.
+    ''' Cached response object, obtained via `self.GET()` if needed.
     '''
-    return P.HEAD(self.url)
+    return self.GET()
 
   @cached_property
   def content_type(self) -> str:
@@ -252,34 +293,38 @@ class FlowState(NS, Promotable):
     meta_http_equiv = TagSet()
     soup = self.soup
     if soup is not None:
-      for tag in soup.head.descendants:
-        if isinstance(tag, str):
-          if tag.strip(): warning("SKIP HEAD tag %r", tag[:40])
-          continue
-        if tag.name != 'meta':
-          continue
-        tag_content = tag.get('content')
-        if not tag_content:
-          continue
-        if tag_name := tag.get('name'):
-          meta_tags[tag_name] = tag_content
-        if prop_name := tag.get('property'):
-          try:
-            tag_content = datetime.fromisoformat(tag_content)
-          except ValueError:
+      if soup.head is None:
+        warning("no HEAD tag")
+        print(soup)
+      else:
+        for tag in soup.head.descendants:
+          if isinstance(tag, str):
+            ##if tag.strip(): warning("SKIP HEAD tag %r", tag[:40])
+            continue
+          if tag.name != 'meta':
+            continue
+          tag_content = tag.get('content')
+          if not tag_content:
+            continue
+          if tag_name := tag.get('name'):
+            meta_tags[tag_name] = tag_content
+          if prop_name := tag.get('property'):
             try:
-              tag_content = int(tag_content)
+              tag_content = datetime.fromisoformat(tag_content)
             except ValueError:
-              pass
-          current = meta_properties.get(prop_name)
-          if current is None:
-            meta_properties[prop_name] = tag_content
-          elif isinstance(current, list):
-            meta_properties[prop_name].append(tag_content)
-          else:
-            meta_properties[prop_name] = [current, tag_content]
-        if http_equiv := tag.get('http-equiv'):
-          meta_http_equiv[http_equiv] = tag['content']
+              try:
+                tag_content = int(tag_content)
+              except ValueError:
+                pass
+            current = meta_properties.get(prop_name)
+            if current is None:
+              meta_properties[prop_name] = tag_content
+            elif isinstance(current, list):
+              meta_properties[prop_name].append(tag_content)
+            else:
+              meta_properties[prop_name] = [current, tag_content]
+          if http_equiv := tag.get('http-equiv'):
+            meta_http_equiv[http_equiv] = tag['content']
     return NS(
         tags=meta_tags, properties=meta_properties, http_equiv=meta_http_equiv
     )
@@ -295,6 +340,8 @@ class FlowState(NS, Promotable):
         for rel in link.attrs.get('rel', ('',)):
           links_by_rel[rel].append(link)
     return links_by_rel
+
+uses_flowstate = default_params(flowstate=FlowState.default)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
@@ -317,8 +364,8 @@ class SiteMapPatternMatch(namedtuple(
 class SiteMap(Promotable):
   ''' A base dataclass for site maps.
 
-      A `SiteMap` embodies domain specific knowledge about a
-      particular website, or collection of websites.
+      A `SiteMap` data class embodies domain specific knowledge about a
+      particular website or collection of websites.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
       clause in the configuration file, see the `Pilfer.sitemaps`
@@ -333,10 +380,10 @@ class SiteMap(Promotable):
 
       This says that websites whose domain matches `docs.python.org`,
       `docs.mitmproxy.org` or the filename glob `*readthedocs.io`
-      are associated with the `SiteMap` referred to as `docs` whose
-      definition comes from the `DocSite` class from the module
+      are all associated with the `SiteMap` referred to as `docs`
+      whose definition comes from the `DocSite` class from the module
       `cs.app.pilfer.sitemap`. The `DocSite` class will be a subclass
-      of this `SiteMap` class.
+      of this `SiteMap` base class.
 
       `SiteMap`s have a few class attributes:
       * `URL_KEY_PATTERNS`: this is a list of `(match,keyformat)`
@@ -765,9 +812,9 @@ class SiteMap(Promotable):
               case _:
                 warning("unhandled prefetch arg")
 
+  @staticmethod
   @uses_pilfer
   def update_tagset_from_meta(
-      self,
       te: str | TagSet,
       flowstate: FlowState,
       *,
@@ -792,9 +839,10 @@ class SiteMap(Promotable):
     te.update(**update_kw)
     return te
 
+  @classmethod
   @promote
-  def entity_key(self, flowstate: FlowState, **match_tags) -> str | None:
-    ''' Given a URL or FlowState, return the name of its primary `TagSet`.
+  def entity_key(cls, flowstate: FlowState, **match_tags) -> str | None:
+    ''' Given a URL or `FlowState`, return the name of its primary `TagSet`.
         Return `None` if there is none.
     '''
     return None
@@ -824,6 +872,41 @@ class SiteMap(Promotable):
     )
     return te
 
+  @on
+  @promote
+  def patch_soup_toolbar(
+      self,
+      flowstate: FlowState,
+      match_tags: Optional[Mapping[str, Any]] = None,
+      soup=None,
+  ):
+    # a list of tags for the toolbar
+    tags = []
+    for link, link_tags in flowstate.links.items():
+      for tag in link_tags:
+        if tag.attrs.get('type') == "application/rss+xml":
+          try:
+            href = tag.attrs['href']
+          except KeyError:
+            warning("no href in %s", tag)
+          else:
+            widget = BS4Tag(name='a', attrs=dict(href=href))
+            widget.string = "RSS"
+            tags.append(widget)
+    if tags:
+      # place a toolbar above the body content
+      body = soup.body
+      toolbar = BS4Tag(name='div')
+      toolbar.append("Toolbar:")
+      for i, widget in enumerate(tags):
+        if i > 0:
+          toolbar.append(", ")
+        toolbar.append(widget)
+      toolbar.append('.')
+      body.insert(0, BS4Tag(name='br'))
+      body.insert(0, toolbar)
+    return soup
+
 # expose the @on decorator globally
 on = SiteMap.on
 
@@ -837,7 +920,7 @@ class DocSite(SiteMap):
 
   # the URL path suffixes which will be cached
   CACHE_SUFFIXES = tuple(
-      '/ .css .gif .html .ico .jpg .js .png .svg .webp .woff2'.split()
+      ['/', '.css', '.gif', '.html', '.ico', '.jpg', '.js', '.png', '.svg', '.webp', '.woff2']
   )
 
   URL_KEY_PATTERNS = [

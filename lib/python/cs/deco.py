@@ -681,20 +681,14 @@ def observable_class(property_names, only_unequal=False):
 
 @decorator
 def default_params(func, _strict=False, **param_defaults):
-  ''' Decorator to provide factory functions for default parameters.
+  ''' A decorator to provide factory functions for default parameters.
 
-      This decorator accepts the following keyword parameters:
+      This decorator accepts the following special keyword parameters:
       * `_strict`: default `False`; if true only replace genuinely
         missing parameters; if false also replace the traditional
         `None` placeholder value
       The remaining keyword parameters are factory functions
       providing the respective default values.
-
-      Atypical one off direct use:
-
-          @default_params(dbconn=open_default_dbconn,debug=lambda:settings.DB_DEBUG_MODE)
-          def dbquery(query, *, dbconn):
-              dbconn.query(query)
 
       Typical use as a decorator factory:
 
@@ -713,6 +707,30 @@ def default_params(func, _strict=False, **param_defaults):
               if ds3client is None:
                   ds3client = get_ds3client()
               ... make queries using ds3client ...
+
+      It's quite common for me to associate one of these with a
+      class.  I have a `HasThreadState` mixin class which maintains
+      a thread-local state object which I use to store a per-thread
+      "ambient" instance of the class so that it does not need to
+      be plumbed through every call (including all the intermediate
+      calls which have no interest in the object, the horror!)
+      So I'll often do this:
+
+          class Thing(..., HasThreadState):
+              ....
+          uses_thing = default_params(thing=Thing.default)
+
+      This can be used to provide the ambient instance of `Thing`
+      to functions while allowing the caller to omit any mention
+      of a `Thing` or to pass a specific instance if sensible.
+      (In this examplke, `Thing.default` is a method provided by the mixin.)
+
+      And then there's the atypical one off direct use,
+      which is not really a big win over the conventional way:
+
+          @default_params(dbconn=open_default_dbconn,debug=lambda:settings.DB_DEBUG_MODE)
+          def dbquery(query, *, dbconn):
+              dbconn.query(query)
   '''
   if not param_defaults:
     raise ValueError("@default_params(%s): no defaults?" % (func,))

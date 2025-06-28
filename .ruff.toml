@@ -97,12 +97,13 @@ ignore = [
     "D416", # Section name should end with a colon
     "E731",
     "I001", # Import block is un-sorted or un-formatted
+    "Q000",
+    "Q002",
     "SIM108", # Use ternary operator
     "SIM117", # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "T201", # `print` found
     "TRY003", # Avoid specifying long messages outside the exception class
-    "Q000",
-    "Q002",
+    "UP035", # Import from `collections.abc` instead
 ]
 flake8-quotes.docstring-quotes = "single"
 flake8-quotes.inline-quotes = "double"

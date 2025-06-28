@@ -35,7 +35,8 @@ from fnmatch import fnmatchcase
 try:
   from functools import cached_property  # 3.8 onward
 except ImportError:
-  cached_property = lambda func: property(cache(func))
+  from functools import lru_cache  # 3.2 onward
+  cached_property = lambda func: property(lru_cache(func))
 from getopt import getopt, GetoptError
 import operator
 import os
@@ -1488,7 +1489,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     ''' Normalise `Tag` values for storage via SQL.
         Preserve things directly expressable in JSON.
         Convert other values via `to_js_str`.
-        Return `PolyValue` for use with the SQL rows.
+        Return a `PolyValue` for use with the SQL rows.
     '''
     if tag_value is None:
       return PolyValue(None, None, None)
@@ -1625,6 +1626,17 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     else:
       db_url_s = str(db_url)
     return f'{self.__class__.__name__}({db_url_s})'
+
+  @classmethod
+  def from_str(cls, db_url: str):
+    ''' Create an `SQLTags` from a `db_url` string.
+    '''
+    if db_url.startswith('~') or isabspath(db_url):
+      # expect filesystem path to an SQLite file
+      if not db_url.endswith('.sqlite'):
+        raise ValueError("expected path to .sqlite file")
+      db_url = expanduser(db_url)
+    return cls(db_url=db_url)
 
   def TAGSETCLASS_DEFAULT(self, *a, _sqltags=None, **kw):
     ''' Factory to return a suitable `TagSet` subclass instance.
@@ -1987,17 +1999,6 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       for tag in te.tags:
         with Pfx(tag):
           e.add_tag(tag)
-
-  @classmethod
-  def from_str(cls, db_url: str):
-    ''' Create an `SQLTags` from `db_url`.
-    '''
-    if db_url.startswith('~') or isabspath(db_url):
-      # expect filesystem path to an SQLite file
-      if not db_url.endswith('.sqlite'):
-        raise ValueError("expected path to .sqlite file")
-      db_url = expanduser(db_url)
-    return cls(db_url=db_url)
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
