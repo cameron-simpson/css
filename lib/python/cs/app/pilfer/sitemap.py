@@ -876,6 +876,42 @@ class SiteMap(Promotable):
     )
     return te
 
+  @on
+  @trace
+  @promote
+  def patch_soup_toolbar(
+      self,
+      flowstate: FlowState,
+      match_tags: Optional[Mapping[str, Any]] = None,
+      soup=None,
+  ):
+    # a list of tags for the toolbar
+    tags = []
+    for link, link_tags in flowstate.links.items():
+      for tag in link_tags:
+        if tag.attrs.get('type') == "application/rss+xml":
+          try:
+            href = tag.attrs['href']
+          except KeyError:
+            warning("no href in %s", tag)
+          else:
+            widget = BS4Tag(name='a', attrs=dict(href=href))
+            widget.string = "RSS"
+            tags.append(widget)
+    if tags:
+      # place a toolbar above the body content
+      body = soup.body
+      toolbar = BS4Tag(name='div')
+      toolbar.append("Toolbar:")
+      for i, widget in enumerate(tags):
+        if i > 0:
+          toolbar.append(", ")
+        toolbar.append(widget)
+      toolbar.append('.')
+      body.insert(0, BS4Tag(name='br'))
+      body.insert(0, toolbar)
+    return soup
+
 # expose the @on decorator globally
 on = SiteMap.on
 
