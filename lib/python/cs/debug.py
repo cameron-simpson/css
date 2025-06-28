@@ -692,13 +692,14 @@ def trace(
     else:
       xlog = X
     log_cite = citation
-    if call:
-      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL   " + fmt, _trace_state.indent, *av)
-      if with_caller:
-        xlog("%s  FROM %s", _trace_state.indent, caller(-4))
     old_indent = _trace_state.indent
     _trace_state.indent += '  '
+    indent = _trace_state.indent
+    if call:
+      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
+      xlog("%sCALL   " + fmt, old_indent, *av)
+      if with_caller:
+        xlog("%sFROM %s", indent, caller(-4))
     start_time = time.time()
     try:
       result = func(*a, **kw)
@@ -710,7 +711,7 @@ def trace(
           xlog_kw['colour'] = 'white'  ## 'red'
         xlog(
             "%sRAISE  %s => %s:%s at %gs",
-            old_indent,
+            indent,
             log_cite,
             e.__class__.__name__,
             e,
@@ -739,7 +740,7 @@ def trace(
             yield_time = time.time()
             xlog(
                 "%sDONE   %s in %gs",
-                old_indent,
+                indent,
                 log_cite,
                 yield_time - next_time,
             )
@@ -752,7 +753,7 @@ def trace(
                 xlog_kw['colour'] = 'red'
               xlog(
                   "%sRAISE  %s => %s at %gs",
-                  old_indent,
+                  indent,
                   log_cite,
                   e,
                   end_time - start_time,
@@ -773,11 +774,10 @@ def trace(
 
       result = traced_generator()
     else:
-      ##xlog("%sRETURN %s <= %s", _trace_state.indent, type(result), log_cite)
       if retval:
         xlog(
             "%sRETURN %s => %s in %gs",
-            old_indent,  ##_trace_state.indent,
+            indent,  ##_trace_state.indent,
             log_cite,
             fmtv(result),
             end_time - start_time,
