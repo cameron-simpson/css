@@ -1627,6 +1627,17 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       db_url_s = str(db_url)
     return f'{self.__class__.__name__}({db_url_s})'
 
+  @classmethod
+  def from_str(cls, db_url: str):
+    ''' Create an `SQLTags` from a `db_url` string.
+    '''
+    if db_url.startswith('~') or isabspath(db_url):
+      # expect filesystem path to an SQLite file
+      if not db_url.endswith('.sqlite'):
+        raise ValueError("expected path to .sqlite file")
+      db_url = expanduser(db_url)
+    return cls(db_url=db_url)
+
   def TAGSETCLASS_DEFAULT(self, *a, _sqltags=None, **kw):
     ''' Factory to return a suitable `TagSet` subclass instance.
         This produces an `SQLTagSet` instance correctly associated with this `SQLTags`.
@@ -1988,17 +1999,6 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       for tag in te.tags:
         with Pfx(tag):
           e.add_tag(tag)
-
-  @classmethod
-  def from_str(cls, db_url: str):
-    ''' Create an `SQLTags` from `db_url`.
-    '''
-    if db_url.startswith('~') or isabspath(db_url):
-      # expect filesystem path to an SQLite file
-      if not db_url.endswith('.sqlite'):
-        raise ValueError("expected path to .sqlite file")
-      db_url = expanduser(db_url)
-    return cls(db_url=db_url)
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
