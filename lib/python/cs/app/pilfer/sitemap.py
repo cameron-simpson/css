@@ -17,8 +17,10 @@ from cs.deco import decorator, fmtdoc, promote, Promotable
 from cs.lex import cutsuffix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.resources import MultiOpenMixin
 from cs.rfc2616 import content_type
 from cs.tagset import TagSet
+from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
@@ -124,11 +126,14 @@ class URLMatcher(Promotable):
       return super().promote(obj)
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
 
-class FlowState(NS, Promotable):
+class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   ''' An object with some resemblance to a `mitmproxy` `Flow` object
       with various utility properties and methods.
       It may be initialised from lesser such as just a URL.
   '''
+
+  # class attribute holding the per-thread state stack
+  perthread_state = ThreadState()
 
   @fmtdoc
   @promote
@@ -168,6 +173,16 @@ class FlowState(NS, Promotable):
     return f'{self.__class__.__name__}({attr_listing})'
 
   __repr__ = __str__
+
+  def __enter_exit__(self):
+    ''' Run both the inherited context managers.
+    '''
+    with self.session:
+      for _ in zip_longest(
+          MultiOpenMixin.__enter_exit__(self),
+          HasThreadState.__enter_exit__(self) if self.default else (),
+      ):
+        yield
 
   # NB: no __getattr__, it preemptys @cached_property
 
@@ -329,6 +344,8 @@ class FlowState(NS, Promotable):
         for rel in link.attrs.get('rel', ('',)):
           links_by_rel[rel].append(link)
     return links_by_rel
+
+uses_flowstate = default_params(flowstate=FlowState.default)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
