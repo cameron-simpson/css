@@ -49,6 +49,27 @@ def uses_pilfer(func):
 
   return func_with_Pilfer
 
+def parse_img_srcset(srcset, offset=0) -> Mapping[str, List[str]]:
+  ''' Parse an `IMG` tag `srcset` attribute into a mapping of URL to conditions.
+  '''
+  mapping = defaultdict(list)
+  offset = skipwhite(srcset, offset)
+  X("skipped => %d %s", offset, srcset[:8])
+  while offset < len(srcset):
+    url, offset = get_nonwhite(srcset, offset)
+    X("url %s", url)
+    offset = skipwhite(srcset, offset)
+    try:
+      condition, srcset = srcset[offset:].split(',', 1)
+      X("condition %s", condition)
+      offset = skipwhite(srcset)
+    except ValueError:
+      condition = srcset[offset:].rstrip()
+      offset = len(srcset)
+
+    mapping[url].append(condition)
+  return mapping
+
 @dataclass
 class URLMatcher(Promotable):
   ''' A class for matching a `URL` against a `(hostname_fnmatch,url_regexp)` pair.
