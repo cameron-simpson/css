@@ -8,13 +8,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from fnmatch import fnmatch
 from functools import cached_property
+from itertools import zip_longest
 import re
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 
 from cs.binary import bs
-from cs.deco import decorator, fmtdoc, promote, Promotable
-from cs.lex import cutsuffix, r
+from cs.deco import decorator, default_params, fmtdoc, promote, Promotable
+from cs.lex import cutsuffix, get_nonwhite, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
@@ -24,11 +25,9 @@ from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag as BS4Tag
 from mitmproxy.flow import Flow
 import requests
-from typeguard import typechecked
-
-from cs.debug import trace, X, r, s, pprint
 
 # The default HTML parser chosen by BeautifulSoup.
 BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
@@ -56,14 +55,11 @@ def parse_img_srcset(srcset, offset=0) -> Mapping[str, List[str]]:
   '''
   mapping = defaultdict(list)
   offset = skipwhite(srcset, offset)
-  X("skipped => %d %s", offset, srcset[:8])
   while offset < len(srcset):
     url, offset = get_nonwhite(srcset, offset)
-    X("url %s", url)
     offset = skipwhite(srcset, offset)
     try:
       condition, srcset = srcset[offset:].split(',', 1)
-      X("condition %s", condition)
       offset = skipwhite(srcset)
     except ValueError:
       condition = srcset[offset:].rstrip()
@@ -368,8 +364,8 @@ class SiteMapPatternMatch(namedtuple(
 class SiteMap(Promotable):
   ''' A base dataclass for site maps.
 
-      A `SiteMap` embodies domain specific knowledge about a
-      particular website, or collection of websites.
+      A `SiteMap` data class embodies domain specific knowledge about a
+      particular website or collection of websites.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
       clause in the configuration file, see the `Pilfer.sitemaps`
@@ -384,10 +380,10 @@ class SiteMap(Promotable):
 
       This says that websites whose domain matches `docs.python.org`,
       `docs.mitmproxy.org` or the filename glob `*readthedocs.io`
-      are associated with the `SiteMap` referred to as `docs` whose
-      definition comes from the `DocSite` class from the module
+      are all associated with the `SiteMap` referred to as `docs`
+      whose definition comes from the `DocSite` class from the module
       `cs.app.pilfer.sitemap`. The `DocSite` class will be a subclass
-      of this `SiteMap` class.
+      of this `SiteMap` base class.
 
       `SiteMap`s have a few class attributes:
       * `URL_KEY_PATTERNS`: this is a list of `(match,keyformat)`
@@ -877,7 +873,6 @@ class SiteMap(Promotable):
     return te
 
   @on
-  @trace
   @promote
   def patch_soup_toolbar(
       self,
@@ -925,7 +920,7 @@ class DocSite(SiteMap):
 
   # the URL path suffixes which will be cached
   CACHE_SUFFIXES = tuple(
-      '/ .css .gif .html .ico .jpg .js .png .svg .webp .woff2'.split()
+      ['/', '.css', '.gif', '.html', '.ico', '.jpg', '.js', '.png', '.svg', '.webp', '.woff2']
   )
 
   URL_KEY_PATTERNS = [
