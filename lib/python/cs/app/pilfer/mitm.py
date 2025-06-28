@@ -541,6 +541,8 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
 @uses_pilfer
 @typechecked
 def patch_soup(hook_name, flow, *, P: Pilfer = None):
+  ''' Patch the soup of a URL by calling all `SiteMap.patch_soup_*` methods.
+  '''
   flowstate = FlowState.from_Flow(flow)
 
   def process_soup(bss: Iterable[bytes]) -> Iterable[bytes]:
@@ -548,7 +550,7 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
     # TODO: consult the content_type full for charset
     flowstate.content = content_bs.decode('utf-8')
     # update the flowstate.soup
-    for _ in P.run_matches(flowstate, 'soup', 'patch*soup'):
+    for _ in P.run_matches(flowstate, 'soup', 'patch_soup_*'):
       pass
     # TODO: consult the content_type_full for charset
     yield str(flowstate.soup).encode('utf-8')
@@ -601,7 +603,7 @@ class MITMHookAction(Promotable):
       'dump': dump_flow,
       'grok': grok_flow,
       'prefetch': prefetch_urls,
-      'soup': patch_soup,
+      'patch_soup': patch_soup,
       'print': print_rq,
       'save': save_stream,
   }
@@ -738,6 +740,8 @@ class MITMAddon:
   def call_hooks_for(self, hook_name: str, flow, *mitm_hook_a, **mitm_hook_kw):
     ''' This calls all the actions for the specified `hook_name`.
     '''
+    PR = lambda *a, **kw: print("call_hooks_for", hook_name, *a, **kw)
+    PR("URL", flow.request.method, flow.request.url)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
     if not hook_actions:
@@ -757,7 +761,7 @@ class MITMAddon:
           if regexp.search(flow.request.url):
             break
         else:
-          print("SKIP", action, "does not match URL", flow.request.url)
+          PR("SKIP, does not match URL")
           continue
       if stream_funcs is not None:
         # note the initial state of the .stream attribute
