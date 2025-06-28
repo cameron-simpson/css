@@ -12,8 +12,6 @@ from tempfile import NamedTemporaryFile
 import time
 from typing import Any, List
 
-from cs.debug import trace, X, pprint
-
 # column names from the firefox sqlite3 database
 FIREFOX_COOKIE_SQL_COLUMNS = (
     'id',
