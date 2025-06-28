@@ -35,7 +35,8 @@ from fnmatch import fnmatchcase
 try:
   from functools import cached_property  # 3.8 onward
 except ImportError:
-  cached_property = lambda func: property(cache(func))
+  from functools import lru_cache  # 3.2 onward
+  cached_property = lambda func: property(lru_cache(func))
 from getopt import getopt, GetoptError
 import operator
 import os
