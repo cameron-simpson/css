@@ -8,7 +8,6 @@ from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
 from inspect import isgeneratorfunction
-from itertools import chain, takewhile
 import os
 from signal import SIGINT
 import sys
@@ -24,7 +23,6 @@ from mitmproxy.options import Options
 from mitmproxy.tools.dump import DumpMaster
 from typeguard import typechecked
 
-from cs.binary import bs
 from cs.cmdutils import vprint
 from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
@@ -34,7 +32,7 @@ from cs.gimmicks import Buffer
 from cs.lex import printt
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
-from cs.progress import Progress, progressbar
+from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
@@ -62,7 +60,6 @@ def consume_stream(
       If the optional `getattrs` are supplied, set them as attributes
       on the returned generator function.
   '''
-
   # TODO: use progress_name?
 
   def consumer_gen(bss: Iterable[bytes]) -> Iterable[bytes]:
@@ -568,7 +565,6 @@ def grok_flow(hook_name, flow, *, P: Pilfer = None):
   if not any(P.sitemaps_for(flowstate.url)):
     return
 
-  @trace
   def grok_stream(bss: Iterable[bytes]):
     content_bs = b''.join(bss)
     # TODO: consult the content_type_full for charset
