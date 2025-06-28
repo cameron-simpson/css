@@ -843,9 +843,10 @@ class SiteMap(Promotable):
     te.update(**update_kw)
     return te
 
+  @classmethod
   @promote
-  def entity_key(self, flowstate: FlowState, **match_tags) -> str | None:
-    ''' Given a URL or FlowState, return the name of its primary `TagSet`.
+  def entity_key(cls, flowstate: FlowState, **match_tags) -> str | None:
+    ''' Given a URL or `FlowState`, return the name of its primary `TagSet`.
         Return `None` if there is none.
     '''
     return None
