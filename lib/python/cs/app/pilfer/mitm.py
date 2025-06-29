@@ -806,10 +806,39 @@ class MITMAddon:
       assert hook_name == 'responseheaders'
       # Streaming may change the size of the content, drop the Content-Length header;
       # wget at least is confused if it's longer than the content.
-      try:
-        del flow.response.headers['content-length']
-      except KeyError:
-        pass
+      flow.response.headers.pop('content-length', None)
+      for hdr in 'content-length', :  ##'content-encoding':
+        try:
+          del flow.response.headers[hdr]
+        except KeyError:
+          pass
+      # We will always pass the decompressed data to the stream stages.
+      content_encoding = flow.response.headers.get('content-encoding',
+                                                   '').strip()
+      if content_encoding:
+        # Multiple encodings may have been applied.
+        # We receive them in the order applied
+        # and decode them in the reverse.
+        for encoding in map(str.strip, content_encoding.split(',')):
+          if encoding in ('zlib', 'gzip', 'x-gzip'):
+
+            def decompress_stream(bss: Iterable[bytes]) -> Iterable[bytes]:
+              ''' Decompress the stream using gzip compatible decompression.
+            '''
+              decompressor = zlib.decompressobj()
+              for zbs in bss:
+                bs = decompressor.decompress(zbs)
+                if len(bs) > 0:
+                  yield bs
+
+            stream_funcs.insert(0, decompress_stream)
+          # TODO: compress, deflate, br, zstd, dcb, dcz
+          else:
+            warning(
+                "process_soup: cannot decode content-encoding %r",
+                content_encoding
+            )
+          flow.response.headers.pop('content-encoding', None)
       if self.hook_map['response']:
         # We have hooks for the response, so add a stream handler to
         # collate the final stream into a raw content bytes instance.
