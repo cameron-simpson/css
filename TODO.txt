@@ -1,3 +1,4 @@
+@promote: handle async functions
 @decorator to preserve the iscoroutineness of the decorated function? And check it works via @OBSOLETE? suggestion by fixerror
 stack_dump does not work given an exception
 pydoc: short summary of methods for classes, like we do for the module as a whole
