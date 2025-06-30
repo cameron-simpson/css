@@ -291,23 +291,21 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   @promote
   def GET(self, P: "Pilfer", url: URL = None, **rq_kw) -> requests.Response:
     ''' Do a `Pilfer.GET` of `self.url` and return the `requests.Response`.
-        This also updates `self.request` and `self.response`
-        and clears `self.content` and `self.soup` (meaning they
-        will be rederived on next access).
+        This also updates `self.request` and `self.response`, sets
+        `self.iterable_content`, and clears `self.content` and
+        `self.soup` (meaning they will be rederived on next access).
     '''
     if url is None:
       url = self.url
     else:
       self.url = url
-    rsp = self.response = P.GET(url, **rq_kw)
-    # forget any derived cache values
-    for attr in 'content', 'soup':
-      try:
-        delattr(self, attr)
-      except AttributeError:
-        pass
+    rsp = self.response = P.GET(url, stream=True, **rq_kw)
+    # forget any cached derived values
+    self.clear('content', 'text', 'soup')
     self.request = rsp.request
     self.url = url
+    # TODO: find out if the requests.response has been decoded/uncompressed
+    self.iterable_content = ClonedIterator(rsp.iter_content(chunk_size=None))
     return rsp
 
   @cached_property
