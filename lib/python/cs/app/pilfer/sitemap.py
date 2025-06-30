@@ -327,7 +327,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     '''
     return self.GET()
 
-  @property
+  @cached_property
   def iterable_content(self) -> Iterable[bytes]:
     ''' An iterable of the _decoded_ content.
 
