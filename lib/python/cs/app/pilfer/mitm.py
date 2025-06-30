@@ -36,7 +36,7 @@ from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
-from cs.rfc2616 import content_length
+from cs.rfc2616 import content_encodings, content_length
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
@@ -45,6 +45,7 @@ from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 from .prefetch import URLFetcher
 from .sitemap import FlowState
+from .util import decode_content
 
 if sys.stdout.isatty():
   print = upd_print
@@ -60,6 +61,7 @@ def consume_stream(
       If the optional `getattrs` are supplied, set them as attributes
       on the returned generator function.
   '''
+
   # TODO: use progress_name?
 
   def consumer_gen(bss: Iterable[bytes]) -> Iterable[bytes]:
