@@ -232,6 +232,61 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     '''
     return URL(self.response.url)
 
+  @cached_property
+  def content_type(self) -> str:
+    ''' The base `Content-Type`, eg `'text/html'`.
+    '''
+    ct = content_type(self.response.headers)
+    if ct is None:
+      return ''
+    return ct.content_type
+
+  @cached_property
+  def content_type_params(self) -> Mapping[str, str]:
+    ''' The parameters from the `Content-Type` as a mapping of the
+        parameter's lowercase form to its value.
+    '''
+    params = {}
+    for param_s in self.response.headers.get('content-type',
+                                             '').split(';')[1:]:
+      k, v = param_s.split('=', 1)
+      params[k.strip().lower()] = v
+    return params
+
+  @property
+  def content_charset(self) -> str | None:
+    ''' The supplied `Content-Type` character set if specified, or `None`.
+    '''
+    return self.content_type_params.get('charset')
+
+  @property
+  def content_encoding(self) -> str:
+    ''' The `Content-Encoding` response header, or `''`.
+    '''
+    return self.response.headers.get('content-encoding', '')
+
+  @content_encoding.setter
+  def content_encoding(self, new_encoding: str):
+    ''' Set the `Content-Encoding` response header.
+    '''
+    self.response.headers['Content-Encoding'] = new_encoding or 'identity'
+
+  @content_encoding.deleter
+  def content_encoding(self):
+    ''' Delete the `Content-Encoding` response header.
+    '''
+    self.response.headers.pop('content-encoding', None)
+
+  @property
+  def content_encodings(self) -> List[str]:
+    ''' A list of the transforming encodings named in the `Content-Encoding` response header.
+          The encoding `'identity'` is discarded.
+      '''
+    return [
+        enc for enc in content_encodings(self.response.headers)
+        if enc != 'identity'
+    ]
+
   @uses_pilfer
   @promote
   def GET(self, P: "Pilfer", url: URL = None, **rq_kw) -> requests.Response:
