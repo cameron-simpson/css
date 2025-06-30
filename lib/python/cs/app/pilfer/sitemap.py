@@ -341,6 +341,17 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     self.clear('iterable_content', 'text', 'soup')
 
   @cached_property
+  def text(self) -> str:
+    ''' The text content of the URL.
+    '''
+    # assume UTF-8 if not specified
+    charset = self.content_charset or 'utf-8'
+    assert not self.content_encodings
+    text = self.content.decode(charset)
+    self.url.text = text
+    return text
+
+  @cached_property
   def soup(self):
     ''' A `BeautifulSoup` of `self.content` for `text/html`, otherwise `None`.
     '''
