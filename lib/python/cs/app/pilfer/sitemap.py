@@ -326,17 +326,19 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     return [self.flow.response.content]
 
   @cached_property
-  @uses_pilfer
-  def content(self, *, P: "Pilfer") -> str:
-    ''' The text content of the URL.
-        Does a `GET` of the URL if there is no `self.response.content`.
+  def content(self) -> bytes:
+    ''' The response content, concatenated as a single `bytes` instance
+        from `self.iterable_content`.
     '''
-    rsp = self.response
-    content = rsp and rsp.content
-    if content is None:
-      self.GET()
-    self.url.text = self.response.content
-    return self.response.content
+    content = b''.join(self.iterable_content)
+    self.set_content(content)  # to clear the derived attributes
+    return content
+
+  def set_content(self, content: bytes):
+    ''' Set `self.content` and forget the `text` and `soup` attributes.
+    '''
+    self.content = content
+    self.clear('iterable_content', 'text', 'soup')
 
   @cached_property
   def soup(self):
