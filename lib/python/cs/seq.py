@@ -15,7 +15,7 @@ in the course of its function.
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
-from typing import Callable, Hashable, Iterable, Optional, Tuple, TypeVar
+from typing import Callable, Hashable, Iterable, Iterator, Optional, Tuple, TypeVar
 
 from cs.deco import decorator
 from cs.gimmicks import warning
@@ -397,6 +397,49 @@ class StatefulIterator(object):
     item, new_state = next(self.it)
     self.state = new_state
     return item
+
+class ClonedIterator(Iterable):
+  ''' A thread safe clone of some orginal iterator.
+
+      `next()` of this yields the next item from the supplied iterator.
+      `iter()` of this returns a generator yielding from the
+      historic items and then from the original iterator.
+
+      Note that this accrues all of the items from the original
+      iterator in memory.
+  '''
+
+  def __init__(self, it: Iterator):
+    ''' Initialise the clone with its original iterator.
+    '''
+    self._iterator = iter(it)
+    self._cloned = []
+    self._lock = Lock()
+
+  def __next__(self):
+    ''' Return the next item from the original iterator.
+    '''
+    with self._lock:
+      item = next(self._iterator)
+      self._cloned.append(item)
+
+  def __iter__(self):
+    ''' Iterate over the clone, returning a new iterator.
+
+        In mild violation of the iterator protocol, instead of
+        returning `self`` iter(self)` returns a generator yielding
+        the historic and then current contents of the original iterator.
+    '''
+    i = 0
+    while True:
+      with self._lock:
+        try:
+          item = self._cloned[i]
+        except IndexError:
+          item = next(self._iterator)
+          self._cloned.append(item)
+      yield item
+      i += 1
 
 def splitoff(sq, *sizes):
   ''' Split a sequence into (usually short) prefixes and a tail,
