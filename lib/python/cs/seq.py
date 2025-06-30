@@ -436,7 +436,10 @@ class ClonedIterator(Iterable):
         try:
           item = self._cloned[i]
         except IndexError:
-          item = next(self._iterator)
+          try:
+            item = next(self._iterator)
+          except StopIteration:
+            return
           self._cloned.append(item)
       yield item
       i += 1
