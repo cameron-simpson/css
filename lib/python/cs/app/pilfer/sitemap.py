@@ -359,7 +359,6 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     '''
     # assume UTF-8 if not specified
     charset = self.content_charset or 'utf-8'
-    assert not self.content_encodings
     text = self.content.decode(charset)
     self.url.text = text
     return text
