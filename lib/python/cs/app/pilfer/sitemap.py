@@ -356,7 +356,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     ''' A `BeautifulSoup` of `self.content` for `text/html`, otherwise `None`.
     '''
     if self.content_type == 'text/html':
-      soup = BeautifulSoup(self.content, self.bs4parser)
+      soup = BeautifulSoup(self.text, self.bs4parser)
       self.url.soup = soup
       return soup
     return None
