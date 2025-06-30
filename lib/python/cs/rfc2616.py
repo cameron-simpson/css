@@ -14,7 +14,7 @@ from functools import cache
 from itertools import takewhile
 from string import ascii_uppercase, ascii_lowercase, digits
 import sys
-from typing import Mapping, Optional, Union
+from typing import List, Mapping, Optional, Union
 
 from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
@@ -145,6 +145,21 @@ def header(
   if registry is None:
     registry = default_headerregistry()
   return registry(header_name, value)
+
+def content_encodings(headers: Mapping[str, str], **header_kw) -> List[str]:
+  ''' A list of the encodings named in the `Content-Encoding` header.
+  '''
+  return [
+      enc for enc in map(
+          lambda enc: enc.strip().lower(),
+          header(
+              headers,
+              'content-encoding',
+              default='',
+              **header_kw,
+          ).split('.')
+      ) if enc
+  ]
 
 def content_length(headers: Mapping[str, str],
                    **header_kw) -> Union[None, int]:
