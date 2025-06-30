@@ -205,6 +205,18 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
         url=flow.request.url,
     )
 
+  def clear(self, *attrs):
+    ''' Delete the named attrubtes `attrs`.
+        We do this to clear derived attributes when we set an
+        antecedant attribute.
+    '''
+    assert len(attrs) > 0
+    for attr in attrs:
+      try:
+        delattr(self, attr)
+      except AttributeError:
+        pass
+
   @cached_property
   @fmtdoc
   def bs4parser(self):
