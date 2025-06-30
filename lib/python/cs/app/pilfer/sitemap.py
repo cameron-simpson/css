@@ -978,7 +978,7 @@ class SiteMap(Promotable):
       # place a toolbar above the body content
       body = soup.body
       toolbar = BS4Tag(name='div')
-      toolbar.append("Toolbar:")
+      toolbar.append("Toolbar: ")
       for i, widget in enumerate(tags):
         if i > 0:
           toolbar.append(", ")
