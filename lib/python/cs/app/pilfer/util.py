@@ -49,7 +49,7 @@ def decode_content(headers: Mapping[str, str],
       if encoding == 'identity':
         pass
       elif encoding in ('gzip', 'x-gzip'):
-        bss = trace(decompress_stream)(bss)
+        bss = decompress_stream(bss)
       else:
         warning("cannot decode content-encoding, passing unchanged")
   yield from iter(bss)

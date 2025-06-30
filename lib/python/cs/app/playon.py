@@ -790,9 +790,9 @@ class PlayOnSQLTags(SQLTags):
       dbpath = expanduser(self.STATEDBPATH)
     super().__init__(db_url=dbpath)
 
-  @staticmethod
+  @classmethod
   @fmtdoc
-  def infer_db_url(envvar=None, default_path=None):
+  def infer_db_url(cls, envvar=None, default_path=None):
     ''' Infer the database URL.
 
         Parameters:
