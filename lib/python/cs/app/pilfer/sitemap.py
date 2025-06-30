@@ -19,8 +19,9 @@ from cs.lex import cutsuffix, get_nonwhite, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
-from cs.rfc2616 import content_type
+from cs.rfc2616 import content_encodings, content_type
 from cs.tagset import TagSet
+from cs.seq import ClonedIterator
 from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
@@ -125,7 +126,19 @@ class URLMatcher(Promotable):
 class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   ''' An object with some resemblance to a `mitmproxy` `Flow` object
       with various utility properties and methods.
-      It may be initialised from lesser such as just a URL.
+      It may be initialised from lesser objects such as just a URL.
+
+      This is intented as a common basis for working in a `mitmproxy`
+      flow or from outside via the `requests` package.
+
+      Note that its `.request` and `.response` objects might be from `mitmproxy`
+      or from `requests`, so they are mostly useful for their headers.
+
+      However, the various `FlowState` attributes and properties
+      are based around the `mitmproxy` `Response` attributes:
+      https://docs.mitmproxy.org/stable/api/mitmproxy/http.html#Response
+      In particular the `.content` and so forth are different from
+      those of `requests.Response.content`.
   '''
 
   # class attribute holding the per-thread state stack
@@ -137,7 +150,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     ''' Initialise `self` from the keyword parameters.
 
         Accepted parameters:
-        - `bs4parser`: the desires BeautifulSoup parser,
+        - `bs4parser`: the desired BeautifulSoup parser,
           default from `{BS4_PARSER_DEFAULT==}`.
         - `flow`: a `mitmproxy` `Flow` instance
         - `request`: a `Request` instance
@@ -1001,7 +1014,10 @@ class DocSite(SiteMap):
 
   # the URL path suffixes which will be cached
   CACHE_SUFFIXES = tuple(
-      ['/', '.css', '.gif', '.html', '.ico', '.jpg', '.js', '.png', '.svg', '.webp', '.woff2']
+      [
+          '/', '.css', '.gif', '.html', '.ico', '.jpg', '.js', '.png', '.svg',
+          '.webp', '.woff2'
+      ]
   )
 
   URL_KEY_PATTERNS = [
