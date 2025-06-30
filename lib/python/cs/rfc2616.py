@@ -146,22 +146,23 @@ def header(
     registry = default_headerregistry()
   return registry(header_name, value)
 
-def content_length(headers: Mapping[str, str]) -> Union[None, int]:
+def content_length(headers: Mapping[str, str],
+                   **header_kw) -> Union[None, int]:
   ''' Return the value of the `Content-Length` header, or `None`.
 
       Note that `headers` is expected to be a case insensitive mapping.
   '''
-  hdr = header(headers, 'content-length')
+  hdr = header(headers, 'content-length', **header_kw)
   if hdr is None:
     return None
   return int(hdr)
 
-def content_type(headers: Mapping[str, str]) -> ContentTypeHeader:
+def content_type(headers: Mapping[str, str], **header_kw) -> ContentTypeHeader:
   ''' Return the parsed value of the `Content-Type` header, or `None`.
 
       Note that `headers` is expected to be a case insensitive mapping.
   '''
-  return header(headers, 'content-type')
+  return header(headers, 'content-type', **header_kw)
 
 def parse_chunk_line1(bline):
   ''' Parse the opening line of a chunked-encoding chunk.
