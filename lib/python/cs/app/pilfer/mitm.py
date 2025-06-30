@@ -534,6 +534,7 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
   else:
     warning("prefetch_urls: unexpected hook_name %r", hook_name)
 
+# TODO: a FlowState method - process_soup?
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
@@ -543,14 +544,29 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
   flowstate = FlowState.from_Flow(flow)
 
   def process_soup(bss: Iterable[bytes]) -> Iterable[bytes]:
-    content_bs = b''.join(bss)
-    # TODO: consult the content_type full for charset
-    flowstate.content = content_bs.decode('utf-8')
+    ''' Yield a byte stream after patching its soup.
+        If the content type is not `text/html`, yield the stream unchanged.
+
+        Gather the input `bss`, a _decoded_ iterable of bytes, into text and transform into BS4 `Soup`.
+        Call `Pilfer.
+    '''
+    if flowstate.content_type != 'text/html':
+      yield from iter(bss)
+      return
+    charset = flowstate.content_charset or 'utf-8'
+    assert not flowstate.content_encodings
+    # set the content so that the soup can be computed
+    flowstate.set_content(b''.join(bss))
     # update the flowstate.soup
     for _ in P.run_matches(flowstate, 'soup', 'patch_soup_*'):
       pass
-    # TODO: consult the content_type_full for charset
-    yield str(flowstate.soup).encode('utf-8')
+    # new values for the content and text in the flowstate
+    flowstate.content_encoding = 'identity'
+    text = str(flowstate.soup)
+    content = text.encode(charset or 'utf-8')
+    flowstate.set_content(content)
+    flowstate.text = text
+    yield content
 
   flow.response.stream = attr(process_soup, desc='patch soup')
 
