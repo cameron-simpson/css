@@ -314,12 +314,16 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     '''
     return self.GET()
 
-  @cached_property
-  def content_type(self) -> str:
-    ''' The base `Content-Type`, eg `'text/html'`.
+  @property
+  def iterable_content(self) -> Iterable[bytes]:
+    ''' An iterable of the _decoded_ content.
+
+        After a `self.GET()` this will be a clone of the `requests.Response` stream,
+        otherwise it will be `[self.content]`.
     '''
-    return self.response.headers.get('content-type',
-                                     '').split(';')[0].strip() or None
+    # there is no .iterable_content yet, expect it from the flow.response.content
+    # TODO: need to decode?
+    return [self.flow.response.content]
 
   @cached_property
   @uses_pilfer
