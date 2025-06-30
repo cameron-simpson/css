@@ -19,8 +19,9 @@ from cs.lex import cutsuffix, get_nonwhite, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
-from cs.rfc2616 import content_type
+from cs.rfc2616 import content_encodings, content_type
 from cs.tagset import TagSet
+from cs.seq import ClonedIterator
 from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
@@ -125,7 +126,19 @@ class URLMatcher(Promotable):
 class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   ''' An object with some resemblance to a `mitmproxy` `Flow` object
       with various utility properties and methods.
-      It may be initialised from lesser such as just a URL.
+      It may be initialised from lesser objects such as just a URL.
+
+      This is intented as a common basis for working in a `mitmproxy`
+      flow or from outside via the `requests` package.
+
+      Note that its `.request` and `.response` objects might be from `mitmproxy`
+      or from `requests`, so they are mostly useful for their headers.
+
+      However, the various `FlowState` attributes and properties
+      are based around the `mitmproxy` `Response` attributes:
+      https://docs.mitmproxy.org/stable/api/mitmproxy/http.html#Response
+      In particular the `.content` and so forth are different from
+      those of `requests.Response.content`.
   '''
 
   # class attribute holding the per-thread state stack
@@ -137,7 +150,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     ''' Initialise `self` from the keyword parameters.
 
         Accepted parameters:
-        - `bs4parser`: the desires BeautifulSoup parser,
+        - `bs4parser`: the desired BeautifulSoup parser,
           default from `{BS4_PARSER_DEFAULT==}`.
         - `flow`: a `mitmproxy` `Flow` instance
         - `request`: a `Request` instance
@@ -205,6 +218,18 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
         url=flow.request.url,
     )
 
+  def clear(self, *attrs):
+    ''' Delete the named attrubtes `attrs`.
+        We do this to clear derived attributes when we set an
+        antecedant attribute.
+    '''
+    assert len(attrs) > 0
+    for attr in attrs:
+      try:
+        delattr(self, attr)
+      except AttributeError:
+        pass
+
   @cached_property
   @fmtdoc
   def bs4parser(self):
@@ -220,62 +245,130 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     '''
     return URL(self.response.url)
 
+  @cached_property
+  def content_type(self) -> str:
+    ''' The base `Content-Type`, eg `'text/html'`.
+    '''
+    ct = content_type(self.response.headers)
+    if ct is None:
+      return ''
+    return ct.content_type
+
+  @cached_property
+  def content_type_params(self) -> Mapping[str, str]:
+    ''' The parameters from the `Content-Type` as a mapping of the
+        parameter's lowercase form to its value.
+    '''
+    params = {}
+    for param_s in self.response.headers.get('content-type',
+                                             '').split(';')[1:]:
+      k, v = param_s.split('=', 1)
+      params[k.strip().lower()] = v
+    return params
+
+  @property
+  def content_charset(self) -> str | None:
+    ''' The supplied `Content-Type` character set if specified, or `None`.
+    '''
+    return self.content_type_params.get('charset')
+
+  @property
+  def content_encoding(self) -> str:
+    ''' The `Content-Encoding` response header, or `''`.
+    '''
+    return self.response.headers.get('content-encoding', '')
+
+  @content_encoding.setter
+  def content_encoding(self, new_encoding: str):
+    ''' Set the `Content-Encoding` response header.
+    '''
+    self.response.headers['Content-Encoding'] = new_encoding or 'identity'
+
+  @content_encoding.deleter
+  def content_encoding(self):
+    ''' Delete the `Content-Encoding` response header.
+    '''
+    self.response.headers.pop('content-encoding', None)
+
+  @property
+  def content_encodings(self) -> List[str]:
+    ''' A list of the transforming encodings named in the `Content-Encoding` response header.
+          The encoding `'identity'` is discarded.
+      '''
+    return [
+        enc for enc in content_encodings(self.response.headers)
+        if enc != 'identity'
+    ]
+
   @uses_pilfer
   @promote
   def GET(self, P: "Pilfer", url: URL = None, **rq_kw) -> requests.Response:
     ''' Do a `Pilfer.GET` of `self.url` and return the `requests.Response`.
-        This also updates `self.request` and `self.response`
-        and clears `self.content` and `self.soup` (meaning they
-        will be rederived on next access).
+        This also updates `self.request` and `self.response`, sets
+        `self.iterable_content`, and clears `self.content` and
+        `self.soup` (meaning they will be rederived on next access).
     '''
     if url is None:
       url = self.url
     else:
       self.url = url
-    rsp = self.response = P.GET(url, **rq_kw)
-    # forget any derived cache values
-    for attr in 'content', 'soup':
-      try:
-        delattr(self, attr)
-      except AttributeError:
-        pass
+    rsp = self.response = P.GET(url, stream=True, **rq_kw)
+    # forget any cached derived values
+    self.clear('content', 'text', 'soup')
     self.request = rsp.request
     self.url = url
+    # TODO: find out if the requests.response has been decoded/uncompressed
+    self.iterable_content = ClonedIterator(rsp.iter_content(chunk_size=None))
     return rsp
 
   @cached_property
-  @uses_pilfer
-  def response(self, P: "Pilfer"):
+  def response(self):
     ''' Cached response object, obtained via `self.GET()` if needed.
     '''
     return self.GET()
 
   @cached_property
-  def content_type(self) -> str:
-    ''' The base `Content-Type`, eg `'text/html'`.
+  def iterable_content(self) -> Iterable[bytes]:
+    ''' An iterable of the _decoded_ content.
+
+        After a `self.GET()` this will be a clone of the `requests.Response` stream,
+        otherwise it will be `[self.content]`.
     '''
-    return self.response.headers.get('content-type',
-                                     '').split(';')[0].strip() or None
+    # there is no .iterable_content yet, expect it from the flow.response.content
+    # TODO: need to decode?
+    return [self.flow.response.content]
 
   @cached_property
-  @uses_pilfer
-  def content(self, *, P: "Pilfer") -> str:
-    ''' The text content of the URL.
-        Does a `GET` of the URL if there is no `self.response.content`.
+  def content(self) -> bytes:
+    ''' The response content, concatenated as a single `bytes` instance
+        from `self.iterable_content`.
     '''
-    rsp = self.response
-    content = rsp and rsp.content
-    if content is None:
-      self.GET()
-    self.url.text = self.response.content
-    return self.response.content
+    content = b''.join(self.iterable_content)
+    self.set_content(content)  # to clear the derived attributes
+    return content
+
+  def set_content(self, content: bytes):
+    ''' Set `self.content` and forget the `text` and `soup` attributes.
+    '''
+    self.content = content
+    self.clear('iterable_content', 'text', 'soup')
+
+  @cached_property
+  def text(self) -> str:
+    ''' The text content of the URL.
+    '''
+    # assume UTF-8 if not specified
+    charset = self.content_charset or 'utf-8'
+    text = self.content.decode(charset)
+    self.url.text = text
+    return text
 
   @cached_property
   def soup(self):
     ''' A `BeautifulSoup` of `self.content` for `text/html`, otherwise `None`.
     '''
     if self.content_type == 'text/html':
-      soup = BeautifulSoup(self.content, self.bs4parser)
+      soup = BeautifulSoup(self.text, self.bs4parser)
       self.url.soup = soup
       return soup
     return None
@@ -897,7 +990,7 @@ class SiteMap(Promotable):
       # place a toolbar above the body content
       body = soup.body
       toolbar = BS4Tag(name='div')
-      toolbar.append("Toolbar:")
+      toolbar.append("Toolbar: ")
       for i, widget in enumerate(tags):
         if i > 0:
           toolbar.append(", ")
@@ -920,7 +1013,10 @@ class DocSite(SiteMap):
 
   # the URL path suffixes which will be cached
   CACHE_SUFFIXES = tuple(
-      ['/', '.css', '.gif', '.html', '.ico', '.jpg', '.js', '.png', '.svg', '.webp', '.woff2']
+      [
+          '/', '.css', '.gif', '.html', '.ico', '.jpg', '.js', '.png', '.svg',
+          '.webp', '.woff2'
+      ]
   )
 
   URL_KEY_PATTERNS = [

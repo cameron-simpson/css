@@ -36,7 +36,7 @@ from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
-from cs.rfc2616 import content_length
+from cs.rfc2616 import content_encodings, content_length
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
@@ -45,6 +45,7 @@ from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 from .prefetch import URLFetcher
 from .sitemap import FlowState
+from .util import decode_content
 
 if sys.stdout.isatty():
   print = upd_print
@@ -60,6 +61,7 @@ def consume_stream(
       If the optional `getattrs` are supplied, set them as attributes
       on the returned generator function.
   '''
+
   # TODO: use progress_name?
 
   def consumer_gen(bss: Iterable[bytes]) -> Iterable[bytes]:
@@ -534,6 +536,7 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
   else:
     warning("prefetch_urls: unexpected hook_name %r", hook_name)
 
+# TODO: a FlowState method - process_soup?
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
@@ -543,14 +546,29 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
   flowstate = FlowState.from_Flow(flow)
 
   def process_soup(bss: Iterable[bytes]) -> Iterable[bytes]:
-    content_bs = b''.join(bss)
-    # TODO: consult the content_type full for charset
-    flowstate.content = content_bs.decode('utf-8')
+    ''' Yield a byte stream after patching its soup.
+        If the content type is not `text/html`, yield the stream unchanged.
+
+        Gather the input `bss`, a _decoded_ iterable of bytes, into text and transform into BS4 `Soup`.
+        Call `Pilfer.
+    '''
+    if flowstate.content_type != 'text/html':
+      yield from iter(bss)
+      return
+    charset = flowstate.content_charset or 'utf-8'
+    assert not flowstate.content_encodings
+    # set the content so that the soup can be computed
+    flowstate.set_content(b''.join(bss))
     # update the flowstate.soup
     for _ in P.run_matches(flowstate, 'soup', 'patch_soup_*'):
       pass
-    # TODO: consult the content_type_full for charset
-    yield str(flowstate.soup).encode('utf-8')
+    # new values for the content and text in the flowstate
+    flowstate.content_encoding = 'identity'
+    text = str(flowstate.soup)
+    content = text.encode(charset or 'utf-8')
+    flowstate.set_content(content)
+    flowstate.text = text
+    yield content
 
   flow.response.stream = attr(process_soup, desc='patch soup')
 
@@ -793,9 +811,11 @@ class MITMAddon:
       # to run whatever stream functions were applied.
       #
       # Because the actions do not know about each other, we
-      # wrap all the stream functions in a function which chains
-      # them together. If there's only one, we pass it straight
-      # though without a wrapper.
+      # wrap all the stream functions in a StreamChain which chains
+      # them together.
+      #
+      # If the content is encoded (eg compressed) we insert a
+      # decoding stream function at the start.
       #
       # Also, if there's an action for the "response" hook we
       # append a stream function which collates the final
@@ -805,14 +825,24 @@ class MITMAddon:
       #
       assert hook_name == 'responseheaders'
       # Streaming may change the size of the content, drop the Content-Length header;
-      # wget at least is confused if it's longer than the content.
-      try:
-        del flow.response.headers['content-length']
-      except KeyError:
-        pass
+      # wget at least is confused (stalls!) if it's longer than the content.
+      flow.response.headers.pop('content-length', None)
+      # We will always pass the decompressed data to the stream stages.
+      # Insert a decoder if required.
+      encodings = [
+          enc for enc in content_encodings(flow.response.headers)
+          if enc != 'identity'
+      ]
+      if encodings:
+        # insert a decoding pass using a copy of the headers as they are now
+        stream_funcs.insert(
+            0, partial(decode_content, flow.response.headers.copy())
+        )
+        flow.response.headers.pop('content-encoding', None)
       if self.hook_map['response']:
         # We have hooks for the response, so add a stream handler to
-        # collate the final stream into a raw content bytes instance.
+        # collate the final stream into a raw content bytes instance
+        # and set it as flow.response.content.
         content_bss = []
 
         def content_stream(bs: bytes) -> bytes:

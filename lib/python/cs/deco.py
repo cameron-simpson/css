@@ -444,7 +444,6 @@ def OBSOLETE(func, suggestion=None):
       This emits a warning log message before calling the decorated function.
       Only one warning is emitted per calling location.
   '''
-
   callers = set()
 
   def OBSOLETE_func_wrapper(*args, **kwargs):
@@ -591,7 +590,6 @@ def observable_class(property_names, only_unequal=False):
         values to be comparable for inequality.
         Default: `False`, meaning that all updates will be reported.
   '''
-
   if isinstance(property_names, str):
     property_names = (property_names,)
 
@@ -599,7 +597,6 @@ def observable_class(property_names, only_unequal=False):
   def make_observable_class(cls):
     ''' Annotate the class `cls` with observable properties.
     '''
-
     # push the per instance initialisation
     old_init = cls.__init__
 
@@ -881,6 +878,7 @@ uses_force = uses_cmd_options(force=False)
 uses_quiet = uses_cmd_options(quiet=False)
 uses_verbose = uses_cmd_options(verbose=False)
 
+# TODO: handle async functions
 # pylint: disable=too-many-statements
 @decorator
 def promote(func, params=None, types=None):
