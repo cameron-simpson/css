@@ -133,13 +133,15 @@ def header(
     headers: Mapping[str, str],
     header_name: str,
     registry: Optional[HeaderRegistry] = None,
+    *,
+    default=None,
 ) -> Union[None, BaseHeader]:
   ''' Return a header parsed into an instance of `email.headerregistry.BaseHeader`
-      or `None` if `header_name` is not present.
+      or `default` if `header_name` is not present.
   '''
   value = headers.get(header_name)
   if value is None:
-    return None
+    return default
   if registry is None:
     registry = default_headerregistry()
   return registry(header_name, value)
