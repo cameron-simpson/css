@@ -2172,9 +2172,13 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           xit = 1
           continue
         print(output.replace('\n', ' '))
-        for tag in sorted(te):
-          if tag.name != 'headline':
-            print(" ", tag)
+        printt(
+            *[
+                [f'  {tag.name}', tag.value]
+                for tag in sorted(te)
+                if tag.name != 'headline'
+            ]
+        )
     return xit
 
   def cmd_import(self, argv):
