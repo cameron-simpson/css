@@ -1785,7 +1785,12 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       if te is None:
         if isinstance(index, int):
           raise IndexError(index)
-        te = self.default_factory(index)
+        if isinstance(index, tuple):
+          name, value = index
+          te = self.default_factory(None)
+          te[name] = value
+        else:
+          te = self.default_factory(index)
     return te
 
   @locked
