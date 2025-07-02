@@ -2023,7 +2023,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
       Attributes:
       * `spec`: the source text from which this choice was parsed,
         possibly `None`
-      * `choice`: the apply/reject flag
+      * `choice`: the select/reject flag, `True` to select
       * `tag`: the `Tag` representing the criterion
       * `comparison`: an indication of the test comparison
 
@@ -3934,27 +3934,31 @@ class TagsCommandMixin:
     return tag_based_test_class.from_str(arg)
 
   @classmethod
-  def parse_tagset_criteria(cls, argv, tag_based_test_class=None):
-    ''' Parse tag specifications from `argv` until an unparseable item is found.
-        Return `(criteria,argv)`
-        where `criteria` is a list of the parsed criteria
-        and `argv` is the remaining unparsed items.
+  def pop_tagset_criteria(cls, argv, tag_based_test_class=None):
+    ''' Parse and pop tag specifications from `argv` until an unparseable item is found.
+        Return a list of the parsed criteria.
 
         Each item is parsed via
         `cls.parse_tagset_criterion(item,tag_based_test_class)`.
     '''
-    argv = list(argv)
     criteria = []
     while argv:
       try:
         criterion = cls.parse_tagset_criterion(
             argv[0], tag_based_test_class=tag_based_test_class
         )
-      except ValueError as e:
+      except (TypeError, ValueError) as e:
         warning("parse_tagset_criteria(%r): %s", argv[0], e)
         break
       criteria.append(criterion)
       argv.pop(0)
+    return criteria
+
+  @OBSOLETE('TagsCommandMixin.pop_tagset_criteria')
+  def parse_tagset_criteria(cls, argv, **ptc_kw):
+    ''' Obsolete shim for pop_tagset_criteria.
+    '''
+    criteria = cls.pop_tagset_criteria(argv, **ptc_kw)
     return criteria, argv
 
   @staticmethod
