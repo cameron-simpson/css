@@ -1975,10 +1975,10 @@ class TagSetCriterion(Promotable):
 
   @classmethod
   @pfx_method
-  def from_any(cls, o):
-    ''' Convert some suitable object `o` into a `TagSetCriterion`.
+  def promote(cls, obj):
+    ''' Promote `obj` into a `TagSetCriterion` (or subclass).
 
-        Various possibilities for `o` are:
+        Various possibilities for `obj` are:
         * `TagSetCriterion`: returned unchanged
         * `str`: a string tests for the presence
           of a tag with that name and optional value;
@@ -1991,30 +1991,26 @@ class TagSetCriterion(Promotable):
         * `(name,value)`: a 2 element sequence
           is equivalent to a positive equality `TagBasedTest`
     '''
-    tag_based_test_class = getattr(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
-    if isinstance(o, (cls, TagSetCriterion)):
+    tag_based_test_class = trace(getattr
+                                 )(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
+    if isinstance(obj, cls):
       # already suitable
-      return o
-    if isinstance(o, str):
-      # parse choice form string
-      return cls.from_str(o)
+      return obj
+    if isinstance(obj, TagSetCriterion):
+      # already suitable? maybe?
+      warning("%s: is a TagSetCriterion but not a %s", r(obj), cls.__name__)
+      return obj
     try:
-      name, value = o
+      name, value = obj
     except (TypeError, ValueError):
-      if hasattr(o, 'choice'):
+      if hasattr(obj, 'choice'):
         # assume TagBasedTest ducktype
-        return o
+        return obj
       try:
-        name = o.name
-        value = o.value
+        name = obj.name
+        value = obj.value
       except AttributeError:
-        pass
-      else:
-        return tag_based_test_class(
-            repr(o), True, tag=Tag(name, value), comparison='='
-        )
-    else:
-      # (name,value) => True TagBasedTest
+        return super().promote(obj)
       return tag_based_test_class(
           repr((name, value)), True, tag=Tag(name, value), comparison='='
       )
