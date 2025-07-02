@@ -83,7 +83,7 @@ def consume_stream(
 
 class StreamChain:
   ''' A single use callable wrapper for a chain of `Flow` stream functions.
-      A new `StreamChain` should be contructed when setting a `Flow`'s
+      A new `StreamChain` should be constructed when setting a `Flow`'s
       `.response.stream` attribute, as it keeps state.
 
       Each stream function is either a callable accepting `bytes`
