@@ -986,9 +986,18 @@ class SiteMap(Promotable):
         on the page's primary entity.
         Returns the entity, a `TagSet`.
     '''
+    PR = lambda *a, **kw: print("grok_default:", flowstate.url, *a, **kw)
+    te = None
     te_key = self.entity_key(flowstate, **(match_tags or {}))
     if te_key is None:
+      og_url = flowstate.meta.properties.get('og:url')
+      if og_url:
+        te = P.sqltags['opengraph.url', og_url]
+    else:
+      te = P.sqltags[te_key]
+    if te is None:
       # just return the metadata
+      PR("no te_key or og:url")
       return TagSet(
           meta=flowstate.meta.tags,
           properties=flowstate.meta.properties,
