@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 
 from cs.binary import bs
 from cs.deco import decorator, default_params, fmtdoc, promote, Promotable
-from cs.lex import cutsuffix, get_nonwhite, r, skipwhite
+from cs.lex import cutprefix, cutsuffix, get_nonwhite, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
@@ -788,6 +788,7 @@ class SiteMap(Promotable):
     for match_to, arg in patterns:
       matcher = URLMatcher.promote(match_to)
       if (match := matcher.match(url, extra=extra)) is not None:
+        # start with the URL attributes
         mapping = {
             attr: getattr(url, attr)
             for attr in (
@@ -808,7 +809,9 @@ class SiteMap(Promotable):
             _=url.cleanrpath,
             __=f'{url.hostname}/{url.cleanrpath}',
         )
+        # overlay any URL query terms
         mapping.update(url.query_dict())
+        # overlay any match results
         mapping.update(match)
         yield SiteMapPatternMatch(self, match_to, arg, match, mapping)
 
@@ -928,13 +931,17 @@ class SiteMap(Promotable):
         If `te` is a string, obtain the `TagSet` from `P.sqltags[te]`,
         thus the need to return the `TagSet`.
 
-        This sets the `TagSet`'s `.properties` to
-        `flowstate.meta.properties` and the `.meta` to
-        `flowstate.meta.tags`.
+        This applies the following updates:
+        - `meta`: `flowstate.meta.tags`
+        - `properties`: `flowstate.meta.properties`
+        - `opengraph.*`: from properties commencing with `og:`
+        - *type*`.*`: from properties commencing with *type*`:`
+          where *type* comes from the `og:type` property
     '''
     # promote a tagset name to an SQLTagSet from P.sqltags
     if isinstance(te, str):
       te = P.sqltags[te]
+    # stash the raw meta and properties
     te.meta = flowstate.meta.tags
     te.properties = flowstate.meta.properties
     te.update(**update_kw)
