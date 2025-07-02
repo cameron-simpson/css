@@ -336,7 +336,12 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     '''
     # there is no .iterable_content yet, expect it from the flow.response.content
     # TODO: need to decode?
-    return [self.flow.response.content]
+    try:
+      flow = self.flow
+    except AttributeError:
+      self.GET()
+      return self.iterable_content
+    return [flow.response.content]
 
   @cached_property
   def content(self) -> bytes:
