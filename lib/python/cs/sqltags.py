@@ -2446,19 +2446,19 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
           yield
 
   @classmethod
-  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
-    ''' Parse tag criteria from `argv`.
+  def parse_tagset_criterion(cls, crit_s, tag_based_test_class=None):
+    ''' Parse a `TagSet` criterion from `crit_s`.
 
-        The criteria may be either:
-        * an integer specifying a `Tag` id
+        The criterion may be either:
+        * an integer specifying a `TagSet` id
         * a sequence of tag criteria
     '''
     # try a single int argument
     try:
-      index = int(arg)
+      index = int(crit_s)
     except ValueError:
       return super().parse_tagset_criterion(
-          arg, tag_based_test_class=tag_based_test_class
+          crit_s, tag_based_test_class=tag_based_test_class
       )
     else:
       return SQTEntityIdTest([index])
