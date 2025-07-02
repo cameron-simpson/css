@@ -2057,15 +2057,14 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     options = self.options
     sqltags = self.sqltags
     badopts = False
-    tag_criteria, argv = self.parse_tagset_criteria(argv)
+    tag_criteria = self.pop_tagset_criteria(argv)
     if not tag_criteria:
-      warning("missing tag criteria")
-      badopts = True
+      raise GetoptError(
+          f'missing tag criteria, unparsed arguments: {argv!r}'
+          if argv else 'missing tag criteria'
+      )
     if argv:
-      warning("remaining unparsed arguments: %r", argv)
-      badopts = True
-    if badopts:
-      raise GetoptError("bad arguments")
+      raise GetoptError('extra arguments: {argv!r}')
     tes = list(sqltags.find(tag_criteria))
     changed_tes = TagSet.edit_tagsets(tes)  # verbose=state.verbose
     for old_name, new_name, te in changed_tes:
