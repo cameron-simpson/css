@@ -1163,4 +1163,11 @@ class Promotable:
     else:
       return from_type(obj, **from_t_kw)
     # try instantiating the class with obj as its sole argument
-    return cls(obj)
+    try:
+      return cls(obj)
+    except TypeError as e:
+      raise TypeError(
+          f'cannot promote object of class {obj.__class__!r} to class {cls!r}'
+          f', last attempt of {cls.__name__}({obj.__class__.__name__}:{obj!r})'
+          f' raised {e.__class__.__name__}: {e}'
+      )
