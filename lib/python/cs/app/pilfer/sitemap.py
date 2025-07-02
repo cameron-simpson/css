@@ -301,8 +301,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     ]
 
   @uses_pilfer
-  @promote
-  def GET(self, P: "Pilfer", url: URL = None, **rq_kw) -> requests.Response:
+  @promote(params=('url',))
+  def GET(self, url: URL = None, *, P: "Pilfer", **rq_kw) -> requests.Response:
     ''' Do a `Pilfer.GET` of `self.url` and return the `requests.Response`.
         This also updates `self.request` and `self.response`, sets
         `self.iterable_content`, and clears `self.content` and
