@@ -1729,14 +1729,16 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
 
   # pylint: disable=arguments-differ
   def get(self, index, default=None):
-    ''' Return an `SQLTagSet` matching `index`, or `None` if there is no such entity.
+    ''' Return an `SQLTagSet` matching `index`, or `default` if there is no such entity.
     '''
     if isinstance(index, int):
+      # a unique TagSet.id
       te = self.TagSetClass.singleton_also_by('id', index)
       if te is not None:
         return te
       tes = self.find(id=index)
     elif isinstance(index, str):
+      # a unique TagSet.name
       te = self.TagSetClass.singleton_also_by('name', index)
       if te is not None:
         return te
@@ -1883,7 +1885,7 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     return self[0]
 
   def find(self, *criteria, _without_tags=False, **crit_kw):
-    ''' Generate and run a query derived from `criteria`
+    ''' A generator to create and run a query derived from `criteria`,
         yielding `SQLTagSet` instances.
 
         Parameters:
