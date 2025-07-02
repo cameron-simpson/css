@@ -1006,6 +1006,22 @@ def promote(func, params=None, types=None):
     annotation = param.annotation
     if annotation is Parameter.empty:
       continue
+    if isinstance(annotation, str):
+      resolved = sys.modules[func.__module__].__dict__.get(annotation)
+      if resolved is None:
+        warning(
+            "@promote(%s): skip param %s:%r: cannot be resolved from sys.modules[%r]",
+            func,
+            param_name,
+            annotation,
+            func.__module__,
+        )
+        continue
+      warning(
+          "@promote(%s): param %s: %r -> %r", func, param_name, annotation,
+          resolved
+      )
+      annotation = resolved
     # recognise optional parameters and use their primary type
     optional = False
     if param.default is not Parameter.empty:
