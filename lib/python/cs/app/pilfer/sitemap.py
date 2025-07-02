@@ -975,7 +975,6 @@ class SiteMap(Promotable):
     return None
 
   @on
-  @promote
   def grok_default(
       self,
       flowstate: FlowState,
