@@ -980,6 +980,8 @@ class SiteMap(Promotable):
       self,
       flowstate: FlowState,
       match_tags: Optional[Mapping[str, Any]] = None,
+      *,
+      P: "Pilfer" = None,
   ) -> TagSet:
     ''' A default low level grok function
         which stores a page's meta tags and properties
@@ -987,6 +989,8 @@ class SiteMap(Promotable):
         Returns the entity, a `TagSet`.
     '''
     PR = lambda *a, **kw: print("grok_default:", flowstate.url, *a, **kw)
+    if P is None:
+      P = default_Pilfer()
     te = None
     te_key = self.entity_key(flowstate, **(match_tags or {}))
     if te_key is None:
@@ -1002,10 +1006,7 @@ class SiteMap(Promotable):
           meta=flowstate.meta.tags,
           properties=flowstate.meta.properties,
       )
-    te = self.update_tagset_from_meta(
-        te_key,
-        flowstate,
-    )
+    self.update_tagset_from_meta(te, flowstate)
     return te
 
   @on
