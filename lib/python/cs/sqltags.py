@@ -1744,7 +1744,12 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         return te
       tes = self.find(name=index)
     else:
-      raise TypeError(f'unsupported index: {r(index)}')
+      # a 2-tuple of attribute and value
+      try:
+        attr, value = index
+      except (TypeError, ValueError) as e:
+        raise TypeError(f'unsupported index: {r(index)}')
+      tes = self.find(**{attr: value})
     tes = list(tes)
     if not tes:
       return default
