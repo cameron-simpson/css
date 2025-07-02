@@ -319,7 +319,7 @@ class Later(MultiOpenMixin, HasThreadState):
 
   def __init__(
       self,
-      capacity,
+      capacity=4,
       name=None,
       inboundCapacity=0,
       retry_delay=None,
@@ -332,6 +332,7 @@ class Later(MultiOpenMixin, HasThreadState):
           to size a Semaphore to constrain the number of dispatched functions
           which may be in play at a time; if not an int it is presumed to be a
           suitable Semaphore-like object, perhaps shared with other subsystems.
+          The default is 4, arbitrarily.
         * `name`: optional identifying name for this instance.
         * `inboundCapacity`: if >0, used as a limit on the number of
           undispatched functions that may be queued up; the default is 0 (no
