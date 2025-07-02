@@ -717,6 +717,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         This is a shim for `SiteMap.grok`.
     '''
     with self:
+      if flowstate.response.status_code != 200:
+        warning(f'{flowstate.response.status_code=} != 200, not grokking')
+        return
       for sitemap in self.sitemaps_for(flowstate.url):
         yield from sitemap.grok(flowstate, flowattr, **grok_kw)
 

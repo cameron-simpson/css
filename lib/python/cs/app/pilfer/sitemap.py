@@ -735,6 +735,9 @@ class SiteMap(Promotable):
         Yield `(method,match_tags,result)` 3-tuples from each method called.
         Usually the `result` is a `TagSet`.
     '''
+    if flowstate.response.status_code != 200:
+      warning(f'{flowstate.response.status_code=} != 200, not grokking')
+      return
     yield from self.run_matches(flowstate, flowattr, 'grok_*', **run_match_kw)
 
   def matches(
