@@ -2000,21 +2000,28 @@ class TagSetCriterion(Promotable):
       # already suitable? maybe?
       warning("%s: is a TagSetCriterion but not a %s", r(obj), cls.__name__)
       return obj
+    # see if we have a tag-like object with .name and .value
     try:
-      name, value = obj
-    except (TypeError, ValueError):
-      if hasattr(obj, 'choice'):
-        # assume TagBasedTest ducktype
-        return obj
+      name = obj.name
+      value = obj.value
+    except AttributeError:
+      # see if we can extract a name,value pair
       try:
-        name = obj.name
-        value = obj.value
-      except AttributeError:
-        return super().promote(obj)
-      return tag_based_test_class(
-          repr((name, value)), True, tag=Tag(name, value), comparison='='
-      )
-    raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
+        name, value = obj
+      except (TypeError, ValueError):
+        # not a 2-tuple either, fall back to the superclass
+        return trace(super().promote)(obj)
+      choice = True
+    else:
+      # we do, honour its .choice, otherwise assume True (select)
+      choice = getattr(obj, 'choice', True)
+    # now we have name, value, choice
+    return tag_based_test_class(
+        f'{name}{"=" if choice else "!="}{value!r}',
+        choice,
+        tag=Tag(name, value),
+        comparison='=',
+    )
 
 class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
                    TagSetCriterion):
