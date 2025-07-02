@@ -62,7 +62,7 @@ from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, popopts
+from cs.cmdutils import BaseCommand, cli_datetime, popopts
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
@@ -2010,6 +2010,23 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
 
   GETOPT_SPEC = 'f:'
 
+  @staticmethod
+  def parse_categories(categories):
+    ''' Extract "category" words from the `str` `categories`,
+        return a list of category names.
+
+        Splits on commas, strips leading and trailing whitespace, downcases.
+    '''
+    return list(
+        filter(
+            None,
+            map(
+                lambda category: category.strip().lower(),
+                categories.split(',')
+            )
+        )
+    )
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database shell.
@@ -2191,44 +2208,37 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     self.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
+  @popopts(
+      c_=(
+          'categories',
+          ''' Specify the categories for this log entry.
+              The default is to recognise a leading CAT,CAT,...: prefix.
+          ''',
+          parse_categories,
+      ),
+      d_=(
+          'dt',
+          'Use dt, an ISO8601 date, as the log entry timestamp.',
+          cli_datetime,
+      ),
+      D_=(
+          'strptime_format',
+          ''' Read the time from the start of the headline
+              according to the provided strptime specification.
+          ''',
+      ),
+  )
   def cmd_log(self, argv):
     ''' Record a log entry.
 
         Usage: {cmd} [-c category,...] [-d when] [-D strptime] {{-|headline}} [tags...]
           Record entries into the database.
           If headline is '-', read headlines from standard input.
-          -c categories
-            Specify the categories for this log entry.
-            The default is to recognise a leading CAT,CAT,...: prefix.
-          -d when
-            Use when, an ISO8601 date, as the log entry timestamp.
-          -D strptime
-            Read the time from the start of the headline
-            according to the provided strptime specification.
     '''
     options = self.options
-    categories = None
-    dt = None
-    strptime_format = None
-    badopts = False
-    opts, argv = getopt(argv, 'c:d:D:', '')
-    for opt, val in opts:
-      with Pfx(opt if val is None else f"{opt} {val!r}"):
-        if opt == '-c':
-          categories = self.parse_categories(val)
-        elif opt == '-d':
-          try:
-            dt = datetime.fromisoformat(val)
-          except ValueError as e:
-            warning("unhandled ISO format date: %s", e)
-            badopts = True
-          if dt.tzinfo is None:
-            # create a nonnaive datetime in the local zone
-            dt = dt.astimezone()
-        elif opt == '-D':
-          strptime_format = val
-        else:
-          raise NotImplementedError("unhandled option")
+    categories = options.categories
+    dt = options.dt
+    strptime_format = options.strptime_format
     if dt is not None and strptime_format is not None:
       warning("-d and -D are mutually exclusive")
       badopts = True
@@ -2397,22 +2407,21 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
   # init
   #   Initialise the database.
 
-  USAGE_FORMAT = '''
-    Usage: {cmd} [-f db_url] subcommand [...]
-      --db db_url SQLAlchemy database URL or filename.
-                  Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').
-  '''
-
   @dataclass
   class Options(BaseCommand.Options):
     ''' Options for the `BaseSQLTagsCommand` class.
     '''
 
-    db_url: str = None
+    db_url: str = os.environ.get(DBURL_ENVVAR) or expanduser(DBURL_DEFAULT)
 
     COMMON_OPT_SPECS = dict(
         **BaseCommand.Options.COMMON_OPT_SPECS,
-        db=('db_url', 'SQLTags database URL.'),
+        db_=(
+            'db_url',
+            '''SQLTags database URL.
+               Default from ${DBURL_ENVVAR} or {DBURL_DEFAULT!r}.
+            ''',
+        ),
     )
 
   @cached_property
@@ -2447,23 +2456,6 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
       )
     else:
       return SQTEntityIdTest([index])
-
-  @staticmethod
-  def parse_categories(categories):
-    ''' Extract "category" words from the `str` `categories`,
-        return a list of category names.
-
-        Splits on commas, strips leading and trailing whitespace, downcases.
-    '''
-    return list(
-        filter(
-            None,
-            map(
-                lambda category: category.strip().lower(),
-                categories.split(',')
-            )
-        )
-    )
 
 class SQLTagsCommand(BaseSQLTagsCommand):
   ''' `sqltags` main command line utility.
