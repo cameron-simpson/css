@@ -1,3 +1,4 @@
+a hook after the SNI or CONNECT and before the requestheaders to pass the TLS stream straight through, eg for icloud
 SiteMap.patch_soup_top_index to put a toolbar across the top of a page with RSS, dl, etc etc
 get the content-length through to stream processing and progressbar
 @decorator to preserve the iscoroutineness of the decorated function? And check it works via @OBSOLETE? suggestion by fixerror
