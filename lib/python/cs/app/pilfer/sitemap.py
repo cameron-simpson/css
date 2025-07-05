@@ -732,9 +732,8 @@ class SiteMap(Promotable):
         method result is not `None` then the result is set as an
         updated value on `flowstate`.
     '''
-    for method, match_tags in self.on_matches(flowstate, **match_kw):
-      if methodglob is not None and not fnmatch(method.__name__, methodglob):
-        continue
+    for method, match_tags in self.on_matches(flowstate, methodglob,
+                                              **match_kw):
       with Pfx("call %s", method.__qualname__):
         try:
           if flowattr is None:
