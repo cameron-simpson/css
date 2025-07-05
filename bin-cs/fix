@@ -41,7 +41,7 @@ done
 for thing
 do
   case "$thing" in
-    *.py)   set -- ruff check --fix "$thing" ;;
+    *.py)   set -- ruff check --fix "--target-version=$RUFF_PYTHON_VERSION" "$thing" ;;
     *)      echo "$cmd: how to fix? $thing" >&2
             exit 1
             ;;
