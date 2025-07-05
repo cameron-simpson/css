@@ -288,11 +288,9 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   if rq.method not in ('GET', 'HEAD'):
     PR(rq.method, "is not GET or HEAD")
     return
-  rsp = flow.response
-  if rsp:
-    rsphdrs = rsp.headers
+  if flow.response:
+    rsphdrs = flow.response.headers
   url = URL(rq.url)
-  rqhdrs = rq.headers
   # scan the sitemaps for the first one offering a key for this URL
   # extra values for use
   extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
@@ -303,21 +301,24 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
     return
   cache = P.content_cache
   with cache:
-    if rsp:
       # update the cache
+    if flow.response:
       if getattr(flow, 'from_cache', False):
         # ignore a response we ourselves pulled from the cache
         pass
       elif rq.method != 'GET':
         PR("response is not from a GET, do not cache")
-      elif rsp.status_code != 200:
-        PR("response status_code", rsp.status_code, "is not 200, do not cache")
+      elif flow.response.status_code != 200:
+        PR(
+            "response status_code", flow.response.status_code,
+            "is not 200, do not cache"
+        )
       elif flow.runstate.cancelled:
         PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
         # response from upstream, update the cache
         PR("to cache, cache_keys", ", ".join(cache_keys))
-        if rsp.content is None:
+        if hook_name == "responseheaders":
           # We are at the response headers
           # and will stream the content to the cache file.
           assert hook_name == "responseheaders"
@@ -333,11 +334,13 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
                   runstate=flow.runstate,
               ),
               name=f'cache {cache_keys}',
-              gen_attrs=dict(content_length=content_length(rsp.headers)),
+              gen_attrs=dict(
+                  content_length=content_length(flow.response.headers)
+              ),
           )
         else:
           # we are at the completed response
-          # pass rsp.content to the cache
+          # pass flow.response.content to the cache
           assert hook_name == "response"
           md = cache.cache_response(
               url,
