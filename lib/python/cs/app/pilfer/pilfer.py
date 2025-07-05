@@ -826,12 +826,23 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
 
-  def cache_keys_for_url(self, url, *, extra=None):
+  def cache_keys_for_url(self, url, rq_headers=None) -> set[str]:
+    ''' Return a set of cache keys for `url`.
+
+        These are obtained by calling every `SiteMap.cache_key_*`
+        method matching the `url`.
+    '''
+    PR = lambda *a, **kw: print("cache_keys_for", url, *a, **kw)
+    flowstate = FlowState(url=url)
     cache = self.content_cache
-    cache_keys = []
-    for match in self.url_matches(url, pattern_type='URL_KEY', extra=extra):
-      url_key = match.format_arg(extra=extra)
-      cache_keys.append(cache.cache_key_for(match.sitemap, url_key))
+    cache_keys = set()
+    with self:
+      for sitemap in self.sitemaps_for(url):
+        PR("sitemap", sitemap)
+        for method, match_tags, site_cache_key in sitemap.run_matches(
+            flowstate, None, 'cache_key_*'):
+          if site_cache_key is not None:
+            cache_keys.add(cache.cache_key_for(sitemap, site_cache_key))
     return cache_keys
 
   @promote
