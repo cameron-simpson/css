@@ -526,38 +526,55 @@ class SiteMap(Promotable):
 
   @staticmethod
   @decorator
-  def on(method, *patterns, **patterns_kw):
+  def on(method, *patterns, **tags_kw):
     ''' A decorator for handler methods which specifies conditions
         which must match for this handler to be called.
         This decorator may be applied multiple times
         if the handler method should match various flows.
 
-        Its parameters indicate the conditions under which this method
-        will be fired; all must be true.
-        Each use of the decorator appends its conjunction of
-        conditions on the method's `.on_conditions` attribute.
+        Its positional parameters indicate the conditions under
+        which this method will be fired; all must be true.
+        Each use of the decorator appends a `(conditions,tags_kw)`
+        2-tuple to the method's `.on_conditions` attribute,
+        where `conditions` is list storing the conjunction of conditions
+        and `tags_kw` is any *tag*`=`*format*` supplied in
+        the decorator keyword arguments.
 
-        Other parameters have the following meanings:
-        - the values in `patterns` may be strings or callables;
-          strings are considered globs to match against the hostname
-          if they contain no slashes or regular expressions to match
-          against the URL path otherwise - a leading slash anchors
-          the regexp against the start of the path;
-          callables are called with the `flow` and may make any test against it
-        - the `patterns_kw` is a mapping of `match_kw` key or `flowstate` attribute
-          to either the required value or a callable to test that value
+        The positional parameters have the following meaning:
+        - a string containing no slash character (`'/'`):
+          a glob to match against the hostname
+        - a string containing a slash:
+          a regular expression to apply against the URL path;
+          a leading slash anchors the regexp against the start of the path
+          otherwise it may match anywhere in the path
+        - a callable: a function accepting a `FlowState`;
+          it may return `None` or `False` for no match,
+          or `True` or a `Mapping[str,str]` for a match
 
+        For example this decoration matches the URL hostname
+        `docs.python.org` and the URL path
+        `/3/library/`*module_name*`.html`.
+        On a match the resulting mat<F7>ch tags will contain:
+        * `'module_name'`: from the regular expression
+        * `'cache_key'`: from the `cache_key=` argument
 
-        Example:
-
-            @on('docs.pytho.org', '/3/library/(?P<module_name>[^/]+).html$')
+            @on(
+                'docs.python.org',
+                '/3/library/(?P<module_name>[^/]+).html$',
+                cache_key='module/{module_name}',
+            )
             def cache_module_html(
                 self,     # the SiteMap instance
                 url,      # the URL
                 flow,     # the mitmproxy Flow
                 P:Pilfer, # the current Pilfer context
             ):
-                P.cache(flow, '{flow.requs
+                ................
+
+        You may notice that the cache key doesn't mention the
+        hostname; the caching system qualifies cache keys with their
+        `SiteMap` name and so the key here need only be unique
+        within domains served with this `SiteMap`.
     '''
     conditions = []
     for pattern in patterns:
@@ -600,16 +617,18 @@ class SiteMap(Promotable):
             )(
                 pattern
             )
+        elif callable(condition):
+          # it should be a callable accepting a FlowState
+          pass
         else:
           raise RuntimeError
         assert condition is not None
         conditions.append(condition)
-    conditions.extend(patterns_kw.items())
     try:
       cond_attr = method.on_conditions
     except AttributeError:
       cond_attr = method.on_conditions = []
-    cond_attr.append(conditions)
+    cond_attr.append((conditions, tags_kw))
     return method
 
   @classmethod
