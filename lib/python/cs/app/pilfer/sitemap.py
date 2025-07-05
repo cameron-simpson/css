@@ -1074,38 +1074,37 @@ class DocSite(SiteMap):
   # the URL path suffixes which will be cached
   CACHE_SUFFIXES = tuple(
       [
-          '/', '.css', '.gif', '.html', '.ico', '.jpg', '.js', '.png', '.svg',
-          '.webp', '.woff2'
+          # web pages
+          '.html',
+          # style sheets
+          '.css',
+          #images
+          '.gif',
+          '.ico',
+          '.jpg',
+          '.png',
+          '.svg',
+          '.webp',
+          # scripts
+          '.js',
+          # fonts
+          '.woff2',
       ]
   )
 
-  URL_KEY_PATTERNS = [
-      (
-          # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+  @on('/', cache_key='{__}')
+  @on(
+      ''.join(
           (
-              None,
-              r'.*(/|\\' + '|\\'.join(CACHE_SUFFIXES) + ')',
-          ),
-          '{__}',
+              '/.*(',
+              '|'.join(ext.replace('.', r'\.') for ext in CACHE_SUFFIXES),
+              ')$',
+          )
       ),
-  ]
-
-@dataclass
-class MiscDocsSite(DocSite):
-  ''' A general purpose doc site map with keys for `.html` and `.js` URLs
-      along with several other common extensions.
-  '''
-
-  URL_KEY_PATTERNS = [
-      (
-          # https://www.crummy.com/software/BeautifulSoup/bs4/doc/
-          (
-              'www.crummy.com',
-              r'/software/BeautifulSoup/bs4/doc/',
-          ),
-          '{__}',
-      ),
-  ]
+      cache_key='{__}',
+  )
+  def cache_key_docsite(self, flowstate: FlowState, match_tags: TagSet) -> str:
+    return match_tags['cache_key']
 
 @dataclass
 class Wikipedia(SiteMap):
@@ -1139,15 +1138,15 @@ class Wikipedia(SiteMap):
     return key
 
 @dataclass
-class Docker(SiteMap):
+class DockerIO(SiteMap):
 
-  URL_KEY_PATTERNS = [
-      # https://registry-1.docker.io/v2/linuxserver/ffmpeg/blobs/sha256:6e04116828ac8a3a5f3297238a6f2d0246440a95c9827d87cafe43067e9ccc5d
-      (
-          (
-              'registry-*.docker.io',
-              r'/v2/.*/blobs/[^/]+:[^/]+$',
-          ),
-          'blobs/{__}',
-      ),
-  ]
+  # https://registry-1.docker.io/v2/linuxserver/ffmpeg/blobs/sha256:6e04116828ac8a3a5f3297238a6f2d0246440a95c9827d87cafe43067e9ccc5d
+  @on(
+      'registry-*.docker.io',
+      r'/v2/.*/blobs/[^/]+:[^/]+$',
+      cache_key='blobs/{__}',
+  )
+  def cache_key_image_blob(
+      self, flowstate: FlowState, match_tags: TagSet
+  ) -> str:
+    return match_tags['cache_key']
