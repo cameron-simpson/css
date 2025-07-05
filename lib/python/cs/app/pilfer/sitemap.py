@@ -14,7 +14,7 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping
 
 from cs.binary import bs
-from cs.deco import decorator, default_params, fmtdoc, promote, Promotable
+from cs.deco import decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable
 from cs.lex import cutprefix, cutsuffix, get_nonwhite, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -878,6 +878,7 @@ class SiteMap(Promotable):
       return matched
     return None
 
+  @OBSOLETE('SiteMap.default_cache_key or cache_key_*')
   @promote
   def url_key(
       self,
