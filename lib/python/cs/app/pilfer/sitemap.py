@@ -439,6 +439,18 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
           links_by_rel[rel].append(link)
     return links_by_rel
 
+  @cached_property
+  def opengraph_tags(self) -> dict:
+    ''' The open graph properties, see https://ogp.me/
+    '''
+    # I have seen these misplaced into the META tags,
+    # so get those then overwrite from the properties.
+    return {
+        f'opengraph.{cutprefix(k,"og:")}': v
+        for k, v in (*self.meta.metaitems(), *self.meta.properties.items())
+        if k.startswith("og:")
+    }
+
 uses_flowstate = default_params(flowstate=FlowState.default)
 
 class SiteMapPatternMatch(namedtuple(
