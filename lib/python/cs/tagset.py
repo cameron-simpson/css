@@ -1975,10 +1975,10 @@ class TagSetCriterion(Promotable):
 
   @classmethod
   @pfx_method
-  def from_any(cls, o):
-    ''' Convert some suitable object `o` into a `TagSetCriterion`.
+  def promote(cls, obj):
+    ''' Promote `obj` into a `TagSetCriterion` (or subclass).
 
-        Various possibilities for `o` are:
+        Various possibilities for `obj` are:
         * `TagSetCriterion`: returned unchanged
         * `str`: a string tests for the presence
           of a tag with that name and optional value;
@@ -1991,34 +1991,37 @@ class TagSetCriterion(Promotable):
         * `(name,value)`: a 2 element sequence
           is equivalent to a positive equality `TagBasedTest`
     '''
-    tag_based_test_class = getattr(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
-    if isinstance(o, (cls, TagSetCriterion)):
+    tag_based_test_class = trace(getattr
+                                 )(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
+    if isinstance(obj, cls):
       # already suitable
-      return o
-    if isinstance(o, str):
-      # parse choice form string
-      return cls.from_str(o)
+      return obj
+    if isinstance(obj, TagSetCriterion):
+      # already suitable? maybe?
+      warning("%s: is a TagSetCriterion but not a %s", r(obj), cls.__name__)
+      return obj
+    # see if we have a tag-like object with .name and .value
     try:
-      name, value = o
-    except (TypeError, ValueError):
-      if hasattr(o, 'choice'):
-        # assume TagBasedTest ducktype
-        return o
+      name = obj.name
+      value = obj.value
+    except AttributeError:
+      # see if we can extract a name,value pair
       try:
-        name = o.name
-        value = o.value
-      except AttributeError:
-        pass
-      else:
-        return tag_based_test_class(
-            repr(o), True, tag=Tag(name, value), comparison='='
-        )
+        name, value = obj
+      except (TypeError, ValueError):
+        # not a 2-tuple either, fall back to the superclass
+        return trace(super().promote)(obj)
+      choice = True
     else:
-      # (name,value) => True TagBasedTest
-      return tag_based_test_class(
-          repr((name, value)), True, tag=Tag(name, value), comparison='='
-      )
-    raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
+      # we do, honour its .choice, otherwise assume True (select)
+      choice = getattr(obj, 'choice', True)
+    # now we have name, value, choice
+    return tag_based_test_class(
+        f'{name}{"=" if choice else "!="}{value!r}',
+        choice,
+        tag=Tag(name, value),
+        comparison='=',
+    )
 
 class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
                    TagSetCriterion):
@@ -2027,7 +2030,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
       Attributes:
       * `spec`: the source text from which this choice was parsed,
         possibly `None`
-      * `choice`: the apply/reject flag
+      * `choice`: the select/reject flag, `True` to select
       * `tag`: the `Tag` representing the criterion
       * `comparison`: an indication of the test comparison
 
@@ -3938,27 +3941,31 @@ class TagsCommandMixin:
     return tag_based_test_class.from_str(arg)
 
   @classmethod
-  def parse_tagset_criteria(cls, argv, tag_based_test_class=None):
-    ''' Parse tag specifications from `argv` until an unparseable item is found.
-        Return `(criteria,argv)`
-        where `criteria` is a list of the parsed criteria
-        and `argv` is the remaining unparsed items.
+  def pop_tagset_criteria(cls, argv, tag_based_test_class=None):
+    ''' Parse and pop tag specifications from `argv` until an unparseable item is found.
+        Return a list of the parsed criteria.
 
         Each item is parsed via
         `cls.parse_tagset_criterion(item,tag_based_test_class)`.
     '''
-    argv = list(argv)
     criteria = []
     while argv:
       try:
         criterion = cls.parse_tagset_criterion(
             argv[0], tag_based_test_class=tag_based_test_class
         )
-      except ValueError as e:
+      except (TypeError, ValueError) as e:
         warning("parse_tagset_criteria(%r): %s", argv[0], e)
         break
       criteria.append(criterion)
       argv.pop(0)
+    return criteria
+
+  @OBSOLETE('TagsCommandMixin.pop_tagset_criteria')
+  def parse_tagset_criteria(cls, argv, **ptc_kw):
+    ''' Obsolete shim for pop_tagset_criteria.
+    '''
+    criteria = cls.pop_tagset_criteria(argv, **ptc_kw)
     return criteria, argv
 
   @staticmethod

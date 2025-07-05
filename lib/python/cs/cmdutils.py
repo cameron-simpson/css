@@ -29,6 +29,7 @@ from code import interact
 from collections import ChainMap
 from contextlib import contextmanager
 from dataclasses import dataclass, field, fields
+from datetime import datetime
 try:
   from functools import cache  # 3.9 onward
 except ImportError:
@@ -1134,6 +1135,17 @@ def popopts(cmd_method, **opt_specs_kw):
       )
 
   return _popopts_cmd_method_wrapper, wrapper_attrs
+
+def cli_datetime(dt_s: str) -> datetime:
+  ''' Parse an ISO8601 date into a datetime.
+      Being for the command line, this assumes the local timezone
+      if a UTC offset is not specified.
+  '''
+  dt = datetime.fromisoformat(dt_s)
+  if dt.tzinfo is None:
+    # create a nonnaive datetime in the local zone
+    dt = dt.astimezone()
+  return dt
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.

@@ -1006,6 +1006,22 @@ def promote(func, params=None, types=None):
     annotation = param.annotation
     if annotation is Parameter.empty:
       continue
+    if isinstance(annotation, str):
+      resolved = sys.modules[func.__module__].__dict__.get(annotation)
+      if resolved is None:
+        warning(
+            "@promote(%s): skip param %s:%r: cannot be resolved from sys.modules[%r]",
+            func,
+            param_name,
+            annotation,
+            func.__module__,
+        )
+        continue
+      warning(
+          "@promote(%s): param %s: %r -> %r", func, param_name, annotation,
+          resolved
+      )
+      annotation = resolved
     # recognise optional parameters and use their primary type
     optional = False
     if param.default is not Parameter.empty:
@@ -1163,4 +1179,11 @@ class Promotable:
     else:
       return from_type(obj, **from_t_kw)
     # try instantiating the class with obj as its sole argument
-    return cls(obj)
+    try:
+      return cls(obj)
+    except TypeError as e:
+      raise TypeError(
+          f'cannot promote object of class {obj.__class__!r} to class {cls!r}'
+          f', last attempt of {cls.__name__}({obj.__class__.__name__}:{obj!r})'
+          f' raised {e.__class__.__name__}: {e}'
+      )

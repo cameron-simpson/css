@@ -254,8 +254,12 @@ class PilferCommand(BaseCommand):
     print(url)
     flowstate = FlowState(url=url)
     flowstate.GET()  # implicit these days, but let's be overt about failure
+    if flowstate.response.status_code != 200:
+      warning("GET %s -> status_code %r", url, flowstate.response.status_code)
     printt(
-        (f'{flowstate.request.method} response headers:',),
+        (
+            f'{flowstate.request.method} response {flowstate.response.status_code} headers:',
+        ),
         *[
             (f'  {key}', value) for key, value in sorted(
                 flowstate.response.headers.items(),
@@ -419,7 +423,7 @@ class PilferCommand(BaseCommand):
   @popopts
   def cmd_grok(self, argv):
     ''' Usage: {cmd} URL
-          Call every matching @on method for sitemaps matching URL.
+          Call every matching @on grok_* method for sitemaps matching URL.
     '''
     if not argv:
       raise GetoptError("missing URL")

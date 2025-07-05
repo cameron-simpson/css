@@ -17,6 +17,7 @@ from typing import Callable, Iterable, Optional
 from icontract import require
 from mitmproxy import http
 import mitmproxy.addons.dumper
+from mitmproxy.http import Request as MITMRequest, Response as MITMResponse
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
@@ -57,7 +58,7 @@ def consume_stream(
     consumer: Callable[Iterable[bytes], None], name=None, *, gen_attrs=None
 ):
   ''' Wrap `consumer` in a generator function suitable for use by a `StreamChain`.
-      Return the generator.
+      Return the generator function.
       If the optional `getattrs` are supplied, set them as attributes
       on the returned generator function.
   '''
@@ -66,14 +67,20 @@ def consume_stream(
 
   def consumer_gen(bss: Iterable[bytes]) -> Iterable[bytes]:
     ''' A generator suitable as a `Flow` stream.
-       This consumees `bss`, copying it to `consumer` via an iterable
-       queue, and yielding it unchanged.
+        This consumees `bss`, copying it to `consumer` via an iterable
+        queue, and yielding it unchanged.
     '''
     consumeq, _ = WorkerQueue(consumer, name=name)
     try:
       for bs in bss:
-        consumeq.put(bs)
-        yield bs
+        try:
+          consumeq.put(bs)
+        finally:
+          yield bs
+    except:
+      # yield any tail after an exception
+      yield from bss
+      raise
     finally:
       consumeq.close()
 
@@ -83,7 +90,7 @@ def consume_stream(
 
 class StreamChain:
   ''' A single use callable wrapper for a chain of `Flow` stream functions.
-      A new `StreamChain` should be contructed when setting a `Flow`'s
+      A new `StreamChain` should be constructed when setting a `Flow`'s
       `.response.stream` attribute, as it keeps state.
 
       Each stream function is either a callable accepting `bytes`
@@ -281,65 +288,66 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   if rq.method not in ('GET', 'HEAD'):
     PR(rq.method, "is not GET or HEAD")
     return
-  rsp = flow.response
-  if rsp:
-    rsphdrs = rsp.headers
+  if flow.response:
+    rsphdrs = flow.response.headers
   url = URL(rq.url)
-  rqhdrs = rq.headers
   # scan the sitemaps for the first one offering a key for this URL
   # extra values for use
-  extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
-  cache_keys = P.cache_keys_for_url(url, extra=extra)
+  cache = P.content_cache
+  cache_keys = P.cache_keys_for_url(url)
   PR("cache_keys", cache_keys)
   if not cache_keys:
-    PR("no URL keys")
+    PR("no cache keys")
     return
-  cache = P.content_cache
+  # we want to cache this request (or use the cache for it)
   with cache:
-    if rsp:
-      # update the cache
+    if flow.response:
+      # we've already got the response, use it to update the cache
+      assert hook_name in ('responseheaders', 'response')
       if getattr(flow, 'from_cache', False):
         # ignore a response we ourselves pulled from the cache
         pass
       elif rq.method != 'GET':
         PR("response is not from a GET, do not cache")
-      elif rsp.status_code != 200:
-        PR("response status_code", rsp.status_code, "is not 200, do not cache")
+      elif flow.response.status_code != 200:
+        PR(
+            "response status_code", flow.response.status_code,
+            "is not 200, do not cache"
+        )
       elif flow.runstate.cancelled:
         PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
         # response from upstream, update the cache
-        PR("to cache, cache_keys", ", ".join(cache_keys))
-        if rsp.content is None:
+        PR("to cache, cache_keys", ", ".join(sorted(cache_keys)))
+        if hook_name == "responseheaders":
           # We are at the response headers
           # and will stream the content to the cache file.
-          assert hook_name == "responseheaders"
-          rsp.stream = consume_stream(
-              lambda bss: cache.cache_response(
-                  url,
-                  cache_keys,
+          flow.response.stream = consume_stream(
+              lambda bss: cache.cache_stream(
                   bss,
-                  rqhdrs,
-                  rsp.headers,
+                  cache_keys,
+                  url=url,
+                  rq_headers=flow.request.headers,
+                  rsp_headers=flow.response.headers,
                   mode=mode,
-                  decoded=False,
                   runstate=flow.runstate,
               ),
               name=f'cache {cache_keys}',
-              gen_attrs=dict(content_length=content_length(rsp.headers)),
+              gen_attrs=dict(
+                  content_length=content_length(flow.response.headers)
+              ),
           )
         else:
           # we are at the completed response
-          # pass rsp.content to the cache
+          # pass flow.response.content to the cache
           assert hook_name == "response"
-          md = cache.cache_response(
-              url,
+          md = cache.cache_stream(
+              [flow.response.content],
               cache_keys,
-              rsp.content,
-              rqhdrs,
-              rsphdrs,
+              url=url,
+              rq_headers=flow.request.headers,
+              rsp_headers=flow.response.headers,
               mode=mode,
-              decoded=True,
           )
     else:
       # probe the cache
@@ -361,15 +369,11 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       rsp_hdrs = dict(md.get('response_headers', {}))
       # The http.Response.make factory accepts the supplied content
       # and _encodes_ it according to the Content-Encoding header, if any.
-      # But we cached the _encoded_ content. So we pull off the Content-Encoding header
-      # (keeping a note of it), make the Response, then put the header back.
-      ce = rsp_hdrs.pop('content-encoding', 'identity')
       flow.response = http.Response.make(
           200,  # HTTP status code
           content_bs,
           rsp_hdrs,
       )
-      flow.response.headers['content-encoding'] = ce
       flow.from_cache = True
       PR("from cache, cache_key", cache_key)
 

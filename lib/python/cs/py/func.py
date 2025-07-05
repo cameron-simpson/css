@@ -9,12 +9,8 @@ Convenience facilities related to Python functions.
 '''
 
 from functools import partial
-from pprint import pformat
 
-from cs.deco import decorator
-from cs.py.stack import caller
 from cs.py3 import raise_from
-from cs.x import X
 
 __version__ = '20240630-post'
 
@@ -26,10 +22,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.deco',
-        'cs.py.stack',
         'cs.py3',
-        'cs.x',
     ],
 }
 
