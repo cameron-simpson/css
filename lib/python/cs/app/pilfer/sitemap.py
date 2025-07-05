@@ -14,7 +14,7 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping
 
 from cs.binary import bs
-from cs.deco import decorator, default_params, fmtdoc, promote, Promotable
+from cs.deco import decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable
 from cs.lex import cutprefix, cutsuffix, get_nonwhite, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -672,7 +672,32 @@ class SiteMap(Promotable):
       except AttributeError:
         # no conditions, skip
         continue
-      matched = TagSet()
+      # prepare the final match result
+      # start with the URL attributes
+      url = flowstate.url
+      match = TagSet(
+          {
+              attr: getattr(url, attr)
+              for attr in (
+                  'basename',
+                  'cleanpath',
+                  'cleanrpath',
+                  'dirname',
+                  'domain',
+                  'hostname',
+                  'netloc',
+                  'path',
+                  'port',
+                  'rpath',
+                  'scheme',
+              )
+          }
+      )
+      # also set _ to the url.path, __ to hostname/path
+      match.update(
+          _=url.cleanrpath,
+          __=f'{url.hostname}/{url.cleanrpath}',
+      )
       for conjunction, tags_kw in conditions:
         with Pfx("match %r", conjunction):
           for condition in conjunction:
@@ -693,16 +718,16 @@ class SiteMap(Promotable):
                   # success, no side effects
                   pass
                 else:
-                  # should be a mapping, update the matched TagSet
+                  # should be a mapping, update the match TagSet
                   # typical example: the result is a re.Match.groupdict()
                   for k, v in test_result.items():
-                    matched[k] = v
+                    match[k] = v
           else:
             # no test failed, this is a match
-            # update matched with any format strings from @on
+            # update match with any format strings from @on
             for name, fmt in tags_kw.items():
-              matched[name] = fmt.format_map(matched)
-            yield method, matched
+              match[name] = fmt.format_map(match)
+            yield method, match
 
   @pfx_method
   @promote
@@ -853,6 +878,7 @@ class SiteMap(Promotable):
       return matched
     return None
 
+  @OBSOLETE('SiteMap.default_cache_key or cache_key_*')
   @promote
   def url_key(
       self,
@@ -875,6 +901,11 @@ class SiteMap(Promotable):
     if not match:
       return None
     return match.format_arg(extra=extra)
+
+  def default_cache_key(self, flowstate: FlowState, match: TagSet) -> str:
+    ''' Return the default `cache_key` from the `@on` match.
+    '''
+    return match['cache_key'].format_map(match)
 
   @uses_pilfer
   ##@typechecked # we don't import Pilfer (circular)

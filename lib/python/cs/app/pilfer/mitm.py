@@ -280,25 +280,22 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       If there is a `flow.response`, update the cache.
   '''
   assert P is not None
-  PR = lambda *a: print(
-      'CACHED_FLOW', hook_name, flow.request.method, flow.request.url, *a
-  )
-  PR()
   rq = flow.request
+  url = URL(rq.url)
+  PR = lambda *a: print('CACHED_FLOW', hook_name, rq.method, url.short, *a)
   if rq.method not in ('GET', 'HEAD'):
-    PR(rq.method, "is not GET or HEAD")
+    ##PR(rq.method, "is not GET or HEAD")
     return
   if flow.response:
     rsphdrs = flow.response.headers
-  url = URL(rq.url)
   # scan the sitemaps for the first one offering a key for this URL
   # extra values for use
   cache = P.content_cache
   cache_keys = P.cache_keys_for_url(url)
-  PR("cache_keys", cache_keys)
   if not cache_keys:
-    PR("no cache keys")
+    PR("NO KEYS")
     return
+  PR("cache_keys", cache_keys)
   # we want to cache this request (or use the cache for it)
   with cache:
     if flow.response:
@@ -758,8 +755,9 @@ class MITMAddon:
   def call_hooks_for(self, hook_name: str, flow, *mitm_hook_a, **mitm_hook_kw):
     ''' This calls all the actions for the specified `hook_name`.
     '''
+    url = URL(flow.request.url)
     PR = lambda *a, **kw: print("call_hooks_for", hook_name, *a, **kw)
-    PR("URL", flow.request.method, flow.request.url)
+    PR("URL", flow.request.method, url.short)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
     if not hook_actions:

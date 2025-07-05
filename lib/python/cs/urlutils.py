@@ -110,6 +110,17 @@ class URL(HasThreadState, Promotable):
   def __repr__(self):
     return f'{self.__class__.__name__}:{self.url_s!r}'
 
+  @property
+  def short(self):
+    ''' A shortened form of the URL for use in messages.
+    '''
+    path = self.path
+    if len(path) <= 32:
+      shortpath = path
+    else:
+      shortpath = f'{path[:15]}...{path[-14:]}'
+    return f'{self.hostname}{shortpath}'
+
   def flush(self):
     ''' Forget all cached content.
     '''
@@ -313,6 +324,13 @@ class URL(HasThreadState, Promotable):
     ''' The URL path as returned by urlparse.urlparse.
     '''
     return self.url_parsed.path
+
+  @property
+  @unattributable
+  def rpath(self):
+    ''' The URL path as returned by urlparse.urlparse, after any leading slashes.
+    '''
+    return self.path.lstrip('/')
 
   @cached_property
   @unattributable
