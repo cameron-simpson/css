@@ -637,11 +637,17 @@ class SiteMap(Promotable):
   def on_matches(
       cls,
       flowstate: FlowState,
+      methodglob: str | None = None,
       **match_kw,
-    ''' A generator yielding `(method,matched)` 2-tuples for  matched
   ) -> Iterable[tuple[Callable, TagSet]]:
+    ''' A generator yielding `(method,matched)` 2-tuples for methods matched
         by `flowstate` and `match_kw`, being the matching method
         and a `TagSet` of values obtained during the match test.
+
+        Parameters:
+        * `flowstate`: the `FlowState` on which to match
+        * `methodglob`: an optional filename glob constraining the chosen method names
+        * `match_kw`: the `on_match` keyword arguments which must match
 
         The matching methods are identified by consulting the
         conditions in the method's `.on_conditions` attribute, a
@@ -655,6 +661,8 @@ class SiteMap(Promotable):
         different `matched` match results.
     '''
     for method_name in dir(cls):
+      if methodglob is not None and not fnmatch(method_name, methodglob):
+        continue
       try:
         method = getattr(cls, method_name)
       except AttributeError:
@@ -665,50 +673,35 @@ class SiteMap(Promotable):
         # no conditions, skip
         continue
       matched = TagSet()
-      for conjunction in conditions:
+      for conjunction, tags_kw in conditions:
         with Pfx("match %r", conjunction):
           for condition in conjunction:
             with Pfx("test %r", condition):
-              try:
-                # a 2-tuple of name and value/value_test()?
-                test_name, test_value = condition
-              except (TypeError, ValueError):
-                with Pfx("on_matches: test %r vs %s", method_name, condition):
-                  try:
-                    test_result = condition(flowstate)
-                  except Exception as e:
-                    warning("exception in condition: %s", e)
-                    raise
-                  # test ran, examine result
-                  if test_result is None or test_result is False:
-                    # failure
-                    break
-                  # success
-                  if test_result is not True:
-                    # should be a mapping, update the matched TagSet
-                    for k, v in test_result.items():
-                      matched[k] = v
-              else:
-                # a 2-tuple of name and value/value_test()?
+              with Pfx("on_matches: test %r vs %s", method_name, condition):
                 try:
-                  value = match_kw[test_name]
-                except KeyError:
-                  try:
-                    value = getattr(flowstate, test_name)
-                  except AttributeError as e:
-                    warning(
-                        "no %s.%s attribute: %s", flowstate.__class__.__name__,
-                        test_name, e
-                    )
-                    # consider the test failed
-                    break
-                  if callable(value):
-                    if not value(flowstate):
-                      break
-                  elif value != test_value:
-                    break
+                  test_result = condition(flowstate)
+                except Exception as e:
+                  warning("exception in condition: %s", e)
+                  # TODO: just fail? print a traceback if we do this
+                  raise
+                # test ran, examine result
+                if test_result is None or test_result is False:
+                  # failure
+                  break
+                # success
+                if test_result is True:
+                  # success, no side effects
+                  pass
+                else:
+                  # should be a mapping, update the matched TagSet
+                  # typical example: the result is a re.Match.groupdict()
+                  for k, v in test_result.items():
+                    matched[k] = v
           else:
             # no test failed, this is a match
+            # update matched with any format strings from @on
+            for name, fmt in tags_kw.items():
+              matched[name] = fmt.format_map(matched)
             yield method, matched
 
   @pfx_method
