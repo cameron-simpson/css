@@ -293,13 +293,13 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   url = URL(rq.url)
   # scan the sitemaps for the first one offering a key for this URL
   # extra values for use
-  extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
-  cache_keys = P.cache_keys_for_url(url, extra=extra)
+  cache = P.content_cache
+  cache_keys = P.cache_keys_for_url(url)
   PR("cache_keys", cache_keys)
   if not cache_keys:
-    PR("no URL keys")
+    PR("no cache keys")
     return
-  cache = P.content_cache
+  # we want to cache this request (or use the cache for it)
   with cache:
       # update the cache
     if flow.response:
