@@ -281,33 +281,34 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     validate_rpath(cache_key)
     return cache_key
 
-  # TODO: if-modified-since mode of some kind
+  # TODO: if-modified-since mode of some kind?
   @promote
   @require(lambda mode: mode in ('missing', 'modified', 'force'))
   @typechecked
   def cache_url(
       self,
-      url: URL,
+      flowstate: FlowState,
       cache_keys: Iterable[str],
       mode='missing',
       duration: Optional[float] = None,
-      **requests_get_kw,
   ) -> Mapping[str, dict]:
-    ''' Cache the contents of `url` against `cache_keys`.
+    ''' Cache the contents of `flowstate` against `cache_keys`.
         Return a mapping of each cache key to the cached metadata.
 
         Parameters:
-        * `url`: the URL to fetch using `requests.get`
+        * `flowstate`: the `FlowState` representing the URL,
+          may be supplied as a URL
         * `cache_keys`: an iterable of cache keys to associate with the response
-        * `mode`: the cache mode, as for `ContentCache.cache_response`
+        * `mode`: the cache mode, as for `ContentCache.cache_stream`
         * `duration`: optional duration for the cache entry
-        Other keywork arguments are passed to `requests.get`
     '''
-    cache_keys = tuple(cache_keys)
+    cache_keys = set(cache_keys)
     if not cache_keys:
       return
+    # check the validity of any keys already present
     md_map = {}
     missing_keys = []
+    latest_md = None
     for cache_key in cache_keys:
       old_md = self.get(cache_key, {})
       if old_md:
@@ -328,18 +329,12 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     # if the cache is up to date, return immediately
     if not missing_keys:
       return md_map
-    # fetch the current content
-    rsp = requests.get(url.url, stream=True, **requests_get_kw)
-    if rsp.status_code != 200:
-      raise ValueError(
-          f'cache_url: GET {url}: expected 200 response, got {rsp.status_code}'
-      )
-    return self.cache_response(
-        url,
+    return self.cache_stream(
+        flowstate.iterable_content,
         cache_keys,
-        rsp.iter_content(chunk_size=8192),
-        rsp.request.headers,
-        rsp.headers,
+        url=flowstate.url,
+        rq_headers=flowstate.request.headers,
+        rsp_headers=flowstate.response.headers,
         mode=mode,
         duration=duration,
     )
