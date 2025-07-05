@@ -12,8 +12,12 @@ set -ue
 
 setx=:
 late_setx='set -x'
-default_homebrewpath=/opt/homebrew ## $HOME/var/homebrew
-default_homebrewcore=$HOME/src/homebrew-core
+case ${CPU:-$(uname -p)} in
+  arm)  default_homebrewpath=/opt/homebrew ## $HOME/var/homebrew
+        ;;
+  *)    default_homebrewpath=/usr/local/var/homebrew
+        ;;
+esac
 
 [ $# -gt 0 ] && [ "x$1" = x-x ] && { setx='set -x' late_setx=:; shift; }
 
