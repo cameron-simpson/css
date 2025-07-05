@@ -11,7 +11,7 @@ from functools import cached_property
 from itertools import zip_longest
 import re
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, Mapping
 
 from cs.binary import bs
 from cs.deco import decorator, default_params, fmtdoc, promote, Promotable
@@ -51,7 +51,7 @@ def uses_pilfer(func):
 
   return func_with_Pilfer
 
-def parse_img_srcset(srcset, offset=0) -> Mapping[str, List[str]]:
+def parse_img_srcset(srcset, offset=0) -> Mapping[str, list[str]]:
   ''' Parse an `IMG` tag `srcset` attribute into a mapping of URL to conditions.
   '''
   mapping = defaultdict(list)
@@ -95,7 +95,7 @@ class URLMatcher(Promotable):
   def match(
       self,
       url: URL,
-      extra: Optional[Mapping] = None,
+      extra: Mapping | None = None,
   ) -> dict | None:
     ''' Compare `url` against this matcher.
         Return `None` on no match.
@@ -291,7 +291,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     self.response.headers.pop('content-encoding', None)
 
   @property
-  def content_encodings(self) -> List[str]:
+  def content_encodings(self) -> list[str]:
     ''' A list of the transforming encodings named in the `Content-Encoding` response header.
           The encoding `'identity'` is discarded.
       '''
@@ -452,7 +452,7 @@ class SiteMapPatternMatch(namedtuple(
       * `mapping`: a mapping of named values gleaned during the match
   '''
 
-  def format_arg(self, extra: Optional[Mapping] = None) -> str:
+  def format_arg(self, extra: Mapping | None = None) -> str:
     ''' Treat `self.pattern_arg` as a format string and format it
         using `self.mapping` and `extra`.
     '''
@@ -607,8 +607,8 @@ class SiteMap(Promotable):
       cls,
       flowstate: FlowState,
       **match_kw,
-  ) -> Iterable[Tuple[Callable, TagSet]]:
     ''' A generator yielding `(method,matched)` 2-tuples for  matched
+  ) -> Iterable[tuple[Callable, TagSet]]:
         by `flowstate` and `match_kw`, being the matching method
         and a `TagSet` of values obtained during the match test.
 
@@ -685,10 +685,10 @@ class SiteMap(Promotable):
   def run_matches(
       self,
       flowstate: FlowState,
-      flowattr: Optional[str] = None,
-      methodglob: Optional[str] = None,
+      flowattr: str | None = None,
+      methodglob: str | None = None,
       **match_kw,
-  ) -> Iterable[Tuple[Callable, TagSet, Any]]:
+  ) -> Iterable[tuple[Callable, TagSet, Any]]:
     ''' Run all the methods in this `SiteMap` whose `.on_conditions`
         match `flowstate` and ``match_kw`, as matched by `SiteMap.on_matches`.
         Yield `(method,match_tags,result)` 3-tuples from each method called.
@@ -730,9 +730,9 @@ class SiteMap(Promotable):
   def grok(
       self,
       flowstate: FlowState,
-      flowattr: Optional[str] = None,
+      flowattr: str | None = None,
       **run_match_kw,
-  ) -> Iterable[Tuple[Callable, TagSet, Any]]:
+  ) -> Iterable[tuple[Callable, TagSet, Any]]:
     ''' A generator to grok the fullness of this `flowstate`, deriving information.
         Usually this involves consulting the URL contents.
         This is a shim for `SiteMap.run_matches` calling any matching
@@ -749,7 +749,7 @@ class SiteMap(Promotable):
       self,
       url: URL,
       patterns: Iterable,  # [Tuple[Tuple[str, str], Any]],
-      extra: Optional[Mapping] = None,
+      extra: Mapping | None = None,
   ) -> Iterable[SiteMapPatternMatch]:
     ''' A generator to match `url` against `patterns`, an iterable
         of `(match_to,arg)` 2-tuples which yields
@@ -819,7 +819,7 @@ class SiteMap(Promotable):
       self,
       url: URL,
       patterns: Iterable,
-      extra: Optional[Mapping] = None,
+      extra: Mapping | None = None,
   ) -> SiteMapPatternMatch | None:
     ''' Scan `patterns` for a match to `url`, returning the first
         match `SiteMapPatternMatch` from `self.matches()`
@@ -833,7 +833,7 @@ class SiteMap(Promotable):
   def url_key(
       self,
       url: URL,
-      extra: Optional[Mapping] = None,
+      extra: Mapping | None = None,
   ) -> str | None:
     ''' Return a string which is a persistent cache key for the
         supplied `url` within the context of this sitemap, or `None`
@@ -978,7 +978,7 @@ class SiteMap(Promotable):
   def grok_default(
       self,
       flowstate: FlowState,
-      match_tags: Optional[Mapping[str, Any]] = None,
+      match_tags: Mapping[str, Any] | None = None,
       *,
       P: "Pilfer" = None,
   ) -> TagSet:
@@ -1013,7 +1013,7 @@ class SiteMap(Promotable):
   def patch_soup_toolbar(
       self,
       flowstate: FlowState,
-      match_tags: Optional[Mapping[str, Any]] = None,
+      match_tags: Mapping[str, Any] | None = None,
       soup=None,
   ):
     # a list of tags for the toolbar
@@ -1113,7 +1113,7 @@ class Wikipedia(SiteMap):
   ]
 
   @promote
-  def url_key(self, url: URL, extra: Optional[Mapping] = None) -> str | None:
+  def url_key(self, url: URL, extra: Mapping | None = None) -> str | None:
     ''' Include the domain name language in the URL key.
     '''
     key = super().url_key(url, extra=extra)
