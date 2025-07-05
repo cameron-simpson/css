@@ -301,8 +301,9 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
     return
   # we want to cache this request (or use the cache for it)
   with cache:
-      # update the cache
     if flow.response:
+      # we've already got the response, use it to update the cache
+      assert hook_name in ('responseheaders', 'response')
       if getattr(flow, 'from_cache', False):
         # ignore a response we ourselves pulled from the cache
         pass
@@ -317,20 +318,18 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
         # response from upstream, update the cache
-        PR("to cache, cache_keys", ", ".join(cache_keys))
+        PR("to cache, cache_keys", ", ".join(sorted(cache_keys)))
         if hook_name == "responseheaders":
           # We are at the response headers
           # and will stream the content to the cache file.
-          assert hook_name == "responseheaders"
-          rsp.stream = consume_stream(
-              lambda bss: cache.cache_response(
-                  url,
-                  cache_keys,
+          flow.response.stream = consume_stream(
+              lambda bss: cache.cache_stream(
                   bss,
-                  rqhdrs,
-                  rsp.headers,
+                  cache_keys,
+                  url=url,
+                  rq_headers=flow.request.headers,
+                  rsp_headers=flow.response.headers,
                   mode=mode,
-                  decoded=False,
                   runstate=flow.runstate,
               ),
               name=f'cache {cache_keys}',
@@ -342,14 +341,13 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           # we are at the completed response
           # pass flow.response.content to the cache
           assert hook_name == "response"
-          md = cache.cache_response(
-              url,
+          md = cache.cache_stream(
+              [flow.response.content],
               cache_keys,
-              rsp.content,
-              rqhdrs,
-              rsphdrs,
+              url=url,
+              rq_headers=flow.request.headers,
+              rsp_headers=flow.response.headers,
               mode=mode,
-              decoded=True,
           )
     else:
       # probe the cache
@@ -371,15 +369,11 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       rsp_hdrs = dict(md.get('response_headers', {}))
       # The http.Response.make factory accepts the supplied content
       # and _encodes_ it according to the Content-Encoding header, if any.
-      # But we cached the _encoded_ content. So we pull off the Content-Encoding header
-      # (keeping a note of it), make the Response, then put the header back.
-      ce = rsp_hdrs.pop('content-encoding', 'identity')
       flow.response = http.Response.make(
           200,  # HTTP status code
           content_bs,
           rsp_hdrs,
       )
-      flow.response.headers['content-encoding'] = ce
       flow.from_cache = True
       PR("from cache, cache_key", cache_key)
 
