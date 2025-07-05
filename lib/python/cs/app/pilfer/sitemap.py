@@ -743,6 +743,7 @@ class SiteMap(Promotable):
             result = method(self, flowstate, match_tags, attrvalue)
         except Exception as e:
           warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
+          raise
         else:
           if flowattr is not None and result is not None:
             pfx_call(setattr, flowstate, flowattr, result)
