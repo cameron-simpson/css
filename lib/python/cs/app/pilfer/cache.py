@@ -38,7 +38,7 @@ from cs.urlutils import URL
 
 from typeguard import typechecked
 
-from .sitemap import SiteMap
+from .sitemap import FlowState, SiteMap
 
 MIN_DURATION = 1.0  # minimum duration for a cache entry
 
@@ -255,7 +255,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         with pfx_call(open, fspath, 'rb') as f:
           content_bs = f.read()
       except OSError as e:
-        warning("find_content: %r->%r: %s", key, fspath, e)
+        ##warning("find_content: %r->%r: %s", key, fspath, e)
         continue
       return key, md, content_bs
     raise KeyError(keys)
