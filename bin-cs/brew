@@ -26,12 +26,12 @@ homebrewpath_git=git@github.com:Homebrew/brew
 homebrewcore=${CS_HOMEBREW_CORE:-$default_homebrewcore}
 homebrewcore_git=git@github.com:Homebrew/homebrew-core
 
-[ -d "$homebrewpath" ] || \
+[ -d "$homebrewpath/bin" ] || \
 { ask "Clone $homebrewpath_git to $homebrewpath" \
   && git clone "$homebrewpath_git" "$homebrewpath"
 } || exit 1
 
-[ -d "$homebrewcore" ] || \
+[ -d "$homebrewcore/.git" ] || \
 { ask "Clone $homebrewcore_git to $homebrewcore" \
   && git clone "$homebrewcore_git" "$homebrewcore"
 } || exit 1
