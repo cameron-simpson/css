@@ -967,13 +967,7 @@ class SiteMap(Promotable):
     # stash the raw meta and properties
     te.meta = flowstate.meta.tags
     te.properties = flowstate.meta.properties
-    # stash the open graph properties
-    # https://ogp.me/
-    og = {
-        f'opengraph.{cutprefix(k,"og:")}': v
-        for k, v in te.properties.items()
-        if k.startswith("og:")
-    }
+    og = flowstate.opengraph_tags
     te.update(**og)
     og_type = og.get('opengraph.type')
     if og_type:
