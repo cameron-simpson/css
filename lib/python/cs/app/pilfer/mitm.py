@@ -17,6 +17,7 @@ from typing import Callable, Iterable, Optional
 from icontract import require
 from mitmproxy import http
 import mitmproxy.addons.dumper
+from mitmproxy.http import Request as MITMRequest, Response as MITMResponse
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
@@ -57,7 +58,7 @@ def consume_stream(
     consumer: Callable[Iterable[bytes], None], name=None, *, gen_attrs=None
 ):
   ''' Wrap `consumer` in a generator function suitable for use by a `StreamChain`.
-      Return the generator.
+      Return the generator function.
       If the optional `getattrs` are supplied, set them as attributes
       on the returned generator function.
   '''
@@ -66,8 +67,8 @@ def consume_stream(
 
   def consumer_gen(bss: Iterable[bytes]) -> Iterable[bytes]:
     ''' A generator suitable as a `Flow` stream.
-       This consumees `bss`, copying it to `consumer` via an iterable
-       queue, and yielding it unchanged.
+        This consumees `bss`, copying it to `consumer` via an iterable
+        queue, and yielding it unchanged.
     '''
     consumeq, _ = WorkerQueue(consumer, name=name)
     try:
