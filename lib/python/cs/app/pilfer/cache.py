@@ -346,137 +346,134 @@ class ContentCache(HasFSPath, MultiOpenMixin):
 
   @promote
   @uses_runstate
-  def cache_response(
+  @typechecked
+  def cache_stream(
       self,
-      url: URL,
+      bss: Iterable[bytes],
       cache_keys: str | Iterable[str],
-      content: bytes | Iterable[bytes],
-      rq_headers,
-      rsp_headers,
       *,
       mode: str = 'modified',
       duration: Optional[float] = None,
-      decoded=False,
       progress_name=None,
       runstate: Optional[RunState] = None,
+      url: URL,
+      rq_headers: Mapping[str, str],
+      rsp_headers: Mapping[str, str],
   ) -> Mapping[str, dict]:
-    ''' Cache the `content` of a URL against `cache_keys`.
+    ''' Cache `bss`, the decoded content of a URL, against `cache_keys`.
         Return a mapping of each cache key to the cached metadata.
 
         Parameters:
-        * `url`: the URL being cached
+        * `bss`: an iterable of `bytes` containing the decoded content
         * `cache_keys`: an iterable of cache keys to associate with the response
-        * `content`: a `bytes` or iterable of `bytes` with the URL's content
-        * `rq_headers`: the request headers used obtaining the `content`
-        * `rsp_headers`: the response headers retrieved with the `content`
-        * `mode`: the cache mode, as for `ContentCache.cache_response`
+        * `url`: the URL being cached
+        * `rq_headers`: the request headers
+        * `rsp_headers`: the response headers
+        * `mode`: optional cache mode, as for `ContentCache.cache_response`
         * `duration`: optional duration for the cache entry
-        * `decoded`: optional Boolean, default `False`, indicating
-          whether the `content` has been decoded
         * `progress_name`: optional progress bar name
     '''
+    PR = lambda *a, **kw: print(
+        "CACHE_STREAM", f'{url.hostname}/...{url.path[-16:]}', *a, **kw
+    )
     if isinstance(cache_keys, str):
-      cache_keys = (cache_keys,)
+      cache_keys = set((cache_keys,))
     else:
-      cache_keys = tuple(cache_keys)
-    md_map = {}
+      cache_keys = set(cache_keys)
     if not cache_keys:
-      return md_map
-    if isinstance(content, bytes):
-      content = [content]
-    content = iter(content)
+      raise ValueError("at least one cache key is required")
     if duration is not None and duration < MIN_DURATION:
       raise ValueError(f'invalid {duration=}, should be >={MIN_DURATION=}')
+    PR("cache_keys =", sorted(cache_keys))
+    # we're saving the decoded content, strip the Content-Encoding header
+    if 'content-encoding' in rsp_headers:
+      PR("strip Content-Encoding:", rsp_headers['content-encoding'])
+      rsp_headers = dict(rsp_headers)
+      del rsp_headers['content-encoding']
     if progress_name is not None:
       # present a progress bar if progress_name was supplied
-      content = progressbar(
-          content,
+      bss = progressbar(
+          bss,
           progress_name,
           total=content_length(rsp_headers),
           report_print=True,
       )
-    if decoded:
-      # we're saving the decoded content, strip this header
-      if 'content-encoding' in rsp_headers:
-        rsp_headers = dict(rsp_headers)
-        del rsp_headers['content-encoding']
-    with self:
-      # new content file path
-      urlbase, urlext = splitext(basename(url.path))
-      ct = content_type(rsp_headers)
-      if ct:
-        ctext = mimetypes.guess_extension(ct.content_type) or ''
-      else:
-        warning("no response Content-Type")
-        ctext = ''
-      # write the content file
-      # only make filesystem items if all the required compute succeeds
-      ext = urlext or ctext
-      now = time.time()
-      base_md = {
-          'url': str(url),
-          'unixtime': now,
-          'request_headers': dict(rq_headers),
-          'response_headers': dict(rsp_headers),
-      }
-      if duration is not None:
-        base_md['expiry'] = now + duration
-      md_map = {}
-      with NamedTemporaryFile(
-          dir=self.cached_path,
-          prefix='.cache_response--',
-          suffix=ext,
-      ) as T:
-        hasher = self.hashclass.hashfunc()
-        for bs in content:
-          runstate.raiseif()
-          T.write(bs)
-          hasher.update(bs)
-        T.flush()
+    # create a temp file holding the content to cache
+    urlbase, urlext = splitext(basename(url.path))
+    ct = content_type(rsp_headers)
+    if ct:
+      ctext = mimetypes.guess_extension(ct.content_type) or ''
+    else:
+      warning("no response Content-Type")
+      ctext = ''
+    ext = urlext or ctext
+    now = time.time()
+    base_md = {
+        'url': str(url),
+        'unixtime': now,
+        'request_headers': dict(rq_headers),
+        'response_headers': dict(rsp_headers),
+    }
+    if duration is not None:
+      base_md['expiry'] = now + duration
+    md_map = {}
+    with NamedTemporaryFile(
+        dir=self.cached_path,
+        prefix='.cache_stream--',
+        suffix=ext,
+    ) as T:
+      hasher = self.hashclass.hashfunc()
+      for bs in bss:
         runstate.raiseif()
-        h = self.hashclass(hasher.digest())
-        base_md.update(content_hash=str(h))
-        # link the content to the various cache locations
-        for cache_key in cache_keys:
-          # partition the key into a directory part and the final component
-          # used as the basis for the cache filename
+        T.write(bs)
+        hasher.update(bs)
+      T.flush()
+      runstate.raiseif()
+      h = self.hashclass(hasher.digest())
+      base_md.update(content_hash=str(h))
+      # link the saved content to the various cache locations
+      for cache_key in cache_keys:
+        # partition the key into a directory part and the final component
+        # used as the basis for the cache filename
+        try:
+          ckdir, ckbase = cache_key.rsplit('/', 1)
+        except ValueError:
+          ckdir = None
+          ckbase = cache_key
+          contentdir = self.cached_path
+        else:
+          contentdir = self.cached_pathto(ckdir)
+          needdir(
+              contentdir, use_makedirs=True
+          ) and vprint("made", shortpath(contentdir))
+        content_base = (
+            f'{ckbase}--{urlbase or "index"}'[:128] + f'--{h}{ext}'
+        )
+        content_path = joinpath(contentdir, content_base)
+        content_rpath = (
+            content_base if ckdir is None else joinpath(ckdir, content_base)
+        )
+        # link the temp file to the final name
+        try:
+          pfx_call(os.remove, content_path)
+        except FileNotFoundError:
+          pass
+        pfx_call(os.link, T.name, content_path)
+        # update the metadata
+        old_md = self.get(cache_key, {})
+        md = dict(**base_md, content_rpath=content_rpath)
+        self[cache_key] = md  # cache mapping
+        md_map[cache_key] = md  # return mapping
+        # remove the old content file if different
+        old_content_rpath = old_md.get('content_rpath', '')
+        if old_content_rpath and old_content_rpath != content_rpath:
           try:
-            ckdir, ckbase = cache_key.rsplit('/', 1)
-          except ValueError:
-            ckdir = None
-            ckbase = cache_key
-            contentdir = self.cached_path
-          else:
-            contentdir = self.cached_pathto(ckdir)
-            needdir(
-                contentdir, use_makedirs=True
-            ) and vprint("made", shortpath(contentdir))
-          content_base = (
-              f'{ckbase}--{urlbase or "index"}'[:128] + f'--{h}{ext}'
-          )
-          content_path = joinpath(contentdir, content_base)
-          content_rpath = (
-              content_base if ckdir is None else joinpath(ckdir, content_base)
-          )
-          # link the temp file to the final name
-          try:
-            pfx_call(os.remove, content_path)
-          except FileNotFoundError:
+            pfx_call(os.remove, self.cached_pathto(old_content_rpath))
+          except FileNotFoundError as e:
+            # this is fine
+            ##warning("file not present in cache: %s", e)
             pass
-          pfx_call(os.link, T.name, content_path)
-          # update the metadata
-          old_md = self.get(cache_key, {})
-          md = dict(**base_md, content_rpath=content_rpath)
-          self[cache_key] = md  # cache mapping
-          md_map[cache_key] = md  # return mapping
-          # remove the old content file if different
-          old_content_rpath = old_md.get('content_rpath', '')
-          if old_content_rpath and old_content_rpath != content_rpath:
-            try:
-              pfx_call(os.remove, self.cached_pathto(old_content_rpath))
-            except FileNotFoundError as e:
-              warning("file not present in cache: %s", e)
-      return md_map
+    return md_map
 
 if __name__ == '__main__':
   sitemap = SiteMap("demo")
