@@ -73,8 +73,14 @@ def consume_stream(
     consumeq, _ = WorkerQueue(consumer, name=name)
     try:
       for bs in bss:
-        consumeq.put(bs)
-        yield bs
+        try:
+          consumeq.put(bs)
+        finally:
+          yield bs
+    except:
+      # yield any tail after an exception
+      yield from bss
+      raise
     finally:
       consumeq.close()
 
