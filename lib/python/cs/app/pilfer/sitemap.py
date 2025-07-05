@@ -672,7 +672,32 @@ class SiteMap(Promotable):
       except AttributeError:
         # no conditions, skip
         continue
-      matched = TagSet()
+      # prepare the final match result
+      # start with the URL attributes
+      url = flowstate.url
+      match = TagSet(
+          {
+              attr: getattr(url, attr)
+              for attr in (
+                  'basename',
+                  'cleanpath',
+                  'cleanrpath',
+                  'dirname',
+                  'domain',
+                  'hostname',
+                  'netloc',
+                  'path',
+                  'port',
+                  'rpath',
+                  'scheme',
+              )
+          }
+      )
+      # also set _ to the url.path, __ to hostname/path
+      match.update(
+          _=url.cleanrpath,
+          __=f'{url.hostname}/{url.cleanrpath}',
+      )
       for conjunction, tags_kw in conditions:
         with Pfx("match %r", conjunction):
           for condition in conjunction:
@@ -693,16 +718,16 @@ class SiteMap(Promotable):
                   # success, no side effects
                   pass
                 else:
-                  # should be a mapping, update the matched TagSet
+                  # should be a mapping, update the match TagSet
                   # typical example: the result is a re.Match.groupdict()
                   for k, v in test_result.items():
-                    matched[k] = v
+                    match[k] = v
           else:
             # no test failed, this is a match
-            # update matched with any format strings from @on
+            # update match with any format strings from @on
             for name, fmt in tags_kw.items():
-              matched[name] = fmt.format_map(matched)
-            yield method, matched
+              match[name] = fmt.format_map(match)
+            yield method, match
 
   @pfx_method
   @promote
