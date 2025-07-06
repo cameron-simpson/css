@@ -583,10 +583,10 @@ def grok_flow(hook_name, flow, *, P: Pilfer = None):
     return
 
   def grok_stream(bss: Iterable[bytes]):
+    ''' Fetch stream content then call `Pilfer.grok`.
+    '''
     content_bs = b''.join(bss)
-    # TODO: consult the content_type_full for charset
-    flowstate.content = content_bs.decode('utf-8')
-    # update the flowstate.soup
+    flowstate.content = content_bs
     for _ in P.grok(flowstate):
       pass
 
