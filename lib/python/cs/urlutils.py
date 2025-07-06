@@ -80,6 +80,8 @@ DISTINFO = {
 ##HTTPConnection.putheader = my_putheader
 
 def urljoin(url, other_url):
+  ''' This is `urllib.parse.urljoin` after coercing both arguments to `str`.
+  '''
   return up_urljoin(str(url), str(other_url))
 
 class URL(HasThreadState, Promotable):
@@ -307,35 +309,35 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def scheme(self):
-    ''' The URL scheme as returned by urlparse.urlparse.
+    ''' The URL scheme as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.scheme
 
   @property
   @unattributable
   def netloc(self):
-    ''' The URL netloc as returned by urlparse.urlparse.
+    ''' The URL netloc as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.netloc
 
   @property
   @unattributable
   def path(self):
-    ''' The URL path as returned by urlparse.urlparse.
+    ''' The URL path as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.path
 
   @property
   @unattributable
   def rpath(self):
-    ''' The URL path as returned by urlparse.urlparse, after any leading slashes.
+    ''' The URL path as returned by `urlparse.urlparse`, after any leading slashes.
     '''
     return self.path.lstrip('/')
 
   @cached_property
   @unattributable
   def cleanpath(self):
-    ''' The URL path as returned by urlparse.urlparse,
+    ''' The URL path as returned by `urlparse.urlparse`,
         with multiple slashes (`/`) reduced to a single slash.
         Technically this can change the meaning of the URL path,
         but usually these are an artifact of sloppy path construction.
@@ -363,14 +365,14 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def params(self):
-    ''' The URL params as returned by urlparse.urlparse.
+    ''' The URL params as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.params
 
   @property
   @unattributable
   def query(self):
-    ''' The URL query as returned by urlparse.urlparse.
+    ''' The URL query as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.query
 
@@ -383,35 +385,35 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def fragment(self):
-    ''' The URL fragment as returned by urlparse.urlparse.
+    ''' The URL fragment as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.fragment
 
   @property
   @unattributable
   def username(self):
-    ''' The URL username as returned by urlparse.urlparse.
+    ''' The URL username as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.username
 
   @property
   @unattributable
   def password(self):
-    ''' The URL password as returned by urlparse.urlparse.
+    ''' The URL password as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.password
 
   @property
   @unattributable
   def hostname(self):
-    ''' The URL hostname as returned by urlparse.urlparse.
+    ''' The URL hostname as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.hostname
 
   @property
   @unattributable
   def port(self):
-    ''' The URL port as returned by urlparse.urlparse.
+    ''' The URL port as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.port
 
