@@ -30,7 +30,7 @@ from bs4.element import Tag as BS4Tag
 from mitmproxy.flow import Flow
 import requests
 
-# The default HTML parser chosen by BeautifulSoup.
+# The default HTML parser to use with BeautifulSoup.
 BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
 
 def default_Pilfer():
@@ -550,11 +550,13 @@ class SiteMap(Promotable):
         - a callable: a function accepting a `FlowState`;
           it may return `None` or `False` for no match,
           or `True` or a `Mapping[str,str]` for a match
+        Note that to avoid confusing the decorator the first condition
+        cannot be a callable. However, it's usually a domain glob anyway.
 
         For example this decoration matches the URL hostname
         `docs.python.org` and the URL path
         `/3/library/`*module_name*`.html`.
-        On a match the resulting mat<F7>ch tags will contain:
+        On a match the resulting match tags will contain:
         * `'module_name'`: from the regular expression
         * `'cache_key'`: from the `cache_key=` argument
 
@@ -563,13 +565,10 @@ class SiteMap(Promotable):
                 '/3/library/(?P<module_name>[^/]+).html$',
                 cache_key='module/{module_name}',
             )
-            def cache_module_html(
-                self,     # the SiteMap instance
-                url,      # the URL
-                flow,     # the mitmproxy Flow
-                P:Pilfer, # the current Pilfer context
-            ):
-                ................
+            def cache_key_pydoc(self, flowstate, match: TagSet) -> str:
+                # here one might fill in match['cache_key']
+                # aka match.cache_key
+                ........
 
         You may notice that the cache key doesn't mention the
         hostname; the caching system qualifies cache keys with their
