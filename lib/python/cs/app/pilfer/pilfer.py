@@ -637,6 +637,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
         Example:
 
+            [sitemaps]
             docs.python.org = docs:cs.app.pilfer.sitemap:DocSite
             docs.mitmproxy.org = docs
             *.readthedocs.io = docs
@@ -660,7 +661,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
             continue
           try:
             map_class = import_name(map_spec)
-          except ImportError as e:
+          except (ImportError, SyntaxError) as e:
             warning(e._)
             continue
           sitemap = map_class(name=map_name)
@@ -838,7 +839,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     cache_keys = set()
     with self:
       for sitemap in self.sitemaps_for(url):
-        PR("sitemap", sitemap)
+        ##PR("sitemap", sitemap)
         for method, match_tags, site_cache_key in sitemap.run_matches(
             flowstate, None, 'cache_key_*'):
           if site_cache_key is not None:

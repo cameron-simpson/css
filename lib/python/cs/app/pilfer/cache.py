@@ -278,7 +278,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     '''
     site_prefix = sitemap.name.replace("/", "__")
     cache_key = f'{site_prefix}/{url_key.lstrip("/")}' if url_key else site_prefix
-    validate_rpath(cache_key)
+    validate_rpath(cache_key.rstrip('/'))
     return cache_key
 
   # TODO: if-modified-since mode of some kind?
@@ -379,7 +379,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       raise ValueError("at least one cache key is required")
     if duration is not None and duration < MIN_DURATION:
       raise ValueError(f'invalid {duration=}, should be >={MIN_DURATION=}')
-    PR("cache_keys =", sorted(cache_keys))
+    ##PR("cache_keys =", sorted(cache_keys))
     # we're saving the decoded content, strip the Content-Encoding header
     if 'content-encoding' in rsp_headers:
       PR("strip Content-Encoding:", rsp_headers['content-encoding'])

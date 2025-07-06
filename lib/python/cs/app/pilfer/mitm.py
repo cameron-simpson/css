@@ -282,7 +282,6 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   assert P is not None
   rq = flow.request
   url = URL(rq.url)
-  PR = lambda *a: print('CACHED_FLOW', hook_name, rq.method, url.short, *a)
   if rq.method not in ('GET', 'HEAD'):
     ##PR(rq.method, "is not GET or HEAD")
     return
@@ -293,9 +292,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   cache = P.content_cache
   cache_keys = P.cache_keys_for_url(url)
   if not cache_keys:
-    PR("NO KEYS")
+    print("CACHE NO KEYS", url.short)
     return
-  PR("cache_keys", cache_keys)
   # we want to cache this request (or use the cache for it)
   with cache:
     if flow.response:
@@ -314,8 +312,8 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       elif flow.runstate.cancelled:
         PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
+        print("CACHE ->", ",".join(sorted(cache_keys)), url.short)
         # response from upstream, update the cache
-        PR("to cache, cache_keys", ", ".join(sorted(cache_keys)))
         if hook_name == "responseheaders":
           # We are at the response headers
           # and will stream the content to the cache file.
@@ -353,12 +351,13 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         cache_key, md, content_bs = cache.find_content(cache_keys)
       except KeyError:
         # nothing cached
-        PR("not cached, pass through")
+        print("CACHE MISS", ",".join(sorted(cache_keys)), url.short)
         # we want to cache this, remove headers which can return a 304 Not Modified
         for hdr in 'if-modified-since', 'if-none-match':
           if hdr in rq.headers:
             del rq.headers[hdr]
         return
+      print("CACHE <-", ",".join(sorted(cache_keys)), url.short)
       # a known key
       if rq.method == 'HEAD':
         content_bs = b''
@@ -372,7 +371,6 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
           rsp_hdrs,
       )
       flow.from_cache = True
-      PR("from cache, cache_key", cache_key)
 
 @attr(default_hooks=('requestheaders', 'responseheaders', 'response'))
 @uses_pilfer
@@ -757,7 +755,7 @@ class MITMAddon:
     '''
     url = URL(flow.request.url)
     PR = lambda *a, **kw: print("call_hooks_for", hook_name, *a, **kw)
-    PR("URL", flow.request.method, url.short)
+    ##PR("URL", flow.request.method, url.short)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
     if not hook_actions:
