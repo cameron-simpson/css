@@ -252,25 +252,30 @@ class PilferCommand(BaseCommand):
     if argv:
       raise GetoptError(f'extra arguments after URL: {argv!r}')
     print(url)
-    state = FlowState(url=url)
-    state.GET()
+    flowstate = FlowState(url=url)
+    flowstate.GET()  # implicit these days, but let's be overt about failure
+    if flowstate.response.status_code != 200:
+      warning("GET %s -> status_code %r", url, flowstate.response.status_code)
     printt(
-        (f'{state.request.method} response headers:',),
+        (
+            f'{flowstate.request.method} response {flowstate.response.status_code} headers:',
+        ),
         *[
             (f'  {key}', value) for key, value in sorted(
-                state.response.headers.items(), key=lambda kv: kv[0].lower()
+                flowstate.response.headers.items(),
+                key=lambda kv: kv[0].lower()
             )
         ],
     )
-    soup = state.soup
+    soup = flowstate.soup
     if soup is None:
-      print("no soup for content_type", state.content_type)
+      print("no soup for content_type", flowstate.content_type)
     else:
       table = []
       title = soup.head.title
       if title:
         table.append(["Title:", title.string])
-      meta = state.meta
+      meta = flowstate.meta
       if meta.tags:
         table.extend(
             (
@@ -291,7 +296,7 @@ class PilferCommand(BaseCommand):
                 ),
             )
         )
-      links_by_rel = state.links
+      links_by_rel = flowstate.links
       if links_by_rel:
         table.extend(
             (
@@ -313,7 +318,7 @@ class PilferCommand(BaseCommand):
       printt(*table)
     table = []
     for i, (method, match_tags,
-            grokked) in enumerate(self.options.pilfer.grok(state)):
+            grokked) in enumerate(self.options.pilfer.grok(flowstate)):
       if i == 0:
         table.append(['Grokked:'])
       table.append(
@@ -327,7 +332,7 @@ class PilferCommand(BaseCommand):
           table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
     printt(*table)
     if soup is not None and self.options.soup:
-      print("Content:", state.content_type)
+      print("Content:", flowstate.content_type)
       table = []
       q = ListQueue([('', soup.head), ('', soup.body)])
       for indent, tag in q:
@@ -418,7 +423,7 @@ class PilferCommand(BaseCommand):
   @popopts
   def cmd_grok(self, argv):
     ''' Usage: {cmd} URL
-          Call every matching @on method for sitemaps matching URL.
+          Call every matching @on grok_* method for sitemaps matching URL.
     '''
     if not argv:
       raise GetoptError("missing URL")
@@ -438,7 +443,13 @@ class PilferCommand(BaseCommand):
       )
       if grokked is not None:
         for k, v in grokked.items():
-          table.append((f'    {k}', v))
+          try:
+            items = v.items()
+          except AttributeError:
+            table.append((f'    {k}', v))
+          else:
+            for i, (vk, vv) in enumerate(sorted(items)):
+              table.append([f'    {k}' if i == 0 else '', vk, vv])
     printt(*table)
 
   @popopts
@@ -570,6 +581,22 @@ class PilferCommand(BaseCommand):
     if bad_actions:
       raise GetoptError("invalid action specifications")
     asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
+
+  def cmd_patch(self, argv):
+    ''' Usage: {cmd} URL
+          Patch the soup for URL and recite the result to the output.
+    '''
+    if not argv:
+      raise GetoptError("missing URL")
+    url = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    flowstate = FlowState(url=url)
+    # Patch the soup of a URL by calling all SiteMap.patch_soup_* methods.
+    for method, match_tags, result in self.options.pilfer.run_matches(
+        flowstate, 'soup', 'patch_soup_*'):
+      print(method, match_tags)
+    print(flowstate.soup)
 
   def cmd_sitemap(self, argv):
     ''' Usage: {cmd} [sitemap|domain [URL...]]

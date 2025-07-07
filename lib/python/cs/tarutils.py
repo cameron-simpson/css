@@ -230,7 +230,6 @@ def traced_untar(
   ##  with open(P.stderr, 'r', buffering=1) as ferr:
   with upd.insert(0) as filename_proxy:
     filenames_q = IterableQueue()
-    filenames_q.open()  # secondary open for the stderr processor
     # consumer of tar stdout
     # expects bare filenames
     Thread(

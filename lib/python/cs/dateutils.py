@@ -64,7 +64,7 @@ else:
 def isodate(when=None, dashed=True):
   ''' Return a date in ISO8601 YYYY-MM-DD format, or YYYYMMDD if not `dashed`.
 
-      Modern Pythons have a `datetime.isoformat` method, you use that.
+      Modern Pythons have a `datetime.isoformat` method, you should use that.
   '''
   if when is None:
     when = localtime()
@@ -76,16 +76,16 @@ def isodate(when=None, dashed=True):
 
 def datetime2unixtime(dt):
   ''' Convert a timezone aware `datetime` to a UNIX timestamp.
+      *WARNING*: a naive datetime is assumed to be in UTC.
   '''
   if dt.tzinfo is None:
     dt = dt.replace(tzinfo=UTC)
   return dt.timestamp()
 
-def unixtime2datetime(unixtime, *, tz: tzinfo):
+def unixtime2datetime(unixtime, *, tz: tzinfo = UTC):
   ''' Convert a a UNIX timestamp to a `datetime` in the timezone `tz`.
+      *Note*: the default timezone is UTC, not the local timezone.
   '''
-  if tz is None:
-    raise ValueError("tz may not be None")
   return datetime.fromtimestamp(unixtime, tz=tz)
 
 def localdate2unixtime(d):

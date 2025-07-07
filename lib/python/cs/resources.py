@@ -124,6 +124,7 @@ class _MultiOpenMixinOpenCloseState:
       opens = self.opens
       if opens < 1:
         error("%s: UNDERFLOW CLOSE from %s", self, caller())
+        ##breakpoint() # for debugging
         final_close_from = self.final_close_from
         if not final_close_from:
           warning("  no self.final_close_from recorded")
@@ -135,7 +136,8 @@ class _MultiOpenMixinOpenCloseState:
               self.opens_from[frame_key]
           )
         return opens, retval
-      opens -= 1
+      else:
+        opens -= 1
       self.opens = opens
       if opens == 0:
         ##INACTIVE##self.tcm_dump(MultiOpenMixin)

@@ -113,7 +113,7 @@ class HasThreadState(ContextManagerMixin):
 
       *NOTE*: `HasThreadState.Thread` is a _class_ method whose default
       is to push state for all active `HasThreadState` subclasses.
-      Contrast with `HasThreadState.bg` which is an _instance_method
+      Contrast with `HasThreadState.bg` which is an _instance_ method
       whose default is to push state for just that instance.
       The top level `cs.threads.bg` function calls `HasThreadState.Thread`
       to obtain its `Thread`.

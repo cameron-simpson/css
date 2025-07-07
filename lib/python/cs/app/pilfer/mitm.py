@@ -7,7 +7,7 @@ import asyncio
 from collections import ChainMap, defaultdict
 from dataclasses import dataclass, field
 from functools import partial
-from itertools import chain, takewhile
+from inspect import isgeneratorfunction
 import os
 from signal import SIGINT
 import sys
@@ -17,26 +17,27 @@ from typing import Callable, Iterable, Optional
 from icontract import require
 from mitmproxy import http
 import mitmproxy.addons.dumper
+from mitmproxy.http import Request as MITMRequest, Response as MITMResponse
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
 from mitmproxy.tools.dump import DumpMaster
 from typeguard import typechecked
 
-from cs.binary import bs
 from cs.cmdutils import vprint
 from cs.context import stackattrs
 from cs.deco import attr, Promotable, promote
 from cs.fileutils import atomic_filename
+from cs.fs import shortpath
 from cs.gimmicks import Buffer
 from cs.lex import printt
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
-from cs.progress import Progress
+from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
-from cs.queues import IterableQueue
+from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
-from cs.rfc2616 import content_length
+from cs.rfc2616 import content_encodings, content_length
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
@@ -45,6 +46,7 @@ from .parse import get_name_and_args
 from .pilfer import Pilfer, uses_pilfer
 from .prefetch import URLFetcher
 from .sitemap import FlowState
+from .util import decode_content
 
 if sys.stdout.isatty():
   print = upd_print
@@ -52,221 +54,217 @@ if sys.stdout.isatty():
 # monkey patch so that Dumper.echo calls the desired print()
 mitmproxy.addons.dumper.print = print
 
-##@require(lambda consumer, is_sink: is_sink or isgeneratorfunction(consumer))
-@uses_pilfer
-@typechecked
-def process_stream(
-    consumer: Callable[Iterable[bytes], Iterable[bytes] | None],
-    progress_name: Optional[str] = None,
-    *,
-    content_length: Optional[int] = None,
-    is_filter: bool,
-    name: Optional[str] = None,
-    runstate: Optional[RunState] = None,
-    P: Pilfer,
-) -> Callable[bytes, Iterable[bytes]]:
-  ''' Dispatch `consumer(bytes_iter)` in a `Thread` to consume data from a flow.
-      Return a callable to set as the `flow.response.stream` in the caller.
-
-      Normally this is called via `filter_stream()` or `consume_stream()`.
-
-      The returned callable accepts a single `bytes` (some chunk
-      from the URL content stream) and yields an iterable of `bytes`;
-      this is acceptable as a `Flow.response.stream`.
-
-      The `Flow.response.stream` attribute can be set to a callable
-      which accepts a `bytes` instance as its sole callable;
-      this provides no context to the stream processor.
-      You can keep context from one chunk to the next by preparing
-      that callable with a closure, but often it is clearer to write
-      a generator which accepts an iterable of `bytes` and yields
-      `bytes`. This function enables the latter.
-
-      *Note that* calling this function actually constructs various
-      queues and dispatches worker `Thread`s to process them, so
-      it should only be called when the `consumer` is about to be
-      actioned.
-      Normally this would be when actually setting `flow.response.stream`.
-
-      Parameters:
-      * `consumer`: a callable accepting an iterable of `bytes` instances;
-        if `is_filter` then this is expected to return an iterable of
-        `bytes`, otherwise it is expected to be a sink
-      * `progress_name`: optional progress bar name, default `None`;
-        do not present a progress bar if `None`
-      * `content_length`: optional expected length of the data stream,
-        typically supplied from the response 'Content-Length` header
-      * `is_filter`: whether `consumer` is a filter (`True`) or a sink (`False`)
-      * `name`: an optional string to name the worker `Thread`,
-        default from `progress_name` or the name of `consumer`
-
-      For example, here is the stream setting from `stream_flow`,
-      which inserts a pass through stream for responses above a
-      certain size (its purpose is essentially to switch mitmproxy
-      from its default "consume all and produce `.content`" mode
-      to a streaming mode, important if this is being used as a real
-      web browsing proxy):
-
-          length = content_length(flow.response.headers)
-          if ( flow.request.method in ('GET',)
-               and (length is None or length >= threshold)
-          ):
-              # put the flow into streaming mode, changing no content
-              flow.response.stream = process_stream(
-                  lambda bss: bss,
-                  f'stream {flow.request}',
-                  content_length=length,
-                  is_filter=True,
-              )
+def consume_stream(
+    consumer: Callable[Iterable[bytes], None], name=None, *, gen_attrs=None
+):
+  ''' Wrap `consumer` in a generator function suitable for use by a `StreamChain`.
+      Return the generator function.
+      If the optional `getattrs` are supplied, set them as attributes
+      on the returned generator function.
   '''
-  if name is None:
-    name = progress_name or funccite(consumer)
-  if progress_name is None:
-    progress_Q = None
-  else:
-    progress_Q = Progress(
-        progress_name,
-        total=content_length,
-    ).qbar(
-        itemlenfunc=len,
-        incfirst=True,
-        report_print=print,
-    )
-  if runstate is not None:
 
-    def cancel_Qs(rs: RunState):
-      ''' Callback to close the data and process queues on cancel.
-      '''
-      data_Q.close()
-      if progress_Q is not None:
-        progress_Q.close()
+  # TODO: use progress_name?
 
-    runstate.notify_cancel.add(cancel_Qs)
+  def consumer_gen(bss: Iterable[bytes]) -> Iterable[bytes]:
+    ''' A generator suitable as a `Flow` stream.
+        This consumees `bss`, copying it to `consumer` via an iterable
+        queue, and yielding it unchanged.
+    '''
+    consumeq, _ = WorkerQueue(consumer, name=name)
+    try:
+      for bs in bss:
+        try:
+          consumeq.put(bs)
+        finally:
+          yield bs
+    except:
+      # yield any tail after an exception
+      yield from bss
+      raise
+    finally:
+      consumeq.close()
 
-  if not is_filter:
-    # wrap a sink function in a change-nothing filter
-    sink_Q = IterableQueue(name=f'{name} -> consumer-sink:{consumer.__name__}')
+  if gen_attrs:
+    attr(consumer_gen, **gen_attrs)
+  return consumer_gen
 
-    def copy_to_sink(bss: Iterable[bytes]) -> Iterable[bytes]:
-      ''' A generator to copy the data to the consumer (on sink_Q)
-          and to yield it unchanged.
+class StreamChain:
+  ''' A single use callable wrapper for a chain of `Flow` stream functions.
+      A new `StreamChain` should be constructed when setting a `Flow`'s
+      `.response.stream` attribute, as it keeps state.
+
+      Each stream function is either a callable accepting `bytes`
+      and returning:
+      - a `bytes`, for a `bytes`->`bytes` filter
+      - an iterable of `bytes`
+      - `None`, for a filter which merely inspects its inputs;
+        (this last is an additional mode beyond the default `Flow` support, 
+        and the initial `bytes` argument is passed through by this class)
+      or a generator accepting an iterable of `bytes` and yielding `bytes`.
+
+      Note that the generator support means that a callable accepting
+      a single `bytes` can never be supplied as a generator, it
+      must be an ordinary function returning an iterable of `bytes`.
+  '''
+
+  # TODO: optional progress bar - overall and per stream func
+  @typechecked
+  def __init__(
+      self,
+      stream_funcs: Iterable[Callable],
+      *,
+      progress_name: Optional[str] = None
+  ):
+    progress_name = None  # DEBUG
+    self.progress_name = progress_name
+    self.progressQ = None
+    self.queues = []
+    bs_funcs = []
+    for func in stream_funcs:
+      if not callable(func):
+        raise ValueError(f'{func=} is not callable')
+      if isgeneratorfunction(func):
+        func = self.func_from_generator(func)
+      # TODO: can we inspect the function to ensure it accepts a single `Buffer`?
+      bs_funcs.append(func)
+    self.stream_funcs = bs_funcs
+    if progress_name:
+
+      def progress_worker(q):
+        for _ in progressbar(q, self.progress_name, itemlenfunc=len):
+          pass
+
+      self.progressQ = IterableQueue(name=self.progress_name)
+      self.queues.append(self.progressQ)
+      Thread(
+          name=f'{self.progress_name} progressbar worker',
+          target=progress_worker,
+          args=(self.progressQ,),
+      ).start()
+
+  def __del__(self):
+    for q in self.queues:
+      q.close()
+
+  def func_from_generator(
+      self, genfunc: Callable[Iterable[bytes], Iterable[bytes]]
+  ):
+    ''' Convert a generator accepting an iterable of `bytes` into
+        a conventional stream function.
+        Note that this dispatches a worker `Thread`.
+    '''
+
+    def worker(qin, qout):
+      ''' A worker to consume the input queue `qin` and to place
+          resulting data onto the queue `qout`.
       '''
       try:
-        for bs in bss:
-          sink_Q.put(bs)  # data -> consumer
-          yield bs  # data -> output
+        obss = genfunc(qin)
+        if self.progress_name:
+          obss = progressbar(
+              obss,
+              f'{self.progress_name} -> {getattr(genfunc,"desc",genfunc.__name__)}',
+              itemlenfunc=len,
+          )
+        for bs in obss:
+          if len(bs) > 0:
+            qout.put(bs)
       finally:
-        sink_Q.close()
+        qout.close()
 
-    # dispatch a Thread consuming sink_Q -> consumer
-    P.bg(
-        partial(consumer, sink_Q),
-        name=f'{name}: sink_Q -> consumer:{consumer.__name__} (sink)',
-        enter_objects=True,
-    )
-    # use the copying filter as the consumer function
-    consumer = copy_to_sink
+    def bs_func(bs: bytes) -> Iterable[bytes]:
+      ''' Receive a `bytes`, put it on the queue consumed by the generator.
+          Yield waiting `bytes`es from the queue emitted from the generator.
+      '''
+      assert isinstance(bs, bytes)
+      at_EOF = len(bs) == 0
+      if at_EOF:
+        # close the generator input then yield all the output
+        genQ.close()
+        for bs in outQ:
+          assert isinstance(bs, bytes)
+          if len(bs) > 0:
+            yield bs
+      else:
+        # send bs to the generator and then yield any ready data
+        genQ.put(bs)
+        while not outQ.empty:
+          bs = outQ.get()
+          assert isinstance(bs, bytes)
+          if len(bs) > 0:
+            yield bs
+      if at_EOF:
+        yield b''
 
-  def filter_data(Qin, Qout):
-    ''' Consume `Qin` (from the `consumer()` generator), put to `Qout`.
+    outQ = IterableQueue()
+    self.queues.append(outQ)
+    # dispatch the worker, obtain genQ
+    genQ, _ = WorkerQueue(worker, args=(outQ,), name=self.progress_name)
+    self.queues.append(genQ)
+    # return the per-bytes submitter
+    return bs_func
+
+  @typechecked
+  def call_stream_func(
+      self,
+      stream_func: Callable[bytes, bytes | Iterable[bytes] | None],
+      bs: bytes,
+      stream_excs: list[Exception],
+  ) -> Iterable[bytes]:
+    ''' Call a single strream function with a `bytes`.
+        Return an iterable of `bytes`.
+        If the function raises an exception, append the exception
+        to `stream_excs` and return the original `bytes`
+        unchanged.
     '''
     try:
-      for obs in consumer(Qin):
-        Qout.put(obs)
-    finally:
-      Qout.close()
+      obss = stream_func(bs)
+    except Exception as e:
+      warning("exception calling stream_func %s: %s", funccite(stream_func), e)
+      stream_excs.append(e)
+      # processing broken, pass the bytes unchanged
+      obss = [bs]
+    # we expect a bytes or an iterable of bytes or None
+    if obss is None:
+      # pass the bytes through unchanged
+      obss = [bs]
+    elif isinstance(obss, Buffer):
+      # promote to an iterable of bytes
+      obss = [obss]
+    return obss
 
-  # dispatch a worker Thread to consume data_Q and put results on post_Q
-  data_Q = IterableQueue(name=f'{name} -> consumer:{consumer.__name__}')
-  post_Q = IterableQueue(name=f'{name} <- consumer:{consumer.__name__}')
-  Thread(
-      target=filter_data,
-      args=(data_Q, post_Q),
-      name=f'{name}: data_Q -> consumer -> post_Q',
-  ).start()
-
-  def copy_bs(bs: bytes) -> Iterable[bytes]:
-    ''' Copy `bs` to the `data_Q` and also to the `progress_Q` if not `None`.
-        Yield chunks from the `post_Q`.
+  @pfx_method
+  def __call__(self, bs0: bytes) -> Iterable[bytes]:
+    ''' Process a single input `bytes`, and yield partial output.
+        There will always be a final `b''` to indicate EOF.
+        There will never be a spurious `b''` in the pre-EOF stream.
+        A spurious `b''` from the stream functions will be discarded.
     '''
-    if len(bs) == 0:
-      # end of input: shut down the streams and collect the entire post_Q
-      try:
-        data_Q.close()
-        if progress_Q is not None:
-          progress_Q.close()
-        # yield the remaining data from post_Q
-        for obs in post_Q:
-          if len(obs) > 0:
-            yield obs
-      finally:
-        # EOF
+    at_EOF = len(bs0) == 0
+    bss = () if at_EOF else (bs0,)
+    try:
+      stream_excs = []
+      for stream_func in self.stream_funcs:
+        obss = []
+        for bs in bss:
+          if len(bs) == 0:
+            # skip empty bytes, we will supply a final bytes later if at_EOF
+            continue
+          obss.extend(self.call_stream_func(stream_func, bs, stream_excs))
+        if at_EOF:
+          # pass the final EOF indicator
+          obss.extend(self.call_stream_func(stream_func, b'', stream_excs))
+        bss = obss
+      for bs in bss:
+        if len(bs) > 0:
+          yield bs
+          if self.progressQ:
+            self.progressQ.put(bs)
+      if stream_excs:
+        raise ExceptionGroup(f'exceptions running {self}', stream_excs)
+    finally:
+      if at_EOF:
         yield b''
-      return
-    if data_Q.closed:
-      # we've closed the output queue, report discarded data
-      if len(bs) > 0:
-        warning(
-            "discarding %d bytes after close of data_Q:%s",
-            len(bs),
-            data_Q.name,
-        )
-      return
-    # copy to the output queue, copy to the process queue
-    data_Q.put(bs)
-    if progress_Q is not None:
-      progress_Q.put(bs)
-    # yield any ready data from post_Q
-    while not post_Q.empty():
-      obs = next(post_Q)
-      if len(bs) > 0:
-        yield obs
-    return
-
-  return copy_bs
-
-@typechecked
-def filter_stream(
-    consumer: Callable[Iterable[bytes], Iterable[bytes]],
-    progress_name: Optional[str] = None,
-    **ps_args,
-) -> Callable[bytes, bytes]:
-  ''' A shim for `process_stream` where the `consumer` processes
-      an iterable of `bytes` and returns an iterable of `bytes`,
-      typicaly a generator yielding `bytes`.
-  '''
-  return process_stream(consumer, progress_name, is_filter=True, **ps_args)
-
-@typechecked
-def consume_stream(
-    consumer: Callable[Iterable[bytes], None],
-    progress_name: Optional[str] = None,
-    **ps_args,
-) -> Callable[bytes, bytes]:
-  ''' A shim for `process_stream` where the `consumer` processes
-      an iterable of `bytes` and returns nothing.
-  '''
-  return process_stream(consumer, progress_name, is_filter=False, **ps_args)
-
-@attr(default_hooks=('responseheaders',))
-@uses_pilfer
-@typechecked
-def stream_flow(hook_name, flow, *, P: Pilfer = None, threshold=262144):
-  ''' If the flow has no content-length or the length is at least
-      threshold, put the flow into streaming mode.
-  '''
-  assert hook_name == 'responseheaders'
-  assert not flow.response.stream
-  length = content_length(flow.response.headers)
-  if (flow.request.method in ('GET',)
-      and (length is None or length >= threshold)):
-    # put the flow into streaming mode, changing nothing
-    flow.response.stream = filter_stream(
-        lambda bss: bss,
-        f'stream {flow.request.url}',
-        content_length=length,
-        runstate=flow.runstate,
-    )
 
 @attr(default_hooks=('requestheaders',))
 def print_rq(hook_name, flow):
@@ -282,70 +280,69 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       If there is a `flow.response`, update the cache.
   '''
   assert P is not None
-  PR = lambda *a: print('CACHED_FLOW', hook_name, flow.request, *a)
   rq = flow.request
-  if rq.method not in ('GET', 'HEAD'):
-    PR(rq.method, "is not GET or HEAD")
-    return
-  rsp = flow.response
-  if rsp:
-    rsphdrs = rsp.headers
   url = URL(rq.url)
-  rqhdrs = rq.headers
+  if rq.method not in ('GET', 'HEAD'):
+    ##PR(rq.method, "is not GET or HEAD")
+    return
+  if flow.response:
+    rsphdrs = flow.response.headers
   # scan the sitemaps for the first one offering a key for this URL
   # extra values for use
-  extra = ChainMap(rsphdrs, rqhdrs) if rsp else rqhdrs
-  cache_keys = P.cache_keys_for_url(url, extra=extra)
-  if not cache_keys:
-    PR("no URL keys")
-    return
   cache = P.content_cache
+  cache_keys = P.cache_keys_for_url(url)
+  if not cache_keys:
+    print("CACHE NO KEYS", url.short)
+    return
+  # we want to cache this request (or use the cache for it)
   with cache:
-    if rsp:
-      # update the cache
+    if flow.response:
+      # we've already got the response, use it to update the cache
+      assert hook_name in ('responseheaders', 'response')
       if getattr(flow, 'from_cache', False):
         # ignore a response we ourselves pulled from the cache
         pass
       elif rq.method != 'GET':
         PR("response is not from a GET, do not cache")
-      elif rsp.status_code != 200:
-        PR("response status_code", rsp.status_code, "is not 200, do not cache")
+      elif flow.response.status_code != 200:
+        PR(
+            "response status_code", flow.response.status_code,
+            "is not 200, do not cache"
+        )
       elif flow.runstate.cancelled:
         PR("flow.runstate", flow.runstate, "cancelled, do not cache")
       else:
+        print("CACHE ->", ",".join(sorted(cache_keys)), url.short)
         # response from upstream, update the cache
-        PR("to cache, cache_keys", ", ".join(cache_keys))
-        if rsp.content is None:
-          # we are at the response headers
-          # and will stream the content to the cache file
-          assert hook_name == "responseheaders"
-          rsp.stream = consume_stream(
-              lambda bss: cache.cache_response(
-                  url,
-                  cache_keys,
+        if hook_name == "responseheaders":
+          # We are at the response headers
+          # and will stream the content to the cache file.
+          flow.response.stream = consume_stream(
+              lambda bss: cache.cache_stream(
                   bss,
-                  rqhdrs,
-                  rsp.headers,
+                  cache_keys,
+                  url=url,
+                  rq_headers=flow.request.headers,
+                  rsp_headers=flow.response.headers,
                   mode=mode,
-                  decoded=False,
                   runstate=flow.runstate,
               ),
-              f'cache {cache_keys}',
-              content_length=content_length(rsp.headers),
-              runstate=flow.runstate,
+              name=f'cache {cache_keys}',
+              gen_attrs=dict(
+                  content_length=content_length(flow.response.headers)
+              ),
           )
         else:
           # we are at the completed response
-          # pass rsp.content to the cache
+          # pass flow.response.content to the cache
           assert hook_name == "response"
-          md = cache.cache_response(
-              url,
+          md = cache.cache_stream(
+              [flow.response.content],
               cache_keys,
-              rsp.content,
-              rqhdrs,
-              rsphdrs,
+              url=url,
+              rq_headers=flow.request.headers,
+              rsp_headers=flow.response.headers,
               mode=mode,
-              decoded=True,
           )
     else:
       # probe the cache
@@ -354,12 +351,13 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
         cache_key, md, content_bs = cache.find_content(cache_keys)
       except KeyError:
         # nothing cached
-        PR("not cached, pass through")
+        print("CACHE MISS", ",".join(sorted(cache_keys)), url.short)
         # we want to cache this, remove headers which can return a 304 Not Modified
         for hdr in 'if-modified-since', 'if-none-match':
           if hdr in rq.headers:
             del rq.headers[hdr]
         return
+      print("CACHE <-", ",".join(sorted(cache_keys)), url.short)
       # a known key
       if rq.method == 'HEAD':
         content_bs = b''
@@ -367,17 +365,12 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       rsp_hdrs = dict(md.get('response_headers', {}))
       # The http.Response.make factory accepts the supplied content
       # and _encodes_ it according to the Content-Encoding header, if any.
-      # But we cached the _encoded_ content. So we pull off the Content-Encoding header
-      # (keeping a note of it), make the Response, then put the header back.
-      ce = rsp_hdrs.pop('content-encoding', 'identity')
       flow.response = http.Response.make(
           200,  # HTTP status code
           content_bs,
           rsp_hdrs,
       )
-      flow.response.headers['content-encoding'] = ce
       flow.from_cache = True
-      PR("from cache, cache_key", cache_key)
 
 @attr(default_hooks=('requestheaders', 'responseheaders', 'response'))
 @uses_pilfer
@@ -460,25 +453,29 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
   '''
   # TODO: avoid prefetched from prefecthed URLs, do not prefetch multiple times
   PR = lambda *a: print(
-      'PROCESS_CONTENT', pattern_type, hook_name, flow.request, *a
+      'PROCESS_CONTENT', pattern_type, hook_name, flow.request.method, flow.
+      request.url, *a
   )
   rq = flow.request
-  url = URL(rq.url)
   if rq.method != "GET":
     PR("not a GET, ignoring")
     return
+  url = URL(rq.url)
   matches = list(P.url_matches(url, pattern_type))
   if not matches:
     # nothing to do
     return
 
-  def gather_content(bss):
+  def gather_content(bss: Iterable[bytes]) -> None:
     ''' Gather the content of the URL.
         At the end, process the content against each match.
         We do not use the `response` hook because that would gather
         content for all URLs instead of just those of interest.
     '''
-    content_bs = bs().join(takewhile(len, bss))
+    bss2 = []
+    for bs in bss:
+      yield bs
+    content_bs = b''.join(bss2)
     method_name = f'content_{pattern_type.lower()}'
     for match in matches:
       PR("for match", match)
@@ -504,8 +501,8 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
         warning("match function %s fails: %e", match.pattern_arg, e)
         raise
 
-  flow.response.stream = consume_stream(
-      gather_content, f'gather content for {pattern_type}'
+  flow.response.stream = attr(
+      gather_content, desc=f'gather content for {pattern_type}'
   )
 
 @attr(default_hooks=(
@@ -538,27 +535,63 @@ def prefetch_urls(hook_name, flow, *, P: Pilfer = None):
   else:
     warning("prefetch_urls: unexpected hook_name %r", hook_name)
 
+# TODO: a FlowState method - process_soup?
 @attr(default_hooks=('responseheaders',))
 @uses_pilfer
 @typechecked
 def patch_soup(hook_name, flow, *, P: Pilfer = None):
+  ''' Patch the soup of a URL by calling all `SiteMap.patch_soup_*` methods.
+  '''
   flowstate = FlowState.from_Flow(flow)
 
   def process_soup(bss: Iterable[bytes]) -> Iterable[bytes]:
+    ''' Yield a byte stream after patching its soup.
+        If the content type is not `text/html`, yield the stream unchanged.
+
+        Gather the input `bss`, a _decoded_ iterable of bytes, into text and transform into BS4 `Soup`.
+        Call `Pilfer.
+    '''
+    if flowstate.content_type != 'text/html':
+      yield from iter(bss)
+      return
+    charset = flowstate.content_charset or 'utf-8'
+    assert not flowstate.content_encodings
+    # set the content so that the soup can be computed
+    flowstate.set_content(b''.join(bss))
+    # update the flowstate.soup
+    for _ in P.run_matches(flowstate, 'soup', 'patch_soup_*'):
+      pass
+    # new values for the content and text in the flowstate
+    flowstate.content_encoding = 'identity'
+    text = str(flowstate.soup)
+    content = text.encode(charset or 'utf-8')
+    flowstate.set_content(content)
+    flowstate.text = text
+    yield content
+
+  flow.response.stream = attr(process_soup, desc='patch soup')
+
+@attr(default_hooks=('responseheaders',))
+@uses_pilfer
+@typechecked
+def grok_flow(hook_name, flow, *, P: Pilfer = None):
+  ''' Grok the fullness of a `Flow`.
+  '''
+  flowstate = FlowState.from_Flow(flow)
+  # ignore URLs for which there is no SiteMap
+  if not any(P.sitemaps_for(flowstate.url)):
+    return
+
+  def grok_stream(bss: Iterable[bytes]):
     content_bs = b''.join(bss)
-    # TODO: consult the content_type full for charset
+    # TODO: consult the content_type_full for charset
     flowstate.content = content_bs.decode('utf-8')
     # update the flowstate.soup
-    for _ in P.run_matches(flowstate, 'soup', 'patch*soup'):
+    for _ in P.grok(flowstate):
       pass
-    # TODO: consult the content_type full for charset
-    yield str(flowstate.soup).encode('utf-8')
 
-  flow.response.stream = filter_stream(
-      process_soup,
-      f'{flow.request}: patch_soup',
-      content_length=content_length(flow.response.headers),
-      runstate=flow.runstate,
+  flow.response.stream = consume_stream(
+      grok_stream, gen_attrs=dict(desc='grok')
   )
 
 @attr(default_hooks=('responseheaders',))
@@ -573,12 +606,7 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
       for bs in bss:
         T.write(bs)
 
-  flow.response.stream = consume_stream(
-      save,
-      f'{flow.request}: save {flow.response.headers["content-type"]} -> {save_as!r}',
-      content_length=content_length(rsp.headers),
-      runstate=flow.runstate,
-  )
+  flow.response.stream = attr(save, desc=f'save->{shortpath(save_as)!r}')
 
 @dataclass
 class MITMHookAction(Promotable):
@@ -586,11 +614,11 @@ class MITMHookAction(Promotable):
   HOOK_SPEC_MAP = {
       'cache': cached_flow,
       'dump': dump_flow,
+      'grok': grok_flow,
       'prefetch': prefetch_urls,
-      'soup': patch_soup,
+      'patch_soup': patch_soup,
       'print': print_rq,
       'save': save_stream,
-      'stream': stream_flow,
   }
 
   action: Callable
@@ -725,6 +753,9 @@ class MITMAddon:
   def call_hooks_for(self, hook_name: str, flow, *mitm_hook_a, **mitm_hook_kw):
     ''' This calls all the actions for the specified `hook_name`.
     '''
+    url = URL(flow.request.url)
+    PR = lambda *a, **kw: print("call_hooks_for", hook_name, *a, **kw)
+    ##PR("URL", flow.request.method, url.short)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
     if not hook_actions:
@@ -744,7 +775,7 @@ class MITMAddon:
           if regexp.search(flow.request.url):
             break
         else:
-          print("SKIP", action, "does not match URL", flow.request.url)
+          PR("SKIP, does not match URL")
           continue
       if stream_funcs is not None:
         # note the initial state of the .stream attribute
@@ -764,7 +795,10 @@ class MITMAddon:
       except Exception as e:
         warning("exception calling hook_action[%d]: %s", i, e)
         prep_excs.append(e)
-      if stream_funcs is not None:
+      if stream_funcs is None:
+        ##PR("stream_funcs is None")
+        pass
+      else:
         # If the .stream attribute was modified, append it to the
         # stream functions and reset the .stream attribute.
         stream = flow.response.stream
@@ -777,9 +811,11 @@ class MITMAddon:
       # to run whatever stream functions were applied.
       #
       # Because the actions do not know about each other, we
-      # wrap all the stream functions in a function which chains
-      # them together. If there's only one, we pass it straight
-      # though without a wrapper.
+      # wrap all the stream functions in a StreamChain which chains
+      # them together.
+      #
+      # If the content is encoded (eg compressed) we insert a
+      # decoding stream function at the start.
       #
       # Also, if there's an action for the "response" hook we
       # append a stream function which collates the final
@@ -789,14 +825,24 @@ class MITMAddon:
       #
       assert hook_name == 'responseheaders'
       # Streaming may change the size of the content, drop the Content-Length header;
-      # wget at least is confused if it's longer than the content.
-      try:
-        del flow.response.headers['content-length']
-      except KeyError:
-        pass
+      # wget at least is confused (stalls!) if it's longer than the content.
+      flow.response.headers.pop('content-length', None)
+      # We will always pass the decompressed data to the stream stages.
+      # Insert a decoder if required.
+      encodings = [
+          enc for enc in content_encodings(flow.response.headers)
+          if enc != 'identity'
+      ]
+      if encodings:
+        # insert a decoding pass using a copy of the headers as they are now
+        stream_funcs.insert(
+            0, partial(decode_content, flow.response.headers.copy())
+        )
+        flow.response.headers.pop('content-encoding', None)
       if self.hook_map['response']:
         # We have hooks for the response, so add a stream handler to
-        # collate the final stream into a raw content bytes instance.
+        # collate the final stream into a raw content bytes instance
+        # and set it as flow.response.content.
         content_bss = []
 
         def content_stream(bs: bytes) -> bytes:
@@ -811,87 +857,7 @@ class MITMAddon:
 
         stream_funcs.append(content_stream)
 
-      if len(stream_funcs) == 1:
-        stream, = stream_funcs
-      else:
-        assert len(stream_funcs) > 1
-
-        def stream(bs: bytes) -> Iterable[bytes]:
-          ''' Run each `bytes` instance through all the stream functions.
-              Return an iterable of `bytes` emenating from the final function.
-          '''
-          # TODO: we really need to think a bit harder about EOF
-          # or exception from a stage.
-          stream_excs = []
-          at_EOF = len(bs) == 0
-          if at_EOF:
-            bss = []
-          else:
-            bss = [bs]
-          try:
-            # Feed the bytes from bss through each of stream_funcs.
-            # Pass the resulting blocks through the next stream function.
-            # We start with a single block, but each stage may produce
-            # multiple blocks for use by the subsequent stages.
-            for stream_func in stream_funcs:
-              # Feed bss through the stream function, collect its
-              # results for use by the next stage.
-              # Because a stage function might return a bytes or an
-              # iterable of bytes we promote each result to an iterable
-              # of bytes and combine them for the next pass.
-              obsses = []  # list of iterables, one per bs in bss
-              for bs in bss:
-                try:
-                  obss = stream_func(bs)
-                except Exception as e:
-                  warning(
-                      "exception calling hook_action stream_func %s: %s",
-                      funccite(stream_func), e
-                  )
-                  stream_excs.append(e)
-                  # processing broken, pass the bytes unchanged
-                  obss = [bs]
-                # we expect a bytes or an iterable of bytes
-                if isinstance(obss, Buffer):
-                  # promote to iterable
-                  obss = [obss]
-                obsses.append(obss)
-                if at_EOF:
-                  # send EOF to each stage
-                  try:
-                    obss = stream_func(b'')
-                  except Exception as e:
-                    warning(
-                        "exception calling hook_action stream_func %s: %s",
-                        funccite(stream_func), e
-                    )
-                    stream_excs.append(e)
-                    # processing broken, pass the bytes unchanged
-                    obss = [bs]
-                  # we expect a bytes or an iterable of bytes
-                  if isinstance(obss, Buffer):
-                    # promote to iterable
-                    obss = [obss]
-                  obsses.append(obss)
-              # prepare the iterable of bytes for the next stage function
-              bss = chain(*obsses)
-            # end of stages: yield the nonempty results
-            for bs in bss:
-              if len(bs) > 0:
-                yield bs
-          finally:
-            if stream_excs:
-              if len(stream_excs) == 1:
-                raise stream_excs[0]
-              raise ExceptionGroup(
-                  f'multiple exceptions running actions for .{hook_name}',
-                  stream_excs
-              )
-            if at_EOF:
-              # send the final EOF
-              yield b''
-
-      flow.response.stream = stream
+      flow.response.stream = StreamChain(stream_funcs)
 
     if prep_excs:
       if len(prep_excs) == 1:
