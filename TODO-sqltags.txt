@@ -1,3 +1,4 @@
+drop all the transactions, make all operations fast insert/update/upsert
 index tag values on name+float, name+str
 SQLTags should only take the lock file after an opportunistic unlocked attempt? needs a transaction? or idempotent ops?
 batch the SQLTags changes mirrors from FSTags?
