@@ -1991,8 +1991,7 @@ class TagSetCriterion(Promotable):
         * `(name,value)`: a 2 element sequence
           is equivalent to a positive equality `TagBasedTest`
     '''
-    tag_based_test_class = trace(getattr
-                                 )(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
+    tag_based_test_class = getattr(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
     if isinstance(obj, cls):
       # already suitable
       return obj
@@ -2010,7 +2009,7 @@ class TagSetCriterion(Promotable):
         name, value = obj
       except (TypeError, ValueError):
         # not a 2-tuple either, fall back to the superclass
-        return trace(super().promote)(obj)
+        return super().promote(obj)
       choice = True
     else:
       # we do, honour its .choice, otherwise assume True (select)
