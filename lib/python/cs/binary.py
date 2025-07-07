@@ -339,7 +339,7 @@ def flatten(transcription) -> Iterable[bytes]:
     if len(transcription) > 0:
       yield transcription
   elif isinstance(transcription, str):
-    if len(transcription) > 0::
+    if len(transcription) > 0:
       yield transcription.encode('ascii')
   else:
     for item in transcription:
