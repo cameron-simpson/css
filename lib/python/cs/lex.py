@@ -15,10 +15,13 @@ raising `ValueError` on failed tokenisation.
 # pylint: disable=too-many-lines
 
 import binascii
+from dataclasses import dataclass
+from datetime import date, datetime
 from functools import partial
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from pprint import pformat, PrettyPrinter
 import re
 from string import (
     ascii_letters,
@@ -31,31 +34,34 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
-from typing import Tuple, Union
+from typing import Any, Iterable, Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import fmtdoc, decorator
+from cs.deco import fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
+from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20240630-post'
+__version__ = '20250428-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
+        "Topic :: Text Processing",
     ],
     'install_requires': [
         'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
+        'cs.obj',
         'cs.pfx',
         'cs.py.func',
         'cs.seq>=20200914',
@@ -172,7 +178,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
           X("foo = %s", s(foo))
   '''
   # pylint: disable=redefined-outer-name
-  o_s = repr(o) if use_repr else str(o)
+  o_s = cropped_repr(o) if use_repr else str(o)
   if max_length is not None:
     o_s = cropped(o_s, max_length)
   s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
@@ -215,14 +221,14 @@ def htmlquote(s):
   ''' Quote a string for use in HTML.
   '''
   s = htmlify(s)
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def jsquote(s):
   ''' Quote a string for use in JavaScript.
   '''
-  s = s.replace("\"", "&dquot;")
-  return "\"" + s + "\""
+  s = s.replace('"', "&dquot;")
+  return '"' + s + '"'
 
 def phpquote(s):
   ''' Quote a string for use in PHP code.
@@ -303,12 +309,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
           chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
         offset0 = offset
-    else:
-      if b in whitelist:
-        inwhite = True
-        chunk = hexify(bs[offset0:offset])
-        chunks.append(chunk)
-        offset0 = offset
+    elif b in whitelist:
+      inwhite = True
+      chunk = hexify(bs[offset0:offset])
+      chunks.append(chunk)
+      offset0 = offset
     offset += 1
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
@@ -408,17 +413,26 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
-def stripped_dedent(s):
+# TODO: add an optional detab=n parameter?
+def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
       strip the supplied string `s`, pull off the leading line,
       dedent the rest, put back the leading line.
 
+      This is a lot like the `inspect.cleandoc()` function.
+
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
 
-      Example:
+      The optional `post_indent` parameter may be used to indent
+      the dedented text before return.
+
+      The optional `sub_indent` parameter may be used to indent
+      the second and following lines if the dedented text before return.
+
+      Examples:
 
           >>> def func(s):
           ...   """ Slightly smarter dedent which ignores a string's opening indent.
@@ -432,6 +446,18 @@ def stripped_dedent(s):
           Slightly smarter dedent which ignores a string's opening indent.
           Strip the supplied string `s`. Pull off the leading line.
           Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, sub_indent='  '))
+          Slightly smarter dedent which ignores a string's opening indent.
+            Strip the supplied string `s`. Pull off the leading line.
+            Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, post_indent='  '))
+            Slightly smarter dedent which ignores a string's opening indent.
+            Strip the supplied string `s`. Pull off the leading line.
+            Dedent the rest. Put back the leading line.
+          >>> print(stripped_dedent(func.__doc__, post_indent='  ', sub_indent='| '))
+            Slightly smarter dedent which ignores a string's opening indent.
+            | Strip the supplied string `s`. Pull off the leading line.
+            | Dedent the rest. Put back the leading line.
   '''
   s = s.strip()
   lines = s.split('\n')
@@ -439,9 +465,9 @@ def stripped_dedent(s):
     return ''
   line1 = lines.pop(0)
   if not lines:
-    return line1
-  adjusted = dedent('\n'.join(lines))
-  return line1 + '\n' + adjusted
+    return indent(line1, post_indent)
+  adjusted = indent(dedent('\n'.join(lines)), sub_indent)
+  return indent(line1 + '\n' + adjusted, post_indent)
 
 @require(lambda offset: offset >= 0)
 def get_prefix_n(s, prefix, n=None, *, offset=0):
@@ -896,6 +922,11 @@ def get_sloshed_text(
     chunks.append(s[offset0:offset])
   return ''.join(chunks), offset
 
+def slosh_quote(raw_s: str, q: str):
+  ''' Quote a string `raw_s` with quote character `q`.
+  '''
+  return q + raw_s.replace('\\', '\\\\').replace(q, '\\' + q)
+
 # pylint: disable=redefined-outer-name
 def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   ''' Parse a simple environment variable reference to $varname or
@@ -1119,8 +1150,10 @@ def as_lines(chunks, partials=None):
 
 # pylint: disable=redefined-outer-name
 def cutprefix(s, prefix):
-  ''' Strip a `prefix` from the front of `s`.
+  ''' Remove `prefix` from the front of `s` if present.
       Return the suffix if `s.startswith(prefix)`, else `s`.
+      As with `str.startswith`, `prefix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching prefix from the tuple will be removed.
 
       Example:
 
@@ -1131,15 +1164,30 @@ def cutprefix(s, prefix):
           'abc.def'
           >>> cutprefix(abc_def, '.zzz') is abc_def
           True
+          >>> cutprefix('this_that', ('this', 'thusly'))
+          '_that'
+          >>> cutprefix('thusly_that', ('this', 'thusly'))
+          '_that'
   '''
   if prefix and s.startswith(prefix):
+    if isinstance(prefix, tuple):
+      # a tuple of str
+      for pfx in prefix:
+        if s.startswith(pfx):
+          return s[len(pfx):]
+      # no match, return the original object
+      return s
+    # a str
     return s[len(prefix):]
+  # no match, return the original object
   return s
 
 # pylint: disable=redefined-outer-name
 def cutsuffix(s, suffix):
-  ''' Strip a `suffix` from the end of `s`.
+  ''' Remove `suffix` from the end of `s` if present.
       Return the prefix if `s.endswith(suffix)`, else `s`.
+      As with `str.endswith`, `suffix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching suffix from the tuple will be removed.
 
       Example:
 
@@ -1150,9 +1198,22 @@ def cutsuffix(s, suffix):
           'abc.def'
           >>> cutsuffix(abc_def, '.zzz') is abc_def
           True
+          >>> cutsuffix('this_that', ('that', 'tother'))
+          'this_'
+          >>> cutsuffix('this_tother', ('that', 'tother'))
+          'this_'
   '''
   if suffix and s.endswith(suffix):
+    if isinstance(suffix, tuple):
+      # a tuple of str
+      for sfx in suffix:
+        if s.endswith(sfx):
+          return s[:-len(sfx)]
+      # no match, return the original object
+      return s
+    # a str
     return s[:-len(suffix)]
+  # no match, return the original object
   return s
 
 def common_prefix(*strs):
@@ -1330,23 +1391,118 @@ def snakecase(camelcased):
     strs.append(c)
   return ''.join(strs)
 
+@OBSOLETE('cs.fs.RemotePath.from_str')
 def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   ''' Split a path with an optional leading `[user@]rhost:` prefix
       into the prefix and the remaining path.
       `None` is returned for the prefix is there is none.
       This is useful for things like `rsync` targets etc.
+
+      OBSOLETE, use `cs.fs.RemotePath.from_str` instead.
   '''
-  ssh_target = None
-  # check for [user@]rhost
-  try:
-    prefix, suffix = remotepath.split(':', 1)
-  except ValueError:
-    pass
-  else:
-    if prefix and '/' not in prefix:
-      ssh_target = prefix
-      remotepath = suffix
-  return ssh_target, remotepath
+  from cs.fs import RemotePath
+  return RemotePath.from_str(remotepath)
+
+def tabulate(*rows, sep='  ', ppcls=None):
+  r''' A generator yielding lines of values from `rows` aligned in columns.
+
+      Each row in rows is a list of strings. Non-`str` objects are
+      promoted to `str` via `pprint.pformat`. If the strings contain
+      newlines they will be split into subrows.
+
+      Example:
+
+          >>> for row in tabulate(
+          ...     ['one col'],
+          ...     ['three', 'column', 'row'],
+          ...     ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
+          ...     ['two', 'cols'],
+          ... ):
+          ...     print(row)
+          ...
+          one col
+          three    column  row
+          row3     multi   goes  and
+                   line    here  here
+                   text
+          two      cols
+          >>>
+  '''
+  if ppcls is None:
+
+    class ppcls(PrettyPrinter):
+      ''' A `PrettyPrinter` subclass which presents `date` and
+          `datetime` as ISO8601 strings.
+      '''
+
+      def format(self, obj, *fmt_a):
+        ''' Use ISO8601 for `date` and `datetime` objects.
+        '''
+        if isinstance(obj, date):
+          return obj.isoformat(), True, False
+        if isinstance(obj, datetime):
+          return obj.isoformat(' '), True, False
+        return super().format(obj, *fmt_a)
+
+  ppr = ppcls(compact=True, sort_dicts=True)
+  if not rows:
+    # avoids max of empty list
+    return
+  # promote all table cells to str via pformat
+  rows = [
+      [(cell if isinstance(cell, str) else ppr.pformat(cell))
+       for cell in row]
+      for row in rows
+  ]
+  # pad short rows with empty columns
+  max_cols = max(map(len, rows))
+  for row in rows:
+    if len(row) < max_cols:
+      row += [''] * (max_cols - len(row))
+  # break rows on newlines
+  srows = []
+  for row in rows:
+    if all("\n" not in cell for cell in row):
+      # no multiline row cells
+      srows.append(row)
+    else:
+      # split multiline cells int columns, pad columns to match
+      cols = [
+          [subcell.rstrip() for subcell in cell.split("\n")] for cell in row
+      ]
+      max_height = max(map(len, cols))
+      for subrow in range(max_height):
+        srows.append(
+            [col[subrow] if subrow < len(col) else '' for col in cols]
+        )
+    rows = srows
+  col_widths = [
+      max(map(len, (row[c]
+                    for row in rows)))
+      for c in range(max(map(len, rows)))
+  ]
+  for row in rows:
+    yield sep.join(
+        f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
+    ).rstrip()
+
+def printt(
+    *table, file=None, flush=False, indent='', print_func=None, **tabulate_kw
+):
+  ''' A wrapper for `tabulate()` to print the results.
+      Each positional argument is a table row.
+
+      Parameters:
+      * `file`: optional output file, passed to `print_func`
+      * `flush`: optional flush flag, passed to `print_func`
+      * `indent`: optional leading indent for the output lines
+      * `print_func`: optional `print()` function, default `builtins.print`
+      Other keyword arguments are passed to `tabulate()`.
+  '''
+  if print_func is None:
+    from builtins import print as print_func
+  for line in tabulate(*table, **tabulate_kw):
+    print_func(indent + line, file=file, flush=flush)
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):
@@ -1656,9 +1812,11 @@ class FormatableFormatter(Formatter):
     offset = 0
     while offset < len(format_spec):
       if format_spec.startswith(':', offset):
+        # an empty spec
         subspec = ''
         offset += 1
       else:
+        # match a FORMAT_RE_FIELD_EXPR
         m_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
         if m_subspec:
           subspec = m_subspec.group()
@@ -1686,8 +1844,7 @@ class FormatableFormatter(Formatter):
     '''
     # parse the format_spec into multiple subspecs
     format_subspecs = cls.get_format_subspecs(format_spec) or []
-    while format_subspecs:
-      format_subspec = format_subspecs.pop(0)
+    for format_subspec in format_subspecs:
       with Pfx("subspec %r", format_subspec):
         assert isinstance(format_subspec, str)
         assert len(format_subspec) > 0
@@ -1697,7 +1854,7 @@ class FormatableFormatter(Formatter):
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
-              value.convert_via_method_or_attr
+              value.convert_via_method_or_attr  # noqa
             except AttributeError:
               # promote to something with convert_via_method_or_attr
               if isinstance(value, str):
@@ -1995,6 +2152,210 @@ class FFloat(FNumericMixin, float):
 class FInt(FNumericMixin, int):
   ''' Formattable `int`.
   '''
+
+@dataclass
+class BaseToken(Promotable):
+  ''' A mixin for token dataclasses.
+
+      Presently I use this in `cs.app.tagger.rules` and `cs.app.pilfer.parse`.
+  '''
+
+  # additional token classes to consider during the parse
+  EXTRAS = ()
+
+  source_text: str
+  offset: int
+  end_offset: int
+
+  def __str__(self):
+    return self.matched_text
+
+  @property
+  def matched_text(self):
+    ''' The text from `self.source_text` which matches this token.
+    '''
+    return self.source_text[self.offset:self.end_offset]
+
+  @classmethod
+  def token_classes(cls):
+    ''' Return the `baseToken` subclasses to consider when parsing a token stream.
+    '''
+    return public_subclasses(cls, extras=cls.EXTRAS)
+
+  @classmethod
+  @pfx_method
+  def parse(cls,
+            text: str,
+            offset: int = 0,
+            *,
+            skip=False) -> Tuple["BaseToken", int]:
+    ''' Parse a token from `test` at `offset` (default `0`).
+        Return a `BaseToken` subclass instance.
+        Raise `SyntaxError` if no subclass parses it.
+        Raise `EOFError` if at the end of the `text`,
+        checked after any whitespace if `skip` is true.
+        The returned token's `.end_offset` is the next parse point.
+
+        This base class method attempts the `.parse` method of all
+        the public subclasses.
+
+        Parameters:
+        * `text`: the text being parsed
+        * `offset`: the offset within the `text` of the the parse cursor
+        * `skip`: if true (default `False`), skip any leading
+          whitespace before matching
+    '''
+    if skip:
+      offset = skipwhite(text, offset)
+    if offset >= len(text):
+      raise EOFError(f'end of text encountered at offset {offset}')
+    token_classes = cls.token_classes()
+    if not token_classes:
+      raise RuntimeError("no token classes")
+    for subcls in token_classes:
+      if subcls is cls:
+        continue
+      try:
+        return subcls.parse(text, offset=offset)
+      except SyntaxError:
+        pass
+    raise SyntaxError(
+        'no subclass.parse succeeded,'
+        f'tried {",".join(subcls.__name__ for subcls in token_classes)}'
+    )
+
+  @classmethod
+  @pfx_method
+  @typechecked
+  def from_str(cls, text: str) -> "BaseToken":
+    ''' Parse `test` as a token of type `cls`, return the token.
+        Raises `SyntaxError` on a parse failure.
+        This is a wrapper for the `parse` class method.
+    '''
+    token = cls.parse(text)
+    if token.end_offset != len(text):
+      raise SyntaxError(
+          f'unparsed text at offset {token.end_offset}:'
+          f' {text[token.end_offset:]!r}'
+      )
+    return token
+
+  @classmethod
+  def scan(cls,
+           text: str,
+           offset: int = 0,
+           *,
+           skip=True) -> Iterable["BaseToken"]:
+    ''' Scan `text`, parsing tokens using `BaseToken.parse` and yielding them.
+        Parameters are as for `BaseToken.parse` except as follows:
+        - encountering end of text end the iteration instead of raising `EOFError`
+        - `skip` defaults to `True` to allow whitespace between tokens
+    '''
+    while True:
+      try:
+        token = cls.parse(text, offset, skip=skip)
+      except EOFError:
+        break
+      yield token
+      offset = token.end_offset
+
+class CoreTokens(BaseToken):
+  ''' A mixin for token dataclasses whose subclasses include `Identifier`,
+      'NumericValue` and `QuotedString`.
+  '''
+
+@dataclass
+class Identifier(CoreTokens, BaseToken):
+  ''' A dotted identifier.
+  '''
+
+  name: str
+
+  @classmethod
+  def parse(cls,
+            text: str,
+            offset: int = 0,
+            *,
+            skip=False) -> Tuple[str, CoreTokens, int]:
+    ''' Parse a dotted identifier from `test`.
+    '''
+    if skip:
+      offset = skipwhite(text, offset)
+    name, end_offset = get_dotted_identifier(text, offset)
+    if not name:
+      raise SyntaxError(
+          f'{offset}: expected dotted identifier, found {text[offset:offset+3]!r}...'
+      )
+    return cls(
+        source_text=text, offset=offset, end_offset=end_offset, name=name
+    )
+
+class _LiteralValue(CoreTokens):
+  value: Any
+
+@dataclass
+class NumericValue(_LiteralValue, BaseToken):
+  ''' An `int` or `float` literal.
+  '''
+
+  value: Union[int, float]
+
+  # anything this matches should be a valid Python int/float
+  _token_re = re.compile(r'[-+]?\d+(\.\d*([eE]-?\d+)?)?')
+
+  def __str__(self):
+    return str(self.value)
+
+  @classmethod
+  def parse(cls, text: str, offset: int = 0, *, skip=False) -> "NumericValue":
+    ''' Parse a Python style `int` or `float`.
+    '''
+    if skip:
+      offset = skipwhite(text, offset)
+    start_offset = skipwhite(text, offset)
+    m = cls._token_re.match(text, start_offset)
+    if not m:
+      raise SyntaxError(
+          f'{start_offset}: expected int or float, found {text[start_offset:start_offset+16]!r}'
+      )
+    try:
+      value = int(m.group())
+    except ValueError:
+      value = float(m.group())
+    return cls(
+        source_text=text, offset=offset, end_offset=m.end(), value=value
+    )
+
+@dataclass
+class QuotedString(_LiteralValue, BaseToken):
+  ''' A double quoted string.
+  '''
+
+  value: str
+  quote: str = '"'
+
+  def __str__(self):
+    return slosh_quote(self.value, self.quote)
+
+  @classmethod
+  def parse(cls, text: str, offset: int = 0, *, skip=False) -> "QuotedString":
+    ''' Parse a double quoted string from `text`.
+    '''
+    if skip:
+      offset = skipwhite(text, offset)
+    if not text.startswith('"', offset):
+      raise SyntaxError(
+          f'{offset}: expected ", found {text[offset:offset+1]!r}'
+      )
+    q = text[offset]
+    value, end_offset = get_qstr(text, offset)
+    return cls(
+        source_text=text,
+        offset=offset,
+        end_offset=end_offset,
+        value=value,
+        quote=q,
+    )
 
 if __name__ == '__main__':
   import cs.lex_tests

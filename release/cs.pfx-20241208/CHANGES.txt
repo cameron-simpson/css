@@ -1,0 +1,1 @@
+lib/python/cs/pfx.py: cs.pfx: Pfx.prefixify_exception: record the original message as {attr}_without_prefix, useful in warnings which themselves recite the prefix

@@ -1,0 +1,1 @@
+Add PyPI classifier, in part to test an updated release script.

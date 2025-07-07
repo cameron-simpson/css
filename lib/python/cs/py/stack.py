@@ -10,7 +10,7 @@ from collections import namedtuple
 import sys
 from traceback import extract_stack
 
-__version__ = '20240630-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'description':
@@ -79,11 +79,43 @@ except ImportError:
           (frame.filename, frame.lineno, frame.name, frame.line)
       )
 
-def frames():
+def frames(source=None, limit=None):
   ''' Return the current stack as a `StackSummary` instance, a list
-      of `FrameSummary` instances.
+      of `FrameSummary` instances. Crop the returned list at `limit`
+      if it is not `None`.
+
+      If `source` is omitted or `None`, obtain the source stack
+      from `traceback.extract_stack()`.
+      Otherwise if `source` has a `.tb_frame` attribute (like a
+      `traceback` object) or `source` has a `.__traceback__` attribute
+      (like an exception), call `traceback.extract_stack` with that
+      to obtain the source stack.
   '''
-  return StackSummary.from_list(extract_stack())
+  if source is None:
+    # default to the current stack
+    stack = extract_stack()
+  else:
+    # see if we can locate a stack frame
+    tb_frame = None
+    # does it look like a traceback object?
+    try:
+      tb_frame = source.tb_frame
+    except AttributeError:
+      # does it looks like an exception?
+      try:
+        tb_frame = source.__traceback__.tb_frame
+      except AttributeError:
+        pass
+    if tb_frame is None:
+      raise TypeError(
+          "stack_dump: unhandled stack type, source=%s:%s" %
+          (type(source).__name__, repr(source))
+      )
+    # extract the stack from the frame
+    stack = extract_stack(f=tb_frame)
+  if limit is not None:
+    stack = stack[:limit]
+  return StackSummary.from_list(stack)
 
 def caller(frame_index=-3):
   ''' Return the `Frame` of the caller's caller.

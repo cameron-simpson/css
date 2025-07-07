@@ -70,7 +70,7 @@ import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 
-__version__ = '20240630-post'
+__version__ = '20250323-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -86,7 +86,6 @@ DISTINFO = {
         'cs.lex',
         'cs.pfx',
         'cs.py.func',
-        'cs.upd',  # done as a late import
     ],
 }
 
@@ -121,7 +120,7 @@ def ifdebug():
   global loginfo  # pylint: disable=global-statement
   if loginfo is None:
     loginfo = setup_logging()
-  return loginfo.level <= logging.DEBUG
+  return loginfo.level is not None and loginfo.level <= logging.DEBUG
 
 class LoggingState(NS):
   ''' A logging setup arranged for conventional UNIX command line use.
@@ -140,7 +139,7 @@ class LoggingState(NS):
       ansi_mode=None,
       trace_mode=None,
       verbose=None,
-      supplant_root_logger=False,
+      supplant_root_logger=None,
   ):
     ''' Prepare the `LoggingState` for conventional UNIX command
         line error messaging.
@@ -155,12 +154,11 @@ class LoggingState(NS):
 
         Parameters:
         * `cmd`: program name, default from `basename(sys.argv[0])`.
-          Side-effect: sets `cs.pfx.cmd` to this value.
         * `main_log`: default logging system.
           If `None`, the main log will go to `sys.stderr`;
           if `main_log` is a string, is it used as a filename to
           open in append mode;
-          otherwise main_log should be a stream suitable
+          otherwise `main_log` should be a stream suitable
           for use with `logging.StreamHandler()`.
           The resulting log handler is added to the `logging` root logger.
         * `format`: the message format for `main_log`.
@@ -189,6 +187,9 @@ class LoggingState(NS):
           (see https://no-color.org/ for the convention).
           A true value causes the root logger to colour certain logging levels
           using ANSI terminal sequences (currently only if `cs.upd` is used).
+        * `supplant_root_logger`: optional mode to replace
+          the root logger's `handlers[0]` logger with our own;
+          if not specified, set if the main log is a tty
         * `trace_mode`: if `None`, set it according to the presence of
           'TRACE' in flags. Otherwise if `trace_mode` is true, set the
           global `loginfo.trace_level` to `loginfo.level`; otherwise it defaults
@@ -208,13 +209,15 @@ class LoggingState(NS):
 
     if cmd is None:
       cmd = os.path.basename(sys.argv[0])
-    cs.pfx.cmd = cmd
 
     if main_log is None:
       main_log = sys.stderr
     elif isinstance(main_log, str):
       # pylint: disable=consider-using-with
       main_log = open(main_log, "a", encoding='utf-8')
+
+    if supplant_root_logger is None:
+      supplant_root_logger = main_log.isatty()
 
     # determine some attributes of main_log
     try:
@@ -287,7 +290,7 @@ class LoggingState(NS):
     '''
     global loginfo
     root_logger = logging.getLogger()
-    if root_logger.handlers:
+    if root_logger.handlers and not self.supplant_root_logger:
       # The logging system is already set up.
       # Just monkey patch the leading handler's formatter.
       PfxFormatter.patch_formatter(root_logger.handlers[0].formatter)
@@ -304,7 +307,7 @@ class LoggingState(NS):
         # only do this the first time
         # TODO: fix this clumsy hack, some kind of stackable state?
         main_handler.setFormatter(PfxFormatter(self.format))
-        if self.supplant_root_logger:
+        if self.supplant_root_logger and root_logger.handlers:
           root_logger.handlers.pop(0)
         root_logger.addHandler(main_handler)
 
@@ -320,14 +323,21 @@ class LoggingState(NS):
 
       signal.signal(signal.SIGHUP, handler)
 
-def setup_logging(cmd=None, **kw):
+def setup_logging(cmd_name=None, **kw):
   ''' Prepare a `LoggingState` and return it.
       It is also available as the global `cs.logutils.loginfo`.
+      Side-effect: sets `cs.pfx.cmd` to this value.
   '''
   global loginfo
-  logstate = LoggingState(cmd=cmd, **kw)
-  logstate.apply()
-  loginfo = logstate
+  if loginfo is None:
+    kw.setdefault('cmd', cmd_name or kw.get('cmd'))
+    logstate = LoggingState(**kw)
+    logstate.apply()
+    loginfo = logstate
+    cs.pfx.cmd = kw['cmd']
+  else:
+    # just amend the current LoggingState
+    loginfo.__dict__.update(**kw)
   return loginfo
 
 class PfxFormatter(Formatter):
@@ -773,7 +783,9 @@ class UpdHandler(StreamHandler):
     else:
       if self.ansi_mode:
         if logrec.levelno >= logging.ERROR:
-          logrec.msg = colourise(logrec.msg, 'red')
+          logrec.msg = colourise(
+              colourise(logrec.msg, 'white'), 'redbg', 'blackbg'
+          )
         elif logrec.levelno >= logging.WARNING:
           logrec.msg = colourise(logrec.msg, 'yellow')
       line = self.format(logrec)

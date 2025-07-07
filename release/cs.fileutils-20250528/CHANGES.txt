@@ -1,0 +1,4 @@
+lib/python/cs/fileutils.py: cs.fileutils: makelockfile: tweak the definition of the ext parameter
+lib/python/cs/fileutils.py: cs.fileutils: makelockfile: include the Thread name in the Pfx context, write the pid and Thread name into the lock file
+lib/python/cs/fileutils.py: csfileutils: atomic_filename: make all parameters after the filename keyword only
+lib/python/cs/fileutils.py: merge pilfer ==> default

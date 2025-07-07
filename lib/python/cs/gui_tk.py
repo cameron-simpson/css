@@ -5,16 +5,12 @@
 '''
 
 from abc import ABC
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from contextlib import contextmanager
 import os
 from os.path import (
-    abspath,
     basename,
     expanduser,
-    isdir as isdirpath,
-    isfile as isfilepath,
-    join as joinpath,
     splitext,
 )
 import platform
@@ -29,17 +25,18 @@ from typeguard import typechecked
 
 from cs.cache import convof
 from cs.cmdutils import BaseCommand
-from cs.fs import needdir, shortpath
-from cs.fstags import FSTags
-from cs.hashutils import SHA256
+from cs.deco import Promotable, promote
+from cs.fs import shortpath
+from cs.fstags import FSTags, TaggedPath, TaggedPathSet, uses_fstags
 from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_method, pfx_call
+from cs.progress import Progress
+from cs.resources import RunState, uses_runstate
 from cs.tagset import Tag
 
 from cs.lex import r
 from cs.x import X
-from cs.py.stack import caller
 
 is_darwin = platform.system() == "Darwin"
 
@@ -83,7 +80,8 @@ class BaseTkCommand(BaseCommand):
       X("yield")
       yield
 
-  def run(self, **kw):
+  @uses_runstate
+  def run(self, runstate: RunState, **kw):
     ''' Run a command.
         Returns the exit status of the command.
 
@@ -100,7 +98,6 @@ class BaseTkCommand(BaseCommand):
     xit = super().run(**kw)
     if xit is None:
       # the command did GUI setup - run the app now
-      runstate = self.options.runstate
       if not runstate.cancelled:
         with runstate:
           self.options.tk_app.mainloop()
@@ -112,13 +109,12 @@ def ispng(pathname):
   '''
   return splitext(basename(pathname))[1].lower() == '.png'
 
-_fstags = FSTags()
-
-def image_size(path):
+@uses_fstags
+def image_size(path, *, fstags: FSTags):
   ''' Return the pixel size of the image file at `path`
       as an `(dx,dy)` tuple, or `None` if the contents cannot be parsed.
   '''
-  tagged = _fstags[path]
+  tagged = fstags[path]
   try:
     size = tagged['pil.size']
   except KeyError:
@@ -128,13 +124,14 @@ def image_size(path):
         size = tagged['pil.size'] = im.size
         tagged['mime_type'] = 'image/' + im.format.lower()
     except UnidentifiedImageError as e:
-      warning("unhandled image: %s", e)
+      warning(f'image_size({path!r}): unhandled image: {e}')
       size = tagged['pil.size'] = None
   if size is not None:
     size = tuple(size)
   return size
 
 @pfx
+@uses_fstags
 def imgof(
     path,
     max_size=None,
@@ -142,6 +139,7 @@ def imgof(
     min_size=None,
     fmt='png',
     force=False,
+    fstags: FSTags,
 ):
   ''' Create a version of the image at `path`,
       scaled to fit within some size constraints.
@@ -154,14 +152,17 @@ def imgof(
       * `force`: optional flag (default `False`)
         to force recreation of the PNG version and associated cache entry
   '''
-  assert '/' not in fmt
+  if len(fmt) == 0 or '/' in fmt or '.' in fmt:
+    raise ValueError(
+        f'{fmt=} must be a nonempty string containing no slashes or dots'
+    )
   FMT = fmt.upper()
   fmt = fmt.lower()
   if max_size is None:
     max_size = 1920, 1080
   if min_size is None:
     min_size = max_size[0] // 2, max_size[1] // 2
-  tagged = _fstags[path]
+  tagged = fstags[path]
   path = tagged.fspath
   size = image_size(path)
   if size is None:
@@ -193,7 +194,13 @@ def imgof(
         pfx_call(im2.save, dstpath, FMT)
 
   convsize = re_size or size
-  return convof(path, f'{fmt}/{convsize[0]}x{convsize[1]}', resize, ext=fmt)
+  return convof(
+      path,
+      f'{fmt}/{convsize[0]}x{convsize[1]}',
+      resize,
+      ext=fmt,
+      force=force,
+  )
 
 def pngfor(path, **imgof_kw):
   ''' Call `imgof` specifying PNG output.
@@ -260,14 +267,14 @@ class _Widget(ABC):
 
   ##@pfx_method
   @typechecked
-  def __init__(self, parent, *a, key=None, fixed_size=None, **kw):
+  def __init__(self, parent, *tk_a, key=None, fixed_size=None, **tk_kw):
     # apply the type(self).WIDGET_* defaults if not present
     for attr in dir(self):
       K = cutprefix(attr, 'WIDGET_')
       if K is not attr:
         v = getattr(self, attr)
         if v is not None:
-          kw.setdefault(K.lower(), v)
+          tk_kw.setdefault(K.lower(), v)
     ##X("CALLER = %s", caller())
     ##X("type(self)=%r", type(self))
     ##X("type(parent)=%s", type(parent))
@@ -276,18 +283,18 @@ class _Widget(ABC):
     ##    "%s: _Widget.__init__: super().__init__(parent=%s,*a=%r,**kw=%r)...",
     ##    type(self), r(parent), a, kw
     ##)
-    super().__init__(parent, *a, **kw)
     if fixed_size is None:
       fixed_size = (None, None)
     self.__parent = parent
     self.fixed_size = fixed_size
     if self.fixed_width is not None:
-      kw.update(width=self.fixed_width)
+      tk_kw.update(width=self.fixed_width)
     if self.fixed_height is not None:
-      kw.update(height=self.fixed_height)
+      tk_kw.update(height=self.fixed_height)
     if key is None:
       key = uuid4()
     self.key = key
+    super().__init__(parent, *tk_a, **tk_kw)
 
   @property
   def parent(self):
@@ -318,22 +325,16 @@ class _Widget(ABC):
     ##    (self, self.winfo_ismapped(), self, self.winfo_viewable())
     ##)
     if not self.winfo_ismapped() or not self.winfo_viewable():
-      return None
+      return False
     g = WidgetGeometry.of(self)
-    overlap = None
     p = self.parent
-    while p:
-      # compare geometry
+    while p is not None:
       pg = WidgetGeometry.of(p)
       overlap = g.overlap(pg)
       if not overlap:
         return False
-      try:
-        p = p.parent
-      except AttributeError as e:
-        break
-    assert hasattr(p, 'state'), "no .state on %s" % (p,)
-    return p.state() == 'normal'
+      p = p.parent
+    return True
 
 # local shims for the tk and ttk widgets
 BaseButton = tk.Button
@@ -497,116 +498,156 @@ class ImageButton(_ImageWidget, tk.Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
-class _FSPathsMixin:
-  ''' A mixin with methods for maintaining a list of filesystem paths.
+class TaggedPathSetVar(tk.StringVar, Promotable):
+  ''' A subclass for `tk.StringVar` maintaining a `TaggedPathSet`.
   '''
 
-  def __init__(self, canonical=None, display=None):
-    if canonical is None:
-      canonical = abspath
-    if display is None:
-      display = shortpath
-    self.__canonical = canonical
-    self.__display = display
-    self.__index_by_canonical = {}
-    self.__index_by_display = {}
-
-  def __clear(self):
-    self.__index_by_canonical.clear()
-    self.__index_by_display.clear()
-
-  def set_fspaths(self, new_fspaths):
-    ''' Update the canonical and display index mappings.
-        Return a list of the display paths.
+  @promote
+  @typechecked
+  def __init__(self, paths: TaggedPathSet = None, *, display=None):
+    ''' Initialise the `TaggedPathSetVar`.
+        If the optional `paths` is supplied, use that as the backing store.
     '''
-    fspaths = list(new_fspaths)
-    display_paths = []
-    self.__clear()
-    for i, fspath in enumerate(fspaths):
-      cpath = self.__canonical(fspath)
-      dpath = self.__display(fspath)
-      display_paths.append(dpath)
-      self.__index_by_canonical[cpath] = i
-      self.__index_by_display[dpath] = i
-    return display_paths
+    self.display = display or shortpath
+    if paths is None:
+      paths = TaggedPathSet()
+    self.taggedpaths = paths
+    super().__init__()
+    self.set(paths.fspaths)
 
-  @pfx_method
-  def index_by_path(self, path):
-    ''' Return the index for path via its display or canonical forms,
-        or `None` if no match.
+  def get(self):
+    ''' Get the current display paths in the expected `('v1',...)` form.
     '''
-    dpath = self.__display(path)
-    try:
-      index = self.__index_by_display[dpath]
-    except KeyError:
-      cpath = self.__canonical(path)
-      try:
-        index = self.__index_by_canonical[cpath]
-      except KeyError:
-        warning("no index found, tried display=%r, canonical=%r", dpath, cpath)
-        index = None
-    return index
+    return ''.join(
+        '(',
+        ','.join(repr(self.display(path.fspath)) for path in self.taggedpaths),
+        ')',
+    )
 
-class PathList_Listbox(Listbox, _FSPathsMixin):
+  def set(self, new_paths=Iterable[str]):
+    ''' Update the list of paths.
+    '''
+    paths = self.taggedpaths
+    paths.clear()
+    paths.update(new_paths)
+    super().set(' '.join(self.display(path.fspath) for path in paths))
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote an object to a `TaggedPathSet`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    return cls(paths=obj)
+
+class HasTaggedPathSet:
+  ''' A mixin with methods for maintaining a list of filesystem paths.
+      This maintains a `.taggedpaths` attribute holding a `TaggedPathSet`.
+  '''
+
+  @promote
+  def __init__(
+      self,
+      paths: TaggedPathSetVar = None,
+      *,
+      display=None,
+  ):
+    ''' Initialise `self.pathsvar`.
+
+        Parameters:
+        * `paths`: used to intialise `.taggedpaths`, optional; an existing
+          `TaggedPathSet` or an iterable of `str` or `TaggedPath`
+        * `display`: optional callable computing the friendly form of a path,
+          default `cs.fs.shortpath`
+    '''
+    if paths is None:
+      paths = TaggedPathSetVar(paths=paths, display=display)
+    elif display is not None:
+      paths.display - display
+    self.pathsvar = paths
+
+  @property
+  def taggedpaths(self):
+    ''' The `TaggedPathSet` instance.
+    '''
+    return self.pathsvar.taggedpaths
+
+  @property
+  def fspaths(self):
+    ''' A list of the filesystem paths.
+    '''
+    return [path.fspath for path in self.taggedpaths]
+
+  @fspaths.setter
+  def fspaths(self, new_fspaths):
+    ''' Setting `.fspaths` calls `self.set(new_fspaths)`.
+    '''
+    self.set(new_fspaths)
+
+  @property
+  def display(self):
+    ''' The display function.
+    '''
+    return self.pathsvar.display
+
+  def display_paths(self):
+    ''' Return a list of the friendly form of each path.
+    '''
+    display = self.display
+    return [display(path.fspath) for path in self.taggedpaths]
+
+  def set(self, paths):
+    ''' Set the `paths`.
+    '''
+    self.pathsvar.set(paths)
+
+class PathList_Listbox(Listbox, HasTaggedPathSet):
   ''' A `Listbox` displaying filesystem paths.
   '''
 
+  @promote
   @typechecked
-  def __init__(self, parent, pathlist: List[str], *, command, **kw):
-    super().__init__(parent, **kw)
-    _FSPathsMixin.__init__(self)
+  def __init__(
+      self, parent, paths: TaggedPathSetVar = None, *, command, **listbox_kw
+  ):
+    HasTaggedPathSet.__init__(self, paths=paths)
+    Listbox.__init__(self, parent, listvariable=self.pathsvar, **listbox_kw)
     self.command = command
-    self.pathlist = pathlist
-    self.display_paths = list(map(shortpath, pathlist))
-    self._list_state = None
     self.bind('<Button-1>', self._clicked)
 
   def _clicked(self, event):
-    nearest = self.nearest(event.y)
-    self.command(nearest, expanduser(self.display_paths[nearest]))
-
-  @pfx_method
-  def set_fspaths(self, new_fspaths):
-    ''' Update the filesystem paths.
+    ''' Call `self.command(nearest_index, self.fspaths[nearest_index])`.
     '''
-    self.display_paths = super().set_fspaths(new_fspaths)
-    list_state = getattr(self, '_list_state', None)
-    if list_state is None:
-      list_state = self._list_state = tk.StringVar(value=self.display_paths)
-      self.config(listvariable=list_state)
-    list_state.set(self.display_paths)
+    nearest = self.nearest(event.y)
+    self.command(nearest, self.fspaths[nearest])
+
+  def _update_display(self):
+    ''' Update the displayed list, to be called when `self.taggedpaths` is modified.
+    '''
+    display_paths = self.display_paths()
+    self.pathsvar.set(' '.join(display_paths))
     if self.fixed_width is None:
       self.config(
-          width=(
-              max(map(len, self.display_paths)) if self.display_paths else 0
-          ) + 10
+          width=(max(map(len, display_paths)) if display_paths else 0) + 10
       )
-    return self.display_paths
 
-  @property
-  def pathlist(self):
-    ''' Return the currently displayed path list.
-    '''
-    return self.display_paths
-
-  @pathlist.setter
-  def pathlist(self, new_paths: Iterable[str]):
-    ''' Update the path list.
-    '''
-    self.set_fspaths(new_paths)
+  def setpaths(self, paths):
+    self.pathsvar.set(paths)
 
   @pfx_method
-  def show_fspath(self, fspath, select=False):
+  @promote
+  def show_fspath(self, fspath: TaggedPath, select=False):
     ''' Adjust the list box so that `fspath` is visible.
     '''
-    index = self.index_by_path(fspath)
-    if index is None:
-      warning("cannot show this path")
-    else:
-      self.see(index)
-      if select:
-        self.selection_clear(0, len(self.display_paths) - 1)
-        self.selection_set(index)
+    paths = self.taggedpaths
+    if fspath not in paths:
+      paths.add(fspath)
+      self._update_display()
+    index = paths.find(fspath)
+    self.see(index)
+    if select:
+      self.selection_clear(0, len(self.taggedpaths) - 1)
+      self.selection_set(index)
 
 class TagValueStringVar(tk.StringVar):
   ''' A `StringVar` which holds a `Tag` value transcription.
@@ -629,19 +670,19 @@ class TagValueStringVar(tk.StringVar):
     ''' Return the value derived from the contents via `Tag.parse_value`.
         An attempt is made to cope with unparsed values.
     '''
-    s = super().get()
+    value0 = super().get()
     try:
-      value, offset = pfx_call(Tag.parse_value, s)
+      value, offset = pfx_call(Tag.parse_value, value0)
     except ValueError as e:
       warning(str(e))
-      value = s
+      value = value0
     else:
-      if offset < len(s):
-        warning("unparsed: %r", s[offset:])
+      if offset < len(value0):
+        warning("unparsed: %r", value0[offset:])
         if isinstance(value, str):
-          value += s[offset:]
+          value += value0[offset:]
         else:
-          value = s
+          value = value0
     return value
 
 class EditValueWidget(Frame):
@@ -723,54 +764,100 @@ class EditValueWidget(Frame):
           value = value_s
     return value
 
-class ThumbNailScrubber(Frame, _FSPathsMixin):
+class ThumbNailScrubber(Frame, HasTaggedPathSet):
   ''' A row of thumbnails for a list of filesystem paths.
   '''
 
   THUMB_X = 64
   THUMB_Y = 64
 
-  def __init__(self, parent, fspaths: List[str], *, command, **kw):
-    super().__init__(parent, **kw)
-    _FSPathsMixin.__init__(self)
-    self.index_by_abspath = {}
-    self.index_by_displaypath = {}
+  def __init__(self, parent, paths: List[str], *, command, **frame_kw):
+    HasTaggedPathSet.__init__(self, paths)
+    Frame.__init__(self, parent, **frame_kw)
     self.command = command
     self.make_subwidget = (
-        lambda i, path: ImageButton(
+        lambda i, fspath: ImageButton(
             self,
-            path=expanduser(path),
-            command=lambda i=i, path=path: self.command(i, expanduser(path)),
+            path=fspath,
+            command=lambda i=i, path=fspath: self.command(i, path),
             fixed_size=(self.THUMB_X, self.THUMB_Y),
         )
     )
-    self._fspaths = None
-    self.fspaths = fspaths
 
-  def set_fspaths(self, new_fspaths):
-    ''' Update the list of filesystem paths.
+  def set(self, new_fspaths):
+    ''' Setting new filesystem paths updates `.pathsvar` and remakes
+        the thumbnail widgets.
     '''
-    display_paths = super().set_fspaths(new_fspaths)
+    super().set(new_fspaths)
+    display_paths = self.display_paths()
     for child in list(self.grid_slaves()):
       child.grid_remove()
-    for i, dpath in enumerate(display_paths):
-      thumbnail = self.make_subwidget(i, dpath)
+    for i, display_path in enumerate(display_paths):
+      thumbnail = self.make_subwidget(i, display_path)
       thumbnail.grid(column=i, row=0)
-
-  @property
-  def fspaths(self):
-    ''' The list of filesystem paths.
-    '''
-    return self._fspaths
-
-  @fspaths.setter
-  def fspaths(self, new_paths):
-    ''' Set the list of filesystem paths.
-    '''
-    self.set_fspaths(new_paths)
 
   @pfx_method
   def show_fspath(self, fspath):
     ''' TODO: bring the correspnding thumbnail into view.
     '''
     warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
+
+class ProgressVar(tk.DoubleVar, Promotable):
+  ''' A subclass of `tk.DoubleVar` maintaining a `cs.progress.Progress`.
+  '''
+
+  @promote
+  @typechecked
+  def __init__(self, progress: Progress):
+    self.progress = progress
+
+  def set(self, position):
+    ''' Setting the control variable updates the `Progress` instance.
+    '''
+    self.progress.position = position
+    super().set(position)
+
+  def promote(cls, obj):
+    ''' Promote a `Progress` to a `ProgressVar`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    return cls(obj)
+
+class ProgressBar(ttk.Progressbar):
+  ''' A `ttk.ProgressBar` with an associated `cs.progress.Progress` instance.
+  '''
+
+  @promote
+  def __init__(
+      self,
+      parent,
+      variable: ProgressVar,
+      *,
+      maximum=None,
+      mode=None,
+      **ttkp_options,
+  ):
+    if variable is None:
+      variable = ProgressVar(Progress(total=maximum))
+    progress = variable.progress
+    if maximum is None:
+      maximum = progress.total
+    if mode is None:
+      mode = 'indeterminate' if progress.total is None else 'determinate'
+    self.progressvar = variable
+    super().__init__(
+        parent, maximum=maximum, mode=mode, variable=variable, **ttkp_options
+    )
+
+  @property
+  def progress(self):
+    ''' The underlying `Progress` instance.
+    '''
+    return self.progressvar.progress
+
+  def step(self, delta=1.0):
+    ''' Bump the underlying `Progress.position`, then call `ttk.ProgressBar.step(delta)`.
+    '''
+    self.progress.position += delta
+    super().step(delta)

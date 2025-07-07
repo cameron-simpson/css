@@ -9,12 +9,8 @@ Convenience facilities related to Python functions.
 '''
 
 from functools import partial
-from pprint import pformat
 
-from cs.deco import decorator
-from cs.py.stack import caller
 from cs.py3 import raise_from
-from cs.x import X
 
 __version__ = '20240630-post'
 
@@ -26,10 +22,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.deco',
-        'cs.py.stack',
         'cs.py3',
-        'cs.x',
     ],
 }
 
@@ -80,9 +73,9 @@ def func_a_kw_fmt(func, *a, **kw):
   av = [
       func if isinstance(func, str) else getattr(func, '__name__', str(func))
   ]
-  afv = ['%r'] * len(a)
+  afv = ['%.40r'] * len(a)
   av.extend(a)
-  afv.extend(['%s=%r'] * len(kw))
+  afv.extend(['%s=%.40r'] * len(kw))
   for kv in kw.items():
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
@@ -107,23 +100,22 @@ def callif(doit, func, *a, **kw):
     func = a.pop(0)
   else:
     modes = {}
-  modes.setdefault('print', print)
   if doit:
     return func(*a, **kw)
-  fmt, av = func_a_kw_fmt(func, *a, **kw)
-  modes['print'](fmt % tuple(av))
+  # just recite the function
+  modes.get('print', print)(func_a_kw(func, *a, **kw))
   return None
 
-def callmethod_if(o, method, default=None, a=None, kw=None):
-  ''' Call the named `method` on the object `o` if it exists.
+def callmethod_if(obj, method, default=None, a=None, kw=None):
+  ''' Call the named `method` on the object `obj` if it exists.
 
       If it does not exist, return `default` (which defaults to None).
-      Otherwise call getattr(o, method)(*a, **kw).
+      Otherwise call getattr(obj, method)(*a, **kw).
       `a` defaults to ().
       `kw` defaults to {}.
   '''
   try:
-    m = getattr(o, method)
+    m = getattr(obj, method)
   except AttributeError:
     return default
   if a is None:

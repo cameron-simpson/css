@@ -1,0 +1,1 @@
+Initial PyPI release with DjangoBaseCommand, cs.cmdutils.BaseCommand subclass suppplanting django.core.management.base.BaseCommand.

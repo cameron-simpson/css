@@ -27,7 +27,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
-from cs.threads import ThreadState
+from cs.threads import NRLock, ThreadState
 
 ##def CHECK():
 ##  ''' Debug function to check for open sqltags.sqlite files,
@@ -42,7 +42,7 @@ from cs.threads import ThreadState
 ##  from cs.py.stack import caller
 ##  X("CHECK from %r", caller())
 
-__version__ = '20240723-post'
+__version__ = '20250308-post'
 
 DISTINFO = {
     'description':
@@ -253,26 +253,26 @@ class ORM(MultiOpenMixin, ABC):
   ''' A convenience base class for an ORM class.
 
       This defines a `.Base` attribute which is a new `DeclarativeBase`
-      and provides various Session related convenience methods.
+      and provides various `Session` related convenience methods.
       It is also a `MultiOpenMixin` subclass
       supporting nested open/close sequences and use as a context manager.
   '''
 
-  @pfx_method
-  def __init__(self, db_url, serial_sessions=None):
-    ''' Initialise the ORM.
-
-        If `serial_sessions` is true (default `True` for SQLite, `False` otherwise)
-        then allocate a lock to serialise session allocation.
-        This might be chosen with SQL backends which do not support
-        concurrent sessions such as SQLite.
-
-        In the case of SQLite there's a small inbuilt timeout in
-        an attempt to serialise transactions but it is possible to
-        exceed it easily and recovery is usually infeasible.
-        Instead we use the `serial_sessions` option to obtain a
-        mutex before allocating a session.
+  @staticmethod
+  def norm_db_url(db_url: str) -> str:
+    ''' Promote a `/`*path*`.sqlite` filesystem path to an `sqlite:///` URL.
+        Return other strings unchanged.
     '''
+    if db_url.startswith('/') and db_url.endswith('.sqlite'):
+      db_url = f'sqlite:///{db_url}'
+    return db_url
+
+  @classmethod
+  def fspath_for_db_url(cls, db_url):
+    ''' Return the filesystem path for a `db_url`, or `None`.
+        This extracts the path from `sqlite:///` URLs.
+    '''
+    db_url = cls.norm_db_url(db_url)
     db_fspath = cutprefix(db_url, 'sqlite:///')
     if db_fspath is db_url:
       # unchanged - no leading "sqlite:///"
@@ -286,19 +286,39 @@ class ORM(MultiOpenMixin, ABC):
     else:
       # starts with sqlite:///, we have the db_fspath from the cutprefix
       pass
-    self.db_url = db_url
-    self.db_fspath = db_fspath
-    is_sqlite = db_url.startswith('sqlite://')
+    return db_fspath
+
+  @pfx_method
+  def __init__(self, db_url, serial_sessions=None):
+    ''' Initialise the ORM.
+
+        The `db_url` is any database URL of the form `dbtype://...`.
+        It may also be an absolute filesystem path, starting with
+        `/` and ending in `.sqlite`. This is transformed into an
+        `sqlite:///fspath` URL.
+
+        If `serial_sessions` is true (default `True` for SQLite, `False` otherwise)
+        then allocate a lock to serialise session allocation.
+        This might be chosen with SQL backends which do not support
+        concurrent sessions such as SQLite.
+
+        In the case of SQLite there's a small inbuilt timeout in
+        an attempt to serialise transactions but it is possible to
+        exceed it easily and recovery is usually infeasible.
+        Instead we use the `serial_sessions` option to obtain a
+        mutex before allocating a session.
+    '''
+    self.db_url = self.norm_db_url(db_url)
+    self.db_fspath = self.fspath_for_db_url(self.db_url)
+    is_sqlite = self.db_url.startswith('sqlite://')
     if serial_sessions is None:
-      # serial SQLite sessions
+      # serial SQLite sessions by default
       serial_sessions = is_sqlite
     elif not serial_sessions:
       if is_sqlite:
         warning(
-            "serial_sessions specified as %r, but is_sqlite=%s:"
-            " this may cause trouble with multithreaded use",
-            serial_sessions,
-            is_sqlite,
+            f'{serial_sessions=} but {is_sqlite=}'
+            '; this may cause trouble with concurrent use'
         )
     self.serial_sessions = serial_sessions or is_sqlite
     self.Base = declarative_base()
@@ -306,11 +326,12 @@ class ORM(MultiOpenMixin, ABC):
         orm=self, engine=None, sessionmaker=None, session=None
     )
     if serial_sessions:
-      self._serial_sessions_lock = Lock()
+      self._serial_sessions_lock = NRLock(
+          f'ORM:{self} session serialiser lock'
+      )
     else:
       self._engine = None
       self._sessionmaker_raw = None
-    self.db_url = db_url
     self.engine_keywords = dict(
         ##case_sensitive=True,
         echo='SQL' in map(str.upper,
@@ -352,26 +373,14 @@ class ORM(MultiOpenMixin, ABC):
   @contextmanager
   def startup_shutdown(self):
     ''' Default startup/shutdown context manager.
-
-        This base method operates a lockfile to manage concurrent access
-        by other programmes (which would also need to honour this file).
-        If you actually expect this to be common
-        you should try to keep the `ORM` "open" as briefly as possible.
-        The lock file is only operated if `self.db_fspath`,
-        currently set only for filesystem SQLite database URLs.
+        This updates the database schema on first use.
     '''
-    with contextif(
-        bool(self.db_fspath),
-        lockfile,
-        self.db_fspath,
-        poll_interval=0.2,
-    ):
-      # make sure that the db tables are up to date
-      if self.__first_use:
-        with self.sqla_state.auto_session() as session:
-          self.Base.metadata.create_all(bind=self.engine)
-        self.__first_use = False
-      yield
+    # make sure that the db tables are up to date
+    if self.__first_use:
+      with self.sqla_state.auto_session() as session:
+        self.Base.metadata.create_all(bind=self.engine)
+      self.__first_use = False
+    yield
 
   @property
   def engine(self):
@@ -404,33 +413,43 @@ class ORM(MultiOpenMixin, ABC):
     return sessionmaker
 
   @contextmanager
+  def serialif(self):
+    ''' A context manager to serialise sessions if `self.serial_sessions`.
+    '''
+    if self.serial_sessions:
+      existing_session = self.sqla_state.session
+      if existing_session is not None:
+        T = current_thread()
+        raise RuntimeError(
+            f'Thread:{T.ident}:{T.name}'
+            f': this Thread already has an ORM session: {existing_session}'
+        )
+      with self._serial_sessions_lock:
+        with contextif(
+            bool(self.db_fspath),
+            lockfile,
+            self.db_fspath,
+            poll_interval=2,
+        ):
+          yield
+    else:
+      yield
+
+  @contextmanager
   @pfx_method(use_str=True)
   def orchestrated_session(self):
-    ''' Orchestrate a new session for this `Thread`,
-        honouring `self.serial_session`.
+    ''' A context manager to orchestrate a *new* session for this `Thread`,
+        honouring `self.serial_session` and yielding the new `Session`.
     '''
     orm_state = self.sqla_state
     with self:
-      if self.serial_sessions:
-        if orm_state.session is not None:
-          T = current_thread()
-          tid = "Thread:%d:%s" % (T.ident, T.name)
-          raise RuntimeError(
-              "%s: this Thread already has an ORM session: %s" % (
-                  tid,
-                  orm_state.session,
-              )
-          )
-        with self._serial_sessions_lock:
-          new_session = self._sessionmaker()
+      with self.serialif():
+        new_session = self._sessionmaker()
+        try:
           with new_session.begin_nested():
             yield new_session
+        finally:
           new_session.close()
-      else:
-        new_session = self._sessionmaker()
-        with new_session.begin_nested():
-          yield new_session
-        new_session.close()
 
   @property
   def default_session(self):
@@ -439,9 +458,9 @@ class ORM(MultiOpenMixin, ABC):
     return self.sqla_state.session
 
 def orm_auto_session(method):
-  ''' Decorator to run a method in a session derived from `self.orm`
+  ''' A decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
-      Intended to assist classes with a `.orm` attribute.
+      This is intended to assist classes with a `.orm` attribute.
 
       See `with_session` for details.
   '''
@@ -714,6 +733,7 @@ def RelationProxy(
     *,
     id_column: Optional[str] = None,
     orm=None,
+    missing=None,
 ):
   ''' Construct a proxy for a row from a relation.
 
@@ -724,6 +744,10 @@ def RelationProxy(
       * `id_column`: options primary key column name,
         default from `BasicTableMixin.DEFAULT_ID_COLUMN`: `'id'`
       * `orm`: the ORM, default from `relation.orm`
+      * `missing`: an optional function to produce a default value
+        for a field if there is no matching record in the relation;
+        if `None` (the default) access to a field raises `KeyError`
+        or `AttributeError` as appropriate
 
       This is something of a workaround for applications which dip
       briefly into the database to obtain information instead of
@@ -777,6 +801,7 @@ def RelationProxy(
       self.id_column = id_column
       self.relation = relation
       self.orm = orm
+      self.missing = missing
       self.__fields = {}
       if db_row is not None:
         self.refresh_from_db(db_row)
@@ -810,9 +835,14 @@ def RelationProxy(
         except KeyError:
           pass
       with using_session(orm=orm) as session:
-        db_row = relation.by_id(
-            self.id, session=session, id_column=self.id_column
-        )
+        try:
+          db_row = relation.by_id(
+              self.id, session=session, id_column=self.id_column
+          )
+        except IndexError as e:
+          if missing is not None:
+            return missing(self, field)
+          raise KeyError(r(field)) from e
         self.refresh_from_db(db_row)
       return self.__fields[field]
 
@@ -829,7 +859,10 @@ def RelationProxy(
           return self[attr]
         except KeyError as e:
           with using_session(orm=orm) as session:
-            db_row = relation.by_id(self.id, session=session)
+            try:
+              db_row = relation.by_id(self.id, session=session)
+            except IndexError as e:
+              raise AttributeError(f'{self.__class__.__name__}.{attr}') from e
             self.__fields[attr] = getattr(db_row, attr)
           raise AttributeError(
               "%s: no cached field .%s" % (type(self).__name__, attr)

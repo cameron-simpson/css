@@ -6,13 +6,13 @@
 from subprocess import PIPE
 
 from cs.app.osx.plist import ingest_plist
-from cs.deco import cachedmethod
+from cs.cache import cachedmethod
 from cs.lex import r
 from cs.psutils import run
 
 from typeguard import typechecked
 
-__version__ = '20240316-post'
+__version__ = '20250108-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -22,7 +22,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.osx.plist',
-        'cs.deco',
+        'cs.cache',
         'cs.lex',
         'cs.psutils',
         'typeguard',
@@ -52,14 +52,13 @@ class Defaults:
   def __init__(self, host=None):
     self.host = host
 
-  def run(self, argv, doit=True, quiet=False) -> str:
+  def run(self, argv, doit=True) -> str:
     ''' Run a `defaults` subcommand, return the output decoded from UTF-8.
     '''
     return defaults(
         argv,
         host=self.host,
         doit=doit,
-        quiet=quiet,
         stdout=PIPE,
         encoding='utf-8',
     ).stdout

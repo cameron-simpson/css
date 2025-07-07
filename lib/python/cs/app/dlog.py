@@ -14,22 +14,25 @@
     which I alias as `dl`, with additional aliases like `HOME` for `dl HOME:`
     and so forth; as short a throwaway line as I can get away with.
     In particular, I use this to make notes about work activity
-    (none of the several time tracking tools I've tried work for me)
+    (none of the several time tracking tools I've tried works for me)
     and things like banking and purchases eg:
 
         dl MYBANK,VENDOR: xfer \\$99 to vendor for widget from bank acct rcpt 1234567
 
     I've got scripts to pull out the work ones for making invoices
-    and an assortment of other scripts (eg my `alert` script) also log via `dlog`.
+    and an assortment of other scripts (eg my `alert` script) also
+    log via `dlog`.
 
     The current incarnation logs to a flat text file (default `~/var/dlog-quick`)
     and to `SQLTags` SQLite database.
-    It has a little daemon mode to reduce contention for the SQLite database too.
+    It has a little daemon mode to reduce contention for the SQLite
+    database too.
 '''
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from getopt import getopt, GetoptError
+from functools import partial
+from getopt import GetoptError
 import os
 from os.path import expanduser
 from queue import Queue
@@ -39,16 +42,15 @@ from stat import S_ISFIFO
 import sys
 from threading import Thread
 import time
-from typing import Optional, Iterable, List, Union
+from typing import Optional, Iterable, Set, Union
 
 from arrow import Arrow
 from icontract import require
 from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, vprint
 from cs.context import stack_signals
-from cs.dateutils import datetime2unixtime
 from cs.deco import fmtdoc, promote
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import skipwhite
@@ -117,7 +119,7 @@ class DLog:
   ''' A log entry.
   '''
   headline: str
-  categories: List[str] = field(default_factory=set)
+  categories: Set[str] = field(default_factory=set)
   tags: TagSet = field(default_factory=TagSet)
   when: float = field(default_factory=time.time)
 
@@ -143,7 +145,7 @@ class DLog:
         Parameters:
         * `line`: the log line from which to derive the `DLog` object
         * `categories`: optional iterable of category names, which will be lowercased
-        * `multi_categories`: default `False`; if true the look for
+        * `multi_categories`: default `False`; if true, look for
           multiple leading *CAT*`,`...`:` preambles on the line to derive
           caetgory names instead of just one
 
@@ -190,7 +192,7 @@ class DLog:
 
   @property
   def dt_s(self):
-    ''' This log entry's local time as a string.
+    ''' The log entry's local time as a string.
     '''
     return datetime.fromtimestamp(self.when).isoformat(
         sep=" ", timespec="seconds"
@@ -242,15 +244,16 @@ class DLog:
       try:
         S = pfx_call(os.stat, pipepath)
       except FileNotFoundError:
-        # no server pipe
+        # no pipe, fall through
         pass
-      except Exception as e:  # pylint: disable=broad-exception-caught
+      except OSError as e:
         warning(
             "cannot stat pipepath:%r: %s, falling back to direct log",
             pipepath, e
         )
       else:
         if S_ISFIFO(S.st_mode):
+          vprint("append to pipe", pipepath, self.headline)
           try:
             with pfx_call(open, pipepath, 'a') as pipef:
               builtin_print(self, file=pipef)
@@ -327,6 +330,7 @@ class DLog:
             lines = get_batch(q)
           if not lines:
             break
+          vprint("daemon:", len(lines), "gathered")
           sqltags = SQLTags.promote(sqltags)
           # open the db once around the whole batch
           with sqltags:
@@ -352,7 +356,6 @@ class DLogCommand(BaseCommand):
   class Options(BaseCommand.Options):
     ''' Options for `DLogCommand`.
     '''
-    categories: set = field(default_factory=set)
     dbpath: str = field(
         default_factory=lambda:
         (os.environ.get('DLOG_DBPATH') or expanduser(DEFAULT_DBPATH))
@@ -365,78 +368,97 @@ class DLogCommand(BaseCommand):
         default_factory=lambda:
         (os.environ.get('DLOG_PIPEPATH') or expanduser(DEFAULT_PIPEPATH))
     )
-    tags: TagSet = field(default_factory=TagSet)
-    when: float = field(default_factory=time.time)
+
+    COMMON_OPT_SPECS = dict(
+        db=('dbpath', 'SQLTags database path.'),
+        log=('logpath', 'Flat log file path.'),
+        pipe=('pipepath', 'Logging named pipe path.'),
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+    )
 
   @staticmethod
-  def cats_from_str(cats_s):
-    ''' Return an iterable of lowercase category names from a comma
-        or space separated string.
+  def cats_from_str(cats_s) -> set:
+    ''' Return a set of lowercase category names from a comma
+        or whitespace separated string.
     '''
-    return (category for category in cats_s.replace(',', ' ').lower().split())
+    return set(
+        category for category in cats_s.replace(',', ' ').lower().split()
+    )
 
   def cmd_daemon(self, argv):
-    ''' Usage: {cmd} [pipepath]
+    ''' Usage: {cmd}
           Listen on pipepath for new dlog messages.
           This serialises contention for the database.
     '''
     options = self.options
-    dbpath = options.dbpath
-    logpath = options.logpath
-    pipepath = options.pipepath
-    if argv:
-      pipepath = argv.pop(0)
+    options.popopts(argv)
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    DLog.daemon(pipepath, logpath=logpath, sqltags=dbpath)
+    DLog.daemon(
+        options.pipepath, logpath=options.logpath, sqltags=options.dbpath
+    )
 
   # pylint: disable=too-many-branches,too-many-locals
   @uses_fstags
   def cmd_log(self, argv, fstags: FSTags):
-    ''' Usage: {cmd} [{{CATEGORIES:|tag=value}}...] headline
+    ''' Usage: {cmd} [{{CATEGORIES:|tag=value}}...] {{-|headline}}
           Log headline to the dlog.
           Options:
           -c categories   Alternate categories specification.
           -d datetime     Timestamp for the log entry instead of "now".
+          -t tags         Tags.
     '''
     options = self.options
-    badopts = False
-    dt = None
-    opts, argv = getopt(argv, 'c:d:')
-    for opt, val in opts:
-      with Pfx(opt if val is None else "%s %r" % (opt, val)):
-        if opt == '-c':
-          options.categories.update(self.cats_from_str(val))
-        elif opt == '-d':
-          try:
-            dt = pfx_call(datetime.fromisoformat, val)
-          except ValueError as e:
-            # pylint: disable=raise-missing-from
-            raise GetoptError("unparsed date: %s" % (e,))
-          options.when = datetime2unixtime(dt)
-        else:
-          raise NotImplementedError("unimplemented option")
-    if dt is None:
-      dt = datetime.fromtimestamp(options.when)
-    if badopts:
-      raise GetoptError("invalid preargv")
-    if not argv:
-      raise GetoptError("no headline")
-    categories = options.categories
-    pipepath = options.pipepath
-    logpath = options.logpath
-    dbpath = options.dbpath
-    dl = DLog.from_str(
-        f'{dt.isoformat(sep=" ",timespec="seconds")} {" ".join(argv)}',
-        categories=categories,
+    options.categories = set()  # pylint: disable=attribute-defined-outside-init
+    options.tags = TagSet()  # pylint: disable=attribute-defined-outside-init
+    options.tags.when = None  # pylint: disable=attribute-defined-outside-init
+    options.popopts(
+        argv,
+        c_=(
+            'categories',
+            'Alternate categories specification.',
+            lambda arg: DLogCommand.cats_from_str(arg),
+        ),
+        d_=(
+            'when',
+            'ISO8601 timestamp for the log entry instead of "now".',
+            datetime.fromisoformat,
+        ),
+        t_=('tags', TagSet.from_str),
     )
-    if not dl.categories:
+    if not argv:
+      raise GetoptError("missing headline")
+    if not options.categories:
       # infer categories from the working directory
       auto_categories = self.cats_from_str(
           fstags['.'].all_tags.get('cs.dlog', '')
       )
-      dl.categories.update(auto_categories)
-    dl.log(logpath=logpath, pipepath=pipepath, sqltags=dbpath)
+      options.categories.update(auto_categories)
+
+    def log_headline(headline):
+      when = options.when
+      if when is None:
+        when = time.time()
+      DLog(
+          headline=headline,
+          categories=options.categories,
+          tags=options.tags,
+          when=when,
+      ).log(
+          logpath=options.logpath,
+          pipepath=options.pipepath,
+          sqltags=options.dbpath,
+      )
+
+    if argv == ['-']:
+      if sys.stdin.isatty():
+        readline = partial(input, f'{self.cmd}> ')
+      else:
+        readline = sys.stdin.readline
+      while line := readline():
+        log_headline(line.rstrip())
+    else:
+      log_headline(" ".join(argv))
 
   @uses_runstate
   def cmd_scan(self, argv, *, runstate: RunState):

@@ -6,19 +6,24 @@
 import abc
 import importlib
 from inspect import (
-    getcomments, getmodule, isclass, isdatadescriptor, isfunction, ismethod,
-    signature
+    getcomments,
+    getmodule,
+    isclass,
+    isdatadescriptor,
+    isfunction,
+    ismethod,
+    signature,
 )
 from itertools import chain
 
 from cs.fsm import FSM
-from cs.gvutils import gvdataurl, GVDATAURL
-from cs.lex import cutprefix, stripped_dedent
+from cs.gvutils import gvdataurl, GVDATAURL, gvsvg
+from cs.lex import cutprefix, stripped_dedent, indent
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.py.modules import module_attributes
 
-__version__ = '20240709-post'
+__version__ = '20250426-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -58,10 +63,18 @@ def module_doc(
         the default is to document `__init__`, then CONSTANTS, the
         dunders, then other public names
   '''
+  from cs.cmdutils import BaseCommand
   if isinstance(module, str):
     module = pfx_call(importlib.import_module, module)
   full_docs = [obj_docstring(module)]
   ALL = getattr(module, '__all__', None)
+
+  def doc_item(anchor, header, obj_doc, nl="\n"):
+    ## return f'\n\n## <a name="{anchor}"></a>`{header}`\n\n{obj_doc}'
+    list_item = f'{nl}- <a name="{anchor}"></a>`{str(header)}`: {stripped_dedent(obj_doc,sub_indent="  ")}'
+    return list_item
+
+  full_docs.append('\n\nShort summary:')
   for Mname, obj in sorted(module_attributes(module), key=sort_key):
     with Pfx(Mname):
       if ALL and Mname not in ALL:
@@ -72,18 +85,42 @@ def module_doc(
       if obj_module is not module:
         # name imported from another module
         continue
+      docstring = (getattr(obj, '__doc__', None) or '').strip()
+      if not docstring:
+        continue
+      line1 = " ".join(
+          line.strip()
+          for line in docstring.split("\n\n")[0].split(". ")[0].split("\n")
+      )
+      if line1[0].isupper() and not line1.endswith('.'):
+        line1 += '.'
+      full_docs.append(f'\n* `{Mname}`: {line1}')
+
+  full_docs.append('\n\nModule contents:')
+  for Mname, obj in sorted(module_attributes(module), key=sort_key):
+    with Pfx(Mname):
+      if ALL and Mname not in ALL:
+        continue
+      if not filter_key(Mname):
+        continue
+      obj_module = getmodule(obj)
+      if obj_module is not module:
+        # name imported from another module
+        continue
+      assert obj_module
       obj_doc = obj_docstring(obj) if obj_module else ''
       if not callable(obj):
         if obj_doc:
-          full_docs.append(f'\n\n## `{Mname} = {obj!r}`\n\n{obj_doc}')
+          full_docs.append(doc_item(Mname, f'{Mname} = {obj!r}', obj_doc))
         continue
       if not obj_doc:
         continue
       if isfunction(obj):
         sig = signature(obj)
-        full_docs.append(f'\n\n## `{Mname}{sig}`\n\n{obj_doc}')
+        full_docs.append(doc_item(Mname, f'{Mname}{sig}', obj_doc))
       elif isclass(obj):
         classname_etc = Mname
+        # compute the list of immediate superclass names
         mro_names = []
         mro_set = set(obj.__mro__)
         for superclass in obj.__mro__:
@@ -99,8 +136,8 @@ def module_doc(
             mro_set.difference_update(superclass.__mro__)
         if mro_names:
           classname_etc += '(' + ', '.join(mro_names) + ')'
-          ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
         if issubclass(obj, FSM) and hasattr(obj, 'FSM_TRANSITIONS'):
+          # append an FSM state diagram
           obj_doc += (
               f'\n\nState diagram:\n![{Mname} State Diagram](' + gvdataurl(
                   obj.fsm_state_diagram_as_dot(
@@ -111,7 +148,17 @@ def module_doc(
                   dataurl_encoding='base64',
               ) + f' "{Mname} State Diagram")\n'
           )
-        full_docs.append(f'\n\n## Class `{classname_etc}`\n\n{obj_doc}')
+        if issubclass(obj, BaseCommand):
+          # extract the Usage: paragraph if present, append a full usage
+          doc_without_usage, usage_text = obj.extract_usage()
+          obj_doc += ''.join(
+              (
+                  doc_without_usage,
+                  "\n\nUsage summary:\n\n",
+                  indent("Usage: " + usage_text, "    "),
+              )
+          )
+        full_docs.append(doc_item(Mname, f'class {classname_etc}', obj_doc))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order
@@ -167,6 +214,7 @@ def module_doc(
         warning("UNHANDLED %r, neither function nor class", Mname)
   return ''.join(full_docs)
 
+# TODO: use inspect.getdoc() initially
 def obj_docstring(obj):
   ''' Return a docstring for `obj` which has been passed through `stripped_dedent`.
 

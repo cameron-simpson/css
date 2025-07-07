@@ -1,0 +1,3 @@
+lib/python/cs/naysync.py: cs.naysync: initial commit: @agen and @afunc decorators to wrap synchronous generators and functions for async use
+lib/python/cs/naysync.py: cs.naysync: set up DISTINFO
+lib/python/cs/naysync.py: cs.naysync: improve the module docstring

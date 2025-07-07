@@ -1,0 +1,2 @@
+lib/python/cs/lex.py: cs.app.tagger.rules: move Identifier, NumericValue, QuotedString to cs.lex
+lib/python/cs/lex.py: cs.lex: BaseToken: expose the parsing subclass selection as a `.token_classes class method

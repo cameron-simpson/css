@@ -8,7 +8,6 @@ import filecmp
 from functools import cached_property, partial
 import os
 from os.path import (
-    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -21,17 +20,19 @@ from os.path import (
     samefile,
 )
 from threading import RLock
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from icontract import require
 from typeguard import typechecked
 
-from cs.deco import cachedmethod, default_params, fmtdoc, promote
-from cs.fs import FSPathBasedSingleton, shortpath
-from cs.fstags import FSTags, TaggedPath, uses_fstags
-from cs.lex import FormatAsError, r, get_dotted_identifier
+from cs.cache import cachedmethod
+from cs.cmdutils import uses_cmd_options, vprint
+from cs.deco import default_params, fmtdoc, promote
+from cs.fs import findup, FSPathBasedSingleton, shortpath
+from cs.fstags import FSTags, uses_fstags
+from cs.lex import FormatAsError, get_dotted_identifier
 from cs.logutils import warning
-from cs.onttags import Ont, ONTTAGS_PATH_DEFAULT, ONTTAGS_PATH_ENVVAR
+from cs.onttags import Ont
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.queues import ListQueue
 from cs.seq import unrepeated
@@ -58,6 +59,7 @@ DISTINFO = {
         },
     },
     'install_requires': [
+        'cs.cache',
         'cs.deco',
         'cs.fs',
         'cs.fstags',
@@ -98,6 +100,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     ''' Initialise the `Tagger`.
 
         Parameters:
+        * `fspath`: the directory to which the `Tagger` will apply
         * `ont`: optional `cs.onttags.Ont`;
           an instance will be created if not supplied
     '''
@@ -124,11 +127,19 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     '''
     return fstags[self.fspath]
 
+  @property
+  def rcfile(self):
+    ''' The path to the `.taggerrc` file.
+    '''
+    return findup(self.fspath, self.TAGGERRC)
+
   @cached_property
   def rules(self):
     ''' The `Rule`s for this `Tagger` directory.
     '''
-    taggerrc = self.pathto(self.TAGGERRC)
+    taggerrc = self.rcfile
+    if taggerrc is None:
+      return ()
     with Pfx("%s.rules", self):
       try:
         with open(taggerrc) as f:
@@ -136,6 +147,7 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       except FileNotFoundError:
         return ()
 
+  @uses_cmd_options(hashname=None, modes=RULE_MODES, doit=None, force=False)
   @uses_fstags
   @require(lambda filename: filename and '/' not in filename)
   @typechecked
@@ -145,16 +157,16 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
       *,
       fstags: FSTags,
       hashname: str,
-      doit=False,
-      verbose=False,
-      modes=RULE_MODES,
+      doit: bool,
+      force: bool,
+      modes: Sequence[str],
   ) -> List[RuleResult]:
     ''' Process the local file `filename` according to the `Tagger` rules.
-        Return the list of `RuleResult`s for matches `Rule`s.
+        Return the list of `RuleResult`s for matched `Rule`s.
     '''
     fspath = self.pathto(filename)
     tagged = fstags[fspath]
-    # start with the format_tags of the file
+    # start the working TagSet with the format_tags of the file
     tags = tagged.format_tagset()
     matched_results = []
     printed_filename = False
@@ -166,32 +178,28 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
             hashname=hashname,
             modes=modes,
             doit=doit,
-            quiet=True,
+            force=force,
         )
         if not applied.matched:
           continue
         matched_results.append(applied)
-        if verbose:
-          if not printed_filename:
-            print(fspath)
-            printed_filename = True
+        if not printed_filename:
+          vprint(fspath)
+          printed_filename = True
         if applied.failed:
           warning("  failed:")
           for failure in applied.failed:
             warning("   %s", failure)
         for new_fspath in applied.filed_to:
-          if verbose:
-            print("  ->", shortpath(new_fspath))
+          vprint("  ->", shortpath(new_fspath))
         for tag_change in applied.tag_changes:
           match tag_change:
             case TagChange(add_remove=True) as change:
-              if verbose:
-                print("  +", change.tag)
+              vprint("  +", change.tag)
             case TagChange(add_remove=False) as change:
-              if verbose:
-                print("  -", change.tag)
+              vprint("  -", change.tag)
             case _:
-              warning("ignoring unsupported action {r(action)}")
+              warning(f'ignoring unsupported action {r(action)}')
         if rule.quick:
           break
     return matched_results
@@ -254,6 +262,8 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
     ''' Return a list of alternative values for `tag_name`
         derived from the ontology `self.ont`.
     '''
+    if not self.ont:
+      return []
     return list(self.ont.type_values(tag_name))
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
@@ -364,8 +374,9 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
         with Pfx("=> %s", shortpath(dstpath)):
           if existspath(dstpath):
             if samefile(origpath, dstpath):
-              warning("same file, already \"linked\"")
+              warning('same file, already "linked"')
               linked_to.append(dstpath)
+            # TODO: use hashindex for this
             elif filecmp.cmp(origpath, dstpath, shallow=False):
               warning("exists with same content")
               linked_to.append(dstpath)
@@ -373,17 +384,16 @@ class Tagger(FSPathBasedSingleton, HasThreadState):
             else:
               warning("already exists with different content, skipping")
               continue
+          elif no_link:
+            linked_to.append(dstpath)
           else:
-            if no_link:
-              linked_to.append(dstpath)
-            else:
-              if not isdirpath(dstdirpath):
-                pfx_mkdir(dstdirpath)
-              try:
-                pfx_link(origpath, dstpath)
-              except OSError as e:
-                warning("cannot link to %r: %s", dstpath, e)
-                continue
+            if not isdirpath(dstdirpath):
+              pfx_mkdir(dstdirpath)
+            try:
+              pfx_link(origpath, dstpath)
+            except OSError as e:
+              warning("cannot link to %r: %s", dstpath, e)
+              continue
           linked_to.append(dstpath)
           fstags[dstpath].update(tagged)
           if prune_inherited:

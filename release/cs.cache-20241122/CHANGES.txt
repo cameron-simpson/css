@@ -1,0 +1,4 @@
+lib/python/cs/cache.py: cs.cache: convof, ConvCache.convof: new options force=False parameter to bypass existing cache entries
+lib/python/cs/cache.py: cs.cache: consolidate imports
+lib/python/cs/cache.py: cs.cache: ConvCache.convof: check the conv_subpath using cs.fs.validate_rpath
+lib/python/cs/cache.py: cs.cache: ConvCache: add some type annotations; convof: make ext and force keyword only

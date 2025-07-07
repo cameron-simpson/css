@@ -8,7 +8,7 @@ weblocal        = $(HOME)/@/ezos/html/cs/css
 hg_repos        = sr.ht-css $${CSS_HG_REPOS}
 git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
-www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
+www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits
 www_github      = https://github.com/cameron-simpson/css
 title           = Cameron Simpson's Scripts
 
@@ -93,6 +93,7 @@ _help:
         @echo '_publish_hg        - publish to upstream repos'
         @echo '_release           - mark tip as new release'
         @echo '_remote            - rsync the Python tree to $$$(RSYNC_TARGET_PYTHON_ENVVAR)'
+        @echo '_synchome          - rsync the Python tree to $$HOME/lib/python/cs/'
         @echo '_tarball           - make a tarball of the tip'
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_test3             - do python 3 syntax checks and self tests'
@@ -105,7 +106,7 @@ _setup:
 _venv:
     set -uex \
     [ -d $(venv_dir) ] || { \
-        $(base_python) -m ensurepip \
+        : SKIP $(base_python) -m ensurepip \
         $(base_pip) install -U pip uv \
         $(uv) venv --python $(base_python) --seed $(venv_dir) \
     }
@@ -116,6 +117,9 @@ _venv:
     pip_reqs=$$TMPDIR/reqs-pip-$$$$.txt \
     if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
     then  $(trace) $(venv_pip) install -r "$$pip_reqs" \
+    fi
+    if [ -n "$${VENV_EXTRAS:-}" ] \
+    then  $(trace) $(uv) pip install -p '$(venv_python)' $$VENV_EXTRAS \
     fi
 
 _tags:  tags
@@ -205,6 +209,9 @@ _push:
 _remote:
         set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$$(RSYNC_TARGET_PYTHON_ENVVAR)/"
 
+_synchome:
+        set -uex; rsync -ia --include=*/ --include=*.py --exclude=* cs/ "$$HOME/lib/python/cs/"
+
 
 bin_suffixes = cs darwin
 
@@ -243,14 +250,14 @@ _publish_ezos:
 
 _publish_git:
         for repo in $(git_repos) \
-        do  pfx "$$repo" hg-gitup -a -f -x "$$repo" \
+        do  pfx "$$repo" set-x hg-gitup -a -f -x "$$repo" \
         done
-        @echo 'changes visible at $(www_bitbucket)'
+        @echo 'changes visible at $(www_bitbucket)/branch/'"$$(vcs branch)"
         @echo 'code visible at $(www_github)'
 
 _publish_hg:
         for repo in $(hg_repos) \
-        do  pfx "$$repo" hg push --new-branch -r tip "$$repo" & \
+        do  pfx "$$repo" set-x hg push --new-branch -r tip "$$repo" & \
         done \
         wait
         @echo 'changes visible at $(www_sr_ht)'

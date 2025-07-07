@@ -1,0 +1,2 @@
+model_batches_qs: accept a nonmapping for exclude= or filter= eg a Q() function.
+model_batches_qs: new optional only= parameter.

@@ -5,8 +5,8 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from getopt import GetoptError
 import platform
+from signal import SIGINT
 import sys
 import tkinter as tk
 
@@ -14,8 +14,10 @@ from icontract import require, ensure
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommandOptions
-from cs.context import stackattrs
+from cs.context import stackattrs, stack_signals
+from cs.deco import promote
 from cs.fs import shortpath, HasFSPath
+from cs.fstags import FSTags, uses_fstags
 from cs.gui_tk import (
     BaseTkCommand,
     _Widget,
@@ -23,16 +25,19 @@ from cs.gui_tk import (
     Canvas,
     EditValueWidget,
     Frame,
+    HasTaggedPathSet,
     ImageWidget,
     LabelFrame,
     PathList_Listbox,
     Scrollbar,
+    TaggedPathSetVar,
     ThumbNailScrubber,
 )
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.pfx import pfx, pfx_call, pfx_method
 from cs.resources import RunState, uses_runstate
 from cs.tagset import Tag, TagSet
+from cs.upd import run_task
 
 from . import Tagger, uses_tagger
 
@@ -43,42 +48,77 @@ def main(argv=None):
   '''
   return TaggerGUICommand(argv).run()
 
+@uses_runstate
+def run(tagger: Tagger, parent=None, *, runstate: RunState, **widget_kw):
+  ''' Create a `TaggerWidget` for `tagger` and run the GUI until
+      the runstate is cancelled.
+  '''
+  widget = trace(TaggerWidget)(
+      parent,
+      tagger=tagger,
+      fixed_size=(1024, 800),
+      **widget_kw,
+  )
+  widget.grid()
+
+  runstate.notify_cancel.add(lambda _: widget.after_idle(widget.quit))
+  with stack_signals(
+      SIGINT,
+      lambda signum, frame: runstate.cancel(),
+      additional=True,
+  ):
+    with run_task(f'{widget} mainloop'):
+      with runstate:
+        widget.lift()
+        widget.focus()
+        widget.mainloop()
+
 class TaggerGUICommand(BaseTkCommand):
+  ''' The "tagger gui" subcommand implementation.
+  '''
 
   @dataclass
-  class Options(BaseCommandOptions, HasFSPath):
+  class Options(BaseTkCommand.Options, HasFSPath):
     fspath: str = '.'
 
   @contextmanager
   def run_context(self):
-    options = self.options
-    with Tagger(options.fspath) as tagger:
-      with stackattrs(options, tagger=tagger):
-        yield
+    with super().run_context():
+      options = self.options
+      with Tagger(options.fspath) as tagger:
+        with stackattrs(options, tagger=tagger):
+          yield
 
   def main(self, argv):
+    ''' Create a `TaggerWidget` and run the GUI.
+    '''
     tagger = self.options.tagger
-    root = tk.Tk()
-    gui = TaggerWidget(root, tagger=tagger, fspaths=argv)
-    gui.mainloop()
+    runstate = self.options.runstate
+    run(tagger, runstate=runstate, paths=argv)
 
 # pylint: disable=too-many-ancestors,too-many-instance-attributes
-class TaggerWidget(_Widget, tk.Frame, HasFSPath):
-  ''' A `Frame` widget for a `Tagger`.
+class TaggerWidget(_Widget, tk.Frame, HasFSPath, HasTaggedPathSet):
+  ''' A `Frame` widget for tagging paths.
   '''
 
   WIDGET_FOREGROUND = None
 
+  @promote
   @uses_tagger
-  def __init__(self, parent, *, tagger, fspaths=None):
+  def __init__(
+      self,
+      parent,
+      *,
+      tagger: Tagger,
+      paths: TaggedPathSetVar = None,
+      **widget_kw,
+  ):
     self.app = None
-    super().__init__(parent)
-    self.grid()
-    if fspaths is None:
-      fspaths = []
     self.tagger = tagger
+    HasTaggedPathSet.__init__(self, paths=paths)
+    super().__init__(parent, **widget_kw)
     self._fspath = None
-    self._fspaths = fspaths
+    self.grid()
 
     # callback to define the widget's contents
     def select_path(_, path):
@@ -86,7 +126,7 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
 
     pathlist = self.pathlist = PathList_Listbox(
         self,
-        self.fspaths,
+        paths=self.pathsvar,
         command=select_path,
     )
     pathview = self.pathview = PathView(self, tagger=self.tagger)
@@ -102,7 +142,7 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
 
     thumbsview = self.thumbsview = ThumbNailScrubber(
         thumbscanvas,
-        self.fspaths,
+        paths=self.pathsvar,
         command=select_path,
     )
     thumbscanvas.create_window(
@@ -119,29 +159,8 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
     self.columnconfigure(2, weight=1)
     self.rowconfigure(0, weight=1)
 
-    # let the geometry settle
-    self.grid()
-    self.update_idletasks()
-
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
-
-  @property
-  def fspaths(self):
-    ''' The current list of filesystem paths.
-    '''
-    return self._fspaths
-
-  @fspaths.setter
-  def fspaths(self, new_fspaths):
-    ''' Update the current list of filesystem paths.
-    '''
-    self._fspaths = list(new_fspaths)
-    if self.pathlist is not None:
-      self.pathlist.set_fspaths(self._fspaths)
-    if self.thumbsview is not None:
-      self.thumbsview.set_fspaths(self._fspaths)
-      self.thumbscanvas.after_idle(self.thumbscanvas.scroll_bbox_x)
 
   @property
   def fspath(self):
@@ -151,6 +170,8 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
 
   @fspath.setter
   def fspath(self, new_fspath):
+    ''' Set the currently displayed filesystem path.
+    '''
     self._fspath = new_fspath
     if self.pathview is not None:
       # display new_fspath
@@ -162,75 +183,11 @@ class TaggerWidget(_Widget, tk.Frame, HasFSPath):
       # scroll to new_fspath
       self.thumbsview.show_fspath(new_fspath)
 
-  @contextmanager
-  def startup_shutdown(self):
-    ''' Startup/shutdown context manager.
+  def set(self, new_fspaths):
+    ''' Update the paths and scroll the thumbnail scrubber.
     '''
-    root = tk.Tk()
-    app = Frame(root)
-    app.grid()
-
-    # Define the window's contents
-    def select_path(_, path):
-      self.fspath = path
-
-    pathlist = PathList_Listbox(
-        app,
-        self.fspaths,
-        command=select_path,
-    )
-    pathlist.grid(column=0, row=0, sticky=tk.N + tk.S, rowspan=2)
-    pathview = PathView(app, tagger=self.tagger)
-    pathview.grid(column=1, row=0, sticky=tk.N + tk.S)
-
-    thumbscanvas = Canvas(app)
-    thumbscanvas.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
-
-    thumbsscroll = Scrollbar(
-        app,
-        orient=tk.HORIZONTAL,
-        command=thumbscanvas.xview,
-    )
-    thumbsscroll.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
-    thumbscanvas['xscrollcommand'] = thumbsscroll.set
-
-    # let the geometry settle
-    app.update_idletasks()
-
-    thumbsview = ThumbNailScrubber(
-        thumbscanvas,
-        (),
-        command=select_path,
-    )
-    thumbscanvas.create_window(
-        thumbsscroll.winfo_width() / 2, 0, anchor=tk.N, window=thumbsview
-    )
-
-    # attach widget references
-    with stackattrs(
-        self,
-        app=app,
-        pathlist=pathlist,
-        pathview=pathview,
-        thumbscanvas=thumbscanvas,
-        thumbsview=thumbsview,
-    ):
-      # set fspaths with side effects to widgets
-      with stackattrs(self, fspaths=self.fspaths):
-        # set current display with side effects to widgets
-        with stackattrs(self,
-                        fspath=self.fspaths[0] if self.fspaths else None):
-          yield app
-
-  @uses_runstate
-  def run(self, runstate: RunState):
-    ''' Run the GUI.
-    '''
-    print("run...")
-    with runstate:
-      print("before mainloop")
-      self.app.mainloop()
-      print("after mainloop")
+    super().set(new_fspaths)
+    self.thumbscanvas.after_idle(self.thumbscanvas.scroll_bbox_x)
 
 class TagValueStringVar(tk.StringVar):
   ''' A `StringVar` which holds a `Tag` value transcription.
@@ -253,19 +210,19 @@ class TagValueStringVar(tk.StringVar):
     ''' Return the value derived from the contents via `Tag.parse_value`.
         An attempt is made to cope with unparsed values.
     '''
-    s = super().get()
+    text = super().get()
     try:
-      value, offset = pfx_call(Tag.parse_value, s)
+      value, offset = pfx_call(Tag.parse_value, text)
     except ValueError as e:
       warning(str(e))
-      value = s
+      value = text
     else:
-      if offset < len(s):
-        warning("unparsed: %r", s[offset:])
+      if offset < len(text):
+        warning("unparsed: %r", text[offset:])
         if isinstance(value, str):
-          value += s[offset:]
+          value += text[offset:]
         else:
-          value = s
+          value = text
     return value
 
 # pylint: disable=too-many-ancestors
@@ -494,9 +451,9 @@ class PathView(LabelFrame):
   ''' A preview of a filesystem path.
   '''
 
-  def __init__(self, parent, fspath=None, *, tagger, **kw):
-    kw.setdefault('text', fspath or 'NONE')
-    super().__init__(parent, **kw)
+  def __init__(self, parent, fspath=None, *, tagger: Tagger, **labelframe_kw):
+    labelframe_kw.setdefault('text', fspath or 'NONE')
+    super().__init__(parent, **labelframe_kw)
     self._fspath = fspath
     self.tagger = tagger
     # path->set(suggested_tags)
@@ -560,12 +517,13 @@ class PathView(LabelFrame):
     return suggestions
 
   @property
-  def tagged(self):
+  @uses_fstags
+  def tagged(self, *, fstags: FSTags):
     ''' The `TaggedFile` for the currently displayed path.
     '''
     if self._fspath is None:
       return None
-    return self.tagger.fstags[self._fspath]
+    return fstags[self._fspath]
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

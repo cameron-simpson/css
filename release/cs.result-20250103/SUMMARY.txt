@@ -1,0 +1,1 @@
+New @not_cancelled decorator for methods to raise CancellationError is self.cancelled.

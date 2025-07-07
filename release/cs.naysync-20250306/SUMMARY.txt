@@ -1,0 +1,5 @@
+AsyncPipeLine.__call__: just return self.outq, use try/finally in submit.
+@agen: new optional `fast` parameter, plumbed to async_iter().
+amap: progressive async consume and dispatch, allowing yield of results as items come in - no longer waits for all items to be dispatched before yielding results.
+amap: new fast=False parameter to indicate that func does not block.
+Some small fixes.

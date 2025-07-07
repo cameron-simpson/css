@@ -14,7 +14,7 @@ anywhere in the code provided this module has been imported somewhere.
 
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
-* `breakpoint`: `cs.upd.breakpoint`
+* `abrk`: a decorator to call `breakpoint()` on an `AssertionError`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`
@@ -49,20 +49,26 @@ from types import SimpleNamespace as NS
 
 from cs.deco import ALL, decorator
 from cs.fs import shortpath
-from cs.lex import s, r, is_identifier, is_dotted_identifier  # pylint: disable=unused-import
+from cs.lex import (
+    cropped_repr,
+    s,
+    r,
+    is_identifier,
+    is_dotted_identifier,
+)  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
 from cs.py.func import funccite, funcname, func_a_kw_fmt
-from cs.py.stack import caller
+from cs.py.stack import caller, frames
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.threads import ThreadState
-from cs.upd import breakpoint, print  # pylint: disable=redefined-builtin
+from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20240630-post'
+__version__ = '20250325-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -87,10 +93,7 @@ DISTINFO = {
     ],
 }
 
-__all__ = [
-    'X', 'breakpoint', 'pformat', 'pprint', 'print', 'r', 'redirect_stdout',
-    's'
-]
+__all__ = ['X', 'pformat', 'pprint', 'print', 'r', 'redirect_stdout', 's']
 
 # environment variable specifying names to become built in
 CS_DEBUG_BUILTINS_ENVVAR = 'CS_DEBUG_BUILTINS'
@@ -192,6 +195,8 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
       Parameters:
       * `stack`: a stack list as returned by `traceback.extract_stack`.
         If missing or `None`, use the result of `traceback.extract_stack()`.
+        If `stack` has a `.tb_frame` or `.__traceback__` attribute,
+        extract the stack from that (this covers traceback objects and exceptions).
       * `limit`: a limit to the number of stack entries to dump.
         If missing or `None`, dump all entries.
       * `logger`: a `logger.Logger` ducktype or the name of a logger.
@@ -199,10 +204,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
       * `log_level`: the logging level for the dump.
         If missing or `None`, use `cs.logutils.loginfo.level`.
   '''
-  if stack is None:
-    stack = traceback.extract_stack()
-  if limit is not None:
-    stack = stack[:limit]
+  stack = frames(stack, limit=limit)
   if logger is None:
     logger = logging.getLogger()
   elif isinstance(logger, str):
@@ -611,6 +613,43 @@ def debug_object_shell(o, prompt=None):
 
 _trace_state = ThreadState(indent='')
 
+def log_via_print(msg, *a, file=None):
+  ''' Logging style message using `cs.upd.print`.
+  '''
+  if a:
+    msg = msg % a
+  if file is None:
+    file = sys.stdout
+  print(msg, file=file, flush=True)
+
+@ALL
+@decorator
+def abrk(func, exceptions=(AssertionError, NameError, RuntimeError)):
+  ''' A decorator to intercept certain exceptions
+      (by default `AssertionError`, `NameError`, `RuntimeError`)
+      and call `breakpoint()`.
+      The breakpoint frame contains:
+      - `func`: the wrapper function
+      - `func_a`, `func_kw`: the function positional and keyword arguments
+  '''
+
+  def cs_debug_abrk_wrapper(*func_a, **func_kw):
+    try:
+      return func(*func_a, **func_kw)
+    except exceptions as e:
+      warning(
+          "%s: %s\n  func = %s\n  func_a = %r\nfunc_kw = %r",
+          funccite(func),
+          e,
+          funccite(func),
+          func_a,
+          func_kw,
+      )
+      breakpoint()
+      raise
+
+  return cs_debug_abrk_wrapper
+
 @ALL
 @decorator
 # pylint: disable=too-many-arguments
@@ -620,8 +659,9 @@ def trace(
     retval=False,
     exception=True,
     use_pformat=False,
-    with_caller=False,
+    with_caller=True,
     with_pfx=False,
+    xlog=None,
 ):
   ''' Decorator to report the call and return of a function.
 
@@ -631,11 +671,12 @@ def trace(
       * `exception`: trace raised exceptions, default `True`
       * `use_pformat`: present the return value using
         `pformat` instead of `repr`, default `False`
-      * `with_caller`: include the caller if this function, default `False`
+      * `with_caller`: include the caller if this function, default `True`
       * `with_pfx`: include the current `Pfx` prefix, default `False`
   '''
 
   citation = funcname(func)  ## funccite(func)
+  fmtv = pformat if use_pformat else cropped_repr
 
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
@@ -651,13 +692,14 @@ def trace(
     else:
       xlog = X
     log_cite = citation
-    if with_caller:
-      log_cite = log_cite + "from[%s]" % (caller(),)
-    if call:
-      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL " + fmt, _trace_state.indent, *av)
     old_indent = _trace_state.indent
     _trace_state.indent += '  '
+    indent = _trace_state.indent
+    if call:
+      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
+      xlog("%sCALL   " + fmt, old_indent, *av)
+      if with_caller:
+        xlog("%sFROM %s", indent, caller(-4))
     start_time = time.time()
     try:
       result = func(*a, **kw)
@@ -666,91 +708,82 @@ def trace(
       if exception:
         xlog_kw = {}
         if xlog is X:
-          xlog_kw['colour'] = 'red'
+          xlog_kw['colour'] = 'white'  ## 'red'
         xlog(
-            "%sCALL %s %gs RAISE %r",
-            _trace_state.indent,
+            "%sRAISE  %s => %s:%s at %gs",
+            indent,
             log_cite,
-            end_time - start_time,
+            e.__class__.__name__,
             e,
+            end_time - start_time,
             **xlog_kw,
         )
       _trace_state.indent = old_indent
       raise
+    end_time = time.time()
+    if inspect.isgeneratorfunction(func):
+      iterator = result
+
+      def traced_generator():
+        while True:
+          next_time = time.time()
+          if call:
+            xlog(
+                "%sNEXT   %s at %gs",
+                old_indent,
+                log_cite,
+                next_time - start_time,
+            )
+          try:
+            item = next(iterator)
+          except StopIteration:
+            yield_time = time.time()
+            xlog(
+                "%sDONE   %s in %gs",
+                indent,
+                log_cite,
+                yield_time - next_time,
+            )
+            break
+          except Exception as e:
+            end_time = time.time()
+            if exception:
+              xlog_kw = {}
+              if xlog is X:
+                xlog_kw['colour'] = 'red'
+              xlog(
+                  "%sRAISE  %s => %s at %gs",
+                  indent,
+                  log_cite,
+                  e,
+                  end_time - start_time,
+                  **xlog_kw,
+              )
+            _trace_state.indent = old_indent
+            raise
+          else:
+            yield_time = time.time()
+            xlog(
+                "%sYIELD  %s => %s at %gs",
+                old_indent,
+                log_cite,
+                fmtv(item),
+                yield_time - next_time,
+            )
+            yield item
+
+      result = traced_generator()
     else:
-      end_time = time.time()
       if retval:
         xlog(
-            "%sCALL %s %gs RETURN %s",
-            _trace_state.indent,
+            "%sRETURN %s => %s in %gs",
+            indent,  ##_trace_state.indent,
             log_cite,
+            fmtv(result),
             end_time - start_time,
-            (pformat if use_pformat else repr)(result),
         )
-      if inspect.isgeneratorfunction(func):
-        iterator = result
-
-        def traced_generator():
-          while True:
-            next_time = time.time()
-            if call:
-              xlog(
-                  "%sNEXT %s %gs ...",
-                  _trace_state.indent,
-                  log_cite,
-                  next_time - start_time,
-              )
-            try:
-              item = next(iterator)
-            except StopIteration:
-              yield_time = time.time()
-              xlog(
-                  "%sDONE %s %gs ...",
-                  _trace_state.indent,
-                  log_cite,
-                  yield_time - next_time,
-              )
-              break
-            except Exception as e:
-              end_time = time.time()
-              if exception:
-                xlog_kw = {}
-                if xlog is X:
-                  xlog_kw['colour'] = 'red'
-                xlog(
-                    "%sCALL %s %gs RAISE %r",
-                    _trace_state.indent,
-                    log_cite,
-                    end_time - start_time,
-                    e,
-                    **xlog_kw,
-                )
-              _trace_state.indent = old_indent
-              raise
-            else:
-              yield_time = time.time()
-              xlog(
-                  "%sYIELD %gs %s <= %s",
-                  _trace_state.indent,
-                  yield_time - next_time,
-                  s(item),
-                  log_cite,
-              )
-              yield item
-
-        result = traced_generator()
-      else:
-        ##xlog("%sRETURN %s <= %s", _trace_state.indent, type(result), log_cite)
-        if retval:
-          xlog(
-              "%sRETURN %gs %s <= %s",
-              _trace_state.indent,
-              end_time - start_time,
-              s(result),
-              log_cite,
-          )
-      _trace_state.indent = old_indent
-      return result
+    _trace_state.indent = old_indent
+    return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
   traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
@@ -835,14 +868,14 @@ if builtin_names_s:
                          builtin_names_s.split(',')):
       if not builtin_name:
         continue
-      if builtin_name in ('breakpoint',):
-        # breakpoint doesn't work right if wrapped, gets the wrong frame
-        continue
       if builtin_name not in __all__:
         warning(
             "$%s: ignoring %r, not in cs.debug.__all__:%r",
             CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
         )
+        continue
+      if builtin_name in ('breakpoint',):
+        # breakpoint doesn't work right if wrapped, gets the wrong frame
         continue
       if not is_identifier(builtin_name):
         warning(

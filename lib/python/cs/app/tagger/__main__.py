@@ -6,37 +6,31 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-from getopt import GetoptError, getopt
+from getopt import GetoptError
 import json
 import os
 from os.path import (
     basename,
     dirname,
-    exists as existspath,
-    isabs as isabspath,
     isdir as isdirpath,
-    isfile as isfilepath,
     join as joinpath,
     realpath,
 )
 from pprint import pprint
-from stat import S_ISDIR, S_ISREG
 import sys
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions
-from cs.context import stackattrs
+from cs.cmdutils import BaseCommand, popopts
+from cs.context import contextif, stackattrs
 from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fs import HasFSPath
 from cs.fstags import FSTags, uses_fstags
-from cs.gui_tk import BaseTkCommand
 from cs.hashindex import HASHNAME_DEFAULT
 from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx, pfxprint, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
 from cs.resources import RunState, uses_runstate
-from cs.seq import unrepeated
 from cs.tagset import Tag
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
@@ -52,15 +46,6 @@ class TaggerCommand(BaseCommand):
   ''' Tagger command line implementation.
   '''
 
-  GETOPT_SPEC = 'd:nqv'
-
-  USAGE_FORMAT = '''Usage: {cmd} [-d dirpath] [-nqv] subcommand [subargs...]
-    -d dirpath  Specify the reference directory, default '.'.
-    -h hashname Specify the content hash algorithm name, default: {HASHNAME_DEFAULT}.
-    -n          No action, dry run.
-    -q          Quiet.
-    -v          Verbose.'''
-
   USAGE_KEYWORDS = {
       'HASHNAME_DEFAULT': HASHNAME_DEFAULT,
       'RULE_MODES': RULE_MODES,
@@ -71,21 +56,12 @@ class TaggerCommand(BaseCommand):
     fspath: str = '.'
     hashname: str = HASHNAME_DEFAULT
 
-  # pylint: disable=no-self-use
-  def apply_opt(self, opt, val):
-    options = self.options
-    if opt == '-d':
-      options.fspath = val
-    if opt == '-h':
-      options.hashname = val
-    elif opt == '-n':
-      options.dry_run = True
-    elif opt == '-q':
-      options.quiet = True
-    elif opt == '-v':
-      options.verbose = True
-    else:
-      raise NotImplementedError(f'unsupported option: {opt!r}')
+    # pylint: disable=use-dict-literal
+    COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+        d_=('fspath', "The reference directory, default '.'."),
+        h_=('hashname', 'The file content hash algorithm name.'),
+    )
 
   @contextmanager
   @uses_fstags
@@ -107,86 +83,51 @@ class TaggerCommand(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals
   @uses_runstate
+  @popopts(
+      _1='once',
+      d=(
+          'direct',
+          'Treat directory paths like files - file the directory, not its contents.'
+      ),
+      f='force',
+      M_=(
+          'modes',
+          ''' Only apply actions in modes, a comma separated list of modes
+              from {RULE_MODES!r}.
+          ''',
+      ),
+      r=('recurse', 'Recurse. Required to autofile a directory tree.'),
+      y=('doit', 'Yes: link files to destinations.'),
+  )
   def cmd_autofile(self, argv, *, runstate: RunState):
-    ''' Usage: {cmd} [-dnrx] paths...
+    ''' Usage: {cmd} [-dnry] paths...
           Link paths to destinations based on their tags.
-          -d    Treat directory paths like files - file the
-                directory, not its contents.
-                (TODO: we file by linking - this needs a rename.)
-          -h hashname
-                Specify the content hash algorithm name, default: {HASHNAME_DEFAULT}.
-          -M modes
-                Only apply actions in modes, a comma separated list of modes
-                from {RULE_MODES!r}.
-          -n    No action (default). Just print filing actions.
-          -r    Recurse. Required to autofile a directory tree.
-          -y    Link files to destinations.
     '''
-    options = self.options
-    options.direct = False
-    options.hashname = HASHNAME_DEFAULT
-    options.modes = ",".join(RULE_MODES)
-    options.once = False
-    options.recurse = False
-    options.popopts(
-        argv,
-        _1='once',
-        d='direct',
-        h='hashname',
-        n='dry_run',  # no action
-        M_=('modes', str),
-        r='recurse',
-        y='doit',  # inverse of -n
-        v='verbose',
-    )
     if not argv:
       raise GetoptError("missing paths")
-    doit = options.doit
-    direct = options.direct
-    hashname = options.hashname
-    modes = options.modes.split(',')
+    options = self.options
+    modes = options.modes
+    if modes is None:
+      modes = RULE_MODES
+    else:
+      modes = modes.split(',')
     if not all([mode in RULE_MODES for mode in modes]):
       raise GetoptError(f'invalid modes not in {RULE_MODES!r}: {modes!r}')
+    direct = options.direct
     once = options.once
     recurse = options.recurse
-    verbose = options.verbose
+    quiet = options.quiet
     taggers = set()
     ok = True
-    paths = []
-    for path in argv:
-      with Pfx(path):
-        try:
-          S = os.stat(path)
-        except OSError as e:
-          warning("cannot stat: %s", e)
-          ok = False
-          continue
-        if S_ISREG(S.st_mode):
-          paths.append(path)
-        elif S_ISDIR(S.st_mode):
-          if direct:
-            paths.append(path)
-          else:
-            paths.extend(
-                [
-                    joinpath(path, base)
-                    for base in sorted(pfx_call(os.listdir, path))
-                    if not base.startswith('.')
-                ]
-            )
-        else:
-          warning("unhandled file type ignored")
     xit = 0
     limit = 1 if once else None
-    q = ListQueue(paths, unique=realpath)
-    with run_task('autofile') as proxy:
+    q = ListQueue(argv, unique=realpath)
+    with contextif(not quiet, run_task, 'autofile') as proxy:
       for path in q:
         runstate.raiseif()
         with Pfx(path):
-          proxy.text = shortpath(path)
-          if not existspath(path):
-            continue
-          if isdirpath(path) and not direct:
+          if proxy: proxy.text = shortpath(path)
+          if not direct and isdirpath(path):
             if recurse:
               # queue children
               q.extend(
@@ -196,55 +137,37 @@ class TaggerCommand(BaseCommand):
                       if not base.startswith('.')
                   ]
               )
+            # do not autofile directories
             continue
-          if isfilepath(path) or (direct and isdirpath(path)):
-            tagger = Tagger(dirname(path))
-            taggers.add(tagger)  # remember for reuse
-            matches = tagger.process(
-                basename(path),
-                hashname=hashname,
-                modes=modes,
-                doit=doit,
-                verbose=verbose,
-            )
-            if matches:
-              for match in matches:
-                if match.filed_to:
-                  # process the filed paths ahead of the pending stuff
-                  # raise limit to process this file in the filed_to places
-                  q.prepend(match.filed_to)
-                  if limit is not None:
-                    limit += len(match.filed_to)
-              if limit is not None:
-                # now drop the limit by 1
-                limit -= 1
-                if limit < 1:
-                  # we're done
-                  break
-            continue
-          warning("not a regular file, skipping")
-          xit = 1
+          tagger = Tagger(dirname(path))
+          taggers.add(tagger)  # remember for reuse
+          matches = tagger.process(basename(path))
+          if matches:
+            for match in matches:
+              if match.filed_to:
+                # process the filed paths ahead of the pending stuff
+                # raise limit to process this file in the filed_to places
+                q.prepend(match.filed_to)
+                if limit is not None:
+                  limit += len(match.filed_to)
+            if limit is not None:
+              # now drop the limit by 1
+              limit -= 1
+              if limit < 1:
+                # we're done
+                break
           continue
     return xit
 
+  @popopts(f=('force', 'Force. Overwrite existing tags.'))
   def cmd_autotag(self, argv):
-    ''' Usage: {cmd} [-fn] paths...
+    ''' Usage: {cmd} paths...
           Apply the inference rules to each path.
-          -f  Force. Overwrite existing tags.
-          -n  No action. Recite inferred tags.
     '''
-    infer_mode = 'infill'
-    opts, argv = getopt(argv, 'fn')
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-f':
-          infill_mode = 'overwrite'
-        elif opt == '-n':
-          infill_mode = 'infer'
-        else:
-          raise NotImplementedError("unhandled option")
     if not argv:
       raise GetoptError("missing paths")
+    options = self.options
+    infer_mode = 'overwrite' if options.force else 'infill'
     for path in argv:
       with Pfx(path):
         print(path)
@@ -265,7 +188,7 @@ class TaggerCommand(BaseCommand):
     if argv:
       dirpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     if not isdirpath(dirpath):
       raise GetoptError("dirpath is not a directory: %r" % (dirpath,))
     tagger = self.tagger_for(dirpath)
@@ -283,8 +206,7 @@ class TaggerCommand(BaseCommand):
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
-          Derive an autofile mapping of tags to directory paths
-          from the directory paths suppplied.
+          Derive an autofile mapping of tags to directory paths.
     '''
     if not argv:
       raise GetoptError("missing dirpaths")
@@ -298,16 +220,18 @@ class TaggerCommand(BaseCommand):
     return 0
 
   def cmd_gui(self, argv):
-    ''' Usage: {cmd} paths...
+    ''' Usage: {cmd} [paths...]
           Run a GUI to tag paths.
+          Tag the contents of the current directory if paths are not supplied.
     '''
     if not argv:
-      raise GetoptError("missing paths")
+      argv = ['.']
     from .gui_tk import main as gui_main  # pylint: disable=import-outside-toplevel
     return gui_main([self.cmd, *argv])
 
   def cmd_ont(self, argv):
     ''' Usage: {cmd} type_name
+          Print ontology information about type_name.
     '''
     tagger = self.options.tagger
     if not argv:
@@ -315,7 +239,7 @@ class TaggerCommand(BaseCommand):
     type_name = argv.pop(0)
     with Pfx("type %r", type_name):
       if argv:
-        raise GetoptError("extra arguments: %r" % (argv,))
+        raise GetoptError(f'extra arguments: {argv!r}')
     print(type_name)
     for type_value in tagger.ont_values(type_name):
       ontkey = f"{type_name}.{type_value}"
@@ -343,7 +267,7 @@ class TaggerCommand(BaseCommand):
     if argv:
       dirpath = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     if not isdirpath(dirpath):
       raise GetoptError("not a directory: %r" % (dirpath,))
     tagger = Tagger(dirpath)
@@ -353,6 +277,24 @@ class TaggerCommand(BaseCommand):
             Tag(tag_name, tag_value),
             repr([shortpath(path) for path in paths])
         )
+
+  def cmd_show(self, argv):
+    ''' Usage: {cmd} rules
+          Show the filing rules.
+    '''
+    dirpath = '.'
+    if not argv:
+      argv = [
+          'rules',
+      ]
+    tagger = Tagger(dirpath)
+    rcfile = tagger.rcfile
+    if rcfile is None:
+      warning("no rcfile for %s", tagger)
+    else:
+      print(shortpath(rcfile))
+      for n, rule in enumerate(tagger.rules, 1):
+        print(n, rule)
 
   @uses_fstags
   def cmd_test(self, argv, *, fstags: FSTags):
@@ -365,7 +307,7 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing path")
     path = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     tagged = fstags[path]
     changed = True
     while True:
