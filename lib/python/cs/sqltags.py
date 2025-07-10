@@ -998,7 +998,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           session.add(self)
           session.flush()
         for tag in tags:
-          pv = SQLTagSet.to_polyvalue(tag.name, tag.value)
+          pv = SQLTagSet.to_polyvalue(tag.value)
           session.add(
               tags_table(
                   entity_id=self.id,
@@ -1254,7 +1254,7 @@ class SQLTagSet(SingletonMixin, TagSet):
         being the extended type,
         a function to convert an instance to `str`
         and a function to convert a `str` to an instance of this type
-      * `to_js_str`: a method accepting `(tag_name,tag_value)`
+      * `to_js_str`: a method accepting `(tag_value)`
         and returning `tag_value` as a `str`;
         the default implementation looks up the type of `tag_value`
         in `TYPE_JS_MAPPING` to locate the corresponding `to_str` function
@@ -1380,7 +1380,7 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   @classmethod
   @typechecked
-  def to_js_str(cls, tag_name: str, tag_value) -> str:
+  def to_js_str(cls, tag_value) -> str:
     ''' Convert `tag_value` to a `str` suitable for storage in `structure_value`.
         This can be reversed by `from_js_str`.
 
@@ -1390,8 +1390,7 @@ class SQLTagSet(SingletonMixin, TagSet):
         as described at the top of this class
         or (for unusual requirements) override this method and also `from_js_str`.
     '''
-    with Pfx("to_js_str(%r, %s:%r)", tag_name, type(tag_value).__name__,
-             tag_value):
+    with Pfx(f'to_js_str({r(tag_value)})'):
       for typelabel, (type_, to_str, from_str) in cls.TYPE_JS_MAPPING.items():
         assert ':' not in typelabel, f'bad typelabel {typelabel!r}: colons forbidden'
         if isinstance(tag_value, type_):
@@ -1401,7 +1400,7 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   @classmethod
   @typechecked
-  def from_js_str(cls, tag_name: str, js: str):
+  def from_js_str(cls, js: str):
     ''' Convert the `str` `js` to a `Tag` value.
         This is the reverse of `as_js_str`.
 
@@ -1478,7 +1477,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   @classmethod
   @ensure(lambda result: result.is_valid())
   @typechecked
-  def to_polyvalue(cls, tag_name: str, tag_value) -> PolyValue:
+  def to_polyvalue(cls, tag_value) -> PolyValue:
     ''' Normalise `Tag` values for storage via SQL.
         Preserve things directly expressable in JSON.
         Convert other values via `to_js_str`.
@@ -1497,7 +1496,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     if isinstance(tag_value, (list, tuple, dict, set)):
       return PolyValue(None, None, cls.jsonable(tag_value))
     # convert to a special string
-    return PolyValue(None, None, cls.to_js_str(tag_name, tag_value))
+    return PolyValue(None, None, cls.to_js_str(tag_value))
 
   # pylint: disable=arguments-differ
   @tag_or_tag_value
@@ -1513,7 +1512,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       else:
         super().set(tag_name, value, verbose=verbose)
         if not skip_db:
-          self.add_db_tag(tag_name, self.to_polyvalue(tag_name, value))
+          self.add_db_tag(tag_name, self.to_polyvalue(value))
 
   @pfx_method
   @typechecked
@@ -1539,7 +1538,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     else:
       super().discard(tag_name, value, verbose=verbose)
       if not skip_db:
-        self.discard_db_tag(tag_name, self.to_polyvalue(tag_name, value))
+        self.discard_db_tag(tag_name, self.to_polyvalue(value))
 
   @typechecked
   def discard_db_tag(self, tag_name: str, pv: Optional[PolyValue] = None):
