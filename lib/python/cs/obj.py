@@ -449,8 +449,8 @@ class SingletonMixin:
 
   @classmethod
   def singleton_also_by(cls, also_key, key):
-    ''' Obtain a singleton by a secondary key.
-        Return the instance or `None`.
+    ''' Obtain an existing singleton by a secondary key.
+        Return the instance or `None` if the key is unknown.
 
         Parameters:
         * `also_key`: the name of the secondary key index
