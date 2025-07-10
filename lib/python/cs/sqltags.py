@@ -46,7 +46,7 @@ import sys
 from subprocess import run
 from threading import RLock
 import time
-from typing import List, Mapping, Optional, Sequence
+from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
 from icontract import ensure, require
 from sqlalchemy import (
@@ -1688,6 +1688,39 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     else:
       sess.flush()
 
+  def db_create(self, **entity_values) -> int:
+    ''' Create a new database entity with the supplied `entity_values`
+        (which must be columns of the `entities` table).
+        Return the `id` of the new entity.
+    '''
+    entity_values.setdefault('unixtime', time.time())
+    with self.db_session() as session:
+      entity = self.orm.entities(**entity_values)
+      session.add(entity)
+      session.flush()
+    return entity.id
+
+  def make(self, index: Optional[Union[str, int]] = None) -> SQLTagSet:
+    ''' Return an instance for `index`, which may be a `int`
+        specifying the id or a `str` specifying the name, or omitted
+        for a new instance with no name.
+    '''
+    if index is None:
+      # make a new "log" entity - it has no name
+      index = self.db_create()
+      te = None
+    else:
+      # see if the index is known, and create an entry if not
+      te = self.get(index)
+      if te is None:
+        index = self.db_create(
+            **(dict(name=index) if isinstance(index, str) else dict(id=index))
+        )
+    if te is None:
+      te = self.get(index)
+    assert te is not None
+    return te
+
   @typechecked
   def default_factory(
       self,
@@ -1704,35 +1737,43 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     '''
     if tags is None:
       tags = ()
-    te = None if name is None else self.get(name)
-    if te is None:
-      # create the new SQLTagSet
-      if unixtime is None:
-        unixtime = time.time()
-      with self.db_session() as session:
-        entity = self.orm.entities(name=name, unixtime=unixtime)
-        session.add(entity)
-        session.flush()
-        te = self.get(entity.id)
-        assert te is not None
-        if tags:
-          entity.add_new_tags(tags, session=session)
-      # refresh entry from some source if there is a .refresh() method
-      if not skip_refresh:
-        refresh = getattr(type(te), 'refresh', None)
-        if refresh is not None and callable(refresh):
-          refresh(te)
-    else:
-      # update the existing SQLTagSet
-      if unixtime is not None:
-        te.unixtime = unixtime
+    te = self.make(name)
+    # refresh entry from some source if there is a .refresh() method
+    if not skip_refresh:
+      refresh = getattr(type(te), 'refresh', None)
+      if refresh is not None and callable(refresh):
+        refresh(te)
+    if tags:
       for tag in tags:
         te.set(tag.name, tag.value)
+    if unixtime is not None:
+      te.unixtime = unixtime
     return te
 
   # pylint: disable=arguments-differ
-  def get(self, index, default=None):
-    ''' Return an `SQLTagSet` matching `index`, or `default` if there is no such entity.
+  def get(
+      self,
+      index: Union[int | str | Tuple[str, Any] | Mapping[str, Any]],
+      default=None
+  ) -> Union[SQLTagSet, None]:
+    ''' Return the `SQLTagSet` matching `index`, or `default` if
+        there is no such entity.
+
+        If `index` is an `int`, consult
+        `self.TagSetClass.singleton_also_by('id', index)`
+        to return an existing instance if known,
+        otherwise we will search for `id==index`.
+
+        If `index` is s `str`, consult
+        `self.TagSetClass.singleton_also_by('name', index)`
+        to return an existing instance if known,
+        otherwise we will search for `name==index`.
+
+        If `index` is a 2-tuple of `(attr,value)`,
+        we will search for `attr==value`.
+
+        Otherwise `index` should be a mapping and we will search
+        for its key-value pairs.
     '''
     if isinstance(index, int):
       # a unique TagSet.id
@@ -1751,8 +1792,9 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       try:
         attr, value = index
       except (TypeError, ValueError) as e:
-        raise TypeError(f'unsupported index: {r(index)}')
-      tes = self.find(**{attr: value})
+        tes = self.find(**index)
+      else:
+        tes = self.find(**{attr: value})
     tes = list(tes)
     if not tes:
       return default
