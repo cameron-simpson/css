@@ -811,23 +811,13 @@ class PolyValueColumnMixin(PolyValued):
       This is used by the `Tags` and `TagMultiValues` relations inside `SQLTagsORM`.
   '''
 
-  float_value = Column(
-      Float,
-      nullable=True,
-      default=None,
-      index=True,
-      comment='tag value in numeric form'
+  float_value: Mapped[Optional[float]] = mapped_column(
+      comment="tag value in numeric form", index=True
   )
-  string_value = Column(
-      String,
-      nullable=True,
-      default=None,
-      index=True,
-      comment='tag value in string form'
+  string_value: Mapped[Optional[str]] = mapped_column(
+      comment="tag value in string form", index=True
   )
-  structured_value = Column(
-      JSON, nullable=True, default=None, comment='tag value in JSON form'
-  )
+  structured_value = mapped_column(JSON, comment="tag value in JSON form")
 
 # pylint: disable=too-many-instance-attributes
 class SQLTagsORM(ORM, UNIXTimeMixin):
