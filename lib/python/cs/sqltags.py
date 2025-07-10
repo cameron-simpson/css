@@ -2132,12 +2132,8 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           * tags: a column per Tag
     '''
     options = self.options
-<<<<<<< working copy
     runstate = options.runstate
     sqltags = options.sqltags
-=======
-    sqltags = self.sqltags
->>>>>>> merge rev
     export_format = 'csv'
     badopts = False
     opts, argv = getopt(argv, 'F:')
@@ -2346,8 +2342,8 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     xit = 0
     use_stdin = cmdline_headline == '-'
     sqltags = self.sqltags
-    for lineno, headline in enumerate((sys.stdin if use_stdin else
-                                       (cmdline_headline,))):
+    headlines = (sys.stdin if use_stdin else (cmdline_headline,))
+    for lineno, headline in enumerate(headlines):
       with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))):
         headline = headline.rstrip('\n')
         unixtime = None
