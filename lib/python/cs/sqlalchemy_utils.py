@@ -842,7 +842,7 @@ def RelationProxy(
         except IndexError as e:
           if missing is not None:
             return missing(self, field)
-          raise KeyError(r(field)) from e
+          raise KeyError(f'{field=}') from e
         self.refresh_from_db(db_row)
       return self.__fields[field]
 
