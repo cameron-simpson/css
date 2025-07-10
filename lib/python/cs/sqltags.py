@@ -1309,12 +1309,14 @@ class SQLTagSet(SingletonMixin, TagSet):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
+      # this is a new instance, populate it
       super().__init__(_id=_id, **kw)
       # pylint: disable=unexpected-keyword-arg
       self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=_sqltags)
       self._singleton_also_index()
     else:
-      assert pre_sqltags is _sqltags, f'pre_sqltags is not sqltags: {pre_sqltags} vs {_sqltags}'
+      assert pre_sqltags is _sqltags, \
+          f'{id(pre_sqltags)}:{pre_sqltags=} is not {id(_sqltags)}:{_sqltags=}'
 
   def __str__(self):
     return f'id={self.id!r}:{self.name}({super().__str__()})'
@@ -1501,6 +1503,8 @@ class SQLTagSet(SingletonMixin, TagSet):
   # pylint: disable=arguments-differ
   @tag_or_tag_value
   def set(self, tag_name, value, *, skip_db=False, verbose=None):
+    ''' Set a tag value.
+    '''
     if tag_name == 'id':
       raise ValueError(f'may not set pseudoTag {tag_name!r}')
     with self.db_session():
