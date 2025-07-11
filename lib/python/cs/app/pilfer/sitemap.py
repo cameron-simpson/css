@@ -333,10 +333,10 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
       self.url = url
     rsp = self.response = P.GET(url, stream=True, **rq_kw)
     # forget any cached derived values
-    self.clear('content', 'text', 'soup')
     self.request = rsp.request
     self.url = url
-    # TODO: find out if the requests.response has been decoded/uncompressed
+    trace(self._new_content, retval=True)()
+    # this should be the decoded content, eg ungzipped
     self.iterable_content = ClonedIterator(rsp.iter_content(chunk_size=None))
     return rsp
 
