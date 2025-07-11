@@ -547,8 +547,10 @@ else
       esac
       # make link tree, might fail if hard link limit reached for files
       $trace mkdir "$dst"
-      $trace rsync -a "--link-dest=$src" "$src/" "$dst/" \
-      || dorsync "$src/" "$dst/"
+      # hard link everything except the .fstags files
+      $trace rsync -a --exclude=.fstags "--link-dest=$src" "$src/" "$dst/" || :
+      # a normal sync to copy the .fstags files
+      dorsync "$src/" "$dst/"
     )
   }
 fi
