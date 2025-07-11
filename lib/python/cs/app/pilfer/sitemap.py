@@ -569,6 +569,8 @@ class SiteMap(Promotable):
         the decorator keyword arguments.
 
         The positional parameters have the following meaning:
+        - a string consisting entirely of uppercase letters;
+          this matches a method name
         - a string containing no slash character (`'/'`):
           a filename glob to match against the hostname
         - a string containing a slash:
@@ -608,7 +610,14 @@ class SiteMap(Promotable):
       with Pfx(f'pattern={r(pattern)}'):
         condition = None
         if isinstance(pattern, str):
-          if '/' in pattern:
+          if pattern.isupper():
+            # a method name
+            condition = lambda method_name: (
+                lambda flowstate: flowstate.method == method_name
+            )(
+                pattern
+            )
+          elif '/' in pattern:
             # a path match
             regexp = pfx_call(re.compile, pattern)
             if pattern.startswith('/'):
