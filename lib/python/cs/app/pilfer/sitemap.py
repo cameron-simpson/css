@@ -212,10 +212,10 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     ''' Promote a `Flow` to a `FlowState`.
     '''
     return cls(
+        url=flow.request.url,
         flow=flow,
         request=flow.request,
         response=flow.response,
-        url=flow.request.url,
     )
 
   def clear(self, *attrs):
