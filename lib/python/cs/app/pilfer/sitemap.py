@@ -388,6 +388,13 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     return text
 
   @cached_property
+  def json(self):
+    ''' A python object decoded from the response JSON payload, an
+        alias for `self.response.json`.
+    '''
+    return self.response.json()
+
+  @cached_property
   def soup(self):
     ''' A `BeautifulSoup` of `self.content` for `text/html`, otherwise `None`.
     '''
