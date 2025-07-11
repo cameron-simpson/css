@@ -246,6 +246,12 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     return URL(self.response.url)
 
   @cached_property
+  def method(self) -> str:
+    ''' The uppercase form of the request method.
+    '''
+    return self.request.method.upper()
+
+  @cached_property
   def content_type(self) -> str:
     ''' The base `Content-Type`, eg `'text/html'`.
     '''
