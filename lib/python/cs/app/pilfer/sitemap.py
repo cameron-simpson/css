@@ -374,8 +374,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   def set_content(self, content: bytes):
     ''' Set `self.content` and forget the `text` and `soup` attributes.
     '''
+    self._new_content()
     self.content = content
-    self.clear('iterable_content', 'text', 'soup')
 
   @cached_property
   def text(self) -> str:
