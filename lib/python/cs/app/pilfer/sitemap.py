@@ -306,6 +306,19 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
         if enc != 'identity'
     ]
 
+  def _new_content(self):
+    ''' Clear various properties derived from the content.
+    '''
+    self.clear(
+        'iterable_content',
+        'json',
+        'links',
+        'meta',
+        'opengraph_tags',
+        'soup',
+        'text',
+    )
+
   @uses_pilfer
   @promote(params=('url',))
   def GET(self, url: URL = None, *, P: "Pilfer", **rq_kw) -> requests.Response:
