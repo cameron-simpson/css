@@ -408,9 +408,9 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   def meta(self):
     ''' The meta information from this page's body head meta tags.
         Return an object with the following attriubutes:
-        - `.tags`: the `meta` tags with `name` attributes
-        - `.properties`: the `meta` tags with `property` attributes
         - `.http_equiv`: the `meta` tags with `http-equiv` attributes
+        - `.properties`: the `meta` tags with `property` attributes
+        - `.tags`: the `meta` tags with `name` attributes
     '''
     meta_tags = TagSet()
     meta_properties = TagSet()
@@ -468,6 +468,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   @cached_property
   def opengraph_tags(self) -> dict:
     ''' The open graph properties, see https://ogp.me/
+        Each key has the form `'opengraph.`*prop*`'`
+        for the OpenGraph property named `og:`*prop*.
     '''
     # I have seen these misplaced into the META tags,
     # so get those then overwrite from the properties.
@@ -568,7 +570,7 @@ class SiteMap(Promotable):
 
         The positional parameters have the following meaning:
         - a string containing no slash character (`'/'`):
-          a glob to match against the hostname
+          a filename glob to match against the hostname
         - a string containing a slash:
           a regular expression to apply against the URL path;
           a leading slash anchors the regexp against the start of the path
