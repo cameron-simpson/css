@@ -1957,7 +1957,6 @@ class TagSetCriterion(Promotable):
       offset += 1
     else:
       choice = True
-    criterion = None
     for crit_cls in cls.CRITERION_PARSE_CLASSES:
       parse_method = crit_cls.parse
       with Pfx("%s.from_str2(%r,offset=%d)", crit_cls.__name__, s, offset):
@@ -1969,7 +1968,7 @@ class TagSetCriterion(Promotable):
         else:
           criterion = crit_cls(s[offset0:offset], choice, **params)
           break
-    if criterion is None:
+    else:
       raise ValueError("no criterion parsed at offset %d" % (offset0,))
     return criterion, offset
 
