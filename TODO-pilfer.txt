@@ -1,3 +1,4 @@
+should the cache update the X-Cache and X-Cache-Hits headers? MISS/HIT, hit counts
 mitm export files to public locations?
 some kind of sitemap reload functionality?
 a hook after the SNI or CONNECT and before the requestheaders to pass the TLS stream straight through, eg for icloud
