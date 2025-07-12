@@ -747,10 +747,17 @@ class SiteMap(Promotable):
               )
           }
       )
-      # also set _ to the url.path, __ to hostname/path
+      # also set _ to the url.path, __ to hostname/path,
+      # method to the request method
       match.update(
+          # url relative path
           _=url.cleanrpath,
+          # hostname/path
           __=f'{url.hostname}/{url.cleanrpath}',
+          # rq method eg GET
+          method=flowstate.method,
+          # eg "tvdb" for thetvdb.com, for use with sqltags
+          tags_domain=cls.tags_domain,
       )
       for conjunction, tags_kw in conditions:
         with Pfx("match %r", conjunction):
