@@ -23,6 +23,7 @@ from cs.lex import (
     get_dotted_identifier,
     is_identifier,
     printt,
+    s,
     skipwhite,
 )
 import cs.logutils
@@ -30,6 +31,7 @@ from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
+from cs.sqltags import SQLTagSet
 from cs.tagset import TagSet
 from cs.urlutils import URL
 
@@ -441,15 +443,17 @@ class PilferCommand(BaseCommand):
               "\n".join(map(str, sorted(match_tags)))
           )
       )
-      if grokked is not None:
+      if grokked is None:
+        table.append(('    grokked =>', 'None'))
+      else:
+        if isinstance(grokked, SQLTagSet):
+          table.append(
+              ('    grokked =>', f'{grokked.sqltags}[{grokked.name}]')
+          )
+        else:
+          table.append(('    grokked =>', s(grokked)))
         for k, v in grokked.items():
-          try:
-            items = v.items()
-          except AttributeError:
-            table.append((f'    {k}', v))
-          else:
-            for i, (vk, vv) in enumerate(sorted(items)):
-              table.append([f'    {k}' if i == 0 else '', vk, vv])
+          table.append((f'      {k}', v))
     printt(*table)
 
   @popopts
