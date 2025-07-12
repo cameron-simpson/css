@@ -763,9 +763,11 @@ class SiteMap(Promotable):
         with Pfx("match %r", conjunction):
           for condition in conjunction:
             with Pfx("test %r", condition):
-              with Pfx("on_matches: test %r vs %s", method_name, condition):
+              with Pfx("on_matches: test %r vs %s", method_name,
+                       getattr(condition, '__name__',
+                               type(condition).__name__)):
                 try:
-                  test_result = condition(flowstate)
+                  test_result = condition(flowstate, match)
                 except Exception as e:
                   warning("exception in condition: %s", e)
                   # TODO: just fail? print a traceback if we do this
@@ -787,7 +789,10 @@ class SiteMap(Promotable):
             # no test failed, this is a match
             # update match with any format strings from @on
             for name, fmt in tags_kw.items():
-              match[name] = fmt.format_map(match)
+              if callable(fmt):
+                match[name] = fmt(flowstate, match)
+              else:
+                match[name] = fmt.format_map(match)
             yield method, match
 
   @pfx_method
