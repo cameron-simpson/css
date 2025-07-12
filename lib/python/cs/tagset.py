@@ -963,8 +963,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
       if name not in other:
         self.discard(name, verbose=verbose)
 
-  def update(self, other=None, *, prefix=None, verbose=None, **kw):
-    ''' Update this `TagSet` from `other`,
+  def update(self, other=None, *, prefix=None, verbose=None, **other_kw):
+    ''' Update this `TagSet` from `other` or `other_kw`,
         a dict of `{name:value}`
         or an iterable of `Tag`like or `(name,value)` things.
     '''
@@ -984,7 +984,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
         if prefix:
           name = prefix + '.' + name
         self.set(name, value, verbose=verbose)
-    for name, value in kw.items():
+    for name, value in other_kw.items():
       if prefix:
         name = prefix + '.' + name
       self.set(name, value, verbose=verbose)
