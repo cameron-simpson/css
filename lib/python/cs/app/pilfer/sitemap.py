@@ -557,6 +557,7 @@ class SiteMap(Promotable):
 
   @staticmethod
   @decorator
+  @typechecked
   def on(method, *patterns, **tags_kw):
     ''' A decorator for handler methods which specifies conditions
         which must match for this handler to be called.
@@ -580,11 +581,19 @@ class SiteMap(Promotable):
           a regular expression to apply against the URL path;
           a leading slash anchors the regexp against the start of the path
           otherwise it may match anywhere in the path
-        - a callable: a function accepting a `FlowState`;
+        - a callable: a function accepting a `FlowState` and the
+          current match `TagSet`;
           it may return `None` or `False` for no match,
           or `True` or a `Mapping[str,str]` for a match
         Note that to avoid confusing the decorator the first condition
         cannot be a callable. However, it's usually a domain glob anyway.
+
+        The keyword parameters specify `Tag`s to set on the match `TagSet`
+        if the conditions have matched. The parameter value may be:
+        - a callable: a function accepting a `FlowState` and the
+          current match `TagSet` which computes the tag value
+        - otherwise it should be a string which will be formatted
+          using `.format_map(match)`
 
         For example this decoration matches the URL hostname
         `docs.python.org` and the URL path
@@ -616,10 +625,11 @@ class SiteMap(Promotable):
           if pattern.isupper():
             # a method name
             condition = lambda method_name: (
-                lambda flowstate: flowstate.method == method_name
+                lambda flowstate, match: flowstate.method == method_name
             )(
                 pattern
             )
+            condition.__name__ = f'flowstate.method vs {pattern=}'
           elif '/' in pattern:
             # a path match
             regexp = pfx_call(re.compile, pattern)
@@ -627,37 +637,42 @@ class SiteMap(Promotable):
               # match at the start of the path
               condition = (
                   lambda regexp: (
-                      lambda flowstate:
+                      lambda flowstate, match:
                       (m := pfx_call(regexp.match, flowstate.url.path)
                        ) and m.groupdict()
                   )
               )(
                   regexp
               )
+              condition.__name__ = f'flowstate.url ~ ^{regexp=}'
             else:
               # match anywhere
               condition = (
                   lambda regexp: (
-                      lambda flowstate:
+                      lambda flowstate, match:
                       (m := pfx_call(regexp.search, flowstate.url.path)
                        ) and m.groupdict()
                   )
               )(
                   regexp
               )
+              condition.__name__ = f'flowstate.url.path ~ {regexp=}'
           else:
             # filename glob on the URL host
             # this indirection is to avoid the lambda pattern binding to the closure
             condition = (
                 lambda pattern: (
-                    lambda flowstate:
+                    lambda flowstate, match:
                     pfx_call(fnmatch, flowstate.url.hostname, pattern)
                 )
             )(
                 pattern
             )
+            condition.__name__ = f'flowstate.url.hostname fnmatch {pattern=}'
         elif callable(condition):
-          # it should be a callable accepting a FlowState
+          # it should be a callable accepting a FlowState and the match TagSet
+          # TODO: can it be inspected?
+          _: Callable[FlowState, TagSet] = condition
           pass
         else:
           raise RuntimeError
