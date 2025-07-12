@@ -2004,12 +2004,15 @@ class TagSetCriterion(Promotable):
       name = obj.name
       value = obj.value
     except AttributeError:
+      # test now, because we could mistake a 2-char string for a name,value :-(
+      if isinstance(obj, str):
+        return trace(super().promote)(obj)
       # see if we can extract a name,value pair
       try:
         name, value = obj
       except (TypeError, ValueError):
         # not a 2-tuple either, fall back to the superclass
-        return trace(super().promote)(obj)
+        return super().promote(obj)
       choice = True
     else:
       # we do, honour its .choice, otherwise assume True (select)
