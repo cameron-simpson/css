@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from inspect import isgeneratorfunction
 import os
+from pprint import pprint
 from signal import SIGINT
 import sys
 from threading import Thread
@@ -37,7 +38,7 @@ from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
-from cs.rfc2616 import content_encodings, content_length
+from cs.rfc2616 import content_encodings, content_length, content_type
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
@@ -375,7 +376,9 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       )
       flow.from_cache = True
 
-@attr(default_hooks=('requestheaders', 'responseheaders', 'response'))
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
 @uses_pilfer
 @typechecked
 def dump_flow(hook_name, flow, *, P: Pilfer = None):
@@ -418,6 +421,11 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
             ],
             indent="    ",
         )
+  if hook_name == 'request':
+    PR("  Request Content:", len(flow.request.content))
+    ct = content_type(flow.request.headers)
+    if ct and ct.content_type == 'application/json':
+      pprint(flow.request.json())
   if hook_name == 'responseheaders':
     print("  Response Headers:")
     printt(
@@ -425,7 +433,13 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
         indent="    ",
     )
   if hook_name == 'response':
-    PR("  Content:", len(flow.response.content))
+    PR("  Response Content:", len(flow.response.content))
+    flowstate = FlowState.from_Flow(flow)
+    if rq.method == "POST":
+      if flowstate.content_type == 'application/json':
+        pprint(flow.response.json)
+      else:
+        print(flow.response.content)
 
 @require(lambda flow: not flow.response.stream)
 @typechecked
