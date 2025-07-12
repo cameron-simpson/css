@@ -1990,8 +1990,7 @@ class TagSetCriterion(Promotable):
         * `(name,value)`: a 2 element sequence
           is equivalent to a positive equality `TagBasedTest`
     '''
-    tag_based_test_class = trace(getattr
-                                 )(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
+    tag_based_test_class = getattr(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
     if isinstance(obj, cls):
       # already suitable
       return obj
@@ -2006,7 +2005,7 @@ class TagSetCriterion(Promotable):
     except AttributeError:
       # test now, because we could mistake a 2-char string for a name,value :-(
       if isinstance(obj, str):
-        return trace(super().promote)(obj)
+        return super().promote(obj)
       # see if we can extract a name,value pair
       try:
         name, value = obj
