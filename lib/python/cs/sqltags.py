@@ -442,7 +442,7 @@ class SQTCriterion(TagSetCriterion):
     ''' Subclasses must return am `SQLParameters` instance
         parameterising the SQL queries that follow.
     '''
-    raise NotImplementedError("sql_parameters")
+    raise NotImplementedError
 
   @abstractmethod
   def match_tagged_entity(self, te: TagSet) -> bool:
@@ -451,7 +451,7 @@ class SQTCriterion(TagSetCriterion):
         cannot be sufficiently implemented in SQL.
         If `self.SQL_COMPLETE` it is not necessary to call this method.
     '''
-    raise NotImplementedError("sql_parameters")
+    raise NotImplementedError
 
   @staticmethod
   def from_equality(tag_name, tag_value):
