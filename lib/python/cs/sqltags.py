@@ -46,7 +46,7 @@ import sys
 from subprocess import run
 from threading import RLock
 import time
-from typing import List, Mapping, Optional, Sequence
+from typing import List, Iterable, Mapping, Optional, Sequence, Tuple
 from uuid import UUID
 
 from icontract import ensure, require
@@ -1328,7 +1328,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       assert pre_sqltags is _sqltags, f'pre_sqltags is not sqltags: {pre_sqltags} vs {_sqltags}'
 
   def __str__(self):
-    return f'id={self.id!r}:{self.name}({super().__str__()})'
+    return f'id={self.id!r}:{self.name} {super().__str__()}'
 
   def __hash__(self):
     return id(self)
@@ -1839,12 +1839,12 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         f'no {self.__class__.__name__}.__delitem__({r(index)})'
     )
 
-  def items(self, *, prefix=None):
+  def items(self, *, prefix=None) -> Iterable[Tuple[str, SQLTagSet]]:
     ''' Return an iterable of `(tagset_name,TagSet)`.
         Excludes unnamed `TagSet`s.
 
         Constrain the names to those starting with `prefix`
-        if not `None`.
+        if `prefix` is not `None`.
     '''
     return map(lambda te: (te.name, te), self.values(prefix=prefix))
 
