@@ -1107,7 +1107,8 @@ class SiteMap(Promotable):
     te = None
     te_key = self.entity_key(flowstate, **(match or {}))
     if te_key is None:
-      og_url = flowstate.meta.properties.get('og:url')
+      og = flowstate.opengraph_tags
+      og_url = og.get('opengraph.url')
       if og_url:
         te = P.sqltags['opengraph.url', og_url]
     else:
