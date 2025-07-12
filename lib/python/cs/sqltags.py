@@ -47,6 +47,7 @@ from subprocess import run
 from threading import RLock
 import time
 from typing import List, Mapping, Optional, Sequence
+from uuid import UUID
 
 from icontract import ensure, require
 from sqlalchemy import (
@@ -1294,6 +1295,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       'bigint': (int, str, int),  # for ints which do not round trip with float
       'date': (date, date.isoformat, date.fromisoformat),
       'datetime': (datetime, datetime.isoformat, datetime.fromisoformat),
+      'uuid': (UUID, str, UUID),
   }
 
   @staticmethod
