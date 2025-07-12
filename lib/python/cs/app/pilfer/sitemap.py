@@ -694,7 +694,7 @@ class SiteMap(Promotable):
       methodglob: str | None = None,
       **match_kw,
   ) -> Iterable[tuple[Callable, TagSet]]:
-    ''' A generator yielding `(method,matched)` 2-tuples for methods matched
+    ''' A generator yielding `(method,match)` 2-tuples for methods matched
         by `flowstate` and `match_kw`, being the matching method
         and a `TagSet` of values obtained during the match test.
 
@@ -707,12 +707,12 @@ class SiteMap(Promotable):
         conditions in the method's `.on_conditions` attribute, a
         list of conjunctions normally defined by applying the `@on`
         decorator to the method.
-        A `(method,matched)` 2-tuple is yielded for each matching conjunction.
+        A `(method,match)` 2-tuple is yielded for each matching conjunction.
 
         Note that this means the same methods may be yielded multiple
         times if different conjunctions match (eg multiple matching
         `@on` decorators); this is because each condition may provide
-        different `matched` match results.
+        different `match` match results.
     '''
     for method_name in dir(cls):
       if methodglob is not None and not fnmatch(method_name, methodglob):
@@ -726,8 +726,8 @@ class SiteMap(Promotable):
       except AttributeError:
         # no conditions, skip
         continue
-      # prepare the final match result
-      # start with the URL attributes
+      # Prepare the final match result.
+      # Start with the URL attributes.
       url = flowstate.url
       match = TagSet(
           {
@@ -794,7 +794,7 @@ class SiteMap(Promotable):
   ) -> Iterable[tuple[Callable, TagSet, Any]]:
     ''' Run all the methods in this `SiteMap` whose `.on_conditions`
         match `flowstate` and ``match_kw`, as matched by `SiteMap.on_matches`.
-        Yield `(method,match_tags,result)` 3-tuples from each method called.
+        Yield `(method,match,result)` 3-tuples from each method called.
 
         Parameters:
         * `flowstate`: the `FlowState` on which to match
@@ -802,8 +802,8 @@ class SiteMap(Promotable):
         * `methodglob`: an optional filename glob constraining the chosen method names
         * `match_kw`: the `on_match` keyword arguments which must match
 
-        Each `method` is called as `method(self,flowstate,match_tags)`
-        where `method` and `match_tags` were yielded from
+        Each `method` is called as `method(self,flowstate,match)`
+        where `method` and `match` were yielded from
         `on_matches(flowstate,**match_kw)`.
 
         If `flowattr` is not `None`, `getattr(flowstate,flowattr)`
@@ -811,22 +811,21 @@ class SiteMap(Promotable):
         method result is not `None` then the result is set as an
         updated value on `flowstate`.
     '''
-    for method, match_tags in self.on_matches(flowstate, methodglob,
-                                              **match_kw):
+    for method, match in self.on_matches(flowstate, methodglob, **match_kw):
       with Pfx("call %s", method.__qualname__):
         try:
           if flowattr is None:
-            result = method(self, flowstate, match_tags)
+            result = method(self, flowstate, match)
           else:
             attrvalue = pfx_call(getattr, flowstate, flowattr)
-            result = method(self, flowstate, match_tags, attrvalue)
+            result = method(self, flowstate, match, attrvalue)
         except Exception as e:
           warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
           raise
         else:
           if flowattr is not None and result is not None:
             pfx_call(setattr, flowstate, flowattr, result)
-          yield method, match_tags, result
+          yield method, match, result
 
   @pfx_method
   @promote
@@ -840,7 +839,7 @@ class SiteMap(Promotable):
         Usually this involves consulting the URL contents.
         This is a shim for `SiteMap.run_matches` calling any matching
         methods named `grok_*`.
-        Yield `(method,match_tags,result)` 3-tuples from each method called.
+        Yield `(method,match,result)` 3-tuples from each method called.
         Usually the `result` is a `TagSet`.
     '''
     if flowstate.response.status_code != 200:
@@ -1071,7 +1070,7 @@ class SiteMap(Promotable):
 
   @classmethod
   @promote
-  def entity_key(cls, flowstate: FlowState, **match_tags) -> str | None:
+  def entity_key(cls, flowstate: FlowState, **match) -> str | None:
     ''' Given a URL or `FlowState`, return the name of its primary `TagSet`.
         Return `None` if there is none.
     '''
@@ -1081,7 +1080,7 @@ class SiteMap(Promotable):
   def grok_default(
       self,
       flowstate: FlowState,
-      match_tags: Mapping[str, Any] | None = None,
+      match: Mapping[str, Any] | None = None,
       *,
       P: "Pilfer" = None,
   ) -> TagSet:
@@ -1094,7 +1093,7 @@ class SiteMap(Promotable):
     if P is None:
       P = default_Pilfer()
     te = None
-    te_key = self.entity_key(flowstate, **(match_tags or {}))
+    te_key = self.entity_key(flowstate, **(match or {}))
     if te_key is None:
       og_url = flowstate.meta.properties.get('og:url')
       if og_url:
@@ -1116,7 +1115,7 @@ class SiteMap(Promotable):
   def patch_soup_toolbar(
       self,
       flowstate: FlowState,
-      match_tags: Mapping[str, Any] | None = None,
+      match: Mapping[str, Any] | None = None,
       soup=None,
   ):
     # a list of tags for the toolbar
@@ -1189,8 +1188,8 @@ class DocSite(SiteMap):
       ),
       cache_key='{__}',
   )
-  def cache_key_docsite(self, flowstate: FlowState, match_tags: TagSet) -> str:
-    return match_tags['cache_key']
+  def cache_key_docsite(self, flowstate: FlowState, match: TagSet) -> str:
+    return match['cache_key']
 
 @dataclass
 class Wikipedia(SiteMap):
@@ -1232,7 +1231,5 @@ class DockerIO(SiteMap):
       r'/v2/.*/blobs/[^/]+:[^/]+$',
       cache_key='blobs/{__}',
   )
-  def cache_key_image_blob(
-      self, flowstate: FlowState, match_tags: TagSet
-  ) -> str:
-    return match_tags['cache_key']
+  def cache_key_image_blob(self, flowstate: FlowState, match: TagSet) -> str:
+    return match['cache_key']
