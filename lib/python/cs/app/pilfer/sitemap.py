@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 from cs.binary import bs
 from cs.deco import decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable
-from cs.lex import cutprefix, cutsuffix, get_nonwhite, r, skipwhite
+from cs.lex import cutprefix, cutsuffix, get_nonwhite, printt, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
@@ -29,6 +29,8 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag as BS4Tag
 from mitmproxy.flow import Flow
 import requests
+from typeguard import typechecked
+
 
 # The default HTML parser to use with BeautifulSoup.
 BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
@@ -673,7 +675,6 @@ class SiteMap(Promotable):
           # it should be a callable accepting a FlowState and the match TagSet
           # TODO: can it be inspected?
           _: Callable[FlowState, TagSet] = condition
-          pass
         else:
           raise RuntimeError
         assert condition is not None
