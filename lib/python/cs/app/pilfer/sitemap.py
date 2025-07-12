@@ -335,7 +335,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     # forget any cached derived values
     self.request = rsp.request
     self.url = url
-    trace(self._new_content, retval=True)()
+    self._new_content()
     # this should be the decoded content, eg ungzipped
     self.iterable_content = ClonedIterator(rsp.iter_content(chunk_size=None))
     return rsp
@@ -363,6 +363,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     return [flow.response.content]
 
   @cached_property
+  @typechecked
   def content(self) -> bytes:
     ''' The response content, concatenated as a single `bytes` instance
         from `self.iterable_content`.
@@ -371,6 +372,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     self.set_content(content)  # to clear the derived attributes
     return content
 
+  @typechecked
   def set_content(self, content: bytes):
     ''' Set `self.content` and forget the `text` and `soup` attributes.
     '''
@@ -454,7 +456,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     )
 
   @cached_property
-  def links(self):
+  def links(self) -> Mapping[str, list[str]]:
     ''' A `defaultdict(list)` mapping `link` `rel=` values a list of `link` tags.
     '''
     links_by_rel = defaultdict(list)
