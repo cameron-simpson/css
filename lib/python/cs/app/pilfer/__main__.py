@@ -602,6 +602,24 @@ class PilferCommand(BaseCommand):
       print(method, match_tags)
     print(flowstate.soup)
 
+  @popopts(p=('makedirs', 'Make required intermeditate directories.'))
+  def cmd_save(self, argv):
+    ''' Usage: {cmd} URL savepath
+          Save URL to the file savepath.
+    '''
+    try:
+      url_s, savepath = argv
+    except ValueError as e:
+      raise GetoptError(f'expected URL and savepath: {e}')
+    url = URL(url_s)
+    options = self.options
+    rsp = options.pilfer.save(url, savepath, makedirs=options.makedirs)
+    if options.verbose:
+      printt(
+          [f'GET {url.short} => {rsp.status_code}'],
+          *([f'  {hdr}', value] for hdr, value in rsp.headers.items()),
+      )
+
   def cmd_sitemap(self, argv):
     ''' Usage: {cmd} [sitemap|domain [URL...]]
           List or query the site maps from the config.
