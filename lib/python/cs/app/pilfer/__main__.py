@@ -123,7 +123,7 @@ class PilferCommand(BaseCommand):
             'Flags which must be true for operation to continue.',
             lambda s: s.replace(',', ' ').split(),
         ),
-        load_cookies='Load the browser cookie state into the Pilfer seesion.',
+        load_cookies='Load the browser cookie state into the Pilfer session.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
