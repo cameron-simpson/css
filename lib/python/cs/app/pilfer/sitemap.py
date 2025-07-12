@@ -968,11 +968,6 @@ class SiteMap(Promotable):
       return None
     return match.format_arg(extra=extra)
 
-  def default_cache_key(self, flowstate: FlowState, match: TagSet) -> str:
-    ''' Return the default `cache_key` from the `@on` match.
-    '''
-    return match['cache_key'].format_map(match)
-
   @uses_pilfer
   ##@typechecked # we don't import Pilfer (circular)
   def content_prefetch(
