@@ -776,9 +776,10 @@ def trace(
     else:
       if retval:
         xlog(
-            "%sRETURN %s => %s in %gs",
+            "%sRETURN %s => %s:%s in %gs",
             indent,  ##_trace_state.indent,
             log_cite,
+            result.__class__.__name__,
             fmtv(result),
             end_time - start_time,
         )
