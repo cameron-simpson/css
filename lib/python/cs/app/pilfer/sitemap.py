@@ -539,6 +539,7 @@ class SiteMap(Promotable):
   '''
 
   name: str
+  tags_domain: str = None
 
   URL_KEY_PATTERNS = ()
 
