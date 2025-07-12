@@ -142,7 +142,7 @@ class PilferSession(MultiOpenMixin, HasFSPath):
     self._session = None
 
   def __getattr__(self, attr):
-    # proxies unknown attributes to the internal requests.Session isntance
+    # proxies unknown attributes to the internal requests.Session instance
     return getattr(self._session, attr)
 
   @property
@@ -410,6 +410,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     if session is None:
       session = self.session
+    # a fresh headers mapping
     hdrs = self.headers()
     if headers is not None:
       hdrs.update(headers)
@@ -440,6 +441,26 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         This is a shim for `Pilfer.request`.
     '''
     return self.request(url, method='POST', **rq_kw)
+
+  @promote
+  def save(self, url: URL, savepath: str, *, makedirs=False, **get_rq_kw):
+    ''' Save `url` to the filesystem path `savepath`.
+        Return the `requests.Response` object.
+
+        If the optional `makedirs` parameter is true,
+        create the required intermediate directories if missing.
+        Other keyword parameters are passed to `Pilfer.GET`.
+    '''
+    savedir = dirname(savepath)
+    if makedirs and not isdirpath(savedir):
+      needdir(savedir, use_makedirs=True)
+    with atomic_filename(savepath, mode='wb') as T:
+      rsp = self.GET(url, stream=True)
+      if rsp.status_code != 200:
+        raise ValueError(f'GET {url.short} {rsp.status_code=} != 200')
+      for bs in rsp.iter_content(chunk_size=None):
+        T.write(bs)
+    return rsp
 
   @cached_property
   def rc_map(self) -> Mapping[str | None, Mapping[str, str]]:
