@@ -659,7 +659,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         alias = aliased(entities)
       entity_id_column = alias.id
       if tag_name == 'name':
-        if not isinstance(tag_value, str):
+        if tag_value is not None and not isinstance(tag_value, str):
           raise ValueError(
               f'name comparison requires a str, got {r(tag_value)}'
           )
