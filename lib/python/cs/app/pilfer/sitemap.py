@@ -1101,7 +1101,7 @@ class SiteMap(Promotable):
         on the page's primary entity.
         Returns the entity, a `TagSet`.
     '''
-    PR = lambda *a, **kw: print("grok_default:", flowstate.url, *a, **kw)
+    PR = lambda *a, **kw: print("grok_default", flowstate.url.short, *a, **kw)
     if P is None:
       P = default_Pilfer()
     te = None
