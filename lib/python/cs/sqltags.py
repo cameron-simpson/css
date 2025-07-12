@@ -63,7 +63,7 @@ from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, cli_datetime, popopts
+from cs.cmdutils import BaseCommand, cli_datetime, popopts, vprint
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
@@ -1515,11 +1515,12 @@ class SQLTagSet(SingletonMixin, TagSet):
   def set(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
       raise ValueError(f'may not set pseudoTag {tag_name!r}')
+    if not skip_db:
+      vprint(self.name or self.id, '+', Tag(tag_name, value))
     with self.db_session():
       if tag_name in ('name', 'unixtime'):
         setattr(self, '_' + tag_name, value)
         if not skip_db:
-          ifverbose(verbose, "+ %s", Tag(tag_name, value))
           setattr(self._get_db_entity(), tag_name, value)
       else:
         super().set(tag_name, value, verbose=verbose)
