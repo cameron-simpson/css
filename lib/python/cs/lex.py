@@ -34,7 +34,7 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
-from typing import Any, Iterable, Tuple, Union
+from typing import Any, Iterable, Mapping, Optional, Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
@@ -77,7 +77,7 @@ if sys.hexversion >= 0x030000:
   _hexify = hexify
 
   # pylint: disable=function-redefined
-  def hexify(bs):
+  def hexify(bs: bytes) -> str:
     ''' A flavour of `binascii.hexlify` returning a `str`.
     '''
     return _hexify(bs).decode()
@@ -85,7 +85,7 @@ if sys.hexversion >= 0x030000:
 ord_space = ord(' ')
 
 # pylint: disable=too-many-branches,redefined-outer-name
-def unctrl(s, tabsize=8):
+def unctrl(s: str, tabsize: int = 8) -> str:
   ''' Return the string `s` with `TAB`s expanded and control characters
       replaced with printable representations.
   '''
@@ -127,7 +127,7 @@ def unctrl(s, tabsize=8):
 
   return s2.expandtabs(tabsize)
 
-def lc_(value):
+def lc_(value: str) -> str:
   ''' Return `value.lower()`
       with `'-'` translated into `'_'` and `' '` translated into `'-'`.
 
@@ -138,7 +138,7 @@ def lc_(value):
   '''
   return value.lower().replace('-', '_').replace(' ', '-')
 
-def titleify_lc(value_lc):
+def titleify_lc(value_lc: str) -> str:
   ''' Translate `'-'` into `' '` and `'_'` translated into `'-'`,
       then titlecased.
 
@@ -146,7 +146,7 @@ def titleify_lc(value_lc):
   '''
   return value_lc.replace('-', ' ').replace('_', '-').title()
 
-def tabpadding(padlen, tabsize=8, offset=0):
+def tabpadding(padlen: int, tabsize: int = 8, offset: int = 0) -> str:
   ''' Compute some spaces to use a tab padding at an offfset.
   '''
   pad = ''
@@ -161,15 +161,20 @@ def tabpadding(padlen, tabsize=8, offset=0):
 
   return pad
 
-def typed_str(o, use_cls=False, use_repr=False, max_length=32):
-  ''' Return "type(o).__name__:str(o)" for some object `o`.
+def typed_str(
+    obj: Any,
+    use_cls: bool = False,
+    use_repr: bool = False,
+    max_length: int = 32,
+) -> str:
+  ''' Return "type(obj).__name__:str(obj)" for some object `obj`.
       This is available as both `typed_str` and `s`.
 
       Parameters:
       * `use_cls`: default `False`;
-        if true, use `str(type(o))` instead of `type(o).__name__`
+        if true, use `str(type(obj))` instead of `type(obj).__name__`
       * `use_repr`: default `False`;
-        if true, use `repr(o)` instead of `str(o)`
+        if true, use `repr(obj)` instead of `str(obj)`
 
       I use this a lot when debugging. Example:
 
@@ -178,31 +183,36 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
           X("foo = %s", s(foo))
   '''
   # pylint: disable=redefined-outer-name
-  o_s = cropped_repr(o) if use_repr else str(o)
+  o_s = cropped_repr(obj) if use_repr else str(obj)
   if max_length is not None:
     o_s = cropped(o_s, max_length)
-  s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
+  s = "%s:%s" % (type(obj) if use_cls else type(obj).__name__, o_s)
   return s
 
 # convenience alias
 s = typed_str
 
-def typed_repr(o, max_length=None, *, use_cls=False):
+def typed_repr(
+    obj: Any,
+    max_length: Optional[int] = None,
+    *,
+    use_cls: bool = False
+) -> str:
   ''' Like `typed_str` but using `repr` instead of `str`.
       This is available as both `typed_repr` and `r`.
   '''
-  return typed_str(o, use_cls=use_cls, max_length=max_length, use_repr=True)
+  return typed_str(obj, use_cls=use_cls, max_length=max_length, use_repr=True)
 
 # convenience alias
 r = typed_repr
 
-def strlist(ary, sep=", "):
+def strlist(ary: Iterable, sep: str = ", ") -> str:
   ''' Convert an iterable to strings and join with `sep` (default `', '`).
   '''
   return sep.join([str(a) for a in ary])
 
 # pylint: disable=redefined-outer-name
-def htmlify(s, nbsp=False):
+def htmlify(s: str, nbsp: bool = False) -> str:
   ''' Convert a string for safe transcription in HTML.
 
       Parameters:
@@ -217,20 +227,20 @@ def htmlify(s, nbsp=False):
     s = s.replace(" ", "&nbsp;")
   return s
 
-def htmlquote(s):
+def htmlquote(s: str) -> str:
   ''' Quote a string for use in HTML.
   '''
   s = htmlify(s)
   s = s.replace('"', "&dquot;")
   return '"' + s + '"'
 
-def jsquote(s):
+def jsquote(s: str) -> str:
   ''' Quote a string for use in JavaScript.
   '''
   s = s.replace('"', "&dquot;")
   return '"' + s + '"'
 
-def phpquote(s):
+def phpquote(s: str) -> str:
   ''' Quote a string for use in PHP code.
   '''
   return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
@@ -245,7 +255,12 @@ def phpquote(s):
 #
 _texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
-def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
+def texthexify(
+    bs: bytes,
+    shiftin: str = '[',
+    shiftout: str = ']',
+    whitelist: Optional[str] = None
+) -> str:
   ''' Transcribe the bytes `bs` to text using compact text runs for
       some common text values.
 
@@ -301,8 +316,9 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
         if offset - offset0 > inout_len:
           # gather up whitelist span if long enough to bother
           chunk = (
-              shiftin + ''.join(chr(bs[o])
-                                for o in range(offset0, offset)) + shiftout
+              shiftin +
+              ''.join(chr(bs[off])
+                      for off in range(offset0, offset)) + shiftout
           )
         else:
           # transcribe as hex anyway - too short
@@ -318,8 +334,8 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
       chunk = (
-          shiftin + ''.join(chr(bs[o])
-                            for o in range(offset0, offset)) + shiftout
+          shiftin + ''.join(chr(bs[off])
+                            for off in range(offset0, offset)) + shiftout
       )
     else:
       chunk = hexify(bs[offset0:offset])
@@ -327,7 +343,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   return ''.join(chunks)
 
 # pylint: disable=redefined-outer-name
-def untexthexify(s, shiftin='[', shiftout=']'):
+def untexthexify(s: str, shiftin: str = '[', shiftout: str = ']') -> str:
   ''' Decode a textual representation of binary data into binary data.
 
       This is the reverse of the `texthexify` function.
@@ -374,7 +390,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
   return b''.join(chunks)
 
 # pylint: disable=redefined-outer-name
-def get_chars(s, offset, gochars):
+def get_chars(s: str, offset: int, gochars: str) -> Tuple[str, int]:
   ''' Scan the string `s` for characters in `gochars` starting at `offset`.
       Return `(match,new_offset)`.
 
@@ -391,7 +407,7 @@ def get_chars(s, offset, gochars):
   return s[ooffset:offset], offset
 
 # pylint: disable=redefined-outer-name
-def get_white(s, offset=0):
+def get_white(s: str, offset: int) -> Tuple[str, int]:
   ''' Scan the string `s` for characters in `string.whitespace`
       starting at `offset` (default `0`).
       Return `(match,new_offset)`.
@@ -399,14 +415,14 @@ def get_white(s, offset=0):
   return get_chars(s, offset, whitespace)
 
 # pylint: disable=redefined-outer-name
-def skipwhite(s, offset=0):
+def skipwhite(s: str, offset: int) -> Tuple[str, int]:
   ''' Convenience routine for skipping past whitespace;
       returns the offset of the next nonwhitespace character.
   '''
   _, offset = get_white(s, offset=offset)
   return offset
 
-def indent(paragraph, line_indent="  "):
+def indent(paragraph: str, line_indent: str = "  ") -> str:
   ''' Return the `paragraph` indented by `line_indent` (default `"  "`).
   '''
   return "\n".join(
@@ -414,7 +430,9 @@ def indent(paragraph, line_indent="  "):
   )
 
 # TODO: add an optional detab=n parameter?
-def stripped_dedent(s, post_indent='', sub_indent=''):
+def stripped_dedent(
+    s: str, post_indent: str = '', sub_indent: str = ''
+) -> str:
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
@@ -470,7 +488,9 @@ def stripped_dedent(s, post_indent='', sub_indent=''):
   return indent(line1 + '\n' + adjusted, post_indent)
 
 @require(lambda offset: offset >= 0)
-def get_prefix_n(s, prefix, n=None, *, offset=0):
+def get_prefix_n(
+    s: str, prefix: str, n: Optional[int] = None, *, offset: int = 0
+) -> str:
   ''' Strip a leading `prefix` and numeric value `n` from the string `s`
       starting at `offset` (default `0`).
       Return the matched prefix, the numeric value and the new offset.
@@ -553,7 +573,12 @@ NUMERAL_NAMES = {
     },
 }
 
-def get_suffix_part(s, *, keywords=('part',), numeral_map=None):
+def get_suffix_part(
+    s: str,
+    *,
+    keywords: Iterable[str] = ('part',),
+    numeral_map: Optional[Mapping[str:int]] = None,
+) -> Union[Tuple[str, int], Tuple[None, None]]:
   ''' Strip a trailing "part N" suffix from the string `s`.
       Return the matched suffix and the number part number.
       Retrn `(None,None)` on no match.
@@ -601,7 +626,7 @@ def get_suffix_part(s, *, keywords=('part',), numeral_map=None):
   return m.group(0), part_n
 
 # pylint: disable=redefined-outer-name
-def get_nonwhite(s, offset=0):
+def get_nonwhite(s: str, offset: int) -> Tuple[str, int]:
   ''' Scan the string `s` for characters not in `string.whitespace`
       starting at `offset` (default `0`).
       Return `(match,new_offset)`.
@@ -609,14 +634,14 @@ def get_nonwhite(s, offset=0):
   return get_other_chars(s, offset=offset, stopchars=whitespace)
 
 # pylint: disable=redefined-outer-name
-def get_decimal(s, offset=0):
+def get_decimal(s: str, offset: int) -> Tuple[str, int]:
   ''' Scan the string `s` for decimal characters starting at `offset` (default `0`).
       Return `(dec_string,new_offset)`.
   '''
   return get_chars(s, offset, digits)
 
 # pylint: disable=redefined-outer-name
-def get_decimal_value(s, offset=0):
+def get_decimal_value(s: str, offset: int = 0) -> Tuple[str, int]:
   ''' Scan the string `s` for a decimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
@@ -626,14 +651,14 @@ def get_decimal_value(s, offset=0):
   return int(value_s), offset
 
 # pylint: disable=redefined-outer-name
-def get_hexadecimal(s, offset=0):
+def get_hexadecimal(s: str, offset: int = 0) -> Tuple[str, int]:
   ''' Scan the string `s` for hexadecimal characters starting at `offset` (default `0`).
       Return `(hex_string,new_offset)`.
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 # pylint: disable=redefined-outer-name
-def get_hexadecimal_value(s, offset=0):
+def get_hexadecimal_value(s: str, offset: int = 0) -> Tuple[str, int]:
   ''' Scan the string `s` for a hexadecimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
@@ -643,7 +668,7 @@ def get_hexadecimal_value(s, offset=0):
   return int('0x' + value_s), offset
 
 # pylint: disable=redefined-outer-name
-def get_decimal_or_float_value(s, offset=0):
+def get_decimal_or_float_value(s: int, offset: int = 0) -> Tuple[str, int]:
   ''' Fetch a decimal or basic float (nnn.nnn) value
       from the str `s` at `offset` (default `0`).
       Return `(value,new_offset)`.
@@ -657,8 +682,13 @@ def get_decimal_or_float_value(s, offset=0):
   return float('.'.join((int_part, sub_part))), offset
 
 def get_identifier(
-    s, offset=0, alpha=ascii_letters, number=digits, extras='_'
-):
+    s: str,
+    offset: int = 0,
+    *,
+    alpha: str = ascii_letters,
+    number: str = digits,
+    extras: str = '_',
+) -> Tuple[str, int]:
   ''' Scan the string `s` for an identifier (by default an ASCII
       letter or underscore followed by letters, digits or underscores)
       starting at `offset` (default 0).
@@ -686,15 +716,20 @@ def get_identifier(
   return ch + idtail, offset
 
 # pylint: disable=redefined-outer-name
-def is_identifier(s, offset=0, **kw):
+def is_identifier(s: str, offset: int = 0, **kw) -> bool:
   ''' Test if the string `s` is an identifier
       from position `offset` (default `0`) onward.
   '''
   s2, offset2 = get_identifier(s, offset=offset, **kw)
-  return s2 and offset2 == len(s)
+  return len(s2) > 0 and offset2 == len(s)
 
 # pylint: disable=redefined-outer-name
-def get_uc_identifier(s, offset=0, number=digits, extras='_'):
+def get_uc_identifier(
+    s: str,
+    offset: int = 0,
+    number: str = digits,
+    extras: str = '_',
+) -> Tuple[str, int]:
   ''' Scan the string `s` for an identifier as for `get_identifier`,
       but require the letters to be uppercase.
   '''
@@ -702,15 +737,15 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
       s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras
   )
 
-def is_uc_identifier(s, offset=0, **kw):
+def is_uc_identifier(s: str, offset: int = 0, **kw) -> bool:
   ''' Test if the string `s` is an uppercase identifier
       from position `offset` (default `0`) onward.
   '''
   s2, offset2 = get_uc_identifier(s, offset=offset, **kw)
-  return s2 and offset2 == len(s)
+  return len(s2) > 0 and offset2 == len(s)
 
 # pylint: disable=redefined-outer-name
-def get_dotted_identifier(s, offset=0, **kw):
+def get_dotted_identifier(s: str, offset: int = 0, **kw) -> Tuple[str, int]:
   ''' Scan the string `s` for a dotted identifier (by default an
       ASCII letter or underscore followed by letters, digits or
       underscores) with optional trailing dot and another dotted
@@ -734,14 +769,16 @@ def get_dotted_identifier(s, offset=0, **kw):
   return s[offset0:offset], offset
 
 # pylint: disable=redefined-outer-name
-def is_dotted_identifier(s, offset=0, **kw):
+def is_dotted_identifier(s: str, offset: int = 0, **kw) -> bool:
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
   s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
   return len(s2) > 0 and offset2 == len(s)
 
 # pylint: disable=redefined-outer-name
-def get_other_chars(s, offset=0, stopchars=None):
+def get_other_chars(s: str,
+                    offset: int = 0,
+                    stopchars: Optional[str] = None) -> Tuple[str, int]:
   ''' Scan the string `s` for characters not in `stopchars` starting
       at `offset` (default `0`).
       Return `(match,new_offset)`.
@@ -1260,43 +1297,43 @@ def cropped(
       s = s[:max_length - len(ellipsis)] + ellipsis
   return s
 
-def cropped_repr(o, roffset=1, max_length=32, inner_max_length=None):
-  ''' Compute a cropped `repr()` of `o`.
+def cropped_repr(obj, roffset=1, max_length=32, inner_max_length=None):
+  ''' Compute a cropped `repr()` of `obj`.
 
       Parameters:
-      * `o`: the object to represent
+      * `obj`: the object to represent
       * `max_length`: the maximum length of the representation, default `32`
       * `inner_max_length`: the maximum length of the representations
-        of members of `o`, default `max_length//2`
+        of members of `obj`, default `max_length//2`
       * `roffset`: the number of trailing characters to preserve, default `1`
   '''
   if inner_max_length is None:
     inner_max_length = max_length // 2
-  if isinstance(o, (tuple, list)):
-    left = '(' if isinstance(o, tuple) else '['
-    right = (',)' if len(o) == 1 else ')') if isinstance(o, tuple) else ']'
+  if isinstance(obj, (tuple, list)):
+    left = '(' if isinstance(obj, tuple) else '['
+    right = (',)' if len(obj) == 1 else ')') if isinstance(obj, tuple) else ']'
     o_repr = left + ','.join(
         map(
             lambda m:
-            cropped_repr(m, max_length=inner_max_length, roffset=roffset), o
+            cropped_repr(m, max_length=inner_max_length, roffset=roffset), obj
         )
     ) + right
-  elif isinstance(o, dict):
+  elif isinstance(obj, dict):
     o_repr = '{' + ','.join(
         map(
             lambda kv: cropped_repr(
                 kv[0], max_length=inner_max_length, roffset=roffset
             ) + ':' +
             cropped_repr(kv[1], max_length=inner_max_length, roffset=roffset),
-            o.items()
+            obj.items()
         )
     ) + '}'
   else:
-    o_repr = repr(o)
+    o_repr = repr(obj)
   return cropped(o_repr, max_length=max_length, roffset=roffset)
 
 # pylint: disable=redefined-outer-name
-def get_ini_clausename(s, offset=0):
+def get_ini_clausename(s: str, offset: int = 0) -> Tuple[str, int]:
   ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
       Return `(clausename,new_offset)`.
   '''
@@ -1314,7 +1351,7 @@ def get_ini_clausename(s, offset=0):
   return clausename, offset + 1
 
 # pylint: disable=redefined-outer-name
-def get_ini_clause_entryname(s, offset=0):
+def get_ini_clause_entryname(s: str, offset: int = 0) -> Tuple[str, str, int]:
   ''' Parse a `[`*clausename*`]`*entryname* string
       from `s` at `offset` (default `0`).
       Return `(clausename,entryname,new_offset)`.
@@ -1326,7 +1363,7 @@ def get_ini_clause_entryname(s, offset=0):
     raise ValueError("missing entryname identifier at position %d" % (offset,))
   return clausename, entryname, offset
 
-def camelcase(snakecased, first_letter_only=False):
+def camelcase(snakecased: str, first_letter_only: bool = False) -> str:
   ''' Convert a snake cased string `snakecased` into camel case.
 
       Parameters:
@@ -1359,7 +1396,7 @@ def camelcase(snakecased, first_letter_only=False):
     words[i] = word
   return ''.join(words)
 
-def snakecase(camelcased):
+def snakecase(camelcased: str) -> str:
   ''' Convert a camel cased string `camelcased` into snake case.
 
       Parameters:
@@ -1744,7 +1781,7 @@ class FormatableFormatter(Formatter):
 
   @staticmethod
   def get_arg_name(field_name):
-    ''' Default initial arg_name is an identifier.
+    ''' The default initial arg_name is an identifier.
 
         Returns `(prefix,offset)`, and `('',0)` if there is no arg_name.
     '''
