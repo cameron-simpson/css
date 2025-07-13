@@ -1685,7 +1685,7 @@ def has_format_attributes(cls, inherit=()):
       classes = (inherit,)
     else:
       classes = inherit
-    for superclass in classes:
+    for superclass in reversed(classes):
       try:
         super_attributes = superclass.get_format_attributes()
       except AttributeError:
