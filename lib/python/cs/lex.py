@@ -34,7 +34,7 @@ from string import (
 import sys
 from textwrap import dedent
 from threading import Lock
-from typing import Any, Iterable, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
@@ -1665,6 +1665,9 @@ def has_format_attributes(cls, inherit=()):
       and to include them in `cls.format_attributes()`.
 
       Methods are normally marked with the `@format_attribute` decorator.
+      The reason for the manual marking is to prevent methods with
+      side effects from being available for use in a (possibly externally
+      supplied) format string.
 
       If `inherit` is true the base format attributes will be
       obtained from other classes:
@@ -1979,8 +1982,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       cls._format_attributes = attributes = {}
     return attributes
 
-  def get_format_attribute(self, attr):
-    ''' Return a mapping of permitted methods to functions of an instance.
+  def get_format_attribute(self, attr: str) -> Mapping[str, Callable]:
+    ''' Return a mapping of permitted method names to functions of an instance.
         This is used to whitelist allowed `:`*name* method formats
         to prevent scenarios like little Bobby Tables calling `delete()`.
     '''
@@ -2015,7 +2018,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         being the converted value and the offset after the method name.
 
         Note that if there is not a leading identifier on `format_spec`
-        then `value` is returned unchanged with `offset=0`.
+        then this method returns `(value,0)`.
 
         The methods/attributes are looked up in the mapping
         returned by `.format_attributes()` which represents allowed methods
