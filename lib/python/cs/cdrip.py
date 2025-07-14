@@ -52,7 +52,7 @@ from cs.psutils import run
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate, RunStateMixin
 from cs.seq import unrepeated
-from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin
+from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin, FIND_OUTPUT_FORMAT_DEFAULT
 from cs.tagset import TagSet, TagsOntology
 from cs.upd import run_task, print
 
@@ -1027,22 +1027,11 @@ class MBSQLTags(SQLTags):
       skip_refresh = '.' not in name
     return super().default_factory(name, skip_refresh=skip_refresh, **kw)
 
-  @fmtdoc
-  def __init__(self, mbdb_path=None):
-    ''' Initialise the `MBSQLTags` instance,
-        computing the default `mbdb_path` if required.
-
-        `mbdb_path` is provided as `db_url` to the `SQLTags` superclass
-        initialiser.
-        If not specified it is obtained from the environment variable
-        {MBDB_PATH_ENVVAR}, falling back to `{MBDB_PATH_DEFAULT!r}`.
-    '''
-    if mbdb_path is None:
-      mbdb_path = os.environ.get(MBDB_PATH_ENVVAR)
-      if mbdb_path is None:
-        mbdb_path = expanduser(MBDB_PATH_DEFAULT)
-    super().__init__(db_url=mbdb_path)
-    self.mbdb_path = mbdb_path
+  @classmethod
+  def infer_db_url(cls):
+    return super().infer_db_url(
+        envvar=MBDB_PATH_ENVVAR, default_path=MBDB_PATH_DEFAULT
+    )
 
   @pfx_method
   def __getitem__(self, index):
@@ -1093,7 +1082,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     RunStateMixin.__init__(self)
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
-    sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
+    sqltags = self.sqltags = MBSQLTags(mbdb_path)
     sqltags.mbdb = self
     with sqltags:
       ont = self.ontology = TagsOntology(sqltags)

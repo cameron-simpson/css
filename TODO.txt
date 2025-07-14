@@ -1,3 +1,6 @@
+printt,tabulate: some kind of width support - tty width is easy, per column widths harder
+docmd: set rl_completer for the cmd_* commands
+cs.cmdutils: poparg(argv,int,"count") fails but poparg(argv,"count",int) succeeds
 @promote: handle async functions
 @decorator to preserve the iscoroutineness of the decorated function? And check it works via @OBSOLETE? suggestion by fixerror
 stack_dump does not work given an exception
