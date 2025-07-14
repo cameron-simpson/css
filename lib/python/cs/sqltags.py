@@ -2143,7 +2143,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
                       Default: {FIND_OUTPUT_FORMAT_DEFAULT}
     '''
     options = self.options
-    sqltags = self.sqltags
+    sqltags = options.sqltags
     badopts = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
     opts, argv = getopt(argv, 'o:')
