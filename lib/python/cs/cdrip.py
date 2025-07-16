@@ -24,6 +24,7 @@ from os.path import (
     isdir as isdirpath,
     join as joinpath,
 )
+from pprint import pprint
 from signal import SIGINT, SIGTERM
 import sys
 import time
@@ -168,12 +169,13 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       with fstags:
         with mbdb:
           mbdb_attrs = {}
-          try:
-            dev_info = pfx_call(discid.read, device=self.device_id)
-          except discid.disc.DiscError as e:
-            warning("no disc information: %s", e)
-          else:
-            mbdb_attrs.update(dev_info=dev_info)
+          if self.subcmd not in ('mbq',):
+            try:
+              dev_info = pfx_call(discid.read, device=self.device_id)
+            except discid.disc.DiscError as e:
+              warning("no disc information: %s", e)
+            else:
+              mbdb_attrs.update(dev_info=dev_info)
           with stackattrs(mbdb, **mbdb_attrs):
             with stackattrs(
                 options,
@@ -349,6 +351,24 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     if argv:
       raise GetoptError("extra arguments")
     return os.system('eject')
+
+  def cmd_mbq(self, argv):
+    ''' Usage: {cmd} type.id
+          Do a MusicBrainzNG API query, report the result.
+    '''
+    if not argv:
+      raise GetoptError('missing type:id')
+    type_and_id = argv.pop(0)
+    if argv:
+      raise GetoptError(
+          f'extra arguments after type:id {type_and_id!r}: {argv!r}'
+      )
+    mbdb = self.options.mbdb
+    qtype, qid = type_and_id.split('.', 1)
+    result = pfx_call(mbdb.query, qtype, qid)
+    pprint(result)
+    mbe = mbdb[f'{qtype}.{qid}']
+    mbdb.apply_dict(mbe, result)
 
   def cmd_probe(self, argv):
     ''' Usage: {cmd} [disc_id]
