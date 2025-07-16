@@ -322,7 +322,7 @@ class VTCmd(BaseCommand):
     ''' Set up and tear down the surrounding context.
     '''
     with super().run_context():
-      cmd = self.cmd
+      subcmd = self.subcmd
       options = self.options
       config = options.config
       show_progress = options.show_progress
@@ -339,8 +339,8 @@ class VTCmd(BaseCommand):
             # redo these because defaults is already initialised
             with stackattrs(run_modes, show_progress=show_progress):
               with fstags:
-                if cmd in ("config", "datadir", "dump", "help", "init",
-                           "profile", "scan"):
+                if subcmd in ("config", "datadir", "dump", "help", "init",
+                              "profile", "scan"):
                   yield
                 else:
                   # open the default Store
