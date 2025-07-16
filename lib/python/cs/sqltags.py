@@ -1846,7 +1846,14 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     tes = list(tes)
     if not tes:
       return default
-    te, = tes
+    try:
+      te, = tes
+    except ValueError as e:
+      warning("%s[%r]: %s: found %d", self, index, e, len(tes))
+      for te in tes:
+        # TODO: really this should  go to the same logger as the warning
+        printt([f'{te.id}:{te.name}'], *sorted(te.items()), file=sys.stderr)
+      te = tes[0]
     return te
 
   @locked
