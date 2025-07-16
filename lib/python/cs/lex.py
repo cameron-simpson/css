@@ -577,7 +577,7 @@ def get_suffix_part(
     s: str,
     *,
     keywords: Iterable[str] = ('part',),
-    numeral_map: Optional[Mapping[str:int]] = None,
+    numeral_map: Optional[Mapping[str, int]] = None,
 ) -> Union[Tuple[str, int], Tuple[None, None]]:
   ''' Strip a trailing "part N" suffix from the string `s`.
       Return the matched suffix and the number part number.
