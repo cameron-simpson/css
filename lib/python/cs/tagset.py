@@ -450,9 +450,75 @@ class _FormatStringTagProxy:
   def __getattr__(self, attr):
     return getattr(self.__proxied, attr)
 
+class TagSetTyping:
+  ''' A mixin to support `TagSet` types based on their `.name` attribute.
+      These see proper use in the `cs.sqltags.SQLTagSets` class where
+      dereferences of tag values to other `TagSet`s may be done.
+      This is used by the `TagSet` class and its subclasses.
+
+      The typing system for a `TagSet` is simple. We base the type
+      on the `.name` attribute which is expected to designate this
+      `TagSet` within some database uniquely, consisting of a dot
+      separated string which we consider to have 3 parts:
+      * the *zone*: the leftmost dotted component
+      * the *subname*: the dotted componented between the *zone* and the *key*
+      * the *key*: the rightmost dotted component
+
+      The *zone* represents the domain where these `TagSet` have meaning.
+      The *subname* represents a type within that domain; it may contain internal dots.
+      The *key* represents a key unique within the *subname* type space.
+
+      For example, a `TagSet` whose `.name` was `tvdb.series.1234` would have
+      the following properties from this mixin class:
+      * `.type_name`: `tvdb.series`
+      * `.type_subname`: `series`
+      * `.type_zone`: `tvdb`
+      * `.type_key`: `1234``
+  '''
+
+  @property
+  def type_name(self):
+    ''' The database-wide type name of this entity, `self.name` without the final dotted component.
+
+        For example, the `.type_name` of an entity named
+        `tvdb.series.1234` is `tvdb.series`.
+    '''
+    return self.name.rsplit('.', 1)[0]
+
+  @property
+  def type_key(self):
+    ''' The type key of this entity, the final dotted component of `self.name`.
+    '''
+    return self.name.rsplit('.', 1)[1]
+
+  @property
+  def type_zone(self):
+    ''' The type zone of this entity, `self.name`'s leftmost dotted component.
+
+        For example the `.type_zone` of an entity named `tvdb.series.1234` is `tvdb`.
+    '''
+    return self.name.split('.', 1)[0]
+
+  @property
+  def type_subname(self):
+    ''' The subtype name of this entity, `self.name` without the
+        first and final dotted components i.e. without the leading zone
+        and the trailing key.
+
+        For example the `.type_subtype` of an entity named `tvdb.series.1234` is `series`.
+    '''
+    print("self.type_name", self.type_name)
+    return self.type_name.split('.', 1)[1]
+
 @has_format_attributes
-class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin,
-             Promotable):
+class TagSet(
+    dict,
+    UNIXTimeMixin,
+    TagSetTyping,
+    FormatableMixin,
+    AttrableMappingMixin,
+    Promotable,
+):
   ''' A setlike class collection of `Tag`s.
 
       This actually subclasses `dict`, so a `TagSet` is a direct
