@@ -1384,6 +1384,7 @@ class BaseCommand:
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
+        subcmd = None
         try:
           main = self.main
         except AttributeError:
@@ -1393,11 +1394,7 @@ class BaseCommand:
         self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
-        subcmd = argv[0] if argv else None
-        if subcmd is not None and re.match(r'^[a-z][-_\w]*$', subcmd):
-          # looks like a subcommand name, take it
-          argv.pop(0)
-        else:
+        if not argv or not re.match(r'^[a-z][-_\w]*$', argv[0]):
           # not a command name, is there a default command?
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
@@ -1412,7 +1409,7 @@ class BaseCommand:
             if isinstance(default_argv, str):
               default_argv = [default_argv]
             argv = [*default_argv, *argv]
-          subcmd = argv.pop(0)
+        subcmd = argv.pop(0)
         try:
           subcommand = self.subcommand(subcmd)
         except KeyError:
@@ -1428,6 +1425,7 @@ class BaseCommand:
           with Pfx(subcmd):
             return subcommand(argv)
 
+        self.subcmd = subcmd
         self._argv = argv
         self._run = _run
     except GetoptError as e:
