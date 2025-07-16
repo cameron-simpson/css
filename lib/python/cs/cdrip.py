@@ -39,7 +39,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, stack_signals
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, Promotable
 from cs.excutils import unattributable
 from cs.ffmpegutils import convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
@@ -48,13 +48,14 @@ from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutsuffix, is_identifier, r
 from cs.logutils import error, warning, info, debug
 from cs.mappings import AttrableMapping
+from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.psutils import run
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate, RunStateMixin
 from cs.seq import unrepeated
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin, FIND_OUTPUT_FORMAT_DEFAULT
-from cs.tagset import TagSet, TagsOntology
+from cs.tagset import HasTags, TagSet, TagsOntology
 from cs.upd import run_task, print
 
 __version__ = '20201004-dev'
@@ -638,16 +639,39 @@ def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   return argv
 
 # pylint: disable=too-many-ancestors
-class _MBTagSet(SQLTagSet):
-  ''' An `SQLTagSet` subclass for MB entities.
+class _MBEntity(HasTags, Promotable):
+  ''' A `HasTags` subclass for MB entities.
+      All the state is proxied through the `.tags`, which is an `SQLTagSet`.
+      Instances are constructed via `MBDB.mbentity(SQLTagSet)`,
+      which also sets the `.mbdb` and `.tags_db` on the instance.
   '''
 
   MB_QUERY_PREFIX = 'musicbrainzngs.api.query.'
   MB_QUERY_RESULT_TAG_NAME = MB_QUERY_PREFIX + 'result'
   MB_QUERY_TIME_TAG_NAME = MB_QUERY_PREFIX + 'time'
 
+  def __init__(self, te: TagSet, mbdb: "MBDB"):
+    self.tags = te
+    self.mbdb = mbdb
+
+  @property
+  def tags_db(self):
+    ''' The `.tags_db` is `self.sqltags`.
+    '''
+    return self.mbdb.sqltags
+
+  @cached_property
+  def tags_entity_key(self):
+    ''' Our tags entity key, derived from `self.mbkey`.
+    '''
+    assert self.__class__.__name__.startswith('MB')
+    return f'mbdb.{self.__class__.__name__.removeprefix("MB").lower()}.{self.mbkey}'
+
+  def __str__(self):
+    return f'{self.__class__.__name__}:{self.tags.name}'
+
   def __repr__(self):
-    return "%s:%s:%r" % (type(self).__name__, self.name, self.as_dict())
+    return f'{self.__class__.__name__}:{self.tags}'
 
   @property
   def query_result(self):
@@ -673,43 +697,28 @@ class _MBTagSet(SQLTagSet):
       )
     return super().dump(keys=keys, **kw)
 
-  @property
-  def mbdb(self):
-    ''' The associated `MBDB`.
-    '''
-    return self.sqltags.mbdb
-
   def refresh(self, **kw):
     ''' Refresh the MBDB entry for this `TagSet`.
     '''
     return self.mbdb.refresh(self, **kw)
 
   @property
-  def mbtype(self):
-    ''' The MusicBrainz type (usually a UUID or discid).
-        Returns `None` for noncompound names.
+  def mbkey(self):
+    ''' The MusicBrainz id, typically a UUID or discid.
     '''
-    try:
-      type_name, _ = self.name.split('.', 1)
-    except ValueError:
-      return None
-    return type_name
+    return self.tags.type_key
 
   @property
-  def mbkey(self):
-    ''' The MusicBrainz key (usually a UUID or discid).
+  def mbtype(self):
+    ''' The MusicBrainz type, eg "release".
     '''
-    with Pfx("%s.mbkey: split(.,1)", self.name):
-      _, mbid = self.name.split('.', 1)
-    return mbid
+    return self.tags.type_subname
 
   @property
   def mbtime(self):
     ''' The timestamp of the most recent .refresh() API call, or `None`.
     '''
-    if self.MB_QUERY_TIME_TAG_NAME not in self:
-      return None
-    return self[self.MB_QUERY_TIME_TAG_NAME]
+    return self.tags.get(self.MB_QUERY_TIME_TAG_NAME)
 
   @property
   def ontology(self):
@@ -723,7 +732,7 @@ class _MBTagSet(SQLTagSet):
       self,
       type_name: str,
       id: Union[str, dict],  # pylint: disable=redefined-builtin
-  ) -> '_MBTagSet':
+  ) -> '_MBEntity':
     ''' Fetch the object `{type_name}.{id}`.
     '''
     if type_name == 'disc':
@@ -735,13 +744,36 @@ class _MBTagSet(SQLTagSet):
         raise RuntimeError("type_name=%r, id=%r is UUID" % (type_name, id))
     if isinstance(id, dict):
       id = id["id"]
-    te_name = f"{type_name}.{id}"
-    te = self.sqltags[te_name]
-    return te
+    te = self.sqltags[f'mbdb.{type_name}.{id}']
+    return _MBEntity.promote(te)
 
-class MBArtist(_MBTagSet):
+  @classmethod
+  def promote(cls, obj, *init_a, **init_kw):
+    ''' Promote `obj` to an instance of `cls`.
+
+        Typically `obj` will be an `SQLTagSet` from the `MBDB`.
+        If a subclass of `cls` has a `.TYPE_SUBNAME` equal to
+        `obj.type_subname` then that subclass will be used to make
+        the new instance. Otherwise `cls` will be used.
+        In this way an `mbdb.artist.*` tagset will be promoted to
+        an `MBArtist` and so forth.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, TagSet):
+      type_subname = obj.type_subname
+      for subclass in public_subclasses(cls):
+        if subclass.TYPE_SUBNAME == type_subname:
+          return subclass(obj, *init_a, **init_kw)
+      # return the generic version
+      return cls(obj, *init_a, **init_kw)
+    return super().promote(obj, *init_a, **init_kw)
+
+class MBArtist(_MBEntity):
   ''' A Musicbrainz artist entry.
   '''
+
+  TYPE_SUBNAME = 'artist'
 
 class MBHasArtistsMixin:
   ''' A mixin for `_MBTagSet`s with artists.
