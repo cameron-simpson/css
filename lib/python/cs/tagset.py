@@ -2684,6 +2684,63 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
+class HasTags:
+  ''' A mixin for classes which have a `.tags:TagSet` attribute.
+
+      The subclass may itself define its `.tags` instance attribute
+      or rely on the default property `.tags`, which will return
+      `self.tags_db[self.tags_entity_key]`.
+  '''
+
+  @cached_property
+  def tags(self):
+    ''' A default `.tags` property which obtains a `TagSet` from `self.tags_db`
+        via using the `TagSet` name `self.tags_entity_key`.
+    '''
+    return self.tags_db[self.tags_entity_key]
+
+  def __getattr__(self, tag_name: str):
+    ''' Convenience attributes which go via the `.tags`.
+        A missing tag raises an `AttributeError`.
+    '''
+    try:
+      return self.tags[tag_name]
+    except KeyError:
+      breakpoint()
+      raise AttributeError(f'{self.__class__.__name__}.{tag_name=}')
+
+  def __getitem__(self, tag_name: str):
+    ''' Index `self.tags`.
+    '''
+    return self.tags[tag_name]
+
+  def __setitem__(self, tag_name, value):
+    ''' Set a tag value.
+    '''
+    self.tags[tag_name] = value
+
+  def get(self, tag_name: str, default=None):
+    ''' Call `.tags.get(tag_name)`.
+    '''
+    return self.tags.get(tag_name, default)
+
+  def keys(self):
+    return self.tags.keys()
+
+  def values(self):
+    return self.tags.values()
+
+  def items(self):
+    return self.tags.items()
+
+  def deref(self, tag_name, attr=None, *, subtype=None):
+    ''' Call `.tags.deref(....)`.
+
+        *Note*: this calls `self.tags.deref()` and so returns
+        `TagSet`s in some form, not instances of `type(self)`.
+    '''
+    return self.tags.deref(tag_name, attr=attr, subtype=subtype)
+
 class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
   ''' A wrapper for a `TagSets` instance backing an ontology.
 
