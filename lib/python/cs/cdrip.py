@@ -648,7 +648,7 @@ class _MBEntity(HasTags, Promotable):
       except KeyError as e:
         raise AttributeError(f'no {self.MB_QUERY_RESULT_TAG_NAME}: {e}') from e
     typename, db_id = self.name.split('.', 1)
-    self.sqltags.mbdb.apply_dict(typename, db_id, mb_result, seen=set())
+    self.mbdb.apply_dict(self, mb_result)
     return mb_result
 
   def dump(self, keys=None, **kw):
@@ -1057,7 +1057,8 @@ class MBSQLTags(SQLTags):
 
   @pfx_method
   def __getitem__(self, index):
-    assert not index.startswith('releases.')
+    assert index.startswith('mbdb.')
+    assert not index.startswith('mbdb.releases.')
     if isinstance(index, str) and index.startswith('disc.'):
       discid = index[5:]
       try:
@@ -1072,7 +1073,7 @@ class MBSQLTags(SQLTags):
     return super().__getitem__(index)
 
 class MBDB(MultiOpenMixin, RunStateMixin):
-  ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
+  ''' An interface to MusicBrainz with a local `SQLTags` cache.
   '''
 
   # Mapping of Tag names whose type is not themselves.
@@ -1125,18 +1126,40 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     with self.sqltags:
       yield
 
-  def find(self, criteria):
+  def mbentity(self, te: TagSet) -> _MBEntity:
+    ''' Promote `te` to a suitable `_MBEntity` subclass instance,
+        set its `.mbdb` and `.tags_db`, and return.
+    '''
+    mbe = _MBEntity.promote(te, self)
+    mbe.mbdb = self
+    return mbe
+
+  def find(self, criteria) -> List[_MBEntity]:
     ''' Find entities in the cache database.
     '''
-    return self.sqltags.find(criteria)
+    return list(map(self.mbentity, self.sqltags.find(criteria)))
 
   def __getitem__(self, index) -> _MBEntity:
     ''' Fetch an `_MBEntity` from an `(mbtype,mbkey)` 2-tuple.
     '''
-    te = self.sqltags[index]
-    if '.' in te.name:
-      te.refresh()
-    return te
+    with Pfx("mbdb[%s]", r(index)):
+      assert isinstance(index, tuple)
+      mbtype, key = index
+      assert '.' not in mbtype
+      tetype = mbtype.replace('-', '_')
+      # UUIDs do not contain . or +
+      # discids may contain . and should not contain +
+      # the sqltags type_key part should not contain a .
+      # so we replace . with +
+      # discid stuff:
+      # https://github.com/metabrainz/libdiscid/blob/192edd70f17661f1a13ac3b349a2a2d96f5f0351/src/base64.c#L85
+      # this is amazingly ill specified AFAICT
+      assert '+' not in key
+      tekey = key.replace('.', '+')
+      te = self.sqltags[f'mbdb.{tetype}.{tekey}']
+      mbe = self.mbentity(te)
+      ##mbe.refresh()
+      return mbe
 
   # pylint: disable=too-many-arguments
   @pfx_method
@@ -1244,91 +1267,92 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       del te[te.MB_QUERY_TIME_TAG_NAME]
 
   # pylint: disable=too-many-branches,too-many-statements
-  @require(lambda te0: '.' in te0.name)
+  @require(lambda mbe: '.' in mbe.tags.name)
   @typechecked
   def refresh(
       self,
       mbe: _MBEntity,
       refetch: bool = True,  ##False,
       recurse: Union[bool, int] = False,
-      no_apply=None,
+      no_apply=False,
   ) -> dict:
-    ''' Query MusicBrainz about the entity `te`, fill recursively.
-        Return the query result of `te`.
+    ''' Query MusicBrainz about the entity `mbe`, fill recursively.
+        Return the query result of `mbe`.
+
+        Parameters:
+        * `mbe`: the MuscBrainzNG entity to refresh
+        * `refetch`: query MuscBrainzNG even if not stale
+        * `recurse`: limit recursive refresh of related entities;
+          if `True`, refresh all related entities,
+          if `False`, refresh no related entities,
+          if an `int`, refresh up to this many related entities
+        * `no_apply`: if true (default `False`) do not apply query results to the database
     '''
-    with run_task("refresh %s" % te0.name) as proxy:
-      q = ListQueue([te0])
-      for te in unrepeated(q, signature=lambda te: te.name):
-        with Pfx("refresh te=%s", te.name):
+    mbe0 = mbe
+    with run_task("refresh %s" % mbe0.name) as proxy:
+      q = ListQueue([mbe0])
+      for mbe in unrepeated(q, signature=lambda mbe: mbe.name):
+        with Pfx("refresh mbe %r", mbe.name):
           if self.runstate.cancelled:
             break
-          with proxy.extend_prefix(": " + te.name):
-            if '.' not in te.name:
-              warning("refresh: skip %r, not dotted", te.name)
+          with proxy.extend_prefix(": " + mbe.name):
+            if '.' not in mbe.name:
+              warning("refresh: skip %r, not dotted", mbe.name)
               continue
-            with Pfx("refresh te %s", te.name):
-              mbtype = te.mbtype
-              mbkey = te.mbkey
-              if mbtype is None:
-                warning("no MBTYPE, not refreshing")
-                continue
-              if mbtype in ('cdstub',):
-                warning("no refresh for mbtype=%r", mbtype)
-                continue
-              q_result_tag = te.MB_QUERY_RESULT_TAG_NAME
-              q_time_tag = te.MB_QUERY_TIME_TAG_NAME
-              if (refetch or q_result_tag not in te or q_time_tag not in te
-                  or not te[q_result_tag]):
-                get_type = mbtype
-                id_name = 'id'
-                record_key = None
-                if mbtype == 'disc':
-                  # we use get_releases_by_discid() for discs
-                  get_type = 'releases'
-                  id_name = 'discid'
-                  record_key = 'disc'
-                  if no_apply is None:
-                    no_apply = True
+            mbtype = mbe.mbtype
+            mbkey = mbe.mbkey
+            if mbtype in ('cdstub',):
+              warning("no refresh for mbtype=%r", mbtype)
+              continue
+            q_result_tag = mbe.MB_QUERY_RESULT_TAG_NAME
+            q_time_tag = mbe.MB_QUERY_TIME_TAG_NAME
+            if (refetch or q_result_tag not in mbe or q_time_tag not in mbe
+                or not mbe[q_result_tag]):
+              query_get_type = mbtype
+              id_name = 'id'
+              record_key = None
+              if mbtype == 'disc':
+                # we use get_releases_by_discid() for discs
+                query_get_type = 'releases'
+                id_name = 'discid'
+                record_key = 'disc'
+              with stackattrs(
+                  proxy,
+                  text=("query(%r,%r,...)" % (query_get_type, mbkey)),
+              ):
+                try:
+                  A = self.query(
+                      query_get_type, mbkey, id_name, record_key=record_key
+                  )
+                except (musicbrainzngs.musicbrainz.MusicBrainzError,
+                        musicbrainzngs.musicbrainz.ResponseError) as e:
+                  warning("%s: not refreshed: %s", type(e).__name__, e)
+                  raise
+                  ##A = mbe.get(mbe.MB_QUERY_RESULT_TAG_NAME, {})
                 else:
-                  if no_apply is None:
-                    no_apply = False
-                with stackattrs(
-                    proxy,
-                    text=("query(%r,%r,...)" % (get_type, mbkey)),
-                ):
-                  try:
-                    A = self.query(
-                        get_type, mbkey, id_name, record_key=record_key
-                    )
-                  except (musicbrainzngs.musicbrainz.MusicBrainzError,
-                          musicbrainzngs.musicbrainz.ResponseError) as e:
-                    warning("%s: not refreshed: %s", type(e).__name__, e)
-                    raise
-                    ##A = te.get(te.MB_QUERY_RESULT_TAG_NAME, {})
-                  else:
-                    te[q_time_tag] = time.time()
-                    # record the full response data for forensics
-                    te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
-                    ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
-                    te[te.MB_QUERY_PREFIX + 'result'] = A
-                    if not no_apply:
-                      self.apply_dict(mbtype, mbkey, A, seen=set())
-                    self.sqltags.flush()
-              else:
-                A = te[te.MB_QUERY_PREFIX + 'result']
-              ##self.apply_dict(mbtype, mbkey, A, seen=set())  # q=q
-              self.sqltags.flush()
-              # cap recursion
-              if isinstance(recurse, bool):
-                if not recurse:
-                  break
-              elif isinstance(recurse, int):
-                recurse -= 1
-                if recurse < 1:
-                  break
-              else:
-                raise TypeError(f'wrong type for recurse {r(recurse)}')
-      return te0.get(te0.MB_QUERY_RESULT_TAG_NAME, {})
+                  mbe[q_time_tag] = time.time()
+                  # record the full response data for forensics
+                  mbe[mbe.MB_QUERY_PREFIX + 'get_type'] = query_get_type
+                  ##mbe[mbe.MB_QUERY_PREFIX + 'includes'] = includes
+                  mbe[mbe.MB_QUERY_PREFIX + 'result'] = A
+                  if not no_apply:
+                    self.apply_dict(mbe, A)
+                  self.sqltags.flush()
+            else:
+              # use the caches result from the database
+              A = mbe[mbe.MB_QUERY_PREFIX + 'result']
+            self.sqltags.flush()
+            # cap recursion
+            if isinstance(recurse, bool):
+              if not recurse:
+                break
+            elif isinstance(recurse, int):
+              recurse -= 1
+              if recurse < 1:
+                break
+            else:
+              raise TypeError(f'wrong type for recurse {r(recurse)}')
+      return mbe0.get(mbe0.MB_QUERY_RESULT_TAG_NAME, {})
 
   @classmethod
   def key_type_name(cls, k):
@@ -1353,83 +1377,97 @@ class MBDB(MultiOpenMixin, RunStateMixin):
   @typechecked
   def apply_dict(
       self,
-      type_name: str,
-      id: str,  # pylint: disable=redefined-builtin
+      mbe: _MBEntity,
       d: dict,
       *,
-      get_te=None,
       q: Optional[ListQueue] = None,
-      seen: set,
+      seen: Optional[set] = None,
   ):
-    ''' Apply an `'id'`-ed dict from MusicbrainzNG query result `d`
-        associated with its `type_name` and `id` value
-        to the corresponding entity obtained by `get_te(type_name,id)`.
+    ''' Apply an `'id'`-ed dict from MusicbrainzNG query result `d` to `mde`.
 
         Parameters:
         * `type_name`: the entity type, eg `'disc'`
         * `id`: the entity identifying value, typically a discid or a UUID
         * `d`: the `dict` to apply to the entity
-        * `get_te`: optional entity fetch function;
-          the default calls `self.sqltags[f"{type_name}.{id}"]`
         * `q`: optional queue onto which to put related entities
     '''
-    sig = type_name, id
-    if sig in seen:
+    sig = mbe.name
+    if seen is None:
+      seen = set()
+    elif sig in seen:
       return
     seen.add(sig)
-    if get_te is None:
-      # pylint: disable=unnecessary-lambda-assignment
-      get_te = lambda type_name, id: self.sqltags[f"{type_name}.{id}"]
+    d = dict(d)  # make a copy because we will be modifying it
+    # check the id if present
     if 'id' in d:
-      assert d['id'] == id, "id=%s but d['id']=%s" % (r(id), r(d['id']))
-    te = get_te(type_name, id)
+      assert d['id'] == mbe.mbkey, f'{mbe.mbkey=} != {d["id"]=}'
+      d.pop('id')
     counts = {}  # sanity check of foo-count against foo-list
     # scan the mapping, recognise contents
-    for k, v in d.items():
+    for k, v in sorted(d.items()):
       with Pfx("%s=%s", k, r(v, 20)):
-        # skip the id field, already checked
-        if k == 'id':
-          continue
         # derive tag_name and field role (None, count, list)
         k_type_name, suffix = self.key_type_name(k)
+        tag_name = k_type_name.replace('-', '_')
         # note expected counts
         if suffix == 'count':
           assert isinstance(v, int)
-          counts[k_type_name] = v
+          counts[tag_name] = v
           continue
         if suffix == 'list':
+          # this is a list of object attributes
           if k_type_name in ('offset',):
+            warning("skip offset-list ?")
             continue
           # apply members
           assert isinstance(v, list)
-          for list_entry in v:
+          flat_v = []
+          for i, list_entry in enumerate(v):
             if not isinstance(list_entry, dict):
+              warning("skip entry %s", r(list_entry))
+              flat_v.append(list_entry)
               continue
             try:
               entry_id = list_entry['id']
             except KeyError:
+              # no list_entry['id']
+              # we expect this entry to be a mapping of types to id-based records
+              # { 'mbtype1':{'id':'id1','a':1,'b':2,...},
+              #   'mbtype2':{'id':'id2','a':3,'b':4,...},
+              # }
+              flat_entry = {}
               for le_key, le_value in list_entry.items():
                 if isinstance(le_value, dict) and 'id' in le_value:
-                  self.apply_dict(
-                      le_key, le_value['id'], le_value, q=q, seen=seen
-                  )
-              continue
-            self.apply_dict(k_type_name, entry_id, list_entry, q=q, seen=seen)
+                  le_id = le_value["id"]
+                  submbe = self[le_key, le_id]
+                  self.apply_dict(submbe, le_value, q=q, seen=seen)
+                  flat_entry[le_key] = le_id
+                else:
+                  flat_entry[le_key] = le_value
+              flat_v.append(flat_entry)
+            else:
+              # this entry is the id and its attributes
+              # {'id':'...','a':1,'b':2,...}
+              submbe = self[k_type_name, entry_id]
+              self.apply_dict(submbe, list_entry, q=q, seen=seen)
+              flat_v.append(entry_id)
+          v = flat_v
+        elif suffix in ('relation', 'relation-list'):
+          warning("skip relation or relation-list")
           continue
-        if suffix in ('relation', 'relation-list'):
-          continue
-        tag_name = k_type_name.replace('-', '_')
         if tag_name == 'name':
-          tag_name = 'name_'
-        tag_value = te.get(tag_name, '')
-        if not tag_value:
-          v = self._fold_value(k_type_name, v, get_te=get_te, q=q, seen=seen)
-          # apply the folded value
-          te.set(tag_name, v)
+          tag_name = 'fullname'
+        elif tag_name == 'fullname':
+          warning(f'unexpected "fullname": {tag_name=}')
+        # fold a dict value down to its key,
+        # applying the dict
+        v = self._fold_value(k_type_name, v, q=q, seen=seen)
+        mbe.tags[tag_name] = v
+    # sanity check the accumulated counts
     for k, c in counts.items():
       with Pfx("counts[%r]=%d", k, c):
-        if k in te:
-          assert len(te[k]) == c
+        if k in mbe:
+          assert len(mbe[k]) == c
 
   @typechecked
   def _fold_value(
@@ -1437,7 +1475,6 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       type_name: str,
       v,
       *,
-      get_te=None,
       q=None,
       seen: set,
   ):
@@ -1448,16 +1485,14 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     if isinstance(v, dict):
       if 'id' in v:
         # {'id':.., ...}
-        v = self._fold_id_dict(type_name, v, get_te=get_te, q=q, seen=seen)
+        v = self._fold_id_dict(type_name, v, q=q, seen=seen)
       else:
         v = dict(v)
         for k, subv in list(v.items()):
           type_name, _ = self.key_type_name(k)
           v[k] = self._fold_value(
-              ##type_name, subv, get_te=get_te, q=q, seen=seen
               type_name,
               subv,
-              get_te=get_te,
               q=q,
               seen=seen
           )
@@ -1465,9 +1500,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       v = list(v)
       for i, subv in enumerate(v):
         with Pfx("[%d]=%s", i, r(subv, 20)):
-          v[i] = self._fold_value(
-              type_name, subv, get_te=get_te, q=q, seen=seen
-          )
+          v[i] = self._fold_value(type_name, subv, q=q, seen=seen)
     elif isinstance(v, str):
       if type_name not in ('name', 'title'):
         # folder integer strings to integers
@@ -1489,7 +1522,6 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       type_name: str,
       d: dict,
       *,
-      get_te=None,
       q=None,
       seen: set,
   ):
@@ -1498,16 +1530,14 @@ class MBDB(MultiOpenMixin, RunStateMixin):
 
         This is used to replace identified records in a MusicbrainzNG query result
         with their identifier.
-
-        If `q` is not `None`, queue `get_te(type_name, id)` for processing
-        by the enclosing `refresh()`.
     '''
-    id = d['id']  # pylint: disable=redefined-builtin
-    assert isinstance(id, str) and id, (
-        "expected d['id'] to be a nonempty string, got: %s" % (r(id),)
+    key = d['id']  # pylint: disable=redefined-builtin
+    assert isinstance(key, str) and key, (
+        "expected d['id'] to be a nonempty string, got: %s" % (r(key),)
     )
-    self.apply_dict(type_name, id, d, get_te=get_te, q=q, seen=seen)
-    return id
+    mbe = self[type_name, key]
+    self.apply_dict(mbe, d, q=q, seen=seen)
+    return key
 
   def _tagif(self, tags, name, value):
     ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
