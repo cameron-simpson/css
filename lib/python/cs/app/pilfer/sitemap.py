@@ -31,7 +31,6 @@ from mitmproxy.flow import Flow
 import requests
 from typeguard import typechecked
 
-
 # The default HTML parser to use with BeautifulSoup.
 BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
 
@@ -748,12 +747,11 @@ class SiteMap(Promotable):
               )
           }
       )
-      # also set _ to the url.path, __ to hostname/path,
-      # method to the request method
+      # set various other things
       match.update(
-          # url relative path
+          # url cleaned relative path
           _=url.cleanrpath,
-          # hostname/path
+          # hostname/cleanpath
           __=f'{url.hostname}/{url.cleanrpath}',
           # rq method eg GET
           method=flowstate.method,
