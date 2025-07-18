@@ -38,7 +38,7 @@ from cs.ffmpegutils import convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
 from cs.fs import needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
-from cs.lex import cutsuffix, is_identifier, r
+from cs.lex import cutsuffix, is_identifier, printt, r
 from cs.logutils import error, warning, info, debug
 from cs.mappings import AttrableMapping
 from cs.obj import public_subclasses
@@ -47,7 +47,7 @@ from cs.psutils import run
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate, RunStateMixin
 from cs.seq import unrepeated
-from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin, FIND_OUTPUT_FORMAT_DEFAULT
+from cs.sqltags import BaseSQLTagsCommand, SQLTags, SQLTagSet, SQLTagsCommandsMixin, FIND_OUTPUT_FORMAT_DEFAULT
 from cs.tagset import HasTags, TagSet, TagsOntology
 from cs.upd import run_task, print
 
@@ -1076,16 +1076,15 @@ class MBDB(MultiOpenMixin, RunStateMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
   '''
 
-  # Mapping of Tag names whose type is not themselves.
-  # TODO: get this from the ontology type?
+  # Mapping of MusicbrainzNG tag names whose type is not themselves.
   TYPE_NAME_REMAP = {
       'artist-credit': 'artist',
-      'begin-area': 'area',
-      'end-area': 'area',
-      'label-info': 'label',
-      'medium': 'disc',
+      ##'begin-area': 'area',
+      ##'end-area': 'area',
+      ##'label-info': 'label',
+      ##'medium': 'disc',
       'release-event': 'event',
-      'release-group': 'release',
+      ##'release-group': 'release',
       'track': 'recording',
   }
 
