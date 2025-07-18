@@ -670,7 +670,7 @@ class _MBEntity(HasTags, Promotable):
   def mbkey(self):
     ''' The MusicBrainz id, typically a UUID or discid.
     '''
-    return self.tags.type_key
+    return self.tags.type_key.replace('+', '.')
 
   @property
   def mbtype(self):
@@ -712,7 +712,7 @@ class _MBEntity(HasTags, Promotable):
     return _MBEntity.promote(te)
 
   @classmethod
-  def promote(cls, obj, *init_a, **init_kw):
+  def promote(cls, obj, mbdb=None):
     ''' Promote `obj` to an instance of `cls`.
 
         Typically `obj` will be an `SQLTagSet` from the `MBDB`.
@@ -724,14 +724,18 @@ class _MBEntity(HasTags, Promotable):
     '''
     if isinstance(obj, cls):
       return obj
+    if isinstance(obj, tuple):
+      # a 2-tuple of MusicbrainzNG type and key
+      obj = mbdb[obj]
     if isinstance(obj, TagSet):
       type_subname = obj.type_subname
       for subclass in public_subclasses(cls):
         if subclass.TYPE_SUBNAME == type_subname:
-          return subclass(obj, *init_a, **init_kw)
+          return subclass(obj, mbdb)
       # return the generic version
-      return cls(obj, *init_a, **init_kw)
-    return super().promote(obj, *init_a, **init_kw)
+      return cls(obj, mbdb)
+    assert mbdb is None
+    return super().promote(obj)
 
 class MBArtist(_MBEntity):
   ''' A Musicbrainz artist entry.
