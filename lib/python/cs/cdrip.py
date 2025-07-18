@@ -661,10 +661,10 @@ class _MBEntity(HasTags, Promotable):
       )
     return super().dump(keys=keys, **kw)
 
-  def refresh(self, **kw):
+  def refresh(self, **mbdb_refresh_kw):
     ''' Refresh the MBDB entry for this `TagSet`.
     '''
-    return self.mbdb.refresh(self, **kw)
+    return self.mbdb.refresh(self, **mbdb_refresh_kw)
 
   @property
   def mbkey(self):
@@ -740,12 +740,12 @@ class MBArtist(_MBEntity):
   TYPE_SUBNAME = 'artist'
 
 class MBHasArtistsMixin:
-  ''' A mixin for `_MBTagSet`s with artists.
+  ''' A mixin for `_MBEntity`s with artists.
       This depends on the class specific property `artist_refs`
       which is a list of Musicbrainzng artist references
       used to construct artist credits:
-      either a `str` of literal interpolated text
-      or a `dict` with an `"artist"` entry which is an artist id.
+      either a `dict` with an `"artist"` entry which is an artist id
+      or a `str` of literal interpolated text.
   '''
 
   @property
@@ -772,7 +772,7 @@ class MBHasArtistsMixin:
 
   @property
   def artist_credit(self) -> str:
-    '''A credit string computes from `self.artists`.'''
+    '''A credit string computed from `self.artists`.'''
     strs = []
     sep = ''
     for artist in self.artists:
@@ -805,7 +805,7 @@ class MBHasArtistsMixin:
         names.append(name)
     return names
 
-class MBDisc(MBHasArtistsMixin, _MBTagSet):
+class MBDisc(MBHasArtistsMixin, _MBEntity):
   ''' A Musicbrainz disc entry.
   '''
 
@@ -990,7 +990,7 @@ class MBDisc(MBHasArtistsMixin, _MBTagSet):
         track_title=recording.title,
     )
 
-class MBRecording(MBHasArtistsMixin, _MBTagSet):
+class MBRecording(MBHasArtistsMixin, _MBEntity):
   ''' A Musicbrainz recording entry, a single track.
   '''
 
@@ -1011,7 +1011,7 @@ class MBRecording(MBHasArtistsMixin, _MBTagSet):
         raise AttributeError("no .title: {e}") from e
     return title
 
-class MBRelease(MBHasArtistsMixin, _MBTagSet):
+class MBRelease(MBHasArtistsMixin, _MBEntity):
   ''' A Musicbrainz recording entry, a single track.
   '''
 
@@ -1124,8 +1124,8 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     '''
     return self.sqltags.find(criteria)
 
-  def __getitem__(self, index):
-    ''' Fetching via the MBDB triggers a refresh.
+  def __getitem__(self, index) -> _MBEntity:
+    ''' Fetch an `_MBEntity` from an `(mbtype,mbkey)` 2-tuple.
     '''
     te = self.sqltags[index]
     if '.' in te.name:
@@ -1214,6 +1214,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       help(getter)
       raise
       ##return {}
+    # we expect the response to have a single entry for the record type requested
     if record_key in mb_info:
       other_keys = sorted(k for k in mb_info.keys() if k != record_key)
       if other_keys:
@@ -1241,7 +1242,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
   @typechecked
   def refresh(
       self,
-      te0: _MBTagSet,
+      mbe: _MBEntity,
       refetch: bool = True,  ##False,
       recurse: Union[bool, int] = False,
       no_apply=None,
