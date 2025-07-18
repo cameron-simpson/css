@@ -922,14 +922,19 @@ async def run_proxy(
     loop.add_signal_handler(SIGINT, runstate.cancel)
     # Hold the root Pilfer open.
     with P:
-      try:
-        prefetcher = URLFetcher(pilfer=P)
-        with prefetcher as worker_task:
-          with stackattrs(P.state, prefetcher=prefetcher):
-            await proxy.run()  # Run inside the event loop
-        await worker_task
-      finally:
-        loop.remove_signal_handler(SIGINT)
-        vprint("Stopping mitmproxy.")
-        proxy.shutdown()
-        runstate.fsm_callback_discard('STOPPING', on_cancel)
+      # by default, requests through the Pilfer use this mitm proxy
+      with stackattrs(P.session, proxies=dict(
+          http=f'{listen_host}:{listen_port}',
+          https=f'{listen_host}:{listen_port}',
+      )):
+        try:
+          prefetcher = URLFetcher(pilfer=P)
+          with prefetcher as worker_task:
+            with stackattrs(P.state, prefetcher=prefetcher):
+              await proxy.run()  # Run inside the event loop
+          await worker_task
+        finally:
+          loop.remove_signal_handler(SIGINT)
+          vprint("Stopping mitmproxy.")
+          proxy.shutdown()
+          runstate.fsm_callback_discard('STOPPING', on_cancel)
