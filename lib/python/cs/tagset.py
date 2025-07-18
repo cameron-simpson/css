@@ -507,7 +507,7 @@ class TagSetTyping:
 
         For example the `.type_subtype` of an entity named `tvdb.series.1234` is `series`.
     '''
-    print("self.type_name", self.type_name)
+    ##print("self.type_name", self.type_name)
     return self.type_name.split('.', 1)[1]
 
 @has_format_attributes
@@ -2709,6 +2709,9 @@ class HasTags:
       breakpoint()
       raise AttributeError(f'{self.__class__.__name__}.{tag_name=}')
 
+  def __contains__(self, key):
+    return key in self.tags
+
   def __getitem__(self, tag_name: str):
     ''' Index `self.tags`.
     '''
@@ -2723,6 +2726,9 @@ class HasTags:
     ''' Call `.tags.get(tag_name)`.
     '''
     return self.tags.get(tag_name, default)
+
+  def __iter__(self):
+    return iter(self.keys())
 
   def keys(self):
     return self.tags.keys()
