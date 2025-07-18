@@ -2534,16 +2534,11 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
     ''' Options for the `BaseSQLTagsCommand` class.
     '''
 
-    db_url: str = os.environ.get(DBURL_ENVVAR) or expanduser(DBURL_DEFAULT)
+    db_url: str = None  ## os.environ.get(DBURL_ENVVAR) or expanduser(DBURL_DEFAULT)
 
     COMMON_OPT_SPECS = dict(
         **BaseCommand.Options.COMMON_OPT_SPECS,
-        db_=(
-            'db_url',
-            '''SQLTags database URL.
-               Default from ${DBURL_ENVVAR} or {DBURL_DEFAULT!r}.
-            ''',
-        ),
+        db_=('db_url', 'SQLTags database URL.'),
     )
 
   @cached_property
