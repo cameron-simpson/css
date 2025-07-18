@@ -2145,6 +2145,15 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         )
     )
 
+  def cmd_dbinit(self, argv):
+    ''' Usage: {cmd}
+          Initialise the database supporting `self.sqltags`.
+          This includes defining the schema and making the root metanode.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    self.sqltags.init()
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database shell.
@@ -2158,6 +2167,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       print("sqlite3", db_fspath)
       run(['sqlite3', db_fspath], check=True)
       return 0
+    # TODO: psql for postgresql
     error("I do not know how to get a db shell for %r", db_url)
     return 1
 
@@ -2318,15 +2328,6 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         with Pfx(srcpath):
           with open(srcpath) as f:
             sqltags.import_csv_file(f, update_mode=update_mode)
-
-  def cmd_init(self, argv):
-    ''' Usage: {cmd}
-          Initialise the database.
-          This includes defining the schema and making the root metanode.
-    '''
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    self.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
   @popopts(
