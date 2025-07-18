@@ -813,6 +813,8 @@ class MBDisc(MBHasArtistsMixin, _MBEntity):
   ''' A Musicbrainz disc entry.
   '''
 
+  TYPE_SUBNAME = 'disc'
+
   @property
   def discid(self):
     ''' The disc id to be used in lookups.
@@ -998,6 +1000,8 @@ class MBRecording(MBHasArtistsMixin, _MBEntity):
   ''' A Musicbrainz recording entry, a single track.
   '''
 
+  TYPE_SUBNAME = 'recording'
+
   @property
   def artist_refs(self):
     return self.query_result['artist-credit']
@@ -1018,6 +1022,8 @@ class MBRecording(MBHasArtistsMixin, _MBEntity):
 class MBRelease(MBHasArtistsMixin, _MBEntity):
   ''' A Musicbrainz recording entry, a single track.
   '''
+
+  TYPE_SUBNAME = 'release'
 
   @property
   def artist_refs(self):
