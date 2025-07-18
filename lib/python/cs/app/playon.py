@@ -582,7 +582,7 @@ class Recording(SQLTagSet):
   @format_attribute
   def nice_name(self):
     ''' A nice name for the recording: the PlayOn series and name,
-        omitting the series if `None`.
+        omitting the series if that is `None`.
     '''
     sei = self.sei
     if sei.series:
