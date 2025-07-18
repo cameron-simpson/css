@@ -1,3 +1,4 @@
+cs.cmdutils: auto print the relevant environment variables in the usage?
 printt,tabulate: some kind of width support - tty width is easy, per column widths harder
 docmd: set rl_completer for the cmd_* commands
 cs.cmdutils: poparg(argv,int,"count") fails but poparg(argv,"count",int) succeeds
