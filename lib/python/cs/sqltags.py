@@ -1674,6 +1674,9 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 
+  DBURL_ENVVAR = DBURL_ENVVAR
+  DBURL_DEFAULT = DBURL_DEFAULT
+
   @classmethod
   def _singleton_key(cls, db_url=None, ontology=None):
     ''' The filesystem path for the `db_url` or `None`.
@@ -1959,21 +1962,21 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       criterion = 'name~' + prefix + '?*'
     return self.find(criterion)
 
-  @staticmethod
+  @classmethod
   @fmtdoc
-  def infer_db_url(envvar=None, default_path=None):
+  def infer_db_url(cls, envvar=None, default_path=None):
     ''' Infer the database URL.
 
         Parameters:
         * `envvar`: environment variable to specify a default,
-          default from `DBURL_ENVVAR` i.e. from `${DBURL_ENVVAR}`.
+          default from `cls.DBURL_ENVVAR` i.e. from `${DBURL_ENVVAR}`.
         * `default_path`: optional default db URL if no environment
-          variable, default from `DBURL_DEFAULT` (`{DBURL_DEFAULT}`).
+          variable, default from `cls.DBURL_DEFAULT` (`{DBURL_DEFAULT}`).
     '''
     if envvar is None:
-      envvar = DBURL_ENVVAR
+      envvar = cls.DBURL_ENVVAR
     if default_path is None:
-      default_path = DBURL_DEFAULT
+      default_path = cls.DBURL_DEFAULT
     db_url = os.environ.get(envvar)
     if not db_url:
       db_url = expanduser(default_path)
