@@ -1042,6 +1042,8 @@ class MBSQLTags(SQLTags):
       'recording': MBRecording,
       'release': MBRelease,
   }
+  DBURL_ENVVAR = MBDB_PATH_ENVVAR
+  DBURL_DEFAULT = MBDB_PATH_DEFAULT
 
   def default_factory(
       self,
@@ -1052,12 +1054,6 @@ class MBSQLTags(SQLTags):
     if skip_refresh is None:
       skip_refresh = '.' not in name
     return super().default_factory(name, skip_refresh=skip_refresh, **kw)
-
-  @classmethod
-  def infer_db_url(cls):
-    return super().infer_db_url(
-        envvar=MBDB_PATH_ENVVAR, default_path=MBDB_PATH_DEFAULT
-    )
 
   @pfx_method
   def __getitem__(self, index):
