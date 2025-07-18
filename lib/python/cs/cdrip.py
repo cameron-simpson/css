@@ -1546,5 +1546,366 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       if value is not None:
         tags.set(name, value)
 
+class CDRipCommand(BaseSQLTagsCommand):
+  ''' 'cdrip' command line.
+  '''
+
+  GETOPT_SPEC = 'd:D:fF:M:'
+
+  off_USAGE_KEYWORDS = {
+      'CDRIP_DEV_ENVVAR': CDRIP_DEV_ENVVAR,
+      'CDRIP_DEV_DEFAULT': CDRIP_DEV_DEFAULT,
+      'CDRIP_DIR_ENVVAR': CDRIP_DIR_ENVVAR,
+      'CDRIP_DIR_DEFAULT': CDRIP_DIR_DEFAULT,
+      'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
+      'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
+  }
+
+  USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand...
+    -d output_dir Specify the output directory path.
+    -D device     Device to access. This may be omitted or "default" or
+                  "" for the default device as determined by the discid module.
+    -f            Force. Read disc and consult Musicbrainz even if a toc file exists.
+    -M mbdb_path  Specify the location of the MusicBrainz SQLTags cache.
+
+  Environment:
+    {CDRIP_DEV_ENVVAR}            Default CDROM device.
+                         default {CDRIP_DEV_DEFAULT!r}.
+    {CDRIP_DIR_ENVVAR}            Default output directory path,
+                         default {CDRIP_DIR_DEFAULT!r}.
+    {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
+                         default {MBDB_PATH_DEFAULT!r}.'''
+
+  SUBCOMMAND_ARGV_DEFAULT = 'rip'
+
+  TAGSETS_CLASS = MBSQLTags
+
+  @dataclass
+  class Options(BaseSQLTagsCommand.Options):
+    ''' Options for `CDRipCommand`.
+    '''
+
+    force: bool = False
+    device: str = field(
+        default_factory=lambda: os.environ.get(CDRIP_DEV_ENVVAR) or
+        CDRIP_DEV_DEFAULT
+    )
+    dirpath: str = field(
+        default_factory=lambda: os.environ.get(CDRIP_DIR_ENVVAR) or
+        expanduser(CDRIP_DIR_DEFAULT)
+    )
+    mbdb_path: Optional[str] = None
+    codecs_spec: str = field(
+        default_factory=lambda: os.environ.
+        get(CDRIP_CODECS_ENVVAR, CDRIP_CODECS_DEFAULT)
+    )
+
+    @property
+    def codecs(self) -> List[str]:
+      '''A list of the codec names to produce.'''
+      return self.codecs_spec.replace(',', ' ').split()
+
+    COMMON_OPT_SPECS = dict(
+        **BaseSQLTagsCommand.Options.COMMON_OPT_SPECS,
+        d_=('dirpath', 'The output directory path.'),
+        D_=(
+            'device', r'''Device to access. This may be omitted or "default" or
+                  "" for the default device as determined by the discid module.
+                  '''
+        ),
+        F_=('codec_spec', 'Specify the output codecs.'),
+    )
+
+  @contextmanager
+  @trace
+  def run_context(self):
+    ''' Prepare the `SQLTags` around each command invocation.
+    '''
+    with super().run_context():
+      options = self.options
+      if not isdirpath(options.dirpath):
+        raise GetoptError(
+            "output directory: not a directory: %r" % (options.dirpath,)
+        )
+      fstags = FSTags()
+      mbdb = MBDB(mbdb_path=options.mbdb_path)
+      with fstags:
+        with mbdb:
+          mbdb_attrs = {}
+          if self.subcmd not in ('mbq',):
+            try:
+              dev_info = pfx_call(discid.read, device=self.device_id)
+            except discid.disc.DiscError as e:
+              warning("no disc information: %s", e)
+            else:
+              mbdb_attrs.update(dev_info=dev_info)
+          with stackattrs(mbdb, **mbdb_attrs):
+            with stackattrs(
+                options,
+                fstags=fstags,
+                mbdb=mbdb,
+                sqltags=mbdb.sqltags,
+                verbose=True,
+            ):
+              yield
+
+  @property
+  @fmtdoc
+  def device_id(self):
+    '''
+    The CD device id to use.
+    This is `self.options.device` unless that is `CDRIP_DEV_DEFAULT` ({CDRIP_DEV_DEFAULT!r})
+    in which case the value from `discid.get_default_device()` is used.
+    '''
+    return (
+        discid.get_default_device()
+        if self.options.device == CDRIP_DEV_DEFAULT else self.options.device
+    )
+
+  def device_info(self, device_id=None):
+    ''' Return the device info from device `device_id`
+        as from `discid.read(device_id)`.
+        The default device comes from `self.device_id`.
+    '''
+    if device_id is None:
+      device_id = self.device_id
+    return pfx_call(discid.read, device=device_id)
+
+  @typechecked
+  def popdisc(self, argv, default=None, *, device_id=None) -> "MBDisc":
+    ''' Pop an `MBDisc` from `argv`.
+        If `argv` is empty and `default` is `None`, raise `IndexError`
+        otherwise use `default`.
+        A value of `"."` obtains the discid from the current device
+        (or `device_id` if provided).
+    '''
+    if argv:
+      disc_id = argv.pop(0)
+    elif default is None:
+      raise IndexError("missing disc_id")
+    else:
+      disc_id = default
+    dev_info = None
+    if disc_id == '.':
+      dev_info = pfx_call(self.device_info, device_id)
+      disc_id = dev_info.id
+    disc = self.options.mbdb.discs[disc_id]
+    if dev_info is not None:
+      disc.mb_toc = dev_info.toc_string
+    return disc
+
+  def cmd_disc(self, argv):
+    ''' Usage: {cmd} {{.|discid}} {{tag[=value]|-tag}}...
+          Tag the disc identified by discid.
+          If discid is "." the discid is derived from the CD device.
+          Typical example:
+            disc . use_discid=some-other-discid
+          to alias this disc with another in the database.
+    '''
+    if not argv:
+      raise GetoptError('missing discid')
+    disc = self.popdisc(argv, '.')
+    if not argv:
+      disc.dump()
+      return
+    try:
+      tag_choices = self.parse_tag_choices(argv)
+    except ValueError as e:
+      raise GetoptError(str(e)) from e
+    for tag_choice in tag_choices:
+      if tag_choice.choice:
+        if tag_choice.tag not in disc:
+          disc.set(tag_choice.tag)
+      else:
+        if tag_choice.tag in disc:
+          disc.discard(tag_choice.tag)
+
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd} [-a] [-R] [entity...]
+          Dump each entity.
+          -a    Dump all tags. By default the Musicbrainz API fields
+                and *_relation fields are suppressed.
+          -R    Explicitly refresh the entity before dumping it.
+          If no entities are supplied, dump the entity for the disc in the CD drive.
+    '''
+    options = self.options
+    mbdb = options.mbdb
+    sqltags = mbdb.sqltags
+    all_fields = False
+    do_refresh = False
+    force_refresh = False
+    opts, argv = getopt(argv, 'aR')
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-a':
+          all_fields = True
+        elif opt == '-R':
+          do_refresh = True
+        else:
+          raise NotImplementedError("unimplemented option")
+    if not argv:
+      if mbdb.dev_info:
+        argv = ['disc.' + mbdb.dev_info.id]
+      else:
+        raise GetoptError("missing entities and no CD in the drive")
+    q = ListQueue(argv)
+    for name in q:
+      with Pfx(name):
+        if name.endswith('.') and is_identifier(name[:-1]):
+          q.prepend(sqltags.keys(prefix=name[:-1]))
+          continue
+        if name not in sqltags:
+          warning("unknown")
+          continue
+        te = sqltags[name]
+        if do_refresh:
+          mbdb.refresh(te, refetch=options.force, recurse=True)
+        te.dump(compact=True, keys=sorted(te.keys()) if all_fields else None)
+
+  def cmd_edit(self, argv):
+    ''' Usage: edit criteria...
+          Edit the entities specified by criteria.
+    '''
+    options = self.options
+    mbdb = options.mbdb
+    badopts = False
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
+    if not tag_criteria:
+      warning("missing tag criteria")
+      badopts = True
+    if argv:
+      warning("remaining unparsed arguments: %r", argv)
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    tes = list(mbdb.find(tag_criteria))
+    changed_tes = SQLTagSet.edit_tagsets(tes)  # verbose=state.verbose
+    for te in changed_tes:
+      print("changed", repr(te.name or te.id))
+
+  def cmd_meta(self, argv):
+    ''' Usage: {cmd} entity...
+          Print the metadata about entity, where entity has the form
+          *type_name*`.`*uuid* such as "artist"
+          and a Musicbrainz UUID for that type.
+    '''
+    options = self.options
+    mbdb = options.mbdb
+    if not argv:
+      raise GetoptError("missing metanames")
+    for metaname in argv:
+      with Pfx("metaname %r", metaname):
+        metadata = mbdb.ontology[metaname]
+        print(' ', metaname, metadata)
+
+  def cmd_eject(self, argv):
+    ''' Usage: {cmd}
+          Eject the disc.
+    '''
+    if argv:
+      raise GetoptError("extra arguments")
+    return os.system('eject')
+
+  def cmd_mbq(self, argv):
+    ''' Usage: {cmd} type.id
+          Do a MusicBrainzNG API query, report the result.
+    '''
+    if not argv:
+      raise GetoptError('missing type:id')
+    type_and_id = argv.pop(0)
+    if argv:
+      raise GetoptError(
+          f'extra arguments after type:id {type_and_id!r}: {argv!r}'
+      )
+    mbdb = self.options.mbdb
+    qtype, qid = type_and_id.split('.', 1)
+    result = pfx_call(mbdb.query, qtype, qid)
+    pprint(result)
+    print("APPLY")
+    mbe = mbdb[qtype, qid]
+    print("... to", mbe)
+    assert 'medium-list' in result
+    mbdb.apply_dict(mbe, result)
+    printt(
+        ["Final MBE", mbe.name],
+        *(
+            [f'  {tag_name}', tag_value]
+            for tag_name, tag_value in sorted(mbe.items())
+            if not tag_name.startswith('musicbrainzngs.api.query.')
+        ),
+    )
+
+  def cmd_probe(self, argv):
+    ''' Usage: {cmd} [disc_id]
+          Probe Musicbrainz about the current disc.
+          disc_id   Optional disc id to query instead of obtaining
+                    one from the current inserted disc.
+    '''
+    disc = self.popdisc(argv, '.')
+    if argv:
+      raise GetoptError("extra arguments after disc_id: %r" % (argv,))
+    options = self.options
+    try:
+      pfx_call(probe_disc, self.device_id, options.mbdb, disc_id=disc.mbkey)
+    except DiscError as e:
+      error("%s", e)
+      return 1
+    return 0
+
+  # pylint: disable=too-many-locals
+  def cmd_rip(self, argv):
+    ''' Usage: {cmd} [-F codecs] [-n] [disc_id]
+          Pull the audio into a subdirectory of the current directory.
+          -F codecs Specify the formats/codecs to produce.
+          -n        No action; recite planned actions.
+    '''
+    options = self.options
+    fstags = options.fstags
+    dirpath = options.dirpath
+    options.popopts(argv, F_='codecs_spec', n='dry_run')
+    disc = self.popdisc(argv, '.')
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    try:
+      rip(
+          self.device_id,
+          options.mbdb,
+          output_dirpath=dirpath,
+          audio_outputs=options.codecs,
+          disc_id=disc.mbkey,
+          fstags=fstags,
+          no_action=options.dry_run,
+          split_by_codec=True,
+      )
+    except discid.disc.DiscError as e:
+      error("disc error: %s", e)
+      return 1
+    os.system("eject")
+    return 0
+
+  def cmd_toc(self, argv):
+    ''' Usage: {cmd} [disc_id]
+          Print a table of contents for the current disc.
+    '''
+    disc = self.popdisc(argv, '.')
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    ##MB = options.mbdb
+    ##with stackattrs(MB, dev_info=dev_info):
+    with Pfx("discid %s", disc.mbkey):
+      disc_tags = disc.disc_tags()
+      print(disc_tags.disc_title)
+      print(disc_tags.disc_artist_credit)
+      for track_index, recording in enumerate(disc.recordings):
+        track_tags = disc.track_tags(track_index)
+        track_title = (
+            f"{track_tags.track_number:02}"
+            f" - {track_tags.track_title}"
+            f" -- {track_tags.track_artist_credit}"
+        )
+        print(track_title)
+    return 0
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
