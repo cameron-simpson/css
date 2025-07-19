@@ -47,7 +47,15 @@ from cs.psutils import run
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate, RunStateMixin
 from cs.seq import unrepeated
-from cs.sqltags import BaseSQLTagsCommand, SQLTags, SQLTagSet, SQLTagsCommandsMixin, FIND_OUTPUT_FORMAT_DEFAULT
+from cs.sqltags import (
+    BaseSQLTagsCommand,
+    HasSQLTags,
+    SQLTags,
+    SQLTagSet,
+    SQLTagsCommandsMixin,
+    UsesSQLTags,
+    FIND_OUTPUT_FORMAT_DEFAULT,
+)
 from cs.tagset import HasTags, TagSet, TagsOntology
 from cs.upd import run_task, print
 
@@ -603,7 +611,7 @@ def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   return argv
 
 # pylint: disable=too-many-ancestors
-class _MBEntity(HasTags, Promotable):
+class _MBEntity(HasSQLTags):
   ''' A `HasTags` subclass for MB entities.
       All the state is proxied through the `.tags`, which is an `SQLTagSet`.
       Instances are constructed via `MBDB.mbentity(SQLTagSet)`,
@@ -614,15 +622,10 @@ class _MBEntity(HasTags, Promotable):
   MB_QUERY_RESULT_TAG_NAME = MB_QUERY_PREFIX + 'result'
   MB_QUERY_TIME_TAG_NAME = MB_QUERY_PREFIX + 'time'
 
-  def __init__(self, te: TagSet, mbdb: "MBDB"):
-    self.tags = te
+  def __init__(self, tags: TagSet, mbdb: "MBDB"):
+    assert mbdb.sqltags is tags.sqltags, f'{mbdb.sqltags=} is not {tags.sqltags=}'
+    self.tags = tags
     self.mbdb = mbdb
-
-  @property
-  def tags_db(self):
-    ''' The `.tags_db` is `self.sqltags`.
-    '''
-    return self.mbdb.sqltags
 
   @cached_property
   def tags_entity_key(self):
@@ -639,7 +642,8 @@ class _MBEntity(HasTags, Promotable):
 
   @property
   def query_result(self):
-    ''' The Musicbrainz query result, fetching it if necessary. '''
+    ''' The Musicbrainz query result, fetching it if necessary.
+    '''
     mb_result = self.get(self.MB_QUERY_RESULT_TAG_NAME)
     if not mb_result:
       self.refresh(refetch=True)
@@ -710,32 +714,6 @@ class _MBEntity(HasTags, Promotable):
       id = id["id"]
     te = self.sqltags[f'mbdb.{type_name}.{id}']
     return _MBEntity.promote(te)
-
-  @classmethod
-  def promote(cls, obj, mbdb=None):
-    ''' Promote `obj` to an instance of `cls`.
-
-        Typically `obj` will be an `SQLTagSet` from the `MBDB`.
-        If a subclass of `cls` has a `.TYPE_SUBNAME` equal to
-        `obj.type_subname` then that subclass will be used to make
-        the new instance. Otherwise `cls` will be used.
-        In this way an `mbdb.artist.*` tagset will be promoted to
-        an `MBArtist` and so forth.
-    '''
-    if isinstance(obj, cls):
-      return obj
-    if isinstance(obj, tuple):
-      # a 2-tuple of MusicbrainzNG type and key
-      obj = mbdb[obj]
-    if isinstance(obj, TagSet):
-      type_subname = obj.type_subname
-      for subclass in public_subclasses(cls):
-        if subclass.TYPE_SUBNAME == type_subname:
-          return subclass(obj, mbdb)
-      # return the generic version
-      return cls(obj, mbdb)
-    assert mbdb is None
-    return super().promote(obj)
 
 class MBArtist(_MBEntity):
   ''' A Musicbrainz artist entry.
