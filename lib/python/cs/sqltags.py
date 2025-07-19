@@ -2157,7 +2157,6 @@ class UsesSQLTags:
   HasSQLTagsClass = None
   TYPE_ZONE = None
 
-  @trace
   def __getitem__(self, index: Tuple) -> HasSQLTags:
     ''' Fetch the `HasSQLTags` instance for the supplied `(subname,key)` 2-tuple.
     '''
