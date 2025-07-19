@@ -1050,9 +1050,14 @@ class MBSQLTags(SQLTags):
         )
     return super().__getitem__(index)
 
-class MBDB(MultiOpenMixin, RunStateMixin):
+class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
   '''
+
+  # the TagSet.name prefix for entities from this domain
+  TYPE_ZONE = 'mbdb'
+  # the base class of the various entities
+  HasSQLTagsClass = _MBEntity
 
   # Mapping of MusicbrainzNG tag names whose type is not themselves.
   TYPE_NAME_REMAP = {
@@ -1083,15 +1088,6 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
     sqltags = self.sqltags = MBSQLTags(mbdb_path)
-    sqltags.mbdb = self
-    with sqltags:
-      ont = self.ontology = TagsOntology(sqltags)
-      self.artists = sqltags.subdomain('artist')
-      ont['artists'].update(type='list', member_type='artist')
-      self.discs = sqltags.subdomain('disc')
-      ont['discs'].update(type='list', member_type='disc')
-      self.recordings = sqltags.subdomain('recording')
-      ont['recordings'].update(type='list', member_type='recording')
 
   def __str__(self):
     return f'{self.__class__.__name__}({self.sqltags})'
@@ -1119,7 +1115,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
   def __getitem__(self, index) -> _MBEntity:
     ''' Fetch an `_MBEntity` from an `(mbtype,mbkey)` 2-tuple.
     '''
-    with Pfx("mbdb[%s]", r(index)):
+    with Pfx("%s[%s]", self, r(index)):
       assert isinstance(index, tuple)
       mbtype, key = index
       assert '.' not in mbtype
@@ -1133,10 +1129,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
       # this is amazingly ill specified AFAICT
       assert '+' not in key
       tekey = key.replace('.', '+')
-      te = self.sqltags[f'mbdb.{tetype}.{tekey}']
-      mbe = self.mbentity(te)
-      ##mbe.refresh()
-      return mbe
+      return super().__getitem__((tetype, tekey))
 
   # pylint: disable=too-many-arguments
   @pfx_method
