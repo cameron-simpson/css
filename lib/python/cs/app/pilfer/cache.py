@@ -44,6 +44,8 @@ MIN_DURATION = 1.0  # minimum duration for a cache entry
 
 @dataclass
 class ContentCache(HasFSPath, MultiOpenMixin):
+  ''' A cache for URL content.
+  '''
 
   # present a progress bar for objects of 200KiB or more
   PROGRESS_THRESHOLD = 204800
