@@ -80,8 +80,17 @@ from cs.sqlalchemy_utils import (
     HasIdMixin,
 )
 from cs.tagset import (
-    TagSet, Tag, TagFile, TagSetCriterion, TagBasedTest, TagsCommandMixin,
-    TagsOntology, BaseTagSets, tag_or_tag_value, as_unixtime
+    BaseTagSets,
+    HasTags,
+    Tag,
+    TagBasedTest,
+    TagFile,
+    TagSet,
+    TagSetCriterion,
+    TagsCommandMixin,
+    TagsOntology,
+    as_unixtime,
+    tag_or_tag_value,
 )
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -2117,6 +2126,47 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       for tag in te.tags:
         with Pfx(tag):
           e.add_tag(tag)
+
+class HasSQLTags(HasTags):
+  ''' A `HasTags` using an `SQLTags` as the backend.
+
+      Note that this mixin brings the `__new__` method of `HasTags`
+      with its "initialise twice" semantics.
+  '''
+
+  @property
+  def tags_db(self):
+    ''' The database is the `SQLTags` instance associated with the `.tags` object.
+    '''
+    return self.tags.sqltags
+
+class UsesSQLTags:
+  ''' A mixin to support classes which is an `SQLTags` to store their data.
+
+      Instances of the subclass must provide a `.sqltags:SQLTags` attribute.
+
+      This mixin requires the subclass to provide:
+      - `HasSQLTagsClass`: a subclass of `HasSQLTags` which represents data entities
+      - `TYPE_ZONE`: the type zone identifying entities in the larger `SQLTags` data
+
+      This mixin provides:
+      - a `__getitem__` method: accepting a `(subname,key)` 2-tuple
+      and returning the appropriate instance of the `HasSQLTagsClass`
+  '''
+
+  HasSQLTagsClass = None
+  TYPE_ZONE = None
+
+  @trace
+  def __getitem__(self, index: Tuple) -> HasSQLTags:
+    ''' Fetch the `HasSQLTags` instance for the supplied `(subname,key)` 2-tuple.
+    '''
+    with Pfx("%s[%s]", self, r(index)):
+      assert isinstance(index, tuple)
+      type_, key = index
+      assert '.' not in key
+      te = self.sqltags[f'{self.TYPE_ZONE}.{type_}.{key}']
+      return trace(self.HasSQLTagsClass)(te, self)
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
