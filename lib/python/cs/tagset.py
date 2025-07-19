@@ -230,7 +230,7 @@ from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
 )
-from cs.obj import SingletonMixin
+from cs.obj import public_subclasses, SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin, openif
@@ -2688,9 +2688,33 @@ class HasTags:
   ''' A mixin for classes which have a `.tags:TagSet` attribute.
 
       The subclass may itself define its `.tags` instance attribute
-      or rely on the default property `.tags`, which will return
+      or rely on the default cached property `.tags`, which will return
       `self.tags_db[self.tags_entity_key]`.
+
+      Note that this mixin brings its own `__new__` method which
+      can choose a subclass based on the subclass' `.TYPE_SUBNAME`
+      attribute. See the `__new__` docstring.
   '''
+
+  def __new__(cls, tags: TagSet, *init_a, **init_kw):
+    ''' Scan the subclasses of `cls` to see if one has a `.TYPE_SUBNAME`
+        attribute matching `tags.type_subname`. If so, return an instance
+        of the subclass, otherwise return an instance of `cls`.
+
+        Note that because of the mechanics of `__new__` the new
+        instance's `__init__` method will be called twice, and
+        therefore it should be both cheap and safe to run twice.
+        Because this mixin is oriented around instances which keep
+        most or all of their state in the `.tags` attribute, usually
+        the initialiser just sets `self.tags` and some other
+        attributes.
+    '''
+    type_subname = tags.type_subname
+    for subclass in public_subclasses(cls):
+      if getattr(subclass, 'TYPE_SUBNAME', None) == type_subname:
+        return super().__new__(subclass)
+    # return the generic version
+    return super().__new__(cls)
 
   @cached_property
   def tags(self):
