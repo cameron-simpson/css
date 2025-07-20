@@ -627,13 +627,6 @@ class _MBEntity(HasSQLTags):
     self.tags = tags
     self.mbdb = mbdb
 
-  @cached_property
-  def tags_entity_key(self):
-    ''' Our tags entity key, derived from `self.mbkey`.
-    '''
-    assert self.__class__.__name__.startswith('MB')
-    return f'mbdb.{self.__class__.__name__.removeprefix("MB").lower()}.{self.mbkey}'
-
   def __str__(self):
     return f'{self.__class__.__name__}:{self.tags.name}'
 
@@ -1008,47 +1001,11 @@ class MBRelease(MBHasArtistsMixin, _MBEntity):
     return self.query_result['artist-credit']
 
 class MBSQLTags(SQLTags):
-  ''' Musicbrainz `SQLTags` with special `TagSetClass`.
+  ''' Musicbrainz `SQLTags`; it just has custom values for the default db location.
   '''
 
-  TAGSETCLASS_DEFAULT = _MBTagSet
-
-  # map 'foo' from 'foo.bah' to a particular TagSet subclass
-  TAGSETCLASS_PREFIX_MAPPING = {
-      'artist': MBArtist,
-      'disc': MBDisc,
-      'recording': MBRecording,
-      'release': MBRelease,
-  }
   DBURL_ENVVAR = MBDB_PATH_ENVVAR
   DBURL_DEFAULT = MBDB_PATH_DEFAULT
-
-  def default_factory(
-      self,
-      name: Optional[str] = None,
-      skip_refresh=None,
-      **kw,
-  ):
-    if skip_refresh is None:
-      skip_refresh = '.' not in name
-    return super().default_factory(name, skip_refresh=skip_refresh, **kw)
-
-  @pfx_method
-  def __getitem__(self, index):
-    assert index.startswith('mbdb.')
-    assert not index.startswith('mbdb.releases.')
-    if isinstance(index, str) and index.startswith('disc.'):
-      discid = index[5:]
-      try:
-        UUID(discid)
-      except ValueError:
-        pass
-      else:
-        raise RuntimeError(
-            "%s.__getitem__(%r): discid is a UUID, should not be!" %
-            (type(self).__name__, index)
-        )
-    return super().__getitem__(index)
 
 class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
@@ -1098,14 +1055,6 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
     '''
     with self.sqltags:
       yield
-
-  def mbentity(self, te: TagSet) -> _MBEntity:
-    ''' Promote `te` to a suitable `_MBEntity` subclass instance,
-        set its `.mbdb` and `.tags_db`, and return.
-    '''
-    mbe = _MBEntity.promote(te, self)
-    mbe.mbdb = self
-    return mbe
 
   def __getitem__(self, index) -> _MBEntity:
     ''' Fetch an `_MBEntity` from an `(mbtype,mbkey)` 2-tuple.
