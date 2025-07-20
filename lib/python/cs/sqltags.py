@@ -2187,9 +2187,9 @@ class UsesSQLTags:
       type_, key = index
       assert '.' not in key
       te = self.sqltags[f'{self.TYPE_ZONE}.{type_}.{key}']
-      return trace(self.HasSQLTagsClass)(te, self)
+      return self.HasSQLTagsClass(te, self)
 
-  def find(self, criteria) -> List[_MBEntity]:
+  def find(self, criteria) -> List["UsesSQLTags"]:
     ''' Find entities in the database.
 
         This runs a find of the `SQLTags` and returns the associated
