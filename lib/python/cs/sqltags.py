@@ -2130,8 +2130,13 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
 class HasSQLTags(HasTags):
   ''' A `HasTags` using an `SQLTags` as the backend.
 
-      Note that this mixin brings the `__new__` method of `HasTags`
-      with its "initialise twice" semantics.
+      Note that this mixin brings the `__new__` method of `HasTags`.
+
+      Note that most subclasses of `HasSQLTags` set `.tags` during
+      the `__init__` method; if you define an "on demand" flavoured
+      subclass you should also provide a `.tags_entity_key` property
+      to compute the `SQLTags` key, as the default here uses
+      `self.tags.name`.
   '''
 
   @property
@@ -2139,6 +2144,23 @@ class HasSQLTags(HasTags):
     ''' The database is the `SQLTags` instance associated with the `.tags` object.
     '''
     return self.tags.sqltags
+
+  @cached_property
+  def tags_entity_key(self):
+    ''' Our tagged entity key, `self.tags.name`.
+
+        This is only really needed by the `HasTags.tags` cached
+        property; most subclasses of `HasSQLTags` set `.tags` during
+        `__init__`.
+        If you have an "on demand" subclass you should override
+        this method to compute the entity key without relying on
+        the (missing) `.tags` attributes.
+    '''
+    if 'tags' not in self.__dict__:
+      raise RuntimeError(
+          f'{self.__class__.__name__}:HasSQLTags.tags_entity_key: no .tags attribute!'
+      )
+    return self.tags.name
 
 class UsesSQLTags:
   ''' A mixin to support classes which is an `SQLTags` to store their data.
