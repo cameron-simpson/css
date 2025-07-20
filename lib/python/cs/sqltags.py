@@ -2189,6 +2189,16 @@ class UsesSQLTags:
       te = self.sqltags[f'{self.TYPE_ZONE}.{type_}.{key}']
       return trace(self.HasSQLTagsClass)(te, self)
 
+  def find(self, criteria) -> List[_MBEntity]:
+    ''' Find entities in the database.
+
+        This runs a find of the `SQLTags` and returns the associated
+        `HasSQLTagsClass` instances.
+    '''
+    return [
+        self.HasSQLTagsClass(te, self) for te in self.sqltags.find(criteria)
+    ]
+
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
   TAGSETS_CLASS = SQLTags

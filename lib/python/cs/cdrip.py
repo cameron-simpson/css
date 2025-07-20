@@ -1107,11 +1107,6 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
     mbe.mbdb = self
     return mbe
 
-  def find(self, criteria) -> List[_MBEntity]:
-    ''' Find entities in the cache database.
-    '''
-    return list(map(self.mbentity, self.sqltags.find(criteria)))
-
   def __getitem__(self, index) -> _MBEntity:
     ''' Fetch an `_MBEntity` from an `(mbtype,mbkey)` 2-tuple.
     '''
