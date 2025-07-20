@@ -2720,6 +2720,11 @@ class HasTags:
   def tags(self):
     ''' A default `.tags` property which obtains a `TagSet` from `self.tags_db`
         via using the `TagSet` name `self.tags_entity_key`.
+        This is for subclasses which might fetch the `.tags` on demand.
+
+        Subclasses of the usual subclass of this, `HasSQLTagSet`,
+        typically `.tags` during `__init__` and therefore have no
+        need for a `.tags_entity_key` property.
     '''
     return self.tags_db[self.tags_entity_key]
 
