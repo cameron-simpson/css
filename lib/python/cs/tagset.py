@@ -2696,7 +2696,7 @@ class HasTags:
       attribute. See the `__new__` docstring.
   '''
 
-  def __new__(cls, tags: TagSet, *init_a, **init_kw):
+  def __new__(cls, tags: TagSet, *_, **__):
     ''' Scan the subclasses of `cls` to see if one has a `.TYPE_SUBNAME`
         attribute matching `tags.type_subname`. If so, return an instance
         of the subclass, otherwise return an instance of `cls`.
