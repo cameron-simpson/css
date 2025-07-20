@@ -619,8 +619,9 @@ class _MBEntity(HasSQLTags):
   '''
 
   MB_QUERY_PREFIX = 'musicbrainzngs.api.query.'
-  MB_QUERY_RESULT_TAG_NAME = MB_QUERY_PREFIX + 'result'
-  MB_QUERY_TIME_TAG_NAME = MB_QUERY_PREFIX + 'time'
+  MB_QUERY_PREFIX_ = f'{MB_QUERY_PREFIX}.'
+  MB_QUERY_RESULT_TAG_NAME = f'{MB_QUERY_PREFIX}.result'
+  MB_QUERY_TIME_TAG_NAME = f'{MB_QUERY_PREFIX}.time'
 
   def __init__(self, tags: TagSet, mbdb: "MBDB"):
     assert mbdb.sqltags is tags.sqltags, f'{mbdb.sqltags=} is not {tags.sqltags=}'
@@ -652,7 +653,7 @@ class _MBEntity(HasSQLTags):
     if keys is None:
       keys = sorted(
           k for k in self.keys() if (
-              not k.startswith(self.MB_QUERY_PREFIX)
+              not k.startswith(self.MB_QUERY_PREFIX_)
               and not k.endswith('_relation')
           )
       )
@@ -1218,10 +1219,10 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
             if mbtype in ('cdstub',):
               warning("no refresh for mbtype=%r", mbtype)
               continue
-            q_result_tag = mbe.MB_QUERY_RESULT_TAG_NAME
-            q_time_tag = mbe.MB_QUERY_TIME_TAG_NAME
-            if (refetch or q_result_tag not in mbe or q_time_tag not in mbe
-                or not mbe[q_result_tag]):
+            if (refetch or mbe.MB_QUERY_RESULT_TAG_NAME not in mbe
+                or mbeMB_QUERY_TIME_TAG_NAME not in mbe
+                or not mbe[mbe.MB_QUERY_RESULT_TAG_NAME]):
+              # refresh or missing or stale
               query_get_type = mbtype
               id_name = 'id'
               record_key = None
@@ -1244,11 +1245,11 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
                   raise
                   ##A = mbe.get(mbe.MB_QUERY_RESULT_TAG_NAME, {})
                 else:
-                  mbe[q_time_tag] = time.time()
                   # record the full response data for forensics
-                  mbe[mbe.MB_QUERY_PREFIX + 'get_type'] = query_get_type
-                  ##mbe[mbe.MB_QUERY_PREFIX + 'includes'] = includes
-                  mbe[mbe.MB_QUERY_PREFIX + 'result'] = A
+                  mbe[f'{mbe.MB_QUERY_PREFIX}.get_type'] = query_get_type
+                  ##mbe[f'{mbe.MB_QUERY_PREFIX.includes'] = includes
+                  mbe[mbe.MB_QUERY_RESULT_TAG_NAME] = A
+                  mbe[mbe.MB_QUERY_TIME_TAG_NAME] = time.time()
                   if not no_apply:
                     self.apply_dict(mbe, A)
                   self.sqltags.flush()
