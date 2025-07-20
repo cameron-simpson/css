@@ -706,7 +706,7 @@ class _MBEntity(HasSQLTags):
         raise RuntimeError("type_name=%r, id=%r is UUID" % (type_name, id))
     if isinstance(id, dict):
       id = id["id"]
-    te = self.sqltags[f'mbdb.{type_name}.{id}']
+    te = self.sqltags[f'{self.type_zone}.{type_name}.{id}']
     return _MBEntity.promote(te)
 
 class MBArtist(_MBEntity):
