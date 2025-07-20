@@ -1350,9 +1350,18 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
               # { 'mbtype1':{'id':'id1','a':1,'b':2,...},
               #   'mbtype2':{'id':'id2','a':3,'b':4,...},
               # }
+              #
+              # Example:
+              # {'area': {'id': '489ce91b-6658-3307-9877-795b68554c98',
+              #           'iso-3166-1-code-list': ['US'],
+              #           'name': 'United States',
+              #           'sort-name': 'United States'},
+              #  'date': '1999-04-20'}
+              #
               flat_entry = {}
               for le_key, le_value in list_entry.items():
                 if isinstance(le_value, dict) and 'id' in le_value:
+                  # an le_value["id"] is there, like the "area" above
                   le_id = le_value["id"]
                   submbe = self[le_key, le_id]
                   self.apply_dict(submbe, le_value, q=q, seen=seen)
