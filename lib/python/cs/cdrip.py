@@ -1120,8 +1120,6 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
 
   SUBCOMMAND_ARGV_DEFAULT = 'rip'
 
-  TAGSETS_CLASS = MBSQLTags
-
   @dataclass
   class Options(BaseSQLTagsCommand.Options):
     ''' Options for `CDRipCommand`.
@@ -1149,11 +1147,11 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
 
     COMMON_OPT_SPECS = dict(
         **BaseSQLTagsCommand.Options.COMMON_OPT_SPECS,
-        d_=('dirpath', 'The output directory path.'),
+        d_=('dirpath', 'Specify the output directory path.'),
         D_=(
-            'device', r'''Device to access. This may be omitted or "default" or
-                  "" for the default device as determined by the discid module.
-                  '''
+            'device',
+            '''Device to access. This may be omitted or "" or "default"
+               for the default device as determined by the discid module.''',
         ),
         F_=('codec_spec', 'Specify the output codecs.'),
     )
@@ -1186,8 +1184,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
                 options,
                 fstags=fstags,
                 mbdb=mbdb,
-                sqltags=mbdb.sqltags,
-                verbose=True,
+                sqltags=mbdb.sqltags,  ##verbose=True,
             ):
               yield
 
@@ -1224,7 +1221,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     if argv:
       disc_id = argv.pop(0)
     elif default is None:
-      raise IndexError("missing disc_id")
+      raise GetoptError("missing disc_id")
     else:
       disc_id = default
     dev_info = None
@@ -1236,6 +1233,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       disc.mb_toc = dev_info.toc_string
     return disc
 
+  @popopts
   def cmd_disc(self, argv):
     ''' Usage: {cmd} {{.|discid}} {{tag[=value]|-tag}}...
           Tag the disc identified by discid.
@@ -1262,32 +1260,27 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         if tag_choice.tag in disc:
           disc.discard(tag_choice.tag)
 
+  @popopts(
+      a=(
+          'all_fields',
+          ''' Dump all tags. By default the Musicbrainz API fields
+              and *_relation fields are suppressed.''',
+      ),
+      R=('do_refresh', 'Explicitly refresh the entity before dumping it.'),
+  )
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [-a] [-R] [entity...]
           Dump each entity.
-          -a    Dump all tags. By default the Musicbrainz API fields
-                and *_relation fields are suppressed.
-          -R    Explicitly refresh the entity before dumping it.
           If no entities are supplied, dump the entity for the disc in the CD drive.
     '''
     options = self.options
     mbdb = options.mbdb
     sqltags = mbdb.sqltags
-    all_fields = False
-    do_refresh = False
-    force_refresh = False
-    opts, argv = getopt(argv, 'aR')
-    for opt, _ in opts:
-      with Pfx(opt):
-        if opt == '-a':
-          all_fields = True
-        elif opt == '-R':
-          do_refresh = True
-        else:
-          raise NotImplementedError("unimplemented option")
+    all_fields = options.all_fields
+    do_refresh = options.do_refresh
     if not argv:
       if mbdb.dev_info:
-        argv = ['disc.' + mbdb.dev_info.id]
+        argv = [f'disc.{mbdb.dev_info.id}']
       else:
         raise GetoptError("missing entities and no CD in the drive")
     q = ListQueue(argv)
@@ -1304,6 +1297,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
           mbdb.refresh(te, refetch=options.force, recurse=True)
         te.dump(compact=True, keys=sorted(te.keys()) if all_fields else None)
 
+  @popopts
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
@@ -1325,6 +1319,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
+  @popopts
   def cmd_meta(self, argv):
     ''' Usage: {cmd} entity...
           Print the metadata about entity, where entity has the form
@@ -1340,6 +1335,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         metadata = mbdb.ontology[metaname]
         print(' ', metaname, metadata)
 
+  @popopts
   def cmd_eject(self, argv):
     ''' Usage: {cmd}
           Eject the disc.
@@ -1348,6 +1344,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       raise GetoptError("extra arguments")
     return os.system('eject')
 
+  @popopts
   def cmd_mbq(self, argv):
     ''' Usage: {cmd} type.id
           Do a MusicBrainzNG API query, report the result.
@@ -1377,6 +1374,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         ),
     )
 
+  @popopts
   def cmd_probe(self, argv):
     ''' Usage: {cmd} [disc_id]
           Probe Musicbrainz about the current disc.
@@ -1395,6 +1393,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     return 0
 
   # pylint: disable=too-many-locals
+  @popopts
   def cmd_rip(self, argv):
     ''' Usage: {cmd} [-F codecs] [-n] [disc_id]
           Pull the audio into a subdirectory of the current directory.
@@ -1425,6 +1424,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     os.system("eject")
     return 0
 
+  @popopts
   def cmd_toc(self, argv):
     ''' Usage: {cmd} [disc_id]
           Print a table of contents for the current disc.
