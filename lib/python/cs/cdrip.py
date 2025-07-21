@@ -283,7 +283,7 @@ class _MBEntity(HasSQLTags):
       which also sets the `.mbdb` and `.tags_db` on the instance.
   '''
 
-  MB_QUERY_PREFIX = 'musicbrainzngs.api.query.'
+  MB_QUERY_PREFIX = 'musicbrainzngs.api.query'
   MB_QUERY_PREFIX_ = f'{MB_QUERY_PREFIX}.'
   MB_QUERY_RESULT_TAG_NAME = f'{MB_QUERY_PREFIX}.result'
   MB_QUERY_TIME_TAG_NAME = f'{MB_QUERY_PREFIX}.time'
