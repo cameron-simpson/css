@@ -433,73 +433,7 @@ class MBArtist(_MBEntity):
 
   TYPE_SUBNAME = 'artist'
 
-class MBHasArtistsMixin:
-  ''' A mixin for `_MBEntity`s with artists.
-      This depends on the class specific property `artist_refs`
-      which is a list of Musicbrainzng artist references
-      used to construct artist credits:
-      either a `dict` with an `"artist"` entry which is an artist id
-      or a `str` of literal interpolated text.
-  '''
-
-  @property
-  def artist_refs(self):
-    ''' Stub method to return a list of artist references.
-        This is overridden by subclasses which use the mixin.
-    '''
-    raise RuntimeError(f'no .artist_refs property on type {type(self)!r}')
-
-  @cached_property
-  @typechecked
-  def artists(self) -> List[Union[MBArtist, str]]:
-    '''A list of `MBArtist`s, possibly interspersed with `str`.'''
-    artists = []
-    for artist_ref in self.artist_refs:
-      with Pfx("artist_ref %s", r(artist_ref)):
-        if isinstance(artist_ref, str):
-          artists.append(artist_ref)
-          continue
-        artist_id = artist_ref['artist']
-        artist = self.resolve_id('artist', artist_id)
-        artists.append(artist)
-    return artists
-
-  @property
-  def artist_credit(self) -> str:
-    '''A credit string computed from `self.artists`.'''
-    strs = []
-    sep = ''
-    for artist in self.artists:
-      if isinstance(artist, str):
-        strs.append(artist)
-        sep = ''
-      else:
-        try:
-          name = artist['name_']
-        except KeyError:
-          warning("no ['name_']: artist keys = %r", sorted(artist.keys()))
-        else:
-          strs.append(sep)
-          strs.append(name)
-          sep = ', '
-    return ''.join(strs)
-
-  @property
-  def artist_names(self) -> List[str]:
-    '''A list of the artist names.'''
-    names = []
-    for artist in self.artists:
-      if isinstance(artist, str):
-        continue
-      try:
-        name = artist['name_']
-      except KeyError:
-        warning("no ['name_']: artist keys = %r", sorted(artist.keys()))
-      else:
-        names.append(name)
-    return names
-
-class MBDisc(MBHasArtistsMixin, _MBEntity):
+class MBDisc(_MBEntity):
   ''' A Musicbrainz disc entry.
   '''
 
@@ -686,7 +620,7 @@ class MBDisc(MBHasArtistsMixin, _MBEntity):
         track_title=recording.title,
     )
 
-class MBRecording(MBHasArtistsMixin, _MBEntity):
+class MBRecording(_MBEntity):
   ''' A Musicbrainz recording entry, a single track.
   '''
 
@@ -709,7 +643,7 @@ class MBRecording(MBHasArtistsMixin, _MBEntity):
         raise AttributeError("no .title: {e}") from e
     return title
 
-class MBRelease(MBHasArtistsMixin, _MBEntity):
+class MBRelease(_MBEntity):
   ''' A Musicbrainz recording entry, a single track.
   '''
 
