@@ -971,13 +971,13 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
           continue
         if suffix == 'list':
           # this is a list of object attributes
-          if k_type_name in ('offset',):
-            warning("skip offset-list ?")
-            continue
           # apply members
           assert isinstance(v, list)
           flat_v = []
           for i, list_entry in enumerate(v):
+            if isinstance(list_entry, (int, str)):
+              flat_v.append(list_entry)
+              continue
             if not isinstance(list_entry, dict):
               warning("skip entry %s", r(list_entry))
               flat_v.append(list_entry)
@@ -1016,9 +1016,6 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
               self.apply_dict(submbe, list_entry, q=q, seen=seen)
               flat_v.append(entry_id)
           v = flat_v
-        elif suffix in ('relation', 'relation-list'):
-          warning("skip relation or relation-list")
-          continue
         if tag_name == 'name':
           tag_name = 'fullname'
         elif tag_name == 'fullname':
