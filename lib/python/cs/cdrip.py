@@ -1107,35 +1107,16 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
       if value is not None:
         tags.set(name, value)
 
-class CDRipCommand(BaseSQLTagsCommand):
+class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
   ''' 'cdrip' command line.
+      Environment:
+        {CDRIP_DEV_ENVVAR}            Default CDROM device.
+                             default {CDRIP_DEV_DEFAULT!r}.
+        {CDRIP_DIR_ENVVAR}            Default output directory path,
+                             default {CDRIP_DIR_DEFAULT!r}.
+        {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
+                             default {MBDB_PATH_DEFAULT!r}.
   '''
-
-  GETOPT_SPEC = 'd:D:fF:M:'
-
-  off_USAGE_KEYWORDS = {
-      'CDRIP_DEV_ENVVAR': CDRIP_DEV_ENVVAR,
-      'CDRIP_DEV_DEFAULT': CDRIP_DEV_DEFAULT,
-      'CDRIP_DIR_ENVVAR': CDRIP_DIR_ENVVAR,
-      'CDRIP_DIR_DEFAULT': CDRIP_DIR_DEFAULT,
-      'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
-      'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
-  }
-
-  USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand...
-    -d output_dir Specify the output directory path.
-    -D device     Device to access. This may be omitted or "default" or
-                  "" for the default device as determined by the discid module.
-    -f            Force. Read disc and consult Musicbrainz even if a toc file exists.
-    -M mbdb_path  Specify the location of the MusicBrainz SQLTags cache.
-
-  Environment:
-    {CDRIP_DEV_ENVVAR}            Default CDROM device.
-                         default {CDRIP_DEV_DEFAULT!r}.
-    {CDRIP_DIR_ENVVAR}            Default output directory path,
-                         default {CDRIP_DIR_DEFAULT!r}.
-    {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
-                         default {MBDB_PATH_DEFAULT!r}.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'rip'
 
