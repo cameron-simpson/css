@@ -371,8 +371,61 @@ class _MBEntity(HasSQLTags):
         raise RuntimeError("type_name=%r, id=%r is UUID" % (type_name, id))
     if isinstance(id, dict):
       id = id["id"]
-    te = self.sqltags[f'{self.type_zone}.{type_name}.{id}']
-    return _MBEntity.promote(te)
+    return self.mbdb[type_name, id]
+
+  @cached_property
+  def artist_credit_v(self):
+    ''' A list of `str|MBArtist` from `self.tags.artist_credit`.
+    '''
+    artists = []
+    for ac in self.tags.artist_credit:
+      if isinstance(ac, str):
+        artists.append(ac)
+      else:
+        artist_info = None
+        for ack, acv in ac.items():
+          if ack == 'artist':
+            artist_info = acv
+          else:
+            warning(
+                "self.tags.artist_credit: unexpected key %r in %r", ack, ac
+            )
+        assert artist_info is not None
+        assert isinstance(artist_info, str)
+        UUID(artist_info)
+        artists.append(self.mbdb['artist', artist_info])
+    return artists
+
+  @property
+  def artists(self):
+    ''' A list of the `MBArtist`s from `self.tags.artist_credit`.
+    '''
+    return [
+        artist for artist in self.artist_credit_v
+        if not isinstance(artist, str)
+    ]
+
+  def artist_names(self):
+    ''' A list of the artist names from `self.tags.artist_credit`.
+    '''
+    return [artist.fullname for artist in self.artists]
+
+  @property
+  def artist_credit(self) -> str:
+    '''A credit string computed from `self.tags.artist_credit`.
+    '''
+    strs = []
+    sep = ''
+    for artist in self.artist_credit_v:
+      if isinstance(artist, str):
+        strs.append(artist)
+        sep = ''
+      else:
+        fn = artist.fullname
+        strs.append(sep)
+        strs.append(fn)
+        sep = ', '
+    return ''.join(strs)
 
 class MBArtist(_MBEntity):
   ''' A Musicbrainz artist entry.
