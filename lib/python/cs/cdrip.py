@@ -784,18 +784,20 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
         raise RuntimeError(
             "query(%r,%r,...): using a UUID" % (typename, db_id)
         )
-    try:
-      mb_info = pfx_call(getter, db_id, includes=includes, **getter_kw)
-    except musicbrainzngs.musicbrainz.MusicBrainzError as e:
-      if e.cause.code == 404:
-        warning("not found: %s(%s): %s", getter_name, r(db_id), e)
-        if typename == 'recording':
-          raise
-        return {}
-      warning("help(%s):\n%s", getter_name, getter.__doc__)
-      help(getter)
-      raise
-      ##return {}
+    with run_task(f'musicbrainzngs.{getter_name}({db_id=},...)',
+                  report_print=True):
+      try:
+        mb_info = pfx_call(getter, db_id, includes=includes, **getter_kw)
+      except musicbrainzngs.musicbrainz.MusicBrainzError as e:
+        if e.cause.code == 404:
+          warning("not found: %s(%s): %s", getter_name, r(db_id), e)
+          if typename == 'recording':
+            raise
+          return {}
+        warning("help(%s):\n%s", getter_name, getter.__doc__)
+        help(getter)
+        raise
+        ##return {}
     # we expect the response to have a single entry for the record type requested
     if record_key in mb_info:
       other_keys = sorted(k for k in mb_info.keys() if k != record_key)
