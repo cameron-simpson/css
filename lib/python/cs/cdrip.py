@@ -442,7 +442,7 @@ class MBDisc(_MBEntity):
   @property
   def discid(self):
     ''' The disc id to be used in lookups.
-        For most discs with is `self.mbkey`, but if our discid is unknown
+        For most discs it is `self.mbkey`, but if our discid is unknown
         and another is in the database, the `use_discid` tag will supply
         that discid.
     '''
@@ -454,12 +454,6 @@ class MBDisc(_MBEntity):
     ''' The medium title or failing that the release title.
     '''
     return self.medium_title or self.release['title']
-
-  @property
-  @unattributable
-  def artist_refs(self):
-    # we get the artist refs from the release
-    return self.release.artist
 
   @property
   def release_list(self):
@@ -512,7 +506,7 @@ class MBDisc(_MBEntity):
   def mb_info(self):
     ''' Salient data from the MusicbrainzNG API response.
     '''
-    discid = self.discid
+    discid = self.mbkey
     release = self.release
     if release is None:
       raise AttributeError(f'no release for discid:{discid!r}')
@@ -627,10 +621,6 @@ class MBRecording(_MBEntity):
   TYPE_SUBNAME = 'recording'
 
   @property
-  def artist_refs(self):
-    return self.query_result['artist-credit']
-
-  @property
   def title(self):
     ''' The recording title.
     '''
@@ -648,10 +638,6 @@ class MBRelease(_MBEntity):
   '''
 
   TYPE_SUBNAME = 'release'
-
-  @property
-  def artist_refs(self):
-    return self.query_result['artist-credit']
 
 class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags`; it just has custom values for the default db location.
