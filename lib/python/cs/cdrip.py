@@ -860,7 +860,7 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
               warning("no refresh for mbtype=%r", mbtype)
               continue
             if (refetch or mbe.MB_QUERY_RESULT_TAG_NAME not in mbe
-                or mbeMB_QUERY_TIME_TAG_NAME not in mbe
+                or mbe.MB_QUERY_TIME_TAG_NAME not in mbe
                 or not mbe[mbe.MB_QUERY_RESULT_TAG_NAME]):
               # refresh or missing or stale
               query_get_type = mbtype
