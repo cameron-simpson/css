@@ -16,7 +16,7 @@ from cs.gimmicks import warning
 from cs.lex import is_dotted_identifier
 from cs.pfx import Pfx, pfx
 
-__version__ = '20250724'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
