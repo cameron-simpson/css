@@ -10,7 +10,6 @@
 
 from dataclasses import dataclass, field
 from inspect import isclass
-from itertools import chain
 import os
 import sys
 from typing import Iterable, List, Mapping
@@ -30,7 +29,7 @@ from cs.cmdutils import BaseCommand as CSBaseCommand
 from cs.gimmicks import warning
 from cs.lex import cutprefix, stripped_dedent
 
-__version__ = '20250219-post'
+__version__ = '20250609-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -52,7 +51,7 @@ if (settings._wrapped is djf_empty
   settings.configure()
 
 class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
-  ''' A subclass of `cs.cmdutils.SubCOmmand` with additional support
+  ''' A subclass of `cs.cmdutils.SubCommand` with additional support
       for Django's `BaseCommand`.
   '''
 
@@ -74,7 +73,7 @@ class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
       return super().__call__(argv)
     method = self.method
     instance = method()
-    return instance.run_from_argv([method.__module__, self.cmd] + argv)
+    return instance.run_from_argv([method.__module__, self.cmd, *argv])
 
   def usage_text(self, *, cmd=None, **kw):
     ''' Return the usage text for this subcommand.
@@ -184,8 +183,8 @@ class BaseCommand(CSBaseCommand, DjangoBaseCommand):
   class Options(CSBaseCommand.Options):
     settings: type(settings) = field(
         default_factory=lambda: dict(
-            (k, getattr(settings, k, None)) for k in sorted(dir(settings)) if k
-            and not k.startswith('_') and k not in ('SECRET_KEY',)
+            (k, getattr(settings, k, None)) for k in sorted(dir(settings)) if
+            (k and not k.startswith('_') and k not in ('SECRET_KEY',))
         )
     )
 
@@ -233,11 +232,13 @@ def model_batches_qs(
     model: Model,
     field_name='pk',
     *,
+    after=None,
     chunk_size=1024,
     desc=False,
     exclude=None,
-    filter=None,
+    filter=None,  # noqa: A002
     only=None,
+    yield_base_qs=False,
 ) -> Iterable[QuerySet]:
   ''' A generator yielding `QuerySet`s which produce nonoverlapping
       batches of `Model` instances.
@@ -253,12 +254,17 @@ def model_batches_qs(
       * `model`: the `Model` to query
       * `field_name`: default `'pk'`, the name of the field on which
         to order the batches
+      * `after`: an optional field value - iteration commences
+        immediately after this value
       * `chunk_size`: the maximum size of each chunk
       * `desc`: default `False`; if true then order the batches in
         descending order instead of ascending order
       * `exclude`: optional mapping of Django query terms to exclude by
       * `filter`: optional mapping of Django query terms to filter by
       * `only`: optional sequence of field names for a Django query `.only()`
+      * `yield_base_qs`: if true (default `False`) yield the base
+        `QuerySet` ahead of the `QuerySet`s for each batch;
+        this can be useful for a count or other preanalysis
 
       Example iteration of a `Model` would look like:
 
@@ -309,29 +315,58 @@ def model_batches_qs(
       qs0 = qs0.filter(filter)
   if only is not None:
     qs0 = qs0.only(*only)
-  qs = qs0.order_by(ordering)[:chunk_size]
   while True:
+    qs = qs0
+    if after is not None:
+      qs = qs.filter(**{after_condition: after})
+    qs = qs.order_by(ordering)
+    if yield_base_qs:
+      yield_base_qs = False
+      yield qs
+    qs = qs[:chunk_size]
     key_list = list(qs.only(field_name).values_list(field_name, flat=True))
     if not key_list:
       break
-    end_key = key_list[-1]
     yield qs
-    qs = qs0.filter(**{
-        after_condition: end_key
-    }).order_by(ordering)[:chunk_size]
+    after = key_list[-1]
 
 def model_instances(
     model: Model,
     field_name='pk',
-    only=None,
+    prefetch_related=None,
+    select_related=None,
+    yield_base_qs=False,
     **mbqs_kw,
 ) -> Iterable[Model]:
-  ''' A generator yielding Model instances.
-      This is a wrapper for `model_batches_qs` and accepts the same arguments.
+  ''' A generator yielding `Model` instances.
+      This is a wrapper for `model_batches_qs` and accepts the same arguments,
+      and some additional parameters.
+
+      If you need to extend the `QuerySet`s beyond what the
+      `model_batches_qs` parameters support it may be better to use
+      that and extend each returned `QuerySet`.
+
+      If `yield_base_qs` is true (default `False`), yield the base
+      `QuerySet` ahead of the model instances; this can be useful
+      for a count or other preanalysis.
+
+      Additional parameters beyond those for `model_batches_qs`:
+      * `prefetch_related`: an optional list of fields to apply to
+        each query with `.prefetch_related()`
+      * `select_related`: an optional list of fields to apply to
+        each query with `.select_related()`
 
       Efficient behaviour requires the field to be indexed.
       Correct behaviour requires the field values to be unique.
   '''
-  return chain.from_iterable(
-      model_batches_qs(model, field_name=field_name, **mbqs_kw)
+  batch_qses = model_batches_qs(
+      model, field_name=field_name, yield_base_qs=yield_base_qs, **mbqs_kw
   )
+  if yield_base_qs:
+    yield next(batch_qses)
+  for batch_qs in batch_qses:
+    if prefetch_related is not None:
+      batch_qs = batch_qs.prefetch_related(*select_related)
+    if select_related is not None:
+      batch_qs = batch_qs.select_related(*select_related)
+    yield from batch_qs

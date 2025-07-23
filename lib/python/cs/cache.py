@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 ''' A few caching data structures and other lossy things with capped sizes.
 '''
@@ -25,9 +25,9 @@ import time
 from typing import Any, Callable, Mapping, Optional
 
 from cs.context import stackattrs, withif
-from cs.deco import decorator, fmtdoc
+from cs.deco import decorator, fmtdoc, uses_verbose
 from cs.fileutils import atomic_filename, DEFAULT_POLL_INTERVAL, FileState
-from cs.fs import needdir, HasFSPath, validate_rpath
+from cs.fs import needdir, HasFSPath, shortpath, validate_rpath
 from cs.gimmicks import warning
 from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.lex import r, s
@@ -64,7 +64,7 @@ DISTINFO = {
     ],
 }
 
-class LRU_Cache(object):
+class LRU_Cache:
   ''' A simple least recently used cache.
 
       Unlike `functools.lru_cache`
@@ -517,6 +517,7 @@ class ConvCache(HasFSPath):
     hashname, hashhex = str(content_key).split(':', 1)
     return joinpath(hashname, *splitoff(hashhex, 2, 2))
 
+  @uses_verbose
   @require(lambda conv_subpath: not isabspath(conv_subpath))
   def convof(
       self,
@@ -526,6 +527,7 @@ class ConvCache(HasFSPath):
       *,
       ext=None,
       force=False,
+      verbose: bool,
   ) -> str:
     ''' Return the filesystem path of the cached conversion of
         `srcpath` via `conv_func`.
@@ -555,6 +557,8 @@ class ConvCache(HasFSPath):
     dstdirpath = dirname(dstpath)
     needdir(dstdirpath, use_makedirs=True)
     if force or not existspath(dstpath):
+      if verbose:
+        print('write', shortpath(dstpath), '<-', shortpath(srcpath))
       with Pfx('<%s %s >%s', srcpath, conv_func, dstpath):
         with atomic_filename(
             dstpath,
@@ -589,13 +593,27 @@ def cachedmethod(
       The cached values are stored on the instance (`self`).
       The revision counter supports the `@revised` decorator.
 
+      This is quite different to the stdlib's `functools.cache`,
+      which caches all results on the function itself, keyed by the arguments.
+      By contrast, this decorator caches results on `self` and the
+      cached results are invalidated if the signature for those
+      arguments changes.
+
+      This is aimed at caching the results of expensive functions
+      whose results for some particular arguments may change.
+      The motivating use case was a large set of mail filing rules
+      where I wanted them reloaded if the rule files were modified.
+      The signature function is a based on `stat()`s of the file
+      modification times; if they do not change, the rules are
+      assumed to be as before.
+
       This decorator may be used in 2 modes.
       Directly:
 
           @cachedmethod
           def method(self, ...)
 
-      or indirectly:
+      or with keyword arguments:
 
           @cachedmethod(poll_delay=0.25)
           def method(self, ...)
@@ -643,76 +661,96 @@ def cachedmethod(
     )
 
   attr = attr_name if attr_name else method.__name__
-  val_attr = '_' + attr
-  sig_attr = val_attr + '__signature'
-  rev_attr = val_attr + '__revision'
-  lastpoll_attr = val_attr + '__lastpoll'
+  cache_attr = '__cachedmethod__' + attr
 
   # pylint: disable=too-many-branches
   def cachedmethod_wrapper(self, *a, **kw):
+    ''' Wrapper for `method` which honours the cache on `self`.
+    '''
     with Pfx("%s.%s", self, attr):
       now = None
-      value0 = getattr(self, val_attr, unset_value)
-      sig0 = getattr(self, sig_attr, None)
-      sig = getattr(self, sig_attr, None)
-      if value0 is unset_value:
-        # value unknown, needs compute
-        pass
-      # we have a cached value for return in the following logic
-      elif poll_delay is None:
-        # no repoll time, the cache is always good
-        return value0
-      # see if the value is stale
-      lastpoll = getattr(self, lastpoll_attr, None)
+      # TODO: recurse down the values making them hashable: list->tuple etc
+      kw_keys = sorted(kw.keys())
+      sig_key = (
+          () if sig_func is None else
+          (tuple(*a), tuple(kw_keys), tuple(kw[k] for k in kw_keys))
+      )
+      try:
+        cache = getattr(self, cache_attr)
+      except AttributeError:
+        cache = {}
+        setattr(self, cache_attr, cache)
+      try:
+        sig, sig_poll_time, result, revision = cache[sig_key]
+      except KeyError:
+        sig, sig_poll_time, result, revision = (
+            unset_value, None, unset_value, 0
+        )
       now = time.time()
-      if (poll_delay is not None and lastpoll is not None
-          and now - lastpoll < poll_delay):
-        # reuse cache
-        return value0
-      # never polled or the cached value is stale, poll now
-      # update the poll time
-      setattr(self, lastpoll_attr, now)
-      # check the signature if provided
-      # see if the signature is unchanged
-      if sig_func is not None:
+      if sig_poll_time is None:
+        # we need to compute the first value
+        pass
+      else:
+        ## FIRES!?! assert sig is not unset_value
+        # see if it is tool early to recompute the signature
+        # (and by inference, the new value)
+        if poll_delay is not None and now - sig_poll_time < poll_delay:
+          # do not even compute the signature
+          # return the cached result
+          return result
+      # update poll time
+      sig_poll_time = now
+      # see if the signature has changed
+      if sig_func is None:
+        new_sig = unset_value
+      else:
         try:
-          sig = sig_func(self)
+          new_sig = sig_func(self, *a, **kw)
         except Exception as e:  # pylint: disable=broad-except
           # signature function fails, use the cache
-          warning("sig func %s(self): %s", sig_func, e, exc_info=True)
-          return value0
-        if sig0 is not None and sig0 == sig:
-          # signature unchanged
-          return value0
-        # update signature
-        setattr(self, sig_attr, sig)
-      # compute the current value
+          warning(
+              "sig_func %s(self,*%r,**%r): %s",
+              sig_func,
+              a,
+              kw,
+              e,
+              exc_info=True
+          )
+          new_sig = sig
+      if result is not unset_value and new_sig == sig:
+        # signature unchanged
+        # just update the poll time and return the cached result
+        cache[sig_key] = sig, sig_poll_time, result, revision
+        return result
+      # cache stale, compute the current value
       try:
-        value = method(self, *a, **kw)
+        new_result = method(self, *a, **kw)
       except Exception as e:  # pylint: disable=broad-except
         # computation fails, return cached value
-        if value0 is unset_value:
-          # no cached value
+        # update the poll time and leave the result unchanged
+        cache[sig_key] = sig, sig_poll_time, result, revision
+        if result is unset_value:
+          # no cached value, raise the exception
           raise
         warning("exception calling %s(self): %s", method, e, exc_info=True)
-        return value0
-      # update the cache
-      setattr(self, val_attr, value)
-      # bump revision if the value changes
-      # noncomparable values are always presumed changed
-      changed = value0 is unset_value or value0 is not value
-      if not changed:
+      else:
+        # see if the revision should change
         try:
-          changed = value0 != value
+          changed = result == new_result
         except TypeError:
+          # not comparable vaues
           changed = True
-      if changed:
-        setattr(self, rev_attr, (getattr(self, rev_attr, 0) or 0) + 1)
-      return value
+        if changed:
+          revision += 1
+        # update the result regardless
+        result = new_result
+      # update the cache
+      cache[sig_key] = sig, sig_poll_time, result, revision
+      return result
 
-  ##  Doesn't work, has no access to self. :-(
   ##  TODO: provide a .flush() function to clear the cached value
-  ##  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
+  ##        cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
+  ##        Doesn't work, has no access to self. :-(
 
   return cachedmethod_wrapper
 

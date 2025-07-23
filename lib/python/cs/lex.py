@@ -16,10 +16,12 @@ raising `ValueError` on failed tokenisation.
 
 import binascii
 from dataclasses import dataclass
+from datetime import date, datetime
 from functools import partial
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from pprint import pformat, PrettyPrinter
 import re
 from string import (
     ascii_letters,
@@ -39,14 +41,14 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import fmtdoc, decorator, Promotable
+from cs.deco import fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20250103-post'
+__version__ = '20250428-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -176,7 +178,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=32):
           X("foo = %s", s(foo))
   '''
   # pylint: disable=redefined-outer-name
-  o_s = repr(o) if use_repr else str(o)
+  o_s = cropped_repr(o) if use_repr else str(o)
   if max_length is not None:
     o_s = cropped(o_s, max_length)
   s = "%s:%s" % (type(o) if use_cls else type(o).__name__, o_s)
@@ -411,12 +413,15 @@ def indent(paragraph, line_indent="  "):
       line and line_indent + line for line in paragraph.split("\n")
   )
 
+# TODO: add an optional detab=n parameter?
 def stripped_dedent(s, post_indent='', sub_indent=''):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Algorithm:
       strip the supplied string `s`, pull off the leading line,
       dedent the rest, put back the leading line.
+
+      This is a lot like the `inspect.cleandoc()` function.
 
       This supports my preferred docstring layout, where the opening
       line of text is on the same line as the opening quote.
@@ -1145,8 +1150,10 @@ def as_lines(chunks, partials=None):
 
 # pylint: disable=redefined-outer-name
 def cutprefix(s, prefix):
-  ''' Strip a `prefix` from the front of `s`.
+  ''' Remove `prefix` from the front of `s` if present.
       Return the suffix if `s.startswith(prefix)`, else `s`.
+      As with `str.startswith`, `prefix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching prefix from the tuple will be removed.
 
       Example:
 
@@ -1157,15 +1164,30 @@ def cutprefix(s, prefix):
           'abc.def'
           >>> cutprefix(abc_def, '.zzz') is abc_def
           True
+          >>> cutprefix('this_that', ('this', 'thusly'))
+          '_that'
+          >>> cutprefix('thusly_that', ('this', 'thusly'))
+          '_that'
   '''
   if prefix and s.startswith(prefix):
+    if isinstance(prefix, tuple):
+      # a tuple of str
+      for pfx in prefix:
+        if s.startswith(pfx):
+          return s[len(pfx):]
+      # no match, return the original object
+      return s
+    # a str
     return s[len(prefix):]
+  # no match, return the original object
   return s
 
 # pylint: disable=redefined-outer-name
 def cutsuffix(s, suffix):
-  ''' Strip a `suffix` from the end of `s`.
+  ''' Remove `suffix` from the end of `s` if present.
       Return the prefix if `s.endswith(suffix)`, else `s`.
+      As with `str.endswith`, `suffix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching suffix from the tuple will be removed.
 
       Example:
 
@@ -1176,9 +1198,22 @@ def cutsuffix(s, suffix):
           'abc.def'
           >>> cutsuffix(abc_def, '.zzz') is abc_def
           True
+          >>> cutsuffix('this_that', ('that', 'tother'))
+          'this_'
+          >>> cutsuffix('this_tother', ('that', 'tother'))
+          'this_'
   '''
   if suffix and s.endswith(suffix):
+    if isinstance(suffix, tuple):
+      # a tuple of str
+      for sfx in suffix:
+        if s.endswith(sfx):
+          return s[:-len(sfx)]
+      # no match, return the original object
+      return s
+    # a str
     return s[:-len(suffix)]
+  # no match, return the original object
   return s
 
 def common_prefix(*strs):
@@ -1356,28 +1391,23 @@ def snakecase(camelcased):
     strs.append(c)
   return ''.join(strs)
 
+@OBSOLETE('cs.fs.RemotePath.from_str')
 def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   ''' Split a path with an optional leading `[user@]rhost:` prefix
       into the prefix and the remaining path.
       `None` is returned for the prefix is there is none.
       This is useful for things like `rsync` targets etc.
-  '''
-  ssh_target = None
-  # check for [user@]rhost
-  try:
-    prefix, suffix = remotepath.split(':', 1)
-  except ValueError:
-    pass
-  else:
-    if prefix and '/' not in prefix:
-      ssh_target = prefix
-      remotepath = suffix
-  return ssh_target, remotepath
 
-def tabulate(*rows, sep='  '):
+      OBSOLETE, use `cs.fs.RemotePath.from_str` instead.
+  '''
+  from cs.fs import RemotePath
+  return RemotePath.from_str(remotepath)
+
+def tabulate(*rows, sep='  ', ppcls=None):
   r''' A generator yielding lines of values from `rows` aligned in columns.
 
-      Each row in rows is a list of strings. If the strings contain
+      Each row in rows is a list of strings. Non-`str` objects are
+      promoted to `str` via `pprint.pformat`. If the strings contain
       newlines they will be split into subrows.
 
       Example:
@@ -1398,9 +1428,32 @@ def tabulate(*rows, sep='  '):
           two      cols
           >>>
   '''
+  if ppcls is None:
+
+    class ppcls(PrettyPrinter):
+      ''' A `PrettyPrinter` subclass which presents `date` and
+          `datetime` as ISO8601 strings.
+      '''
+
+      def format(self, obj, *fmt_a):
+        ''' Use ISO8601 for `date` and `datetime` objects.
+        '''
+        if isinstance(obj, date):
+          return obj.isoformat(), True, False
+        if isinstance(obj, datetime):
+          return obj.isoformat(' '), True, False
+        return super().format(obj, *fmt_a)
+
+  ppr = ppcls(compact=True, sort_dicts=True)
   if not rows:
     # avoids max of empty list
     return
+  # promote all table cells to str via pformat
+  rows = [
+      [(cell if isinstance(cell, str) else ppr.pformat(cell))
+       for cell in row]
+      for row in rows
+  ]
   # pad short rows with empty columns
   max_cols = max(map(len, rows))
   for row in rows:
@@ -1432,6 +1485,24 @@ def tabulate(*rows, sep='  '):
     yield sep.join(
         f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
     ).rstrip()
+
+def printt(
+    *table, file=None, flush=False, indent='', print_func=None, **tabulate_kw
+):
+  ''' A wrapper for `tabulate()` to print the results.
+      Each positional argument is a table row.
+
+      Parameters:
+      * `file`: optional output file, passed to `print_func`
+      * `flush`: optional flush flag, passed to `print_func`
+      * `indent`: optional leading indent for the output lines
+      * `print_func`: optional `print()` function, default `builtins.print`
+      Other keyword arguments are passed to `tabulate()`.
+  '''
+  if print_func is None:
+    from builtins import print as print_func
+  for line in tabulate(*table, **tabulate_kw):
+    print_func(indent + line, file=file, flush=flush)
 
 # pylint: disable=redefined-outer-name
 def format_escape(s):

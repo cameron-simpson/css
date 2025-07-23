@@ -1,0 +1,1 @@
+frame: accept an optional traceback object or exception as a source from which to obtain the stack, add optional limit to crop the stack.

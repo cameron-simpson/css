@@ -58,7 +58,7 @@ class URLFetcher(MultiOpenMixin):
     cache = P.content_cache
     cache_keys = self.pilfer.cache_keys_for_url(url)
     if not cache_keys:
-      ##PR("no cache keys")
+      PR("no cache keys")
       return
     R = Result(f'_fetch_url({url})')
     new_keys = []
@@ -119,7 +119,8 @@ class URLFetcher(MultiOpenMixin):
       try:
         with stackattrs(self, _q=q):
           t = asyncio.create_task(self.prefetch_worker(aqiter(q, eoq)))
-          yield t
+          with stackattrs(self.pilfer.state, prefetcher=self):
+            yield t
       finally:
         q.put(eoq)
 

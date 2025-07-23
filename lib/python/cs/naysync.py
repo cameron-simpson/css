@@ -54,7 +54,7 @@ from typing import (
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
 
-__version__ = '20250103-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -521,6 +521,8 @@ class AsyncPipeLine:
     tasks = []
     for stage_spec in stage_specs:
       new_outq = IterableAsyncQueue(maxsize)
+      # TODO: a fast setting and honour it
+      fast = None  # indicator for synchronous stage functions, as yet unimplementd
       try:
         stage_func, batchsize = stage_spec
       except (

@@ -5,13 +5,6 @@
     uses the discid and musicbrainzngs modules.
 '''
 
-# Extract discid and track info from a CD as a preliminary to
-# constructing a FreeDB CDDB entry. Used by cdsubmit.
-# Rework of cddiscinfo in Python, since the Perl libraries aren't
-# working any more; update to work on OSX and use MusicBrainz.
-# - Cameron Simpson <cs@cskk.id.au> 31mar2016
-#
-
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -36,7 +29,7 @@ from icontract import require
 import musicbrainzngs
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs, stack_signals
 from cs.deco import fmtdoc
 from cs.excutils import unattributable
@@ -52,7 +45,7 @@ from cs.psutils import run
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate, RunStateMixin
 from cs.seq import unrepeated
-from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin
+from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommandsMixin, FIND_OUTPUT_FORMAT_DEFAULT
 from cs.tagset import TagSet, TagsOntology
 from cs.upd import run_task, print
 
@@ -79,33 +72,14 @@ def main(argv=None):
 
 class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
   ''' 'cdrip' command line.
+      Environment:
+        {CDRIP_DEV_ENVVAR}            Default CDROM device.
+                             default {CDRIP_DEV_DEFAULT!r}.
+        {CDRIP_DIR_ENVVAR}            Default output directory path,
+                             default {CDRIP_DIR_DEFAULT!r}.
+        {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
+                             default {MBDB_PATH_DEFAULT!r}.
   '''
-
-  GETOPT_SPEC = 'd:D:fF:M:'
-
-  USAGE_KEYWORDS = {
-      'CDRIP_DEV_ENVVAR': CDRIP_DEV_ENVVAR,
-      'CDRIP_DEV_DEFAULT': CDRIP_DEV_DEFAULT,
-      'CDRIP_DIR_ENVVAR': CDRIP_DIR_ENVVAR,
-      'CDRIP_DIR_DEFAULT': CDRIP_DIR_DEFAULT,
-      'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
-      'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
-  }
-
-  USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand...
-    -d output_dir Specify the output directory path.
-    -D device     Device to access. This may be omitted or "default" or
-                  "" for the default device as determined by the discid module.
-    -f            Force. Read disc and consult Musicbrainz even if a toc file exists.
-    -M mbdb_path  Specify the location of the MusicBrainz SQLTags cache.
-
-  Environment:
-    {CDRIP_DEV_ENVVAR}            Default CDROM device.
-                         default {CDRIP_DEV_DEFAULT}.
-    {CDRIP_DIR_ENVVAR}            Default output directory path,
-                         default {CDRIP_DIR_DEFAULT}.
-    {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
-                         default {MBDB_PATH_DEFAULT}.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'rip'
 
@@ -134,28 +108,15 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       '''A list of the codec names to produce.'''
       return self.codecs_spec.replace(',', ' ').split()
 
-  def apply_opts(self, opts):
-    ''' Apply the command line options.
-    '''
-    options = self.options
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-d':
-          options.dirpath = val
-        elif opt == '-D':
-          options.device = val
-        elif opt == '-f':
-          options.force = True
-        elif opt == '-M':
-          options.mbdb_path = val
-        elif opt == 'F:':
-          options.codecs_spec = val
-        else:
-          raise GetoptError("unimplemented option")
-    if not isdirpath(options.dirpath):
-      raise GetoptError(
-          "output directory: not a directory: %r" % (options.dirpath,)
-      )
+    COMMON_OPT_SPECS = dict(
+        **BaseCommand.Options.COMMON_OPT_SPECS,
+        d_=('dirpath', 'Specify the output directory path.'),
+        D_=(
+            'device',
+            '''Device to access. This may be omitted or "" or "default"
+               for the default device as determined by the discid module.''',
+        ),
+    )
 
   @contextmanager
   def run_context(self):
@@ -238,6 +199,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       disc.mb_toc = dev_info.toc_string
     return disc
 
+  @popopts
   def cmd_disc(self, argv):
     ''' Usage: {cmd} {{.|discid}} {{tag[=value]|-tag}}...
           Tag the disc identified by discid.
@@ -264,32 +226,27 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         if tag_choice.tag in disc:
           disc.discard(tag_choice.tag)
 
+  @popopts(
+      a=(
+          'all_fields',
+          ''' Dump all tags. By default the Musicbrainz API fields
+              and *_relation fields are suppressed.''',
+      ),
+      R=('do_refresh', 'Explicitly refresh the entity before dumping it.'),
+  )
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [-a] [-R] [entity...]
           Dump each entity.
-          -a    Dump all tags. By default the Musicbrainz API fields
-                and *_relation fields are suppressed.
-          -R    Explicitly refresh the entity before dumping it.
           If no entities are supplied, dump the entity for the disc in the CD drive.
     '''
     options = self.options
     mbdb = options.mbdb
     sqltags = mbdb.sqltags
-    all_fields = False
-    do_refresh = False
-    force_refresh = False
-    opts, argv = getopt(argv, 'aR')
-    for opt, _ in opts:
-      with Pfx(opt):
-        if opt == '-a':
-          all_fields = True
-        elif opt == '-R':
-          do_refresh = True
-        else:
-          raise NotImplementedError("unimplemented option")
+    all_fields = options.all_fields
+    do_refresh = options.do_refresh
     if not argv:
       if mbdb.dev_info:
-        argv = ['disc.' + mbdb.dev_info.id]
+        argv = [f'disc.{mbdb.dev_info.id}']
       else:
         raise GetoptError("missing entities and no CD in the drive")
     q = ListQueue(argv)
@@ -306,6 +263,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
           mbdb.refresh(te, refetch=options.force, recurse=True)
         te.dump(compact=True, keys=sorted(te.keys()) if all_fields else None)
 
+  @popopts
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
@@ -327,6 +285,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
+  @popopts
   def cmd_meta(self, argv):
     ''' Usage: {cmd} entity...
           Print the metadata about entity, where entity has the form
@@ -342,6 +301,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
         metadata = mbdb.ontology[metaname]
         print(' ', metaname, metadata)
 
+  @popopts
   def cmd_eject(self, argv):
     ''' Usage: {cmd}
           Eject the disc.
@@ -350,6 +310,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       raise GetoptError("extra arguments")
     return os.system('eject')
 
+  @popopts
   def cmd_probe(self, argv):
     ''' Usage: {cmd} [disc_id]
           Probe Musicbrainz about the current disc.
@@ -368,6 +329,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     return 0
 
   # pylint: disable=too-many-locals
+  @popopts
   def cmd_rip(self, argv):
     ''' Usage: {cmd} [-F codecs] [-n] [disc_id]
           Pull the audio into a subdirectory of the current directory.
@@ -380,7 +342,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     options.popopts(argv, F_='codecs_spec', n='dry_run')
     disc = self.popdisc(argv, '.')
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     try:
       rip(
           self.device_id,
@@ -398,13 +360,14 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     os.system("eject")
     return 0
 
+  @popopts
   def cmd_toc(self, argv):
     ''' Usage: {cmd} [disc_id]
           Print a table of contents for the current disc.
     '''
     disc = self.popdisc(argv, '.')
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     ##MB = options.mbdb
     ##with stackattrs(MB, dev_info=dev_info):
@@ -1027,22 +990,11 @@ class MBSQLTags(SQLTags):
       skip_refresh = '.' not in name
     return super().default_factory(name, skip_refresh=skip_refresh, **kw)
 
-  @fmtdoc
-  def __init__(self, mbdb_path=None):
-    ''' Initialise the `MBSQLTags` instance,
-        computing the default `mbdb_path` if required.
-
-        `mbdb_path` is provided as `db_url` to the `SQLTags` superclass
-        initialiser.
-        If not specified it is obtained from the environment variable
-        {MBDB_PATH_ENVVAR}, falling back to `{MBDB_PATH_DEFAULT!r}`.
-    '''
-    if mbdb_path is None:
-      mbdb_path = os.environ.get(MBDB_PATH_ENVVAR)
-      if mbdb_path is None:
-        mbdb_path = expanduser(MBDB_PATH_DEFAULT)
-    super().__init__(db_url=mbdb_path)
-    self.mbdb_path = mbdb_path
+  @classmethod
+  def infer_db_url(cls):
+    return super().infer_db_url(
+        envvar=MBDB_PATH_ENVVAR, default_path=MBDB_PATH_DEFAULT
+    )
 
   @pfx_method
   def __getitem__(self, index):
@@ -1093,7 +1045,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     RunStateMixin.__init__(self)
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
-    sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
+    sqltags = self.sqltags = MBSQLTags(mbdb_path)
     sqltags.mbdb = self
     with sqltags:
       ont = self.ontology = TagsOntology(sqltags)

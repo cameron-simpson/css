@@ -1,0 +1,3 @@
+lib/python/cs/debug.py: cs.debug: fix docstring typo
+lib/python/cs/debug.py: cs.debug: stack_dump: stack may also be a traceback object or an exception
+lib/python/cs/debug.py: cs.debug: stack_dump: move the logic to obtain the stack into cs.py.stack.frames()

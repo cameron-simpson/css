@@ -80,7 +80,7 @@ class OntCommand(TagsOntologyCommand):
           Run some tests.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     ont = self.options.ontology
     type_names = sorted(ont.type_names())
     for tn in type_names:

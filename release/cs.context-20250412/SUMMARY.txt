@@ -1,0 +1,1 @@
+push_cmgr: also pop the pop function attribute.

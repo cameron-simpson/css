@@ -1,7 +1,17 @@
+some kind of sitemap reload functionality?
+a hook after the SNI or CONNECT and before the requestheaders to pass the TLS stream straight through, eg for icloud
+SiteMap.patch_soup_top_index to put a toolbar across the top of a page with RSS, dl, etc etc
+get the content-length through to stream processing and progressbar
+@decorator to preserve the iscoroutineness of the decorated function? And check it works via @OBSOLETE? suggestion by fixerror
+cmd_dump: intercept html comments before nav strings
+sitemaps: an @on(selector....) instead of the opaque pattern stuff in use presently, flexible generator/return types etc
+expose the site-by-sitemap stuff etc as methods on sitemaps?
+multiple @listen ? could listen on localhost and fleet2-wg
+autoreload modified sitemaps if modified and syntax ok?
 pilfer from: can we use the Pilfer cache.find_content over url.GET ?
 URLFetcher - if there are cached keys and uncaches keys for a URL, link an old cache entry to the new keys
 BUG - if the content comes from the cache the mitm fetch does not happen, so the following stream stages do not run against the content
-prefetch should skip+warning URLswith no cache keys
+prefetch should skip+warning URLs with no cache keys
 requestheaders should block on in-progress identifcal fetches based on the cache keys?
 cache should cache against all sitemap keys
 pipe-stage|pipeline runs the stage and pipes its results to pipeline, passing the original input through to the next stage

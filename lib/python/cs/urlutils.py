@@ -44,7 +44,7 @@ from cs.deco import promote, Promotable
 from cs.excutils import unattributable
 from cs.lex import parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.rfc2616 import datetime_from_http_date
 from cs.seq import skip_map
 from cs.threads import locked, ThreadState, HasThreadState
@@ -80,6 +80,8 @@ DISTINFO = {
 ##HTTPConnection.putheader = my_putheader
 
 def urljoin(url, other_url):
+  ''' This is `urllib.parse.urljoin` after coercing both arguments to `str`.
+  '''
   return up_urljoin(str(url), str(other_url))
 
 class URL(HasThreadState, Promotable):
@@ -102,8 +104,6 @@ class URL(HasThreadState, Promotable):
     self._lock = RLock()
     self._parts = None
     self._info = None
-    self._soup = soup
-    self._text = text
     self.flush()
 
   def __str__(self):
@@ -111,6 +111,17 @@ class URL(HasThreadState, Promotable):
 
   def __repr__(self):
     return f'{self.__class__.__name__}:{self.url_s!r}'
+
+  @property
+  def short(self):
+    ''' A shortened form of the URL for use in messages.
+    '''
+    path = self.path
+    if len(path) <= 32:
+      shortpath = path
+    else:
+      shortpath = f'{path[:15]}...{path[-14:]}'
+    return f'{self.hostname}{shortpath}'
 
   def flush(self):
     ''' Forget all cached content.
@@ -183,14 +194,12 @@ class URL(HasThreadState, Promotable):
     '''
     return self.GET_response.content
 
-  @property
+  @cached_property
   @unattributable
   def text(self) -> str:
     ''' The URL decoded content as a string.
     '''
-    if self._text is None:
-      self._text = self.GET_response.text
-    return self._text
+    return self.GET_response.text
 
   @property
   @unattributable
@@ -201,12 +210,24 @@ class URL(HasThreadState, Promotable):
     r = self.HEAD_response
     return r.headers
 
-  @property
+  # TODO: use functions from cs.rfc2616? they do return an email.BaseHeader :-(
+  @cached_property
+  @unattributable
+  def content_type_full(self):
+    ''' The URL content MIME type from the `Content-Type` header.
+    '''
+    try:
+      return self.headers['content-type']
+    except KeyError as e:
+      warning("%s.content_type_full", self)
+
+  @cached_property
   @unattributable
   def content_type(self):
-    ''' The URL content MIME type.
+    ''' The base URL content MIME type from the `Content-Type` header.
+        Example: `'text/html'`
     '''
-    return self.headers['content-type']
+    return self.content_type_full.split(';')[0].strip().lower()
 
   @property
   @unattributable
@@ -258,26 +279,12 @@ class URL(HasThreadState, Promotable):
   def soup(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    if self._soup is not None:
-      return self._soup
-    try:
-      text = self.text
-      if self.content_type == 'text/html':
-        parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
-      else:
-        parser_names = ('lxml', 'xml')
-      try:
-        soup = BeautifulSoup(text, 'html5lib')
-        ##soup = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
-      except Exception as e:
-        exception(
-            "%s: .parsed: BeautifulSoup(text,html5lib) fails: %s", self, e
-        )
-        raise
-      self._soup = soup
-      return soup
-    except:
-      raise
+    if self.content_type == 'text/html':
+      parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
+    else:
+      parser_names = ('lxml', 'xml')
+    soup = pfx_call(BeautifulSoup, self.text, 'lxml')  ## list(parser_names))
+    return soup
 
   def feedparsed(self):
     ''' A parse of the content via the feedparser module.
@@ -302,28 +309,35 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def scheme(self):
-    ''' The URL scheme as returned by urlparse.urlparse.
+    ''' The URL scheme as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.scheme
 
   @property
   @unattributable
   def netloc(self):
-    ''' The URL netloc as returned by urlparse.urlparse.
+    ''' The URL netloc as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.netloc
 
   @property
   @unattributable
   def path(self):
-    ''' The URL path as returned by urlparse.urlparse.
+    ''' The URL path as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.path
+
+  @property
+  @unattributable
+  def rpath(self):
+    ''' The URL path as returned by `urlparse.urlparse`, after any leading slashes.
+    '''
+    return self.path.lstrip('/')
 
   @cached_property
   @unattributable
   def cleanpath(self):
-    ''' The URL path as returned by urlparse.urlparse,
+    ''' The URL path as returned by `urlparse.urlparse`,
         with multiple slashes (`/`) reduced to a single slash.
         Technically this can change the meaning of the URL path,
         but usually these are an artifact of sloppy path construction.
@@ -351,14 +365,14 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def params(self):
-    ''' The URL params as returned by urlparse.urlparse.
+    ''' The URL params as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.params
 
   @property
   @unattributable
   def query(self):
-    ''' The URL query as returned by urlparse.urlparse.
+    ''' The URL query as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.query
 
@@ -371,35 +385,35 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def fragment(self):
-    ''' The URL fragment as returned by urlparse.urlparse.
+    ''' The URL fragment as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.fragment
 
   @property
   @unattributable
   def username(self):
-    ''' The URL username as returned by urlparse.urlparse.
+    ''' The URL username as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.username
 
   @property
   @unattributable
   def password(self):
-    ''' The URL password as returned by urlparse.urlparse.
+    ''' The URL password as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.password
 
   @property
   @unattributable
   def hostname(self):
-    ''' The URL hostname as returned by urlparse.urlparse.
+    ''' The URL hostname as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.hostname
 
   @property
   @unattributable
   def port(self):
-    ''' The URL port as returned by urlparse.urlparse.
+    ''' The URL port as returned by `urlparse.urlparse`.
     '''
     return self.url_parsed.port
 
@@ -646,7 +660,8 @@ class URL(HasThreadState, Promotable):
         `str` is promoted directly to `cls(obj)`.
         `(url,referer)` is promoted to `cls(url,referer=referer)`.
     '''
-    if isinstance(obj, cls):
+    # TODO: can the None check comes from Promotable.promote?
+    if obj is None or isinstance(obj, cls):
       return obj
     if isinstance(obj, str):
       return cls(obj)

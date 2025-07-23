@@ -20,33 +20,20 @@
     * buffer:
       an instance of `cs.buffer.CornuCopyBuffer`,
       which manages an iterable of bytes-like values
-      and has various useful methods;
-      it also has a few factory methods to make one from a variety of sources
-      such as bytes, iterables, binary files, `mmap`ped files,
-      TCP data streams, etc.
+      and has various useful methods for parsing.
     * chunk:
       a piece of binary data obeying the buffer protocol,
+      i.e. a `collections.abc.Buffer`;
       almost always a `bytes` instance or a `memoryview`,
       but in principle also things like `bytearray`.
 
-    There are 5 main classes on which an implementor should base their data structures:
-    * `BinarySingleStruct`: a factory for classes based
-      on a `struct.struct` format string with a single value;
-      this builds a `namedtuple` subclass
-    * `BinaryMultiStruct`: a factory for classes based
-      on a `struct.struct` format string with multiple values;
-      this also builds a `namedtuple` subclass
-    * `BinarySingleValue`: a base class for subclasses
-      parsing and transcribing a single value
-    * `BinaryMultiValue`: a base class for subclasses
-      parsing and transcribing multiple values
-      with no variation
-    * `SimpleBinary`: a base class for subclasses
-      with custom `.parse` and `.transcribe` methods,
-      for structures with variable fields
+    The `CornuCopyBuffer` is the basis for all parsing, as it manages
+    a variety of input sources such as files, memory, sockets etc.
+    It also has a factory methods to make one from a variety of sources
+    such as bytes, iterables, binary files, `mmap`ped files,
+    TCP data streams, etc.
 
-    Any the classes derived from the above inherit all the methods
-    of `AbstractBinary`.
+    All the binary classes subclass `AbstractBinary`.
     Amongst other things, this means that the binary transcription
     can be had simply from `bytes(instance)`,
     although there are more transcription methods provided
@@ -54,34 +41,155 @@
     It also means that all classes have `parse`* and `scan`* methods
     for parsing binary data streams.
 
+    The `.parse(cls,bfr)` class method reads binary data from a
+    buffer and returns an instance.
+
+    The `.transcribe(self)` method may be a regular function or a
+    generator which returns or yields things which can be transcribed
+    as bytes via the `flatten` function.
+    See the `AbstractBinary.transcribe` docstring for specifics; this might:
+    - return a `bytes`
+    - return an ASCII string
+    - be a generator which yields various values such as bytes,
+      ASCII strings, other `AbstractBinary` instances such as each
+      field (which get transcribed in turn) or an iterable of these
+      things
+
+    There are 6 main ways an implementor might base their data structures:
+    * `BinaryStruct`: a factory for classes based
+      on a `struct.struct` format string with multiple values;
+      this also builds a `namedtuple` subclass
+    * `@binclass`: a dataclass-like specification of a binary structure
+    * `BinarySingleValue`: a base class for subclasses
+      parsing and transcribing a single value, such as `UInt8` or
+      `BinaryUTF8NUL`
+    * `BinaryMultiValue`: a factory for subclasses
+      parsing and transcribing multiple values
+      with no variation
+    * `SimpleBinary`: a base class for subclasses
+      with custom `.parse` and `.transcribe` methods,
+      for structures with variable fields;
+      this makes a `SimpleNamespace` subclass
+
+    These can all be mixed as appropriate to your needs.
+
     You can also instantiate objects directly;
     there's no requirement for the source information to be binary.
 
     There are several presupplied subclasses for common basic types
     such as `UInt32BE` (an unsigned 32 bit big endian integer).
 
-    # Two Examples
+    ## Some Examples
 
-    Here are two examples drawn from `cs.iso14496`.
-    Like all the `Binary*` subclasses, parsing an instance from a
+    ### A `BinaryStruct`, from `cs.iso14496`
+
+    A simple `struct` style definitiion for 9 longs:
+
+        Matrix9Long = BinaryStruct(
+            'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
+        )
+
+    Per the `struct.struct` format string, this parses 9 big endian longs
+    and returns a `namedtuple` with 9 fields.
+    Like all the `AbstractBinary` subclasses, parsing an instance from a
     stream can be done like this:
 
         m9 = Matrix9Long.parse(bfr)
         print("m9.v3", m9.v3)
 
-        edit_list = ELSTBoxBody.parse(bfr)
-        print("edit list: entry_count =", edit_list.entry_count)
-
     and writing its binary form to a file like this:
 
         f.write(bytes(m9))
-        f.write(bytes(edit_list))
 
-    A simple `struct` style definitiion for 9 longs:
+    ### A `@binclass`, also from `cs.iso14496`
 
-        Matrix9Long = BinaryMultiStruct(
-            'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
-        )
+    For reasons to do with the larger MP4 parser this uses an extra
+    decorator `@boxbodyclass` which is just a shim for the `@binclass`
+    decorator with an addition step.
+
+        @boxbodyclass
+        class FullBoxBody2(BoxBody):
+          """ A common extension of a basic `BoxBody`, with a version and flags field.
+              ISO14496 section 4.2.
+          """
+          version: UInt8
+          flags0: UInt8
+          flags1: UInt8
+          flags2: UInt8
+
+          @property
+          def flags(self):
+            """ The flags value, computed from the 3 flag bytes.
+            """
+            return (self.flags0 << 16) | (self.flags1 << 8) | self.flags2
+
+    This has 4 fields, each an unsigned 8 bit value (one bytes),
+    and a property `.flags` which is the overall flags value for
+    the box header.
+
+    You should look at the source code for the `TKHDBoxBody` from
+    that module for an example of a `@binclass` with a variable
+    collection of fields based on an earlier `version` field value.
+
+    ### A `BinarySingleValue`, the `BSUInt` from this module
+
+    The `BSUint` transcribes an unsigned integer of arbitrary size
+    as a big endian variable sizes sequence of bytes.
+    I understand this is the same scheme MIDI uses.
+
+    You can define a `BinarySingleValue` with conventional `.parse()`
+    and `.transribe()` methods but it is usually expedient to instead
+    provide `.parse_value()` and `transcribe_value()` methods, which
+    return or transcibe the core value (the unsigned integer in
+    this case).
+
+        class BSUInt(BinarySingleValue, value_type=int):
+          """ A binary serialised unsigned `int`.
+
+              This uses a big endian byte encoding where continuation octets
+              have their high bit set. The bits contributing to the value
+              are in the low order 7 bits.
+          """
+
+          @staticmethod
+          def parse_value(bfr: CornuCopyBuffer) -> int:
+            """ Parse an extensible byte serialised unsigned `int` from a buffer.
+
+                Continuation octets have their high bit set.
+                The value is big-endian.
+
+                This is the go for reading from a stream. If you already have
+                a bare bytes instance then the `.decode_bytes` static method
+                is probably most efficient;
+                there is of course the usual `AbstractBinary.parse_bytes`
+                but that constructs a buffer to obtain the individual bytes.
+            """
+            n = 0
+            b = 0x80
+            while b & 0x80:
+              b = bfr.byte0()
+              n = (n << 7) | (b & 0x7f)
+            return n
+
+          # pylint: disable=arguments-renamed
+          @staticmethod
+          def transcribe_value(n):
+            """ Encode an unsigned int as an entensible byte serialised octet
+                sequence for decode. Return the bytes object.
+            """
+            bs = [n & 0x7f]
+            n >>= 7
+            while n > 0:
+              bs.append(0x80 | (n & 0x7f))
+              n >>= 7
+            return bytes(reversed(bs))
+
+    ### A `BinaryMultiValue`
+
+    A `BinaryMultiValue` s a class factory for making a multi field
+    `AbstractBinary` from variable field descriptions.
+    You're probably better off using `@binclass` these days.
+    See the `BinaryMultiValue` docstring for details and an example.
 
     An MP4 ELST box:
 
@@ -89,11 +197,11 @@
           """ An 'elst' Edit List FullBoxBody - section 8.6.6.
           """
 
-          V0EditEntry = BinaryMultiStruct(
+          V0EditEntry = BinaryStruct(
               'ELSTBoxBody_V0EditEntry', '>Llhh',
               'segment_duration media_time media_rate_integer media_rate_fraction'
           )
-          V1EditEntry = BinaryMultiStruct(
+          V1EditEntry = BinaryStruct(
               'ELSTBoxBody_V1EditEntry', '>Qqhh',
               'segment_duration media_time media_rate_integer media_rate_fraction'
           )
@@ -130,28 +238,41 @@
     flavours of edit entry structure and a property to return the
     suitable class based on the version field.  The `parse_fields()`
     method is called from the base `BoxBody` class' `parse()` method
-    to collect addition fields for any box.  For this box it collectsa
-    32 bit `entry_count` and then a list of that many edit entries.
+    to collect addition fields for any box.  For this box it collects
+    a 32 bit `entry_count` and then a list of that many edit entries.
     The transcription yields corresponding values.
-
-    # Module Contents
 '''
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
+from dataclasses import dataclass, fields
+from inspect import signature, Signature
 from struct import Struct  # pylint: disable=no-name-in-module
 import sys
 from types import SimpleNamespace
-from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
+from typing import (
+    get_args,
+    get_origin,
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
+
+from typeguard import check_type, typechecked
 
 from cs.buffer import CornuCopyBuffer
-from cs.deco import OBSOLETE, promote, strable
-from cs.gimmicks import warning, debug
-from cs.lex import cropped, cropped_repr, typed_str
+from cs.deco import OBSOLETE, decorator, promote, Promotable, strable
+from cs.gimmicks import Buffer, debug, warning
+from cs.lex import cropped, cropped_repr, r, stripped_dedent, typed_str
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.seq import Seq
 
-__version__ = '20240630-post'
+__version__ = '20250501-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -167,27 +288,35 @@ DISTINFO = {
         'cs.lex',
         'cs.pfx',
         'cs.seq',
+        'typeguard',
     ],
     'python_requires':
     '>=3.6',
 }
 
-if (sys.version_info.major < 3
-    or (sys.version_info.major == 3 and sys.version_info.minor < 6)):
+if sys.version_info < (3, 6):
   warning(
       "module %r requires Python 3.6 for reliable field ordering but version_info=%s",
       __name__, sys.version_info
   )
 
-def flatten(chunks):
-  ''' Flatten `chunks` into an iterable of `bytes`-like instances.
-      None of the `bytes` instances will be empty.
+def flatten(transcription) -> Iterable[bytes]:
+  ''' Flatten `transcription` into an iterable of `Buffer`s.
+      None of the `Buffer`s will be empty.
 
       This exists to allow subclass methods to easily return
-      transcribeable things (having a `.transcribe` method), ASCII
+      transcribable things (having a `.transcribe` method), ASCII
       strings or bytes or iterables or even `None`, in turn allowing
       them simply to return their superclass' chunks iterators
       directly instead of having to unpack them.
+
+      The supplied `transcription` may be any of the following:
+      - `None`: yield nothing
+      - an object with a `.transcribe` method: yield from
+        `flatten(transcription.transcribe())`
+      - a `Buffer`: yield the `Buffer` if it is not empty
+      - a `str`: yield `transcription.encode('ascii')`
+      - an iterable: yield from `flatten(item)` for each item in `transcription`
 
       An example from the `cs.iso14496.METABoxBody` class:
 
@@ -197,40 +326,60 @@ def flatten(chunks):
               yield self.boxes
 
       The binary classes `flatten` the result of the `.transcribe`
-      method to obtain `bytes` insteances for the object's bnary
+      method to obtain `bytes` instances for the object's binary
       transcription.
   '''
-  if chunks is None:
+  if transcription is None:
     pass
-  elif hasattr(chunks, 'transcribe'):
-    yield from flatten(chunks.transcribe())
-  elif isinstance(chunks, (bytes, memoryview)):
-    if chunks:
-      yield chunks
-  elif isinstance(chunks, str):
-    if chunks:
-      yield chunks.encode('ascii')
+  elif hasattr(transcription, 'transcribe'):
+    yield from flatten(transcription.transcribe())
+  elif isinstance(transcription, Buffer):
+    if transcription:
+      yield transcription
+  elif isinstance(transcription, str):
+    if transcription:
+      yield transcription.encode('ascii')
   else:
-    for subchunk in chunks:
-      yield from flatten(subchunk)
+    for item in transcription:
+      yield from flatten(item)
+
+@decorator
+def parse_offsets(parse, report=False):
+  ''' Decorate `parse` (usually an `AbstractBinary` class method)
+      to record the buffer starting offset as `self.offset`
+      and the buffer post parse offset as `self.end_offset`.
+      If the decorator parameter `report` is true,
+      call `bfr.report_offset()` with the starting offset at the end of the parse.
+  '''
+
+  def parse_wrapper(cls, bfr: CornuCopyBuffer, **parse_kw):
+    offset = bfr.offset
+    self = parse(cls, bfr, **parse_kw)
+    self.offset = offset
+    self.end_offset = bfr.offset
+    if report:
+      bfr.report_offset(offset)
+    return self
+
+  return parse_wrapper
 
 _pt_spec_seq = Seq()
 
-def pt_spec(pt, name=None):
+def pt_spec(pt, name=None, value_type=None, as_repr=None, as_str=None):
   ''' Convert a parse/transcribe specification `pt`
       into an `AbstractBinary` subclass.
 
       This is largely used to provide flexibility
       in the specifications for the `BinaryMultiValue` factory
-      but can be used as a factory for other simple classes.
+      but can also be used as a factory for other simple classes.
 
       If the specification `pt` is a subclass of `AbstractBinary`
       this is returned directly.
 
-      If `pt` is a 2-tuple of `str`
+      If `pt` is a (str,str) 2-tuple
       the values are presumed to be a format string for `struct.struct`
-      and filed names separated by spaces;
-      a new `BinaryMultiStruct` class is created from these and returned.
+      and field names separated by spaces;
+      a new `BinaryStruct` class is created from these and returned.
 
       Otherwise two functions
       `f_parse_value(bfr)` and `f_transcribe_value(value)`
@@ -251,39 +400,53 @@ def pt_spec(pt, name=None):
     if issubclass(pt, AbstractBinary):
       return pt
   except TypeError:
+    # not a class at all, fall through
     pass
   # other specifications construct a class
   try:
+    # an object with .parse_value and .transcribe_value attributes
     f_parse_value = pt.parse_value
     f_transcribe_value = pt.transcribe_value
   except AttributeError:
+    # an int number of bytes
     if isinstance(pt, int):
       # pylint: disable=unnecessary-lambda-assignment
       f_parse_value = lambda bfr: bfr.take(pt)
       f_transcribe_value = lambda value: value
+      if value_type is None:
+        value_type = Buffer
+      elif not issubclass(value_type, Buffer):
+        raise TypeError(f'supplied {value_type=} is not a subclass of Buffer')
     else:
-      pt0, pt1 = pt
-      if isinstance(pt0, str) and isinstance(pt1, str):
+      struct_format, struct_fields = pt
+      if isinstance(struct_format, str) and isinstance(struct_fields, str):
+        # a struct (format,fields) 2-tuple
         # struct format and field names
-        return BinaryMultiStruct(
-            '_'.join(
-                (
-                    name or "PTStruct", str(next(_pt_spec_seq)),
-                    pt1.replace(' ', '__')
-                )
-            ), pt0, pt1
-        )
-      f_parse_value = pt0
-      f_transcribe_value = pt1
+        if name is None:
+          name = f'PTStruct_{next(_pt_spec_seq)}__{struct_fields.replace(" ", "__")}'
+        return BinaryStruct(name, struct_format, struct_fields)
+      # otherwise a parse/transcribe pair
+      f_parse_value, f_transcribe_value = pt
 
-  class PTValue(BinarySingleValue):  # pylint: disable=used-before-assignment
+  if value_type is None:
+    sig = signature(f_parse_value)
+    value_type = sig.return_annotation
+    if value_type is Signature.empty:
+      raise ValueError(f'no return type annotation on {f_parse_value=}')
+
+  class PTValue(BinarySingleValue, value_type=value_type):  # pylint: disable=used-before-assignment
     ''' A `BinarySingleValue` subclass
         made from `f_parse_value` and `f_transcribe_value`.
     '''
 
+    if as_str:
+      __str__ = as_str
+    if as_repr:
+      __repr__ = as_repr
+
     @staticmethod
-    def parse_value(bfr: CornuCopyBuffer):
-      ''' Parse value form buffer.
+    def parse_value(bfr: CornuCopyBuffer) -> value_type:
+      ''' Parse value from buffer.
       '''
       return f_parse_value(bfr)
 
@@ -293,13 +456,16 @@ def pt_spec(pt, name=None):
       '''
       return f_transcribe_value(value)
 
-  if name is not None:
-    PTValue.__name__ = name
-  PTValue.__name__ += '_' + str(next(_pt_spec_seq))
+  PTValue.__name__ = name or f'PTValue_{next(_pt_spec_seq)}'
+  PTValue.__doc__ = stripped_dedent(
+      f'''{name}, a `BinarySingleValue` subclass
+          made from {f_parse_value=} and {f_transcribe_value=}.
+      '''
+  )
   return PTValue
 
 class bs(bytes):
-  ''' A `bytes subclass with a compact `repr()`.
+  ''' A `bytes` subclass with a compact `repr()`.
   '''
 
   def __repr__(self):
@@ -312,15 +478,15 @@ class bs(bytes):
 
   @classmethod
   def promote(cls, obj):
-    ''' Promote `bytes` or `memoryview` to a `bs`.
+    ''' Promote a `Buffer` (eg `bytes` or `memoryview`) to a `bs`.
     '''
     if isinstance(obj, cls):
       return obj
-    if isinstance(obj, (bytes, memoryview)):
+    if isinstance(obj, Buffer):
       return cls(obj)
     raise TypeError(f'{cls.__name__}.promote({obj.__class__}): cannot promote')
 
-class AbstractBinary(ABC):
+class AbstractBinary(Promotable, ABC):
   ''' Abstract class for all `Binary`* implementations,
       specifying the abstract `parse` and `transcribe` methods
       and providing various helper methods.
@@ -329,6 +495,54 @@ class AbstractBinary(ABC):
       - `parse`* methods parse a single instance from a buffer
       - `scan`* methods are generators yielding successive instances from a buffer
   '''
+
+  def __str__(self, attr_names=None, attr_choose=None, str_func=None):
+    ''' The string summary of this object.
+        If called explicitly rather than via `str()` the following
+        optional parametsrs may be supplied:
+        * `attr_names`: an iterable of `str` naming the attributes to include;
+          the default if the keys of `self.__dict__`
+        * `attr_choose`: a callable to select amongst the attribute names names;
+          the default is to choose names which do not start with an underscore
+        * `str_func`: a callable returning the string form of an attribute value;
+          the default returns `cropped_repr(v)` where `v` is the value's `.value`
+          attribute for single value objects otherwise the object itself
+    '''
+    if attr_names is None:
+      attr_names = self._field_names
+    if attr_choose is None:
+      # pylint: disable=unnecessary-lambda-assignment
+      attr_choose = lambda attr: not attr.startswith('_')
+    elif attr_choose is True:
+      attr_choose = lambda: True
+    if str_func is None:
+      str_func = lambda obj: (
+          cropped_repr(obj.value)
+          if is_single_value(obj) else cropped_repr(obj)
+      )
+    attr_values = [
+        (attr, getattr(self, attr, None))
+        for attr in attr_names
+        if attr_choose(attr)
+    ]
+    return "%s(%s)" % (
+        self.__class__.__name__,
+        ','.join(
+            ("%s=%s" % (attr, str_func(obj)) for attr, obj in attr_values)
+        ),
+    )
+
+  def __repr__(self):
+    return "%s(%s)" % (
+        self.__class__.__name__, ",".join(
+            "%s=%s:%s" % (attr, type(value).__name__, cropped_repr(value))
+            for attr, value in self.__dict__.items()
+        )
+    )
+
+  @property
+  def _field_names(self):
+    return self.__dict__.keys()
 
   # pylint: disable=deprecated-decorator
   @abstractclassmethod
@@ -363,12 +577,13 @@ class AbstractBinary(ABC):
     raise NotImplementedError("transcribe")
 
   @pfx_method
-  def self_check(self):
+  def self_check(self, *, field_types=None):
     ''' Internal self check. Returns `True` if passed.
 
         If the structure has a `FIELD_TYPES` attribute, normally a
-        class attribute, then check the fields against it. The
-        `FIELD_TYPES` attribute is a mapping of `field_name` to
+        class attribute, then check the fields against it.
+
+        The `FIELD_TYPES` attribute is a mapping of `field_name` to
         a specification of `required` and `types`. The specification
         may take one of 2 forms:
         * a tuple of `(required,types)`
@@ -406,37 +621,39 @@ class AbstractBinary(ABC):
         it has more than one acceptable type.
     '''
     ok = True
-    try:
-      fields_spec = self.FIELD_TYPES
-    except AttributeError:
-      warning("no FIELD_TYPES")
-      ##ok = False
-    else:
-      # check fields against self.FIELD_TYPES
-      for field_name, field_spec in fields_spec.items():
-        with Pfx(".%s=%s", field_name, field_spec):
-          if isinstance(field_spec, tuple):
-            required, basetype = field_spec
-          else:
-            required, basetype = True, field_spec
-          try:
-            field = getattr(self, field_name)
-          except AttributeError:
-            if required:
-              warning(
-                  "missing required field %s.%s: __dict__=%s",
-                  type(self).__name__, field_name, cropped_repr(self.__dict__)
-              )
-              ok = False
-          else:
-            if not isinstance(field, basetype):
-              warning(
-                  "should be an instance of %s:%s but is %s", (
-                      'tuple'
-                      if isinstance(basetype, tuple) else basetype.__name__
-                  ), basetype, typed_str(field, max_length=64)
-              )
-              ok = False
+    if field_types is None:
+      try:
+        field_types = self.FIELD_TYPES
+      except AttributeError:
+        warning("no FIELD_TYPES")
+        field_types = {}
+    # check fields against self.FIELD_TYPES
+    # TODO: call self_check on members with a .self_check() method
+    for field_name, field_spec in field_types.items():
+      with Pfx(".%s=%s", field_name, field_spec):
+        if isinstance(field_spec, tuple):
+          required, basetype = field_spec
+        else:
+          required, basetype = True, field_spec
+        try:
+          field = getattr(self, field_name)
+        except AttributeError:
+          if required:
+            warning(
+                "missing required field %s.%s: __dict__=%s",
+                type(self).__name__, field_name, cropped_repr(self.__dict__)
+            )
+            ok = False
+        else:
+          if not isinstance(field, basetype):
+            warning(
+                "should be an instance of %s:%s but is %s", (
+                    'tuple'
+                    if isinstance(basetype, tuple) else basetype.__name__
+                ), basetype, typed_str(field, max_length=64)
+            )
+            ok = False
+            raise RuntimeError
     return ok
 
   def __bytes__(self):
@@ -464,8 +681,12 @@ class AbstractBinary(ABC):
       with_offsets=False,
       **parse_kw,
   ):
-    ''' Function to scan the buffer `bfr` for repeated instances of `cls`
-        until end of input and yield them.
+    ''' A generator to scan the buffer `bfr` for repeated instances of `cls`
+        until end of input, and yield them.
+
+        Note that if `bfr` is not already a `CornuCopyBuffer`
+        it is promoted to `CornuCopyBuffer` from several types
+        such as filenames etc; see `CornuCopyBuffer.promote`.
 
         Parameters:
         * `bfr`: the buffer to scan, or any object suitable for `CornuCopyBuffer.promote`
@@ -482,8 +703,7 @@ class AbstractBinary(ABC):
         Scanning stops after `max_count` instances (if specified).
         If fewer than `min_count` instances (if specified) are scanned
         a warning is issued.
-        This is to accomodate nonconformant streams
-        without raising exceptions.
+        This is to accomodate nonconformant streams without raising exceptions.
         Callers wanting to validate `max_count` may want to probe `bfr.at_eof()`
         after return.
         Callers not wanting a warning over `min_count` should not specify it,
@@ -492,28 +712,20 @@ class AbstractBinary(ABC):
     if count is None:
       if min_count is None:
         min_count = 0
-      else:
-        if min_count < 0:
-          raise ValueError(
-              "min_count must be >=0 if specified, got: %r" % (min_count,)
-          )
+      elif min_count < 0:
+        raise ValueError(f'{min_count=} must be >=0 if specified')
       if max_count is not None:
         if max_count < 0:
-          raise ValueError(
-              "max_count must be >=0 if specified, got: %r" % (max_count,)
-          )
+          raise ValueError(f'{max_count=} must be >=0 if specified')
         if max_count < min_count:
-          raise ValueError(
-              "max_count must be >= min_count, got: min_count=%r, max_count=%rr"
-              % (min_count, max_count)
-          )
+          raise ValueError(f'{max_count=} must be >= {min_count=}')
     else:
       if min_count is not None or max_count is not None:
         raise ValueError(
             "scan_with_offsets: may not combine count with either min_count or max_count"
         )
       if count < 0:
-        raise ValueError("count must be >=0 if specified, got: %r" % (count,))
+        raise ValueError(f'{count=} must be >=0 if specified')
       min_count = max_count = count
     scanned = 0
     while (max_count is None or scanned < max_count) and not bfr.at_eof():
@@ -557,7 +769,7 @@ class AbstractBinary(ABC):
         `self.scan_with_offsets(..,**kw)` according to the
         `with_offsets` parameter.
 
-        *Deprecated; please just call `scan` with a filesystem pathname.
+        *Deprecated; please just call `scan` with a filesystem pathname.*
 
         Parameters:
         * `fspath`: the filesystem path of the file to scan
@@ -613,9 +825,7 @@ class AbstractBinary(ABC):
     '''
     instance, offset = cls.parse_bytes(bs, **parse_bytes_kw)
     if offset < len(bs):
-      raise ValueError(
-          "unparsed data at offset %d: %r" % (offset, bs[offset:])
-      )
+      raise ValueError(f'unparsed data at {offset=}: {bs[offset:]!r}')
     return instance
 
   @classmethod
@@ -665,6 +875,18 @@ class AbstractBinary(ABC):
       file.flush()
     return length
 
+def is_single_value(obj):
+  ''' Test whether `obj` is a single value binary object.
+
+      This currently recognises `BinarySingleValue` instances
+      and tuple based `AbstractBinary` instances of length 1.
+  '''
+  if isinstance(obj, BinarySingleValue):
+    return True
+  if isinstance(obj, AbstractBinary) and isinstance(obj, tuple):
+    return tuple.__len__(obj) == 1
+  return False
+
 class SimpleBinary(SimpleNamespace, AbstractBinary):
   ''' Abstract binary class based on a `SimpleNamespace`,
       thus providing a nice `__str__` and a keyword based `__init__`.
@@ -681,23 +903,7 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
               super().__init__(field1=field1, field2=field2)
   '''
 
-  def __str__(self, attr_names=None, attr_choose=None):
-    if attr_names is None:
-      attr_names = sorted(self.__dict__.keys())
-    if attr_choose is None:
-      # pylint: disable=unnecessary-lambda-assignment
-      attr_choose = lambda attr: not attr.startswith('_')
-    return "%s(%s)" % (
-        type(self).__name__, ','.join(
-            (
-                "%s=%s" % (attr, cropped_repr(getattr(self, attr, None)))
-                for attr in attr_names
-                if attr_choose(attr)
-            )
-        )
-    )
-
-class BinarySingleValue(AbstractBinary):
+class BinarySingleValue(AbstractBinary, Promotable):
   ''' A representation of a single value as the attribute `.value`.
 
       Subclasses must implement:
@@ -705,12 +911,25 @@ class BinarySingleValue(AbstractBinary):
       * `transcribe` or `transcribe_value`
   '''
 
+  @classmethod
+  def __init_subclass__(cls, *, value_type, **isc_kw):
+    if not isinstance(value_type, type) and not get_origin(value_type):
+      raise TypeError(
+          f'{cls.__name__}.__init_subclass__: value_type={r(value_type)} is not a type'
+      )
+    super().__init_subclass__(**isc_kw)
+    cls.VALUE_TYPE = value_type
+
   def __init__(self, value):
+    ''' Initialise `self` with `value`.
+    '''
+    check_type(value, self.VALUE_TYPE)
     self.value = value
 
   def __repr__(self):
     return "%s(%r)" % (
-        type(self).__name__, getattr(self, 'value', '<no-value>')
+        type(self).__name__,
+        getattr(self, 'value', f'<NO-{self.__class__.__name__}.value>')
     )
 
   def __str__(self):
@@ -780,25 +999,99 @@ class BinarySingleValue(AbstractBinary):
     '''
     return cls(value).transcribe()
 
-class BinaryByteses(AbstractBinary):
+class BinaryBytes(
+    BinarySingleValue,
+    value_type=Union[Buffer, Iterable[Buffer]],
+):
   ''' A list of `bytes` parsed directly from the native iteration of the buffer.
+      Subclasses are initialised with a `consume=` class parameter
+      indicating how many bytes to console on parse; the default
+      is `...` meaning to consume the entire remaining buffer, but
+      a positive integer can also be supplied to consume exactly
+      that many bytes.
   '''
 
-  def __init__(self):
-    self.values = []
+  def __init_subclass__(
+      cls,
+      *,
+      consume=...,
+      value_type=Union[Buffer, Iterable[Buffer]],
+      **bsv_kw,
+  ):
+    if consume is not Ellipsis:
+      if not isinstance(consume, int) or consume < 1:
+        raise ValueError(
+            f'class {cls.__name__}: consume should be Ellipsis or a positive int, got {r(consume)}'
+        )
+    super().__init_subclass__(value_type=value_type, **bsv_kw)
+    cls.PARSE_SIZE = consume
 
   def __repr__(self):
-    return "%s:%r" % (type(self).__name__, self.values)
+    cls = self.__class__
+    bufs = getattr(self, "_bufs", "NO_BUFS")
+    return f'{cls.__name__}[cls.PARSE_SIZE]:{bufs}'
+
+  def __iter__(self):
+    return iter(self._bufs)
+
+  @property
+  def value(self):
+    ''' The internal list of `bytes` instances joined together.
+        This is a property and may be expensive to compute for a large list.
+    '''
+    return b''.join(self._bufs)
+
+  @value.setter
+  def value(self, bss: Union[Buffer, Iterable[Buffer]]):
+    ''' Set the value from a `bytes` or iterable of `bytes`.
+    '''
+    if isinstance(bss, Buffer):
+      bss = [bss]
+    self._bufs = list(bss)
 
   @classmethod
   def parse(cls, bfr: CornuCopyBuffer):
-    self = cls()
-    self.values.extend(bfr)
+    ''' Consume `cls.PARSE_SIZE` bytes from the buffer and instantiate a new instance.
+    '''
+    return cls(bfr.takev(cls.PARSE_SIZE))
+
+  def transcribe(self):
+    ''' Transcribe each value.
+    '''
+    return self._bufs
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to a `BinaryBytes` instance.
+        Other instances of `AbstractBinary` will be transcribed into the buffers.
+        Otherwise use `BinarySingleValue.promote(obj)`.
+    '''
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, AbstractBinary):
+      return cls(obj.transcribe())
+    return super().promote(obj)
+
+class ListOfBinary(list, AbstractBinary):
+
+  # the AbstractBinary subclass of the items in the list
+  LIST_ITEM_TYPE = None
+
+  def __init_subclass__(cls, *, item_type):
+    super().__init_subclass__()
+    cls.LIST_ITEM_TYPE = item_type
+
+  @classmethod
+  def parse(cls, bfr: CornuCopyBuffer, **scan_kw):
+    ''' Scan instances of `cls.LIST_ITEM_TYPE` and return a new instance.
+    '''
+    self = cls(cls.LIST_ITEM_TYPE.scan(bfr, **scan_kw))
     return self
 
   def transcribe(self):
-    yield from iter(self.values)
+    return self
 
+# TODO: can this just be ListOfBinary above?
 class BinaryListValues(AbstractBinary):
   ''' A list of values with a common parse specification,
       such as sample or Boxes in an ISO14496 Box structure.
@@ -808,7 +1101,7 @@ class BinaryListValues(AbstractBinary):
     self.values = []
 
   def __str__(self):
-    return "%s%r" % (type(self).__name__, self.values)
+    return '{self.__class__.__name__}{self.values!r}'
 
   __repr__ = __str__
 
@@ -853,16 +1146,14 @@ class BinaryListValues(AbstractBinary):
       if min_count is None:
         min_count = count
       elif min_count < count:
-        raise ValueError("min_count(%s) < count(%s)" % (min_count, count))
+        raise ValueError(f'{min_count=} < {count=}')
       if max_count is None:
         max_count = count
       elif max_count > count:
-        raise ValueError("max_count(%s) > count(%s)" % (max_count, count))
+        raise ValueError(f'{max_count=} > {count=}')
     if (min_count is not None and max_count is not None
         and min_count > max_count):
-      raise ValueError(
-          "min_count(%s) > max_count(%s)" % (min_count, max_count)
-      )
+      raise ValueError(f'{min_count=} > {max_count=}')
     self = cls()
     values = self.values
     func_parse = pt_spec(pt).parse
@@ -887,55 +1178,138 @@ class BinaryListValues(AbstractBinary):
         if isinstance(value, bytes) else value.transcribe(), self.values
     )
 
-_binary_multi_struct_classes = {}
+@typechecked
+def struct_field_types(
+    struct_format: str,
+    field_names: Union[str, Iterable[str]],
+) -> Mapping[str, type]:
+  ''' Construct a `dict` mapping field names to struct return types.
+
+      Example:
+
+          >>> struct_field_types('>Hs', 'count text_bs')
+          {'count': <class 'int'>, 'text_bs': <class 'bytes'>}
+  '''
+  if isinstance(field_names, str):
+    field_names = field_names.split()
+  else:
+    field_names = list(field_names)
+  fieldmap = {}
+  for c in struct_format:
+    if not c.isalpha():
+      continue
+    try:
+      fieldtype = {
+          'x': None,
+          'C': int,
+          'b': int,
+          'B': int,
+          'h': int,
+          'H': int,
+          'i': int,
+          'I': int,
+          'l': int,
+          'L': int,
+          'q': int,
+          'Q': int,
+          'n': int,
+          'N': int,
+          'e': float,
+          'f': float,
+          'd': float,
+          's': bytes,
+          'p': str,
+          'P': int,
+      }[c]
+    except KeyError:
+      raise ValueError(
+          f'no type known for struct spec {c=} in {struct_format=}'
+      )
+    if fieldtype is None:
+      # padding
+      continue
+    try:
+      field_name = field_names.pop(0)
+    except IndexError:
+      raise ValueError(
+          f'no field names left at struct spec {c=} in {struct_format=}'
+      )
+    fieldmap[field_name] = fieldtype
+  if field_names:
+    raise ValueError(f'unused field names {field_names=} vs {struct_format=}')
+  return fieldmap
 
 @pfx
-def BinaryMultiStruct(
-    class_name: str, struct_format: str, field_names: Union[str, List[str]]
+def BinaryStruct(
+    class_name: str,
+    struct_format: str,
+    field_names: Union[str, List[str]] = 'value',
 ):
   ''' A class factory for `AbstractBinary` `namedtuple` subclasses
-      built around complex `struct` formats.
+      built around potentially complex `struct` formats.
 
       Parameters:
       * `class_name`: name for the generated class
       * `struct_format`: the `struct` format string
-      * `field_names`: field name list,
-        a space separated string or an interable of strings
+      * `field_names`: optional field name list,
+        a space separated string or an interable of strings;
+        the default is `'value'`, intended for single field structs
 
       Example:
 
           # an "access point" record from the .ap file
-          Enigma2APInfo = BinaryMultiStruct('Enigma2APInfo', '>QQ', 'pts offset')
+          Enigma2APInfo = BinaryStruct('Enigma2APInfo', '>QQ', 'pts offset')
 
           # a "cut" record from the .cuts file
-          Enigma2Cut = BinaryMultiStruct('Enigma2Cut', '>QL', 'pts type')
+          Enigma2Cut = BinaryStruct('Enigma2Cut', '>QL', 'pts type')
+
+          >>> UInt16BE = BinaryStruct('UInt16BE', '>H')
+          >>> UInt16BE.__name__
+          'UInt16BE'
+          >>> UInt16BE.format
+          '>H'
+          >>> UInt16BE.struct   #doctest: +ELLIPSIS
+          <_struct.Struct object at ...>
+          >>> field = UInt16BE.from_bytes(bytes((2,3)))
+          >>> field
+          UInt16BE('>H',value=515)
+          >>> field.value
+          515
   '''
   if isinstance(field_names, str):
     field_names = field_names.split()
-  if not isinstance(field_names, tuple):
+  elif not isinstance(field_names, tuple):
     field_names = tuple(field_names)
   if len(set(field_names)) != len(field_names):
-    raise ValueError("field names not unique")
-  # we memoise the class definitions
-  key = (struct_format, field_names, class_name)
-  struct_class = _binary_multi_struct_classes.get(key)
-  if struct_class:
-    return struct_class
-  # construct new class
+    raise ValueError(f'repeated name in {field_names=}')
   struct = Struct(struct_format)
+  fieldmap = struct_field_types(struct_format, field_names)
   for field_name in field_names:
     with Pfx(field_name):
       if (field_name in ('length', 'struct', 'format')
           or hasattr(AbstractBinary, field_name)):
         raise ValueError(
-            "field name conflicts with AbstractBinary.%s" % (field_name,)
+            f'field name conflicts with AbstractBinary.{field_name}'
         )
-  tuple_type = namedtuple(class_name or "StructSubValues", field_names)
 
   # pylint: disable=function-redefined
-  class struct_class(tuple_type, AbstractBinary):
+  class struct_class(
+      namedtuple(class_name or "StructSubValues", field_names),
+      AbstractBinary,
+      Promotable,
+  ):
     ''' A struct field for a complex struct format.
     '''
+
+    _struct = struct
+    _field_names = tuple(field_names)
+
+    def __repr__(self):
+      cls = self.__class__
+      values_s = ",".join(
+          f'{attr}={getattr(self,attr)}' for attr in self._field_names
+      )
+      return f'{cls.__name__}({struct.format!r},{values_s})'
 
     @classmethod
     @promote
@@ -952,6 +1326,10 @@ def BinaryMultiStruct(
       return struct.pack(*self)
 
     if len(field_names) == 1:
+      # structs with a single field
+
+      def __str__(self):
+        return str(self[0])
 
       def __int__(self):
         return int(self[0])
@@ -968,7 +1346,7 @@ def BinaryMultiStruct(
           return self[0]
 
       @classmethod
-      def parse_value(cls, bfr: CornuCopyBuffer):
+      def parse_value(cls, bfr: CornuCopyBuffer) -> fieldmap[field_names[0]]:
         ''' Parse a value from `bfr`, return the value.
         '''
         bs = bfr.take(struct.size)
@@ -981,58 +1359,52 @@ def BinaryMultiStruct(
         '''
         return struct.pack(value)
 
+      @classmethod
+      def promote(cls, obj):
+        ''' Promote a single value to an instance of `cls`.
+        '''
+        if isinstance(obj, cls):
+          return obj
+        return cls(**{field_names[0]: obj})
+    else:
+
+      @classmethod
+      def promote(cls, obj):
+        ''' Promote an iterable of field values to an instance of `cls`.
+        '''
+        if isinstance(obj, cls):
+          return obj
+        return cls(
+            **{
+                field_name: item
+                for field_name, item in zip(field_names, obj)
+            }
+        )
+
+  assert isinstance(struct_class, type)
   struct_class.__name__ = class_name
+  field_list_s = ",".join(f".{fieldname}" for fieldname in field_names)
   struct_class.__doc__ = (
-      ''' An `AbstractBinary` `namedtuple` which parses and transcribes
-          the struct format `%r` and presents the attributes %r.
-      ''' % (struct_format, field_names)
+      f'''An `AbstractBinary` `namedtuple` which parses and transcribes
+          the struct format `{struct_format!r}` and presents the attributes {field_list_s}.
+      '''
   )
   struct_class.struct = struct
   struct_class.format = struct_format
   struct_class.length = struct.size
   struct_class.field_names = field_names
-  _binary_multi_struct_classes[key] = struct_class
   return struct_class
 
-def BinarySingleStruct(
-    class_name: str, struct_format: str, field_name: Optional[str] = None
-):
-  ''' A convenience wrapper for `BinaryMultiStruct`
-      for `struct_format`s with a single field.
-
-      Parameters:
-      * `class_name`: the class name for the generated class
-      * `struct_format`: the struct format string, specifying a
-        single struct field
-      * `field_name`: optional field name for the value,
-        default `'value'`
-
-      Example:
-
-          >>> UInt16BE = BinarySingleStruct('UInt16BE', '>H')
-          >>> UInt16BE.__name__
-          'UInt16BE'
-          >>> UInt16BE.format
-          '>H'
-          >>> UInt16BE.struct   #doctest: +ELLIPSIS
-          <_struct.Struct object at ...>
-          >>> field = UInt16BE.from_bytes(bytes((2,3)))
-          >>> field
-          UInt16BE(value=515)
-          >>> field.value
-          515
-  '''
-  if field_name is None:
-    field_name = 'value'
-  return BinaryMultiStruct(class_name, struct_format, field_name)
+BinaryMultiStruct = OBSOLETE(BinaryStruct)
+BinarySingleStruct = OBSOLETE(BinaryStruct)
 
 # various common values
-UInt8 = BinarySingleStruct('UInt8', 'B')
+UInt8 = BinaryStruct('UInt8', 'B')
 UInt8.TEST_CASES = (
     (0, b'\0'),
     (65, b'A'),
 )
-Int16BE = BinarySingleStruct('Int16BE', '>h')
+Int16BE = BinaryStruct('Int16BE', '>h')
 Int16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1040,7 +1412,7 @@ Int16BE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x80\x00'),
 )
-Int16LE = BinarySingleStruct('Int16LE', '<h')
+Int16LE = BinaryStruct('Int16LE', '<h')
 Int16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1048,7 +1420,7 @@ Int16LE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x00\x80'),
 )
-Int32BE = BinarySingleStruct('Int32BE', '>l')
+Int32BE = BinaryStruct('Int32BE', '>l')
 Int32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1056,7 +1428,7 @@ Int32BE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x80\x00\x00\x00'),
 )
-Int32LE = BinarySingleStruct('Int32LE', '<l')
+Int32LE = BinaryStruct('Int32LE', '<l')
 Int32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1064,7 +1436,7 @@ Int32LE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x00\x00\x00\x80'),
 )
-UInt16BE = BinarySingleStruct('UInt16BE', '>H')
+UInt16BE = BinaryStruct('UInt16BE', '>H')
 UInt16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1072,7 +1444,7 @@ UInt16BE.TEST_CASES = (
     (32768, b'\x80\x00'),
     (65535, b'\xff\xff'),
 )
-UInt16LE = BinarySingleStruct('UInt16LE', '<H')
+UInt16LE = BinaryStruct('UInt16LE', '<H')
 UInt16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1080,7 +1452,7 @@ UInt16LE.TEST_CASES = (
     (32768, b'\x00\x80'),
     (65535, b'\xff\xff'),
 )
-UInt32BE = BinarySingleStruct('UInt32BE', '>L')
+UInt32BE = BinaryStruct('UInt32BE', '>L')
 UInt32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1089,7 +1461,7 @@ UInt32BE.TEST_CASES = (
     (4294967294, b'\xff\xff\xff\xfe'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt32LE = BinarySingleStruct('UInt32LE', '<L')
+UInt32LE = BinaryStruct('UInt32LE', '<L')
 UInt32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1098,7 +1470,7 @@ UInt32LE.TEST_CASES = (
     (4294967294, b'\xfe\xff\xff\xff'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt64BE = BinarySingleStruct('UInt64BE', '>Q')
+UInt64BE = BinaryStruct('UInt64BE', '>Q')
 UInt64BE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\0\0\0\0\0\0\0\1'),
@@ -1111,7 +1483,7 @@ UInt64BE.TEST_CASES = (
     (18446744073709551614, b'\xff\xff\xff\xff\xff\xff\xff\xfe'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-UInt64LE = BinarySingleStruct('UInt64LE', '<Q')
+UInt64LE = BinaryStruct('UInt64LE', '<Q')
 UInt64LE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\1\0\0\0\0\0\0\0'),
@@ -1124,18 +1496,18 @@ UInt64LE.TEST_CASES = (
     (18446744073709551614, b'\xfe\xff\xff\xff\xff\xff\xff\xff'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-Float64BE = BinarySingleStruct('Float64BE', '>d')
+Float64BE = BinaryStruct('Float64BE', '>d')
 Float64BE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'?\xf0\x00\x00\x00\x00\x00\x00'),
 )
-Float64LE = BinarySingleStruct('Float64LE', '<d')
+Float64LE = BinaryStruct('Float64LE', '<d')
 Float64LE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
 )
 
-class BSUInt(BinarySingleValue):
+class BSUInt(BinarySingleValue, value_type=int):
   ''' A binary serialised unsigned `int`.
 
       This uses a big endian byte encoding where continuation octets
@@ -1216,7 +1588,7 @@ class BSUInt(BinarySingleValue):
       n >>= 7
     return bytes(reversed(bs))
 
-class BSData(BinarySingleValue):
+class BSData(BinarySingleValue, value_type=Buffer):
   ''' A run length encoded data chunk, with the length encoded as a `BSUInt`.
   '''
 
@@ -1260,7 +1632,15 @@ class BSData(BinarySingleValue):
     '''
     return BSData(bs).data_offset
 
-class BSString(BinarySingleValue):
+  @classmethod
+  def promote(cls, obj):
+    if isinstance(obj, cls):
+      return obj
+    if isinstance(obj, Buffer):
+      return cls(bytes(obj))
+    raise TypeError(f'{cls.__name__}.promote: cannot promote {r(obj)}')
+
+class BSString(BinarySingleValue, value_type=str):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
 
@@ -1294,7 +1674,7 @@ class BSString(BinarySingleValue):
     payload = value.encode(encoding)
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
-class BSSFloat(BinarySingleValue):
+class BSSFloat(BinarySingleValue, value_type=float):
   ''' A float transcribed as a `BSString` of `str(float)`.
   '''
 
@@ -1470,9 +1850,14 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
   ''' Construct a `SimpleBinary` subclass named `class_name`
       whose fields are specified by the mapping `field_map`.
 
-      The `field_map` is a mapping of field name to buffer parsers and transcribers.
+      The `field_map` is a mapping of field name
+      to parse/trasncribe specifications suitable for `pt_spec()`;
+      these are all promoted by `pt_spec` into `AbstractBinary` subclasses.
 
-      *Note*:
+      The `field_order` is an optional ordering of the field names;
+      the default comes from the iteration order of `field_map`.
+
+      *Note* for Python <3.6:
       if `field_order` is not specified
       it is constructed by iterating over `field_map`.
       Prior to Python 3.6, `dict`s do not provide a reliable order
@@ -1486,9 +1871,6 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       Subclasses with variable records should override
       the `.parse` and `.transcribe` methods
       accordingly.
-
-      The `field_map` is a mapping of field name
-      to a class returned by the `pt_spec()` function.
 
       If the class has both `parse_value` and `transcribe_value` methods
       then the value itself will be directly stored.
@@ -1532,9 +1914,9 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
             >>> bmv.n2
             34
             >>> bmv  #doctest: +ELLIPSIS
-            BMV(n1=17, n2=34, n3=119, nd=nd_1_short__bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
+            BMV(n1=17, n2=34, n3=119, nd=nd('>H4s',short=33154,bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
             >>> bmv.nd  #doctest: +ELLIPSIS
-            nd_1_short__bs(short=33154, bs=b'zyxw')
+            nd('>H4s',short=33154,bs=b'zyxw')
             >>> bmv.nd.bs
             b'zyxw'
             >>> bytes(bmv.nd)
@@ -1552,11 +1934,10 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
   with Pfx("BinaryMultiValue(%r,...)", class_name):
     if field_order is None:
       field_order = tuple(field_map)
-      if (sys.version_info.major, sys.version_info.minor) < (3, 6):
-        warning(
-            "Python version %s < 3.6: dicts are not ordered,"
-            " and the inferred field order may not be correct: %r",
-            sys.version, field_order
+      if len(field_order) > 1 and sys.version_info < (3, 6):
+        raise ValueError(
+            f'class {class_name}: Python version {sys.version} < 3.6:'
+            ' dicts are not ordered and so we cannot infer the field_order'
         )
     else:
       field_order = tuple(
@@ -1593,19 +1974,393 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
 
     bmv_class.__name__ = class_name
     bmv_class.__doc__ = (
-        ''' An `SimpleBinary` which parses and transcribes
-            the fields `%r`.
-        ''' % (field_order,)
+        f'''A `SimpleBinary` which parses and transcribes
+            the fields {field_order!r}.
+        '''
     )
     return bmv_class
+
+@decorator
+def binclass(cls, kw_only=True):
+  r'''A decorator for `dataclass`-like binary classes.
+
+      Example use:
+
+          >>> @binclass
+          ... class SomeStruct:
+          ...     """A struct containing a count and some flags."""
+          ...     count : UInt32BE
+          ...     flags : UInt8
+          >>> ss = SomeStruct(count=3, flags=0x04)
+          >>> ss
+          SomeStruct:SomeStruct__dataclass(count=UInt32BE('>L',value=3),flags=UInt8('B',value=4))
+          >>> print(ss)
+          SomeStruct(count=3,flags=4)
+          >>> bytes(ss)
+          b'\x00\x00\x00\x03\x04'
+          >>> SomeStruct.promote(b'\x00\x00\x00\x03\x04')
+          SomeStruct:SomeStruct__dataclass(count=UInt32BE('>L',value=3),flags=UInt8('B',value=4))
+
+      Extending an existing `@binclass` class, for example to add
+      the body of a structure to some header part:
+
+          >>> @binclass
+          ... class HeaderStruct:
+          ...     """A header containing a count and some flags."""
+          ...     count : UInt32BE
+          ...     flags : UInt8
+          >>> @binclass
+          ... class Packet(HeaderStruct):
+          ...     body_text : BSString
+          ...     body_data : BSData
+          ...     body_longs : BinaryStruct(
+          ...         'longs', '>LL', 'long1 long2'
+          ...     )
+          >>> packet = Packet(
+          ...     count=5, flags=0x03,
+          ...     body_text="hello",
+          ...     body_data=b'xyzabc',
+          ...     body_longs=(10,20),
+          ... )
+          >>> packet
+          Packet:Packet__dataclass(count=UInt32BE('>L',value=5),flags=UInt8('B',value=3),body_text=BSString('hello'),body_data=BSData(b'xyzabc'),body_longs=longs('>LL',long1=10,long2=20))
+          >>> print(packet)
+          Packet(count=5,flags=3,body_text=hello,body_data=b'xyzabc',body_longs=longs(long1=10,long2=20))
+          >>> packet.body_data
+          b'xyzabc'
+  '''
+  name0 = cls.__name__
+
+  # collate the annotated class attributes
+  # these are our own, and those from the superclasses
+  # TODO: should it be an error to find a field twice?
+  attr_annotations = {}
+  for supercls in reversed(cls.__mro__):
+    for attr, anno_type in getattr(supercls, '__annotations__', {}).items():
+      attr_annotations[attr] = anno_type
+  if not attr_annotations:
+    raise TypeError(f'{cls} has no annotated attributes')
+
+  # create the dataclass
+  class dcls:
+    pass
+
+  for attr in attr_annotations:
+    try:
+      attr_value = getattr(cls, attr)
+    except AttributeError:
+      continue
+    setattr(dcls, attr, attr_value)
+  dcls.__annotations__ = attr_annotations
+  dcls.__doc__ = f'The inner dataclass supporting {cls.__module__}.{cls.__name__}.'
+  dcls.__name__ = f'{cls.__name__}__dataclass'
+  dcls = dataclass(dcls, kw_only=kw_only)
+
+  def promote_fieldtypemap(fieldtypemap):
+    ''' Promote the types in a field type map into `AbstractBinary` subclasses.
+    '''
+    for field_name, field_type in tuple(fieldtypemap.items()):
+      if isinstance(field_type, type):
+        # a class
+        if not issubclass(field_type, AbstractBinary):
+          raise TypeError(
+              f'field {field_name!r}, type {field_type} should be a subclass of AbstractBinary'
+          )
+      else:
+        # a Union of types?
+        typing_class = get_origin(field_type)
+        if typing_class is Union:
+          for element_type in get_args(field_type):
+            if element_type is not None and not issubclass(element_type,
+                                                           AbstractBinary):
+              raise TypeError(
+                  f'field {field_name!r}, Union element type {element_type} should be a subclass of AbstractBinary'
+              )
+        elif field_type is Ellipsis or isinstance(field_type, int):
+          # a ... or an int indicates a object consuming that many bytes
+          class FieldClass(BinaryBytes, consume=field_type):
+            pass
+
+          FieldClass.__name__ = field_name
+          FieldClass.__doc__ = f'BinaryBytes,consume={field_type})'
+          fieldtypemap[field_name] = FieldClass
+        else:
+          raise TypeError(
+              f'field {field_name!r}, type {field_type} is not supported'
+          )
+
+  # cache a mapping of its fields by name
+  # this dict's keys will be in the fields() order
+  fieldtypemap = {field.name: field.type for field in fields(dcls)}
+  promote_fieldtypemap(fieldtypemap)
+
+  @decorator
+  def bcmethod(func):
+    ''' A decorator for a `BinClass` method
+        to look first for a _direct_ override in `cls.__dict__`
+        then to fall back to the `BinClass` method.
+
+        Note that this resolution is done at `BinClass` definition
+        time, not method call time.
+    '''
+    methodname = func.__name__
+    clsd = cls.__dict__
+    try:
+      method = clsd[methodname]
+      method._desc = f'BinClass:{name0}.{methodname} from base class {cls.__name__}'
+    except KeyError:
+      method = func
+      method._desc = f'BinClass:{name0}.{methodname} from BinClass for {cls.__name__}'
+    return method
+
+  class BinClass(cls, AbstractBinary):
+    ''' The wrapper class for the `@binclass` class.
+        This subclasses `cls` so a to inherit its methods.
+    '''
+
+    # the class being wrapped
+    _baseclass = cls
+    # the generated dataclass
+    _dataclass = dcls
+    # the mapping of field names to types as annotated
+    _datafieldtypes = fieldtypemap
+    # a list of the field names in order
+    _field_names = tuple(fieldtypemap)
+
+    # a list of the fields used by AbstractBinary.self_check
+    FIELD_TYPES = {
+        fieldname: (True, fieldtype)
+        for fieldname, fieldtype in fieldtypemap.items()
+    }
+
+    def __init__(self, **dcls_kwargs):
+      self.__dict__['_data'] = None  # get dummy entry in early, aids debugging
+      cls = self.__class__
+      dcls = cls._dataclass
+      # promote nonbinary values to AbstractBinary values
+      dcls_kwargs = {
+          attr: self.promote_field_value(attr, obj)
+          for attr, obj in dcls_kwargs.items()
+      }
+      dataobj = dcls(**dcls_kwargs)
+      self.__dict__['_data'] = dataobj
+
+    def self_check(self):
+      ''' An `@binclass` class instance's raw fields are in `self._data`.
+      '''
+      return AbstractBinary.self_check(
+          self._data, field_types=self.FIELD_TYPES
+      )
+
+    def __str__(self):
+      cls = self.__class__
+      fieldnames = self._field_names
+      if len(fieldnames) == 1:
+        return str(getattr(self._data, fieldnames[0]))
+      return "%s(%s)" % (
+          self.__class__.__name__,
+          ",".join(
+              f'{fieldname}={getattr(self._data,fieldname)}'
+              for fieldname in fieldnames
+              if not fieldname.endswith('_')
+          ),
+      )
+
+    def __repr__(self):
+      cls = self.__class__
+      data = self.__dict__.get('_data')
+      fieldnames = cls._field_names
+      return "%s:%s(%s)" % (
+          self.__class__.__name__,
+          ("NONE" if data is None else data.__class__.__name__),
+          (
+              "NO-DATA" if data is None else ",".join(
+                  f'{fieldname}={getattr(data,fieldname)!r}'
+                  for fieldname in fieldnames
+              )
+          ),
+      )
+
+    def __getattr__(self, attr: str):
+      ''' Return a data field value, the `.value` attribute if it is a single value field.
+      '''
+      data = self._data
+      try:
+        obj = getattr(data, attr)
+      except AttributeError:
+        gsa = super().__getattr__
+        try:
+          return gsa(attr)
+        except AttributeError as e:
+          raise AttributeError(
+              f'{self.__class__.__name__}.{attr}: no entry in the dataclass instance (self._data) or via super().__getattr__'
+          ) from e
+      # we have a dataclass instance attribute
+      assert isinstance(
+          obj, AbstractBinary
+      ), f'{self._data}.{attr}={r(obj)} is not an AbstractBinary'
+      if is_single_value(obj):
+        return obj.value
+      return obj
+
+    def __setattr__(self, attr, value):
+      ''' Set a data field from `value`.
+      '''
+      cls = self.__class__
+      if attr in cls._datafieldtypes:
+        # dataclass attribute
+        dataobj = self._data
+        datavalue = self.promote_field_value(attr, value)
+        setattr(dataobj, attr, datavalue)
+      else:
+        # ordinary attribute
+        self.__dict__[attr] = value
+
+    @classmethod
+    @bcmethod
+    def parse_field(
+        cls,
+        fieldname: str,
+        bfr: CornuCopyBuffer,
+        fieldtypes: Optional[Mapping[str, type]] = None
+    ):
+      ''' Parse an instance of the field named `fieldname` from `bfr`.
+          Return the field instance.
+      '''
+      if fieldtypes is None:
+        fieldtypes = cls._datafieldtypes
+      else:
+        # a mapping of field name -> type: copy and promote it
+        fieldtypes = dict(**fieldtypes)
+        promote_fieldtypemap(fieldtypes)
+      fieldtype = fieldtypes[fieldname]
+      parse = fieldtype.parse
+      return parse(bfr)
+
+    @classmethod
+    @bcmethod
+    def parse_fields(
+        cls,
+        bfr: CornuCopyBuffer,
+        fieldtypes: Optional[Union[
+            Mapping[str, type],
+            Iterable[str],
+            str,
+        ]] = None,
+    ) -> Mapping[str, AbstractBinary]:
+      ''' Parse all the fields from `cls._datafieldtypes` from `bfr`
+          by calling `cls.parse_field(fieldname,bfr)` for each.
+          Return a mapping of field names to values
+          suitable for passing to `cls`.
+
+          The `fieldtypes` defaults to `cls._datafieldtypes` but may be provided as:
+          - a mapping of field name to type
+          - an iterable of field names, whose types will come from
+            `cls._datafieldtypes`
+          - a string being a space separated list of field names,
+            whose types will come from `cls._datafieldtypes`
+
+          Each of these will be converted to a mapping and then
+          promoted with `promote_fieldtypemap`.
+      '''
+      if fieldtypes is None:
+        # use the default mapping, already promoted
+        fieldtypes = cls._datafieldtypes
+      elif isinstance(fieldtypes, Mapping):
+        # a mapping of field name -> type: copy and promote it
+        fieldtypes = dict(**fieldtypes)
+        promote_fieldtypemap(fieldtypes)
+      elif isinstance(fieldtypes, str):
+        # space separated field names
+        fieldtypes = {
+            fieldname: cls._datafieldtypes[fieldname]
+            for fieldname in fieldtypes.split()
+        }
+        promote_fieldtypemap(fieldtypes)
+      else:
+        # should be an iterable of str (field names)
+        fieldtypes = {
+            fieldname: cls._datafieldtypes[fieldname]
+            for fieldname in fieldtypes
+        }
+        promote_fieldtypemap(fieldtypes)
+      return {
+          fieldname: cls.parse_field(fieldname, bfr, fieldtypes)
+          for fieldname in fieldtypes
+      }
+
+    @classmethod
+    @bcmethod
+    def promote_field_value(cls, fieldname: str, obj):
+      ''' Promote a received `obj` to the appropriate `AbstractBinary` instance.
+      '''
+      try:
+        fieldtype = cls._datafieldtypes[fieldname]
+      except KeyError:
+        if not isinstance(obj, AbstractBinary):
+          raise TypeError(
+              f'promote_field_value({cls.__name__}.promote_field_value({fieldname=},{r(obj)}): not an AbstractBinary and not in {cls.__name__}._datafieldtypes:{sorted(cls._datafieldtypes)}'
+          )
+      else:
+        try:
+          promote = fieldtype.promote
+        except AttributeError:
+          # no .promote, but accept if we're already an instance
+          if not isinstance(obj, fieldtype):
+            # see if we're a Union, if so try promoting to the subtypes
+            uniontype = get_origin(fieldtype)
+            if uniontype is Union:
+              for element_type in get_args(fieldtype):
+                try:
+                  promote = element_type.promote
+                except AttributeError:
+                  promote = element_type
+                try:
+                  obj = promote(obj)
+                except (ValueError, TypeError):
+                  pass
+                else:
+                  break
+              else:
+                raise TypeError(
+                    f'{cls.__name__}.promote_field_value({fieldname=},obj={r(obj)}): cannot promote obj'
+                )
+        else:
+          obj = pfx_call(promote, obj)
+      return obj
+
+    @classmethod
+    @bcmethod
+    def parse(cls, bfr: CornuCopyBuffer):
+      ''' Parse an instance from `bfr`.
+          This default implementation calls `cls(**cls.parse_fields(bfr))`.
+      '''
+      parse_fields = cls.parse_fields
+      fields = parse_fields(bfr)
+      return cls(**fields)
+
+    @bcmethod
+    def transcribe(self):
+      ''' Transcribe this instance.
+      '''
+      cls = self.__class__
+      for fieldname in cls._datafieldtypes:
+        yield getattr(self._data, fieldname).transcribe()
+
+  cls.name0 = name0
+  cls.__name__ = f'{name0}__original'
+  assert BinClass._baseclass is cls
+  assert BinClass._dataclass is dcls
+  BinClass.__name__ = name0
+  return BinClass
 
 def BinaryFixedBytes(class_name: str, length: int):
   ''' Factory for an `AbstractBinary` subclass matching `length` bytes of data.
       The bytes are saved as the attribute `.data`.
   '''
-  return BinarySingleStruct(class_name, f'>{length}s', 'data')
+  return BinaryStruct(class_name, f'>{length}s', 'data')
 
-class BinaryUTF8NUL(BinarySingleValue):
+class BinaryUTF8NUL(BinarySingleValue, value_type=str):
   ''' A NUL terminated UTF-8 string.
   '''
 
@@ -1649,7 +2404,7 @@ class BinaryUTF8NUL(BinarySingleValue):
       nul = bfr.take(1)
       if nul != b'\0':
         raise RuntimeError(
-            "after %d bytes, expected NUL, found %r" % (nul_pos, nul)
+            f'after {nul_pos} bytes, expected NUL, found {nul!r}'
         )
     return utf8
 
@@ -1661,7 +2416,7 @@ class BinaryUTF8NUL(BinarySingleValue):
     yield s.encode('utf-8')
     yield b'\0'
 
-class BinaryUTF16NUL(BinarySingleValue):
+class BinaryUTF16NUL(BinarySingleValue, value_type=str):
   ''' A NUL terminated UTF-16 string.
   '''
 
@@ -1682,8 +2437,7 @@ class BinaryUTF16NUL(BinarySingleValue):
   def __init__(self, value: str, *, encoding: str):
     if encoding not in self.VALID_ENCODINGS:
       raise ValueError(
-          'unexpected encoding %r, expected one of %r' %
-          (encoding, self.VALID_ENCODINGS)
+          f'unexpected {encoding=}, expected one of {self.VALID_ENCODINGS!r}'
       )
     self.encoding = encoding
     self.value = value
@@ -1731,3 +2485,30 @@ class BinaryUTF16NUL(BinarySingleValue):
     '''
     yield value.encode(encoding)
     yield b'\0\0'
+
+if __name__ == '__main__':
+
+  @binclass
+  class HeaderStruct:
+    """A header containing a count and some flags."""
+
+    count: UInt32BE
+    flags: UInt8
+
+  @binclass
+  class Packet(HeaderStruct):
+    ''' The Packet, subclassing HeaderStruct. '''
+
+    body_text: BSString
+    body_data: BSData
+    body_longs: BinaryStruct('ll_longs', '>LL', 'long1 long2')
+
+  packet = Packet(
+      count=5,
+      flags=0x03,
+      body_text="hello",
+      body_data=b'xyzabc',
+      body_longs=(10, 20),
+  )
+  print(repr(packet))
+  ##breakpoint()

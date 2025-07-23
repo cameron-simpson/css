@@ -33,12 +33,12 @@ import shutil
 import stat
 import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
-from threading import Lock, RLock
+from threading import current_thread, Lock, RLock
 import time
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import decorator, fmtdoc, OBSOLETE, strable
+from cs.deco import fmtdoc, OBSOLETE, strable
 from cs.filestate import FileState
 from cs.fs import shortpath
 from cs.gimmicks import TimeoutError  # pylint: disable=redefined-builtin
@@ -50,10 +50,10 @@ from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
-from cs.threads import locked
+from cs.threads import locked, NRLock
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20250103-post'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -563,7 +563,7 @@ def make_files_property(
 def makelockfile(
     path,
     *,
-    ext=None,
+    ext='.lock',
     poll_interval=None,
     timeout=None,
     runstate: RunState,
@@ -571,6 +571,7 @@ def makelockfile(
     max_interval=37,
 ):
   ''' Create a lockfile and return its path.
+      If `keepopen`, return a `(lockpath,lockfd)` 2-tuple.
 
       The lockfile can be removed with `os.remove`.
       This is the core functionality supporting the `lockfile()`
@@ -580,7 +581,7 @@ def makelockfile(
       * `path`: the base associated with the lock file,
         often the filesystem object whose access is being managed.
       * `ext`: the extension to the base used to construct the lockfile name.
-        Default: ".lock"
+        Default: `".lock"`
       * `timeout`: maximum time to wait before failing.
         Default: `None` (wait forever).
         Note that zero is an accepted value
@@ -595,13 +596,11 @@ def makelockfile(
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
-  if ext is None:
-    ext = '.lock'
   if timeout is not None and timeout < 0:
     raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
   lockpath = path + ext
-  with Pfx("makelockfile: %r", lockpath):
+  with Pfx("makelockfile, thread %s: %r", current_thread().name, lockpath):
     while True:
       if runstate.cancelled:
         warning(
@@ -641,6 +640,10 @@ def makelockfile(
         time.sleep(sleep_for)
         continue
       else:
+        os.write(
+            lockfd,
+            b'pid %d Thread %r\n' % (os.getpid(), current_thread().name)
+        )
         break
     if keepopen:
       return lockpath, lockfd
@@ -648,22 +651,28 @@ def makelockfile(
     return lockpath
 
 @contextmanager
-def lockfile(path, **lock_kw):
+def lockfile(path, _lockmap={}, _lockmap_lock=Lock(), **makelockfile_kw):
   ''' A context manager which takes and holds a lock file.
       An open file descriptor is kept for the lock file as well
       to aid locating the process holding the lock file using eg `lsof`.
       This is just a context manager shim for `makelockfile`
-      and all arguments are plumbed through.
+      and all keyword arguments are plumbed through.
   '''
-  lockpath, lockfd = makelockfile(path, keepopen=True, **lock_kw)
-  try:
-    yield lockpath
-  finally:
+  with _lockmap_lock:
     try:
-      pfx_call(os.remove, lockpath)
-    except FileNotFoundError as e:
-      warning("lock file already removed: %s", e)
-    pfx_call(os.close, lockfd)
+      nrlock = _lockmap[path]
+    except KeyError:
+      nrlock = _lockmap[path] = NRLock(path)
+  with nrlock:
+    lockpath, lockfd = makelockfile(path, keepopen=True, **makelockfile_kw)
+    try:
+      yield lockpath
+    finally:
+      try:
+        pfx_call(os.remove, lockpath)
+      except FileNotFoundError as e:
+        warning("lock file already removed: %s", e)
+      pfx_call(os.close, lockfd)
 
 def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
@@ -976,6 +985,7 @@ def byteses_as_fd(bss, **kw):
   '''
   return CornuCopyBuffer(bss).as_fd(**kw)
 
+# TODO: how is this different to read_data()?
 def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   ''' General purpose reader for file descriptors yielding data from `offset`.
       **Note**: This does not move the file descriptor position
@@ -1094,10 +1104,10 @@ class ReadMixin(object):
   ''' Useful read methods to accomodate modes not necessarily available in a class.
 
       Note that this mixin presumes that the attribute `self._lock`
-      is a threading.RLock like context manager.
+      is a `threading.RLock`-like context manager.
 
       Classes using this mixin should consider overriding the default
-      .datafrom method with something more efficient or direct.
+      `.datafrom` method with something more efficient or direct.
   '''
 
   def datafrom(self, offset, readsize=None):
@@ -1478,12 +1488,17 @@ class NullFile(object):
     ''' Flush buffered data to the subsystem.
     '''
 
+# TODO: how is this different to datafrom()?
+@fmtdoc
 def file_data(fp, nbytes=None, rsize=None):
   ''' Read `nbytes` of data from `fp` and yield the chunks as read.
 
       Parameters:
-      * `nbytes`: number of bytes to read; if None read until EOF.
-      * `rsize`: read size, default DEFAULT_READSIZE.
+      * `nbytes`: number of bytes to read; if `None` read until EOF.
+      * `rsize`: read size, default {DEFAULT_READSIZE==}`.
+
+      This tries to use the file's `.read1` "short read" method if
+      available, otherwise it uses `.read`.
   '''
   # try to use the "short read" flavour of read if available
   if rsize is None:
@@ -1540,6 +1555,7 @@ def read_data(fp, nbytes, rsize=None):
     return bss[0]
   return b''.join(bss)
 
+# TODO: how is this different to datafrom()
 def read_from(fp, rsize=None, tail_mode=False, tail_delay=None):
   ''' Generator to present text or data from an open file until EOF.
 
@@ -1580,6 +1596,7 @@ def lines_of(fp, partials=None):
 @contextmanager
 def atomic_filename(
     filename,
+    *,
     exists_ok=False,
     placeholder=False,
     dir=None,

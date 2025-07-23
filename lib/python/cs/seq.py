@@ -15,12 +15,12 @@ in the course of its function.
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
-from typing import Callable, Hashable, Iterable, Optional, Tuple, TypeVar
+from typing import Callable, Hashable, Iterable, Iterator, Optional, Tuple, TypeVar
 
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20250103-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'description':
@@ -398,6 +398,52 @@ class StatefulIterator(object):
     self.state = new_state
     return item
 
+class ClonedIterator(Iterable):
+  ''' A thread safe clone of some orginal iterator.
+
+      `next()` of this yields the next item from the supplied iterator.
+      `iter()` of this returns a generator yielding from the
+      historic items and then from the original iterator.
+
+      Note that this accrues all of the items from the original
+      iterator in memory.
+  '''
+
+  def __init__(self, it: Iterator):
+    ''' Initialise the clone with its original iterator.
+    '''
+    self._iterator = iter(it)
+    self._cloned = []
+    self._lock = Lock()
+
+  def __next__(self):
+    ''' Return the next item from the original iterator.
+    '''
+    with self._lock:
+      item = next(self._iterator)
+      self._cloned.append(item)
+
+  def __iter__(self):
+    ''' Iterate over the clone, returning a new iterator.
+
+        In mild violation of the iterator protocol, instead of
+        returning `self`` iter(self)` returns a generator yielding
+        the historic and then current contents of the original iterator.
+    '''
+    i = 0
+    while True:
+      with self._lock:
+        try:
+          item = self._cloned[i]
+        except IndexError:
+          try:
+            item = next(self._iterator)
+          except StopIteration:
+            return
+          self._cloned.append(item)
+      yield item
+      i += 1
+
 def splitoff(sq, *sizes):
   ''' Split a sequence into (usually short) prefixes and a tail,
       for example to construct subdirectory trees based on a UUID.
@@ -698,6 +744,10 @@ def infill_from_batches(
     obj_keys: Callable[[_infill_T], _infill_K],
     existing_keys: Callable[[_infill_T], _infill_K],
     all: Optional[bool] = False,
+    amend_batch: Optional[Callable[
+        [Iterable[_infill_T]],
+        Iterable[_infill_T],
+    ]] = lambda obj_batch: obj_batch,
 ):
   ''' A batched version of `infill(objs)` accepting an iterable of
       batches of objects which yields `(obj,obj_key)` 2-tuples
@@ -718,8 +768,10 @@ def infill_from_batches(
         an iterable of the existing keys
       * `all`: optional flag, default `False`: if true then yield
         `(obj,())` for objects with no missing records
+      * `amend_batch`: optional callable to amend the batch of objects,
+        for example to amend a `QuerySet` with `.select_related()` or similar
   '''
-  for objs in objss:
+  for objs in map(amend_batch, objss):
     yield from infill(
         objs, obj_keys=obj_keys, existing_keys=existing_keys, all=all
     )

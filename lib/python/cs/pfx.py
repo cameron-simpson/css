@@ -61,7 +61,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20241208-post'
+__version__ = '20250613-post'
 
 DISTINFO = {
     'description':
@@ -337,9 +337,9 @@ class Pfx(object):
       ##  current_prefix, text.__class__, text, sys.exc_info())
       return text
     return (
-        current_prefix + DEFAULT_SEPARATOR +
-        ustr(text, errors='replace'
-             ).replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
+        current_prefix + DEFAULT_SEPARATOR + ustr(text, errors='replace')
+        # removed, makes messages unreadable
+        ##replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
     )
 
   @classmethod
@@ -348,6 +348,11 @@ class Pfx(object):
         The original value of some .attr is preserved as .{attr}_without_prefix.
         Return `True` if modified, `False` if unable to modify.
     '''
+    if hasattr(e, '_'):
+      return True
+    # preserve the original str(e) for concise messages
+    e._ = str(e)
+    # now try to modify the attributes to prefix the first one
     current_prefix = cls._state.prefix
     did_prefix = False
     for attr in 'args', 'message', 'msg', 'reason', 'strerror':

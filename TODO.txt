@@ -1,3 +1,34 @@
+cs.cmdutils: auto print the relevant environment variables in the usage?
+printt,tabulate: some kind of width support - tty width is easy, per column widths harder
+docmd: set rl_completer for the cmd_* commands
+cs.cmdutils: poparg(argv,int,"count") fails but poparg(argv,"count",int) succeeds
+@promote: handle async functions
+@decorator to preserve the iscoroutineness of the decorated function? And check it works via @OBSOLETE? suggestion by fixerror
+stack_dump does not work given an exception
+pydoc: short summary of methods for classes, like we do for the module as a whole
+cs.units: decompose to return a Decomposed with a nice __str__
+printt: output formats - csv, html, md1 does this even make sense?
+TagSet ontologies - make it easy to define ontology type information and to set it
+cs.distutils - check validity of cs.* install_requires names
+print_argv short str() its arguments - maybe only if they are pathlib.path?
+ListQueue: use a deque double eneded queue
+tagset save: if permissionerror on the temp file, rewrite in place if possible?
+docker-caddy script
+dlog fwd local dlog sock through ssh, provide $DLOG_PIPEPATH through?
+CornuCopyBuffer - is .offset the post buffer size? it should be the logic offset - pre-buffer - but the mp4 parsing suggests that it is not?
+cs.binary as_hexpat() class method for ImHex Hex Editor Hex Patterns, maybe a cs.hexpat modules later
+units - conciser transcribe function names
+cs.progress: @auto_progress - rename to @uses_progress?
+cs.cmdutils: support --no-thing options with no arg
+hashindex: make default rearrange mode mv ?
+distinfo: strip #doctest: +ELLIPSIS
+cs.cmdutils: accept popopts(long_name=(....),short="long_name") sharing a common opt spec
+hashindex check - check hashindex ls style output against files
+cs.cmdutils subcommand help should still recite the common options
+wpr - do not import the osx stuff if we're not updating the spaces - it takes forever
+exract the make-a-dir-of-images from wpr as a tool
+RunState pause state and effects, Event to block for it?
+fstags - can we store tags for directories in the dir .fstags, requires a state maybe we already do that? migrate - if isdir and no tags in the dir fstags get them from the parent
 default: sqlite worker - use the queue get_batch mode to collect requests, open sqlite db in bursts
 default: generic sqlite dbm with thread worker to be pulled from ContentCache, into a dbmutils or mappings class
 cs.urlutils: URL: use cs.rfc2616.content_type, content_length

@@ -67,7 +67,7 @@ from cs.py.func import funcname, func_a_kw_fmt
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20250103-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -386,7 +386,7 @@ class Result(FSM):
         `(None,exc_info)` is returned
         where `exc_info` is a tuple of `(exc_type,exc_value,exc_traceback)`.
         If the function was cancelled the sequence `(None,None)`
-        is returned.
+        is returned; the `.fsm_state` will be `'CANCELLED'`.
     '''
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()
