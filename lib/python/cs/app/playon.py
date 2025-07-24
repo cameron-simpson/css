@@ -912,15 +912,17 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
     self._jwt = data['token']
 
   @staticmethod
-  def from_playon_date(date_s):
-    ''' The PlayOn API seems to use UTC date strings.
+  def from_playon_date(date_s) -> datetime:
+    ''' Return a timezone aware datetime from a PlayOn date/time value;
+        The PlayOn API seems to use UTC date strings.
     '''
     return datetime.strptime(date_s,
                              "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
 
   @typechecked
-  def __getitem__(self, download_id: int):
-    ''' Return the recording `TagSet` associated with the recording `download_id`.
+  def __getitem__(self, index: tuple | int) -> HasSQLTags:
+    ''' If `index` is an `int` return the associated `Recording`.
+        Otherwise `index` should be a `tuple`, returns the associated `HasSQLTags`.
     '''
     return self.sqltags[download_id]
 
@@ -994,8 +996,9 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
       )
 
   @pfx_method
-  def recordings(self):
-    ''' Return the `TagSet` instances for the available recordings.
+  def fetch_recordings(self) -> set[Recording]:
+    ''' Return a set of the `Recording` instances for the available recordings.
+        This makes an API request.
     '''
     with self.sqltags.db_session():
       data = self.suburl_data('library/all')
