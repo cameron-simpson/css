@@ -98,8 +98,8 @@ DISTINFO = {
     ],
 }
 
-DBURL_ENVVAR = 'PLAYON_TAGS_DBURL'
-DBURL_DEFAULT = '~/var/playon.sqlite'
+PLAYON_DBURL_ENVVAR = 'PLAYON_TAGS_DBURL'
+PLAYON_DBURL_DEFAULT = '~/var/playon.sqlite'
 
 FILENAME_FORMAT_ENVVAR = 'PLAYON_FILENAME_FORMAT'
 DEFAULT_FILENAME_FORMAT = (
@@ -132,8 +132,8 @@ class PlayOnCommand(BaseCommand):
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
       'FILENAME_FORMAT_ENVVAR': FILENAME_FORMAT_ENVVAR,
       'LS_FORMAT': LS_FORMAT,
-      'DBURL_ENVVAR': DBURL_ENVVAR,
-      'DBURL_DEFAULT': DBURL_DEFAULT,
+      'PLAYON_DBURL_ENVVAR': PLAYON_DBURL_ENVVAR,
+      'PLAYON_DBURL_DEFAULT': PLAYON_DBURL_DEFAULT,
       'QUEUE_FORMAT': QUEUE_FORMAT,
   }
 
@@ -145,8 +145,8 @@ class PlayOnCommand(BaseCommand):
                                 This is obtained from .netrc if omitted.
       {FILENAME_FORMAT_ENVVAR}  Format string for downloaded filenames.
                                 Default: {DEFAULT_FILENAME_FORMAT}
-      {DBURL_ENVVAR:17}         Location of state tags database.
-                                Default: {DBURL_DEFAULT}
+      {PLAYON_DBURL_ENVVAR:17}         Location of state tags database.
+                                Default: {PLAYON_DBURL_DEFAULT}
 
     Recording specification:
       an int        The specific recording id.
@@ -774,110 +774,11 @@ class LoginState(SQLTagSet):
 
 # pylint: disable=too-many-ancestors
 class PlayOnSQLTags(SQLTags):
-  ''' `SQLTags` subclass with PlayOn related methods.
+  ''' PlayOn flavoured `SQLTags`; it just has custom values for the default db location.
   '''
 
-  STATEDBPATH = '~/var/playon.sqlite'
-
-  # map 'foo' from 'foo.bah' to a particular TagSet subclass
-  TAGSETCLASS_PREFIX_MAPPING = {
-      'login': LoginState,
-      'recording': Recording,
-  }
-
-  def __init__(self, dbpath=None):
-    if dbpath is None:
-      dbpath = expanduser(self.STATEDBPATH)
-    super().__init__(db_url=dbpath)
-
-  @classmethod
-  @fmtdoc
-  def infer_db_url(cls, envvar=None, default_path=None):
-    ''' Infer the database URL.
-
-        Parameters:
-        * `envvar`: environment variable to specify a default,
-          default from `DBURL_ENVVAR` (`{DBURL_ENVVAR}`).
-    '''
-    if envvar is None:
-      envvar = DBURL_ENVVAR
-    if default_path is None:
-      default_path = DBURL_DEFAULT
-    return super().infer_db_url(envvar=envvar, default_path=default_path)
-
-  def __getitem__(self, index):
-    ''' Override `SQLTags.__getitem__` to promote `int` indices
-        to a `str` with value `f'recording.{index}'`.
-    '''
-    if isinstance(index, int):
-      index = f'recording.{index}'
-    return super().__getitem__(index)
-
-  def recordings(self):
-    ''' Yield recording `TagSet`s, those named `"recording.*"`.
-
-        Note that this includes both recorded and queued items.
-    '''
-    return self.find('name~recording.*')
-
-  __iter__ = recordings
-
-  # pylint: disable=too-many-branches
-  @pfx_method
-  def recording_ids_from_str(self, arg):
-    ''' Convert a string to a list of recording ids.
-    '''
-    with Pfx(arg):
-      recordings = []
-      if arg == 'all':
-        recordings.extend(iter(self))
-      elif arg == 'available':
-        recordings.extend(
-            recording for recording in self if recording.is_available()
-        )
-      elif arg == 'downloaded':
-        recordings.extend(
-            recording for recording in self if recording.is_downloaded()
-        )
-      elif arg == 'expired':
-        recordings.extend(
-            recording for recording in self if recording.is_expired()
-        )
-      elif arg == 'pending':
-        recordings.extend(
-            recording for recording in self
-            if not recording.is_downloaded() and recording.is_available()
-        )
-      elif arg == 'queued':
-        recordings.extend(
-            recording for recording in self if recording.is_queued()
-        )
-      elif arg.startswith('/'):
-        # match regexp against playon.Series or playon.Name
-        r_text = arg[1:]
-        if r_text.endswith('/'):
-          r_text = r_text[:-1]
-        r = pfx_call(re.compile, r_text, re.I)
-        for recording in self:
-          pl_tags = recording.subtags('playon')
-          name = getattr(pl_tags, 'Name', '')
-          series = getattr(pl_tags, 'Series', '')
-          if (series and r.search(series)) or (name and r.search(name)):
-            recordings.append(recording)
-      else:
-        # integer recording id
-        try:
-          dl_id = int(arg)
-        except ValueError:
-          warning("unsupported word")
-        else:
-          recordings.append(self[dl_id])
-      return list(
-          filter(
-              lambda dl_id: dl_id is not None,
-              map(lambda recording: recording.get('playon.ID'), recordings)
-          )
-      )
+  DBURL_ENVVAR = PLAYON_DBURL_ENVVAR
+  DBURL_DEFAULT = PLAYON_DBURL_DEFAULT
 
 # pylint: disable=too-many-instance-attributes
 @monitor
