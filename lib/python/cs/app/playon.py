@@ -1022,6 +1022,67 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
 
   __iter__ = recordings
 
+  # pylint: disable=too-many-branches
+  @pfx_method
+  def recording_ids_from_str(self, arg):
+    ''' Convert a string to a list of recording ids.
+    '''
+    with Pfx(arg):
+      recordings = []
+      if arg == 'all':
+        recordings.extend(iter(self))
+      elif arg == 'available':
+        recordings.extend(
+            recording for recording in self.recordings()
+            if recording.is_available()
+        )
+      elif arg == 'downloaded':
+        recordings.extend(
+            recording for recording in self.recordings()
+            if recording.is_downloaded()
+        )
+      elif arg == 'expired':
+        recordings.extend(
+            recording for recording in self.recordings()
+            if recording.is_expired()
+        )
+      elif arg == 'pending':
+        recordings.extend(
+            recording for recording in self.recordings()
+            if not recording.is_downloaded() and recording.is_available()
+        )
+      elif arg == 'queued':
+        recordings.extend(
+            recording for recording in self.recordings()
+            if recording.is_queued()
+        )
+      elif arg.startswith('/'):
+        # match regexp against playon.Series or playon.Name
+        r_text = arg[1:]
+        if r_text.endswith('/'):
+          r_text = r_text[:-1]
+        r = pfx_call(re.compile, r_text, re.I)
+        for recording in self:
+          pl_tags = recording.subtags('playon')
+          name = getattr(pl_tags, 'Name', '')
+          series = getattr(pl_tags, 'Series', '')
+          if (series and r.search(series)) or (name and r.search(name)):
+            recordings.append(recording)
+      else:
+        # integer recording id
+        try:
+          dl_id = int(arg)
+        except ValueError:
+          warning("unsupported word")
+        else:
+          recordings.append(self[dl_id])
+      return list(
+          filter(
+              lambda dl_id: dl_id is not None,
+              map(lambda recording: recording.get('playon.ID'), recordings)
+          )
+      )
+
   available = recordings
 
   @pfx_method
