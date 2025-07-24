@@ -1910,6 +1910,33 @@ class FormatableFormatter(Formatter):
             value = format(value, format_subspec)
     return FStr(value)
 
+class FormatMapping(Mapping):
+  ''' A `Mapping` subclass based on an object and a mapping
+      intends for use by the `FormatableMixin.format_as` method.
+      The mapping maps field names to values, where the values may be 
+      callables accepting an object.
+      Fetching a value from the mapping will call `value(obj)` if the value is callable.
+  '''
+
+  def __init__(self, obj, base_format_mapping: Mapping):
+    self.obj = obj
+    self.mapping = base_format_mapping
+
+  def __len__(self):
+    return len(self.mapping)
+
+  def __iter__(self):
+    return iter(self.mapping)
+
+  def __getitem__(self, field_name):
+    ''' Fetch the value for `field_name`.
+        If the value is callable, call `value(self.obj)` to get the value.
+    '''
+    value = self.mapping[field_name]
+    if callable(value):
+      value = value(self.obj)
+    return value
+
 @has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A subclass of `FormatableFormatter` which  provides 2 features:
@@ -2073,26 +2100,29 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         to provide a mapping for `str.format_map`
         then the instance itself is used as the mapping.
     '''
-    get_format_mapping = getattr(self, 'format_kwargs', None)
-    if get_format_mapping is None:
-      if control_kw:
-        # pylint: disable=raise-missing-from
-        raise ValueError(
-            "no .format_kwargs() method, but control_kw=%r" % (control_kw,)
+    with Pfx(f'{self.__class__.__name__}.format_as({format_s=},...)'):
+      get_format_mapping = getattr(self, 'format_kwargs', None)
+      if get_format_mapping is None:
+        if control_kw:
+          # pylint: disable=raise-missing-from
+          raise ValueError(
+              f'{r(self)}: no .format_kwargs() method, but {control_kw=}'
+          )
+        format_mapping = self
+      else:
+        format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
+      if any(callable(value) for value in format_mapping.values()):
+        format_mapping = FormatMapping(self, format_mapping)
+      if strict is None:
+        strict = self.format_mode.strict
+      with self.format_mode(strict=strict):
+        return pfx_call(
+            _format_as,
+            format_s,
+            format_mapping,
+            formatter=self,
+            error_sep=error_sep,
         )
-      format_mapping = self
-    else:
-      format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
-    if strict is None:
-      strict = self.format_mode.strict
-    with self.format_mode(strict=strict):
-      return pfx_call(
-          _format_as,
-          format_s,
-          format_mapping,
-          formatter=self,
-          error_sep=error_sep,
-      )
 
   # Utility methods for formats.
   @format_attribute
