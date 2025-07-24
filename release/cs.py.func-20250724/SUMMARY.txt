@@ -1,0 +1,2 @@
+func_a_kw_fmt: shorten long %r, widen another field.
+Drop Python 2 support.
