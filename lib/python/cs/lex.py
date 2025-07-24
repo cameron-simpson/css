@@ -407,7 +407,7 @@ def get_chars(s: str, offset: int, gochars: str) -> Tuple[str, int]:
   return s[ooffset:offset], offset
 
 # pylint: disable=redefined-outer-name
-def get_white(s: str, offset: int) -> Tuple[str, int]:
+def get_white(s: str, offset: int = 0) -> Tuple[str, int]:
   ''' Scan the string `s` for characters in `string.whitespace`
       starting at `offset` (default `0`).
       Return `(match,new_offset)`.
@@ -415,7 +415,7 @@ def get_white(s: str, offset: int) -> Tuple[str, int]:
   return get_chars(s, offset, whitespace)
 
 # pylint: disable=redefined-outer-name
-def skipwhite(s: str, offset: int) -> Tuple[str, int]:
+def skipwhite(s: str, offset: int = 0) -> Tuple[str, int]:
   ''' Convenience routine for skipping past whitespace;
       returns the offset of the next nonwhitespace character.
   '''
@@ -1874,8 +1874,7 @@ class FormatableFormatter(Formatter):
   @pfx_method
   @typechecked
   def format_field(cls, value, format_spec: str):
-    ''' Format a value using `value.format_format_field`,
-        returning an `FStr`
+    ''' Format a value using `format_field`, returning an `FStr`
         (a `str` subclass with additional `format_spec` features).
 
         We actually recognise colon separated chains of formats
@@ -1974,7 +1973,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   @classmethod
   def get_format_attributes(cls):
-    ''' Return the mapping of format attributes.
+    ''' Return the mapping of format attributes from `cls._format_attributes`.
     '''
     try:
       attributes = cls.__dict__['_format_attributes']
