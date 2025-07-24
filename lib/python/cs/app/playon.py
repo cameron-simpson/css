@@ -778,16 +778,6 @@ class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
       # strip the sSSeEE and any following spaces or dashes
       episode_title = episode_title[offset:].lstrip(' -')
     # fall back from provided stuff to inferred stuff
-
-class LoginState(SQLTagSet):
-
-  @property
-  def expiry(self):
-    ''' Expiry unixtime of the login state information.
-        `-1` if the `'exp'` field is not present.
-    '''
-    exp = self.get('exp')
-    return exp or -1
     return cls(
         series=playon_series or browse_series,
         season=playon_season or episode_title_season or browse_season,
