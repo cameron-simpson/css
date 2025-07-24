@@ -8,15 +8,15 @@
 '''
 
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import datetime, UTC
 from functools import cached_property
 from getopt import getopt, GetoptError
 from netrc import netrc
 import os
 from os import environ
 from os.path import (
-    basename, exists as existspath, expanduser, realpath, samefile, splitext
+    basename, exists as existspath, realpath, samefile, splitext
 )
 from pprint import pformat, pprint
 import re
@@ -32,13 +32,14 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import fmtdoc, promote, Promotable, uses_quiet, uses_verbose
+from cs.deco import fmtdoc, Promotable, uses_quiet, uses_verbose
 from cs.fileutils import atomic_filename
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
     cutprefix,
     cutsuffix,
     format_attribute,
+    FormatableMixin,
     get_prefix_n,
     get_suffix_part,
     has_format_attributes,
@@ -51,7 +52,7 @@ from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.rfc2616 import content_length
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
-from cs.sqltags import SQLTags, SQLTagSet
+from cs.sqltags import HasSQLTags, SQLTags, UsesSQLTags
 from cs.tagset import TagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
@@ -916,8 +917,7 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
     ''' Return a timezone aware datetime from a PlayOn date/time value;
         The PlayOn API seems to use UTC date strings.
     '''
-    return datetime.strptime(date_s,
-                             "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    return datetime.strptime(date_s, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
 
   @typechecked
   def __getitem__(self, index: tuple | int) -> HasSQLTags:
