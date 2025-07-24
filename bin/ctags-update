@@ -10,7 +10,7 @@ set -ue
 tags=
 
 cmd=$(basename "$0")
-usage="Usage: $cmd [-o tagfile] [--] paths..."
+usage="Usage: $cmd [-o tagfile] [--] [ctags-options...] paths..."
 
 badopts=
 
@@ -39,4 +39,7 @@ exec 1>&2
 
 ##[ -s "$tags" ] || set --
 set -x
-exec lock -P "$tags" ctags -R -a -o "$tags" --tag-relative --links=no --extras=fq ${1+"$@"}
+exec lock -P "$tags" \
+       ctags -R -o "$tags" \
+         --tag-relative --links=no --extras=fq \
+         ${1+"$@"}
