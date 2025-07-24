@@ -2684,7 +2684,7 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class HasTags:
+class HasTags(FormatableMixin):
   ''' A mixin for classes which have a `.tags:TagSet` attribute.
 
       The subclass may itself define its `.tags` instance attribute
@@ -2727,6 +2727,18 @@ class HasTags:
         need for a `.tags_entity_key` property.
     '''
     return self.tags_db[self.tags_entity_key]
+
+  def get_arg_name(self, field_name):
+    return self.tags.get_arg_name(field_name)
+
+  def format_kwargs(self):
+    ''' A `format_kwargs` method to support `cs.lex.FormatableMixin`.
+    '''
+    # TODO: what to do when the tags and the format attributes conflict?
+    kwargs = dict(self.tags)
+    for kw, method in self.get_format_attributes().items():
+      kwargs[kw] = method
+    return kwargs
 
   def __getattr__(self, tag_name: str):
     ''' Convenience attributes which go via the `.tags`.
