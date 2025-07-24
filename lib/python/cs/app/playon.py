@@ -588,6 +588,8 @@ class Recording(_PlayOnEntity):
         via the `Recording.RECORDING_QUALITY` mapping.
     '''
     quality = self.tags.get('playon.Quality')
+    if quality is None:
+      return None
     return self.RECORDING_QUALITY.get(quality, quality)
 
   @format_attribute
@@ -613,7 +615,7 @@ class Recording(_PlayOnEntity):
       if sei.episode_part:
         citation += f' - pt{sei.episode_part:02d}'
     else:
-      citation = sei.episode_title
+      citation = sei.episode_title or self['playon.Name']
     return citation
 
   @format_attribute
