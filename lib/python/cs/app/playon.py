@@ -829,12 +829,27 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
       self.login_userid = login
     self._password = password
 
+  @cached_property
+  @typechecked
+  def login_userid(self) -> str:
+    ''' The default `login_userid` comes from the netrc entry for `self.API_HOSTNAME`.
+    '''
+    N = netrc()
+    with Pfx(".netrc host %r", self.API_HOSTNAME):
+      entry = N.hosts.get(self.API_HOSTNAME)
+    if entry is None:
+      raise AttributeError(
+          f'{self.__class__.__name__}.login_userid'
+          f': no netrc entry for {self.API_HOSTNAME=}'
+      )
+    return entry[0]
+
   @pfx_method
   def login(self):
     ''' Perform a login, return the resulting `dict`.
         *Does not* update the state of `self`.
     '''
-    login = self._login
+    login = self.login_userid
     password = self._password
     if not login or not password:
       N = netrc()
