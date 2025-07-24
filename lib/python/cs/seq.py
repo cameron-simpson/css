@@ -20,7 +20,7 @@ from typing import Callable, Hashable, Iterable, Iterator, Optional, Tuple, Type
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20250724'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'description':
