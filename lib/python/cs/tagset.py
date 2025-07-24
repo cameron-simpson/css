@@ -2746,9 +2746,10 @@ class HasTags(FormatableMixin):
     '''
     try:
       return self.tags[tag_name]
-    except KeyError:
-      breakpoint()
-      raise AttributeError(f'{self.__class__.__name__}.{tag_name=}')
+    except KeyError as e:
+      raise AttributeError(
+          f'{self.__class__.__name__}.{tag_name=}: {e}'
+      ) from e
 
   def __contains__(self, key):
     return key in self.tags
