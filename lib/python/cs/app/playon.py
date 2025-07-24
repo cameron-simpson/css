@@ -194,6 +194,7 @@ class PlayOnCommand(BaseCommand):
           runstate.raiseif()
           yield
 
+  @popopts
   def cmd_account(self, argv):
     ''' Usage: {cmd}
           Report account state.
@@ -204,6 +205,7 @@ class PlayOnCommand(BaseCommand):
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
 
+  @popopts
   def cmd_api(self, argv):
     ''' Usage: {cmd} suburl
           GET suburl via the API, print result.
@@ -217,6 +219,7 @@ class PlayOnCommand(BaseCommand):
     result = api.suburl_data(suburl)
     pprint(result)
 
+  @popopts
   def cmd_cds(self, argv):
     ''' Usage: {cmd} suburl
           GET suburl via the content delivery API, print result.
@@ -421,6 +424,7 @@ class PlayOnCommand(BaseCommand):
             recording.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
+  @popopts
   def cmd_downloaded(self, argv, locale='en_US'):
     ''' Usage: {cmd} recordings...
           Mark the specified recordings as downloaded and no longer pending.
@@ -468,6 +472,7 @@ class PlayOnCommand(BaseCommand):
       for tag in playon:
         print(" ", tag)
 
+  @popopts
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
@@ -477,12 +482,14 @@ class PlayOnCommand(BaseCommand):
     '''
     return self._list(argv, self.options, ['available'], LS_FORMAT)
 
+  @popopts
   def cmd_poll(self, argv):
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
     pprint(api.notifications())
 
+  @popopts
   def cmd_queue(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List queued recordings.
@@ -494,6 +501,7 @@ class PlayOnCommand(BaseCommand):
 
   cmd_q = cmd_queue
 
+  @popopts
   def cmd_refresh(self, argv):
     ''' Usage: {cmd} [queue] [recordings]
           Update the db state from the PlayOn service.
@@ -519,6 +527,7 @@ class PlayOnCommand(BaseCommand):
       T.join()
     return xit
 
+  @popopts
   def cmd_service(self, argv, locale='en_US'):
     ''' Usage: {cmd} [service_id]
           List services.
