@@ -744,7 +744,6 @@ class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
     playon_series = R.get('playon.Series')
     playon_season = R.get('playon.Season')
     playon_episode = R.get('playon.Episode')
-    self = cls.from_str(episode_title, series=playon_series)
     # now override various fields from the playon tags
     ###############################################################
     # match a Playon browse path like "... | The Flash | Season 9"
@@ -779,11 +778,6 @@ class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
       # strip the sSSeEE and any following spaces or dashes
       episode_title = episode_title[offset:].lstrip(' -')
     # fall back from provided stuff to inferred stuff
-    self.series = playon_series or self.series or browse_series
-    self.season = playon_season or self.season or episode_title_season or browse_season
-    self.episode = playon_episode or self.episode or episode_title_episode
-    self.episode_part = episode_part
-    return self
 
 class LoginState(SQLTagSet):
 
@@ -794,6 +788,12 @@ class LoginState(SQLTagSet):
     '''
     exp = self.get('exp')
     return exp or -1
+    return cls(
+        series=playon_series or browse_series,
+        season=playon_season or episode_title_season or browse_season,
+        episode=playon_episode or episode_title_episode,
+        episode_part=episode_part,
+    )
 
 # pylint: disable=too-many-ancestors
 class PlayOnSQLTags(SQLTags):
