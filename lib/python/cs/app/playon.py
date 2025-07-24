@@ -1013,6 +1013,15 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
           )
       )
 
+  def recordings(self):
+    ''' Yield the `Recording`s.
+
+        Note that this includes both recorded and queued items.
+    '''
+    return self.find(f'name~{self.TYPE_ZONE}.recording.*')
+
+  __iter__ = recordings
+
   available = recordings
 
   @pfx_method
