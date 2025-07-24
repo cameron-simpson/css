@@ -572,9 +572,9 @@ class Recording(_PlayOnEntity):
   ''' A PlayOn recording.
   '''
 
-  # recording data stale after 10 minutes
   TYPE_SUBNAME = 'recording'
 
+  # recording data are considered stale after 10 minutes
   STALE_AGE = 600
 
   RECORDING_QUALITY = {
@@ -697,9 +697,12 @@ class Recording(_PlayOnEntity):
         service.
     '''
     if self.is_expired():
-      # expired recording will never become unstale
+      # an expired recording will never become stale
       return False
-    return super().is_stale(max_age=max_age)
+    last_updated = self.get('last_updated')
+    if last_updated is None:
+      return True
+    return last_updated + (max_age or self.STALE_AGE) < time.time()
 
   @fmtdoc
   def filename(self, filename_format=None) -> str:
