@@ -81,7 +81,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20250531.1-post'
+__version__ = '20250724'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
