@@ -15,6 +15,7 @@ raising `ValueError` on failed tokenisation.
 # pylint: disable=too-many-lines
 
 import binascii
+from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import partial
@@ -1912,7 +1913,7 @@ class FormatableFormatter(Formatter):
             value = format(value, format_subspec)
     return FStr(value)
 
-class FormatMapping(Mapping):
+class FormatMapping(MappingABC):
   ''' A `Mapping` subclass based on an object and a mapping
       intends for use by the `FormatableMixin.format_as` method.
       The mapping maps field names to values, where the values may be 
