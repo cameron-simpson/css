@@ -549,13 +549,32 @@ class PlayOnCommand(BaseCommand):
       for tag in playon:
         print(" ", tag)
 
-# pylint: disable=too-many-ancestors
+class _PlayOnEntity(HasSQLTags, FormatableMixin):
+
+  def __init__(self, tags: TagSet, api: "PlayOnAPI"):
+    assert api.sqltags is tags.sqltags, f'{api.sqltags=} is not {tags.sqltags=}'
+    self.tags = tags
+    self.api = api
+
+class LoginState(_PlayOnEntity):
+
+  TYPE_SUBNAME = 'login.state'
+
+  @property
+  def expiry(self):
+    ''' Expiry unixtime of the login state information.
+        `-1` if the `'exp'` field is not present.
+    '''
+    return self.tags.get('exp') or -1
+
 @has_format_attributes
-class Recording(SQLTagSet):
-  ''' An `SQLTagSet` with knowledge about PlayOn recordings.
+class Recording(_PlayOnEntity):
+  ''' A PlayOn recording.
   '''
 
   # recording data stale after 10 minutes
+  TYPE_SUBNAME = 'recording'
+
   STALE_AGE = 600
 
   RECORDING_QUALITY = {
@@ -568,7 +587,7 @@ class Recording(SQLTagSet):
     ''' The recording resolution derived from the quality
         via the `Recording.RECORDING_QUALITY` mapping.
     '''
-    quality = self.get('playon.Quality')
+    quality = self.tags.get('playon.Quality')
     return self.RECORDING_QUALITY.get(quality, quality)
 
   @format_attribute
@@ -956,7 +975,7 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
     with self.sqltags.db_session():
       data = self.suburl_data('queue')
       entries = data['entries']
-      return self._entry_tagsets(
+      return self._entry_entities(
           entries, 'recording', dict(
               Episode=int,
               ReleaseYear=int,
@@ -971,7 +990,7 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
     with self.sqltags.db_session():
       data = self.suburl_data('library/all')
       entries = data['entries']
-      return self._entry_tagsets(
+      return self._entry_entities(
           entries, 'recording', dict(
               Episode=int,
               ReleaseYear=int,
@@ -983,46 +1002,48 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
 
   @pfx_method
   @require(lambda type: type in ('feature', 'recording', 'service'))
-  def _entry_tagsets(
-      self, entries, type: str, conversions: Optional[dict] = None
-  ) -> set:
+  def _entry_entities(
+      self,
+      entries,
+      type: str,
+      conversions: Optional[dict] = None
+  ) -> set[_PlayOnEntity]:
     ''' Return a `set` of `TagSet` instances from PlayOn data entries.
     '''
-    with self.sqltags:
-      now = time.time()
-      tes = set()
-      for entry in entries:
-        entry_id = entry['ID']
-        with Pfx(entry_id):
-          # pylint: disable=use-dict-literal
-          if conversions:
-            for e_field, conv in sorted(conversions.items()):
-              try:
-                value = entry[e_field]
-              except KeyError:
-                pass
-              else:
-                with Pfx("%s=%r", e_field, value):
-                  if value is None:
-                    del entry[e_field]
+    now = time.time()
+    entities = set()
+    for entry in entries:
+      entry_id = entry['ID']
+      with Pfx(entry_id):
+        # pylint: disable=use-dict-literal
+        if conversions:
+          for e_field, conv in sorted(conversions.items()):
+            try:
+              value = entry[e_field]
+            except KeyError:
+              pass
+            else:
+              with Pfx("%s=%r", e_field, value):
+                if value is None:
+                  del entry[e_field]
+                else:
+                  try:
+                    value2 = conv(value)
+                  except ValueError as e:
+                    warning("%r: %s", value, e)
                   else:
-                    try:
-                      value2 = conv(value)
-                    except ValueError as e:
-                      warning("%r: %s", value, e)
-                    else:
-                      entry[e_field] = value2
-          te = self.sqltags[f'{type}.{entry_id}']
-          te.update(entry, prefix='playon')
-          te.update(dict(last_updated=now))
-          tes.add(te)
-      return tes
+                    entry[e_field] = value2
+        entity = self[type, str(entry_id)]
+        entity.tags.update(entry, prefix='playon')
+        entity.tags.update(dict(last_updated=now))
+        entities.add(entity)
+    return entities
 
   @pfx_method
   def _services_from_entries(self, entries):
     ''' Return the service `TagSet` instances from PlayOn data entries.
     '''
-    return self._entry_tagsets(entries, 'service')
+    return self._entry_entities(entries, 'service')
 
   @pfx_method
   def services(self):
@@ -1041,7 +1062,7 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
     ''' Fetch the list of featured shows.
     '''
     entries = self.cdsurl_data('content/featured')
-    return self._entry_tagsets(entries, 'feature')
+    return self._entry_entities(entries, 'feature')
 
   def feature(self, feature_id):
     ''' Return the feature `SQLTags` instance for `feature_id`.
