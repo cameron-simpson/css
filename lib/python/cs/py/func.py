@@ -10,8 +10,6 @@ Convenience facilities related to Python functions.
 
 from functools import partial
 
-from cs.py3 import raise_from
-
 __version__ = '20240630-post'
 
 DISTINFO = {
@@ -21,9 +19,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [
-        'cs.py3',
-    ],
+    'python_requires':
+    '>=3',
 }
 
 def funcname(func):
@@ -139,7 +136,7 @@ def prop(func):
     try:
       return func(*a, **kw)
     except AttributeError as e:
-      raise_from(RuntimeError("inner function %s raised %s" % (func, e)), e)
+      raise RuntimeError("inner function %s raised %s" % (func, e)) from e
 
   prop_wrapper.__name__ = "@prop(%s)" % (funcname(func),)
   return property(prop_wrapper)
@@ -180,7 +177,7 @@ def derived_property(
             setattr(self, property_name, p)
             setattr(self, property_revision_name, o_revision)
     except AttributeError as e:
-      raise_from(RuntimeError("AttributeError: %s" % (e,)), e)
+      raise RuntimeError("AttributeError: %s" % (e,)) from e
     return p
 
   return property(property_value)
