@@ -1893,16 +1893,18 @@ class FormatableFormatter(Formatter):
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
-              value.convert_via_method_or_attr  # noqa
+              vconv = value.convert_via_method_or_attr
             except AttributeError:
               # promote to something with convert_via_method_or_attr
               if isinstance(value, str):
                 value = FStr(value)
+                value, offset = FStr(value).convert_via_method_or_attr(
+                    format_subspec
+                )
               else:
                 value = pfx_call(format, value, format_subspec)
-            value, offset = value.convert_via_method_or_attr(
-                value, format_subspec
-            )
+            else:
+              value, offset = vconv(format_subspec)
             if offset < len(format_subspec):
               subspec_tail = format_subspec[offset:]
               value = cls.get_subfield(value, subspec_tail)
@@ -2036,7 +2038,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     return super().convert_field(value, conversion)
 
   @pfx_method
-  def convert_via_method_or_attr(self, value, format_spec):
+  def convert_via_method_or_attr(self, format_spec):
     ''' Apply a method or attribute name based conversion to `value`
         where `format_spec` starts with a method name
         applicable to `value`.
@@ -2069,28 +2071,21 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         and `posixpath:json` via `FStr`
         even though a `PurePosixPath` does not subclass `FStr`.
     '''
+    attr, offset = get_identifier(format_spec)
+    if not attr:
+      # no leading method/attribute name, return unchanged
+      return self, 0
     try:
-      attr, offset = get_identifier(format_spec)
-      if not attr:
-        # no leading method/attribute name, return unchanged
-        return value, 0
-      try:
-        attribute = value.get_format_attribute(attr)
-      except AttributeError as e:
-        raise TypeError(
-            "convert_via_method_or_attr(%s,%r): %s" %
-            (typed_repr(value), format_spec, e)
-        ) from e
-      if callable(attribute):
-        converted = attribute()
-      else:
-        converted = attribute
-      return converted, offset
-    except TypeError:
-      if not isinstance(value, FStr):
-        with Pfx("fall back to FStr(value=%s).convert_via_method_or_attr"):
-          return self.convert_via_method_or_attr(FStr(value), format_spec)
-      raise
+      attribute = self.get_format_attribute(attr)
+    except AttributeError as e:
+      raise TypeError(
+          f'{self.__class__.__name__}.convert_via_method_or_attr({format_spec=}): no .{attr}: {e}'
+      ) from e
+    if callable(attribute):
+      converted = attribute()
+    else:
+      converted = attribute
+    return converted, offset
 
   def format_as(self, format_s, error_sep=None, strict=None, **control_kw):
     ''' Return the string `format_s` formatted using the mapping
