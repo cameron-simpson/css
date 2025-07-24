@@ -924,7 +924,9 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
     ''' If `index` is an `int` return the associated `Recording`.
         Otherwise `index` should be a `tuple`, returns the associated `HasSQLTags`.
     '''
-    return self.sqltags[download_id]
+    if isinstance(index, int):
+      index = 'recording', str(index)
+    return super().__getitem__(index)
 
   def suburl(
       self, suburl, *, api_version=None, headers=None, _base_url=None, **kw
