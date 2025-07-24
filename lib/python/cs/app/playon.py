@@ -233,8 +233,8 @@ class PlayOnCommand(BaseCommand):
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
-    lstate = api.login_state
-    pprint(lstate)
+    login_state = api.login_state
+    pprint(login_state)
     result = api.cdsurl_data(suburl)
     pprint(result)
 
@@ -370,13 +370,11 @@ class PlayOnCommand(BaseCommand):
     return xit
 
   @uses_runstate
-  def _refresh_sqltags_data(
-      self, api, sqltags, runstate: RunState, max_age=None
-  ):
+  def _refresh_sqltags_data(self, api, runstate: RunState, max_age=None):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
-    recordings = set(sqltags.recordings())
+    recordings = set(api.fetch_recordings())
     need_refresh = (
         # any current recordings whose state is stale
         any(recording.is_stale(max_age=max_age) for recording in recordings) or
@@ -398,7 +396,7 @@ class PlayOnCommand(BaseCommand):
           -l        Long listing: list tags below each entry.
           -o format Format string for each entry.
     '''
-    sqltags = options.sqltags
+    api = options.api
     long_mode = False
     listing_format = default_format
     opts, argv = getopt(argv, 'lo:', '')
@@ -414,12 +412,12 @@ class PlayOnCommand(BaseCommand):
     xit = 0
     for arg in argv:
       with Pfx(arg):
-        recording_ids = sqltags.recording_ids_from_str(arg)
+        recording_ids = api.recording_ids_from_str(arg)
         if not recording_ids:
           warning("no recording ids")
           continue
         for dl_id in sorted(recording_ids):
-          recording = sqltags[dl_id]
+          recording = api[dl_id]
           with Pfx(recording.name):
             recording.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
@@ -431,18 +429,18 @@ class PlayOnCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing recordings")
-    sqltags = self.options.sqltags
+    api = self.options.api
     xit = 0
     for spec in argv:
       with Pfx(spec):
-        recording_ids = sqltags.recording_ids_from_str(spec)
+        recording_ids = api.recording_ids_from_str(spec)
         if not recording_ids:
           warning("no recording ids")
           xit = 1
           continue
         for dl_id in recording_ids:
           with Pfx("%s", dl_id):
-            recording = sqltags[dl_id]
+            recording = api[dl_id]
             print(dl_id, '+ downloaded')
             recording.add("downloaded")
     return xit
@@ -788,9 +786,12 @@ class PlayOnSQLTags(SQLTags):
 
 # pylint: disable=too-many-instance-attributes
 @monitor
-class PlayOnAPI(HTTPServiceAPI):
+class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
   ''' Access to the PlayOn API.
   '''
+
+  HasSQLTagsClass = _PlayOnEntity
+  TYPE_ZONE = 'playon'
 
   API_HOSTNAME = 'api.playonrecorder.com'
   API_BASE = f'https://{API_HOSTNAME}/v3/'
@@ -802,11 +803,16 @@ class PlayOnAPI(HTTPServiceAPI):
   CDS_HOSTNAME_LOCAL = 'cds-au.playonrecorder.com'
   CDS_BASE_LOCAL = f'https://{CDS_HOSTNAME_LOCAL}/api/v6/'
 
-  def __init__(self, login, password, sqltags=None):
+  def __init__(self, login=None, password=None, sqltags=None):
     if sqltags is None:
       sqltags = PlayOnSQLTags()
-    super().__init__(sqltags=sqltags)
-    self._login = login
+    super().__init__(
+        sqltags=sqltags,
+        has_sqltags_class=self.HasSQLTagsClass,
+        type_zone=self.TYPE_ZONE,
+    )
+    if login:
+      self.login_userid = login
     self._password = password
 
   @pfx_method
