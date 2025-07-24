@@ -1018,7 +1018,7 @@ class TagSet(
   def set_from(self, other, verbose=None):
     ''' Completely replace the values in `self`
         with the values from `other`,
-        a `TagSet` or any other `name`=>`value` dict.
+        a `TagSet` or any other `name`=>`value` mapping.
 
         This has the feature of logging changes
         by calling `.set` and `.discard` to effect the changes.
@@ -1255,7 +1255,7 @@ class TagSet(
 
   @classmethod
   @pfx_method
-  def edit_tagsets(cls, tes, editor=None, verbose=True):
+  def edit_tagsets(cls, tes, editor=None, *, verbose=None):
     ''' Edit a collection of `TagSet`s.
         Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
