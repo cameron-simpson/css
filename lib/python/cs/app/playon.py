@@ -183,19 +183,16 @@ class PlayOnCommand(BaseCommand):
     with super().run_context():
       options = self.options
       runstate = options.runstate
-      sqltags = PlayOnSQLTags()
-      api = PlayOnAPI(options.user, options.password, sqltags)
-      with sqltags:
-        with stackattrs(options, api=api, sqltags=sqltags):
-          with api:
-            # preload all the recordings from the db
-            ##print("RC PRELOAD")
-            ##list(sqltags.recordings())
-            # if there are unexpired stale entries or no unexpired entries,
-            # refresh them
-            self._refresh_sqltags_data(api, sqltags)
-            runstate.raiseif()
-            yield
+      api = PlayOnAPI(options.user, options.password)
+      with api:
+        with stackattrs(options, api=api):
+          # preload all the recordings from the db
+          ##list(sqltags.recordings())
+          # if there are unexpired stale entries or no unexpired entries,
+          # refresh them
+          self._refresh_sqltags_data(api)
+          runstate.raiseif()
+          yield
 
   def cmd_account(self, argv):
     ''' Usage: {cmd}
