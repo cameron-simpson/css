@@ -11,6 +11,7 @@
 '''
 
 from contextlib import contextmanager
+from functools import cached_property
 from json import JSONDecodeError
 from threading import RLock
 import time
@@ -20,13 +21,13 @@ from icontract import require
 import requests
 from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
 
-from cs.deco import promote
+from cs.deco import promote, uses_verbose
 from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
-from cs.sqltags import SQLTags, SQLTagSet
-from cs.upd import uses_upd
+from cs.sqltags import SQLTags, SQLTagSet, UsesSQLTags
+from cs.upd import run_task, uses_upd
 from cs.urlutils import URL
 
 __version__ = '20241007-post'
@@ -51,7 +52,7 @@ DISTINFO = {
     ],
 }
 
-class ServiceAPI(MultiOpenMixin):
+class ServiceAPI(MultiOpenMixin, UsesSQLTags):
   ''' `SewrviceAPI` base class for other APIs talking to services.
   '''
 
@@ -61,9 +62,14 @@ class ServiceAPI(MultiOpenMixin):
 
   @promote
   @uses_fstags
-  def __init__(self, *, fstags: FSTags, sqltags: SQLTags):
+  def __init__(
+      self, *, fstags: FSTags, sqltags: SQLTags, has_sqltags_class,
+      type_zone: str
+  ):
     self.fstags = fstags
     self.sqltags = sqltags
+    self.HasSQLTagsClass = has_sqltags_class
+    self.TYPE_ZONE = type_zone
     self._lock = RLock()
     self.login_state_mapping = None
 
@@ -95,16 +101,15 @@ class ServiceAPI(MultiOpenMixin):
         or if `do_refresh` is true (default `False`).
     '''
     with self._lock:
-      state = self.sqltags['login.state']
-      if do_refresh or not state or (self.API_AUTH_GRACETIME is not None
-                                     and time.time() + self.API_AUTH_GRACETIME
-                                     >= state.expiry):
+      state = self['login.state', self.login_userid.replace('.', '_')]
+      if do_refresh or (self.API_AUTH_GRACETIME is not None and
+                        time.time() + self.API_AUTH_GRACETIME >= state.expiry):
         for k, v in self.login().items():
           if k not in ('id', 'name'):
             state[k] = v
     return state
 
-  @property
+  @cached_property
   def login_state(self) -> SQLTagSet:
     ''' The login state, a mapping. Performs a login if necessary.
     '''
@@ -125,7 +130,9 @@ class HTTPServiceAPI(ServiceAPI):
         For example, the `PlayOnAPI` defines this as `f'https://{API_HOSTNAME}/v3/'`.
   '''
 
-  def __init__(self, api_hostname=None, *, default_headers=None, **kw):
+  def __init__(
+      self, api_hostname=None, *, default_headers=None, **service_api_kw
+  ):
     if api_hostname is None:
       api_hostname = type(self).API_HOSTNAME
     else:
@@ -133,7 +140,7 @@ class HTTPServiceAPI(ServiceAPI):
       self.API_BASE = f'https://{api_hostname}/'
     if default_headers is None:
       default_headers = {}
-    super().__init__(**kw)
+    super().__init__(**service_api_kw)
     session = self.session = requests.Session()
     # mapping of method names to requests convenience calls
     self.REQUESTS_METHOD_CALLS = {
@@ -147,8 +154,8 @@ class HTTPServiceAPI(ServiceAPI):
   def __div__(self, suburl) -> URL:
     return self.suburl(suburl)
 
-  @uses_upd
   @uses_runstate
+  @uses_verbose
   @require(lambda suburl: not suburl.startswith('/'))
   def suburl(
       self,
@@ -160,7 +167,7 @@ class HTTPServiceAPI(ServiceAPI):
       cookies=None,
       headers=None,
       runstate: RunState,
-      upd,
+      verbose: bool,
       **rqkw,
   ) -> URL:
     ''' Request `suburl` from the service, by default using a `GET`.
@@ -184,7 +191,7 @@ class HTTPServiceAPI(ServiceAPI):
     rq_headers.update(self.default_headers)
     if headers is not None:
       rq_headers.update(headers)
-    with upd.run_task(f'{_method} {url}'):
+    with run_task(f'{_method} {url}', report_print=verbose):
       for retry in range(self.API_RETRY_COUNT, 0, -1):
         runstate.raiseif()
         try:
