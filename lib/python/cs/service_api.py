@@ -96,9 +96,11 @@ class ServiceAPI(MultiOpenMixin, UsesSQLTags):
     '''
     return None
 
-  def get_login_state(self, do_refresh=False) -> SQLTagSet:
-    ''' The login state, a mapping. Performs a login if necessary
-        or if `do_refresh` is true (default `False`).
+  def get_login_state(self, do_refresh=False) -> HasSQLTags:
+    ''' The login state, a `HasSQLTags`, stored in `self.sqltags`
+        under *TYPE_ZONE*`.login.state.`*login_userid*.
+        This performs a login if necessary or if `do_refresh` is true
+        (default `False`).
     '''
     with self._lock:
       state = self['login.state', self.login_userid.replace('.', '_')]
