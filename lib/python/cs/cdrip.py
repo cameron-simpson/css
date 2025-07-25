@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#
 
 ''' A tool for working with audio Compact Discs (CDs),
     uses the discid and musicbrainzngs modules.
@@ -640,7 +639,7 @@ class MBRelease(_MBEntity):
   TYPE_SUBNAME = 'release'
 
 class MBSQLTags(SQLTags):
-  ''' Musicbrainz `SQLTags`; it just has custom values for the default db location.
+  ''' Musicbrainz flavoured `SQLTags`; it just has custom values for the default db location.
   '''
 
   DBURL_ENVVAR = MBDB_PATH_ENVVAR
@@ -873,7 +872,7 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
                 record_key = 'disc'
               with stackattrs(
                   proxy,
-                  text=("query(%r,%r,...)" % (query_get_type, mbkey)),
+                  text=f'query({query_get_type!r},{mbkey!r},...)',
               ):
                 try:
                   A = self.query(
@@ -1157,7 +1156,6 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     )
 
   @contextmanager
-  @trace
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
@@ -1228,7 +1226,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     if disc_id == '.':
       dev_info = pfx_call(self.device_info, device_id)
       disc_id = dev_info.id
-    disc = self.options.mbdb.discs[disc_id]
+    disc = self.options.mbdb['disc', disc_id]
     if dev_info is not None:
       disc.mb_toc = dev_info.toc_string
     return disc
@@ -1314,7 +1312,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    tes = list(mbdb.find(tag_criteria))
+    tes = list(mbdb.sqltags.find(tag_criteria))
     changed_tes = SQLTagSet.edit_tagsets(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
@@ -1360,10 +1358,8 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     qtype, qid = type_and_id.split('.', 1)
     result = pfx_call(mbdb.query, qtype, qid)
     pprint(result)
-    print("APPLY")
-    mbe = mbdb[qtype, qid]
-    print("... to", mbe)
     assert 'medium-list' in result
+    mbe = mbdb[qtype, qid]
     mbdb.apply_dict(mbe, result)
     printt(
         ["Final MBE", mbe.name],
