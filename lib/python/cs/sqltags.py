@@ -2154,7 +2154,7 @@ class HasSQLTags(HasTags):
         `__init__`.
         If you have an "on demand" subclass you should override
         this method to compute the entity key without relying on
-        the (missing) `.tags` attributes.
+        the (missing) `.tags` attribute.
     '''
     if 'tags' not in self.__dict__:
       raise RuntimeError(
@@ -2167,13 +2167,13 @@ class UsesSQLTags:
 
       Instances of the subclass must provide a `.sqltags:SQLTags` attribute.
 
-      This mixin requires the subclass to provide:
+      This mixin requires the subclass or its instances to provide:
       - `HasSQLTagsClass`: a subclass of `HasSQLTags` which represents data entities
       - `TYPE_ZONE`: the type zone identifying entities in the larger `SQLTags` data
 
       This mixin provides:
       - a `__getitem__` method: accepting a `(subname,key)` 2-tuple
-      and returning the appropriate instance of the `HasSQLTagsClass`
+        and returning the appropriate instance of the `HasSQLTagsClass`
   '''
 
   HasSQLTagsClass = None
