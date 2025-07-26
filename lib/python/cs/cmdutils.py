@@ -1956,27 +1956,29 @@ class BaseCommand:
           if k and not k.startswith('_')
       }
       local = pub_mapping(self.__dict__)
-      del local['options']
-      local.update(
-          {
-              f'options.{k}': v
-              for k, v in sorted(pub_mapping(options.__dict__).items())
-          }
-      )
       local.update(argv=argv, cmd=self.cmd, self=self)
     if banner is None:
-      vars_banner = indent(
-          "\n".join(
-              tabulate(
-                  *(
-                      [k, pformat(v, compact=True)]
-                      for k, v in sorted(local.items())
-                      if k and not k.startswith('_')
-                  )
-              )
+      banner_mapping = dict(local)
+      del banner_mapping['options']
+      banner_mapping.update(
+          {
+              f'options.{k}': v
+              for k, v in pub_mapping(options.__dict__).items()
+          }
+      )
+      del banner_mapping['self']
+      banner_mapping.update(
+          {
+              f'self.{k}': v
+              for k, v in pub_mapping(self.__dict__).items()
+          }
+      )
+      banner = "\n".join(
+          tabulate(
+              ['{self.cmd} {self.subcmd}:'],
+              *([f'  {k}', v] for k, v in sorted(banner_mapping.items()))
           )
       )
-      banner = f'{self.cmd}\n\n{vars_banner}\n'
     try:
       # pylint: disable=import-outside-toplevel
       from bpython import embed
