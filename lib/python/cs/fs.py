@@ -26,7 +26,11 @@ from os.path import (
     splitext,
 )
 from pathlib import Path
-from pwd import getpwuid
+try:
+  from pwd import getpwuid
+except ImportError:
+  # not UNIX? we'll try to cope later
+  getpwuid = None
 from tempfile import mkstemp, TemporaryDirectory
 from threading import Lock
 from typing import Any, Callable, Iterable, Optional, Union
@@ -515,19 +519,20 @@ def shortpath(
     if collapseuser:
       # scan for the lowest homedir in the path
       pws = {}
-      for i, path in enumerate(paths):
-        try:
-          st = path.stat()
-        except OSError:
-          continue
-        try:
-          pw = pws[st.st_uid]
-        except KeyError:
-          pw = pws[st.st_uid] = getpwuid(st.st_uid)
-        if path.samefile(pw.pw_dir):
-          base_s = '~' if pw.pw_uid == os.geteuid() else f'~{pw.pw_name}'
-          paths = paths[:i + 1]
-          break
+      if getpwuid is not None:
+        for i, path in enumerate(paths):
+          try:
+            st = path.stat()
+          except OSError:
+            continue
+          try:
+            pw = pws[st.st_uid]
+          except KeyError:
+            pw = pws[st.st_uid] = getpwuid(st.st_uid)
+          if path.samefile(pw.pw_dir):
+            base_s = '~' if pw.pw_uid == os.geteuid() else f'~{pw.pw_name}'
+            paths = paths[:i + 1]
+            break
     # a list of (Path,display) from base to leaf
     paths_as = [[path, None] for path in reversed(paths)]
     # note the display for the base Path
