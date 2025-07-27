@@ -500,6 +500,14 @@ class TagSetTyping:
     return self.name.split('.', 1)[0]
 
   @property
+  def type_zone_key(self):
+    ''' The type zone of this entity, `self.name`'s second and following dotted components.
+
+        For example the `.type_zone_key` of an entity named `tvdb.series.1234` is `series.1234`.
+    '''
+    return self.name.split('.', 1)[1]
+
+  @property
   def type_subname(self):
     ''' The subtype name of this entity, `self.name` without the
         first and final dotted components i.e. without the leading zone
