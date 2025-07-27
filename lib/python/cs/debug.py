@@ -88,6 +88,7 @@ DISTINFO = {
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
+        'cs.threads',
         'cs.upd',
         'cs.x',
     ],
