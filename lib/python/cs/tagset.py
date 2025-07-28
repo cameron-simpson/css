@@ -2858,13 +2858,27 @@ class HasTags(FormatableMixin):
         via using the `TagSet` name `self.tags_entity_key`.
         This is for subclasses which might fetch the `.tags` on demand.
 
-        Subclasses of the usual subclass of this, `HasSQLTagSet`,
-        typically `.tags` during `__init__` and therefore have no
-        need for a `.tags_entity_key` property.
+        Subclasses typically set `.tags` during `__init__` and
+        therefore have no need for a `.tags_entity_key` property.
     '''
     return self.tags_db[self.tags_entity_key]
 
+  @cached_property
+  def tags_entity_key(self):
+    ''' Our tagged entity key, `self.tags.name`.
+
+        This is only really needed by the `.tags` cached
+        property; most subclasses of `HasTags` set `.tags` during
+        `__init__`.
+        If you have an "on demand" subclass you should override
+        this method to compute the entity key without relying on
+        the (missing) `.tags` attribute.
     '''
+    if 'tags' not in self.__dict__:
+      raise RuntimeError(
+          f'{self.__class__.__name__}:HasSQLTags.tags_entity_key: no .tags attribute!'
+      )
+    return self.tags.name
 
   def __getattr__(self, tag_name: str):
     ''' Convenience attributes which go via the `.tags`.
@@ -2908,10 +2922,9 @@ class HasTags(FormatableMixin):
     return self.tags.items()
 
   def deref(self, tag_name, attr=None, *, subtype=None):
-    ''' Call `.tags.deref(....)`.
-
-        *Note*: this calls `self.tags.deref()` and so returns
-        `TagSet`s in some form, not instances of `type(self)`.
+    ''' Call `.tags_db.deref(self,tag_name,...)`.
+    '''
+    return self.tags_db.deref(self, tag_name, attr=attr, subtype=subtype)
 
   #######################################################
   # Methods supports FormatableMixin
