@@ -120,7 +120,7 @@
 
     It's important to know that `BaseTagSets`, `HasTags`, and
     `UsesTagSets` all have a `.deref()` method for dereferencing
-    tags which refer to entity ids.
+    tags which refer to other entity ids.
 
     Setting up a class for a particular knowledge domain requires
     defining 2 classes: a base entity class for `HasTags` members
@@ -141,7 +141,7 @@
     The `MBDB` class subclasses `UsesTagSets` and defines the
     following class attributes:
     - `TYPE_ZONE`: a name prefix for enetities in this domain,
-      as typical use stores multiple domains in a command `SQLTags`
+      as typical use stores multiple domains in a common `SQLTags`
       database
     - `HasTagsClass`: the base class for entities in this domain
     - `TagSetsClass`: the `BaseTagSets` subclass which stores the
@@ -149,9 +149,9 @@
       `MBSQLTags` class is just an `SQLTags` subclass with a different
       default location for the database
 
-    The purpose of distinct the `HasTagsClass` subclass for entities
+    The purpose of the distinct `HasTagsClass` subclass for entities
     is so that `UsesTags.__new__` can locate a further subclass for
-    particular entity based on its type; it starts its search at
+    a particular entity based on its type; it starts its search at
     the `HasTagsClass` class. For example, `_MBEntity` has several
     subclasses for discs, releases and so forth. The `MBDisc`
     subclass starts like this:
@@ -163,9 +163,9 @@
           TYPE_SUBNAME = 'disc'
 
     In the shared `SQLTags` each disc has a `.name` of the form:
-    `mbdb.disc.`*discid*.
-    The leading `mbdb.` identifies it as belonginto to the `MBDB`
-    class matchings its `TYPE_ZONE` attribute, and the `following
+    `mbdb.disc.`*discid*
+    The leading `mbdb.` identifies it as belonging to to the `MBDB`
+    class matching its `TYPE_ZONE` attribute, and the following
     `disc` identifies the `MBDisc` class, matching its `TYPE_SUBNAME`
     attribute.
 
