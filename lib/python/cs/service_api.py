@@ -26,6 +26,7 @@ from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.tagset import HasTags, UsesTagSets
 from cs.sqltags import SQLTags, SQLTagSet, UsesSQLTags
 from cs.upd import run_task, uses_upd
 from cs.urlutils import URL
@@ -60,24 +61,23 @@ class ServiceAPI(MultiOpenMixin, UsesSQLTags):
   API_RETRY_COUNT = 3  # number of request attempts
   API_RETRY_DELAY = 5  # interval between request retries
 
-  @promote
   @uses_fstags
   def __init__(
-      self, *, fstags: FSTags, sqltags: SQLTags, has_sqltags_class,
-      type_zone: str
+      self,
+      *,
+      fstags: FSTags,
+      tagsets: UsesTagSets = None,
   ):
+    super().__init__(tagsets=tagsets)
     self.fstags = fstags
-    self.sqltags = sqltags
-    self.HasSQLTagsClass = has_sqltags_class
-    self.TYPE_ZONE = type_zone
     self._lock = RLock()
     self.login_state_mapping = None
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Open/close the FSTags and SQLTags.
+    ''' Open/close the `FSTags` and `UsesTagSets`.
     '''
-    with self.sqltags:
+    with self.tagsets:
       with self.fstags:
         yield
 
@@ -96,9 +96,8 @@ class ServiceAPI(MultiOpenMixin, UsesSQLTags):
     '''
     return None
 
-  def get_login_state(self, do_refresh=False) -> HasSQLTags:
-    ''' The login state, a `HasSQLTags`, stored in `self.sqltags`
-        under *TYPE_ZONE*`.login.state.`*login_userid*.
+  def get_login_state(self, do_refresh=False) -> HasTags:
+    ''' The login state, a `HasTags`, stored as `login.state.`*login_userid*.
         This performs a login if necessary or if `do_refresh` is true
         (default `False`).
     '''
@@ -112,7 +111,7 @@ class ServiceAPI(MultiOpenMixin, UsesSQLTags):
     return state
 
   @cached_property
-  def login_state(self) -> SQLTagSet:
+  def login_state(self) -> HasTags:
     ''' The login state, a mapping. Performs a login if necessary.
     '''
     return self.get_login_state()
