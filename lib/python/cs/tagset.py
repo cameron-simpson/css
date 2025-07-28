@@ -97,7 +97,7 @@
     programme has ceased running. This is usually done by subclassing
     `TagSet` and `BaseTagSets` to load state from some storage and
     to mirror changes back to that storage.
-    The usual subclasses for doing with with an SQL database are
+    The usual subclasses for doing this with an SQL database are
     the `SQLTagSet` and `SQLTags` classes from `cs.sqltags`.
     Another example is the `TaggedPath` and `FSTags` classes from
     `cs.fstags`, where `TaggedPath` subclasses `TagSet`; these are
@@ -2820,9 +2820,8 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       # look up the attribute value
       deref_name_condition = f'name~{type_zone}.{subtype}.*'
       result = [
-          (key, list(self.find(deref_name_condition, **{
-              attr: key
-          }))) for key in value
+          (key, list(self.find(deref_name_condition, **{attr: key})))
+          for key in value
       ]
       return result
     if subtype is None:
