@@ -2483,28 +2483,33 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
   def __repr__(self):
     return str(self)
 
-  def default_factory(self, name: str):
+  def default_factory(self, name: str, **tags_kw) -> TagSet:
     ''' Create a new `TagSet` named `name`.
     '''
     te = self.TagSetClass(name=name)
     te.ontology = self.ontology
+    if tags_kw:
+      te.update(tags_kw)
     return te
 
   @pfx_method
-  def __missing__(self, name: str, **kw):
+  def __missing__(self, name: str, **tags_kw) -> TagSet:
     ''' Like `dict`, the `__missing__` method may autocreate a new `TagSet`.
 
-        This is called from `__getitem__` if `name` is missing
-        and uses the factory `cls.default_factory`.
-        If that is `None` raise `KeyError`,
-        otherwise call `self.default_factory(name,**kw)`.
-        If that returns `None` raise `KeyError`,
-        otherwise save the entity under `name` and return the entity.
+        This is called from `__getitem__` if `name` is missing and
+        uses the factory `cls.default_factory`, which may be `None`
+        to disable autocreation; the default uses `self.TagSetClass`
+        to create a new `TagSet`.
+
+        If the factory `None` raise `KeyError`.
+        Otherwise call `self.default_factory(name,**tags_kw)`.
+        If that returns `None` raise `KeyError`.
+        Otherwise save the entity under `name` and return the entity.
     '''
     te_factory = self.default_factory
     if te_factory is None:
       raise KeyError(name)
-    te = te_factory(name, **kw)
+    te = te_factory(name, **tags_kw)
     if te is None:
       raise KeyError(name)
     self[name] = te
