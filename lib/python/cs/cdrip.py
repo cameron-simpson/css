@@ -275,8 +275,10 @@ def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   return argv
 
 # pylint: disable=too-many-ancestors
-class _MBEntity(HasSQLTags):
+class _MBEntity(HasTags):
   ''' A `HasTags` subclass for MB entities.
+      This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
+
       All the state is proxied through the `.tags`, which is an `SQLTagSet`.
       Instances are constructed via `MBDB.mbentity(SQLTagSet)`,
       which also sets the `.mbdb` and `.tags_db` on the instance.
@@ -286,17 +288,6 @@ class _MBEntity(HasSQLTags):
   MB_QUERY_PREFIX_ = f'{MB_QUERY_PREFIX}.'
   MB_QUERY_RESULT_TAG_NAME = f'{MB_QUERY_PREFIX}.result'
   MB_QUERY_TIME_TAG_NAME = f'{MB_QUERY_PREFIX}.time'
-
-  def __init__(self, tags: TagSet, mbdb: "MBDB"):
-    assert mbdb.sqltags is tags.sqltags, f'{mbdb.sqltags=} is not {tags.sqltags=}'
-    self.tags = tags
-    self.mbdb = mbdb
-
-  def __str__(self):
-    return f'{self.__class__.__name__}:{self.tags.name}'
-
-  def __repr__(self):
-    return f'{self.__class__.__name__}:{self.tags}'
 
   @property
   def query_result(self):
@@ -645,14 +636,13 @@ class MBSQLTags(SQLTags):
   DBURL_ENVVAR = MBDB_PATH_ENVVAR
   DBURL_DEFAULT = MBDB_PATH_DEFAULT
 
-class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
+class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
   '''
 
-  # the TagSet.name prefix for entities from this domain
   TYPE_ZONE = 'mbdb'
-  # the base class of the various entities
-  HasSQLTagsClass = _MBEntity
+  HasTagsClass = _MBEntity
+  TagSetsClass = MBSQLTags
 
   # Mapping of MusicbrainzNG tag names whose type is not themselves.
   TYPE_NAME_REMAP = {
@@ -679,19 +669,19 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
   QUERY_INCLUDES_NEED_LOGIN = ['user-tags', 'user-ratings']
 
   def __init__(self, mbdb_path=None):
+    UsesTagSets.__init__(self, tagsets=MBSQLTags(mbdb_path))
     RunStateMixin.__init__(self)
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
-    sqltags = self.sqltags = MBSQLTags(mbdb_path)
 
   def __str__(self):
-    return f'{self.__class__.__name__}({self.sqltags})'
+    return f'{self.__class__.__name__}({self.tagsets})'
 
   @contextmanager
   def startup_shutdown(self):
     ''' Context manager for open/close.
     '''
-    with self.sqltags:
+    with self.tagsets:
       yield
 
   def __getitem__(self, index) -> _MBEntity:
@@ -891,11 +881,9 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
                   mbe[mbe.MB_QUERY_TIME_TAG_NAME] = time.time()
                   if not no_apply:
                     self.apply_dict(mbe, A)
-                  self.sqltags.flush()
             else:
               # use the caches result from the database
               A = mbe[mbe.MB_QUERY_PREFIX + 'result']
-            self.sqltags.flush()
             # cap recursion
             if isinstance(recurse, bool):
               if not recurse:
@@ -1102,9 +1090,8 @@ class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin):
   def _tagif(self, tags, name, value):
     ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
     '''
-    with self.sqltags:
-      if value is not None:
-        tags.set(name, value)
+    if value is not None:
+      tags.set(name, value)
 
 class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
   ''' 'cdrip' command line.
@@ -1182,7 +1169,6 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
                 options,
                 fstags=fstags,
                 mbdb=mbdb,
-                sqltags=mbdb.sqltags,  ##verbose=True,
             ):
               yield
 
@@ -1273,7 +1259,6 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     '''
     options = self.options
     mbdb = options.mbdb
-    sqltags = mbdb.sqltags
     all_fields = options.all_fields
     do_refresh = options.do_refresh
     if not argv:
