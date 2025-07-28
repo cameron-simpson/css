@@ -2625,6 +2625,118 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
         with Pfx("rename %r => %r", old_name, new_name):
           te.name = new_name
 
+  def deref(
+      self,
+      te: TagSet,
+      tag_name,
+      attr=None,
+      *,
+      type_zone,
+      subtype=None
+  ) -> Union[
+      None,  # no match
+      TagSet,  # key -> TagSet
+      List[TagSet],  # attr -> TagSet matches
+      List[Tuple[Any, TagSet]],  # attr:List[values]] -> List[(value,TagSet)]
+  ]:
+    ''' Dereference the tag `tag_name` through `te`, a `TagSet`.
+        Return the entities it implies, using the tag value as the
+        target entity key or keys.
+
+        The optional `subtype` parameter may be used to specify a
+        target entity subtype instead of inferring it from `tag_name`
+        as outlined below.
+
+        The return is variously:
+        - `None` if the `tag_name` is not present
+        If `attr` is `None` then the tag value is a type key or list of type keys:
+        - a `TagSet` derived from the tag value
+        - a list of `TagSet`s from a list of the tag values which are type keys
+        If `attr` is not `None` then the tag value is an another
+        tag value or list of tag values:
+        - a list of `TagSet` where the `TagSet.attr` matches the tag value
+        - a list of `(value,List[TagSet])` from a list of tag values
+          where the `TagSet.attr` matches each value
+        These are detailed below.
+
+        Return `None` if the tag is not present.
+        Otherwise the return depends on whether `attr` is not `None`
+        and whether the tag value is a `Sequence`.
+
+        If `attr` is `None`, the lookup is done on the entity `.name`,
+        which is `{te.type_zone}.{subtype}.{key}`.
+        If the value is a `Sequence` then the default `subtype` is the
+        `tag_name`, with a trailing `s` removed if present, and the
+        `key` is each element of the value in turn.
+        If the value is not a `Sequence` then the `subtype` defaults
+        to the `tag_name` and the `key` is the tag value.
+
+        If the `attr` is not `None`, the lookup is done on the
+        entity tag named `attr` for entities whose `.name` starts
+        with `{te.type_zone}.{subtype}.`.
+
+        If the value is a `Sequence` then the default `subtype` is
+        the `tag_name` with a trailing `s` removed if present and
+        the `key` is each element of the value in turn, checked
+        against each entity's tag; this returns a `dict` mapping
+        each `key` to a list of the matching entities.
+
+        If the value is not a `Sequence` then the default `subtype`
+        is the `tag_name` and the `key` is the tag value; this
+        returns a list of the matching entities.
+
+        Some examples should clarify. Suppose we have `te`
+        as the entity named `tvdb.series.1234` with the following tag
+        values:
+
+            characters  [56, 123, 78]
+            genres      ["Documentary", "Food"]
+            studio      99
+            episode     "Fred explores the foods of somewhere."
+
+        Then:
+
+        Calling `deref(te,'characters')` would return a list
+        containing the entities named `tvdb.character.56`,
+        `tvdb.character.123`, `tvdb.character.78`.
+
+        Calling `deref(te,'genres', 'genre_title')` would return
+        a `list` of: `[("Documentary",List[TagSet]),("Food",List[TagSet])]`
+        associating `"Documentary"` and `"Food"` to a list of
+        entities whose `.genre_title` matched each genre and whose
+        `.name` started with `tvdb.genre.`.
+
+        Calling `deref(te,'studio')` would return the entity named `tvdb.studio.99`.
+
+        Calling `deref(te,'episode', 'summary')` would return a list of
+        the entities whose `.summary` was `"Fred explores the foods of somewhere."`
+        and whose `.name` starts with `tvdb.episode.`.
+    '''
+    try:
+      value = te[tag_name]
+    except KeyError:
+      return None
+    if isinstance(value, Sequence):
+      if subtype is None:
+        # an English specific crude hack to infer a subtype from a plural
+        subtype = tag_name[:-1] if tag_name.endswith('s') else tag_name
+      if attr is None:
+        # use the entity name
+        return [self[f'{type_zone}.{subtype}.{key}'] for key in value]
+      # look up the attribute value
+      deref_name_condition = f'name~{type_zone}.{subtype}.*'
+      result = [
+          (key, list(self.find(deref_name_condition, **{
+              attr: key
+          }))) for key in value
+      ]
+      return result
+    if subtype is None:
+      subtype = tag_name
+    if attr is None:
+      return self[f'{type_zone}.{subtype}.{value}']
+    return list(self.find(deref_name_condition, **{attr: value}))
+
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
   ''' A view into a `BaseTagSets` for keys commencing with a prefix
       being the subdomain plus a dot (`'.'`).
