@@ -550,12 +550,10 @@ class PlayOnCommand(BaseCommand):
       for tag in playon:
         print(" ", tag)
 
-class _PlayOnEntity(HasSQLTags, FormatableMixin):
-
-  def __init__(self, tags: TagSet, api: "PlayOnAPI"):
-    assert api.sqltags is tags.sqltags, f'{api.sqltags=} is not {tags.sqltags=}'
-    self.tags = tags
-    self.api = api
+class _PlayOnEntity(HasTags):
+  ''' The base class of the entity subclasses.
+      This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
+  '''
 
 class LoginState(_PlayOnEntity):
 
@@ -801,12 +799,13 @@ class PlayOnSQLTags(SQLTags):
 
 # pylint: disable=too-many-instance-attributes
 @monitor
-class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
+class PlayOnAPI(HTTPServiceAPI):
   ''' Access to the PlayOn API.
   '''
 
-  HasSQLTagsClass = _PlayOnEntity
   TYPE_ZONE = 'playon'
+  HasTagsClass = _PlayOnEntity
+  TagSetsClass = PlayOnSQLTags
 
   API_HOSTNAME = 'api.playonrecorder.com'
   API_BASE = f'https://{API_HOSTNAME}/v3/'
@@ -818,14 +817,8 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
   CDS_HOSTNAME_LOCAL = 'cds-au.playonrecorder.com'
   CDS_BASE_LOCAL = f'https://{CDS_HOSTNAME_LOCAL}/api/v6/'
 
-  def __init__(self, login=None, password=None, sqltags=None):
-    if sqltags is None:
-      sqltags = PlayOnSQLTags()
-    super().__init__(
-        sqltags=sqltags,
-        has_sqltags_class=self.HasSQLTagsClass,
-        type_zone=self.TYPE_ZONE,
-    )
+  def __init__(self, login=None, password=None, **kw):
+    super().__init__(**kw)
     if login:
       self.login_userid = login
     self._password = password
@@ -920,9 +913,9 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
     return datetime.strptime(date_s, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
 
   @typechecked
-  def __getitem__(self, index: tuple | int) -> HasSQLTags:
+  def __getitem__(self, index: tuple | int) -> HasTags:
     ''' If `index` is an `int` return the associated `Recording`.
-        Otherwise `index` should be a `tuple`, returns the associated `HasSQLTags`.
+        Otherwise `index` should be a `tuple`, returns the associated `HasTags`.
     '''
     if isinstance(index, int):
       index = 'recording', str(index)
@@ -986,32 +979,30 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
   def queue(self):
     ''' Return the `TagSet` instances for the queued recordings.
     '''
-    with self.sqltags.db_session():
-      data = self.suburl_data('queue')
-      entries = data['entries']
-      return self._entry_entities(
-          entries, 'recording', dict(
-              Episode=int,
-              ReleaseYear=int,
-              Season=int,
-          )
-      )
+    data = self.suburl_data('queue')
+    entries = data['entries']
+    return self._entry_entities(
+        entries, 'recording', dict(
+            Episode=int,
+            ReleaseYear=int,
+            Season=int,
+        )
+    )
 
   @pfx_method
   def fetch_recordings(self) -> set[Recording]:
     ''' Return a set of the `Recording` instances for the available recordings.
         This makes an API request.
     '''
-    with self.sqltags.db_session():
-      data = self.suburl_data('library/all')
-      entries = data['entries']
-      return self._entry_entities(
-          entries, 'recording', dict(
-              Episode=int,
-              ReleaseYear=int,
-              Season=int,
-          )
-      )
+    data = self.suburl_data('library/all')
+    entries = data['entries']
+    return self._entry_entities(
+        entries, 'recording', dict(
+            Episode=int,
+            ReleaseYear=int,
+            Season=int,
+        )
+    )
 
   def recordings(self):
     ''' Yield the `Recording`s.
@@ -1020,7 +1011,10 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
     '''
     return self.find(f'name~{self.TYPE_ZONE}.recording.*')
 
-  __iter__ = recordings
+  def __iter__(self):
+    ''' Iteration iterates over the recordins.
+    '''
+    return iter(self.recordings())
 
   # pylint: disable=too-many-branches
   @pfx_method
@@ -1140,7 +1134,7 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
   def service(self, service_id: str):
     ''' Return the service `SQLTags` instance for `service_id`.
     '''
-    return self.sqltags[f'service.{service_id}']
+    return self['service', service_id]
 
   @pfx_method
   def features(self):
@@ -1152,7 +1146,7 @@ class PlayOnAPI(HTTPServiceAPI, UsesSQLTags):
   def feature(self, feature_id):
     ''' Return the feature `SQLTags` instance for `feature_id`.
     '''
-    return self.sqltags[f'feature.{feature_id}']
+    return self['feature', feature_id]
 
   def featured_image_url(self, feature_name: str):
     ''' URL of the image for a featured show. '''
