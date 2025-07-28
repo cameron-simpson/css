@@ -2841,6 +2841,17 @@ class HasTags(FormatableMixin):
     # return the generic version
     return super().__new__(cls)
 
+  def __init__(self, tags: TagSet, tags_db: "UsesTagSets"):
+    super().__init__()
+    self.tags = tags
+    self.tags_db = tags_db
+
+  def __str__(self):
+    return f'{self.__class__.__name__}:{self.tags.name}'
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self.tags}'
+
   @cached_property
   def tags(self):
     ''' A default `.tags` property which obtains a `TagSet` from `self.tags_db`
