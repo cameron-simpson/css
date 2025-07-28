@@ -2864,17 +2864,7 @@ class HasTags(FormatableMixin):
     '''
     return self.tags_db[self.tags_entity_key]
 
-  def get_arg_name(self, field_name):
-    return self.tags.get_arg_name(field_name)
-
-  def format_kwargs(self):
-    ''' A `format_kwargs` method to support `cs.lex.FormatableMixin`.
     '''
-    # TODO: what to do when the tags and the format attributes conflict?
-    kwargs = dict(self.tags)
-    for kw, method in self.get_format_attributes().items():
-      kwargs[kw] = method
-    return kwargs
 
   def __getattr__(self, tag_name: str):
     ''' Convenience attributes which go via the `.tags`.
@@ -2922,6 +2912,21 @@ class HasTags(FormatableMixin):
 
         *Note*: this calls `self.tags.deref()` and so returns
         `TagSet`s in some form, not instances of `type(self)`.
+
+  #######################################################
+  # Methods supports FormatableMixin
+
+  def get_arg_name(self, field_name):
+    return self.tags.get_arg_name(field_name)
+
+  def format_kwargs(self):
+    ''' A `format_kwargs` method to support `cs.lex.FormatableMixin`.
+    '''
+    # TODO: what to do when the tags and the format attributes conflict?
+    kwargs = dict(self.tags)
+    for kw, method in self.get_format_attributes().items():
+      kwargs[kw] = method
+    return kwargs
     '''
     return self.tags.deref(tag_name, attr=attr, subtype=subtype)
 
