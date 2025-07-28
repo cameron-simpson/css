@@ -2039,77 +2039,25 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         with Pfx(tag):
           dbe.add_tag(tag)
 
-class HasSQLTags(HasTags):
-  ''' A `HasTags` using an `SQLTags` as the backend.
+class UsesSQLTags(UsesTagSets):
+  ''' A mixin subclassing `UsesTagSets` to support classes which
+      use an `SQLTags` to store their data.
 
-      Note that this mixin brings the `__new__` method of `HasTags`.
+      As with `cs.tagset.UsesTagSets`, subclasses must supply a
+      `hastags_class` and _may_ supply a `tagsets_class` if it
+      should not be `SQLTags`. The subclass must also define a
+      `.TYPE_ZONE` class attribute.
+      An example from `cs.cdrip`:
 
-      Note that most subclasses of `HasSQLTags` set `.tags` during
-      the `__init__` method; if you define an "on demand" flavoured
-      subclass you should also provide a `.tags_entity_key` property
-      to compute the `SQLTags` key, as the default here uses
-      `self.tags.name`.
+          class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin:
+
+              TYPE_ZONE = 'mbdb'
+              HasTagsClass = _MBEntity
+              TagSetsClass = MBSQLTags
+
   '''
 
-  @property
-  def tags_db(self):
-    ''' The database is the `SQLTags` instance associated with the `.tags` object.
-    '''
-    return self.tags.sqltags
-
-  @cached_property
-  def tags_entity_key(self):
-    ''' Our tagged entity key, `self.tags.name`.
-
-        This is only really needed by the `HasTags.tags` cached
-        property; most subclasses of `HasSQLTags` set `.tags` during
-        `__init__`.
-        If you have an "on demand" subclass you should override
-        this method to compute the entity key without relying on
-        the (missing) `.tags` attribute.
-    '''
-    if 'tags' not in self.__dict__:
-      raise RuntimeError(
-          f'{self.__class__.__name__}:HasSQLTags.tags_entity_key: no .tags attribute!'
-      )
-    return self.tags.name
-
-class UsesSQLTags:
-  ''' A mixin to support classes which is an `SQLTags` to store their data.
-
-      Instances of the subclass must provide a `.sqltags:SQLTags` attribute.
-
-      This mixin requires the subclass or its instances to provide:
-      - `HasSQLTagsClass`: a subclass of `HasSQLTags` which represents data entities
-      - `TYPE_ZONE`: the type zone identifying entities in the larger `SQLTags` data
-
-      This mixin provides:
-      - a `__getitem__` method: accepting a `(subname,key)` 2-tuple
-        and returning the appropriate instance of the `HasSQLTagsClass`
-  '''
-
-  HasSQLTagsClass = None
-  TYPE_ZONE = None
-
-  def __getitem__(self, index: Tuple) -> HasSQLTags:
-    ''' Fetch the `HasSQLTags` instance for the supplied `(subname,key)` 2-tuple.
-    '''
-    with Pfx("%s[%s]", self, r(index)):
-      assert isinstance(index, tuple)
-      type_, key = index
-      assert '.' not in key
-      te = self.sqltags[f'{self.TYPE_ZONE}.{type_}.{key}']
-      return self.HasSQLTagsClass(te, self)
-
-  def find(self, criteria) -> List["UsesSQLTags"]:
-    ''' Find entities in the database.
-
-        This runs a find of the `SQLTags` and returns the associated
-        `HasSQLTagsClass` instances.
-    '''
-    return [
-        self.HasSQLTagsClass(te, self) for te in self.sqltags.find(criteria)
-    ]
+  TagSetsClass = SQLTags
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
