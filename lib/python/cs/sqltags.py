@@ -89,6 +89,7 @@ from cs.tagset import (
     TagSetCriterion,
     TagsCommandMixin,
     TagsOntology,
+    UsesTagSets,
     as_unixtime,
     tag_or_tag_value,
 )
