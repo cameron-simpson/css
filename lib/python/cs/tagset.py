@@ -16,13 +16,13 @@
 
     All of the available complexity is optional:
     you can use `Tag`s without bothering with `TagSet`s
-    or `TagsOntology`s.
+    or `TagsOntology`s or the persistence of domain knowledge classes.
 
-    This module contains the following main classes:
+    This module contains the following primary classes:
     * `Tag`: an object with a `.name` and optional `.value` (default `None`)
       and also an optional reference `.ontology`
       for associating semantics with tag values.
-      The `.value`, if not `None`, will often be a string,
+      The `.value`, if not `None`, will often be a string or a number,
       but may be any Python object.
       If you're using these via `cs.fstags`,
       the object will need to be JSON transcribeable.
@@ -32,9 +32,12 @@
       As such it only supports a single `Tag` for a given tag name,
       but that tag value can of course be a sequence or mapping
       for more elaborate tag values.
-    * `TagsOntology`:
-      a mapping of type names to `TagSet`s defining the type
-      and also to entries for the metadata for specific per-type values.
+    * `BaseTagSets`: a base class for collections of `TagSet`s,
+      subclassed to provide persistence, for example in a database
+      a done with the `cs.sqltags.SQLTags` class
+
+    There is also support for persisting `TagSets` and using them
+    for storing per-domain knowledge, see below.
 
     Here's a simple example with some `Tag`s and a `TagSet`.
 
@@ -88,11 +91,100 @@
         >>> subtopic2 in tags
         False
 
+    ## Persistence
+
+    It is often desirable for `TagSet`s to persist after your
+    programme has ceased running. This is usually done by subclassing
+    `TagSet` and `BaseTagSets` to load state from some storage and
+    to mirror changes back to that storage.
+    The usual subclasses for doing with with an SQL database are
+    the `SQLTagSet` and `SQLTags` classes from `cs.sqltags`.
+    Another example is the `TaggedPath` and `FSTags` classes from
+    `cs.fstags`, where `TaggedPath` subclasses `TagSet`; these are
+    used to store metadata about files in a filesystem.
+
+    ## Domain Knowledge
+
+    I've experimented with further subclassing, for example,
+    `SQLTagSet` and `SQLTags` to represent domain knowledge, for
+    example to cache MusicBrainzNG knowledge when ripping CDs.
+    The direct subclassing approach scales poorly.
+
+    Instead the preferred approach is to use the `HasTags` and
+    `UsesTagSets` base classes. The `HasTags` class stored the
+    entityt state in its `.tags` attribute, a `TagSet` and has a
+    reference to a `.tags_db`, which is an instance of a `UsesTagSets`,
+    the larger collection of `TagSet`s.  The `UsesTagSets` class
+    has a `.tagsets` attribute referring to an instance of a
+    `BaseTagSets`, a collection of `TagSets`.
+
+    It's important to know that `BaseTagSets`, `HasTags`, and
+    `UsesTagSets` all have a `.deref()` method for dereferencing
+    tags which refer to entity ids.
+
+    Setting up a class for a particular knowledge domain requires
+    defining 2 classes: a base entity class for `HasTags` members
+    of the domain, and a `UsesTagSets` class for the domain itself.
+    Here is the basis of the MusicBrainzNG domain from `cs.cdrip`:
+
+        class _MBEntity(HasTags):
+            ... common methods for all MB entities ...
+
+        class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
+          """ An interface to MusicBrainz with a local `SQLTags` cache.
+          """
+
+          TYPE_ZONE = 'mbdb'
+          HasTagsClass = _MBEntity
+          TagSetsClass = MBSQLTags
+
+    The `MBDB` class subclasses `UsesTagSets` and defines the
+    following class attributes:
+    - `TYPE_ZONE`: a name prefix for enetities in this domain,
+      as typical use stores multiple domains in a command `SQLTags`
+      database
+    - `HasTagsClass`: the base class for entities in this domain
+    - `TagSetsClass`: the `BaseTagSets` subclass which stores the
+      entities; this will often be `SQLTags`; in this case the
+      `MBSQLTags` class is just an `SQLTags` subclass with a different
+      default location for the database
+
+    The purpose of distinct the `HasTagsClass` subclass for entities
+    is so that `UsesTags.__new__` can locate a further subclass for
+    particular entity based on its type; it starts its search at
+    the `HasTagsClass` class. For example, `_MBEntity` has several
+    subclasses for discs, releases and so forth. The `MBDisc`
+    subclass starts like this:
+
+        class MBDisc(_MBEntity):
+          """ A Musicbrainz disc entry.
+          """
+
+          TYPE_SUBNAME = 'disc'
+
+    In the shared `SQLTags` each disc has a `.name` of the form:
+    `mbdb.disc.`*discid*.
+    The leading `mbdb.` identifies it as belonginto to the `MBDB`
+    class matchings its `TYPE_ZONE` attribute, and the `following
+    `disc` identifies the `MBDisc` class, matching its `TYPE_SUBNAME`
+    attribute.
+
+    Accessing or creating an entity is done by indexing the `MBDB`
+    instance:
+
+        disc = mbdb['disc', discid]
+
+    which will return an `MBDisc` instance, creating it in the
+    database if necessary.
+
     ## Ontologies
 
     `Tag`s and `TagSet`s suffice to apply simple annotations to things.
     However, an ontology brings meaning to those annotations.
 
+    There is also a `TagsOntology`, a mapping of type names to
+    `TagSet`s defining the type and also to entries for the metadata
+    for specific per-type values.
     See the `TagsOntology` class for implementation details,
     access methods and more examples.
 
