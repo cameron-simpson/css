@@ -207,7 +207,9 @@ from pprint import pformat
 import re
 import sys
 import time
-from typing import Iterable, Mapping, Optional, Tuple, Union
+from typing import (
+    Any, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+)
 from uuid import UUID, uuid4
 
 from icontract import require
@@ -2417,7 +2419,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       Subclasses must implement:
       * `get(name,default=None)`: return the `TagSet` associated
         with `name`, or `default`.
-      * `__setitem__(name,tagset)`: associate a `TagSet`with the key `name`;
+      * `__setitem__(name,tagset)`: associate a `TagSet` with the key `name`;
         this is called by the `__missing__` method with a newly created `TagSet`.
       * `keys(self)`: return an iterable of names
 
@@ -2478,7 +2480,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     self.ontology = ontology
 
   def __str__(self):
-    return "%s<%s>" % (type(self).__name__, id(self))
+    return f'{self.__class__.__name__}<{id(self)}>'
 
   def __repr__(self):
     return str(self)
