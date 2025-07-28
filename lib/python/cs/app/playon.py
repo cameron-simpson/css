@@ -52,8 +52,8 @@ from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.rfc2616 import content_length
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
-from cs.sqltags import HasSQLTags, SQLTags, UsesSQLTags
-from cs.tagset import TagSet
+from cs.sqltags import SQLTags, UsesSQLTags
+from cs.tagset import HasTags, TagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -1067,7 +1067,9 @@ class PlayOnAPI(HTTPServiceAPI):
         try:
           dl_id = int(arg)
         except ValueError:
-          warning("unsupported word")
+          warning(
+              "unsupported word, expected one of all, available, downloaded, expired, pending, queues or a /search"
+          )
         else:
           recordings.append(self[dl_id])
       return list(
