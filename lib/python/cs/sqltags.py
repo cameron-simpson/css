@@ -2023,21 +2023,21 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       entities = self.orm.entities
       if te.name is None:
         # new log entry
-        e = entities(name=None, unixtime=te.unixtime)
-        session.add(e)
+        dbe = entities(name=None, unixtime=te.unixtime)
+        session.add(dbe)
       else:
-        e = entities.lookup1(name=te.name, session=session)
-        if e:
+        dbe = entities.lookup1(name=te.name, session=session)
+        if dbe:
           if not update_mode:
             raise ValueError(f'entity named {te.name!r} already exists')
         else:
           # new named entry
-          e = entities(name=te.name, unixtime=te.unixtime)
-          session.add(e)
+          dbe = entities(name=te.name, unixtime=te.unixtime)
+          session.add(dbe)
       # update the db entry
       for tag in te.tags:
         with Pfx(tag):
-          e.add_tag(tag)
+          dbe.add_tag(tag)
 
 class HasSQLTags(HasTags):
   ''' A `HasTags` using an `SQLTags` as the backend.
