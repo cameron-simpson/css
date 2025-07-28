@@ -2940,8 +2940,84 @@ class HasTags(FormatableMixin):
     for kw, method in self.get_format_attributes().items():
       kwargs[kw] = method
     return kwargs
+
+class UsesTagSets:
+  ''' A mixin to support classes which use a `BaseTagSets` to store their data.
+      Typical use subclasses `cs.sqltags.UsesSQLTags`, a subclass
+      of this which uses an `SQLTags` as the storage backend.
+
+      Subclasses must define the following class attributes:
+      - `TYPE_ZONE`: the type zone identifying entities in the larger `BaseTagSets` data
+      - `HasTagsClass`: a subclass of `HasTags` which represents data entities
+
+      This mixin requires the subclass or its instances to provide:
+
+      This mixin provides:
+      - a `__getitem__` method: accepting a `(subname,key)` 2-tuple
+        and returning the appropriate instance of the `HasTagSetsClass`
+  '''
+
+  def __init__(self, *, tagsets=None, **kw):
+    self.tagsets = tagsets or self.TagSetsClass()
+    super().__init__(**kw)
+
+  def tagged(self, te: TagSet) -> HasTags:
+    ''' Promote `te` to a `HasTags` in this zone.
+        Return a `self.HasTagSetsClass` instance tagged with `te`.
     '''
-    return self.tags.deref(tag_name, attr=attr, subtype=subtype)
+    if te.type_zone != self.TYPE_ZONE:
+      raise ValueError(
+          f'{self}.tagged({te.__class__.__name__}[{te.name!r}]): {te.type_zone=} != {self.TYPE_ZONE=}'
+      )
+    return self.HasTagsClass(te, self)
+
+  def __getitem__(self, index: Tuple[str, str]) -> HasTags:
+    ''' Fetch the `HasTags` instance for the supplied `(subname,key)` 2-tuple.
+    '''
+    with Pfx("%s[%s]", self, r(index)):
+      assert isinstance(index, tuple)
+      type_, key = index
+      assert '.' not in key
+      te = self.tagsets[f'{self.TYPE_ZONE}.{type_}.{key}']
+      return self.tagged(te)
+
+  def find(self, criteria) -> List[HasTags]:
+    ''' Find entities in the database.
+
+        This runs a find of the `BaseTagSets` and returns the associated
+        `HasTagSetsClass` instances.
+    '''
+    return [self.HasTagsClass(te, self) for te in self.tagsets.find(criteria)]
+
+  def deref(
+      self,
+      tagged: HasTags,
+      tag_name: str,
+      attr: str = None,
+      *,
+      subtype: str = None
+  ):
+    ''' Call `self.tagsets.deref` on `tagged.tags` and promote the
+        result to use our `HasTags` instances.
+    '''
+    result = self.tagsets.deref(
+        tagged.tags, attr=attr, type_zone=self.TYPE_ZONE, subtype=subtype
+    )
+    if result is None:
+      return None
+    if attr is None:
+      # look up of .name, returns a `TagSet` or list of `TagSet`s
+      if isinstance(result, TagSet):
+        return self.tagged(result)
+      return [self.tagged(te) for te in result]
+    # lookup by attribute
+    # return a list of TagSets or a list of (value,TagSet) 2-tuples
+    return [
+        (
+            self.tagged(item) if isinstance(item, TagSet) else
+            (item[0], self.tagged(item[1]))
+        ) for item in result
+    ]
 
 class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
   ''' A wrapper for a `TagSets` instance backing an ontology.
