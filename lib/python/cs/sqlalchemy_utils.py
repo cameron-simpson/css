@@ -10,6 +10,7 @@ import logging
 import os
 from os.path import abspath
 from threading import current_thread, Lock
+import sys
 from typing import Any, Optional, Union, List, Tuple
 
 from icontract import require
@@ -25,6 +26,7 @@ from cs.fileutils import lockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
+from cs.psutils import run
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import NRLock, ThreadState
@@ -381,6 +383,18 @@ class ORM(MultiOpenMixin, ABC):
         self.Base.metadata.create_all(bind=self.engine)
       self.__first_use = False
     yield
+
+  # TODO: psql for postgresql
+  def dbshell(self):
+    ''' Run an interactive database prompt.
+    '''
+    db_url = self.db_url
+    if db_url.startswith("sqlite://"):
+      db_fspath = self.db_fspath
+      print("sqlite3", db_fspath)
+      run(['sqlite3', db_fspath], check=True, stdin=sys.stdin)
+    else:
+      raise ValueError(f'I do not know how to get a db shell for {db_url=}')
 
   @property
   def engine(self):
