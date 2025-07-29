@@ -21,14 +21,14 @@ from icontract import require
 import requests
 from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
 
-from cs.deco import promote, uses_verbose
+from cs.deco import uses_verbose
 from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.tagset import HasTags, UsesTagSets
-from cs.sqltags import SQLTags, SQLTagSet, UsesSQLTags
-from cs.upd import run_task, uses_upd
+from cs.sqltags import SQLTagSet, UsesSQLTags
+from cs.upd import run_task
 from cs.urlutils import URL
 
 __version__ = '20241007-post'
