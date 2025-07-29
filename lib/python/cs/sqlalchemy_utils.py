@@ -9,8 +9,8 @@ from inspect import isgeneratorfunction
 import logging
 import os
 from os.path import abspath
-from threading import current_thread, Lock
 import sys
+from threading import current_thread
 from typing import Any, Optional, Union, List, Tuple
 
 from icontract import require
@@ -207,7 +207,6 @@ def auto_session(function):
 
       See `with_session` for details.
   '''
-
   if isgeneratorfunction(function):
 
     def auto_session_generator_wrapper(*a, orm=None, session=None, **kw):
@@ -228,7 +227,7 @@ def auto_session(function):
 
     wrapper = auto_session_function_wrapper
 
-  wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
+  wrapper.__name__ = "@auto_session(%s)" % (funccite(function),)
   wrapper.__doc__ = function.__doc__
   wrapper.__module__ = getattr(function, '__module__', None)
   return wrapper
@@ -478,7 +477,6 @@ def orm_auto_session(method):
 
       See `with_session` for details.
   '''
-
   if isgeneratorfunction(method):
 
     def orm_auto_session_wrapper(self, *a, session=None, **kw):
