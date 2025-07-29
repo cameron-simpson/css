@@ -7,7 +7,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cached_property
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import os
 from os.path import (
     dirname,
@@ -17,7 +17,6 @@ from os.path import (
     join as joinpath,
 )
 from pprint import pprint
-from signal import SIGINT, SIGTERM
 import sys
 import time
 from typing import List, Optional, Union
@@ -30,8 +29,8 @@ import musicbrainzngs
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
-from cs.context import stackattrs, stack_signals
-from cs.deco import fmtdoc, Promotable
+from cs.context import stackattrs
+from cs.deco import fmtdoc
 from cs.excutils import unattributable
 from cs.ffmpegutils import convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
@@ -40,23 +39,21 @@ from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutsuffix, is_identifier, printt, r
 from cs.logutils import error, warning, info, debug
 from cs.mappings import AttrableMapping
-from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.psutils import run
 from cs.queues import ListQueue
-from cs.resources import MultiOpenMixin, RunState, uses_runstate, RunStateMixin
+from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import unrepeated
 from cs.sqltags import (
     BaseSQLTagsCommand,
-    HasSQLTags,
     SQLTags,
     SQLTagSet,
     SQLTagsCommandsMixin,
-    UsesSQLTags,
     FIND_OUTPUT_FORMAT_DEFAULT,
 )
-from cs.tagset import HasTags, TagSet, TagsOntology
+from cs.tagset import HasTags, TagSet, UsesTagSets
 from cs.upd import run_task, print
+
 
 __version__ = '20201004-dev'
 
