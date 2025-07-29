@@ -22,6 +22,7 @@ from cs.resources import MultiOpenMixin
 from cs.rfc2616 import content_encodings, content_type
 from cs.tagset import TagSet
 from cs.seq import ClonedIterator
+from cs.tagset import BaseTagSets, UsesTagSets
 from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
@@ -502,11 +503,18 @@ class SiteMapPatternMatch(namedtuple(
     return self.pattern_arg.format_map(ChainMap(self.mapping, extra or {}))
 
 @dataclass
-class SiteMap(Promotable):
+class SiteMap(UsesTagSets, Promotable):
   ''' A base dataclass for site maps.
 
       A `SiteMap` data class embodies domain specific knowledge about a
       particular website or collection of websites.
+
+      It subclasses `cs.tagset.UsesTagSets` and gets its `.tagsets`
+      from `self.pilfer` if unspecified. Use as a `UsesTagSet`
+      domain requires setting:
+      - `TYPE_ZONE` to the domain prefix
+      - `HasTagsClass` to the base `HasTags` entity class
+      See `cs.tagset.UsesTagSets` for details.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
       clause in the configuration file, see the `Pilfer.sitemaps`
@@ -539,10 +547,21 @@ class SiteMap(Promotable):
         See the `SiteMap.content_prefetch` method.
   '''
 
-  name: str
+  name: str = 'veve.me'
+  pilfer: object = None
   tags_domain: str = None
+  tagsets: BaseTagSets = None
 
   URL_KEY_PATTERNS = ()
+
+  @uses_pilfer
+  @trace
+  def __post_init__(self, *, P: "Pilfer"):
+    ''' Initialise `.pilfer` if omitted`, and then `.tagsets` from `self.pilfer`.
+    '''
+    if self.pilfer is None:
+      self.pilfer = P
+    UsesTagSets.__init__(self, tagsets=self.pilfer.sqltags)
 
   @classmethod
   @uses_pilfer
