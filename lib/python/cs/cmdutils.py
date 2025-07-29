@@ -45,7 +45,6 @@ from inspect import isclass
 from itertools import chain
 import os
 from os.path import basename
-from pprint import pformat
 import re
 # this enables readline support in the docmd stuff
 try:
