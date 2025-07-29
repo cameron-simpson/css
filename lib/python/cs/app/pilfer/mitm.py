@@ -63,7 +63,6 @@ def consume_stream(
       If the optional `getattrs` are supplied, set them as attributes
       on the returned generator function.
   '''
-
   # TODO: use progress_name?
 
   def consumer_gen(bss: Iterable[bytes]) -> Iterable[bytes]:
@@ -894,6 +893,10 @@ async def run_proxy(
     runstate: RunState,
     P: Pilfer,
 ):
+  ''' Asynchronous function to run a `mitmproxy.tools.dump.DumpMaster`
+      proxy, listening on `listen_host:listen_port` and processing flows
+      via the actions in `addon`.
+  '''
   opts = Options(
       listen_host=listen_host,
       listen_port=listen_port,
