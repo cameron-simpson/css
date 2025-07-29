@@ -243,6 +243,12 @@ class PilferCommand(BaseCommand):
             )
         )
 
+  @popopts
+  def cmd_dbshell(self, argv):
+    if argv:
+      raise GetoptError(f'extra arguments: {argv=}')
+    self.options.pilfer.dbshell()
+
   @popopts(soup='Dump the page soup, normally omitted.')
   def cmd_dump(self, argv):
     ''' Usage: {cmd} URL

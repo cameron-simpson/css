@@ -366,6 +366,11 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return SQLTags(self.sqltags_db_url) if self.sqltags_db_url else None
 
+  def dbshell(self):
+    ''' Run an interactive database prompt for `self.sqltags`.
+    '''
+    return self.sqltags.dbshell()
+
   def load_browser_cookies(
       self, jar: Optional[RequestsCookieJar] = None
   ) -> RequestsCookieJar:
