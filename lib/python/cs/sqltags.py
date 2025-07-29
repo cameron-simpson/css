@@ -1673,6 +1673,11 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     with self.orm:
       yield self
 
+  def dbshell(self):
+    ''' Run a database shell connected to the ORM database.
+    '''
+    return self.orm.dbshell()
+
   @contextmanager
   def db_session(self, *, new=False):
     ''' Context manager to obtain a db session if required
