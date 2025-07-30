@@ -23,7 +23,6 @@ pycodestyle
 # used by dedrm
 pycryptodome
 pyflakes
-pyicontract-lint
 pylint
 ##pylzma - seems to be stale, what was I using this for? - cameron 30nov2024
 ##pyobjc[allbindings]  ## macos only
