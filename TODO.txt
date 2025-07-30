@@ -1,3 +1,4 @@
+icontract and icontract-lint's build process uses setup.py, needs updating
 cs.cmdutils: BaseCommand.poppreargv to replace apply_preargv, saving returning the argv which we are modifying in place anyway
 cs.psutils et al: SIGKILL does not exist on Windows - possibly only SIGTERM exists on Windows - check and make a bit portable
 cs.cmdutils: auto print the relevant environment variables in the usage?
