@@ -3009,10 +3009,19 @@ class HasTags(FormatableMixin):
     return self.tags.keys()
 
   def values(self):
+    ''' The tags values.
+    '''
     return self.tags.values()
 
   def items(self):
+    ''' The tags items.
+    '''
     return self.tags.items()
+
+  def update(self, *update_a, **update_kw):
+    ''' Update the tags, tupically from a mapping or keyword arguments.
+    '''
+    self.tags.update(*update_a, **update_kw)
 
   def deref(self, tag_name, attr=None, *, subtype=None):
     ''' Call `.tags_db.deref(self,tag_name,...)`.
@@ -3064,13 +3073,16 @@ class UsesTagSets:
       )
     return self.HasTagsClass(te, self)
 
-  def __getitem__(self, index: Tuple[str, str]) -> HasTags:
+  def __getitem__(self, index: Tuple[str, Union[str | int]]) -> HasTags:
     ''' Fetch the `HasTags` instance for the supplied `(subname,key)` 2-tuple.
     '''
     with Pfx("%s[%s]", self, r(index)):
       assert isinstance(index, tuple)
       type_, key = index
-      assert '.' not in key
+      if isinstance(key, int):
+        key = str(key)
+      else:
+        assert '.' not in key
       te = self.tagsets[f'{self.TYPE_ZONE}.{type_}.{key}']
       return self.tagged(te)
 
