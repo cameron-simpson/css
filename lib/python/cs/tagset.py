@@ -3098,9 +3098,9 @@ class UsesTagSets:
       self,
       tagged: HasTags,
       tag_name: str,
-      attr: str = None,
+      attr: Optional[str] = None,
       *,
-      subtype: str = None
+      subtype: Optional[str] = None
   ):
     ''' Call `self.tagsets.deref` on `tagged.tags` and promote the
         result to use our `HasTags` instances.
