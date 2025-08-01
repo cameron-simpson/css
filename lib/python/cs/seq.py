@@ -20,7 +20,7 @@ from typing import Callable, Hashable, Iterable, Iterator, Optional, Tuple, Type
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20250306-post'
+__version__ = '20250801-post'
 
 DISTINFO = {
     'description':
@@ -422,6 +422,7 @@ class ClonedIterator(Iterable):
     with self._lock:
       item = next(self._iterator)
       self._cloned.append(item)
+    return item
 
   def __iter__(self):
     ''' Iterate over the clone, returning a new iterator.

@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions: new empty __post_init__ so that subclasses can call super().__post_init__() unconditionally
+lib/python/cs/cmdutils.py: merge default ==> pilfer
+lib/python/cs/cmdutils.py: cs.cmdutils: new cli_datetime to parse a CLI supplied datetime specification, accepts ISO8601

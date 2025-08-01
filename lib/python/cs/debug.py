@@ -68,7 +68,7 @@ from cs.threads import ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20250325-post'
+__version__ = '20250728-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -88,6 +88,7 @@ DISTINFO = {
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
+        'cs.threads',
         'cs.upd',
         'cs.x',
     ],
