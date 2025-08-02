@@ -558,7 +558,7 @@ class TagSetTyping:
       * the *subname*: the dotted componented between the *zone* and the *key*
       * the *key*: the rightmost dotted component
 
-      The *zone* represents the domain where these `TagSet` have meaning.
+      The *zone* represents the domain where this `TagSet` have meaning.
       The *subname* represents a type within that domain; it may contain internal dots.
       The *key* represents a key unique within the *subname* type space.
 
@@ -607,7 +607,7 @@ class TagSetTyping:
         first and final dotted components i.e. without the leading zone
         and the trailing key.
 
-        For example the `.type_subtype` of an entity named `tvdb.series.1234` is `series`.
+        For example the `.type_subname` of an entity named `tvdb.series.1234` is `series`.
     '''
     ##print("self.type_name", self.type_name)
     return self.type_name.split('.', 1)[1]
