@@ -627,7 +627,7 @@ def get_suffix_part(
   return m.group(0), part_n
 
 # pylint: disable=redefined-outer-name
-def get_nonwhite(s: str, offset: int) -> Tuple[str, int]:
+def get_nonwhite(s: str, offset: int = 0) -> Tuple[str, int]:
   ''' Scan the string `s` for characters not in `string.whitespace`
       starting at `offset` (default `0`).
       Return `(match,new_offset)`.
@@ -635,7 +635,7 @@ def get_nonwhite(s: str, offset: int) -> Tuple[str, int]:
   return get_other_chars(s, offset=offset, stopchars=whitespace)
 
 # pylint: disable=redefined-outer-name
-def get_decimal(s: str, offset: int) -> Tuple[str, int]:
+def get_decimal(s: str, offset: int = 0) -> Tuple[str, int]:
   ''' Scan the string `s` for decimal characters starting at `offset` (default `0`).
       Return `(dec_string,new_offset)`.
   '''
