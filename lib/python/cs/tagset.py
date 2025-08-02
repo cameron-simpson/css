@@ -2902,7 +2902,7 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class HasTags(FormatableMixin):
+class HasTags(TagSetTyping, FormatableMixin):
   ''' A mixin for classes which have a `.tags:TagSet` attribute.
 
       The subclass may itself define its `.tags` instance attribute
