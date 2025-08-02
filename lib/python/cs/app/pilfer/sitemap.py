@@ -549,7 +549,6 @@ class SiteMap(UsesTagSets, Promotable):
 
   name: str = 'veve.me'
   pilfer: object = None
-  tags_domain: str = None
   tagsets: BaseTagSets = None
 
   URL_KEY_PATTERNS = ()
@@ -777,6 +776,13 @@ class SiteMap(UsesTagSets, Promotable):
           # eg "tvdb" for thetvdb.com, for use with sqltags
           tags_domain=cls.tags_domain,
       )
+      # eg "tvdb" for thetvdb.com, for use with sqltags
+      try:
+        type_zone = cls.TYPE_ZONE
+      except AttributeError:
+        pass
+      else:
+        match["type_zone"] = type_zone
       for conjunction, tags_kw in conditions:
         with Pfx("match %r", conjunction):
           for condition in conjunction:
