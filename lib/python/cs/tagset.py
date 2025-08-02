@@ -3106,7 +3106,11 @@ class UsesTagSets:
         result to use our `HasTags` instances.
     '''
     result = self.tagsets.deref(
-        tagged.tags, attr=attr, type_zone=self.TYPE_ZONE, subtype=subtype
+        tagged.tags,
+        tag_name,
+        attr=attr,
+        type_zone=self.TYPE_ZONE,
+        subtype=subtype
     )
     if result is None:
       return None
