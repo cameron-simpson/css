@@ -624,7 +624,7 @@ class SiteMap(UsesTagSets, Promotable):
 
             @on(
                 'docs.python.org',
-                '/3/library/(?P<module_name>[^/]+).html$',
+                r'/3/library/(?P<module_name>[^/]+).html$',
                 cache_key='module/{module_name}',
             )
             def cache_key_pydoc(self, flowstate, match: TagSet) -> str:
