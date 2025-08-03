@@ -22,7 +22,7 @@ from cs.resources import MultiOpenMixin
 from cs.rfc2616 import content_encodings, content_type
 from cs.tagset import TagSet
 from cs.seq import ClonedIterator
-from cs.tagset import BaseTagSets, UsesTagSets
+from cs.tagset import BaseTagSets, HasTags, UsesTagSets
 from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
@@ -484,6 +484,62 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     }
 
 uses_flowstate = default_params(flowstate=FlowState.default)
+
+class SiteEntity(HasTags):
+  ''' A base class for entities associates with a `SiteMap`.
+
+      This provides the following additional facilities:
+
+      If the entity class has a *FOO*`_FORMAT` attribute
+      then `self.`*foo*` will return that formatted against the entity
+      A common example is to provide a `SITEPAGE_FORMAT` class
+      attribute to enable a `.sitepage` attribute which returns the
+      primary web page for the entity.
+  '''
+
+  def __getattr__(self, attr):
+    if attr.islower():
+      # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
+      try:
+        format_s = getattr(self.__class__, f'{attr.upper()}_FORMAT')
+      except AttributeError:
+        pass
+      else:
+        return self.format_as(format_s)
+    return super().__getattr__(attr)
+
+  def format_kwargs(self):
+    ''' The format keyword mapping for a `SiteEntity`.
+
+        This includes:
+        - the `HasTags.format_kwargs()`
+        - the values for any names in `type(self.tags)` with an
+          upper case leading letter such as `URL_DOMAIN`
+    '''
+    kwargs = super().format_kwargs()
+    kwargs.update(
+        {
+            k: v
+            for k, v in self.tags.__class__.__dict__.items()
+            if k[:1].isupper()
+        }
+    )
+    return kwargs
+
+  @cached_property
+  def url_root(self):
+    ''' Proxy to `self.tags.url_root`.
+    '''
+    return self.tags.url_root
+
+  @property
+  def sitepage(self) -> str:
+    ''' The `sitepage` is derived from `self.SITEPAGE_FORMAT`.
+    '''
+    url = self.__getattr__('sitepage')
+    if url.startswith('/'):
+      url = f'{self.url_root}{url[1:]}'
+    return url
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
