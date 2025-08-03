@@ -2168,7 +2168,7 @@ class FStr(FormatableMixin, str):
     return int(self, base=base)
 
   @format_attribute
-  def lc(self):
+  def lc_(self):
     ''' Lowercase using `lc_()`.
     '''
     return lc_(self)
