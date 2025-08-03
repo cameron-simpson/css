@@ -1852,22 +1852,21 @@ class FormatableFormatter(Formatter):
     subspecs = []
     offset = 0
     while offset < len(format_spec):
+      # swallow colons
       if format_spec.startswith(':', offset):
-        # an empty spec
-        subspec = ''
         offset += 1
+        continue
+      # match a FORMAT_RE_FIELD_EXPR
+      m_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
+      if m_subspec:
+        subspec = m_subspec.group()
       else:
-        # match a FORMAT_RE_FIELD_EXPR
-        m_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
-        if m_subspec:
-          subspec = m_subspec.group()
-        else:
-          warning(
-              "unrecognised subspec at %d: %r, falling back to split", offset,
-              format_spec[offset:]
-          )
-          subspec, *_ = format_spec[offset:].split(':', 1)
-        offset += len(subspec)
+        warning(
+            "unrecognised subspec at %d: %r, falling back to split", offset,
+            format_spec[offset:]
+        )
+        subspec, *_ = format_spec[offset:].split(':', 1)
+      offset += len(subspec)
       subspecs.append(subspec)
     return subspecs
 
