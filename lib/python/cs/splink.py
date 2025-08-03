@@ -837,11 +837,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       self,
       argv,
       *,
+      fstags: FSTags,
       upd: Upd,
       datasets=None,
       doit=None,
       force=None,
-      fstags: FSTags,
   ):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
