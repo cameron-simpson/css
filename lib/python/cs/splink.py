@@ -1090,9 +1090,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     stacked = options.stacked
     event_labels = options.event_labels
     detailed = spd.DetailedData
-    detail_series_cropped = lambda field: detailed[field].as_pd_series(
-        start, stop, pad=True, tz=tz
-    )
+    detail_series_cropped = lambda field_name: detailed[
+        field_name].as_pd_series(
+            start, stop, pad=True, tz=tz
+        )
     # list of graph specifications
     had_failed_specs = False
     graphs = {}
