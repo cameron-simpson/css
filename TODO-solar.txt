@@ -1,3 +1,4 @@
+splink cmd_import: stop the flickering, keep a single status line for the imports
 splink pull with empty data dir fails
 comment out the load black line
 Tk widget for an interactive eg zoomable graph
