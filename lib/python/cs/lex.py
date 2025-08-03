@@ -52,7 +52,7 @@ from cs.seq import common_prefix_length, common_suffix_length
 __version__ = '20250724-post'
 
 DISTINFO = {
-    'keywords': ["python2", "python3"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
