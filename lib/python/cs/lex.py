@@ -1941,7 +1941,7 @@ class FormatMapping(MappingABC):
 
 @has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
-  ''' A subclass of `FormatableFormatter` which  provides 2 features:
+  ''' A subclass of `FormatableFormatter` which  provides 2 main features:
       - a `__format__` method which parses the `format_spec` string
         into multiple colon separated terms whose results chain
       - a `format_as` method which formats a format string using `str.format_map`
@@ -1961,8 +1961,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       By contrast, `format_as` is designed to fill out an entire format
       string from the current object.
 
-      For example, the `cs.tagset.TagSetMixin` class
-      uses `FormatableMixin` to provide a `format_as` method
+      For example, the `cs.tagset.TagSet` class
+      subclasses `FormatableMixin` to provide a `format_as` method
       whose replacement fields are derived from the tags in the tag set.
 
       Subclasses wanting to provide additional `format_spec` terms
