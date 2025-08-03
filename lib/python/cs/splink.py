@@ -758,10 +758,13 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     with super().run_context():
       options = self.options
-      fetch_source = (
-          options.fetch_source
-          or os.environ.get(self.DEFAULT_FETCH_SOURCE_ENVVAR)
-      )
+      if not options.fetch_source:
+        options.fetch_source = os.environ.get(self.DEFAULT_FETCH_SOURCE_ENVVAR)
+      if not options.spdpath:
+        options.spdpath = os.environ.get(
+            self.DEFAULT_SPDPATH_ENVVAR, self.DEFAULT_SPDPATH
+        )
+      options.tz = tzlocal()
       with fstags:
         with stackattrs(
             options,
