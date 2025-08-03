@@ -1,0 +1,4 @@
+lib/python/cs/result.py: cs.result: new @not_cancelled decorator for mthods to raise CancellationError is self.cancelled
+lib/python/cs/result.py: merge default => pilfer
+lib/python/cs/result.py: merge default -> pilfer
+lib/python/cs/result.py: merge default -> pilfer

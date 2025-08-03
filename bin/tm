@@ -177,6 +177,8 @@ case "$op" in
       badopts=1
     fi
     ;;
+  exec )
+    ;;
   ls | list-sessions)
     ;;
   pick-new-prefix-session)
@@ -199,14 +201,6 @@ case "$op" in
       echo "$cmd: $op: extra arguments after prefix: $*" >&2
       badopts=1
     fi
-    ;;
-  rc)
-    rc_all=
-    [ $# = 0 ] || { [ "x$1" = x-a ] && { rc_all=1; shift; }; }
-    [ $# = 0 ] || {
-      echo "$cmd: $op: extra arguments: $*" >&2
-      badopts=1
-    }
     ;;
   pick-new-prefix-session-remote)
     if [ $# = 0 ]
@@ -236,6 +230,15 @@ case "$op" in
       echo "$cmd: $op: extra arguments after remote-host: $*" >&2
       badopts=1
     fi
+    ;;
+  rc)
+    # rc [-a]
+    rc_all=
+    [ $# = 0 ] || { [ "x$1" = x-a ] && { rc_all=1; shift; }; }
+    [ $# = 0 ] || {
+      echo "$cmd: $op: extra arguments: $*" >&2
+      badopts=1
+    }
     ;;
   recite-function-remote)
     if [ $# -gt 0 ]
@@ -385,6 +388,41 @@ case "$op" in
   down)  do_tmux select-pane -D ;;
   left)  do_tmux select-pane -L ;;
   right) do_tmux select-pane -R ;;
+  exec)
+    # execute the specified tmux session
+    # start initial tmux sessions; just the named ones of names specified
+    # obtains definitions from $HOME/.tmrc
+    cd
+    if [ ! -f "$tmrc" ]
+    then
+      echo "$cmd: $op: no tmrc: $tmrc" >&2
+      exit 1
+    fi
+    tmrc \
+    | \
+    {
+      xit=0
+      matched=
+      while read -r session_name shcmd
+      do
+        if [ $# -gt 0 ]
+        then
+          case " $* " in
+            *" $session_name "*)
+              ;;
+            *)continue
+              ;;
+          esac
+        fi
+        matched=1
+        [ -n "$shcmd" ] || shcmd='exec $SHELL'
+        set -x
+        exec sh -c "set -x; $shcmd"
+      done
+      echo "$cmd: $op: no sessions matched" >&2
+      xit=1
+    }
+    ;;
   ls | list-sessions)
     # no tmux? use scr
     have_tmux || exec $trace scr
@@ -409,7 +447,7 @@ case "$op" in
     echo "$session_name"
     ;;
   rc)
-    tmrc
+    tmrc ${1+"$@"}
     ;;
   recite-function-remote)
     # recite a shell function for accessing remote sessions,

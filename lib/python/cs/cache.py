@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 ''' A few caching data structures and other lossy things with capped sizes.
 '''
@@ -6,7 +6,8 @@
 from collections import deque
 from collections.abc import MutableMapping
 from contextlib import contextmanager
-from functools import partial
+import errno
+from functools import cache, partial
 from itertools import chain
 import os
 from os.path import (
@@ -24,9 +25,10 @@ import time
 from typing import Any, Callable, Mapping, Optional
 
 from cs.context import stackattrs, withif
-from cs.deco import fmtdoc
-from cs.fileutils import atomic_filename
-from cs.fs import needdir, HasFSPath, validate_rpath
+from cs.deco import decorator, fmtdoc, uses_verbose
+from cs.fileutils import atomic_filename, DEFAULT_POLL_INTERVAL, FileState
+from cs.fs import needdir, HasFSPath, shortpath, validate_rpath
+from cs.gimmicks import warning
 from cs.hashindex import file_checksum, HASHNAME_DEFAULT
 from cs.lex import r, s
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -37,7 +39,7 @@ from cs.seq import splitoff, unrepeated
 
 from icontract import require
 
-__version__ = '20241122-post'
+__version__ = '20250111-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -50,6 +52,7 @@ DISTINFO = {
         'cs.deco',
         'cs.fileutils',
         'cs.fs',
+        'cs.gimmicks',
         'cs.hashindex',
         'cs.lex',
         'cs.pfx',
@@ -61,7 +64,7 @@ DISTINFO = {
     ],
 }
 
-class LRU_Cache(object):
+class LRU_Cache:
   ''' A simple least recently used cache.
 
       Unlike `functools.lru_cache`
@@ -514,6 +517,7 @@ class ConvCache(HasFSPath):
     hashname, hashhex = str(content_key).split(':', 1)
     return joinpath(hashname, *splitoff(hashhex, 2, 2))
 
+  @uses_verbose
   @require(lambda conv_subpath: not isabspath(conv_subpath))
   def convof(
       self,
@@ -523,6 +527,7 @@ class ConvCache(HasFSPath):
       *,
       ext=None,
       force=False,
+      verbose: bool,
   ) -> str:
     ''' Return the filesystem path of the cached conversion of
         `srcpath` via `conv_func`.
@@ -552,22 +557,271 @@ class ConvCache(HasFSPath):
     dstdirpath = dirname(dstpath)
     needdir(dstdirpath, use_makedirs=True)
     if force or not existspath(dstpath):
+      if verbose:
+        print('write', shortpath(dstpath), '<-', shortpath(srcpath))
       with Pfx('<%s %s >%s', srcpath, conv_func, dstpath):
         with atomic_filename(
             dstpath,
             prefix=
-            f'.{self.__class__.__name__}.convof--{conv_subpath.replace(os.sep,"--")}--',
+            f'.{self.__class__.__name__}.convof--{conv_subpath.replace(os.sep, "--")}--',
             suffix=suffix,
             exists_ok=force,
         ) as T:
           pfx_call(conv_func, srcpath, T.name)
     return dstpath
 
-_default_conv_cache = ConvCache()
+@cache
+def get_default_conv_cache():
+  ''' Return the default instance of `ConvCache`.
+  '''
+  return ConvCache()
 
 def convof(srcpath, conv_subpath, conv_func, *, ext=None, force=False):
   ''' `ConvCache.convof` using the default cache.
   '''
-  return _default_conv_cache.convof(
+  return get_default_conv_cache().convof(
       srcpath, conv_subpath, conv_func, ext=ext, force=force
   )
+
+@decorator
+def cachedmethod(
+    method, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
+):
+  ''' Decorator to cache the result of an instance or class method
+      and keep a revision counter for changes.
+
+      The cached values are stored on the instance (`self`).
+      The revision counter supports the `@revised` decorator.
+
+      This is quite different to the stdlib's `functools.cache`,
+      which caches all results on the function itself, keyed by the arguments.
+      By contrast, this decorator caches results on `self` and the
+      cached results are invalidated if the signature for those
+      arguments changes.
+
+      This is aimed at caching the results of expensive functions
+      whose results for some particular arguments may change.
+      The motivating use case was a large set of mail filing rules
+      where I wanted them reloaded if the rule files were modified.
+      The signature function is a based on `stat()`s of the file
+      modification times; if they do not change, the rules are
+      assumed to be as before.
+
+      This decorator may be used in 2 modes.
+      Directly:
+
+          @cachedmethod
+          def method(self, ...)
+
+      or with keyword arguments:
+
+          @cachedmethod(poll_delay=0.25)
+          def method(self, ...)
+
+      Optional keyword arguments:
+      * `attr_name`: the basis name for the supporting attributes.
+        Default: the name of the method.
+      * `poll_delay`: minimum time between polls; after the first
+        access, subsequent accesses before the `poll_delay` has elapsed
+        will return the cached value.
+        Default: `None`, meaning the value never becomes stale.
+      * `sig_func`: a signature function, which should be significantly
+        cheaper than the method. If the signature is unchanged, the
+        cached value will be returned. The signature function
+        expects the instance (`self`) as its first parameter.
+        Default: `None`, meaning no signature function;
+        the first computed value will be kept and never updated.
+      * `unset_value`: the value to return before the method has been
+        called successfully.
+        Default: `None`.
+
+      If the method raises an exception, this will be logged and
+      the method will return the previously cached value,
+      unless there is not yet a cached value
+      in which case the exception will be reraised.
+
+      If the signature function raises an exception
+      then a log message is issued and the signature is considered unchanged.
+
+      An example use of this decorator might be to keep a "live"
+      configuration data structure, parsed from a configuration
+      file which might be modified after the program starts. One
+      might provide a signature function which called `os.stat()` on
+      the file to check for changes before invoking a full read and
+      parse of the file.
+
+      *Note*: use of this decorator requires the `cs.pfx` module.
+  '''
+  from cs.pfx import Pfx  # pylint: disable=import-outside-toplevel
+  if poll_delay is not None and poll_delay <= 0:
+    raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
+  if poll_delay is not None and poll_delay <= 0:
+    raise ValueError(
+        "invalid poll_delay, should be >0, got: %r" % (poll_delay,)
+    )
+
+  attr = attr_name if attr_name else method.__name__
+  cache_attr = '__cachedmethod__' + attr
+
+  # pylint: disable=too-many-branches
+  def cachedmethod_wrapper(self, *a, **kw):
+    ''' Wrapper for `method` which honours the cache on `self`.
+    '''
+    with Pfx("%s.%s", self, attr):
+      now = None
+      # TODO: recurse down the values making them hashable: list->tuple etc
+      kw_keys = sorted(kw.keys())
+      sig_key = (
+          () if sig_func is None else
+          (tuple(*a), tuple(kw_keys), tuple(kw[k] for k in kw_keys))
+      )
+      try:
+        cache = getattr(self, cache_attr)
+      except AttributeError:
+        cache = {}
+        setattr(self, cache_attr, cache)
+      try:
+        sig, sig_poll_time, result, revision = cache[sig_key]
+      except KeyError:
+        sig, sig_poll_time, result, revision = (
+            unset_value, None, unset_value, 0
+        )
+      now = time.time()
+      if sig_poll_time is None:
+        # we need to compute the first value
+        pass
+      else:
+        ## FIRES!?! assert sig is not unset_value
+        # see if it is tool early to recompute the signature
+        # (and by inference, the new value)
+        if poll_delay is not None and now - sig_poll_time < poll_delay:
+          # do not even compute the signature
+          # return the cached result
+          return result
+      # update poll time
+      sig_poll_time = now
+      # see if the signature has changed
+      if sig_func is None:
+        new_sig = unset_value
+      else:
+        try:
+          new_sig = sig_func(self, *a, **kw)
+        except Exception as e:  # pylint: disable=broad-except
+          # signature function fails, use the cache
+          warning(
+              "sig_func %s(self,*%r,**%r): %s",
+              sig_func,
+              a,
+              kw,
+              e,
+              exc_info=True
+          )
+          new_sig = sig
+      if result is not unset_value and new_sig == sig:
+        # signature unchanged
+        # just update the poll time and return the cached result
+        cache[sig_key] = sig, sig_poll_time, result, revision
+        return result
+      # cache stale, compute the current value
+      try:
+        new_result = method(self, *a, **kw)
+      except Exception as e:  # pylint: disable=broad-except
+        # computation fails, return cached value
+        # update the poll time and leave the result unchanged
+        cache[sig_key] = sig, sig_poll_time, result, revision
+        if result is unset_value:
+          # no cached value, raise the exception
+          raise
+        warning("exception calling %s(self): %s", method, e, exc_info=True)
+      else:
+        # see if the revision should change
+        try:
+          changed = result == new_result
+        except TypeError:
+          # not comparable vaues
+          changed = True
+        if changed:
+          revision += 1
+        # update the result regardless
+        result = new_result
+      # update the cache
+      cache[sig_key] = sig, sig_poll_time, result, revision
+      return result
+
+  ##  TODO: provide a .flush() function to clear the cached value
+  ##        cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
+  ##        Doesn't work, has no access to self. :-(
+
+  return cachedmethod_wrapper
+
+@decorator
+def file_based(
+    func,
+    attr_name=None,
+    filename=None,
+    poll_delay=None,
+    sig_func=None,
+    **dkw
+):
+  ''' A decorator which caches a value obtained from a file.
+
+      In addition to all the keyword arguments for `@cs.cache.cachedmethod`,
+      this decorator also accepts the following arguments:
+      * `attr_name`: the name for the associated attribute, used as
+        the basis for the internal cache value attribute
+      * `filename`: the filename to monitor.
+        Default from the `._{attr_name}__filename` attribute.
+        This value will be passed to the method as the `filename` keyword
+        parameter.
+      * `poll_delay`: delay between file polls, default `DEFAULT_POLL_INTERVAL`.
+      * `sig_func`: signature function used to encapsulate the relevant
+        information about the file; default
+        cs.filestate.FileState({filename}).
+
+      If the decorated function raises OSError with errno == ENOENT,
+      this returns None. Other exceptions are reraised.
+  '''
+  if attr_name is None:
+    attr_name = func.__name__
+  filename_attr = '_' + attr_name + '__filename'
+  filename0 = filename
+  if poll_delay is None:
+    poll_delay = DEFAULT_POLL_INTERVAL
+  sig_func = dkw.pop('sig_func', None)
+  if sig_func is None:
+
+    def sig_func(self):
+      ''' The default signature function: `FileState(filename,missing_ok=True)`.
+      '''
+      filename = filename0
+      if filename is None:
+        filename = getattr(self, filename_attr)
+      return FileState(filename, missing_ok=True)
+
+  def wrap0(self, *a, **kw):
+    ''' Inner wrapper for `func`.
+    '''
+    filename = kw.pop('filename', None)
+    if filename is None:
+      if filename0 is None:
+        filename = getattr(self, filename_attr)
+      else:
+        filename = filename0
+    kw['filename'] = filename
+    try:
+      return func(self, *a, **kw)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        return None
+      raise
+
+  dkw['attr_name'] = attr_name
+  dkw['poll_delay'] = poll_delay
+  dkw['sig_func'] = sig_func
+  return cachedmethod(**dkw)(wrap0)
+
+@decorator
+def file_property(func, **dkw):
+  ''' A property whose value reloads if a file changes.
+  '''
+  return property(file_based(func, **dkw))

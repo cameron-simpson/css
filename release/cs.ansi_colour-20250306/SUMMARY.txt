@@ -1,0 +1,1 @@
+colourise: do not colour the leading and trailing whitespace, provide colour_padding=False optional flag to disable.

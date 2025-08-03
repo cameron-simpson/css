@@ -9,26 +9,36 @@
 
 from contextlib import contextmanager
 from functools import partial
+from queue import Queue, PriorityQueue, Empty as Queue_Empty
 import sys
 from threading import Timer, Lock, RLock, Thread
 import time
+from typing import Any, Callable, Iterable
+
+from typeguard import typechecked
 
 from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
 from cs.obj import Sentinel
 from cs.pfx import Pfx, PfxCallInfo
-from cs.py3 import Queue, PriorityQueue, Queue_Empty
-from cs.resources import MultiOpenMixin, not_closed, ClosedError
+from cs.resources import (
+    MultiOpenMixin,
+    RunState,
+    RunStateMixin,
+    uses_runstate,
+    not_closed,
+    ClosedError,
+)
+from cs.result import CancellationError
 from cs.seq import seq, unrepeated
 
-__version__ = '20240412-post'
+__version__ = '20250426-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
@@ -36,33 +46,44 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
-        'cs.py3',
         'cs.resources',
+        'cs.result',
         'cs.seq',
+        'typeguard',
     ],
 }
 
-class QueueIterator(MultiOpenMixin):
+class QueueIterator(Iterable[Any]):
   ''' A `QueueIterator` is a wrapper for a `Queue`like object
       which presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
+      It does present a `.close` method.
   '''
 
   def __init__(self, q, name=None):
     if name is None:
-      name = "QueueIterator-%d" % (seq(),)
+      name = f'{self.__class__.__name__}-{seq()}'
     self.q = q
     self.name = name
-    self.finalise_later = True
     self.sentinel = Sentinel(
         "%s:%s:SENTINEL" % (self.__class__.__name__, name)
     )
     # count of non-sentinel items
     self._item_count = 0
+    self.closed = False
     self.__lock = Lock()
 
   def __str__(self):
-    return "%s(%r:q=%s)" % (type(self).__name__, self.name, self.q)
+    return f'{self.__class__.__name__}({self.name!r},q={self.q})'
+
+  def __repr__(self):
+    return str(self)
+
+  def close(self):
+    with self.__lock:
+      if not self.closed:
+        self.q.put(self.sentinel)
+        self.closed = True
 
   @not_closed
   def put(self, item, *args, **kw):
@@ -70,30 +91,15 @@ class QueueIterator(MultiOpenMixin):
         Warn if the queue is closed.
         Raises `ValueError` if `item` is the sentinel.
     '''
-    if self.closed:
-      with PfxCallInfo():
-        warning("%r.put: all closed: item=%s", self, item)
-      raise ClosedError("QueueIterator closed")
-    if item is self.sentinel:
-      raise ValueError("put(sentinel)")
-    self._put(item, *args, **kw)
     with self.__lock:
+      if self.closed:
+        with PfxCallInfo():
+          warning("%r.put: all closed: item=%s", self, item)
+        raise ClosedError("QueueIterator closed")
+      if item is self.sentinel:
+        raise ValueError("put(sentinel)")
+      self.q.put(item, *args, **kw)
       self._item_count += 1
-
-  def _put(self, item, *args, **kw):
-    ''' Direct call to `self.q.put()` with no checks.
-    '''
-    return self.q.put(item, *args, **kw)
-
-  @contextmanager
-  def startup_shutdown(self):
-    ''' `MultiOpenMixin` support; puts the sentinel onto the underlying queue
-        on the final close.
-    '''
-    try:
-      yield
-    finally:
-      self._put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -108,30 +114,21 @@ class QueueIterator(MultiOpenMixin):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning("%s: Queue_Empty: %s", self, e)
-      self._put(self.sentinel)
+      warning("%s: queue.Empty: %s", self, e)
+      q.put(self.sentinel)
       # pylint: disable=raise-missing-from
-      raise StopIteration("Queue_Empty: %s" % (e,))
+      raise StopIteration(f'{self}.get: queue.Empty: {e}') from e
     if item is self.sentinel:
       # sentinel consumed (clients won't see it, so we must)
-      self.q.task_done()
+      q.task_done()
       # put the sentinel back for other consumers
-      self._put(self.sentinel)
-      raise StopIteration("SENTINEL")
+      q.put(self.sentinel)
+      raise StopIteration(f'{self}.get: SENTINEL')
     with self.__lock:
       self._item_count -= 1
     return item
 
   next = __next__
-
-  def _get(self):
-    ''' Calls the inner queue's `.get` via `.__next__`; can break other users' iterators.
-    '''
-    try:
-      return next(self)
-    except StopIteration as e:
-      # pylint: disable=raise-missing-from
-      raise Queue_Empty("got %s from %s" % (e, self))
 
   def empty(self):
     ''' Test if the queue is empty.
@@ -171,6 +168,7 @@ class QueueIterator(MultiOpenMixin):
 
   def iter_batch(self, batch_size=1024):
     ''' A generator which yields batches of items from the queue.
+        The default `batch_size` is `1024`.
     '''
     while True:
       batch = self.next_batch(batch_size=batch_size, block_once=True)
@@ -183,12 +181,40 @@ def IterableQueue(capacity=0, name=None):
       Note that the returned queue is already open
       and needs a close.
   '''
-  return QueueIterator(Queue(capacity), name=name).open()
+  return QueueIterator(Queue(capacity), name=name)
 
 def IterablePriorityQueue(capacity=0, name=None):
   ''' Factory to create an iterable `PriorityQueue`.
   '''
-  return QueueIterator(PriorityQueue(capacity), name=name).open()
+  return QueueIterator(PriorityQueue(capacity), name=name)
+
+def WorkerQueue(worker, capacity=0, name=None, args=(), kwargs=None):
+  ''' Create an `IterableQueue` and start a worker `Thread` to consume it.
+      Return a `(queue,Thread)` 2-tuple.
+      The caller must close the queue.
+
+      Parameters:
+      * `worker`: the function to consume the queue
+      * `capacity`: optional, passed to `IterableQueue`
+      * `name`: optional, passed to `IterableQueue` and used in the `Thread` name
+      * `args`: optional additional positional arguments for `worker` after the queue
+      * `kwargs`: optional keyword arguments for the worker
+  '''
+  if name is None:
+    name = worker.__name__
+  q = IterableQueue(capacity=capacity, name=name)
+  try:
+    T = Thread(
+        target=worker,
+        args=[q, *args],
+        kwargs=kwargs,
+        name=f'{name} WorkerQueue'
+    )
+    T.start()
+  except Exception:
+    q.close()
+    raise
+  return q, T
 
 class Channel(object):
   ''' A zero-storage data passage.
@@ -275,7 +301,7 @@ class Channel(object):
     else:
       self.closed = True
 
-class PushQueue(MultiOpenMixin):
+class PushQueue(MultiOpenMixin, RunStateMixin):
   ''' A puttable object which looks like an iterable `Queue`.
 
       In this base class,
@@ -290,8 +316,16 @@ class PushQueue(MultiOpenMixin):
       as resource controlled concurrency.
   '''
 
-  def __init__(self, name, functor, outQ):
-    ''' Initialise the PushQueue with the callable `functor`
+  @uses_runstate
+  @typechecked
+  def __init__(
+      self,
+      name: str,
+      functor: Callable[[Any], Iterable],
+      outQ,
+      runstate: RunState,
+  ):
+    ''' Initialise the `PushQueue` with the callable `functor`
         and the output queue `outQ`.
 
         Parameters:
@@ -329,15 +363,20 @@ class PushQueue(MultiOpenMixin):
         the result of `functor` differently, or to queue the call
         to `functor(item)` via some taks system.
     '''
+    runstate = self.runstate
+    if runstate.cancelled:
+      raise CancellationError(f'{runstate}.cancelled')
     outQ = self.outQ
     functor = self.functor
     with outQ:
       for computed in functor(item):
+        if runstate.cancelled:
+          raise CancellationError(f'{runstate}.cancelled')
         outQ.put(computed)
 
 class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.
-      Calls to `.get()` raise `Queue_Empty`.
+      Calls to `.get()` raise `queue.Empty`.
   '''
 
   def __init__(self, blocking=False, name=None):
@@ -366,7 +405,7 @@ class NullQueue(MultiOpenMixin):
     '''
 
   def get(self):
-    ''' Get the next value. Always raises `Queue_Empty`.
+    ''' Get the next value. Always raises `queue.Empty`.
         If `.blocking,` delay until `.shutdown()`.
     '''
     if self.blocking:
@@ -677,7 +716,7 @@ class ListQueue:
 
 def get_batch(q, max_batch=128, *, poll_delay=0.01):
   ''' Get up to `max_batch` closely spaced items from the queue `q`.
-      Return the batch. Raise `Queue_Empty` if the first `q.get()` raises.
+      Return the batch. Raise `queue.Empty` if the first `q.get()` raises.
 
       Block until the first item arrives. While the batch's size is
       less that `max_batch` and there is another item available

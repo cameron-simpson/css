@@ -5,7 +5,7 @@ r'''
 Assorted process and subprocess management functions.
 
 Not to be confused with the excellent
-(psutil)[https://pypi.org/project/psutil/] package.
+[psutil package](https://pypi.org/project/psutil/).
 '''
 
 import builtins
@@ -25,7 +25,7 @@ from cs.deco import fmtdoc, uses_cmd_options
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
-__version__ = '20241206-post'
+__version__ = '20250513-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -207,6 +207,7 @@ def run(
     input=None,
     logger=None,
     print=None,
+    fold=None,
     quiet: bool,
     remote=None,
     ssh_exe=None,
@@ -228,6 +229,7 @@ def run(
         NB: _unlike_ the `subprocess.run` default, which is `False`
       * `doit`: optional flag, default `True`;
         if false do not run the command and return `None`
+      * `fold`: optional flag, passed to `print_argv`
       * `input`: default `None`: alternative to `stdin`;
         passed to `subprocess.run`
       * `logger`: optional logger, default `None`;
@@ -249,13 +251,24 @@ def run(
       if logger:
         trace("skip: %s", shlex.join(argv))
       else:
-        print_argv(*argv, fold=True)
+        if fold is None:
+          fold = True
+        print_argv(*argv, fold=fold, print=print)
     return None
   if not quiet:
     if logger:
       trace("+ %s", shlex.join(argv))
     else:
-      print_argv(*argv, indent="+ ", file=sys.stderr, print=print)
+      if fold is None:
+        fold = False
+      print_argv(
+          *argv,
+          indent0="+ ",
+          indent="  ",
+          file=sys.stderr,
+          fold=fold,
+          print=print
+      )
   if input is None:
     if stdin is None:
       stdin = subprocess_DEVNULL
@@ -351,7 +364,7 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
       * `argv`: the sequence of arguments to distribute; this may not be empty
       * `post_argv`: optional, the sequence of trailing arguments
       * `max_argv`: optional, the maximum length of each distributed
-        argument list, default from `MAX_ARGV`: `{MAX_ARGV}`
+        argument list, default from `{MAX_ARGV==}`
       * `encode`: default `False`.
         If true, encode the argv sequences into bytes for accurate tallying.
         If `encode` is a Boolean,
@@ -463,15 +476,33 @@ def prep_argv(*argv, ssh_exe, remote=None):
 
 def print_argv(
     *argv,
+    indent0=None,
     indent="",
     subindent="  ",
     end="\n",
     file=None,
     fold=False,
     print=None,
+    as_str=str,
 ):
-  ''' Print an indented possibly folded command line.
+  r'''Print an indented possibly folded command line.
+
+      Parameters:
+      * `argv`: the arguments to print
+      * `indent0`: optional indent for the first argument
+      * `indent`: optional per line indent if `fold` is true
+      * `subindent`: optional additional indent for the second and
+        following lines, default `"  "`
+      * `end`: optional line ending, default `"\n"`
+      * `file`: optional output file, default `sys.stdout`
+      * `fold`: optional fold mode, default `False`;
+        if true then arguments are laid out over multiple lines
+      * `print`: optional `print` callable, default `builtins.print`
+      * `as_str`: optional callable to convert arguments to strings, default `str`;
+        this can be `None` to avoid conversion
   '''
+  if indent0 is None:
+    indent0 = indent
   if file is None:
     file = sys.stdout
   if print is None:
@@ -479,8 +510,10 @@ def print_argv(
   pr_argv = []
   was_opt = False
   for i, arg in enumerate(argv):
+    if as_str is not None:
+      arg = as_str(arg)
     if i == 0:
-      pr_argv.append(indent)
+      pr_argv.append(indent0)
       was_opt = False
     elif len(arg) >= 2 and arg.startswith('-'):
       if fold:

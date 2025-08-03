@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# Fix various things. - Cameron Simpson <cs@cskk.id.au> 10jan2025
+#
+
+set -ue
+
+: ${TMPDIR:='/tmp'}
+
+ruff_fixes=${RUFF_FIXES:-'F401'}
+ruff_pyver=${RUFF_PYTHON_VERSION:-'py38'}
+
+cmd=$0
+usage="Usage: $( basename "$cmd" ) [-n] [-q] [-x] [--] things...
+  Fix things - apply lint autofixes to files.
+  -n    No action. Recite actions.
+  -q    Quiet. RUn actions without tracing.
+  -x    Trace execution of actions.
+  Known things:
+    *.py  ruff check --fix --select $ruff_fixes"
+
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -x) trace=set-x ;;
+    -n) trace=echo ;;
+    -q) trace= ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing things" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for thing
+do
+  case "$thing" in
+    *.py)
+        tmpf=$TMPDIR/.fix.$$.$( basename "$thing" )
+        cp -- "$thing" "$tmpf"
+        $trace ruff check \
+                 --fix --fix-only \
+                 "--target-version=$ruff_pyver" \
+                 --select "$ruff_fixes" \
+                 "$tmpf"
+        rewriteif -d "$thing" < "$tmpf"
+        rm -f "$tmpf"
+        ;;
+    *)  echo "$cmd: how to fix? $thing" >&2
+        exit 1
+        ;;
+  esac
+done

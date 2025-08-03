@@ -9,14 +9,8 @@ Convenience facilities related to Python functions.
 '''
 
 from functools import partial
-from pprint import pformat
 
-from cs.deco import decorator
-from cs.py.stack import caller
-from cs.py3 import raise_from
-from cs.x import X
-
-__version__ = '20240630-post'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -25,12 +19,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [
-        'cs.deco',
-        'cs.py.stack',
-        'cs.py3',
-        'cs.x',
-    ],
+    'python_requires':
+    '>=3',
 }
 
 def funcname(func):
@@ -80,9 +70,9 @@ def func_a_kw_fmt(func, *a, **kw):
   av = [
       func if isinstance(func, str) else getattr(func, '__name__', str(func))
   ]
-  afv = ['%r'] * len(a)
+  afv = ['%.40r'] * len(a)
   av.extend(a)
-  afv.extend(['%s=%r'] * len(kw))
+  afv.extend(['%s=%.40r'] * len(kw))
   for kv in kw.items():
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
@@ -146,7 +136,7 @@ def prop(func):
     try:
       return func(*a, **kw)
     except AttributeError as e:
-      raise_from(RuntimeError("inner function %s raised %s" % (func, e)), e)
+      raise RuntimeError("inner function %s raised %s" % (func, e)) from e
 
   prop_wrapper.__name__ = "@prop(%s)" % (funcname(func),)
   return property(prop_wrapper)
@@ -187,7 +177,7 @@ def derived_property(
             setattr(self, property_name, p)
             setattr(self, property_revision_name, o_revision)
     except AttributeError as e:
-      raise_from(RuntimeError("AttributeError: %s" % (e,)), e)
+      raise RuntimeError("AttributeError: %s" % (e,)) from e
     return p
 
   return property(property_value)

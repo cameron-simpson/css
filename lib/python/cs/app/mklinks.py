@@ -12,32 +12,37 @@ mklinks: tool for finding and hardlinking identical files
 
 Mklinks walks supplied paths looking for files with the same content,
 based on a cryptographic checksum of their content. It hardlinks
-all such files found, keeping the newest version.
+all such files found, keeping the oldest version.
 
 Unlike some rather naive tools out there, mklinks only compares
-files with other files of the same size, and is hardlink aware - a
-partially hardlinked tree is processed efficiently and correctly.
+files with other files of the same size, and is hardlink aware;
+a partially hardlinked tree is processed efficiently and correctly.
 '''
 
 from collections import defaultdict
+from dataclasses import dataclass, field
 from functools import cached_property
 from getopt import GetoptError
 import os
-from os.path import dirname, isdir, join as joinpath, relpath
+from os.path import isdir, join as joinpath, relpath
 from stat import S_ISREG
 import sys
-from tempfile import NamedTemporaryFile
 
-from cs.cmdutils import BaseCommand
-from cs.fileutils import common_path_prefix, shortpath
-from cs.hashindex import file_checksum
-from cs.logutils import status, warning, error
+from typeguard import typechecked
+
+from cs.cmdutils import BaseCommand, popopts, uses_cmd_options
+from cs.deco import Promotable
+from cs.fileutils import shortpath
+from cs.fs import HasFSPath
+from cs.hashindex import HASHNAME_DEFAULT, file_checksum, merge
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.progress import progressbar
-from cs.pfx import Pfx, pfx_method
 from cs.resources import RunState, uses_runstate
-from cs.upd import UpdProxy, print, run_task  # pylint: disable=redefined-builtin
+from cs.seq import first
+from cs.upd import run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20221228-post'
+__version__ = '20250530-post'
 
 DISTINFO = {
     'description':
@@ -49,12 +54,15 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils>=20210404',
+        'cs.deco',
         'cs.fileutils>=20200914',
+        'cs.fs',
         'cs.hashindex',
         'cs.logutils',
         'cs.pfx',
         'cs.progress>=20200718.3',
-        'cs.units',
+        'cs.resources',
+        'cs.seq',
         'cs.upd>=20200914',
     ],
     'entry_points': {
@@ -65,171 +73,165 @@ DISTINFO = {
 }
 
 def main(argv=None):
-  ''' Main command line programme.
+  ''' CLI for `mklinks`.
   '''
-  return MKLinksCmd(argv).run()
+  return MKLinksCommand(argv).run()
 
-class MKLinksCmd(BaseCommand):
-  ''' Main programme command line class.
+class MKLinksCommand(BaseCommand):
+  ''' Hard link files with identical contents.
   '''
 
-  USAGE_FORMAT = r'''Usage: {cmd} paths...
-          Hard link files with identical contents.
-          -n    No action. Report proposed actions.'''
-
-  GETOPT_SPEC = 'n'
-
-  def apply_opt(self, opt, val):
-    ''' Apply command line option.
+  @dataclass
+  class Options(BaseCommand.Options):
+    ''' Options for `MrgCommand`.
     '''
-    if opt == '-n':
-      self.options.dry_run = True
-    else:
-      raise NotImplementedError("unhandled option")
+    hashname: str = HASHNAME_DEFAULT
 
-  @uses_runstate
-  def main(self, argv, *, runstate: RunState):
-    ''' Usage: mklinks [-n] paths...
+  @popopts
+  def main(self, argv):
+    ''' Usage: {cmd} paths...
           Hard link files with identical contents.
-          -n    No action. Report proposed actions.
     '''
     if not argv:
       raise GetoptError("missing paths")
     options = self.options
+    hashname = options.hashname
+    runstate = options.runstate
+    xit = 0
     linker = Linker()
     with run_task("scan") as step:
       # scan the supplied paths
       for path in argv:
         runstate.raiseif()
-        if runstate.cancelled:
-          return 1
-        step("scan " + path + ' ...')
-        with Pfx(path):
-          linker.scan(path)
+        with step.extend_prefix(f' {path}'):
+          with Pfx(path):
+            try:
+              linker.scan(path)
+            except OSError as e:
+              warning("scan fails: %s", e)
+              xit = 1
     with run_task("merge"):
       linker.merge(dry_run=options.dry_run)
-    return 0
+    return xit
 
-class FileInfo(object):
+@dataclass
+class Inode(HasFSPath, Promotable):
   ''' Information about a particular inode.
   '''
+  dev: int
+  ino: int
+  mtime: float
+  size: int
+  hashname: str = HASHNAME_DEFAULT
+  paths: set = field(default_factory=set)
 
-  # pylint: disable=too-many-arguments
-  def __init__(self, dev, ino, size, mtime, paths=()):
-    self.dev = dev
-    self.ino = ino
-    self.size = size
-    self.mtime = mtime
-    self.paths = set(paths)
-    self._checksum = None
+  def __eq__(self, other):
+    return self.key == other.key
 
-  def __str__(self):
-    return (
-        "%d:%d:size=%d:mtime=%d" % (self.dev, self.ino, self.size, self.mtime)
-    )
-
-  def __repr__(self):
-    return "FileInfo(%d,%d,%d,%d,paths=%r)" \
-           % (self.dev, self.ino, self.size, self.mtime, self.paths)
-
-  @staticmethod
-  def stat_key(S):
-    ''' Compute the key `(dev,ino)` from the stat object `S`.
-    '''
-    return S.st_dev, S.st_ino
-
-  @property
-  def key(self):
-    ''' The key for this file: `(dev,ino)`.
-    '''
-    return self.dev, self.ino
-
-  @property
-  def path(self):
-    ''' The primary path for this file, or `None` if we have no paths.
-    '''
-    return sorted(self.paths)[0] if self.paths else None
+  def __hash__(self):
+    return hash(self.key)
 
   @cached_property
   def checksum(self):
-    ''' Checksum the file contents, used as a proxy for comparing the actual content.
+    ''' The content checksum.
     '''
-    return file_checksum(self.path)
+    return file_checksum(self.fspath)
+
+  @cached_property
+  def fspath(self):
+    ''' The first filesystem path in `.paths`, somewhat arbitrary.
+    '''
+    return first(self.paths)
+
+  @property
+  def key(self):
+    ''' A `(ino,dev)` 2-tuple.
+    '''
+    return self.ino, self.dev
+
+  @classmethod
+  def stat_key(cls, fspath: str):
+    ''' Compute the `(ino,dev)` 2-tuple from `os.stat(fspath)`.
+    '''
+    S = os.lstat(fspath)
+    if not S_ISREG(S.st_mode):
+      raise ValueError(
+          f'{cls.__name__}.stat_key({fspath=}): not a regular file'
+      )
+    return S.st_ino, S.st_dev
+
+  def samefs(self, other):
+    ''' Test whether 2 `Inode`'s are on the same filesystem (same `.dev` values).
+    '''
+    return self.dev == other.dev
+
+  @classmethod
+  @uses_cmd_options(hashname=HASHNAME_DEFAULT)
+  def from_str(cls, fspath: str, *, hashname: str):
+    ''' Promote a filesystem path to an `Inode`.
+    '''
+    S = os.lstat(fspath)
+    if not S_ISREG(S.st_mode):
+      raise ValueError(
+          f'{cls.__name__}.from_str({fspath=}): not a regular file'
+      )
+    return cls(
+        dev=S.st_dev,
+        ino=S.st_ino,
+        mtime=S.st_mtime,
+        size=S.st_size,
+        hashname=hashname,
+        paths={fspath},
+    )
 
   def same_dev(self, other):
-    ''' Test whether two FileInfos are on the same filesystem.
+    ''' Test whether two `Inode`s are on the same filesystem.
     '''
     return self.dev == other.dev
 
   def same_file(self, other):
-    ''' Test whether two FileInfos refer to the same file.
+    ''' Test whether two `Inode`s refer to the same file.
     '''
     return self.key == other.key  # pylint: disable=comparison-with-callable
 
   @uses_runstate
-  def assimilate(self, other, *, dry_run=False, runstate: RunState):
+  @typechecked
+  def assimilate(self, other: "Inode", *, dry_run=False, runstate: RunState):
     ''' Link our primary path to all the paths from `other`. Return success.
     '''
+    if self is other or self == other:
+      raise ValueError(f'{self=} refers to the same inode as {other=}')
+    if self.hashname != other.hashname:
+      raise ValueError(f'{self.hashname=} != {other.hashname=}')
     ok = True
-    path = self.path
     opaths = other.paths
-    pathprefix = common_path_prefix(path, *opaths)
-    vpathprefix = shortpath(pathprefix)
-    pathsuffix = path[len(pathprefix):]  # pylint: disable=unsubscriptable-object
-    with UpdProxy() as proxy:
-      proxy(
-          "%s%s <= %r", vpathprefix, pathsuffix,
-          list(map(lambda opath: opath[len(pathprefix):], sorted(opaths)))
-      )
-      with Pfx(path):
-        if self is other or self.same_file(other):
-          # already assimilated
-          return ok
-        assert self.same_dev(other)
-        for opath in sorted(opaths):
-          if runstate.cancelled:
-            break
-          with Pfx(opath):
-            if opath in self.paths:
-              warning("already assimilated")
-              continue
-            if vpathprefix:
-              print(
-                  "%s: %s => %s" %
-                  (vpathprefix, opath[len(pathprefix):], pathsuffix)
-              )
-            else:
-              print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
-            if dry_run:
-              continue
-            odir = dirname(opath)
-            with NamedTemporaryFile(dir=odir) as tfp:
-              with Pfx("unlink(%s)", tfp.name):
-                os.unlink(tfp.name)
-              with Pfx("rename(%s, %s)", opath, tfp.name):
-                os.rename(opath, tfp.name)
-              with Pfx("link(%s, %s)", path, opath):
-                try:
-                  os.link(path, opath)
-                except OSError as e:
-                  error("%s", e)
-                  ok = False
-                  # try to restore the previous file
-                  with Pfx("restore: link(%r, %r)", tfp.name, opath):
-                    os.link(tfp.name, opath)
-                else:
-                  self.paths.add(opath)
-                  opaths.remove(opath)
+    with run_task("assimilate %d:%d -> %d:%d %s" % (
+        other.dev,
+        other.ino,
+        self.dev,
+        self.ino,
+        self.shortpath,
+    )) as proxy:
+      for ofspath in sorted(other.paths):
+        runstate.raiseif()
+        proxy.text = shortpath(ofspath)
+        if merge(ofspath, self.fspath, doit=not dry_run,
+                 hashname=self.hashname):
+          other.paths.remove(ofspath)
     return ok
 
+@dataclass
 class Linker:
   ''' The class which links files with identical content.
   '''
+  # group the Inodes by their sizes
+  inodes_by_size: dict = field(default_factory=lambda: defaultdict(set))
+  # map Inode stat keys to Inodes
+  inodes_by_key: dict = field(default_factory=dict)
+  min_size: int = 512
 
-  def __init__(self, min_size=512):
-    self.sizemap = defaultdict(dict)  # file_size => FileInfo.key => FileInfo
-    self.keymap = {}  # FileInfo.key => FileInfo
-    self.min_size = min_size
+  def __repr__(self):
+    return f'<{self.__class__.__name__}>'
 
   @pfx_method
   @uses_runstate
@@ -240,74 +242,64 @@ class Linker:
       if isdir(path):
         for dirpath, dirnames, filenames in os.walk(path):
           runstate.raiseif()
-          proxy("sweep " + relpath(dirpath, path))
+          proxy(f'sweep {relpath(dirpath, path)}')
           for filename in progressbar(
               sorted(filenames),
               label=relpath(dirpath, path),
           ):
             runstate.raiseif()
             filepath = joinpath(dirpath, filename)
-            self.addpath(filepath)
+            try:
+              self.addpath(filepath)
+            except ValueError as e:
+              warning("%s: %s", filepath, e)
           dirnames[:] = sorted(dirnames)
       else:
         self.addpath(path)
 
+  @pfx
   def addpath(self, path):
     ''' Add a new path to the data structures.
     '''
-    with Pfx("addpath(%r)", path):
-      with Pfx("lstat"):
-        S = os.lstat(path)
-      if not S_ISREG(S.st_mode):
-        return
-      if S.st_size < self.min_size:
-        return
-      key = FileInfo.stat_key(S)
-      FI = self.keymap.get(key)
-      if FI:
-        assert FI.key == key
-        FI.paths.add(path)
-      else:
-        FI = FileInfo(S.st_dev, S.st_ino, S.st_size, S.st_mtime, (path,))
-        assert FI.key == key  # pylint: disable=comparison-with-callable
-        self.keymap[key] = FI
-        assert key not in self.sizemap[S.st_size]
-        self.sizemap[S.st_size][key] = FI
+    key = Inode.stat_key(path)
+    try:
+      inode = self.inodes_by_key[key]
+    except KeyError:
+      inode = self.inodes_by_key[key] = Inode.from_str(path)
+      assert inode.key == key, f'{inode.key=} != {Inode.stat_key(path)=}'
+      self.inodes_by_size[inode.size].add(inode)
 
   @pfx_method
   @uses_runstate
   def merge(self, *, dry_run=False, runstate: RunState):
     ''' Merge files with equivalent content.
     '''
-    # process FileInfo groups by size, largest to smallest
-    with run_task('merge ... ') as proxy:
-      for _, FImap in sorted(self.sizemap.items(), reverse=True):
+    # process Inode groups by size, largest to smallest
+    with run_task('merge') as proxy:
+      for size, inodes in progressbar(
+          sorted(self.inodes_by_size.items(), reverse=True),
+          'merge by size',
+      ):
+        if len(inodes) < 2:
+          continue
+        if size < self.min_size:
+          continue
         runstate.raiseif()
-        # order FileInfos by mtime (newest first) and then path
-        FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
-        size = FIs[0].size
-        with proxy.extend_prefix(f'size {size} '):
-          for i, FI in enumerate(progressbar(FIs, f'size {size}')):
+        with proxy.extend_prefix(f' size {size}'):
+          inodes_by_hashcode = defaultdict(list)
+          for inode in inodes:
             runstate.raiseif()
-            # skip FileInfos with no paths
-            # this happens when a FileInfo has been assimilated
-            if not FI.paths:
-              ##warning("SKIP, no paths")
+            inodes_by_hashcode[inode.checksum].append(inode)
+          for same_inodes in inodes_by_hashcode.values():
+            if len(same_inodes) < 2:
               continue
-            for FI2 in FIs[i + 1:]:
-              runstate.raiseif()
-              status(FI2.path)
-              assert FI.size == FI2.size
-              assert FI.mtime >= FI2.mtime
-              assert not FI.same_file(FI2)
-              if not FI.same_dev(FI2):
-                # different filesystems, cannot link
-                continue
-              if FI.checksum != FI2.checksum:
-                # different content, skip
-                continue
-              # FI2 is the younger, keep it
-              FI.assimilate(FI2, dry_run=dry_run)
+            # order by mtime (newest first) and then path
+            inode0, *oinodes = sorted(
+                same_inodes,
+                key=lambda inode: (-inode.mtime, inode.fspath),
+            )
+            for oinode in oinodes:
+              inode0.assimilate(oinode, dry_run=dry_run)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

@@ -18,6 +18,7 @@ from typing import Mapping, Set
 
 from icontract import require
 import requests
+from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
 
 from cs.deco import promote
 from cs.fstags import FSTags, uses_fstags
@@ -26,6 +27,7 @@ from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.upd import uses_upd
+from cs.urlutils import URL
 
 __version__ = '20241007-post'
 
@@ -125,7 +127,7 @@ class HTTPServiceAPI(ServiceAPI):
 
   def __init__(self, api_hostname=None, *, default_headers=None, **kw):
     if api_hostname is None:
-      api_hostname = self.API_HOSTNAME
+      api_hostname = type(self).API_HOSTNAME
     else:
       self.API_HOSTNAME = api_hostname
       self.API_BASE = f'https://{api_hostname}/'
@@ -142,6 +144,9 @@ class HTTPServiceAPI(ServiceAPI):
     self.cookies = session.cookies
     self.default_headers = default_headers
 
+  def __div__(self, suburl) -> URL:
+    return self.suburl(suburl)
+
   @uses_upd
   @uses_runstate
   @require(lambda suburl: not suburl.startswith('/'))
@@ -157,7 +162,7 @@ class HTTPServiceAPI(ServiceAPI):
       runstate: RunState,
       upd,
       **rqkw,
-  ):
+  ) -> URL:
     ''' Request `suburl` from the service, by default using a `GET`.
         The `suburl` must be a URL subpath not commencing with `'/'`.
 
@@ -206,7 +211,7 @@ class HTTPServiceAPI(ServiceAPI):
       rsp.encoding = _response_encoding
     try:
       return rsp.json()
-    except JSONDecodeError as e:
+    except (JSONDecodeError, RequestsJSONDecodeError) as e:
       warning("response is not JSON: %s\n%r", e, rsp)
       raise
 

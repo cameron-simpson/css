@@ -28,13 +28,13 @@ from cs.context import (
 )
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.gimmicks import error, warning
+from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20241005-post'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'description':
@@ -48,7 +48,7 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.excutils',
-        'cs.gimmicks',
+        'cs.logutils',
         'cs.pfx',
         'cs.py.func',
         'cs.py.stack',
@@ -113,7 +113,7 @@ class HasThreadState(ContextManagerMixin):
 
       *NOTE*: `HasThreadState.Thread` is a _class_ method whose default
       is to push state for all active `HasThreadState` subclasses.
-      Contrast with `HasThreadState.bg` which is an _instance_method
+      Contrast with `HasThreadState.bg` which is an _instance_ method
       whose default is to push state for just that instance.
       The top level `cs.threads.bg` function calls `HasThreadState.Thread`
       to obtain its `Thread`.
@@ -204,7 +204,7 @@ class HasThreadState(ContextManagerMixin):
       else:
         # just the current instance of the calling class
         currency = {
-            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR, 'current'), None)
+            cls: getattr(getattr(cls, cls.THREAD_STATE_ATTR), 'current', None)
         }
     return currency
 
@@ -231,29 +231,18 @@ class HasThreadState(ContextManagerMixin):
     '''
     if name is None:
       name = funcname(target)
-    if enter_objects is True:
-      # the bool True means enter all the state objects, marked as for-with
-      enter_tuples = (
-          (
-              getattr(
-                  getattr(htscls, htscls.THREAD_STATE_ATTR), 'current', None
-              ), True
-          ) for htscls in HasThreadState._HasThreadState_classes
+    if enter_objects is None:
+      # enter no objects
+      enter_tuples = ()
+    elif isinstance(enter_objects, bool):
+      # all the current objects, marked as for-with or not-for-with
+      for_with = enter_objects
+      enter_tuples = tuple(
+          (hts, for_with) for hts in cls.get_thread_states(True).values()
       )
     else:
-      enter_tuples = (
-          # all the current objects, marked as not-for-with
-          [
-              (
-                  getattr(
-                      getattr(htscls, htscls.THREAD_STATE_ATTR), 'current',
-                      None
-                  ), False
-              ) for htscls in HasThreadState._HasThreadState_classes
-          ] +
-          # the enter_objects, marked as for-with
-          [(obj, True) for obj in enter_objects or ()]
-      )
+      # just the specified objects, marked as for-with
+      enter_tuples = ((enter_obj, True) for enter_obj in enter_objects)
     enter_it = iter(enter_tuples)
 
     def with_enter_objects():
@@ -277,7 +266,7 @@ class HasThreadState(ContextManagerMixin):
               yield from with_enter_objects()
           else:
             thread_state = getattr(enter_obj, enter_obj.THREAD_STATE_ATTR)
-            with thread_state(curret=enter_obj):
+            with thread_state(current=enter_obj):
               yield from with_enter_objects()
 
     def target_wrapper(*a, **kw):
@@ -310,6 +299,7 @@ class HasThreadState(ContextManagerMixin):
     cls = type(self)
     if enter_objects is None:
       enter_objects = (self,)
+    # run the module level bg() function, below
     return bg(
         func,
         thread_factory=cls.Thread,
@@ -329,7 +319,7 @@ def bg(
     kwargs=None,
     thread_factory=None,
     pre_enter_objects=None,
-    **tfkw,
+    **thread_factory_kw,
 ):
   ''' Dispatch the callable `func` in its own `Thread`;
       return the `Thread`.
@@ -347,12 +337,13 @@ def bg(
       * `pre_enter_objects`: an optional iterable of objects which
         should be entered using `with`
 
-      If `pre_enter_objects` is supplied, these objects will be
-      entered before the `Thread` is started and exited when the
+      If `pre_enter_objects` is supplied, these context manager
+      objects will be entered using `with` via the `closeall()`
+      function before the `Thread` is started and exited when the
       `Thread` target function ends.
       If the `Thread` is _not_ started (`no_start=True`, very
-      unusual) then it will be the caller's responsibility to manage
-      to entered objects.
+      unusual) then the objects will still be entered and it will
+      be the caller's responsibility to manage the entered objects.
   '''
   if name is None:
     name = funcname(func)
@@ -380,7 +371,7 @@ def bg(
   T = thread_factory(
       name=thread_prefix,
       target=thread_body,
-      **tfkw,
+      **thread_factory_kw,
   )
   if not no_logexc:
     func = logexc(func)
@@ -424,7 +415,6 @@ class AdjustableSemaphore(object):
     return "%s[%d]" % (self.__name, self.limit0)
 
   def __enter__(self):
-    from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
     with LogTime("%s(%d).__enter__: acquire", self.__name, self.__value):
       self.acquire()
 
@@ -473,7 +463,6 @@ class AdjustableSemaphore(object):
           self.__sem.release()
           delta -= 1
       else:
-        from cs.logutils import LogTime  # pylint: disable=import-outside-toplevel
         while delta < 0:
           with LogTime("AdjustableSemaphore(%s): acquire excess capacity",
                        self.__name):
@@ -811,7 +800,7 @@ class NRLock:
     lock = self._lock
     if lock.locked() and current_thread() is self._lock_thread:
       raise DeadlockError(
-          f'lock already held by current Thread:{self._locked_by}'
+          f'lock {self._name!r} already held by current Thread:{self._locked_by}'
       )
     acquired = lock.acquire(*a, **kw)
     if acquired:

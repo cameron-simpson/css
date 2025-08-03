@@ -1,5 +1,18 @@
 #!/bin/sh
 
+set -ue
+
+: ${VQPATH:="$HOME/dl/v:$HOME/v:$HOME/vv:$HOME/media/video"}
+
+vqpaths=
+for d in $( echo "$VQPATH" | tr : ' ' )
+do  [ -d "$d" ] && vqpaths="$vqpaths $d/."
+done
+[ -n "$vqpaths" ] || {
+  echo "$0: no directories found to search" >&2
+  exit 1
+}
+
 [ $# -gt 0 ] || {
   echo "$0: missing words" >&2
   echo "Usage: $0 words..." >&2
@@ -9,7 +22,7 @@
 word1=$1; shift
 
 if [ $# = 0 ]
-then  find "$HOME/dl/playon/" "$HOME/v/" "$HOME/vv/" -iname "*${word1}*"
-else  find "$HOME/dl/playon/" "$HOME/v/" "$HOME/vv/" -iname "*${word1}*" | grepall "$word1" "$@"
+then  find $vqpaths -iname "*${word1}*"
+else  find $vqpaths -iname "*${word1}*" | grepall "$word1" "$@"
 fi \
 | sort

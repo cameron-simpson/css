@@ -1,0 +1,1 @@
+lib/python/cs/pfx.py: cs.pfx: Pfx.prefixify: no longer prefixify internal newlines, makes the message unreadable

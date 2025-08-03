@@ -3,9 +3,9 @@
 ''' Trite hacks for use with typing.
 '''
 
-from typing import TypeVar
+from typing import get_args, get_origin, TypeVar, Union
 
-__version__ = '20230331-post'
+__version__ = '20250503-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -15,6 +15,23 @@ DISTINFO = {
     ],
     'install_requires': [],
 }
+
+def is_optional(annotation):
+  ''' Check if `annotation` is an `Optional[type]`.
+      Return `type` if so, `None` otherwise.
+  '''
+  origin = get_origin(annotation)
+  if origin is not Union:
+    return None
+  try:
+    t, none = get_args(annotation)
+  except ValueError:
+    # an Optional is [type,None]
+    return None
+  if none is not None and none is not type(None):
+    # [type1,type2] is not an Optional
+    return None
+  return t
 
 def subtype(t, name=None):
   ''' Construct a `TypeVar` for subtypes of the type `t`.
