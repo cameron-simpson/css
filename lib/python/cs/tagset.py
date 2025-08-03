@@ -3041,6 +3041,15 @@ class HasTags(TagSetTyping, FormatableMixin):
     kwargs = dict(self.tags)
     for kw, method in self.get_format_attributes().items():
       kwargs[kw] = method
+    # TODO: grab type_* from TagSetTyping.__dict__.keys() ?
+    for type_attr in (
+        'type_key',
+        'type_name',
+        'type_subname',
+        'type_zone',
+        'type_zone_key',
+    ):
+      kwargs[type_attr] = getattr(self, type_attr)
     return kwargs
 
 class UsesTagSets:
