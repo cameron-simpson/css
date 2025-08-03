@@ -630,6 +630,13 @@ class SiteMap(UsesTagSets, Promotable):
         f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
     )
 
+  @cached_property
+  def url_root(self) -> str:
+    ''' The root URL for this site, derived from `self.URL_DOMAIN`.
+        This includes the trailing slash, eg `https://example.com/`
+    '''
+    return f'https://{self.URL_DOMAIN}/'
+
   @staticmethod
   @decorator
   @typechecked
