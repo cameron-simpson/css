@@ -27,10 +27,10 @@ do
   then
     if [ $# = 0 ]
     then  find "$vqpath" -iname "*${word1}*"
-    else  find "$vqpath" -iname "*${word1}*" | grepall "$word1" "$@"
+    else  find "$vqpath" -iname "*${word1}*" | grepall -i "$word1" "$@"
     fi
   else
-    grepall "$word1" ${1+"$@"} < "$vqpath"
+    grepall -i "$word1" ${1+"$@"} < "$vqpath"
   fi
 done \
 | sort
