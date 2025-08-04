@@ -1395,8 +1395,9 @@ def BinaryStruct(
   struct_class.field_names = field_names
   return struct_class
 
-BinaryMultiStruct = OBSOLETE(BinaryStruct)
-BinarySingleStruct = OBSOLETE(BinaryStruct)
+# the old compatibility names
+BinaryMultiStruct = OBSOLETE(BinaryStruct, "BinaryStruct")
+BinarySingleStruct = OBSOLETE(BinaryStruct, "BinaryStruct")
 
 # various common values
 UInt8 = BinaryStruct('UInt8', 'B')
