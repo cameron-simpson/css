@@ -1,3 +1,4 @@
+redo grepall in python, the sed is getting tricky
 dl FOO: puts a literal +when into the log entry in dlog-quick, likely elsewhere
 vq: scan a file eg a hashindex?
 hasindex comm: accept a file containing a hash index, like we accept - ?
