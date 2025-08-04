@@ -1,3 +1,4 @@
+vq: scan a file eg a hashindex?
 hasindex comm: accept a file containing a hash index, like we accept - ?
 icontract and icontract-lint's build process uses setup.py, needs updating
 cs.cmdutils: BaseCommand.poppreargv to replace apply_preargv, saving returning the argv which we are modifying in place anyway
