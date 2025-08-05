@@ -1,3 +1,4 @@
+histbackup: --reflink to be deprecaded in favour of --link-mode=default,reflink,clonefile, use reflink on linux, clonefile/cp -c on macos
 redo grepall in python, the sed is getting tricky
 dl FOO: puts a literal +when into the log entry in dlog-quick, likely elsewhere
 vq: scan a file eg a hashindex?
