@@ -45,7 +45,7 @@ from cs.csvutils import csv_import
 from cs.cache import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
-from cs.lex import s
+from cs.lex import printt, s
 from cs.logutils import warning, error
 from cs.mplutils import axes, remove_decorations, print_figure, save_figure, FigureSize
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
@@ -999,7 +999,29 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     options = self.options
     spd = options.spd
     print(spd)
-    pprint(spd.info_dict())
+    infod = spd.info_dict()
+    table = []
+    for field, infof in sorted(infod.items()):
+      if field == 'timeseries':
+        for tsname, tsinfo in sorted(infof.items()):
+          for tsfield, tsfvalue in sorted(tsinfo.items()):
+            tscol = f'{field} {tsname} {tsfield}'
+            if tsfield == 'keys':
+              tsfvalue = "\n".join(tsfvalue)
+            elif tsfield == 'subseries':
+              for ssfield, ssvalue in sorted(tsfvalue.items()):
+                for ssvi, (ssvf, ssvv) in enumerate(sorted(ssvalue.items())):
+                  table.append(
+                      [
+                          tscol if ssvi == 0 else '',
+                          ssfield if ssvi == 0 else '', ssvf, ssvv
+                      ]
+                  )
+              continue
+            table.append([tscol, tsfvalue])
+      else:
+        table.append([field, infof])
+    printt(*table)
 
   # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
