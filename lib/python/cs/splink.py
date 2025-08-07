@@ -690,15 +690,14 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'info'
 
   DEFAULT_FETCH_SOURCE_ENVVAR = 'SPLINK_FETCH_SOURCE'
+  DEFAULT_SPDPATH = SPLinkData.FSPATH_DEFAULT
+  DEFAULT_SPDPATH_ENVVAR = SPLinkData.FSPATH_ENVVAR
 
   ALL_DATASETS = SPLinkData.EVENTS_DATASETS + SPLinkData.TIMESERIES_DATASETS
 
   USAGE_KEYWORDS = {
       'ALL_DATASETS': ' '.join(sorted(ALL_DATASETS)),
       'TIMESERIES_DATASETS': ' '.join(sorted(SPLinkData.TIMESERIES_DATASETS)),
-      'DEFAULT_SPDPATH': SPLinkData.FSPATH_DEFAULT,
-      'DEFAULT_SPDPATH_ENVVAR': SPLinkData.FSPATH_ENVVAR,
-      'DEFAULT_FETCH_SOURCE_ENVVAR': DEFAULT_FETCH_SOURCE_ENVVAR,
   }
 
   @dataclass
@@ -758,17 +757,13 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     with super().run_context():
       options = self.options
-      if not options.fetch_source:
-        options.fetch_source = os.environ.get(self.DEFAULT_FETCH_SOURCE_ENVVAR)
-      if not options.spdpath:
-        options.spdpath = os.environ.get(
-            self.DEFAULT_SPDPATH_ENVVAR, self.DEFAULT_SPDPATH
-        )
-      options.tz = tzlocal()
       with fstags:
         with stackattrs(
             options,
-            fetch_source=fetch_source,
+            fetch_source=(options.fetch_source
+                          or os.environ.get(self.DEFAULT_FETCH_SOURCE_ENVVAR)),
+            spdpath=(options.spdpath or os.environ.get(
+                self.DEFAULT_SPDPATH_ENVVAR, self.DEFAULT_SPDPATH)),
             tz=tzlocal(),
         ):
           with options.spd:
