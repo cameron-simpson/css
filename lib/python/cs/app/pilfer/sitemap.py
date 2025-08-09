@@ -836,8 +836,6 @@ class SiteMap(UsesTagSets, Promotable):
           __=f'{url.hostname}/{url.cleanrpath}',
           # rq method eg GET
           method=flowstate.method,
-          # eg "tvdb" for thetvdb.com, for use with sqltags
-          tags_domain=cls.tags_domain,
       )
       # eg "tvdb" for thetvdb.com, for use with sqltags
       try:
