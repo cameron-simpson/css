@@ -348,7 +348,7 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         This calls `HasThreadState.default()` first,
         but falls back to constructing the default `Store` instance
         from `Store.get_default_spec` and `Store.get_default_cache_spec`.
-        As such, the returns `Store` is not necessarily "open"
+        As such, the returned `Store` is not necessarily "open"
         and users should open it for use. Example:
 
             S = Store.default()
