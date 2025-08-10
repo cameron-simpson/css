@@ -399,6 +399,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     except AttributeError:
       self.GET()
       return self.iterable_content
+    # TODO: can we accomodate a flow whose content is streaming in?
     return [flow.response.content]
 
   @cached_property
@@ -523,7 +524,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
 uses_flowstate = default_params(flowstate=FlowState.default)
 
 class SiteEntity(HasTags):
-  ''' A base class for entities associates with a `SiteMap`.
+  ''' A base class for entities associated with a `SiteMap`.
 
       This provides the following additional facilities:
 
@@ -647,7 +648,6 @@ class SiteMap(UsesTagSets, Promotable):
   URL_KEY_PATTERNS = ()
 
   @uses_pilfer
-  @trace
   def __post_init__(self, *, P: "Pilfer"):
     ''' Initialise `.pilfer` if omitted`, and then `.tagsets` from `self.pilfer`.
     '''
