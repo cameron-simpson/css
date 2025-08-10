@@ -393,6 +393,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       bss = progressbar(
           bss,
           progress_name,
+          itemlenfunc=len,
           total=content_length(rsp_headers),
           report_print=True,
       )
