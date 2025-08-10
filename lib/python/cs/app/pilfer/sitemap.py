@@ -579,6 +579,14 @@ class SiteEntity(HasTags):
       url = f'{self.url_root}{url[1:]}'
     return url
 
+  @promote
+  def grok_sitepage(self, flowstate: FlowState):
+    ''' Parse information from `flowstate` and apply to `self`.
+
+        We expect subclasses to provide site specific implementations.
+    '''
+    warning("%s.grok_sitepage: not grokking anything from %s", self, flowstate)
+
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
   ''' A pattern match result:
@@ -678,6 +686,39 @@ class SiteMap(UsesTagSets, Promotable):
         This includes the trailing slash, eg `https://example.com/`
     '''
     return self.urlto('')
+
+  @classmethod
+  @uses_pilfer
+  def update_entities(
+      cls, entities: Iterable["SiteEntity"], *, P: "Pilfer", force=False
+  ):
+    ''' A generator yielding updated `SiteEntity` instances.
+    '''
+
+    def entity_sitepages(entities: Iterable[SiteEntity]):
+      ''' A generator yielding `(entity,sitepage)` 2-tuples
+          for entities with a `.sitepage` property.
+          Entities with a `"sitepage.last_update_unixtime"` tag
+          are skipped unless `force` is true.
+      '''
+      for entity in entities:
+        if not force and "sitepage.last_update_unixtime" in entity.tags:
+          continue
+        try:
+          sitepage = entity.sitepage
+        except AttributeError as e:
+          warning("no .sitepage for %s: %s", entity, e)
+        else:
+          yield entity, sitepage
+
+    esps = ClonedIterator(entity_sitepages(entities))
+    for (entity, sitepage), flowstate in zip(
+        esps,
+        FlowState.iterable_flowstates(esp[1] for esp in esps),
+    ):
+      entity["sitepage.last_update_unixtime"] = time.time()
+      entity.grok_sitepage(flowstate)
+      yield entity
 
   @staticmethod
   @decorator
