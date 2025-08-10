@@ -603,7 +603,7 @@ class SiteMap(UsesTagSets, Promotable):
         See the `SiteMap.content_prefetch` method.
   '''
 
-  name: str = 'veve.me'
+  name: str
   pilfer: object = None
   tagsets: BaseTagSets = None
 
