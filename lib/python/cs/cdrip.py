@@ -54,7 +54,6 @@ from cs.sqltags import (
 from cs.tagset import HasTags, TagSet, UsesTagSets
 from cs.upd import run_task, print
 
-
 __version__ = '20201004-dev'
 
 musicbrainzngs.set_useragent(__name__, __version__, os.environ['EMAIL'])
@@ -1256,6 +1255,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     '''
     options = self.options
     mbdb = options.mbdb
+    sqltags = mbdb.sqltags
     all_fields = options.all_fields
     do_refresh = options.do_refresh
     if not argv:
