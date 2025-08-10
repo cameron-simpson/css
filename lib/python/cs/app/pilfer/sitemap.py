@@ -630,6 +630,11 @@ class SiteMap(UsesTagSets, Promotable):
         f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
     )
 
+  def urlto(self, suburl, domain=None, *, scheme='https'):
+    ''' Return the full URL for `suburl`.
+    '''
+    return f'{scheme}://{domain or self.URL_DOMAIN}/{suburl.lstrip("/")}'
+
   @cached_property
   def url_root(self) -> str:
     ''' The root URL for this site, derived from `self.URL_DOMAIN`.
