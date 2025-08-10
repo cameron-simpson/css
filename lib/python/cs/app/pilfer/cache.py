@@ -349,26 +349,28 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       bss: Iterable[bytes],
       cache_keys: str | Iterable[str],
       *,
-      mode: str = 'modified',
-      duration: Optional[float] = None,
-      progress_name=None,
-      runstate: Optional[RunState] = None,
       url: URL,
       rq_headers: Mapping[str, str],
       rsp_headers: Mapping[str, str],
+      mode: str = 'modified',
+      duration: Optional[float] = None,
+      progress_name: Optional[str] = None,
+      runstate: RunState = None,
   ) -> Mapping[str, dict]:
     ''' Cache `bss`, the decoded content of a URL, against `cache_keys`.
         Return a mapping of each cache key to the cached metadata.
 
-        Parameters:
+        Required parameters:
         * `bss`: an iterable of `bytes` containing the decoded content
         * `cache_keys`: an iterable of cache keys to associate with the response
         * `url`: the URL being cached
         * `rq_headers`: the request headers
         * `rsp_headers`: the response headers
-        * `mode`: optional cache mode, as for `ContentCache.cache_response`
-        * `duration`: optional duration for the cache entry
-        * `progress_name`: optional progress bar name
+
+        Optional parameters:
+        * `mode`: cache mode, default `'modified'`, as for `ContentCache.cache_response`
+        * `duration`: duration for the cache entry
+        * `progress_name`: progress bar name
     '''
     PR = lambda *a, **kw: print(
         "CACHE_STREAM", f'{url.hostname}/...{url.path[-16:]}', *a, **kw
