@@ -590,7 +590,11 @@ class PilferCommand(BaseCommand):
           bad_actions = True
     if bad_actions:
       raise GetoptError("invalid action specifications")
-    asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
+    asyncio.run(run_proxy(
+        listen_host,
+        listen_port,
+        addon=mitm_addon,
+    ))
 
   def cmd_patch(self, argv):
     ''' Usage: {cmd} URL
