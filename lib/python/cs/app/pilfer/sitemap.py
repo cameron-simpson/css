@@ -10,6 +10,7 @@ from fnmatch import fnmatch
 from functools import cached_property
 from itertools import zip_longest
 import re
+import time
 from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping
 
@@ -18,11 +19,10 @@ from cs.deco import decorator, default_params, fmtdoc, OBSOLETE, promote, Promot
 from cs.lex import cutprefix, cutsuffix, get_nonwhite, printt, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import content_encodings, content_type
-from cs.tagset import TagSet
 from cs.seq import ClonedIterator
-from cs.tagset import BaseTagSets, HasTags, UsesTagSets
+from cs.tagset import BaseTagSets, HasTags, TagSet, UsesTagSets
 from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
