@@ -221,6 +221,42 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
         response=flow.response,
     )
 
+  @classmethod
+  @uses_pilfer
+  @uses_runstate
+  def iterable_flowstates(
+      cls, flowstates: Iterable, P: "Pilfer", runstate: RunState
+  ):
+    ''' A generator yielding `FlowState` instances with a ready
+        `.iterable_content` attribute, promoted from `flowstates`.
+
+        This prepares the `FlowState`s concurrently, performing a
+        `GET` if necessary, yielding them in the supplied order.
+
+        Example:
+
+            # call self.grok_the_page on several page URLs
+            pages = [ f'url-of-page-n' for n in range(1,count) ]
+            for flowstate in FlowState.iterable_flowstates(*pages):
+                # we know this page can be parsed immediately
+                info = self.grok_the_page(flowstate)
+                ... apply info ...
+    '''
+
+    @promote
+    def get_iterable_fs(fs: "FlowState") -> "FlowState":
+      ''' Promote `fs` to a `FlowState` and ready its `.iterable_content` attribute.
+          This will do a `GET` if necessary.
+      '''
+      with P:
+        fs.iterable_content  # snure the content has been made available
+      return fs
+
+    with P:
+      for flowstate in P.later.map(get_iterable_fs, flowstates):
+        yield flowstate
+        runstate.raiseif()
+
   def clear(self, *attrs):
     ''' Delete the named attrubtes `attrs`.
         We do this to clear derived attributes when we set an
