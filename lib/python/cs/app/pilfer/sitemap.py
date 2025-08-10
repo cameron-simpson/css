@@ -640,7 +640,7 @@ class SiteMap(UsesTagSets, Promotable):
     ''' The root URL for this site, derived from `self.URL_DOMAIN`.
         This includes the trailing slash, eg `https://example.com/`
     '''
-    return f'https://{self.URL_DOMAIN}/'
+    return self.urlto('')
 
   @staticmethod
   @decorator
