@@ -1211,12 +1211,13 @@ class SiteMap(UsesTagSets, Promotable):
     return None
 
   @on
+  @uses_pilfer
   def grok_default(
       self,
       flowstate: FlowState,
       match: Mapping[str, Any] | None = None,
       *,
-      P: "Pilfer" = None,
+      P: "Pilfer",
   ) -> TagSet:
     ''' A default low level grok function
         which stores a page's meta tags and properties
@@ -1224,8 +1225,6 @@ class SiteMap(UsesTagSets, Promotable):
         Returns the entity, a `TagSet`.
     '''
     PR = lambda *a, **kw: print("grok_default", flowstate.url.short, *a, **kw)
-    if P is None:
-      P = default_Pilfer()
     te = None
     te_key = self.entity_key(flowstate, **(match or {}))
     if te_key is None:
