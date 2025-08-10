@@ -18,6 +18,7 @@ from os.path import (
     exists as existspath,
     expanduser,
     isabs as isabspath,
+    isdir as isdirpath,
     join as joinpath,
 )
 import shlex
