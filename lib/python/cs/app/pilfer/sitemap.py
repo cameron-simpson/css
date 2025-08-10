@@ -49,7 +49,8 @@ def uses_pilfer(func):
   def func_with_Pilfer(*a, P: "Pilfer" = None, **kw):
     if P is None:
       P = default_Pilfer()
-    return func(*a, P=P, **kw)
+    with P:
+      return func(*a, P=P, **kw)
 
   return func_with_Pilfer
 
