@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 import dbm.sqlite3
+from functools import partial
 import json
 import mimetypes
 import os
@@ -372,9 +373,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         * `duration`: duration for the cache entry
         * `progress_name`: progress bar name
     '''
-    PR = lambda *a, **kw: print(
-        "CACHE_STREAM", f'{url.hostname}/...{url.path[-16:]}', *a, **kw
-    )
+    PR = partial(print, "CACHE_STREAM", url.short)
     if isinstance(cache_keys, str):
       cache_keys = set((cache_keys,))
     else:
