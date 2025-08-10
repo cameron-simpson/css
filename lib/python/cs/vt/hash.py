@@ -204,7 +204,7 @@ class HashCode(
     return f'{self.hex()}.{self.hashname}'
 
   @classmethod
-  def from_filename(cls, filename):
+  def from_hash_based_filename(cls, filename):
     ''' Take a *hashcodehex*`.`*hashname* string
         and return a `HashCode` subclass instance.
 
