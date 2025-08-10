@@ -416,6 +416,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     if duration is not None:
       base_md['expiry'] = now + duration
     md_map = {}
+    # We are not using atomic_filename here
+    # because we link the cached file to multiple locations.
     with NamedTemporaryFile(
         dir=self.cached_path,
         prefix='.cache_stream--',
