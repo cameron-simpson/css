@@ -627,11 +627,13 @@ class PilferCommand(BaseCommand):
       )
 
   def cmd_sitemap(self, argv):
-    ''' Usage: {cmd} [sitemap|domain [URL...]]
+    ''' Usage: {cmd} [sitemap|domain {{sitecmd [args...] | [URL...]}}]
           List or query the site maps from the config.
           With no arguments, list the sitemaps.
-          With a sitemap name (eg "docs"), list the sitemap.
-          WIth additional URLs, print the key for each URL.
+          With a sitemap name (eg "docs") and no further arguments, list the sitemap.
+          If a word follows the sitemap name, treat it as a subcommand of the sitemap.
+          Otherwise assume all remaining arguments are URLs and print the the key for
+          each URL.
     '''
     options = self.options
     P = options.pilfer
@@ -664,6 +666,16 @@ class PilferCommand(BaseCommand):
             ('  Format:', format_s),
         )
       return 0
+    # a subcommand?
+    if argv[0].isalpha():
+      sitecmd = argv.pop(0)
+      with Pfx(sitecmd):
+        try:
+          cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
+        except AttributeError:
+          raise GetoptError("unknown sitemap command")
+        with stackattrs(sitemap, options=self.options):
+          return cmdmethod(argv)
     # match URLs against the sitemap
     table = []
     for url in argv:
