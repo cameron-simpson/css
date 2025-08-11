@@ -3147,6 +3147,21 @@ class UsesTagSets:
       te = self.tagsets[f'{self.TYPE_ZONE}.{type_}.{key}']
       return self.tagged(te)
 
+  def keys(self, subname=None):
+    ''' Return the keys from `self.tagsets` as `(subname,type_key)` 2-tuples
+        suitable as indices of `self`.
+        If `subname` is not `None`, restrict the keys to those with that subname.
+    '''
+    yield from map(
+        lambda key: TagSetTyping.type_zone_key_of(key).rsplit('.', 1),
+        self.tagsets.keys(
+            prefix=(
+                f'{self.TYPE_ZONE}.' if subname is
+                None else f'{self.TYPE_ZONE}.{subname}.'
+            )
+        )
+    )
+
   def find(self, criteria) -> List[HasTags]:
     ''' Find entities in the database.
 
