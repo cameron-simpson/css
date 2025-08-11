@@ -1297,6 +1297,26 @@ class SiteMap(UsesTagSets, Promotable):
       body.insert(0, toolbar)
     return soup
 
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} subname [type [key...]]
+          List entities for this SiteMap.
+    '''
+    if not argv:
+      for subname in sorted(set(subname for subname, type_key in self.keys())):
+        print(subname)
+      return 0
+    subname = argv.pop(0)
+    if not argv:
+      for k_subname, type_key in sorted(self.keys(subname=subname)):
+        print(k_subname, type_key)
+        assert k_subname == subname
+        printt(
+            *(
+                [f'  {tag_name}', tag_value] for tag_name, tag_value in
+                sorted(self[k_subname, type_key].items())
+            )
+        )
+
 # expose the @on decorator globally
 on = SiteMap.on
 
