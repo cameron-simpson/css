@@ -799,8 +799,9 @@ class SiteMap(UsesTagSets, Promotable):
         if isinstance(pattern, str):
           if pattern.isupper():
             # a method name
-            condition = lambda method_name: (
-                lambda flowstate, match: flowstate.method == method_name
+            condition = (
+                lambda method_name:
+                (lambda flowstate, match: flowstate.method == method_name)
             )(
                 pattern
             )
