@@ -570,28 +570,68 @@ class TagSetTyping:
       * `.type_key`: `1234``
   '''
 
+  @staticmethod
+  def type_name_of(name: str):
+    ''' The database-wide type name of this entity name, the name without the final dotted component.
+
+        Example:
+
+            >>> TagSetTyping.type_name_of('tvdb.series.1234')
+            'tvdb.series'
+    '''
+    return name.rsplit('.', 1)[0]
+
   @property
   def type_name(self):
     ''' The database-wide type name of this entity, `self.name` without the final dotted component.
-
-        For example, the `.type_name` of an entity named
-        `tvdb.series.1234` is `tvdb.series`.
     '''
-    return self.name.rsplit('.', 1)[0]
+    return self.type_name_of(self.name)
+
+  @staticmethod
+  def type_key_of(name: str):
+    ''' The type key of this entity name, the final dotted component.
+
+        Example:
+
+            >>> TagSetTyping.type_key_of('tvdb.series.1234')
+            '1234'
+    '''
+    return name.rsplit('.', 1)[1]
 
   @property
   def type_key(self):
     ''' The type key of this entity, the final dotted component of `self.name`.
     '''
-    return self.name.rsplit('.', 1)[1]
+    return self.type_key_of(self.name)
+
+  @staticmethod
+  def type_zone_of(name: str):
+    ''' The type zone of this entity name, the leftmost dotted component.
+
+        For example the `.type_zone_of` of an entity named `tvdb.series.1234` is `tvdb`.
+        Example:
+
+            >>> TagSetTyping.type_zone_of('tvdb.series.1234')
+            'tvdb'
+    '''
+    return name.split('.', 1)[0]
 
   @property
   def type_zone(self):
     ''' The type zone of this entity, `self.name`'s leftmost dotted component.
-
-        For example the `.type_zone` of an entity named `tvdb.series.1234` is `tvdb`.
     '''
-    return self.name.split('.', 1)[0]
+    return self.type_zone_of(self.name)
+
+  @staticmethod
+  def type_zone_key_of(name: str):
+    ''' The type zone of this entity name, the second and following dotted components.
+
+        Example:
+
+            >>> TagSetTyping.type_zone_key_of('tvdb.series.1234')
+            'series.1234'
+    '''
+    return name.split('.', 1)[1]
 
   @property
   def type_zone_key(self):
@@ -599,7 +639,20 @@ class TagSetTyping:
 
         For example the `.type_zone_key` of an entity named `tvdb.series.1234` is `series.1234`.
     '''
-    return self.name.split('.', 1)[1]
+    return self.type_zone_key_of(self.name)
+
+  @classmethod
+  def type_subname_of(cls, name: str):
+    ''' The subtype name of this entity name, the name without the
+        first and final dotted components i.e. without the leading zone
+        and the trailing key.
+
+        Example:
+
+            >>> TagSetTyping.type_subname_of('tvdb.series.1234')
+            'series'
+    '''
+    return cls.type_name_of(name).split('.', 1)[1]
 
   @property
   def type_subname(self):
@@ -609,8 +662,7 @@ class TagSetTyping:
 
         For example the `.type_subname` of an entity named `tvdb.series.1234` is `series`.
     '''
-    ##print("self.type_name", self.type_name)
-    return self.type_name.split('.', 1)[1]
+    return self.type_subname_of(self.name)
 
 @has_format_attributes
 class TagSet(
