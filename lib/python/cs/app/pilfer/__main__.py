@@ -653,7 +653,6 @@ class PilferCommand(BaseCommand):
       return 0
     # use a particular sitemap
     map_name = argv.pop(0)
-    print("map_name", map_name)
     for domain_glob, sitemap in P.sitemaps:
       if map_name == sitemap.name:
         break
