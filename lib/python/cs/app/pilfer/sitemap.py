@@ -196,6 +196,13 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
       ):
         yield
 
+  def __del__(self):
+    ''' Close `self.response` on delete.
+    '''
+    rsp = self.__dict__.get('response')
+    if rsp is not None:
+      rsp.close()
+
   # NB: no __getattr__, it preemptys @cached_property
 
   @classmethod
@@ -370,6 +377,9 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
       url = self.url
     else:
       self.url = url
+    # TODO: is the response closed in a timely fashion?
+    #       Until consumed it occupies a slot in the urllib3 connection pool.
+    #       We try to close in in self.__del__.
     rsp = self.response = P.GET(url, stream=True, **rq_kw)
     # forget any cached derived values
     self.request = rsp.request
