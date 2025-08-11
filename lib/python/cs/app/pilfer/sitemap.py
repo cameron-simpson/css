@@ -1263,40 +1263,6 @@ class SiteMap(UsesTagSets, Promotable):
     return None
 
   @on
-  @uses_pilfer
-  def grok_default(
-      self,
-      flowstate: FlowState,
-      match: Mapping[str, Any] | None = None,
-      *,
-      P: "Pilfer",
-  ) -> TagSet:
-    ''' A default low level grok function
-        which stores a page's meta tags and properties
-        on the page's primary entity.
-        Returns the entity, a `TagSet`.
-    '''
-    PR = lambda *a, **kw: print("grok_default", flowstate.url.short, *a, **kw)
-    te = None
-    te_key = self.entity_key(flowstate, **(match or {}))
-    if te_key is None:
-      og = flowstate.opengraph_tags
-      og_url = og.get('opengraph.url')
-      if og_url:
-        te = P.sqltags['opengraph.url', og_url]
-    else:
-      te = P.sqltags[te_key]
-    if te is None:
-      # just return the metadata
-      PR("no te_key or og:url")
-      return TagSet(
-          meta=flowstate.meta.tags,
-          properties=flowstate.meta.properties,
-      )
-    self.update_tagset_from_meta(te, flowstate)
-    return te
-
-  @on
   @promote
   def patch_soup_toolbar(
       self,
