@@ -1,3 +1,4 @@
+cs.cmdutils cmd_shell_completion to emit shell completion for $SHELL, see https://mill-build.org/blog/14-bash-zsh-completion.html
 histbackup: --reflink to be deprecaded in favour of --link-mode=default,reflink,clonefile, use reflink on linux, clonefile/cp -c on macos
 redo grepall in python, the sed is getting tricky
 dl FOO: puts a literal +when into the log entry in dlog-quick, likely elsewhere
