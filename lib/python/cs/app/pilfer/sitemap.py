@@ -659,7 +659,7 @@ class SiteMap(UsesTagSets, Promotable):
         See the `SiteMap.content_prefetch` method.
   '''
 
-  name: str
+  name: str = None
   pilfer: object = None
   tagsets: BaseTagSets = None
 
@@ -669,6 +669,8 @@ class SiteMap(UsesTagSets, Promotable):
   def __post_init__(self, *, P: "Pilfer"):
     ''' Initialise `.pilfer` if omitted`, and then `.tagsets` from `self.pilfer`.
     '''
+    if self.name is None:
+      self.name = self.TYPE_ZONE
     if self.pilfer is None:
       self.pilfer = P
     UsesTagSets.__init__(self, tagsets=self.pilfer.sqltags)
