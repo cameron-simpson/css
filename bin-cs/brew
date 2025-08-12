@@ -18,6 +18,7 @@ case ${CPU:-$(uname -p)} in
   *)    default_homebrewpath=/usr/local/var/homebrew
         ;;
 esac
+default_homebrewcore=$default_homebrewpath/core
 
 [ $# -gt 0 ] && [ "x$1" = x-x ] && { setx='set -x' late_setx=:; shift; }
 
