@@ -599,6 +599,23 @@ class SiteEntity(HasTags):
       url = f'{self.url_root}{url[1:]}'
     return url
 
+  def equivalents(self):
+    ''' Return a list of equivalent `SiteEntity` instances from other type zones,
+        derived from the keys in `self['equivalents']`.
+        Unhandled key elicit a warning and are discarded.
+    '''
+    with Pfx("%s.equivalents", self):
+      equiv_keys = self.get('equivalents', [])
+      equivs = []
+      for eqk in equiv_keys:
+        with Pfx(eqk):
+          try:
+            equiv = SiteMap.by_db_key(eqk)
+          except KeyError as e:
+            warning("no SiteEntity for key: %s", e)
+            continue
+          equivs.append(equiv)
+    return equivs
 
   @classmethod
   def by_db_key(cls, db_key: str):
