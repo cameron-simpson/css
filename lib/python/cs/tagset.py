@@ -571,7 +571,32 @@ class TagSetTyping:
   '''
 
   @staticmethod
-  def type_name_of(name: str):
+  def type_parts_of(name: str) -> Tuple[str, str, str]:
+    ''' Return the `(zone,subname,key)` 3 tuple from an entity
+        `name`, where the zone if the leftmost dotted component,
+        the key is the rightmost dotted component, and the subname
+        is the middle components.
+
+        Example:
+
+            >>> TagSetTyping.type_parts_of('tvdb.series.1234')
+            ('tvdb', 'series', '1234')
+    '''
+    type_zone, zone_parts = name.split('.', 1)
+    type_subname, type_key = zone_parts.rsplit('.', 1)
+    return type_zone, type_subname, type_key
+
+  @property
+  def type_parts(self):
+    ''' The `(zone,subname,key)` 3 tuple from `self.name`
+        where the zone if the leftmost dotted component,
+        the key is the rightmost dotted component, and the subname
+        is the middle components.
+    '''
+    return self.type_parts_of(self.name)
+
+  @classmethod
+  def type_name_of(cls, name: str):
     ''' The database-wide type name of this entity name, the name without the final dotted component.
 
         Example:
@@ -579,7 +604,8 @@ class TagSetTyping:
             >>> TagSetTyping.type_name_of('tvdb.series.1234')
             'tvdb.series'
     '''
-    return name.rsplit('.', 1)[0]
+    parts = cls.type_parts_of(name)
+    return f'{parts[0]}.{parts[1]}'
 
   @property
   def type_name(self):
@@ -587,8 +613,8 @@ class TagSetTyping:
     '''
     return self.type_name_of(self.name)
 
-  @staticmethod
-  def type_key_of(name: str):
+  @classmethod
+  def type_key_of(cls, name: str):
     ''' The type key of this entity name, the final dotted component.
 
         Example:
@@ -596,7 +622,7 @@ class TagSetTyping:
             >>> TagSetTyping.type_key_of('tvdb.series.1234')
             '1234'
     '''
-    return name.rsplit('.', 1)[1]
+    return cls.type_parts_of(name)[2]
 
   @property
   def type_key(self):
@@ -604,8 +630,8 @@ class TagSetTyping:
     '''
     return self.type_key_of(self.name)
 
-  @staticmethod
-  def type_zone_of(name: str):
+  @classmethod
+  def type_zone_of(cls, name: str):
     ''' The type zone of this entity name, the leftmost dotted component.
 
         For example the `.type_zone_of` of an entity named `tvdb.series.1234` is `tvdb`.
@@ -614,7 +640,7 @@ class TagSetTyping:
             >>> TagSetTyping.type_zone_of('tvdb.series.1234')
             'tvdb'
     '''
-    return name.split('.', 1)[0]
+    return cls.type_parts_of(name)[0]
 
   @property
   def type_zone(self):
@@ -622,8 +648,8 @@ class TagSetTyping:
     '''
     return self.type_zone_of(self.name)
 
-  @staticmethod
-  def type_zone_key_of(name: str):
+  @classmethod
+  def type_zone_key_of(cls, name: str):
     ''' The type zone of this entity name, the second and following dotted components.
 
         Example:
@@ -631,7 +657,8 @@ class TagSetTyping:
             >>> TagSetTyping.type_zone_key_of('tvdb.series.1234')
             'series.1234'
     '''
-    return name.split('.', 1)[1]
+    parts = cls.type_parts_of(name)
+    return f'{parts[1]}.{parts[2]}'
 
   @property
   def type_zone_key(self):
@@ -652,7 +679,7 @@ class TagSetTyping:
             >>> TagSetTyping.type_subname_of('tvdb.series.1234')
             'series'
     '''
-    return cls.type_name_of(name).split('.', 1)[1]
+    return cls.type_parts_of(name)[1]
 
   @property
   def type_subname(self):
