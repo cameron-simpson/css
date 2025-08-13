@@ -7,7 +7,7 @@ import os
 import os.path
 from os.path import expanduser
 from getopt import GetoptError
-from pprint import pformat
+from pprint import pformat, pprint
 import sys
 from typing import Iterable
 
@@ -249,7 +249,15 @@ class PilferCommand(BaseCommand):
       raise GetoptError(f'extra arguments: {argv=}')
     self.options.pilfer.dbshell()
 
-  @popopts(soup='Dump the page soup, normally omitted.')
+  @popopts(
+      content=(
+          'dump_content',
+          '''
+      Dump the page content, normally omitted.
+      Currently supports HTML (text/html) and JSON (application/json).
+      ''',
+      )
+  )
   def cmd_dump(self, argv):
     ''' Usage: {cmd} URL
           Fetch URL and dump information from it.
@@ -339,45 +347,73 @@ class PilferCommand(BaseCommand):
         for k, v in grokked.items():
           table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
     printt(*table)
-    if soup is not None and self.options.soup:
+    if self.options.dump_content:
       print("Content:", flowstate.content_type)
-      table = []
-      q = ListQueue([('', soup.head), ('', soup.body)])
-      for indent, tag in q:
-        subindent = indent + '  '
-        # TODO: looks like commants are also NavigableStrings, intercept here
-        if isinstance(tag, NavigableString):
-          text = str(tag).strip()
-          if text:
-            table.append(('', text))
-          continue
-        if tag.name == 'script':
-          continue
-        # sorted copy of the attributes
-        attrs = dict(sorted(tag.attrs.items()))
-        label = tag.name
-        # pop off the id attribute if present, include in the label
-        try:
-          id_attr = attrs.pop('id')
-        except KeyError:
-          pass
+      if flowstate.content_type in ('text/html',):
+        soup = flowstate.soup
+        table = []
+        q = ListQueue([('', soup.head), ('', soup.body)])
+        for indent, tag in q:
+          subindent = indent + '  '
+          # TODO: looks like commants are also NavigableStrings, intercept here
+          if isinstance(tag, NavigableString):
+            text = str(tag).strip()
+            if text:
+              table.append(('', text))
+            continue
+          if tag.name == 'script':
+            continue
+          # sorted copy of the attributes
+          attrs = dict(sorted(tag.attrs.items()))
+          label = tag.name
+          # pop off the id attribute if present, include in the label
+          try:
+            id_attr = attrs.pop('id')
+          except KeyError:
+            pass
+          else:
+            label += f' #{id_attr}'
+          children = list(tag.children)
+          if not attrs and len(children) == 1 and isinstance(children[0],
+                                                             NavigableString):
+            desc = str(children[0].strip())
+          else:
+            desc = "\n".join(
+                f'{attr}={value!r}' for attr, value in attrs.items()
+            ) if attrs else ''
+            for index, subtag in enumerate(children):
+              q.insert(index, (subindent, subtag))
+          table.append((
+              f'{indent}{label}',
+              desc,
+          ))
+        printt(*table)
+      elif flowstate.content_type in ('application/json',):
+        jdata = flowstate.json
+        if isinstance(jdata, dict):
+          jkeys = list(jdata.keys())
+          if len(jkeys) == 0:
+            pprint(jdata)
+          elif len(jkeys) > 1:
+            printt(
+                ['{'],
+                *sorted(jdata.items()),
+                ['}'],
+            )
+          else:
+            jkey, = jkeys
+            printt(
+                [f'{{ {pformat(jkey)}'],
+                *(
+                    [f'    {pformat(k)}', v]
+                    for k, v in sorted(jdata[jkey].items())
+                ),
+                ['}'],
+            )
         else:
-          label += f' #{id_attr}'
-        children = list(tag.children)
-        if not attrs and len(children) == 1 and isinstance(children[0],
-                                                           NavigableString):
-          desc = str(children[0].strip())
-        else:
-          desc = "\n".join(
-              f'{attr}={value!r}' for attr, value in attrs.items()
-          ) if attrs else ''
-          for index, subtag in enumerate(children):
-            q.insert(index, (subindent, subtag))
-        table.append((
-            f'{indent}{label}',
-            desc,
-        ))
-      printt(*table)
+          pprint(jdata)
+      else:
+        warning("No content dump for %s.", flowstate.content_type)
 
   @popopts
   def cmd_from(self, argv):
