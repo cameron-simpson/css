@@ -599,6 +599,12 @@ class SiteEntity(HasTags):
       url = f'{self.url_root}{url[1:]}'
     return url
 
+
+  @classmethod
+  def by_db_key(cls, db_key: str):
+    ''' Return the `SiteEntity` for the database wide `key`.
+    '''
+    return SiteMap.by_db_key(db_key)
   @promote
   def grok_sitepage(self, flowstate: FlowState):
     ''' Parse information from `flowstate` and apply to `self`.
@@ -680,6 +686,9 @@ class SiteMap(UsesTagSets, Promotable):
   pilfer: object = None
   tagsets: BaseTagSets = None
 
+  # a registry of SiteMap subclasses nstancesby their TYPE_ZONE
+  sitemap_by_type_zone = {}
+
   URL_KEY_PATTERNS = ()
 
   @uses_pilfer
@@ -690,7 +699,35 @@ class SiteMap(UsesTagSets, Promotable):
       self.name = self.TYPE_ZONE
     if self.pilfer is None:
       self.pilfer = P
-    UsesTagSets.__init__(self, tagsets=self.pilfer.sqltags)
+    # Register this `SiteMap` by its `TYPE_ZONE`.
+    sitemap_by_type_zone = self.__class__.sitemap_by_type_zone
+    try:
+      self.TYPE_ZONE
+    except AttributeError:
+      warning(f'no .TYPE_ZONE for SiteMap instance {self}')
+    else:
+      try:
+        other_map = sitemap_by_type_zone[self.TYPE_ZONE]
+      except KeyError:
+        pass
+      else:
+        warning(f'replacing {self.TYPE_ZONE=} -> {other_map} with {self}')
+      sitemap_by_type_zone[self.TYPE_ZONE] = self
+    super().__init__(tagsets=self.pilfer.sqltags)
+
+  @classmethod
+  def by_db_key(cls, db_key: str):
+    ''' Return the `SiteEntity` for the database wide `key`.
+    '''
+    try:
+      zone, subname, key = TagSetTyping.type_parts_of(db_key)
+    except ValueError as e:
+      raise KeyError(f'{db_key=}: cannot parse into type parts: {e}') from e
+    try:
+      sitemap = cls.sitemap_by_type_zone[zone]
+    except KeyError as e:
+      raise KeyError(f'{db_key=}: no SiteMap registered for {zone=}') from e
+    return sitemap[subname, key]
 
   @classmethod
   @uses_pilfer
