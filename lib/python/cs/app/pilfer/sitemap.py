@@ -39,7 +39,10 @@ def default_Pilfer():
   ''' Obtain the ambient `Pilfer` instance via a late import.
   '''
   from .pilfer import Pilfer
-  return Pilfer.default()
+  P = Pilfer.default()
+  if P is None:
+    P = Pilfer()
+  return P
 
 @decorator
 def uses_pilfer(func):
