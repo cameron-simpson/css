@@ -3162,15 +3162,20 @@ class UsesTagSets:
     return self.HasTagsClass(te, self)
 
   def __getitem__(self, index: Tuple[str, Union[str | int]]) -> HasTags:
-    ''' Fetch the `HasTags` instance for the supplied `(subname,key)` 2-tuple.
+    ''' Fetch the `HasTags` instance for the supplied `index`,
+        which may be a *subname*`.`*key* string or a `(subname,key)` 2-tuple.
     '''
     with Pfx("%s[%s]", self, r(index)):
-      assert isinstance(index, tuple)
-      type_, key = index
-      if isinstance(key, int):
-        key = str(key)
+      if isinstance(index, str):
+        type_, key = index.rsplit('.', 1)
+      elif isinstance(index, tuple):
+        type_, key = index
+        if isinstance(key, int):
+          key = str(key)
+        else:
+          assert '.' not in key
       else:
-        assert '.' not in key
+        raise TypeError(f'{self}[{r(index)}]: expected str or (subname,key)')
       te = self.tagsets[f'{self.TYPE_ZONE}.{type_}.{key}']
       return self.tagged(te)
 
@@ -3180,7 +3185,7 @@ class UsesTagSets:
         If `subname` is not `None`, restrict the keys to those with that subname.
     '''
     yield from map(
-        lambda key: TagSetTyping.type_zone_key_of(key).rsplit('.', 1),
+        lambda key: tuple(TagSetTyping.type_zone_key_of(key).rsplit('.', 1)),
         self.tagsets.keys(
             prefix=(
                 f'{self.TYPE_ZONE}.' if subname is
