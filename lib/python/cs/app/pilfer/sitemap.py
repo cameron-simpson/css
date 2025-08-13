@@ -718,10 +718,11 @@ class SiteMap(UsesTagSets, Promotable):
 
   @classmethod
   @uses_pilfer
-  def update_entities(
+  def updated_entities(
       cls, entities: Iterable["SiteEntity"], *, P: "Pilfer", force=False
   ):
-    ''' A generator yielding updated `SiteEntity` instances.
+    ''' A generator yielding updated `SiteEntity` instances
+        from an iterable of `SiteEntity` instances.
     '''
 
     def entity_sitepages(entities: Iterable[SiteEntity]):
@@ -732,6 +733,9 @@ class SiteMap(UsesTagSets, Promotable):
       '''
       for entity in entities:
         if not force and "sitepage.last_update_unixtime" in entity.tags:
+          print(
+              f'update_entities: skip {entity.name}, has sitepage.last_update_unixtime'
+          )
           continue
         try:
           sitepage = entity.sitepage
@@ -745,8 +749,14 @@ class SiteMap(UsesTagSets, Promotable):
         esps,
         FlowState.iterable_flowstates(esp[1] for esp in esps),
     ):
-      entity["sitepage.last_update_unixtime"] = time.time()
-      entity.grok_sitepage(flowstate)
+      print("UPDATE", entity, "from", sitepage)
+      grok_time = time.time()
+      try:
+        entity.grok_sitepage(flowstate)
+      except NotImplementedError:
+        pass
+      else:
+        entity["sitepage.last_update_unixtime"] = grok_time
       yield entity
 
   @staticmethod
