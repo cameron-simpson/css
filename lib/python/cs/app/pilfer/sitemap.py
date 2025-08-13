@@ -1396,13 +1396,14 @@ class SiteMap(UsesTagSets, Promotable):
       return 0
     subname = argv.pop(0)
     if not argv:
-      for k_subname, type_key in sorted(self.keys(subname=subname)):
-        print(k_subname, type_key)
-        assert k_subname == subname
+      # list all entities of this type
+      for ent in self.updated_entities(
+          self[key] for key in sorted(self.keys(subname=subname))):
+        print(ent.type_subname, ent.type_key)
         printt(
             *(
-                [f'  {tag_name}', tag_value] for tag_name, tag_value in
-                sorted(self[k_subname, type_key].items())
+                [f'  {tag_name}', tag_value]
+                for tag_name, tag_value in sorted(ent.items())
             )
         )
 
