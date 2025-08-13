@@ -551,12 +551,19 @@ class SiteEntity(HasTags):
   def __getattr__(self, attr):
     if attr.islower():
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
+      fmtattr_name = f'{attr.upper()}_FORMAT'
       try:
-        format_s = getattr(self.__class__, f'{attr.upper()}_FORMAT')
+        format_s = getattr(self.__class__, fmtattr_name)
       except AttributeError:
         pass
       else:
-        return self.format_as(format_s)
+        try:
+          return self.format_as(format_s)
+        except FormatAsError as e:
+          warning("%s.format_as %r: %s", self, format_s, e)
+          raise AttributeError(
+              f'format {self.__class__.__name__}.{fmtattr_name} {format_s!r}: {e}'
+          ) from e
     return super().__getattr__(attr)
 
   def format_kwargs(self):
