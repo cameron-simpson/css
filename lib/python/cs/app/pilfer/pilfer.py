@@ -30,6 +30,7 @@ from types import SimpleNamespace as NS
 
 import requests
 from requests.cookies import RequestsCookieJar
+from requests.adapters import HTTPAdapter
 from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
@@ -157,6 +158,15 @@ class PilferSession(MultiOpenMixin, HasFSPath):
     ''' Load the cookie state from its state file, and save on exit.
     '''
     with requests.Session() as session:
+      session.mount(
+          'https://',
+          HTTPAdapter(
+              max_retries=1,
+              pool_block=True,
+              pool_connections=4,
+              pool_maxsize=16,
+          )
+      )
       with stackattrs(self, _session=session):
         self.load_cookies()
         try:
