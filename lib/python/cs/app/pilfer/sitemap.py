@@ -15,14 +15,15 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping
 
 from cs.binary import bs
+from cs.cmdutils import popopts
 from cs.deco import decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable
-from cs.lex import cutprefix, cutsuffix, get_nonwhite, printt, r, skipwhite
+from cs.lex import cutprefix, cutsuffix, FormatAsError, get_nonwhite, printt, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import content_encodings, content_type
 from cs.seq import ClonedIterator
-from cs.tagset import BaseTagSets, HasTags, TagSet, UsesTagSets
+from cs.tagset import BaseTagSets, HasTags, TagSet, TagSetTyping, UsesTagSets
 from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
@@ -622,6 +623,7 @@ class SiteEntity(HasTags):
     ''' Return the `SiteEntity` for the database wide `key`.
     '''
     return SiteMap.by_db_key(db_key)
+
   @promote
   def grok_sitepage(self, flowstate: FlowState):
     ''' Parse information from `flowstate` and apply to `self`.
@@ -680,13 +682,15 @@ class SiteMap(UsesTagSets, Promotable):
           *.readthedocs.io = docs
 
       This says that websites whose domain matches `docs.python.org`,
-      `docs.mitmproxy.org` or the filename glob `*readthedocs.io`
+      `docs.mitmproxy.org` or the filename glob `*.readthedocs.io`
       are all associated with the `SiteMap` referred to as `docs`
       whose definition comes from the `DocSite` class from the module
       `cs.app.pilfer.sitemap`. The `DocSite` class will be a subclass
       of this `SiteMap` base class.
 
       `SiteMap`s have a few class attributes:
+      * `TYPE_ZONE`: the `TagSetTyping.type_zone` value for entities
+        associated with this class
       * `URL_KEY_PATTERNS`: this is a list of `(match,keyformat)`
         2-tuples specifying cache keys for caching URL contents; the
         `pilfer mitm ... cache` filter consults these to decide what
@@ -770,6 +774,7 @@ class SiteMap(UsesTagSets, Promotable):
     '''
     return self.urlto('')
 
+  # TODO: some notion of staleness
   @classmethod
   @uses_pilfer
   def updated_entities(
@@ -1385,6 +1390,7 @@ class SiteMap(UsesTagSets, Promotable):
           List entities for this SiteMap.
     '''
     if not argv:
+      # list subnames - entity types
       for subname in sorted(set(subname for subname, type_key in self.keys())):
         print(subname)
       return 0
