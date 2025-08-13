@@ -252,10 +252,9 @@ class PilferCommand(BaseCommand):
   @popopts(
       content=(
           'dump_content',
-          '''
-      Dump the page content, normally omitted.
-      Currently supports HTML (text/html) and JSON (application/json).
-      ''',
+          ''' Dump the page content, normally omitted.
+              Currently supports HTML (text/html) and JSON (application/json).
+          ''',
       )
   )
   def cmd_dump(self, argv):
