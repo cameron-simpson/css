@@ -965,14 +965,15 @@ class Later(MultiOpenMixin, HasThreadState):
         yield from map(func, it)
       return
     # dispatch concurrently via the Later
-    Rs = []
+    Rs = set()
     for i, item in enumerate(it):
       R = self.defer(func, item)
       R.extra.update(i=i)
-      Rs.append(R)
+      Rs.add(R)
     if unordered:
       # yield results as they come in
       for R in report(Rs):
+        Rs.remove(R)
         result = R()
         if indexed:
           yield R.extra.i, R
@@ -984,6 +985,7 @@ class Later(MultiOpenMixin, HasThreadState):
     results = []
     unqueued = 0
     for R in report(Rs):
+      Rs.remove(R)
       result = R()
       i = R.extra.i
       heappush(results, (i, result))
