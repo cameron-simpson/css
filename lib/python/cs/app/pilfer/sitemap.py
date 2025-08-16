@@ -603,9 +603,14 @@ class SiteEntity(HasTags):
 
   @cached_property
   def url_root(self):
-    ''' Proxy to `self.tags.url_root`.
+    ''' Proxy to `self.tags_db.url_root`.
     '''
-    return self.tags.url_root
+    return self.tags_db.url_root
+
+  def urlto(self, path):
+    ''' Proxy to `self.tags_db.urlto()`.
+    '''
+    return self.tags_db.urlto(path)
 
   @property
   def sitepage(self) -> str:
