@@ -15,11 +15,12 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping
 
 from cs.binary import bs
-from cs.cmdutils import popopts
+from cs.cmdutils import popopts, vprint
 from cs.deco import decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable
 from cs.lex import cutprefix, cutsuffix, FormatAsError, get_nonwhite, printt, r, skipwhite
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.py.func import funccite
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import content_encodings, content_type
 from cs.seq import ClonedIterator
