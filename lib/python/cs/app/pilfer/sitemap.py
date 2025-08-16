@@ -260,7 +260,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
           This will do a `GET` if necessary.
       '''
       with P:
-        fs.iterable_content  # snure the content has been made available
+        fs.iterable_content  # ensure the content has been made available
       return fs
 
     with P:
@@ -837,9 +837,9 @@ class SiteMap(UsesTagSets, Promotable):
 
         The positional parameters have the following meaning:
         - a string consisting entirely of uppercase letters;
-          this matches a method name
+          this matches an HTTP method name such as `GET` or `POST`
         - a string containing no slash character (`'/'`):
-          a filename glob to match against the hostname
+          a filename glob to match against the URL hostname
         - a string containing a slash:
           a regular expression to apply against the URL path;
           a leading slash anchors the regexp against the start of the path
