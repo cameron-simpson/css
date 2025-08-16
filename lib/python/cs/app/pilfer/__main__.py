@@ -21,6 +21,7 @@ from cs.lex import (
     cutprefix,
     cutsuffix,
     get_dotted_identifier,
+    get_identifier,
     is_identifier,
     printt,
     s,
@@ -258,29 +259,70 @@ class PilferCommand(BaseCommand):
       )
   )
   def cmd_dump(self, argv):
-    ''' Usage: {cmd} URL
-          Fetch URL and dump information from it.
+    ''' Usage: {cmd} [METHOD] url [header:value...] [param=value...]
+          Fetch url and dump information from it.
     '''
+    options = self.options
+    P = options.pilfer
+    # optional leading METHOD
+    if argv and argv[0].isupper():
+      method = argv.pop(0)
+    else:
+      method = 'GET'
+    # url
     if not argv:
       raise GetoptError("missing URL")
     url = argv.pop(0)
+    # optional header:value
+    rqhdrs = {}
+    while argv:
+      name, offset = get_identifier(argv[0], extra='_-')
+      if not name or not name.startswith(':'):
+        # not a header
+        break
+      rqhdrs[name] = name[offset + 1:]
+      argv.pop(0)
+    # optional param=value
+    params = {}
+    while argv:
+      name, offset = get_identifier(argv[0], extra='_-')
+      if not name or not name.startswith('='):
+        # not a parameter
+        break
+      params[name] = name[offset + 1:]
+      argv.pop(0)
     if argv:
-      raise GetoptError(f'extra arguments after URL: {argv!r}')
-    print(url)
-    flowstate = FlowState(url=url)
-    flowstate.GET()  # implicit these days, but let's be overt about failure
-    if flowstate.response.status_code != 200:
-      warning("GET %s -> status_code %r", url, flowstate.response.status_code)
+      raise GetoptError(f'extra arguments after URL/headers/params: {argv!r}')
+    print(
+        method,
+        url,
+        *(f'{name}:{value}' for name, value in rqhdrs.items()),
+        *(f'{param}={value}' for param, value in params.items()),
+    )
+    rsp = trace(P.request)(
+        url,
+        method=method,
+        headers=rqhdrs,
+        params=(None if not params or method == 'POST' else params),
+        data=(None if not params or method != 'POST' else params),
+    )
+    if rsp.status_code != 200:
+      warning("%s %s -> status_code %r", method, url, rsp.status_code)
+    flowstate = FlowState(
+        url=url,
+        request=rsp.request,
+        response=rsp,
+    )
     printt(
-        (
-            f'{flowstate.request.method} response {flowstate.response.status_code} headers:',
-        ),
-        *[
-            (f'  {key}', value) for key, value in sorted(
+        [
+            f'{flowstate.request.method} response {flowstate.response.status_code} headers:'
+        ],
+        *(
+            [f'  {key}', value] for key, value in sorted(
                 flowstate.response.headers.items(),
                 key=lambda kv: kv[0].lower()
             )
-        ],
+        ),
     )
     soup = flowstate.soup
     if soup is None:
