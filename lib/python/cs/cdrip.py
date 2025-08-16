@@ -1144,10 +1144,6 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     '''
     with super().run_context():
       options = self.options
-      if not isdirpath(options.dirpath):
-        raise GetoptError(
-            "output directory: not a directory: %r" % (options.dirpath,)
-        )
       fstags = FSTags()
       mbdb = MBDB(mbdb_path=options.mbdb_path)
       with fstags:
@@ -1236,9 +1232,8 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
       if tag_choice.choice:
         if tag_choice.tag not in disc:
           disc.set(tag_choice.tag)
-      else:
-        if tag_choice.tag in disc:
-          disc.discard(tag_choice.tag)
+      elif tag_choice.tag in disc:
+        disc.discard(tag_choice.tag)
 
   @popopts(
       a=(
