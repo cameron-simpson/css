@@ -181,6 +181,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     )
     if extra_attrs:
       raise ValueError(f'unexpected attributes supplied: {extra_attrs}')
+    if rsp := self.__dict__.get('response'):
+      self.iterable_content = ClonedIterator(rsp.iter_content(chunk_size=None))
 
   def __str__(self):
     attr_listing = ",".join(
