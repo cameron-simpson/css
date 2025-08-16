@@ -2798,6 +2798,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
         with Pfx("rename %r => %r", old_name, new_name):
           te.name = new_name
 
+  @typechecked
   def deref(
       self,
       te: TagSet,
@@ -3173,7 +3174,7 @@ class UsesTagSets:
         if isinstance(key, int):
           key = str(key)
         else:
-          assert '.' not in key
+          assert '.' not in key, f'{self}[{index=}: found . in {key=}'
       else:
         raise TypeError(f'{self}[{r(index)}]: expected str or (subname,key)')
       te = self.tagsets[f'{self.TYPE_ZONE}.{type_}.{key}']
@@ -3202,6 +3203,7 @@ class UsesTagSets:
     '''
     return [self.HasTagsClass(te, self) for te in self.tagsets.find(criteria)]
 
+  @typechecked
   def deref(
       self,
       tagged: HasTags,
