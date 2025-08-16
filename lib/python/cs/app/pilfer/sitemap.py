@@ -238,13 +238,26 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   @uses_pilfer
   @uses_runstate
   def iterable_flowstates(
-      cls, flowstates: Iterable, P: "Pilfer", runstate: RunState
+      cls,
+      flowstates: Iterable,
+      P: "Pilfer",
+      runstate: RunState,
+      **later_map_kw,
   ):
     ''' A generator yielding `FlowState` instances with a ready
         `.iterable_content` attribute, promoted from `flowstates`.
 
         This prepares the `FlowState`s concurrently, performing a
         `GET` if necessary, yielding them in the supplied order.
+
+        Parameters:
+        * `flowstates`: an iterable, notionally of `FlowState`s but
+          actually any object which can be promoted to a `FlowState`
+          such as a URL
+        * `P`: optional `Pilfer` if not the ambient one
+        * `runstate`: optional `RunState` if not the ambient one
+        Other keyword arguments are passed to `Later.map` to control
+        how things are fulfilled.
 
         Example:
 
@@ -266,7 +279,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
       return fs
 
     with P:
-      for flowstate in P.later.map(get_iterable_fs, flowstates):
+      for flowstate in P.later.map(get_iterable_fs, flowstates,
+                                   **later_map_kw):
         yield flowstate
         runstate.raiseif()
 
