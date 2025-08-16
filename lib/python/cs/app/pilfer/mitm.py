@@ -4,7 +4,7 @@
 #
 
 import asyncio
-from collections import ChainMap, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import partial
 from inspect import isgeneratorfunction
@@ -18,7 +18,6 @@ from typing import Callable, Iterable, Optional
 from icontract import require
 from mitmproxy import http
 import mitmproxy.addons.dumper
-from mitmproxy.http import Request as MITMRequest, Response as MITMResponse
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
