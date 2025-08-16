@@ -302,7 +302,7 @@ class Later(MultiOpenMixin, HasThreadState):
       after a delay or after other pending functions. These methods
       return `LateFunction`s, a subclass of `cs.result.Result`.
 
-      A Later instance' close method closes the Later for further
+      A `Later` instance's `close` method closes the `Later` for further
       submission.
       Shutdown does not imply that all submitted functions have
       completed or even been dispatched.
