@@ -904,64 +904,80 @@ class SiteMap(UsesTagSets, Promotable):
     conditions = []
     for pattern in patterns:
       with Pfx(f'pattern={r(pattern)}'):
-        condition = None
         if isinstance(pattern, str):
           if pattern.isupper():
             # a method name
-            condition = (
-                lambda method_name:
-                (lambda flowstate, match: flowstate.method == method_name)
-            )(
-                pattern
-            )
-            condition.__name__ = f'flowstate.method vs {pattern=}'
+            def maketest(method_name):
+              test_name = f'flowstate.method == {method_name=}'
+
+              def test(flowstate, match):
+                vprint(f'@on: {method_name=} vs {method_name=}')
+                return flowstate.method == method_name
+
+              test.__name__ = test_name
+              test.method_name = method_name  # for use in breakpoints
+              return test
+
           elif '/' in pattern:
             # a path match
-            regexp = pfx_call(re.compile, pattern)
-            if pattern.startswith('/'):
-              # match at the start of the path
-              condition = (
-                  lambda regexp: (
-                      lambda flowstate, match:
-                      (m := pfx_call(regexp.match, flowstate.url.path)
-                       ) and m.groupdict()
-                  )
-              )(
-                  regexp
-              )
-              condition.__name__ = f'flowstate.url ~ ^{regexp=}'
-            else:
-              # match anywhere
-              condition = (
-                  lambda regexp: (
-                      lambda flowstate, match:
-                      (m := pfx_call(regexp.search, flowstate.url.path)
-                       ) and m.groupdict()
-                  )
-              )(
-                  regexp
-              )
-              condition.__name__ = f'flowstate.url.path ~ {regexp=}'
+            def maketest(regexp):
+              regexp = pfx_call(re.compile, pattern)
+              if pattern.startswith('/'):
+                # match at the start of the path
+                test_name = f'flowstate.url.path ~ ^{regexp}'
+
+                def test(flowstate, match):
+                  vprint(f'@on: {flowstate.url.path=} ~ ^{regexp}')
+                  m = pfx_call(regexp.match, flowstate.url.path)
+                  if m is None:
+                    return None
+                  return m.groupdict()
+              else:
+                test_name = f'flowstate.url.path ~ {regexp}'
+
+                def test(flowstate, match):
+                  vprint(f'@on: {flowstate.url.path=} ~ {regexp}')
+                  m = pfx_call(regexp.search, flowstate.url.path)
+                  if m is None:
+                    return None
+                  return m.groupdict()
+
+              test.__name__ = test_name
+              return test
           else:
             # filename glob on the URL host
-            # this indirection is to avoid the lambda pattern binding to the closure
-            condition = (
-                lambda pattern: (
-                    lambda flowstate, match:
-                    pfx_call(fnmatch, flowstate.url.hostname, pattern)
-                )
-            )(
-                pattern
-            )
-            condition.__name__ = f'flowstate.url.hostname fnmatch {pattern=}'
-        elif callable(condition):
+            def maketest(glob):
+
+              def test(flowstate, match):
+                vprint(f'@on: {flowstate.url.hostname=} ~ {glob=}')
+                return pfx_call(fnmatch, flowstate.url.hostname, glob)
+
+              test.__name__ = f'flowstate.url.hostname ~ {glob=}'
+              test.glob = glob
+              return test
+
+        elif callable(pattern):
           # it should be a callable accepting a FlowState and the match TagSet
           # TODO: can it be inspected?
-          _: Callable[FlowState, TagSet] = condition
+          _: Callable[FlowState, TagSet] = pattern
+
+          def maketest(condition_func):
+            citation = funccite(condition_func)
+
+            def test(flowstate, match):
+              vprint(f'@on: {citation}(flowstate:{flowstate.url=})')
+              return condition_func(flowstate)
+
+            test.__name__ = f'{citation}(flowstate)'
+            return test
+
         else:
           raise RuntimeError
+        condition = maketest(pattern)
         assert condition is not None
+        assert callable(condition)
         conditions.append(condition)
+        del condition
     try:
       cond_attr = method.on_conditions
     except AttributeError:
