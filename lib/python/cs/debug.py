@@ -711,11 +711,16 @@ def trace(
         if xlog is X:
           xlog_kw['colour'] = 'white'  ## 'red'
         xlog(
-            "%sRAISE  %s => %s:%s at %gs",
+            "%sRAISE  %s => %s:%s\n"
+            "%s  at %s\n"
+            "%s  elapsed %gs",
             indent,
             log_cite,
             e.__class__.__name__,
             e,
+            indent,
+            e.__traceback__.tb_next.tb_frame,
+            indent,
             end_time - start_time,
             **xlog_kw,
         )
