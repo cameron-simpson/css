@@ -460,8 +460,7 @@ class PlayOnCommand(BaseCommand):
   def cmd_poll(self, argv):
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
-    api = self.options.api
-    pprint(api.notifications())
+    pprint(self.options.api.notifications())
 
   @popopts(
       l=('long_mode', 'Long listing: list tags below each entry.'),
@@ -1076,7 +1075,7 @@ class PlayOnAPI(HTTPServiceAPI):
       type: str,
       conversions: Optional[dict] = None
   ) -> set[_PlayOnEntity]:
-    ''' Return a `set` of `TagSet` instances from PlayOn data entries.
+    ''' Return a `set` of `HasTags` instances from PlayOn data entries.
     '''
     now = time.time()
     entities = set()
