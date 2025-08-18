@@ -1067,29 +1067,27 @@ class SiteMap(UsesTagSets, Promotable):
       for conjunction, tags_kw in conditions:
         with Pfx("match %r", conjunction):
           for condition in conjunction:
-            with Pfx("test %r", condition):
-              with Pfx("on_matches: test %r vs %s", method_name,
-                       getattr(condition, '__name__',
-                               type(condition).__name__)):
-                try:
-                  test_result = condition(flowstate, match)
-                except Exception as e:
-                  warning("exception in condition: %s", e)
-                  # TODO: just fail? print a traceback if we do this
-                  raise
-                # test ran, examine result
-                if test_result is None or test_result is False:
-                  # failure
-                  break
-                # success
-                if test_result is True:
-                  # success, no side effects
-                  pass
-                else:
-                  # should be a mapping, update the match TagSet
-                  # typical example: the result is a re.Match.groupdict()
-                  for k, v in test_result.items():
-                    match[k] = v
+            cond_spec = getattr(condition, "__name__", str(condition))
+            with Pfx("on_matches: test %r vs %s", method_name, cond_spec):
+              try:
+                test_result = pfx_call(condition, flowstate, match)
+              except Exception as e:
+                warning("exception in condition: %s", e)
+                # TODO: just fail? print a traceback if we do this
+                raise
+              # test ran, examine result
+              if test_result is None or test_result is False:
+                # failure
+                break
+              # success
+              if test_result is True:
+                # success, no side effects
+                pass
+              else:
+                # should be a mapping, update the match TagSet
+                # typical example: the result is a re.Match.groupdict()
+                for k, v in test_result.items():
+                  match[k] = v
           else:
             # no test failed, this is a match
             # update match with any format strings from @on
