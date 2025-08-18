@@ -303,6 +303,7 @@ from typing import (
     Any, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 )
 from uuid import UUID, uuid4
+from weakref import WeakValueDictionary
 
 from icontract import require
 from typeguard import typechecked
@@ -3148,9 +3149,30 @@ class UsesTagSets:
         and returning the appropriate instance of the `HasTagSetsClass`
   '''
 
+  # a mapping of type zone names to their most recent UsesTagSets subclass instance
+  by_type_zone = WeakValueDictionary()
+
   def __init__(self, *, tagsets=None, **kw):
-    self.tagsets = tagsets or self.TagSetsClass()
     super().__init__(**kw)
+    self.tagsets = tagsets or self.TagSetsClass()
+    cls = self.__class__
+    try:
+      type_zone = cls.__dict__['TYPE_ZONE']
+    except KeyError:
+      # no direct .TYPE_ZONE attribute, do not map
+      pass
+    else:
+      subclass_map = cls.by_type_zone
+      try:
+        old = subclass_map[type_zone]
+      except KeyError:
+        pass
+      else:
+        warning(
+            "%s.%s: type zone %r already mapped to %s, replacing with %s",
+            cls.__module__, cls.__name__, type_zone, old, self
+        )
+      subclass_map[type_zone] = self
 
   def tagged(self, te: TagSet) -> HasTags:
     ''' Promote `te` to a `HasTags` in this zone.
@@ -3165,6 +3187,25 @@ class UsesTagSets:
   def __getitem__(self, index: Tuple[str, Union[str | int]]) -> HasTags:
     ''' Fetch the `HasTags` instance for the supplied `index`,
         which may be a *subname*`.`*key* string or a `(subname,key)` 2-tuple.
+  @classmethod
+  @trace
+  def by_entity_id(cls, entity_id: str) -> HasTags:
+    ''' Return the `HasTags` instance corresponding to `entity_id`
+        from the full tb 
+        Raise `ValueError` is `entity_id` cannot be parsed by
+        `TagSetTyping.type_parts_of`.
+        Raise `KeyError` if there is no `UsesTagSets` instance for the zone.
+    '''
+    zone, subname, key = TagSetTyping.type_parts_of(entity_id)
+    try:
+      tags_db = cls.by_type_zone[zone]
+    except KeyError as e:
+      raise KeyError(
+          f'{cls.__module__}.{cls.__name__}.for_entity_id({entity_id=}): no zone {zone=}'
+      ) from e
+    assert tags_db.TYPE_ZONE == zone
+    return tags_db[subname, key]
+
     '''
     with Pfx("%s[%s]", self, r(index)):
       if isinstance(index, str):
