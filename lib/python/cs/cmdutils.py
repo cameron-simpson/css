@@ -1092,8 +1092,8 @@ class BaseCommandOptions(HasThreadState):
 
 @decorator
 def popopts(cmd_method, **opt_specs_kw):
-  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`
-      and update `self.options`. This also updates the method's usage message.
+  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`,
+      updating `self.options`. This also updates the method's usage message.
 
       Example:
 
