@@ -905,7 +905,7 @@ class PlayOnAPI(HTTPServiceAPI):
         Otherwise `index` should be a `tuple`, returns the associated `HasTags`.
     '''
     if isinstance(index, int):
-      index = 'recording', str(index)
+      index = 'recording', index
     return super().__getitem__(index)
 
   def suburl(
