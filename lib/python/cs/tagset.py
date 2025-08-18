@@ -3236,7 +3236,7 @@ class UsesTagSets:
           key = str(key)
       else:
         raise TypeError(
-            f'{self}[{r(index)}]: expected str or (subname,key) or (*zone,subname,key)'
+            f'{self}[{r(index)}]: expected str or (subname,key) or (zone,subname,key)'
         )
       assert '.' not in zone
       assert '.' not in key
