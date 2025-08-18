@@ -1421,14 +1421,29 @@ class SiteMap(UsesTagSets, Promotable):
       body.insert(0, toolbar)
     return soup
 
+  @popopts(l=('long_mode', 'Long Mode.'))
   def cmd_ls(self, argv):
     ''' Usage: {cmd} subname [type [key...]]
           List entities for this SiteMap.
     '''
+    options = self.options
+    long_mode = options.long_mode
     if not argv:
       # list subnames - entity types
       for subname in sorted(set(subname for subname, type_key in self.keys())):
         print(subname)
+        if long_mode:
+          printt(
+              *(
+                  [
+                      f'  {entity.type_key}',
+                      entity.get('fullname') or entity.get('title', ''),
+                  ] for entity in map(
+                      lambda key: self[key],
+                      sorted(self.keys(subname=subname))
+                  )
+              )
+          )
       return 0
     subname = argv.pop(0)
     if not argv:
@@ -1436,12 +1451,13 @@ class SiteMap(UsesTagSets, Promotable):
       for ent in self.updated_entities(
           self[key] for key in sorted(self.keys(subname=subname))):
         print(ent.type_subname, ent.type_key)
-        printt(
-            *(
-                [f'  {tag_name}', tag_value]
-                for tag_name, tag_value in sorted(ent.items())
-            )
-        )
+        if long_mode:
+          printt(
+              *(
+                  [f'  {tag_name}', tag_value]
+                  for tag_name, tag_value in sorted(ent.items())
+              )
+          )
 
 # expose the @on decorator globally
 on = SiteMap.on
