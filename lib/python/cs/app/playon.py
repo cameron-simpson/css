@@ -43,6 +43,7 @@ from cs.lex import (
     get_prefix_n,
     get_suffix_part,
     has_format_attributes,
+    printt,
 )
 from cs.logutils import warning
 from cs.mediainfo import SeriesEpisodeInfo
@@ -720,17 +721,19 @@ class Recording(_PlayOnEntity):
     filename = re.sub('---+', '--', filename)
     return filename
 
-  def ls(self, ls_format=None, long_mode=False, print_func=None):
+  def ls(self, *, format=None, long_mode=False, print_func=None):
     ''' List a recording.
     '''
-    if ls_format is None:
-      ls_format = PlayOnCommand.LS_FORMAT
+    if format is None:
+      format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(self.format_as(ls_format))
+    print_func(self.format_as(format))
     if long_mode:
-      for tag in sorted(self):
-        print_func(" ", tag)
+      printt(
+          *([f'  {tag.name}', tag.value] for tag in sorted(self.tags)),
+          print_func=print_func,
+      )
 
 @dataclass
 class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
