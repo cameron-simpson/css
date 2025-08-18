@@ -33,7 +33,7 @@ from cs.pfx import pfx_call
 word_re_map = missingdict(partial(re.compile, flags=re.I))
 
 def main(argv=None):
-  USAGE_FORMAT = '''Usage: {cmd} [-nwp] [-N] [-P wppath] [--] [spaces] [ RENEW | words...]
+  USAGE_FORMAT = '''Usage: {cmd} [-nwp] [-N] [-P wppath] [-v] [--] [spaces] [ RENEW | words...]
       Select wallpapers from the directories in $WPPATH
       at random matching the sed-regexps "words".
       Construct a scratch directoy in $WPLINKDIR: $WPLINKDIR
@@ -41,8 +41,9 @@ def main(argv=None):
       as the wallpaper directory for the current (or specified) space.
       -nwp        Limit the number of wallpapers to nwp (${nwp}).
       -N          Do not update the OSX Spaces wallpaper settings.
-      -W wppath   Use the supplied wallpaper path, default from
-                  $WPPATH, which defaults to $WPDIR:$SSV_DIR: {":".join(wppath)}'''
+      -P wppath   Use the supplied wallpaper path, default from
+                  $WPPATH, which defaults to $WPDIR:$SSV_DIR: {":".join(wppath)}
+      -v          Verbose.'''
   if argv is None:
     argv = list(sys.argv)
   cmd = argv.pop(0)
@@ -70,6 +71,8 @@ def main(argv=None):
       update_spaces = False
     elif opt == 'P':
       wppath = argv.pop(0).split(':')
+    elif opt == 'v':
+      verbose = True
     else:
       print(f'{cmd}: unrecognised option: -{opt}', file=sys.stderr)
       badopts = True
