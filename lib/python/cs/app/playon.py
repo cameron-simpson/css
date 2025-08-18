@@ -1101,7 +1101,7 @@ class PlayOnAPI(HTTPServiceAPI):
                     warning("%r: %s", value, e)
                   else:
                     entry[e_field] = value2
-        entity = self[type, str(entry_id)]
+        entity = self[type, entry_id]
         entity.tags.update(entry, prefix='playon')
         entity.tags.update(dict(last_updated=now))
         entities.add(entity)
