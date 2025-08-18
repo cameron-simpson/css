@@ -3185,7 +3185,6 @@ class UsesTagSets:
     return self.HasTagsClass(te, self)
 
   @classmethod
-  @trace
   def by_entity_id(cls, entity_id: str) -> HasTags:
     ''' Return the `HasTags` instance corresponding to `entity_id`
         from the full tb 
@@ -3202,6 +3201,21 @@ class UsesTagSets:
       ) from e
     assert tags_db.TYPE_ZONE == zone
     return tags_db[subname, key]
+
+  #############################################################################
+  # HasTags interface
+  def zone_entity(self, zone: str) -> "HasTags":
+    ''' Return the `HasTags` entity associated with a per-type-zone key.
+        For example, `self.zone_entity('tvdb')` would return the entity
+        for `tvdb.`*tvdb_id* where `tvdb_id` comes from `self['tvdb.id']`.
+    '''
+    assert '.' not in zone
+    zone_key = self[f'{zone}.id']
+    assert isinstance(zone_key, str) and '.' in zone_key, (
+        f'no . in {zone_key=} (from self[{zone=}.id])'
+    )
+    entity_id = f'{zone}.{zone_key}'
+    return self.by_entity_id(entity_id)
 
   def __getitem__(
       self,
