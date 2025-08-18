@@ -264,7 +264,7 @@ class PlayOnCommand(BaseCommand):
           continue
         _, ext = splitext(basename(fspath))
         try:
-          recording = fstags[fspath].by_zone_key('playon')
+          recording = fstags[fspath].zone_entity('playon')
         except KeyError as e:
           warning("no playon zone key, skipping: %s", e)
           continue
