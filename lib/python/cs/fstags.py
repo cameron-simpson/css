@@ -138,14 +138,17 @@ from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.seq import unrepeated
 from cs.tagset import (
-    Tag,
-    TagSet,
-    TagBasedTest,
-    TagsOntology,
-    TagFile,
-    TagsOntologyCommand,
-    TagsCommandMixin,
+    BaseTagSets,
+    HasTags,
     RegexpTagRule,
+    Tag,
+    TagBasedTest,
+    TagFile,
+    TagSet,
+    TagsCommandMixin,
+    TagsOntology,
+    TagsOntologyCommand,
+    UsesTagSets,
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property, State
