@@ -3184,9 +3184,6 @@ class UsesTagSets:
       )
     return self.HasTagsClass(te, self)
 
-  def __getitem__(self, index: Tuple[str, Union[str | int]]) -> HasTags:
-    ''' Fetch the `HasTags` instance for the supplied `index`,
-        which may be a *subname*`.`*key* string or a `(subname,key)` 2-tuple.
   @classmethod
   @trace
   def by_entity_id(cls, entity_id: str) -> HasTags:
@@ -3206,19 +3203,44 @@ class UsesTagSets:
     assert tags_db.TYPE_ZONE == zone
     return tags_db[subname, key]
 
+  def __getitem__(
+      self,
+      index: Union[
+          str,
+          Tuple[str, Union[str, int]],
+          Tuple[str, str, Union[str, int]],
+      ],
+  ) -> HasTags:
+    ''' Fetch the `HasTags` instance for the supplied `index`.
+        The `index` ay take the following forms:
+        - `(subname,key)`: a 2-tuple of the type subname and key in `self.TYPE_ZONE`;
+          the key may be a `str` or an `int`
+        - `str`: a string which will be split into subname and key
+          for use in `self.TYPE_ZONE`
+        - `(zone,subname,key)`: a 3-tuple of the type zone, subname and key
     '''
     with Pfx("%s[%s]", self, r(index)):
       if isinstance(index, str):
         type_, key = index.rsplit('.', 1)
+        zone = self.TYPE_ZONE
       elif isinstance(index, tuple):
-        type_, key = index
+        try:
+          # (type,key) -> TYPE_ZONE, type, key
+          type_, key = index
+        except ValueError:
+          # (zone,type,key)
+          zone, type_, key = index
+        else:
+          zone = self.TYPE_ZONE
         if isinstance(key, int):
           key = str(key)
-        else:
-          assert '.' not in key, f'{self}[{index=}: found . in {key=}'
       else:
-        raise TypeError(f'{self}[{r(index)}]: expected str or (subname,key)')
-      te = self.tagsets[f'{self.TYPE_ZONE}.{type_}.{key}']
+        raise TypeError(
+            f'{self}[{r(index)}]: expected str or (subname,key) or (*zone,subname,key)'
+        )
+      assert '.' not in zone
+      assert '.' not in key
+      te = self.tagsets[f'{zone}.{type_}.{key}']
       return self.tagged(te)
 
   def keys(self, subname=None):
