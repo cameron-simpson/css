@@ -1244,6 +1244,7 @@ class PlayOnAPI(HTTPServiceAPI):
       recording.set('download_path', fullpath)
     # apply the SQLTagSet to the FSTags TagSet
     tagged = self.fstags[fullpath]
+    tagged[f'{recording.type_zone}.id'] = recording.type_zone_key
     tagged.update(recording.subtags('playon'), prefix='playon')
     # and also the Series/Season/Episode info
     tagged.update(recording.sei.as_dict())
