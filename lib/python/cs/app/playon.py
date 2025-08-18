@@ -388,41 +388,6 @@ class PlayOnCommand(BaseCommand):
         for T in Ts:
           T.join()
 
-  @staticmethod
-  def _list(argv, options, default_argv, default_format):
-    ''' Inner workings of "ls" and "queue".
-
-        Usage: {ls|queue} [-l] [-o format] [recordings...]
-          List available downloads.
-          -l        Long listing: list tags below each entry.
-          -o format Format string for each entry.
-    '''
-    api = options.api
-    long_mode = False
-    listing_format = default_format
-    opts, argv = getopt(argv, 'lo:', '')
-    for opt, val in opts:
-      if opt == '-l':
-        long_mode = True
-      elif opt == '-o':
-        listing_format = val
-      else:
-        raise NotImplementedError("unhandled option: %r" % (opt,))
-    if not argv:
-      argv = list(default_argv)
-    xit = 0
-    for arg in argv:
-      with Pfx(arg):
-        recording_ids = api.recording_ids_from_str(arg)
-        if not recording_ids:
-          warning("no recording ids")
-          continue
-        for dl_id in sorted(recording_ids):
-          recording = api[dl_id]
-          with Pfx(recording.name):
-            recording.ls(ls_format=listing_format, long_mode=long_mode)
-    return xit
-
   @popopts
   def cmd_downloaded(self, argv, locale='en_US'):
     ''' Usage: {cmd} recordings...
@@ -471,15 +436,25 @@ class PlayOnCommand(BaseCommand):
       for tag in playon:
         print(" ", tag)
 
-  @popopts
+  @popopts(
+      l=('long_mode', 'Long listing: list tags below each entry.'),
+      o_=(
+          'ls_format',
+          ''' Format string for each entry. Default format:
+              {LS_FORMAT}
+          ''',
+      ),
+  )
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l] [recordings...]
+    ''' Usage: {cmd} [recordings...]
           List available downloads.
-          -l        Long listing: list tags below each entry.
-          -o format Format string for each entry.
-          Default format: {LS_FORMAT}
     '''
-    return self._list(argv, self.options, ['available'], LS_FORMAT)
+    options = self.options
+    options.api.ls(
+        argv or ['available'],
+        format=options.ls_format,
+        long_mode=options.long_mode,
+    )
 
   @popopts
   def cmd_poll(self, argv):
@@ -488,15 +463,25 @@ class PlayOnCommand(BaseCommand):
     api = self.options.api
     pprint(api.notifications())
 
-  @popopts
+  @popopts(
+      l=('long_mode', 'Long listing: list tags below each entry.'),
+      o_=(
+          'queue_format',
+          ''' Format string for each entry. Default format:
+              {QUEUE_FORMAT}
+          ''',
+      ),
+  )
   def cmd_queue(self, argv):
-    ''' Usage: {cmd} [-l] [recordings...]
+    ''' Usage: {cmd} [recordings...]
           List queued recordings.
-          -l        Long listing: list tags below each entry.
-          -o format Format string for each entry.
-          Default format: {QUEUE_FORMAT}
     '''
-    return self._list(argv, self.options, ['queued'], QUEUE_FORMAT)
+    options = self.options
+    options.api.ls(
+        argv or ['available'],
+        format=options.ls_format,
+        long_mode=options.long_mode,
+    )
 
   cmd_q = cmd_queue
 
@@ -1165,6 +1150,20 @@ class PlayOnAPI(HTTPServiceAPI):
         _base_url=self.CDS_HOSTNAME,
         api_version=9,
     )
+
+  def ls(self, recording_specs, *, format: str, long_mode=False):
+    ''' List the specified recordings.
+    '''
+    for spec in recording_specs:
+      with Pfx(spec):
+        recording_ids = self.recording_ids_from_str(spec)
+        if not recording_ids:
+          warning("no recording ids")
+          continue
+        for dl_id in sorted(recording_ids):
+          recording = self[dl_id]
+          with Pfx(recording.name):
+            recording.ls(format=format, long_mode=long_mode)
 
   # pylint: disable=too-many-locals
   @pfx_method
