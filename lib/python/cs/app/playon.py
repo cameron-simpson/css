@@ -263,12 +263,11 @@ class PlayOnCommand(BaseCommand):
           xit = 1
           continue
         _, ext = splitext(basename(fspath))
-        playon_id = fstags[fspath].get('playon.ID')
-        if not playon_id:
-          warning("no playon.ID, skipping")
-          xit = 1
+        try:
+          recording = fstags[fspath].by_zone_key('playon')
+        except KeyError as e:
+          warning("no playon zone key, skipping: %s", e)
           continue
-        recording = api[playon_id]
         new_filename = recording.filename(filename_format)
         new_pfx, new_ext = splitext(new_filename)
         new_filename = new_pfx + ext
