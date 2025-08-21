@@ -16,8 +16,13 @@ from typing import Any, Callable, Iterable, Mapping
 
 from cs.binary import bs
 from cs.cmdutils import popopts, vprint
-from cs.deco import decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable
-from cs.lex import cutprefix, cutsuffix, FormatAsError, get_nonwhite, printt, r, skipwhite
+from cs.deco import (
+    decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
+    uses_verbose
+)
+from cs.lex import (
+    cutprefix, cutsuffix, FormatAsError, get_nonwhite, printt, r, skipwhite
+)
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite
@@ -988,11 +993,14 @@ class SiteMap(UsesTagSets, Promotable):
 
   @classmethod
   @pfx_method
+  @uses_verbose
   @promote
   def on_matches(
       cls,
       flowstate: FlowState,
       methodglob: str | None = None,
+      *,
+      verbose: bool,
       **match_kw,
   ) -> Iterable[tuple[Callable, TagSet]]:
     ''' A generator yielding `(method,match)` 2-tuples for methods matched
@@ -1069,12 +1077,16 @@ class SiteMap(UsesTagSets, Promotable):
           for condition in conjunction:
             cond_spec = getattr(condition, "__name__", str(condition))
             with Pfx("on_matches: test %r vs %s", method_name, cond_spec):
+              print('ON_MATCHES', f'{method_name} vs {cond_spec}')
+              if verbose:
+                printt(*[(f'  {k}', v) for k, v in sorted(match.items())],)
               try:
                 test_result = pfx_call(condition, flowstate, match)
               except Exception as e:
                 warning("exception in condition: %s", e)
                 # TODO: just fail? print a traceback if we do this
                 raise
+              print(f'  -> {test_result=}')
               # test ran, examine result
               if test_result is None or test_result is False:
                 # failure
@@ -1084,9 +1096,13 @@ class SiteMap(UsesTagSets, Promotable):
                 # success, no side effects
                 pass
               else:
+                print(
+                    "  true but not True, should be a mapping", r(test_result)
+                )
                 # should be a mapping, update the match TagSet
                 # typical example: the result is a re.Match.groupdict()
                 for k, v in test_result.items():
+                  print(f'    set match[{k=}] = {v=}')
                   match[k] = v
           else:
             # no test failed, this is a match
