@@ -1794,13 +1794,12 @@ class FormatableFormatter(Formatter):
     return get_identifier(field_name)
 
   # pylint: disable=arguments-differ
-  @pfx_method
   def get_field(self, field_name, args, kwargs):
     ''' Get the object referenced by the field text `field_name`.
         Raises `KeyError` for an unknown `field_name`.
     '''
     assert not args
-    with Pfx("field_name=%r: kwargs=%r", field_name, kwargs):
+    with Pfx("get_field %r", field_name):
       arg_name, offset = self.get_arg_name(field_name)
       arg_value, _ = self.get_value(arg_name, args, kwargs)
       # resolve the rest of the field
@@ -1837,7 +1836,6 @@ class FormatableFormatter(Formatter):
     return value
 
   # pylint: disable=arguments-differ,arguments-renamed
-  @pfx_method
   def get_value(self, arg_name, args, kwargs):
     ''' Get the object with index `arg_name`.
 
@@ -2097,7 +2095,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         to provide a mapping for `str.format_map`
         then the instance itself is used as the mapping.
     '''
-    with Pfx(f'{self.__class__.__name__}.format_as({format_s=},...)'):
+    with Pfx(f'{self.__class__.__name__}.format_as'):  ##({format_s=},...)'):
       get_format_mapping = getattr(self, 'format_kwargs', None)
       if get_format_mapping is None:
         if control_kw:
@@ -2113,8 +2111,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       if strict is None:
         strict = self.format_mode.strict
       with self.format_mode(strict=strict):
-        return pfx_call(
-            _format_as,
+        return _format_as(
             format_s,
             format_mapping,
             formatter=self,
