@@ -3227,8 +3227,9 @@ class UsesTagSets:
   ) -> HasTags:
     ''' Fetch the `HasTags` instance for the supplied `index`.
         The `index` ay take the following forms:
-        - `(subname,key)`: a 2-tuple of the type subname and key in `self.TYPE_ZONE`;
-          the key may be a `str` or an `int`
+        - `(subname,key)`: a 2-tuple of the type subname and key
+          in `self.TYPE_ZONE`; the key may be a `str` or an `int`;
+          the subname make also be a subclass of `self.HasTagsClass`
         - `str`: a string which will be split into subname and key
           for use in `self.TYPE_ZONE`
         - `(zone,subname,key)`: a 3-tuple of the type zone, subname and key
@@ -3246,6 +3247,8 @@ class UsesTagSets:
           zone, type_, key = index
         else:
           zone = self.TYPE_ZONE
+          if trace(issubclass, retval=True)(type_, self.HasTagsClass):
+            type_ = type_.TYPE_SUBNAME
         if isinstance(key, int):
           key = str(key)
       else:
