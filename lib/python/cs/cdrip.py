@@ -619,11 +619,23 @@ class MBRecording(_MBEntity):
         raise AttributeError("no .title: {e}") from e
     return title
 
+class MBTrack(_MBEntity):
+  ''' A Musicbrainz track entry, a recording on a disc.
+  '''
+
+  TYPE_SUBNAME = 'track'
+
 class MBRelease(_MBEntity):
   ''' A Musicbrainz recording entry, a single track.
   '''
 
   TYPE_SUBNAME = 'release'
+
+class MBReleaseGroup(_MBEntity):
+  ''' A Musicbrainz release group, associated with a recording.
+  '''
+
+  TYPE_SUBNAME = 'release_group'
 
 class MBSQLTags(SQLTags):
   ''' Musicbrainz flavoured `SQLTags`; it just has custom values for the default db location.
