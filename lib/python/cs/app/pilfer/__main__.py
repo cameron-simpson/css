@@ -256,7 +256,8 @@ class PilferCommand(BaseCommand):
           ''' Dump the page content, normally omitted.
               Currently supports HTML (text/html) and JSON (application/json).
           ''',
-      )
+      ),
+      no_redirects='Do not follow redirects.',
   )
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [METHOD] url [header:value...] [param=value...]
@@ -305,6 +306,7 @@ class PilferCommand(BaseCommand):
         headers=rqhdrs,
         params=(None if not params or method == 'POST' else params),
         data=(None if not params or method != 'POST' else params),
+        allow_redirects=not options.no_redirects,
     )
     if rsp.status_code != 200:
       warning("%s %s -> status_code %r", method, url, rsp.status_code)
