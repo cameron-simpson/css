@@ -1558,15 +1558,17 @@ class FormatAsError(LookupError):
     if error_sep is None:
       error_sep = self.DEFAULT_SEPARATOR
     LookupError.__init__(self, key)
-    self.args = (key, format_s, format_mapping, error_sep)
+    self.key = key
+    self.format_s = format_s
+    self.format_mapping = format_mapping
+    self.error_sep = error_sep
 
   def __str__(self):
-    key, format_s, format_mapping, error_sep = self.args
-    return error_sep.join(
+    return self.error_sep.join(
         (
-            "format fails, missing key: %s" % (key,),
-            "format string was: %r" % (format_s,),
-            "available keys: %s" % (' '.join(sorted(format_mapping.keys()))),
+            f'format fails, missing key {self.key!r}:',
+            f'format string was {self.format_s!r}',
+            f'available keys: {" ".join(sorted(self.format_mapping.keys()))}',
         )
     )
 
