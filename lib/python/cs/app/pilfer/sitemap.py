@@ -666,6 +666,12 @@ class SiteEntity(HasTags):
         f'no grok_sitepage implementation for {type(self)}'
     )
 
+  def update(self, *, force=False):
+    ''' Update this entity from its sitepage if stale.
+    '''
+    for _ in self.tags_db.updated_entities((self,), force=force):
+      pass
+
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
   ''' A pattern match result:
@@ -809,6 +815,11 @@ class SiteMap(UsesTagSets, Promotable):
   ):
     ''' A generator yielding updated `SiteEntity` instances
         from an iterable of `SiteEntity` instances.
+
+        Parameters:
+        - `entities`: an iterable of `SiteEntity` instances to update
+        - `force`: optional flag to force an update even if the
+          entity does not appear stale
     '''
 
     def entity_sitepages(entities: Iterable[SiteEntity]):
