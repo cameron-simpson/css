@@ -26,6 +26,7 @@ from cs.lex import (
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite
+from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import content_encodings, content_type
 from cs.seq import ClonedIterator
@@ -1475,16 +1476,17 @@ class SiteMap(UsesTagSets, Promotable):
     subname = argv.pop(0)
     if not argv:
       # list all entities of this type
-      for ent in self.updated_entities(
-          self[key] for key in sorted(self.keys(subname=subname))):
-        print(ent.type_subname, ent.type_key)
-        if long_mode:
-          printt(
-              *(
-                  [f'  {tag_name}', tag_value]
-                  for tag_name, tag_value in sorted(ent.items())
-              )
-          )
+      argv = sorted(self.keys(subname=subname))
+    Q = ListQueue((self[key] for key in argv), unique=lambda ent: ent.name)
+    for ent in self.updated_entities(Q):
+      print(ent.type_subname, ent.type_key)
+      if long_mode:
+        printt(
+            *(
+                [f'  {tag_name}', tag_value]
+                for tag_name, tag_value in sorted(ent.items())
+            )
+        )
 
 # expose the @on decorator globally
 on = SiteMap.on
