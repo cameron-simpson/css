@@ -623,7 +623,10 @@ class SiteEntity(HasTags):
   def sitepage(self) -> str:
     ''' The `sitepage` is derived from `self.SITEPAGE_FORMAT`.
     '''
-    url = self.__getattr__('sitepage')
+    try:
+      url = self["sitepage"]
+    except KeyError:
+      url = self.__getattr__('sitepage')
     if url.startswith('/'):
       url = f'{self.url_root}{url[1:]}'
     return url
