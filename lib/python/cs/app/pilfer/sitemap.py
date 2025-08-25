@@ -1248,6 +1248,37 @@ class SiteMap(UsesTagSets, Promotable):
       return
     yield from self.run_matches(flowstate, flowattr, 'grok_*', **run_match_kw)
 
+  @staticmethod
+  @decorator
+  def grok_entity_sitepage(func, *, ent_class):
+    ''' A decorator for sitepage `grok_*` methods which apply grokked
+        information to a `SiteEntity`.
+        This obtains the `entity` from `self[ent_class,match["type_key"]]`,
+        calls `entity.grok_sitepage(flowstate)`,
+        calls `func(self,flowstate,match,entity)`,
+        returns the `entity`.
+
+        Example:
+
+            @on(
+                URL_DOMAIN,
+                r'/something/(?P<type_key>[^/+])/....',
+            )
+            @grok_entity_sitepage(ent_class=FrogEntity)
+            def grok_frog_sitepage(self, flowstate: FlowState, match, entity:FrogEntity):
+                pass # this example does no additional work
+    '''
+
+    def _grok_sitepage_wrapper(
+        self, flowstate: FlowState, match
+    ) -> SiteEntity:
+      entity = self[ent_class, match["type_key"]]
+      entity.grok_sitepage(flowstate)
+      func(self, flowstate, match, entity)
+      return entity
+
+    return _grok_sitepage_wrapper
+
   def matches(
       self,
       url: URL,
