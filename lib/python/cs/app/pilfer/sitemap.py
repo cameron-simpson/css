@@ -670,7 +670,7 @@ class SiteEntity(HasTags):
         f'no grok_sitepage implementation for {type(self)}'
     )
 
-  def update(self, *, force=False):
+  def update_entity(self, *, force=False):
     ''' Update this entity from its sitepage if stale.
     '''
     for _ in self.tags_db.updated_entities((self,), force=force):
