@@ -10,6 +10,7 @@ from fnmatch import fnmatch
 from functools import cached_property
 from itertools import zip_longest
 import re
+from threading import Thread
 import time
 from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping
@@ -26,7 +27,7 @@ from cs.lex import (
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite
-from cs.queues import ListQueue
+from cs.queues import IterableQueue, ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import content_encodings, content_type
 from cs.seq import ClonedIterator
@@ -1577,8 +1578,9 @@ class SiteMap(UsesTagSets, Promotable):
             )
         )
 
-# expose the @on decorator globally
+# expose the @on and @grok_entity_sitepage decorators globally
 on = SiteMap.on
+grok_entity_sitepage = SiteMap.grok_entity_sitepage
 
 # Some presupplied site maps.
 
