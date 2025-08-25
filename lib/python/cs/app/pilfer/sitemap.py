@@ -1539,13 +1539,18 @@ class SiteMap(UsesTagSets, Promotable):
       body.insert(0, toolbar)
     return soup
 
-  @popopts(l=('long_mode', 'Long Mode.'))
+  @popopts(
+      l=('long_mode', 'Long Mode.'),
+      r=('recurse', 'Recurse into related entities.'),
+  )
   def cmd_ls(self, argv):
     ''' Usage: {cmd} subname [type [key...]]
           List entities for this SiteMap.
     '''
     options = self.options
     long_mode = options.long_mode
+    recurse = options.recurse
+    runstate = options.runstate
     if not argv:
       # list subnames - entity types
       for subname in sorted(set(subname for subname, type_key in self.keys())):
@@ -1554,29 +1559,32 @@ class SiteMap(UsesTagSets, Promotable):
           printt(
               *(
                   [
-                      f'  {entity.type_key}',
+                      entity.type_key,
                       entity.get('fullname') or entity.get('title', ''),
                   ] for entity in map(
                       lambda key: self[key],
                       sorted(self.keys(subname=subname))
                   )
-              )
+              ),
+              indent='  '
           )
       return 0
     subname = argv.pop(0)
-    if not argv:
+    if argv:
+      keys = [(subname, key) for key in argv]
+    else:
       # list all entities of this type
-      argv = sorted(self.keys(subname=subname))
-    Q = ListQueue((self[key] for key in argv), unique=lambda ent: ent.name)
-    for ent in self.updated_entities(Q):
+      keys = sorted(self.keys(subname=subname))
+      print("self.keys ->", *map(r, keys))
+    Q = ListQueue((self[key] for key in keys), unique=lambda ent: ent.name)
+    for ent in self.updated_entities(Q, force=True):
+      runstate.raiseif()
       print(ent.type_subname, ent.type_key)
       if long_mode:
-        printt(
-            *(
-                [f'  {tag_name}', tag_value]
-                for tag_name, tag_value in sorted(ent.items())
-            )
-        )
+        printt(*sorted(ent.items()), indent='  ')
+      if recurse:
+        for (attr, subents) in ent.related():
+          print(attr, '->', [subent.name for subent in subents])
 
 # expose the @on and @grok_entity_sitepage decorators globally
 on = SiteMap.on
