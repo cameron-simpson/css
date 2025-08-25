@@ -826,38 +826,93 @@ class SiteMap(UsesTagSets, Promotable):
           entity does not appear stale
     '''
 
-    def entity_sitepages(entities: Iterable[SiteEntity]):
-      ''' A generator yielding `(entity,sitepage)` 2-tuples
-          for entities with a `.sitepage` property.
-          Entities with a `"sitepage.last_update_unixtime"` tag
-          are skipped unless `force` is true.
-      '''
-      for entity in entities:
-        if not force and "sitepage.last_update_unixtime" in entity.tags:
-          print(
-              f'update_entities: skip {entity.name}, has sitepage.last_update_unixtime'
-          )
-          continue
-        try:
-          sitepage = entity.sitepage
-        except AttributeError as e:
-          warning("no .sitepage for %s: %s", entity, e)
-        else:
-          yield entity, sitepage
+    # Prepare queues for processing:
+    #
+    # entities -> process_entities --ent_spQ-> process_entity_sitepages
+    #                    |                            |
+    #                    v                            |
+    #                 ent_fsQ <-----------------------+
+    #                    |
+    #                    v
+    #         call entity.grok_sitepage(flowstate)
+    #                    |
+    #                    v
+    #             updated entities
 
-    esps = ClonedIterator(entity_sitepages(entities))
-    for (entity, sitepage), flowstate in zip(
-        esps,
-        FlowState.iterable_flowstates(esp[1] for esp in esps),
-    ):
-      print("UPDATE", entity, "from", sitepage)
-      grok_time = time.time()
+    ent_spQ = IterableQueue()
+    ent_fsQ = IterableQueue()
+
+    def process_entities():
+      ''' Process the iterable of entities.
+          Entities with no sitepage or which are not stale
+          are put diectly only `ent_fsQ` with `None` for the `flowstate`.
+          Other entities are put only `flowstateQ` to be fetched.
+      '''
       try:
-        entity.grok_sitepage(flowstate)
-      except NotImplementedError:
-        pass
-      else:
-        entity["sitepage.last_update_unixtime"] = grok_time
+        for entity in entities:
+          print(f'PROCESS_ENTITIES: entity {entity}')
+          sitepage = getattr(entity, "sitepage", None)
+          if sitepage is None:
+            ent_fsQ.put((entity, None))
+          elif not force and "sitepage.last_update_unixtime" in entity:
+            ent_fsQ.put((entity, None))
+          else:
+            ent_spQ.put((entity, sitepage))
+      finally:
+        # close the (entity,sitepage) processor
+        ent_spQ.close()
+        # send one of the 2 end markers for the (entity,flowstate) queue
+        ent_fsQ.put((None, None))
+
+    def process_entity_sitepages():
+      ''' Process the queue of `(entity,sitepage)` pairs from `ent_spQ`
+          and put `(entity,flowstate)` 2-tuples onto `ent_fsQ`
+          as the flowstates become ready (HTTP response received,
+          content available in streaming mode).
+      '''
+      try:
+        ent_sps = ClonedIterator(ent_spQ)
+        for (entity, sitepage), flowstate in zip(
+            ent_sps,
+            FlowState.iterable_flowstates(
+                (ent_sp[1] for ent_sp in ent_sps),
+                unordered=False,
+            ),
+        ):
+          ent_fsQ.put((entity, flowstate))
+      finally:
+        # send one of the 2 end markers
+        ent_fsQ.put((None, None))
+
+    # dispatch the workers
+    process_entitiesT = Thread(target=process_entities, daemon=True)
+    process_entity_sitepagesT = Thread(
+        target=process_entity_sitepages, daemon=True
+    )
+    process_entitiesT.start()
+    process_entity_sitepagesT.start()
+
+    # Process the (entity,flowstate) queue.
+    # Each 2-tuple received will be:
+    # - (None,None): an end marker from one of the workers - we expect 2
+    # - (entity,None): an entity whose sitepage is unknown or unobtainable
+    # - (entity,flowstate): an entity and a ready flowstate whose content can be processed
+    n_end_markers = 0
+    for qitem in ent_fsQ:
+      print("ent_fsQ ->", r(qitem))
+      entity, flowstate = qitem
+      if entity is None:
+        assert flowstate is None
+        n_end_markers += 1
+        if n_end_markers == 2:
+          break
+        continue
+      if flowstate is not None:
+        # process the flowstate
+        try:
+          pfx_call(entity.grok_sitepage, flowstate)
+        except Exception as e:
+          warning("exception calling %s.grok_sitepage: %s", entity, e)
       yield entity
 
   @staticmethod
