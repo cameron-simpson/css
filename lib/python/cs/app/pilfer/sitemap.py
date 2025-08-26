@@ -631,7 +631,15 @@ class SiteEntity(HasTags):
 
   @property
   def sitepage(self) -> str:
-    ''' The `sitepage` is derived from `self.SITEPAGE_FORMAT`.
+    ''' The `sitepage` is derived from `self["sitepage"]`
+        and failing that from `self.SITEPAGE_FORMAT`.
+        If this value commences with a `/` then `self.url_root` is
+        prepended to it before return.
+
+        This means that entities which record their page as `["sitepage"]`
+        fetch that exact URL.
+        Otherwise the sitepage is computed from `self.SITEPAGE_FORMAT`,
+        which need only specify the path component.
     '''
     try:
       url = self["sitepage"]
@@ -644,7 +652,7 @@ class SiteEntity(HasTags):
   def equivalents(self):
     ''' Return a list of equivalent `SiteEntity` instances from other type zones,
         derived from the keys in `self['equivalents']`.
-        Unhandled key elicit a warning and are discarded.
+        Unhandled keys elicit a warning and are discarded.
     '''
     with Pfx("%s.equivalents", self):
       equiv_keys = self.get('equivalents', [])
