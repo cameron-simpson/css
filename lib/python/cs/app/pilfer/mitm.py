@@ -282,7 +282,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   assert P is not None
   rq = flow.request
   url = URL(rq.url)
-  PR = partial(print, CACHED_FLOW, rq.method, url.short)
+  PR = partial(print, 'CACHED_FLOW', rq.method, url.short)
   if rq.method not in ('GET', 'HEAD'):
     ##PR(rq.method, "is not GET or HEAD")
     return
