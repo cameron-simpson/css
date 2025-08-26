@@ -159,6 +159,11 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   # class attribute holding the per-thread state stack
   perthread_state = ThreadState()
 
+  # Shared count of the existing FlowState instance
+  # raised by __init__, lowered by __del__.
+  # Used to look for leaking FlowSTate references.
+  nfs = 0
+
   @fmtdoc
   @promote
   def __init__(self, url: URL, **ns_kw):
@@ -179,6 +184,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
         - `.request` and `.response` are obtained from `.flow`
         - `.url` is obtained from `.request.url`
     '''
+    FlowState.nfs += 1
+    vprint("FlowStates += 1 ->", FlowState.nfs)
     super().__init__(url=url, **ns_kw)
     extra_attrs = self.__dict__.keys() - (
         'bs4parser',
@@ -213,6 +220,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   def __del__(self):
     ''' Close `self.response` on delete.
     '''
+    FlowState.nfs -= 1
+    vprint("FlowStates -= 1 ->", FlowState.nfs)
     rsp = self.__dict__.get('response')
     if rsp is not None:
       rsp.close()
