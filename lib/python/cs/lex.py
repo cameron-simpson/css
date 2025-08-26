@@ -1542,6 +1542,11 @@ def printt(
   for line in tabulate(*table, **tabulate_kw):
     print_func(indent + line, file=file, flush=flush)
 
+def single_space(s: str, *, sep=' ') -> str:
+  ''' Return the string `s` stripped and with internal whitespace replaced by `sep` (default `" "`).
+  '''
+  return sep.join(s.strip().split())
+
 # pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
