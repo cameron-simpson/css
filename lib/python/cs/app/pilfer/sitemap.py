@@ -596,7 +596,7 @@ class SiteEntity(HasTags):
         except FormatAsError as e:
           warning("%s.format_as %r: %s", self, format_s, e)
           raise AttributeError(
-              f'format {self.__class__.__name__}.{fmtattr_name} {format_s!r}: {e}'
+              f'format {self.__class__.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
           ) from e
     return super().__getattr__(attr)
 
