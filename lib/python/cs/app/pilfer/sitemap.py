@@ -850,6 +850,7 @@ class SiteMap(UsesTagSets, Promotable):
     #             updated entities
 
     ent_spQ = IterableQueue()
+    ent_sps = ClonedIterator(ent_spQ)
     ent_fsQ = IterableQueue()
 
     def process_entities():
@@ -881,7 +882,6 @@ class SiteMap(UsesTagSets, Promotable):
           content available in streaming mode).
       '''
       try:
-        ent_sps = ClonedIterator(ent_spQ)
         for (entity, sitepage), flowstate in zip(
             ent_sps,
             FlowState.iterable_flowstates(
