@@ -1,3 +1,9 @@
+cs.cmdutils cmd_shell_completion to emit shell completion for $SHELL, see https://mill-build.org/blog/14-bash-zsh-completion.html
+histbackup: --reflink to be deprecaded in favour of --link-mode=default,reflink,clonefile, use reflink on linux, clonefile/cp -c on macos
+redo grepall in python, the sed is getting tricky
+dl FOO: puts a literal +when into the log entry in dlog-quick, likely elsewhere
+vq: scan a file eg a hashindex?
+hasindex comm: accept a file containing a hash index, like we accept - ?
 icontract and icontract-lint's build process uses setup.py, needs updating
 cs.cmdutils: BaseCommand.poppreargv to replace apply_preargv, saving returning the argv which we are modifying in place anyway
 cs.psutils et al: SIGKILL does not exist on Windows - possibly only SIGTERM exists on Windows - check and make a bit portable

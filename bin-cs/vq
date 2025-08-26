@@ -2,7 +2,7 @@
 
 set -ue
 
-: ${VQPATH:="$HOME/dl/v:$HOME/v:$HOME/vv:$HOME/media/video"}
+: "${VQPATH:=$HOME/dl/v:$HOME/v:$HOME/vv:$HOME/media/video}"
 
 vqpaths=
 for d in $( echo "$VQPATH" | tr : ' ' )
@@ -21,8 +21,16 @@ done
 
 word1=$1; shift
 
-if [ $# = 0 ]
-then  find $vqpaths -iname "*${word1}*"
-else  find $vqpaths -iname "*${word1}*" | grepall "$word1" "$@"
-fi \
+for vqpath in $vqpaths
+do
+  if [ -d "$vqpath/." ]
+  then
+    if [ $# = 0 ]
+    then  find "$vqpath" -iname "*${word1}*"
+    else  find "$vqpath" -iname "*${word1}*" | grepall -i "$word1" "$@"
+    fi
+  else
+    grepall -i "$word1" ${1+"$@"} < "$vqpath"
+  fi
+done \
 | sort
