@@ -1549,6 +1549,7 @@ class SiteMap(UsesTagSets, Promotable):
     return soup
 
   @popopts(
+      f=('force', 'Force refresh of entities even if not stale.'),
       l=('long_mode', 'Long Mode.'),
       r=('recurse', 'Recurse into related entities.'),
   )
@@ -1557,6 +1558,7 @@ class SiteMap(UsesTagSets, Promotable):
           List entities for this SiteMap.
     '''
     options = self.options
+    force = options.force
     long_mode = options.long_mode
     recurse = options.recurse
     runstate = options.runstate
@@ -1586,9 +1588,9 @@ class SiteMap(UsesTagSets, Promotable):
       keys = sorted(self.keys(subname=subname))
       print("self.keys ->", *map(r, keys))
     Q = ListQueue((self[key] for key in keys), unique=lambda ent: ent.name)
-    for ent in self.updated_entities(Q, force=True):
+    for ent in self.updated_entities(Q, force=force):
       runstate.raiseif()
-      print(ent.type_subname, ent.type_key)
+      print(ent.name)
       if long_mode:
         printt(*sorted(ent.items()), indent='  ')
       if recurse:
