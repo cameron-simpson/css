@@ -618,16 +618,22 @@ class SiteEntity(HasTags):
     )
     return kwargs
 
+  @property
+  def sitemap(self):
+    ''' The `SiteMap` is the `tags_db`.
+    '''
+    return self.tags_db
+
   @cached_property
   def url_root(self):
-    ''' Proxy to `self.tags_db.url_root`.
+    ''' Proxy to `self.sitemap.url_root`.
     '''
-    return self.tags_db.url_root
+    return self.sitemap.url_root
 
   def urlto(self, path):
-    ''' Proxy to `self.tags_db.urlto()`.
+    ''' Proxy to `self.sitemap.urlto()`.
     '''
-    return self.tags_db.urlto(path)
+    return self.sitemap.urlto(path)
 
   @property
   def sitepage(self) -> str:
