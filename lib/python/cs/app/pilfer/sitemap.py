@@ -689,7 +689,7 @@ class SiteEntity(HasTags):
         mark the `last_update_unixtime` tag if this method raises
         `NotImplementedError`, which this default implementation does.
     '''
-    warning("%s.grok_sitepage: not grokking anything from %s", self, flowstate)
+    ##warning("%s.grok_sitepage: not grokking anything from %s", self, flowstate)
     raise NotImplementedError(
         f'no grok_sitepage implementation for {type(self)}'
     )
@@ -786,7 +786,8 @@ class SiteMap(UsesTagSets, Promotable):
     try:
       self.TYPE_ZONE
     except AttributeError:
-      warning(f'no .TYPE_ZONE for SiteMap instance {self}')
+      ##warning(f'no .TYPE_ZONE for SiteMap instance {self}')
+      pass
     else:
       try:
         other_map = sitemap_by_type_zone[self.TYPE_ZONE]
@@ -875,13 +876,15 @@ class SiteMap(UsesTagSets, Promotable):
       '''
       try:
         for entity in entities:
-          print(f'PROCESS_ENTITIES: entity {entity}')
+          ##print(f'PROCESS_ENTITIES: entity {entity}')
           sitepage = getattr(entity, "sitepage", None)
           if sitepage is None:
+            ##print("  NO SITEPAGE")
             ent_fsQ.put((entity, None))
           elif not force and "sitepage.last_update_unixtime" in entity:
             ent_fsQ.put((entity, None))
           else:
+            ##print(f'process_entities: ({entity=},{sitepage=}) -> ent_sqQ')
             ent_spQ.put((entity, sitepage))
       finally:
         # close the (entity,sitepage) processor
@@ -903,6 +906,7 @@ class SiteMap(UsesTagSets, Promotable):
                 unordered=False,
             ),
         ):
+          ##print(f'process_entity_sitepages: ent_fsQ <- ({entity=},flowstate)')
           ent_fsQ.put((entity, flowstate))
       finally:
         # send one of the 2 end markers
@@ -923,7 +927,7 @@ class SiteMap(UsesTagSets, Promotable):
     # - (entity,flowstate): an entity and a ready flowstate whose content can be processed
     n_end_markers = 0
     for qitem in ent_fsQ:
-      print("ent_fsQ ->", r(qitem))
+      ##print("ent_fsQ ->", r(qitem))
       entity, flowstate = qitem
       if entity is None:
         assert flowstate is None
@@ -1171,16 +1175,17 @@ class SiteMap(UsesTagSets, Promotable):
           for condition in conjunction:
             cond_spec = getattr(condition, "__name__", str(condition))
             with Pfx("on_matches: test %r vs %s", method_name, cond_spec):
-              print('ON_MATCHES', f'{method_name} vs {cond_spec}')
               if verbose:
-                printt(*[(f'  {k}', v) for k, v in sorted(match.items())],)
+                print('ON_MATCHES', f'{method_name} vs {cond_spec}')
+                printt(*sorted(match.items()), indent='  ')
               try:
                 test_result = pfx_call(condition, flowstate, match)
               except Exception as e:
                 warning("exception in condition: %s", e)
                 # TODO: just fail? print a traceback if we do this
                 raise
-              print(f'  -> {test_result=}')
+              if verbose:
+                print(f'  -> {test_result=}')
               # test ran, examine result
               if test_result is None or test_result is False:
                 # failure
@@ -1190,17 +1195,15 @@ class SiteMap(UsesTagSets, Promotable):
                 # success, no side effects
                 pass
               else:
-                print(
-                    "  true but not True, should be a mapping", r(test_result)
-                )
                 # should be a mapping, update the match TagSet
                 # typical example: the result is a re.Match.groupdict()
                 for k, v in test_result.items():
-                  print(f'    set match[{k=}] = {v=}')
+                  vprint(f'    set match[{k=}] = {v=}')
                   match[k] = v
           else:
+            vprint("ALL CONDITIONS OK")
             # no test failed, this is a match
-            # update match with any format strings from @on
+            # update the match with any format strings from @on
             for name, fmt in tags_kw.items():
               if callable(fmt):
                 match[name] = fmt(flowstate, match)
