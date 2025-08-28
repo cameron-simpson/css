@@ -695,11 +695,11 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
   def __getitem__(self, index) -> _MBEntity:
     ''' Fetch an `_MBEntity` from an `(mbtype,mbkey)` 2-tuple.
     '''
-    with Pfx("%s[%s]", self, r(index)):
-      assert isinstance(index, tuple)
+    try:
       mbtype, key = index
-      assert '.' not in mbtype
-      tetype = mbtype.replace('-', '_')
+    except ValueError:
+      pass
+    else:
       # UUIDs do not contain . or +
       # discids may contain . and should not contain +
       # the sqltags type_key part should not contain a .
@@ -707,9 +707,11 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
       # discid stuff:
       # https://github.com/metabrainz/libdiscid/blob/192edd70f17661f1a13ac3b349a2a2d96f5f0351/src/base64.c#L85
       # this is amazingly ill specified AFAICT
-      assert '+' not in key
-      tekey = key.replace('.', '+')
-      return super().__getitem__((tetype, tekey))
+      index = (
+          mbtype.replace('-', '_') if isinstance(mbtype, str) else mbtype,
+          key.replace('.', '+'),
+      )
+    return super().__getitem__(index)
 
   # pylint: disable=too-many-arguments
   @pfx_method
