@@ -864,6 +864,7 @@ class SiteMap(UsesTagSets, Promotable):
     #                    v
     #             updated entities
 
+    start_time = time.time()
     ent_spQ = IterableQueue()
     ent_sps = ClonedIterator(ent_spQ)
     ent_fsQ = IterableQueue()
@@ -941,6 +942,8 @@ class SiteMap(UsesTagSets, Promotable):
           pfx_call(entity.grok_sitepage, flowstate)
         except Exception as e:
           warning("exception calling %s.grok_sitepage: %s", entity, e)
+        else:
+          entity["sitepage.last_update_unixtime"] = start_time
       yield entity
 
   @staticmethod
