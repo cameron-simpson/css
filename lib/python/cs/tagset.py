@@ -2596,8 +2596,10 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       * `keys(self)`: return an iterable of names
 
       Subclasses may reasonably want to override the following:
-      * `startup_shutdown(self)`: context manager to allocate and release any
-        needed resources such as database connections
+      * `startup_shutdown(self)`: a context manager to allocate and
+        release any needed resources such as database connections;
+        this is used via the `MultiOpenMixin` when the instance is
+        used as a context manager
 
       Subclasses may implement:
       * `__len__(self)`: return the number of names
@@ -2841,7 +2843,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
         If `attr` is `None`, the lookup is done on the entity `.name`,
         which is `{te.type_zone}.{subtype}.{key}`.
         If the value is a `Sequence` then the default `subtype` is the
-        `tag_name`, with a trailing `s` removed if present, and the
+        `tag_name`, with a trailing `_id` removed if present, and the
         `key` is each element of the value in turn.
         If the value is not a `Sequence` then the `subtype` defaults
         to the `tag_name` and the `key` is the tag value.
@@ -2893,8 +2895,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       return None
     if isinstance(value, Sequence):
       if subtype is None:
-        # an English specific crude hack to infer a subtype from a plural
-        subtype = tag_name[:-1] if tag_name.endswith('s') else tag_name
+        subtype = cutsuffix(tag_name, '_id')
       if attr is None:
         # use the entity name
         return [self[f'{type_zone}.{subtype}.{key}'] for key in value]
