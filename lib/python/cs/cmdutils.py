@@ -1974,7 +1974,7 @@ class BaseCommand:
       )
       banner = "\n".join(
           tabulate(
-              ['{self.cmd} {self.subcmd}:'],
+              [f'{self.cmd} {self.subcmd}:'],
               *([f'  {k}', v] for k, v in sorted(banner_mapping.items()))
           )
       )
