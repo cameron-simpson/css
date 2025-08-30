@@ -424,6 +424,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         * `method`: the HTTP method to use, default `'GET'`
         Other keyword arguments are passed to the `session` request method.
     '''
+    vprint(f'{self.__class__.__name__}: {method} {url}')
     if session is None:
       session = self.session
     # a fresh headers mapping
@@ -690,7 +691,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           try:
             sitemap = named[sitemap_spec]
           except KeyError:
-            warning("ignore unknown bare sitwemap name: %r", sitemap_spec)
+            warning("ignore unknown bare sitemap name: %r", sitemap_spec)
             continue
         else:
           if map_name in named:
