@@ -58,7 +58,11 @@ def uses_pilfer(func):
   ''' Set the optional `P:Pilfer` parameter via a late import.
   '''
 
-  def func_with_Pilfer(*a, P: "Pilfer" = None, **kw):
+  def func_with_Pilfer(
+      *a,
+      P: "Pilfer" = None,  # noqa: F821
+      **kw
+  ):
     if P is None:
       P = default_Pilfer()
     with P:
@@ -257,7 +261,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   def iterable_flowstates(
       cls,
       flowstates: Iterable,
-      P: "Pilfer",
+      P: "Pilfer",  # noqa: F821
       runstate: RunState,
       **later_map_kw,
   ):
@@ -404,7 +408,13 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
 
   @uses_pilfer
   @promote(params=('url',))
-  def GET(self, url: URL = None, *, P: "Pilfer", **rq_kw) -> requests.Response:
+  def GET(
+      self,
+      url: URL = None,
+      *,
+      P: "Pilfer",  # noqa: F821
+      **rq_kw,
+  ) -> requests.Response:
     ''' Do a `Pilfer.GET` of `self.url` and return the `requests.Response`.
         This also updates `self.request` and `self.response`, sets
         `self.iterable_content`, and clears `self.content` and
@@ -774,7 +784,11 @@ class SiteMap(UsesTagSets, Promotable):
   URL_KEY_PATTERNS = ()
 
   @uses_pilfer
-  def __post_init__(self, *, P: "Pilfer"):
+  def __post_init__(
+      self,
+      *,
+      P: "Pilfer",  # noqa: F821
+  ):
     ''' Initialise `.pilfer` if omitted`, and then `.tagsets` from `self.pilfer`.
     '''
     if self.name is None:
@@ -814,7 +828,12 @@ class SiteMap(UsesTagSets, Promotable):
 
   @classmethod
   @uses_pilfer
-  def from_str(cls, sitemap_name: str, *, P: "Pilfer") -> "SiteMap":
+  def from_str(
+      cls,
+      sitemap_name: str,
+      *,
+      P: "Pilfer",  # noqa: F821
+  ) -> "SiteMap":
     ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
     '''
     for name, sitemap in P.sitemaps:
@@ -840,7 +859,11 @@ class SiteMap(UsesTagSets, Promotable):
   @classmethod
   @uses_pilfer
   def updated_entities(
-      cls, entities: Iterable["SiteEntity"], *, P: "Pilfer", force=False
+      cls,
+      entities: Iterable["SiteEntity"],
+      *,
+      P: "Pilfer",  # noqa: F821
+      force=False,
   ):
     ''' A generator yielding updated `SiteEntity` instances
         from an iterable of `SiteEntity` instances.
@@ -1300,7 +1323,9 @@ class SiteMap(UsesTagSets, Promotable):
     '''
 
     def _grok_sitepage_wrapper(
-        self, flowstate: FlowState, match
+        self,
+        flowstate: FlowState,
+        match=None,
     ) -> SiteEntity:
       entity = self[ent_class, match["type_key"]]
       entity.grok_sitepage(flowstate)
@@ -1425,7 +1450,7 @@ class SiteMap(UsesTagSets, Promotable):
       flow,
       content_bs: bs,
       *,
-      P: "Pilfer",
+      P: "Pilfer",  # noqa: F821
   ):
     ''' The generic prefetch handler.
 
@@ -1487,7 +1512,7 @@ class SiteMap(UsesTagSets, Promotable):
       te: str | TagSet,
       flowstate: FlowState,
       *,
-      P: "Pilfer",
+      P: "Pilfer",  # noqa: F821
       **update_kw,
   ):
     ''' Update a `TagSet` from `flowstate.meta`.
