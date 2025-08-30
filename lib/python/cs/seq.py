@@ -409,7 +409,7 @@ class ClonedIterator(Iterable):
       iterator in memory.
   '''
 
-  def __init__(self, it: Iteratable):
+  def __init__(self, it: Iterable):
     ''' Initialise the clone with the iterable `it`.
     '''
     self._iterator = iter(it)
