@@ -634,8 +634,12 @@ class MBRelease(_MBEntity):
 class MBReleaseGroup(_MBEntity):
   ''' A Musicbrainz release group, associated with a recording.
   '''
-
   TYPE_SUBNAME = 'release_group'
+
+class MBLabel(_MBEntity):
+  ''' A Musicbrainz label.
+  '''
+  TYPE_SUBNAME = 'label'
 
 class MBSQLTags(SQLTags):
   ''' Musicbrainz flavoured `SQLTags`; it just has custom values for the default db location.
