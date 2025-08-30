@@ -923,7 +923,7 @@ class Later(MultiOpenMixin, HasThreadState):
   ):
     ''' A generator yielding the results of `func(item)`
         for each `item` in the iterable `it`,
-        usig this `Later` to manage dispatch.
+        using this `Later` to manage dispatch.
 
         `func` must be a callable.
 
