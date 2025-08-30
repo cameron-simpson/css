@@ -316,9 +316,9 @@ from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
 from cs.lex import (
-    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
-    is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_attributes, format_attribute, FStr, r, s
+    cropped, cropped_repr, cutprefix, cutsuffix, get_dotted_identifier,
+    get_nonwhite, is_dotted_identifier, is_identifier, skipwhite,
+    FormatableMixin, has_format_attributes, format_attribute, FStr, r, s
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
