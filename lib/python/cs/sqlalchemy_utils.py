@@ -200,8 +200,9 @@ def with_session(function, *a, orm=None, session=None, **kw):
   with using_session(orm=orm, session=session):
     return function(*a, **kw)
 
+@decorator
 def auto_session(function):
-  ''' Decorator to run a function in a session if one is not presupplied.
+  ''' A decorator to run a function in a session if one is not presupplied.
       The function `function` runs within a transaction,
       nested if the session already exists.
 
@@ -227,9 +228,6 @@ def auto_session(function):
 
     wrapper = auto_session_function_wrapper
 
-  wrapper.__name__ = "@auto_session(%s)" % (funccite(function),)
-  wrapper.__doc__ = function.__doc__
-  wrapper.__module__ = getattr(function, '__module__', None)
   return wrapper
 
 @contextdecorator
@@ -470,6 +468,7 @@ class ORM(MultiOpenMixin, ABC):
     '''
     return self.sqla_state.session
 
+@decorator
 def orm_auto_session(method):
   ''' A decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
@@ -492,11 +491,6 @@ def orm_auto_session(method):
       with using_session(orm=self.orm, session=session) as active_session:
         return method(self, *a, session=active_session, **kw)
 
-  orm_auto_session_wrapper.__name__ = "@orm_auto_session(%s)" % (
-      funcname(method),
-  )
-  orm_auto_session_wrapper.__doc__ = method.__doc__
-  orm_auto_session_wrapper.__module__ = getattr(method, '__module__', None)
   return orm_auto_session_wrapper
 
 class BasicTableMixin:
