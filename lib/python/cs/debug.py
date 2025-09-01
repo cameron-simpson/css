@@ -655,7 +655,6 @@ def trace(
       * `with_caller`: include the caller if this function, default `True`
       * `with_pfx`: include the current `Pfx` prefix, default `False`
   '''
-
   citation = funcname(func)  ## funccite(func)
   fmtv = pformat if use_pformat else cropped_repr
 
@@ -738,10 +737,16 @@ def trace(
               if xlog is X:
                 xlog_kw['colour'] = 'red'
               xlog(
-                  "%sRAISE  %s => %s at %gs",
+                  "%sRAISE  %s => %s:%s\n"
+                  "%s  at %s\n"
+                  "%s  elapsed %gs\n",
                   indent,
                   log_cite,
+                  e.__class__.__name__,
                   e,
+                  indent,
+                  e.__traceback__.tb_next.tb_frame,
+                  indent,
                   end_time - start_time,
                   **xlog_kw,
               )
