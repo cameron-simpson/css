@@ -486,26 +486,6 @@ class DebuggingThread(threading_Thread, DebugWrapper):
     _debug_threads.discard(self)
     return retval
 
-def trace_caller(func):
-  ''' Decorator to report the caller of a function when called.
-  '''
-
-  def subfunc(*a, **kw):
-    frame = caller()
-    D(
-        "CALL %s()<%s:%d> FROM %s()<%s:%d>",
-        func.__name__,
-        func.__code__.co_filename,
-        func.__code__.co_firstlineno,
-        frame.name,
-        frame.filename,
-        frame.lineno,
-    )
-    return func(*a, **kw)
-
-  subfunc.__name__ = "trace_caller/subfunc/" + func.__name__
-  return subfunc
-
 class TracingObject(Proxy):
 
   def __init__(self, other):
