@@ -1526,15 +1526,16 @@ class SQLTagSet(SingletonMixin, TagSet):
     if tag_name == 'id':
       raise ValueError(f'may not set pseudoTag {tag_name!r}')
     if not skip_db:
-      vprint(self.name or self.id, '+', Tag(tag_name, value))
-    with self.db_session():
-      if tag_name in ('name', 'unixtime'):
-        setattr(self, '_' + tag_name, value)
-        if not skip_db:
+      vprint(f'{self.name or self.id} + {tag_name}={value}')
+    if tag_name in ('name', 'unixtime'):
+      setattr(self, '_' + tag_name, value)
+      if not skip_db:
+        with self.db_session():
           setattr(self._get_db_entity(), tag_name, value)
-      else:
-        super().set(tag_name, value, verbose=verbose)
-        if not skip_db:
+    else:
+      super().set(tag_name, value, verbose=False)
+      if not skip_db:
+        with self.db_session():
           self.add_db_tag(tag_name, self.to_polyvalue(tag_name, value))
 
   @pfx_method
