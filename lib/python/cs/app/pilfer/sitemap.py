@@ -723,20 +723,7 @@ class SiteEntity(HasTags):
     '''
     return SiteMap.by_db_key(db_key)
 
-  @promote
-  def grok_sitepage(self, flowstate: FlowState):
-    ''' Parse information from `flowstate` and apply to `self`.
 
-        We expect subclasses to provide site specific implementations.
-
-        Note that the `SiteMap.updated_entities()` method does not
-        mark the `last_update_unixtime` tag if this method raises
-        `NotImplementedError`, which this default implementation does.
-    '''
-    ##warning("%s.grok_sitepage: not grokking anything from %s", self, flowstate)
-    raise NotImplementedError(
-        f'no grok_sitepage implementation for {type(self)}'
-    )
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
@@ -970,6 +957,10 @@ class SiteMap(UsesTagSets, Promotable):
           if sitepage is None:
             # no sitepage, do not update
             ##print("  NO SITEPAGE")
+            ent_fsQ.put((entity, None))
+            continue
+          if not hasattr(entity, 'grok_sitepage'):
+            # sitepage but no grok-sitepage, do not update
             ent_fsQ.put((entity, None))
             continue
           # send the entity and sitepage to the prefetcher
