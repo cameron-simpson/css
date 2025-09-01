@@ -916,6 +916,7 @@ class Later(MultiOpenMixin, HasThreadState):
       self,
       func: Callable,
       it: Iterable,
+      *,
       concurrent=True,
       unordered=False,
       indexed=False,
