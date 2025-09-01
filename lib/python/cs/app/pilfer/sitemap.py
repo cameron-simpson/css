@@ -300,8 +300,12 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
       return fs
 
     with P:
-      for flowstate in P.later.map(get_iterable_fs, flowstates,
-                                   **later_map_kw):
+      for flowstate in P.later.map(
+          get_iterable_fs,
+          flowstates,
+          concurrent=True,
+          **later_map_kw,
+      ):
         yield flowstate
         runstate.raiseif()
 
