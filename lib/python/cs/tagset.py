@@ -3026,6 +3026,11 @@ class HasTags(TagSetTyping, FormatableMixin):
     '''
     return self.tags_db[self.tags_entity_key]
 
+  def as_dict(self):
+    ''' Proxy `.as_dict()` to `self.tags`.
+    '''
+    return self.tags.as_dict()
+
   @cached_property
   def tags_entity_key(self):
     ''' Our tagged entity key, `self.tags.name`.
@@ -3056,6 +3061,11 @@ class HasTags(TagSetTyping, FormatableMixin):
 
   def __contains__(self, key):
     return key in self.tags
+
+  def __delitem__(self, tag_name: str):
+    ''' Remove an entry from `self.tags`.
+    '''
+    del self.tags[tag_name]
 
   def __getitem__(self, tag_name: str):
     ''' Index `self.tags`.
