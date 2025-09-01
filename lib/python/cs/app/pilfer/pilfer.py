@@ -489,7 +489,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     mapping = defaultdict(lambda: defaultdict(str))
     for rcpath in reversed(self.rcpaths):
-      print("Pilfer.rc_map:", rcpath)
+      vprint("Pilfer.rc_map:", rcpath)
       cfg = ConfigParser(allow_unnamed_section=True)
       try:
         pfx_call(cfg.read, rcpath)
