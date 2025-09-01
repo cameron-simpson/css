@@ -1038,7 +1038,7 @@ class SiteMap(UsesTagSets, Promotable):
             else:
               raise ValueError(f'cannot honour update_from={r(update_from)}')
         except Exception as e:
-          warning("exception for update_from=%s: %s", r(update_from), e)
+          warning("exception for update_from=%s: %s", r(update_from), s(e))
         else:
           # mark the entity as up to date as of start_time
           entity["sitepage.last_update_unixtime"] = start_time
