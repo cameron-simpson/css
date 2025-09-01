@@ -650,7 +650,7 @@ class TagSetTyping:
     return self.type_zone_of(self.name)
 
   @classmethod
-  def type_zone_key_of(cls, name: str):
+  def type_zone_key_of(cls, name: str) -> str:
     ''' The type zone of this entity name, the second and following dotted components.
 
         Example:
@@ -1142,22 +1142,10 @@ class TagSet(
         If `verbose`, emit an info message if this changes the previous value.
     '''
     self.modified = True
-    if verbose is None or verbose:
-      if tag_name in self:
-        old_value = self.get(tag_name)
-        if old_value is not value and old_value != value:
-          # report different values
-          tag = Tag(tag_name, value, ontology=self.ontology)
-          if verbose:
-            try:
-              tag_s = str(tag)
-            except TypeError:
-              tag_s = repr(tag)
-            msg = (
-                f'+ {tag_s}'
-                if old_value is None else f'+ {tag_s} (was {old_value!r})'
-            )
-            ifverbose(verbose, msg)
+    if verbose:
+      print(
+          f'{self.name or self.id or f"{self.__class__.__name__}:id(self)"} + {tag_name}={value}'
+      )
     self._set(tag_name, value)
 
   # "set" mode
@@ -3074,7 +3062,8 @@ class HasTags(TagSetTyping, FormatableMixin):
     '''
     return self.tags[tag_name]
 
-  def __setitem__(self, tag_name, value):
+  @uses_verbose
+  def __setitem__(self, tag_name, value, *, verbose=False):
     ''' Set a tag value.
     '''
     self.tags[tag_name] = value
