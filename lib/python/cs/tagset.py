@@ -3118,8 +3118,10 @@ class HasTags(TagSetTyping, FormatableMixin):
   def format_kwargs(self):
     ''' A `format_kwargs` method to support `cs.lex.FormatableMixin`.
     '''
-    # TODO: what to do when the tags and the format attributes conflict?
     kwargs = dict(self.tags)
+    # Allow the format attributes to override the tags,
+    # partly for correctness and partly to allow fallback if a tag is missing,
+    # since the attribute's implementation  might choose the tag if present.
     for kw, method in self.get_format_attributes().items():
       kwargs[kw] = method
     # TODO: grab type_* from TagSetTyping.__dict__.keys() ?
@@ -3247,7 +3249,7 @@ class UsesTagSets:
           zone, type_, key = index
         else:
           zone = self.TYPE_ZONE
-          if trace(issubclass, retval=True)(type_, self.HasTagsClass):
+          if isinstance(type_, type) and issubclass(type_, self.HasTagsClass):
             type_ = type_.TYPE_SUBNAME
         if isinstance(key, int):
           key = str(key)
@@ -3255,8 +3257,14 @@ class UsesTagSets:
         raise TypeError(
             f'{self}[{r(index)}]: expected str or (subname,key) or (zone,subname,key)'
         )
-      assert '.' not in zone
-      assert '.' not in key
+      if not isinstance(key, str):
+        print("%s[%s]: key=%s" % (self, r(index), r(key)))
+        breakpoint()
+      assert '.' not in zone, f'dot in {zone=}'
+      assert '.' not in key, f'dot in {key=}'
+      assert isinstance(zone, str), f'zone={r(zone)} is not a str'
+      assert isinstance(type_, str), f'type_={r(type_)} is not a str'
+      assert isinstance(key, str), f'key={r(key)} is not a str'
       te = self.tagsets[f'{zone}.{type_}.{key}']
       return self.tagged(te)
 
