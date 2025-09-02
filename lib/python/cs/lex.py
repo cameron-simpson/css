@@ -2235,6 +2235,23 @@ class BaseToken(Promotable):
   offset: int
   end_offset: int
 
+  def __post_init__(self):
+    ''' An omitted `offset,end_offset` means the token is the whole `source_text`.
+    '''
+    if self.offset is None:
+      assert self.end_offset is None, (
+          f'{self.offset=} but {self.end_offset=} (both should be None)'
+      )
+      self.offset = 0
+      self.end_offset = len(self.source_text)
+    else:
+      assert self.end_offset is not None, (
+          f'{self.offset=} but {self.end_offset=} (neither should be None)'
+      )
+    assert 0 <= self.offset <= self.end_offset <= len(self.source_text), (
+        f'{len(self.source_text)=}: {self.offset=} or {self.end_offset=} out of range'
+    )
+
   def __str__(self):
     return self.matched_text
 
