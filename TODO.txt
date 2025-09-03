@@ -1,3 +1,4 @@
+rewriteif in python fileutils?
 cs.seq.in_order(iterable,processor,it_key,result_key) to yield results from processor(iterable) in the original order
 cs.seq.in_order(items,process_items,item_key=None,result_key=None)
 cs.cmdutils cmd_shell_completion to emit shell completion for $SHELL, see https://mill-build.org/blog/14-bash-zsh-completion.html
