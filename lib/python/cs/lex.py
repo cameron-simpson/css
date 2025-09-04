@@ -1664,7 +1664,7 @@ def format_attribute(method):
 
 @decorator
 def has_format_attributes(cls, inherit=()):
-  ''' Class decorator to walk this class for direct methods
+  ''' A class decorator to walk this class for direct methods
       marked as for use in format strings
       and to include them in `cls.format_attributes()`.
 
@@ -1894,10 +1894,14 @@ class FormatableFormatter(Formatter):
 
 class FormatMapping(MappingABC):
   ''' A `Mapping` subclass based on an object and a mapping
-      intends for use by the `FormatableMixin.format_as` method.
+      intended for use by the `FormatableMixin.format_as` method.
       The mapping maps field names to values, where the values may be 
       callables accepting an object.
-      Fetching a value from the mapping will call `value(obj)` if the value is callable.
+      Fetching a value from the mapping will call `value(obj)` if
+      the value is callable.
+      Some additonal extra field names are provided if not already
+      present in the mapping:
+      - `self`: the object
   '''
 
   def __init__(self, obj, base_format_mapping: Mapping):
@@ -1914,9 +1918,16 @@ class FormatMapping(MappingABC):
     ''' Fetch the value for `field_name`.
         If the value is callable, call `value(self.obj)` to get the value.
     '''
-    value = self.mapping[field_name]
-    if callable(value):
-      value = value(self.obj)
+    try:
+      value = self.mapping[field_name]
+    except KeyError:
+      if field_name == 'self':
+        value = self.obj
+      else:
+        raise
+    else:
+      if callable(value):
+        value = value(self.obj)
     return value
 
 @has_format_attributes
@@ -2086,8 +2097,9 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         format_mapping = self
       else:
         format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
-      if any(callable(value) for value in format_mapping.values()):
-        format_mapping = FormatMapping(self, format_mapping)
+      # wrap the mapping in FormatMapping, which provides "self"
+      # if missing and calls callable mapping values
+      format_mapping = FormatMapping(self, format_mapping)
       return format_as(
           format_s,
           format_mapping,
