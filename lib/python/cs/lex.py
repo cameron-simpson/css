@@ -1603,7 +1603,6 @@ def format_as(
     format_mapping,
     formatter=None,
     error_sep=None,
-    strict=None,
 ):
   ''' Format the string `format_s` using `Formatter.vformat`,
       return the formatted result.
@@ -1620,23 +1619,22 @@ def format_as(
       * `error_sep`: optional separator for the multipart error message,
         default from `FormatAsError.DEFAULT_SEPARATOR`:
         `'{FormatAsError.DEFAULT_SEPARATOR}'`
-      * `strict`: optional flag (default `False`)
-        indicating that an unresolveable field should raise a
-        `KeyError` instead of inserting a placeholder
   '''
   if formatter is None:
     formatter = FormatableFormatter(format_mapping)
-  if strict is None:
-    strict = formatter.format_mode.strict
-  with formatter.format_mode(strict=strict):
-    try:
-      formatted = formatter.vformat(format_s, (), format_mapping)
-    except KeyError as e:
-      # pylint: disable=raise-missing-from
-      raise FormatAsError(
-          e.args[0], format_s, format_mapping, error_sep=error_sep
-      )
-    return formatted
+  try:
+    formatted = formatter.vformat(format_s, (), format_mapping)
+  except KeyError as e:
+    # pylint: disable=raise-missing-from
+    printt([f'format_as({format_s=})'], *sorted(format_mapping.items()))
+    raise FormatAsError(
+        ##e.args[0],
+        e._,
+        format_s,
+        format_mapping,
+        error_sep=error_sep,
+    )
+  return formatted
 
 _format_as = format_as  # for reuse in the format_as method below
 
@@ -1732,27 +1730,6 @@ class FormatableFormatter(Formatter):
           r'(!(?P<conversion>[^:}]*))?' + r'(:(?P<format_spec>[^}]*))?' + r'}'
       ), re.I
   )
-
-  @property
-  def format_mode(self):
-    ''' Thread local state object.
-
-        Attributes:
-        * `strict`: initially `False`; raise a `KeyError` for
-          unresolveable field names
-    '''
-    try:
-      lock = self.__dict__['_lock']
-    except KeyError:
-      lock = self.__dict__['_lock'] = Lock()
-    with lock:
-      try:
-        mode = self.__dict__['format_mode']
-      except KeyError:
-        # pylint: disable=import-outside-toplevel
-        from cs.threads import ThreadState
-        mode = self.__dict__['format_mode'] = ThreadState(strict=False)
-    return mode
 
   if False:  # pylint: disable=using-constant-test
 
@@ -2092,7 +2069,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       converted = attribute
     return converted, offset
 
-  def format_as(self, format_s, error_sep=None, strict=None, **control_kw):
+  def format_as(self, format_s, error_sep=None, **control_kw):
     ''' Return the string `format_s` formatted using the mapping
         returned by `self.format_kwargs(**control_kw)`.
 
@@ -2113,15 +2090,12 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
       if any(callable(value) for value in format_mapping.values()):
         format_mapping = FormatMapping(self, format_mapping)
-      if strict is None:
-        strict = self.format_mode.strict
-      with self.format_mode(strict=strict):
-        return _format_as(
-            format_s,
-            format_mapping,
-            formatter=self,
-            error_sep=error_sep,
-        )
+      return _format_as(
+          format_s,
+          format_mapping,
+          formatter=self,
+          error_sep=error_sep,
+      )
 
   # Utility methods for formats.
   @format_attribute
