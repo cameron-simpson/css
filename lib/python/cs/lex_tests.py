@@ -181,27 +181,44 @@ class TestFormattable(unittest.TestCase):
   ''' Unit tests for `FormattableFormatter` and `FormatableMixin`.
   '''
 
-  def _test_format_as(self, obj, extra_formats=()):
-    for format_s, result in (
+  def _test_format_as(self, obj, *extra_formats):
+    for format_s, expected in (
         ('', ''),
-        ('{obj}', str(obj)),
+        ('{self}', str(obj)),
         *extra_formats,
     ):
-      with self.subtest(s(obj), format_s=format_s, expected=result):
-        print(repr(format_s), '->', repr(result))
-        self.assertEqual(obj.format_as(format_s), result)
+      with self.subTest(
+          f'{s(obj)}.format_as',
+          format_s=format_s,
+          expected=expected,
+      ):
+        if isinstance(expected, type) and issubclass(expected, Exception):
+          self.assertRaises(expected, obj.format_as, format_s)
+        else:
+          self.assertEqual(obj.format_as(format_s), expected)
 
   def test_formatable_dict(self):
 
     class fdict(dict, FormatableMixin):
       pass
 
-    fd = fdict(a=1, b=2, c='foo', d='BAR')
-    self.assertEqual(fd.format_as(''), '')
-    self.assertEqual(fd.format_as('c={c}'), 'c=foo')
-    self.assertRaises(FormatAsError, fd.format_as, 'c2={c2}')
-    self.assertEqual(fd.format_as('d={d}'), 'd=BAR')
-    self.assertEqual(fd.format_as('d={d:lc_}'), 'd=bar')
+    fd = fdict(a=1, b=2, c='foo', d='BAR', path='a/b/C.def')
+    self._test_format_as(
+        fd,
+        # simple interpolation
+        ('c={c}', 'c=foo'),
+        # unknown key
+        ('c2={c2}', FormatAsError),
+        # simple conversions
+        ('d={d}', 'd=BAR'),
+        ('d={d:title}', 'd=Bar'),
+        ('d={d:lc_}', 'd=bar'),
+        # compound conversions using Fstr methods and str methods
+        ('path={path}', 'path=a/b/C.def'),
+        ('path={path:basename}', 'path=C.def'),
+        ('path={path:basename:lc_}', 'path=c.def'),
+        ('path={path:basename:upper}', 'path=C.DEF'),
+    )
 
 def selftest(argv):
   ''' Run selftests.
