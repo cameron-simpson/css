@@ -10,11 +10,21 @@
 import sys
 from functools import partial
 import unittest
-from cs.lex import texthexify, untexthexify, \
-                   get_envvar, \
-                   get_sloshed_text, SLOSH_CHARMAP, \
-                   get_qstr, \
-                   get_identifier, get_dotted_identifier
+
+from .lex import (
+    FormatAsError,
+    FormatableMixin,
+    SLOSH_CHARMAP,
+    get_dotted_identifier,
+    get_envvar,
+    get_identifier,
+    get_qstr,
+    get_sloshed_text,
+    s,
+    texthexify,
+    untexthexify,
+)
+
 from cs.py3 import bytes
 
 ##from cs.logutils import X
@@ -154,7 +164,7 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_identifier('1a', 1), ('a', 2))
 
   def test05get_dotted_identifier(self):
-    ''' test get_gotted_identifier.
+    ''' Test get_gotted_identifier.
     '''
     self.assertEqual(get_dotted_identifier(''), ('', 0))
     self.assertEqual(get_dotted_identifier('a'), ('a', 1))
@@ -166,6 +176,32 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_dotted_identifier('a1..b'), ('a1', 2))
     self.assertEqual(get_dotted_identifier('a1.b.c'), ('a1.b.c', 6))
     self.assertEqual(get_dotted_identifier('a1.b.c+'), ('a1.b.c', 6))
+
+class TestFormattable(unittest.TestCase):
+  ''' Unit tests for `FormattableFormatter` and `FormatableMixin`.
+  '''
+
+  def _test_format_as(self, obj, extra_formats=()):
+    for format_s, result in (
+        ('', ''),
+        ('{obj}', str(obj)),
+        *extra_formats,
+    ):
+      with self.subtest(s(obj), format_s=format_s, expected=result):
+        print(repr(format_s), '->', repr(result))
+        self.assertEqual(obj.format_as(format_s), result)
+
+  def test_formatable_dict(self):
+
+    class fdict(dict, FormatableMixin):
+      pass
+
+    fd = fdict(a=1, b=2, c='foo', d='BAR')
+    self.assertEqual(fd.format_as(''), '')
+    self.assertEqual(fd.format_as('c={c}'), 'c=foo')
+    self.assertRaises(FormatAsError, fd.format_as, 'c2={c2}')
+    self.assertEqual(fd.format_as('d={d}'), 'd=BAR')
+    self.assertEqual(fd.format_as('d={d:lc_}'), 'd=bar')
 
 def selftest(argv):
   ''' Run selftests.
