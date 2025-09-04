@@ -1636,8 +1636,6 @@ def format_as(
     )
   return formatted
 
-_format_as = format_as  # for reuse in the format_as method below
-
 def format_attribute(method):
   ''' A decorator to mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
@@ -2090,7 +2088,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
       if any(callable(value) for value in format_mapping.values()):
         format_mapping = FormatMapping(self, format_mapping)
-      return _format_as(
+      return format_as(
           format_s,
           format_mapping,
           formatter=self,
