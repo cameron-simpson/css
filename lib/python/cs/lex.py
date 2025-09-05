@@ -1835,24 +1835,17 @@ class FormatableFormatter(Formatter):
       with Pfx("subspec %r", format_subspec):
         assert isinstance(format_subspec, str)
         assert len(format_subspec) > 0
-        with Pfx("value=%r, format_subspec=%r", value, format_subspec):
-          # promote bare str to FStr
-          if value is None or type(value) is str:  # pylint: disable=unidiomatic-typecheck
+        with Pfx("value=%s, format_subspec=%r", r(value), format_subspec):
+          # promote None or bare str to FStr
+          if value is None or (isinstance(value, str)
+                               and not isinstance(value, FStr)):
             value = FStr(value)
           if format_subspec[0].isalpha():
             try:
-              vconv = value.convert_via_method_or_attr
-            except AttributeError:
-              # promote to something with convert_via_method_or_attr
-              if isinstance(value, str):
-                value = FStr(value)
-                value, offset = FStr(value).convert_via_method_or_attr(
-                    format_subspec
-                )
-              else:
-                value = pfx_call(format, value, format_subspec)
-            else:
-              value, offset = vconv(format_subspec)
+              value, offset = value.convert_via_method_or_attr(format_subspec)
+            except (AttributeError, TypeError) as e:
+              value = format(value, format_subspec)
+              offset = len(format_subspec)
             if offset < len(format_subspec):
               subspec_tail = format_subspec[offset:]
               value = cls.get_subfield(value, subspec_tail)
@@ -1990,31 +1983,25 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     return super().convert_field(value, conversion)
 
   @pfx_method
-  def convert_via_method_or_attr(self, format_spec):
-    ''' Apply a method or attribute name based conversion to `value`
-        where `format_spec` starts with a method name
-        applicable to `value`.
+  def convert_via_method_or_attr(self, format_spec) -> Tuple[Any, int]:
+    ''' Apply a method or attribute name based conversion to `self`
+        where `format_spec` starts with a method or attribute name.
         Return `(converted,offset)`
         being the converted value and the offset after the method name.
 
         Note that if there is not a leading identifier on `format_spec`
-        then this method returns `(value,0)`.
+        then this method returns `(self,0)`.
 
-        The methods/attributes are looked up in the mapping
-        returned by `.format_attributes()` which represents allowed methods
-        (broadly, one should not allow methods which modify any state).
+        The converted value is obtained from `getattr(self,name)`;
+        if this raises an `AttributeError` a second attempt is made with
+        `getattr(FStr(self),attr)` if `self` is not already an `FStr`
+        (this provides the common utility methods on other types).
 
-        If this returns a callable, it is called to obtain the converted value
-        otherwise it is used as is.
-
-        As a final tweak,
-        if `value.get_format_attribute()` raises an `AttributeError`
-        (the attribute is not an allowed attribute)
-        or calling the attribute raises a `TypeError`
-        (the `value` isn't suitable)
-        and the `value` is not an instance of `FStr`,
-        convert it to an `FStr` and try again.
-        This provides the common utility methods on other types.
+        If the value is callable but does not have a true
+        `.is_format_attribute` a `TypeError` is raised, otherwise
+        the value is called to complete the conversion.
+        (The `.is_format_attribute` is usually set by decorating a
+        method with the `@format_attribute` decorator.)
 
         The motivating example was a `PurePosixPath`,
         which does not JSON transcribe;
@@ -2027,16 +2014,29 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     if not attr:
       # no leading method/attribute name, return unchanged
       return self, 0
+    # use format_attributes by preference
     try:
-      attribute = self.get_format_attribute(attr)
-    except AttributeError as e:
-      raise TypeError(
-          f'{self.__class__.__name__}.convert_via_method_or_attr({format_spec=}): no .{attr}: {e}'
-      ) from e
-    if callable(attribute):
-      converted = attribute()
+      attribute = self.format_attributes[attr]
+    except KeyError as e:
+      try:
+        attribute = getattr(self, attr)
+      except AttributeError:
+        if not isinstance(self, FStr):
+          return FStr(self).convert_via_method_or_attr(attr)
+        raise
+      else:
+        if callable(attribute):
+          if not getattr(attribute, 'is_format_attribute', False):
+            raise TypeError(
+                f'{self.__class__.__name__}.convert_via_method_or_attr({format_spec=})'
+                f': self.{attr}.is_format_attribute is false'
+            )
+          converted = attribute()
+        else:
+          converted = attribute
     else:
-      converted = attribute
+      # we trust the callables obtained directly from self.format_attributes
+      converted = attribute(self)
     return converted, offset
 
   def format_as(self, format_s, error_sep=None, **control_kw):
