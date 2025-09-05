@@ -1571,7 +1571,7 @@ class FormatAsError(LookupError):
   def __str__(self):
     return self.error_sep.join(
         (
-            f'format fails, missing key {self.key!r}:',
+            f'format fails, missing key {getattr(self,"_",self.key)}:',
             f'format string was {self.format_s!r}',
             f'available keys: {" ".join(sorted(self.format_mapping.keys()))}',
         )
@@ -1692,8 +1692,11 @@ class FormatableFormatter(Formatter):
   FORMAT_RE_FIELD_EXPR = re.compile(FORMAT_RE_FIELD_EXPR_s, re.I)
   FORMAT_RE_FIELD = re.compile(
       (
-          r'{' + rf'(?P<arg_name>{FORMAT_RE_FIELD_EXPR_s})?' +
-          r'(!(?P<conversion>[^:}]*))?' + r'(:(?P<format_spec>[^}]*))?' + r'}'
+          r'{'
+          rf'(?P<arg_name>{FORMAT_RE_FIELD_EXPR_s})?'
+          r'(!(?P<conversion>[^:}]*))?'
+          r'(:(?P<format_spec>[^}]*))?'
+          r'}'
       ), re.I
   )
 
@@ -1920,9 +1923,9 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       By contrast, `format_as` is designed to fill out an entire format
       string from the current object.
 
-      For example, the `cs.tagset.TagSet` class
-      subclasses `FormatableMixin` to provide a `format_as` method
-      whose replacement fields are derived from the tags in the tag set.
+      For example, the `cs.tagset.TagSet` class subclasses
+      `FormatableMixin` to provide a `format_as` method whose
+      replacement fields are derived from the tags in the tag set.
 
       Subclasses wanting to provide additional `format_spec` terms
       should:
@@ -1981,11 +1984,14 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   def convert_field(self, value, conversion):
     ''' The default converter for fields calls `Formatter.convert_field`.
+
+        This is a tiny shim to transmute the `''` conversion to `None`
+        which is what `Formatter.convert_field` expects.
     '''
     if conversion == '':
       warning(
-          "%s.convert_field(%s, conversion=%r): turned conversion into None",
-          type(self).__name__, typed_str(value, use_repr=True), conversion
+          "%s.convert_field(%s,conversion=%r): turned conversion into None",
+          type(self).__name__, r(value), conversion
       )
       conversion = None
     return super().convert_field(value, conversion)
