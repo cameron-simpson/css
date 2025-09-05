@@ -1603,6 +1603,7 @@ def format_as(
     format_mapping,
     formatter=None,
     error_sep=None,
+    missing: Optional[Callable[[Mapping, Any], Any]] = None,
 ):
   ''' Format the string `format_s` using `Formatter.vformat`,
       return the formatted result.
@@ -1619,13 +1620,16 @@ def format_as(
       * `error_sep`: optional separator for the multipart error message,
         default from `FormatAsError.DEFAULT_SEPARATOR`:
         `'{FormatAsError.DEFAULT_SEPARATOR}'`
+      * `missing`: an optional callable to turn a key missing from
+        `format_mapping` into a value to interpolate
   '''
   if formatter is None:
     formatter = FormatableFormatter(format_mapping)
+  if missing is not None:
+    format_mapping = FormatMapping(None, FormatMapping, missing)
   try:
     formatted = formatter.vformat(format_s, (), format_mapping)
   except KeyError as e:
-    # pylint: disable=raise-missing-from
     printt([f'format_as({format_s=})'], *sorted(format_mapping.items()))
     raise FormatAsError(
         ##e.args[0],
@@ -1633,7 +1637,7 @@ def format_as(
         format_s,
         format_mapping,
         error_sep=error_sep,
-    )
+    ) from e
   return formatted
 
 def format_attribute(method):
