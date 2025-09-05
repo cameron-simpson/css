@@ -1642,7 +1642,7 @@ def format_as(
 
 def format_attribute(method):
   ''' A decorator to mark a method as available as a format method.
-      Requires the enclosing class to be decorated with `@has_format_attributes`.
+      This sets `method.is_format_attribute=True`.
 
       For example,
       the `FormatableMixin.json` method is defined like this:
@@ -1666,48 +1666,12 @@ def format_attribute(method):
   method.is_format_attribute = True
   return method
 
+@OBSOLETE("@has_format_attributes is no longer needed")
 @decorator
 def has_format_attributes(cls, inherit=()):
-  ''' A class decorator to walk this class for direct methods
-      marked as for use in format strings
-      and to include them in `cls.format_attributes()`.
-
-      Methods are normally marked with the `@format_attribute` decorator.
-      The reason for the manual marking is to prevent methods with
-      side effects from being available for use in a (possibly externally
-      supplied) format string.
-
-      If `inherit` is true the base format attributes will be
-      obtained from other classes:
-      * `inherit` is `True`: use `cls.__mro__`
-      * `inherit` is a class: use that class
-      * otherwise assume `inherit` is an iterable of classes
-      For each class `otherclass`, update the initial attribute
-      mapping from `otherclass.get_format_attributes()`.
+  ''' A obsolete class decorator formerly used to walk the class for `@formatmethod`
+      methods. This is now done by `FormatableMixin.__init_subclass__`.
   '''
-  attributes = cls.get_format_attributes()
-  if inherit:
-    if inherit is True:
-      classes = cls.__mro__
-    elif isinstance(inherit, type):
-      classes = (inherit,)
-    else:
-      classes = inherit
-    for superclass in reversed(classes):
-      try:
-        super_attributes = superclass.get_format_attributes()
-      except AttributeError:
-        pass
-      else:
-        attributes.update(super_attributes)
-  for attr in dir(cls):
-    try:
-      attribute = getattr(cls, attr)
-    except AttributeError:
-      pass
-    else:
-      if getattr(attribute, 'is_format_attribute', False):
-        attributes[attr] = attribute
   return cls
 
 class FormatableFormatter(Formatter):
@@ -1934,7 +1898,6 @@ class FormatMapping(MappingABC):
         value = value(self.obj)
     return value
 
-@has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A subclass of `FormatableFormatter` which  provides 2 main features:
       - a `__format__` method which parses the `format_spec` string
@@ -1973,6 +1936,26 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   FORMAT_JSON_ENCODER = JSONEncoder(separators=(',', ':'))
 
+  def __init_subclass__(cls, **kw):
+    ''' Prefill the `cls.format_attributes` mapping from the
+        superclass and any format attributes of `cls`.
+    '''
+    super().__init_subclass__(**kw)
+    # establish the .format_attributes class attribute
+    # TODO: rename to just format_attributes
+    try:
+      attributes = cls.__dict__['format_attributes']
+    except KeyError:
+      cls.format_attributes = attributes = {}
+    for attr in dir(cls):
+      try:
+        attribute = getattr(cls, attr)
+      except AttributeError:
+        pass
+      else:
+        if getattr(attribute, 'is_format_attribute', False):
+          attributes[attr] = attribute
+
   # pylint: disable=invalid-format-returned
   def __format__(self, format_spec):
     ''' Format `self` according to `format_spec`.
@@ -1995,32 +1978,6 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     '''
     return self.format_field(self, format_spec)
 
-  @classmethod
-  def get_format_attributes(cls):
-    ''' Return the mapping of format attributes from `cls._format_attributes`.
-    '''
-    try:
-      attributes = cls.__dict__['_format_attributes']
-    except KeyError:
-      cls._format_attributes = attributes = {}
-    return attributes
-
-  def get_format_attribute(self, attr: str) -> Mapping[str, Callable]:
-    ''' Return a mapping of permitted method names to functions of an instance.
-        This is used to whitelist allowed `:`*name* method formats
-        to prevent scenarios like little Bobby Tables calling `delete()`.
-    '''
-    # this shuffle is because cls.__dict__ is a proxy, not a dict
-    cls = type(self)
-    attributes = cls.get_format_attributes()
-    if attr in attributes:
-      return getattr(self, attr)
-    raise AttributeError(
-        "disallowed attribute %r: not in %s._format_attributes" %
-        (attr, cls.__name__)
-    )
-
-  ##@staticmethod
   def convert_field(self, value, conversion):
     ''' The default converter for fields calls `Formatter.convert_field`.
     '''
@@ -2118,7 +2075,6 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     '''
     return self.FORMAT_JSON_ENCODER.encode(self)
 
-@has_format_attributes
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
       particularly its `__format__` method
@@ -2129,7 +2085,7 @@ class FStr(FormatableMixin, str):
   '''
 
   # str is immutable: prefill with all public class attributes
-  _format_attributes = {
+  format_attributes = {
       attr: getattr(str, attr)
       for attr in dir(str)
       if attr[0].isalpha()
@@ -2199,12 +2155,10 @@ class FNumericMixin(FormatableMixin):
     '''
     return unixtime2datetime(self, tz=tzlocal())
 
-@has_format_attributes
 class FFloat(FNumericMixin, float):
   ''' Formattable `float`.
   '''
 
-@has_format_attributes
 class FInt(FNumericMixin, int):
   ''' Formattable `int`.
   '''
