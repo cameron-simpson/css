@@ -1865,9 +1865,15 @@ class FormatMapping(MappingABC):
       - `self`: the object
   '''
 
-  def __init__(self, obj, base_format_mapping: Mapping):
+  def __init__(
+      self,
+      obj,
+      base_format_mapping: Mapping,
+      missing: Optional[Callable[[Mapping, Any], Any]] = None,
+  ):
     self.obj = obj
     self.mapping = base_format_mapping
+    self.missing = missing
 
   def __len__(self):
     return len(self.mapping)
@@ -1884,6 +1890,8 @@ class FormatMapping(MappingABC):
     except KeyError:
       if field_name == 'self':
         value = self.obj
+      elif self.missing is not None:
+        value = self.missing(self.mapping, field_name)
       else:
         raise
     else:
@@ -2039,7 +2047,13 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       converted = attribute(self)
     return converted, offset
 
-  def format_as(self, format_s, error_sep=None, **control_kw):
+  def format_as(
+      self,
+      format_s: str,
+      error_sep: Optional[str] = None,
+      missing: Optional[Callable[[Mapping, Any], Any]] = None,
+      **control_kw
+  ):
     ''' Return the string `format_s` formatted using the mapping
         returned by `self.format_kwargs(**control_kw)`.
 
@@ -2060,7 +2074,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
       # wrap the mapping in FormatMapping, which provides "self"
       # if missing and calls callable mapping values
-      format_mapping = FormatMapping(self, format_mapping)
+      format_mapping = FormatMapping(self, format_mapping, missing)
       return format_as(
           format_s,
           format_mapping,
