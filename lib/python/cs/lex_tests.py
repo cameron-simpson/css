@@ -181,7 +181,7 @@ class TestFormattable(unittest.TestCase):
   ''' Unit tests for `FormattableFormatter` and `FormatableMixin`.
   '''
 
-  def _test_format_as(self, obj, *extra_formats):
+  def _test_format_as(self, obj, *extra_formats, **format_as_kwargs):
     for format_s, expected in (
         ('', ''),
         ('{self}', str(obj)),
@@ -193,14 +193,23 @@ class TestFormattable(unittest.TestCase):
           expected=expected,
       ):
         if isinstance(expected, type) and issubclass(expected, Exception):
-          self.assertRaises(expected, obj.format_as, format_s)
+          self.assertRaises(
+              expected, obj.format_as, format_s, **format_as_kwargs
+          )
         else:
-          self.assertEqual(obj.format_as(format_s), expected)
+          self.assertEqual(
+              obj.format_as(format_s, **format_as_kwargs), expected
+          )
 
   def test_formatable_dict(self):
 
     class fdict(dict, FormatableMixin):
       pass
+
+    def missing(mapping, key):
+      if key == 'miskey':
+        return f'MISSING_KEY({key=})'
+      raise KeyError(key)
 
     fd = fdict(a=1, b=2, c='foo', d='BAR', path='a/b/C.def')
     self._test_format_as(
@@ -218,6 +227,10 @@ class TestFormattable(unittest.TestCase):
         ('path={path:basename}', 'path=C.def'),
         ('path={path:basename:lc_}', 'path=c.def'),
         ('path={path:basename:upper}', 'path=C.DEF'),
+        # fill in missing key via the missing() function
+        ('missing={miskey}', "missing=MISSING_KEY(key='miskey')"),
+        ('missing={badkey}', FormatAsError),
+        missing=missing,
     )
 
 def selftest(argv):
