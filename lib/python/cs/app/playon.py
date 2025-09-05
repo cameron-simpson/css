@@ -550,7 +550,6 @@ class LoginState(_PlayOnEntity):
     '''
     return self.tags.get('exp') or -1
 
-@has_format_attributes
 class Recording(_PlayOnEntity):
   ''' A PlayOn recording.
   '''
