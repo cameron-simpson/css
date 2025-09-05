@@ -852,47 +852,14 @@ class TagSet(
     )
 
   #################################################################
-  # methods supporting FormattableMixin
+  # Methods supporting FormattableMixin.
 
   def get_arg_name(self, field_name):
     ''' Override for `FormattableMixin.get_arg_name`:
         return the leading dotted identifier,
-        which represents a tag or tag prefix.
+        which represents a tag name or prefix.
     '''
     return get_dotted_identifier(field_name)
-
-  def get_value(self, arg_name, a, kw):
-    ''' Override for `FormattableMixin.get_value`:
-        look up `arg_name` in `kw`, return a value.
-
-        The value is obtained as follows:
-        * `kw[arg_name]`: the `Tag` named `arg_name` if present
-        * `kw.get_format_attribute(arg_name)`:
-          a formattable attribute named `arg_name`
-        otherwise raise `KeyError` if `self.format_mode.strict`
-        otherwise return the placeholder string `'{'+arg_name+'}'`.
-    '''
-    assert isinstance(kw, TagSet)
-    ##assert kw is self ## not the case, needs a bit more digging
-    assert not a
-    try:
-      value = kw[arg_name]
-    except KeyError:
-      try:
-        attribute = kw.get_format_attribute(arg_name)
-      except AttributeError:
-        if self.format_mode.strict:
-          # pylint: disable=raise-missing-from
-          raise KeyError(
-              "%s.get_value: unrecognised arg_name %r" %
-              (type(self).__name__, arg_name)
-          )
-        value = f'{{{arg_name}}}'
-      else:
-        value = attribute() if callable(attribute) else attribute
-    else:
-      value = _FormatStringTagProxy(Tag(arg_name, value, ontology=kw.ontology))
-    return value, arg_name
 
   ################################################################
   # The magic attributes.
@@ -2456,11 +2423,6 @@ class TagSetPrefixView(FormatableMixin):
       return tag
     return self._tags.subtags(self._prefix, as_tagset=True)
 
-  def get_format_attribute(self, attr):
-    ''' Fetch a formatting attribute from the proxied object.
-    '''
-    return self.__proxied.get_format_attribute(attr)
-
   def keys(self):
     ''' The keys of the subtags.
     '''
@@ -3122,8 +3084,7 @@ class HasTags(TagSetTyping, FormatableMixin):
     # Allow the format attributes to override the tags,
     # partly for correctness and partly to allow fallback if a tag is missing,
     # since the attribute's implementation  might choose the tag if present.
-    for kw, method in self.get_format_attributes().items():
-      kwargs[kw] = method
+    kwargs.update(self.format_attributes)
     # TODO: grab type_* from TagSetTyping.__dict__.keys() ?
     for type_attr in (
         'type_key',
