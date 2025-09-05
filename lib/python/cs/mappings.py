@@ -762,7 +762,7 @@ class MappingChain(object):
     return ks
 
 class SeenSet(object):
-  ''' A set-like collection with optional backing store file.
+  ''' A set-like collection with an optional backing store file.
   '''
 
   def __init__(self, name, backing_path=None):
