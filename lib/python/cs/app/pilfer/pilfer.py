@@ -892,10 +892,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         as indicated by `mode`.
         Return a mapping of each cache key to the cached metadata.
     '''
-    matches = list(self.url_matches(url, pattern_type='URL_KEY', extra=extra))
-    if not matches:
-      print("cache_url: no matches for", url)
-      return None
+    return self.content_cache.cache_url(
+        url, self.cache_keys_for_url(url), mode=mode
+    )
 
   @promote
   def export_url(
