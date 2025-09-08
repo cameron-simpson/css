@@ -61,7 +61,7 @@ def make_cbz(
       for pagen, img in enumerate(images, 1):
         with Pfx(img):
           if isinstance(img, str):
-            imgfspath, arcname = img, f'pages/page-{pagen:0{pagen_width}d}-{basename(img)}'
+            imgfspath, arcname = img, f'pages/{pagen:0{pagen_width}d}--{basename(img)}'
           # TODO: Path instances?
           else:
             imgfspath, arcname = img
