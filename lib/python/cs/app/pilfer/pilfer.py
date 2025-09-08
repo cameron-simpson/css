@@ -6,6 +6,7 @@ from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
 import copy
 from dataclasses import dataclass, field
+import errno
 from fnmatch import fnmatch
 from functools import cached_property
 from http.cookies import Morsel
@@ -22,6 +23,7 @@ from os.path import (
     join as joinpath,
 )
 import shlex
+import shutil
 import sys
 from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
@@ -894,13 +896,59 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     if not matches:
       print("cache_url: no matches for", url)
       return None
+
+  @promote
+  def export_url(
+      self,
+      url: URL,
+      fspath: Optional[str] = None,
+      *,
+      dir='.',
+      prefix: Optional[str] = '',
+  ) -> str:
+    ''' Export a filesystem path for `url`.
+        It is safe to remove the exported path.
+        If the URL is present in the cache a hard link (or failing
+        that, a copy) is made from the cache file to the export
+        path.
+        Otherwise the URL is fetched, and cached if there are cache keys.
+
+        The optional `fspath` parameter can be used to specify an export path,
+        which must not exist already.
+        If not supplied, an export path is composed by joining
+        `dir` (default `'.'`) and the URL basename prefixed by
+        `prefix (default `''`).
+    '''
+    if fspath is None:
+      fspath = joinpath(dir, prefix + url.basename)
+    if existspath(fspath):
+      raise FileExistsError(fspath)
+    cache_keys = self.cache_keys_for_url(url)
     cache = self.content_cache
-    with cache:
-      cache_keys = [
-          cache.cache_key_for(match.sitemap, match.format_arg(extra=extra))
-          for match in matches
-      ]
-      return cache.cache_url(url, cache_keys, mode=mode)
+    try:
+      cache_key, cache_md, cache_fspath = cache.find_cache_fspath(cache_keys)
+    except KeyError:
+      # nothing cached, fetch the URL
+      flowstate = FlowState(url)
+      if cache_keys:
+        # fetch via the cache
+        cached_map = cache.cache_url(flowstate, cache_keys)
+        cache_key, cache_md, cache_fspath = cache.find_cache_fspath(cache_keys)
+      else:
+        # fetch directly, do not bother with the cache
+        bss = flowstate.iterable_content
+        with open(fspath, 'xb') as f:
+          for bs in bss:
+            f.write(bs)
+        return fspath
+    try:
+      pfx_call(os.link, cache_fspath, fspath)
+    except OSError as e:
+      if e.errno == errno.EXDEV:
+        pfx_call(shutil.copyfile, cache_fspath, fspath)
+      else:
+        raise
+    return fspath
 
   # Note: this method is _last_ because otherwise it shadows the
   # @promote decorator, used on earlier methods.
