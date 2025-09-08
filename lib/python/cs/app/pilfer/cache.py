@@ -242,11 +242,14 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     except KeyError:
       return default
 
-  def find_content(self,
-                   keys: str | Iterable[str]) -> Tuple[str, Mapping, bytes]:
+  def find_content(
+      self,
+      keys: str | Iterable[str],
+  ) -> Tuple[str, Mapping, bytes]:
     ''' Look for the cached content for `keys`,
         return a `(key,md,content_bs)` 3-tuple being the found `key`,
         its associated metadata `md` and the cached `content_bs` as a `bytes`.
+        Raise `KeyError` if no cache files are can be read.
     '''
     for key, md in self.findall(keys):
       content_rpath = md.get('content_rpath', None)
@@ -261,6 +264,26 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         ##warning("find_content: %r->%r: %s", key, fspath, e)
         continue
       return key, md, content_bs
+    raise KeyError(keys)
+
+  def find_cache_fspath(
+      self,
+      keys: str | Iterable[str],
+  ) -> Tuple[str, Mapping, str]:
+    ''' Look for a cache file for `keys`,
+        return a `(key,md,fspath)` 3-tuple being the found `key`,
+        its associated metadata `md` and filesystem path of the cache file.
+        Raise `KeyError` if no cache files are found.
+    '''
+    for key, md in self.findall(keys):
+      content_rpath = md.get('content_rpath', None)
+      if content_rpath is None:
+        warning("find_content: %r: no content_rpath", key)
+        continue
+      fspath = self.cached_pathto(content_rpath)
+      if not existspath(fspath):
+        continue
+      return key, md, fspath
     raise KeyError(keys)
 
   @typechecked
@@ -305,11 +328,12 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         * `mode`: the cache mode, as for `ContentCache.cache_stream`
         * `duration`: optional duration for the cache entry
     '''
+    md_map = {}
     cache_keys = set(cache_keys)
     if not cache_keys:
-      return
+      # early return with an empty map if there are no keys
+      return md_map
     # check the validity of any keys already present
-    md_map = {}
     missing_keys = []
     latest_md = None
     for cache_key in cache_keys:
