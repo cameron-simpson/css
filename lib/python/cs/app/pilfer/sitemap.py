@@ -226,7 +226,12 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     vprint("FlowStates -= 1 ->", FlowState.nfs)
     rsp = self.__dict__.get('response')
     if rsp is not None:
-      rsp.close()
+      try:
+        rsp_close = rsp.close
+      except AttributeError as e:
+        warning("no .close for %s", r(rsp))
+      else:
+        rsp_close()
 
   # NB: no __getattr__, it preemptys @cached_property
 
