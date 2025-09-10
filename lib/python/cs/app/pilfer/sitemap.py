@@ -343,7 +343,11 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
   def method(self) -> str:
     ''' The uppercase form of the request method.
     '''
-    return self.request.method.upper()
+    try:
+      rsp = self.request
+    except AttributeError:
+      return 'GET'
+    return rsp.method.upper()
 
   @cached_property
   def content_type(self) -> str:
