@@ -27,11 +27,12 @@ from typeguard import typechecked
 
 from cs.cmdutils import vprint
 from cs.context import stackattrs
-from cs.deco import attr, Promotable, promote
+from cs.deco import attr, Promotable, promote, uses_verbose
 from cs.fileutils import atomic_filename
 from cs.fs import shortpath
+from cs.fsm import CancellationError
 from cs.gimmicks import Buffer
-from cs.lex import printt
+from cs.lex import printt, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
