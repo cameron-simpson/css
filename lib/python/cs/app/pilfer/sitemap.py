@@ -200,8 +200,6 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     )
     if extra_attrs:
       raise ValueError(f'unexpected attributes supplied: {extra_attrs}')
-    if rsp := self.__dict__.get('response'):
-      self.iterable_content = ClonedIterator(rsp.iter_content(chunk_size=None))
 
   def __str__(self):
     attr_listing = ",".join(
@@ -454,12 +452,14 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
         otherwise it will be `[self.content]`.
     '''
     # there is no .iterable_content yet, expect it from the flow.response.content
-    # TODO: need to decode?
+    # flow.response.content?
     try:
       flow = self.flow
     except AttributeError:
-      self.GET()
-      return self.iterable_content
+      # no mitmproxy.http.HTTPFlow, use requests
+      # requests.Response.iter_content?
+      iter_content = self.response.iter_content
+      return ClonedIterator(iter_content(chunk_size=None))
     # TODO: can we accomodate a flow whose content is streaming in?
     return [flow.response.content]
 
