@@ -867,6 +867,12 @@ class SiteMap(UsesTagSets, Promotable):
         f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
     )
 
+  @property
+  def name__(self):
+    ''' The `SiteMap.name` with slashes replaced be double underscores.
+    '''
+    return self.name.replace("/", "__")
+
   def urlto(self, suburl, domain=None, *, scheme='https'):
     ''' Return the full URL for `suburl`.
     '''
