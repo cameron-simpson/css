@@ -379,7 +379,58 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
 )
 @uses_pilfer
 @typechecked
-def dump_flow(hook_name, flow, *, P: Pilfer = None):
+def reject_flow(hook_name, flow, *, P: Pilfer, **reject_kw):
+  ''' Reject flows matching all of `reject_kw`.
+      If all the conditions specified by `reject_kw` are matched,
+      raise `MITMCancelActions` which the caller (`MITMAddon.call_hooks_for`)
+      uses to cancel application of following actions.
+  '''
+  assert P is not None
+  rq = flow.request
+  url = URL(rq.url)
+  PR = lambda *a: print(
+      'SELECT', hook_name, flow.request.method, url.short, *a
+  )
+  for attr, value in reject_kw.items():
+    r_value = r(value)
+    with Pfx("%s=%s", attr, r_value):
+      url_attr = getattr(url, attr)
+      if url_attr != value:
+        return
+  raise MITMCancelActions(f'reject_flow: URL:{url.short}) matches {reject_kw}')
+
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
+@uses_pilfer
+@typechecked
+def select_flow(hook_name, flow, *, P: Pilfer, **select_kw):
+  ''' Select flows matching all of `select_kw`.
+      Failue to match a condition raises `MITMCancelActions` which
+      the caller (`MITMAddon.call_hooks_for`) uses to cancel
+      application of following actions.
+  '''
+  assert P is not None
+  rq = flow.request
+  url = URL(rq.url)
+  PR = lambda *a: print(
+      'SELECT', hook_name, flow.request.method, url.short, *a
+  )
+  for attr, value in select_kw.items():
+    r_value = r(value)
+    with Pfx("%s=%s", attr, r_value):
+      url_attr = getattr(url, attr)
+      if url_attr != value:
+        raise MITMCancelActions(
+            f'select_flow: {attr}={r_value}: url.{attr}={r(url_attr)} does not match'
+        )
+
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
+@uses_pilfer
+@typechecked
+def dump_flow(hook_name, flow, *, P: Pilfer):
   ''' Dump request information: headers and query parameters.
   '''
   assert P is not None
@@ -633,7 +684,9 @@ class MITMHookAction(Promotable):
       'prefetch': prefetch_urls,
       'patch_soup': patch_soup,
       'print': print_rq,
+      'reject': reject_flow,
       'save': save_stream,
+      'select': select_flow,
   }
 
   action: Callable
@@ -683,6 +736,11 @@ class MITMHookAction(Promotable):
     if callable(obj):
       return cls(action=obj)
     return super().promote(obj)
+
+class MITMCancelActions(CancellationError):
+  ''' The exception is raise to cancel the chain of actions
+      during the `MITMAddon.call_hook_for` method.
+  '''
 
 class MITMAddon:
   ''' A mitmproxy addon class which collects multiple actions per
@@ -775,12 +833,17 @@ class MITMAddon:
     if flow.runstate.running:
       flow.runstate.stop()
 
-  @pfx_method
-  def call_hooks_for(self, hook_name: str, flow, *mitm_hook_a, **mitm_hook_kw):
+  @uses_verbose
+  def call_hooks_for(
+      self, hook_name: str, flow, *mitm_hook_a, verbose: bool, **mitm_hook_kw
+  ):
     ''' This calls all the actions for the specified `hook_name`.
     '''
-    url = URL(flow.request.url)
-    PR = lambda *a, **kw: print("call_hooks_for", hook_name, *a, **kw)
+    rq = flow.request
+    url = URL(rq.url)
+    PR = lambda *a, **kw: print(
+        "call_hooks_for", hook_name, rq.method, url.short, *a, **kw
+    )
     ##PR("URL", flow.request.method, url.short)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
@@ -790,6 +853,7 @@ class MITMAddon:
     prep_excs = []
     # for collating any .stream functions during responseheaders
     stream_funcs = [] if hook_name == 'responseheaders' else None
+    cancelled = False
     for i, (
         action,
         action_args,
@@ -818,6 +882,10 @@ class MITMAddon:
             **action_kwargs,
             **mitm_hook_kw,
         )
+      except MITMCancelActions as e:
+        if verbose:
+          PR("cancelling further actions:", e._)
+        cancelled = True
       except Exception as e:
         warning("exception calling hook_action[%d]: %s", i, e)
         prep_excs.append(e)
@@ -832,6 +900,9 @@ class MITMAddon:
           if stream:
             stream_funcs.append(stream)
           flow.response.stream = stream0
+      # perform no further actions is we got a MITMCancelActions
+      if cancelled:
+        break
     if stream_funcs:
       # After the actions have run, define the stream attribute
       # to run whatever stream functions were applied.
