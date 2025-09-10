@@ -566,16 +566,16 @@ class PilferCommand(BaseCommand):
           - a dotted name followed by a colon and another dotted subname,
             which specifies a callable object from an importable module
           Examples:
-            cache   The predefined "cache" action on its default hooks.
-            dump@requestheaders
-                    The predefined "dump" action on the "requestheaders" hook.
-            my.module:handler:3,x=4@requestheaders
-                    Call handler(3,hook_name,flow,x=4) from module my.module
-                    on the "requestheaders" hook.
+          - `cache`: the predefined "cache" action on its default hooks.
+          - `dump@requestheaders`: the predefined "dump" action on
+            the "requestheaders" hook.
+          - `my.module:handler:3,x=4@requestheaders`: call
+            `handler(3,hook_name,flow,x=4)` from module `my.module`
+            on the "requestheaders" hook.
           It is generally better to use named parameters in actions because
           it is easier to give them default values in the function.
     '''
-    from .mitm import (MITMAddon, run_proxy)
+    from .mitm import MITMAddon, run_proxy
     listen_host = DEFAULT_MITM_LISTEN_HOST
     listen_port = DEFAULT_MITM_LISTEN_PORT
     # leading optional @[host:]port
@@ -749,8 +749,10 @@ class PilferCommand(BaseCommand):
         )
       return 0
     # a subcommand?
-    if argv[0].isalpha():
-      sitecmd = argv.pop(0)
+    argv0_ = argv[0].replace('-', '_')
+    if is_identifier(argv0_):
+      sitecmd = argv0_
+      argv.pop(0)
       with Pfx(sitecmd):
         try:
           cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
