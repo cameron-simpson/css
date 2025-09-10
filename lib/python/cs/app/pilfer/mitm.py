@@ -8,6 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import partial
 from inspect import isgeneratorfunction
+import logging
 import os
 from pprint import pprint
 from signal import SIGINT
@@ -688,8 +689,9 @@ class MITMAddon:
       hook and calls each in order.
   '''
 
-  def __init__(self):
+  def __init__(self, logging_handlers=None):
     self.hook_map = defaultdict(list)
+    self.logging_handlers = logging_handlers
 
   @promote
   @typechecked
@@ -722,7 +724,17 @@ class MITMAddon:
       hook_actions = self.hook_map[hook_name]
       if not hook_actions:
         raise AttributeError(f'no actions for {hook_name=}')
-      return partial(self.call_hooks_for, hook_name)
+
+      def call_hooks(*a, **kw):
+        root_logger = logging.getLogger()
+        with stackattrs(
+            root_logger,
+            handlers=(root_logger.handlers if self.logging_handlers is None
+                      else list(self.logging_handlers)),
+        ):
+          self.call_hooks_for(hook_name, *a, **kw)
+
+      return call_hooks
 
   def load(self, loader):
     loader.add_option(

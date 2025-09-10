@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+import logging
 import os
 import os.path
 from os.path import expanduser
@@ -592,7 +593,7 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError('missing actions')
     bad_actions = False
-    mitm_addon = MITMAddon()
+    mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
     for action in argv:
       with Pfx("action %r", action):
         hook_names = None
