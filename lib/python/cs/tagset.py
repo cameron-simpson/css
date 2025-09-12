@@ -459,7 +459,7 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
-def jsonable(obj, converted: dict):
+def jsonable(obj, converted: Optional[dict] = None):
   ''' Convert `obj` to a JSON encodable form.
       This returns `obj` for purely JSONable objects and a JSONable
       deep copy of `obj` if it or some subcomponent required
@@ -469,6 +469,8 @@ def jsonable(obj, converted: dict):
   '''
   if obj is None:
     return obj
+  if converted is None:
+    converted = {}
   try:
     # known object - return conversion from the cache
     return converted[id(obj)]
