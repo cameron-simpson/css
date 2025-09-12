@@ -3097,7 +3097,8 @@ class HasTags(TagSetTyping, FormatableMixin):
   def format_kwargs(self):
     ''' A `format_kwargs` method to support `cs.lex.FormatableMixin`.
     '''
-    kwargs = dict(self.tags)
+    tags = self.tags
+    kwargs = dict(tags)
     # Allow the format attributes to override the tags,
     # partly for correctness and partly to allow fallback if a tag is missing,
     # since the attribute's implementation  might choose the tag if present.
