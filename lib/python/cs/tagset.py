@@ -3003,6 +3003,13 @@ class HasTags(TagSetTyping, FormatableMixin):
   def json(self):
     return self.tags.json()
 
+  def printt(self, key_indent="  ", **printt_kw):
+    return printt(
+        [str(self)],
+        *[[f'{key_indent}{k}', v] for k, v in sorted(self.as_dict().items())],
+        **printt_kw
+    )
+
   @cached_property
   def tags_entity_key(self):
     ''' Our tagged entity key, `self.tags.name`.
