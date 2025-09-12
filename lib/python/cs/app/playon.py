@@ -904,7 +904,7 @@ class PlayOnAPI(HTTPServiceAPI):
         Otherwise `index` should be a `tuple`, returns the associated `HasTags`.
     '''
     if isinstance(index, int):
-      index = 'recording', index
+      index = Recording, index
     return super().__getitem__(index)
 
   def suburl(
@@ -968,7 +968,7 @@ class PlayOnAPI(HTTPServiceAPI):
     data = self.suburl_data('queue')
     entries = data['entries']
     return self._entry_entities(
-        entries, 'recording', dict(
+        entries, Recording, dict(
             Episode=int,
             ReleaseYear=int,
             Season=int,
@@ -983,7 +983,7 @@ class PlayOnAPI(HTTPServiceAPI):
     data = self.suburl_data('library/all')
     entries = data['entries']
     return self._entry_entities(
-        entries, 'recording', dict(
+        entries, Recording, dict(
             Episode=int,
             ReleaseYear=int,
             Season=int,
@@ -1068,11 +1068,16 @@ class PlayOnAPI(HTTPServiceAPI):
   available = recordings
 
   @pfx_method
-  @require(lambda type: type in ('feature', 'recording', 'service'))
+  @require(
+      lambda entity_type: (
+          isinstance(entity_type, type) and
+          issubclass(entity_type, _PlayOnEntity)
+      ) or entity_type in ('feature', 'recording', 'service')
+  )
   def _entry_entities(
       self,
       entries,
-      type: str,
+      entity_type: type | str,
       conversions: Optional[dict] = None
   ) -> set[_PlayOnEntity]:
     ''' Return a `set` of `HasTags` instances from PlayOn data entries.
@@ -1100,7 +1105,7 @@ class PlayOnAPI(HTTPServiceAPI):
                     warning("%r: %s", value, e)
                   else:
                     entry[e_field] = value2
-        entity = self[type, entry_id]
+        entity = self[entity_type, entry_id]
         entity.tags.update(entry, prefix='playon')
         entity.tags.update(dict(last_updated=now))
         entities.add(entity)
