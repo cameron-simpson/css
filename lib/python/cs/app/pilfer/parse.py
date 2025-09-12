@@ -206,7 +206,7 @@ def parse_action(action, do_trace):
   # test of variable value
   # varname~selector
   if action.startswith('~', offset):
-    selector = Action(action[offset + 1:])
+    selector = _Action(action[offset + 1:])
     if selector.sig != StageType.SELECTOR:
       raise ValueError(
           "expected selector function but found: %s" % (selector,)
@@ -315,7 +315,7 @@ def parse_action(action, do_trace):
             "expected second marker to match first: expected %r, saw %r" %
             (marker, action[offset])
         )
-      selector = Action(action[offset + 1:])
+      selector = _Action(action[offset + 1:])
       if selector.sig != StageType.SELECTOR:
         raise ValueError(
             "expected selector function but found: %s" % (selector,)
