@@ -5,6 +5,8 @@
 
 from functools import cached_property
 
+from cs.lex import printt
+
 class GraphQLDataMixin:
   ''' A mixin for dealing with the data from a GraphQL response.
   '''
@@ -59,6 +61,11 @@ class GraphQLDataMixin:
       )
       nodes.append(node)
     return nodes
+
+  def printt(self, **printt_kw):
+    ''' Print the contents of `self.data` via `cs.lex.printt()`.
+    '''
+    printt(*sorted(self.data.items()), **printt_kw)
 
 class DunderProxy:
   ''' A proxy to the `__*` names in a dict from a GraphQL data response.
