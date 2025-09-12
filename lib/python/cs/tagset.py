@@ -862,6 +862,12 @@ class TagSet(
     '''
     return get_dotted_identifier(field_name)
 
+  @format_attribute
+  def json(self):
+    ''' Return a JSONable version of this `TagSet`.
+    '''
+    return self.FORMAT_JSON_ENCODER.encode(jsonable(self))
+
   ################################################################
   # The magic attributes.
 
@@ -2992,6 +2998,10 @@ class HasTags(TagSetTyping, FormatableMixin):
     ''' Proxy `.as_dict()` to `self.tags`.
     '''
     return self.tags.as_dict()
+
+  @format_attribute
+  def json(self):
+    return self.tags.json()
 
   @cached_property
   def tags_entity_key(self):
