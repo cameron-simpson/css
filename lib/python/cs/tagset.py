@@ -3111,7 +3111,19 @@ class HasTags(TagSetTyping, FormatableMixin):
         'type_zone_key',
     ):
       kwargs[type_attr] = getattr(self, type_attr)
-    return kwargs
+
+    def missing(kwargs, key):
+      ''' Look up this missing key as a method of the `tags`.
+      '''
+      try:
+        method = getattr(tags, key)
+      except AttributeError:
+        raise KeyError(key)
+      if not getattr(method, 'is_format_attribute', False):
+        raise KeyError(key)
+      return method
+
+    return FormatMapping(self, kwargs, missing)
 
 class UsesTagSets:
   ''' A mixin to support classes which use a `BaseTagSets` to store their data.
