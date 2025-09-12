@@ -3128,8 +3128,12 @@ class HasTags(TagSetTyping, FormatableMixin):
 
 class UsesTagSets:
   ''' A mixin to support classes which use a `BaseTagSets` to store their data.
-      Typical use subclasses `cs.sqltags.UsesSQLTags`, a subclass
+
+      A typical use subclasses `cs.sqltags.UsesSQLTags`, a subclass
       of this which uses an `SQLTags` as the storage backend.
+
+      The meaning of the type *zone*, *subname* and *key* are as
+      described for the `TagSetTyping` class.
 
       Subclasses must define the following class attributes:
       - `TYPE_ZONE`: the type zone identifying entities in the larger `BaseTagSets` data
@@ -3219,15 +3223,51 @@ class UsesTagSets:
       ],
   ) -> HasTags:
     ''' Fetch the `HasTags` instance for the supplied `index`.
-        The `index` ay take the following forms:
-        - `(subname,key)`: a 2-tuple of the type subname and key
-          in `self.TYPE_ZONE`; the key may be a `str` or an `int`;
-          the subname make also be a subclass of `self.HasTagsClass`
-        - `str`: a string which will be split into subname and key
+
+        The meaning of the type *zone*, *subname* and *key* are as
+        described for the `TagSetTyping` class.
+
+        The `index` may take the following forms:
+        - `str`: a string which will be split into *subname* and *key*
           for use in `self.TYPE_ZONE`
+        - `(subname,key)`: a 2-tuple of the type *subname* and *key*
+          in `self.TYPE_ZONE`
+          the subname make also be a subclass of `self.HasTagsClass`
         - `(zone,subname,key)`: a 3-tuple of the type zone, subname and key
+        The *subname* may also be a class (normally a subclass of
+        `HasTags`, usually a subclass of `type(self).HasTagsClass`);
+        in this case the *subname* will be taken from `type(self).TYPE_SUBNAME`
+        attribute.
+        The *key* may also be an `int` or a `uuid.UUID`, in which
+        case it will be used as `str(key)`.
+
+        Examples:
+
+            # the HasTags subclass Artist, and the UsesTagSets
+            # subclass MBDB which hold MusicbrainzNG information
+            from cs.cdrip import Artist, MBDB
+            mbdb = MBDB()
+
+            # Various indices obtaining the record for Jon Cleary,
+            # whose key is 'mbdb.artist.a417f0e5-2c14-445a-9a07-5a7ad2bdeafa'
+
+            # the subname.key as a single string
+            artist = mbdb['artist.a417f0e5-2c14-445a-9a07-5a7ad2bdeafa']
+
+            # the subname and key in a 2-tuple
+            artist = mbdb['artist', 'a417f0e5-2c14-445a-9a07-5a7ad2bdeafa']
+
+            # the record but not from the default MBDB zonne
+            artist = mbdb['mbdb2', 'artist', 'a417f0e5-2c14-445a-9a07-5a7ad2bdeafa']
+
+            # the preferred way to obtain it, using the entity type
+            artist = mbdb[Artist, 'a417f0e5-2c14-445a-9a07-5a7ad2bdeafa']
+
+            # or if you're working with UUIDs
+            artist_uuid = UUID('a417f0e5-2c14-445a-9a07-5a7ad2bdeafa')
+            artist = mbdb[Artist, artist_uuid]
     '''
-    with Pfx("%s[%s]", self, r(index)):
+    with Pfx("%s[%s]", s(self), r(index), print=True):
       if isinstance(index, str):
         type_, key = index.rsplit('.', 1)
         zone = self.TYPE_ZONE
@@ -3240,9 +3280,10 @@ class UsesTagSets:
           zone, type_, key = index
         else:
           zone = self.TYPE_ZONE
-          if isinstance(type_, type) and issubclass(type_, self.HasTagsClass):
-            type_ = type_.TYPE_SUBNAME
-        if isinstance(key, int):
+          print(f'  {zone=}, {type_=}, {key=}')
+        if isinstance(type_, type):
+          type_ = type_.TYPE_SUBNAME
+        if isinstance(key, (int, UUID)):
           key = str(key)
       else:
         raise TypeError(
