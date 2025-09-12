@@ -1013,28 +1013,24 @@ class PlayOnAPI(HTTPServiceAPI):
         recordings.extend(iter(self))
       elif arg == 'available':
         recordings.extend(
-            recording for recording in self.recordings()
-            if recording.is_available()
+            recording for recording in self if recording.is_available()
         )
       elif arg == 'downloaded':
         recordings.extend(
-            recording for recording in self.recordings()
-            if recording.is_downloaded()
+            recording for recording in self if recording.is_downloaded()
         )
       elif arg == 'expired':
         recordings.extend(
-            recording for recording in self.recordings()
-            if recording.is_expired()
+            recording for recording in self if recording.is_expired()
         )
       elif arg == 'pending':
         recordings.extend(
-            recording for recording in self.recordings()
+            recording for recording in self
             if not recording.is_downloaded() and recording.is_available()
         )
       elif arg == 'queued':
         recordings.extend(
-            recording for recording in self.recordings()
-            if recording.is_queued()
+            recording for recording in self if recording.is_queued()
         )
       elif arg.startswith('/'):
         # match regexp against playon.Series or playon.Name
