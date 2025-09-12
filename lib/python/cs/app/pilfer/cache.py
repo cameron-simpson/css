@@ -302,7 +302,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     ''' Compute the cache key from a `SiteMap` and a URL key.
         This is essentially the URL key prefixed with the sitemap name.
     '''
-    site_prefix = sitemap.name.replace("/", "__")
+    site_prefix = sitemap.name__
     cache_key = f'{site_prefix}/{url_key.lstrip("/")}' if url_key else site_prefix
     validate_rpath(cache_key.rstrip('/'))
     return cache_key
