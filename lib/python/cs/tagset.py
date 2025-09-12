@@ -694,7 +694,6 @@ class TagSetTyping:
     '''
     return self.type_subname_of(self.name)
 
-@has_format_attributes
 class TagSet(
     dict,
     UNIXTimeMixin,
@@ -1528,7 +1527,6 @@ class TagSet(
         ] = ('' if tag.value is None else tag.transcribe_value(tag.value))
       config.write(f)
 
-@has_format_attributes
 class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
   ''' A name/value pair.
       Each `Tag` has a `.name` (`str`), a `.value` and an optional `.ontology`.
