@@ -318,7 +318,8 @@ from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped, cropped_repr, cutprefix, cutsuffix, get_dotted_identifier,
     get_nonwhite, is_dotted_identifier, is_identifier, skipwhite,
-    FormatableMixin, has_format_attributes, format_attribute, FStr, r, s
+    FormatMapping, FormatableMixin, has_format_attributes, format_attribute,
+    FStr, printt, r, s
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
