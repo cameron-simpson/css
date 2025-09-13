@@ -895,8 +895,12 @@ class PlayOnAPI(HTTPServiceAPI):
     ''' Return a timezone aware datetime from a PlayOn date/time value;
         The PlayOn API seems to use UTC date strings.
     '''
-    return datetime.strptime(date_s,
-                             "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=UTC)
+    for time_format in "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S":
+      try:
+        return datetime.strptime(date_s, time_format).replace(tzinfo=UTC)
+      except ValueError:
+        pass
+    raise ValueError(f'failed to parse PlayOn time string {date_s=}')
 
   @typechecked
   def __getitem__(self, index: tuple | int) -> HasTags:
