@@ -1875,8 +1875,8 @@ class FormatMapping(MappingABC):
       self,
       obj,
       base_format_mapping: Mapping,
-      *,
       missing: Optional[Callable[[Mapping, Any], Any]] = None,
+      *,
       strict=True,
   ):
     self.obj = obj
