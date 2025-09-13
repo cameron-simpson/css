@@ -30,6 +30,7 @@ cmd=$0
 usage="Usage: $cmd [-2] [-3] filenames...
   -2    Use Python 2 for Python linting.
   -3    Use Python 3 for Python linting.
+  -3.x  Use Python 3 for Python linting and tell ruff to use this version.
   -q    Quick. Skip the more expensive lints."
 
 badopts=

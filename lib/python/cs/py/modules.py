@@ -50,7 +50,7 @@ def import_module_name(module_name, name=None, sys_path=None, lock=None):
       except ImportError as e:
         # pylint: disable=raise-missing-from
         raise ImportError(
-            f'no module named {module_name!r}: {e.__class__.__name__}:{e}'
+            f'cannot import {module_name!r}: {e.__class__.__name__}: {e}'
         ) from e
     if M is not None:
       if name is None:

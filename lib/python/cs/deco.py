@@ -1017,10 +1017,10 @@ def promote(func, params=None, types=None):
             func.__module__,
         )
         continue
-      warning(
-          "@promote(%s): param %s: %r -> %r", func, param_name, annotation,
-          resolved
-      )
+      ##warning(
+      ##    "@promote(%s): param %s: str:%r -> %r", func, param_name, annotation,
+      ##    resolved
+      ##)
       annotation = resolved
     # recognise optional parameters and use their primary type
     optional = False

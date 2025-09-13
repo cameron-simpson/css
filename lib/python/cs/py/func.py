@@ -37,7 +37,8 @@ def funcname(func):
         name = "partial(%s)" % (funcname(func.func),)
       else:
         name = str(func)
-  return "%s:%s" % (getattr(func, '__module__', '?'), name)
+  module_name = getattr(func, '__module__', None)
+  return "%s:%s" % (module_name, name) if module_name else name
 
 def funccite(func):
   ''' Return a citation for a function (name and code location).

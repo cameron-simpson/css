@@ -377,13 +377,13 @@ class StatefulIterator(object):
       * `.state`: the last state value from the internal iterator
 
       The originating use case is resuse of an iterator by independent
-      calls that are typically sequential, specificly the .read
+      calls that are typically sequential, specificly the `.read`
       method of file like objects. Naive sequential reads require
       the underlying storage to locate the data on every call, even
       though the previous call has just performed this task for the
       previous read. Saving the iterator used from the preceeding
       call allows the iterator to pick up directly if the file
-      offset hasn't been fiddled in the meantime.
+      offset hasn't been modified in the meantime.
   '''
 
   def __init__(self, it):
@@ -409,8 +409,8 @@ class ClonedIterator(Iterable):
       iterator in memory.
   '''
 
-  def __init__(self, it: Iterator):
-    ''' Initialise the clone with its original iterator.
+  def __init__(self, it: Iterable):
+    ''' Initialise the clone with the iterable `it`.
     '''
     self._iterator = iter(it)
     self._cloned = []
@@ -428,7 +428,7 @@ class ClonedIterator(Iterable):
     ''' Iterate over the clone, returning a new iterator.
 
         In mild violation of the iterator protocol, instead of
-        returning `self`` iter(self)` returns a generator yielding
+        returning `self`, `iter(self)` returns a generator yielding
         the historic and then current contents of the original iterator.
     '''
     i = 0

@@ -138,14 +138,17 @@ from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.seq import unrepeated
 from cs.tagset import (
-    Tag,
-    TagSet,
-    TagBasedTest,
-    TagsOntology,
-    TagFile,
-    TagsOntologyCommand,
-    TagsCommandMixin,
+    BaseTagSets,
+    HasTags,
     RegexpTagRule,
+    Tag,
+    TagBasedTest,
+    TagFile,
+    TagSet,
+    TagsCommandMixin,
+    TagsOntology,
+    TagsOntologyCommand,
+    UsesTagSets,
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property, State
@@ -1060,16 +1063,18 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
 
 # pylint: disable=too-many-public-methods
-class FSTags(MultiOpenMixin):
+class FSTags(MultiOpenMixin, UsesTagSets):
   ''' A class to examine filesystem tags.
   '''
 
   @fmtdoc
   def __init__(
       self,
+      *,
       tagsfile_basename=None,
       ontology_filepath=None,
       physical=None,
+      tagsets: Optional[BaseTagSets] = None,
       update_mapping: Optional[Mapping] = None,
       update_prefix: Optional[str] = __name__,
       update_uuid_tag_name: Optional[str] = 'uuid',
@@ -1083,6 +1088,7 @@ class FSTags(MultiOpenMixin):
         * `physical`: optional flag for the associated `FSTagsConfig`
           specifying whether `TagFile`s are indexed by their physical or logical
           filesystem paths
+        * `tagsets`: an optional `BaseTagSets` to be used via the `UsesTagSets` methods
         * `update_mapping`: optional secondary mapping to which to mirror
           tags, such as an `SQLTags`;
           the default comes from an `SQLTags` specified by the
@@ -1099,6 +1105,10 @@ class FSTags(MultiOpenMixin):
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
+    if tagsets is None:
+      self.tagsets = None
+    else:
+      UsesTagSets.__init__(self, tagsets=tagsets)
     if update_mapping is None:
       update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
       if update_mapping:

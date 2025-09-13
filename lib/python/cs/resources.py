@@ -58,6 +58,13 @@ DISTINFO = {
     ],
 }
 
+@OBSOLETE('cs.semantics.not_closed')
+def not_closed(method):
+  ''' Obsolete shim for `cs.sendmatics.not_closed`
+  '''
+  from cs.semantics import not_closed
+  return not_closed(method)
+
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
 if sys.version_info >= (3, 10):
   _mdc = dataclass(slots=True)
