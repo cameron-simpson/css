@@ -301,7 +301,7 @@ class PilferCommand(BaseCommand):
         *(f'{name}:{value}' for name, value in rqhdrs.items()),
         *(f'{param}={value}' for param, value in params.items()),
     )
-    rsp = trace(P.request)(
+    rsp = P.request(
         url,
         method=method,
         headers=rqhdrs,

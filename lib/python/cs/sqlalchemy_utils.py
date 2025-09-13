@@ -23,7 +23,7 @@ from typeguard import typechecked
 from cs.context import contextif
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import lockfile
-from cs.lex import cutprefix
+from cs.lex import cutprefix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.psutils import run

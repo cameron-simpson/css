@@ -22,7 +22,7 @@ from cs.deco import (
     uses_verbose
 )
 from cs.lex import (
-    cutprefix, cutsuffix, FormatAsError, get_nonwhite, printt, r, skipwhite
+    cutprefix, cutsuffix, FormatAsError, get_nonwhite, printt, r, s, skipwhite
 )
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -731,8 +731,6 @@ class SiteEntity(HasTags):
     ''' Return the `SiteEntity` for the database wide `key`.
     '''
     return SiteMap.by_db_key(db_key)
-
-
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):

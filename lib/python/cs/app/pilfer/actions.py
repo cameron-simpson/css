@@ -16,7 +16,7 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.lex import BaseToken
+from cs.lex import BaseToken, cutprefix
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
 from cs.pfx import Pfx, pfx_call
@@ -26,7 +26,6 @@ from .parse import get_name_and_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 
 @dataclass
-
 @dataclass
 class _Action(BaseToken):
 
