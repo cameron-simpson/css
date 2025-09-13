@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import re
 import shlex
 from subprocess import Popen, PIPE
-from typing import Any, Callable, List, Tuple, Union
+from typing import Any, Callable, List, Mapping, Tuple, Union
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:

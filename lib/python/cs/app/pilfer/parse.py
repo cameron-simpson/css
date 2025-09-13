@@ -364,7 +364,7 @@ def parse_action(action, do_trace):
           (marker, action[offset])
       )
     else:
-      args, kwargs, offset = parse_action_args(action, offset)
+      args, kwargs, offset = get_action_args(action, offset)
     if offset < len(action):
       raise ValueError("unparsed content after args: %r", action[offset:])
     if name == "grok":
@@ -547,7 +547,7 @@ def parse_action(action, do_trace):
   # some other function: gather arguments and then look up function by name in mappings
   if offset < len(action):
     marker = action[offset]
-    args, kwargs, offset = parse_action_args(action, offset + 1)
+    args, kwargs, offset = get_action_args(action, offset + 1)
     if offset < len(action):
       raise ValueError(
           "unparsed text after arguments: %r (found a=%r, kw=%r)" %
@@ -635,7 +635,7 @@ def get_action_args(action, offset, delim=None):
   args = []
   kwargs = {}
   while offset < len(action):
-    with Pfx("parse_action_args(%r)", action[offset:]):
+    with Pfx("get_action_args(%r)", action[offset:]):
       if delim is not None and action.startswith(delim, offset):
         break
       if action.startswith(',', offset):
