@@ -656,7 +656,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
                   direct=options.use_direct_tags,
               )
             except FormatAsError as e:
-              error(str(e))
+              if not options.quiet:
+                error(str(e))
               xit = 1
               continue
             print(listing)
