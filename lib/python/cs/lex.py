@@ -1571,7 +1571,7 @@ class FormatAsError(LookupError):
   def __str__(self):
     return self.error_sep.join(
         (
-            f'format fails, missing key {getattr(self,"_",self.key)}:',
+            f'missing key {getattr(self,"_",self.key)}:',
             f'format string was {self.format_s!r}',
             f'available keys: {" ".join(sorted(self.format_mapping.keys()))}',
         )
@@ -1630,7 +1630,6 @@ def format_as(
   try:
     formatted = formatter.vformat(format_s, (), format_mapping)
   except KeyError as e:
-    printt([f'format_as({format_s=})'], *sorted(format_mapping.items()))
     raise FormatAsError(
         ##e.args[0],
         e._,
@@ -1884,7 +1883,20 @@ class FormatMapping(MappingABC):
   def __iter__(self):
     return iter(self.mapping)
 
-  def __getitem__(self, field_name):
+  # the .items from MappingABC somehow does the wrong thing
+  def items(self):
+    ''' Proxy `.items` via `self.mapping`.
+    '''
+    for key in self.keys():
+      yield key, self[key]
+
+  # the .keys from MappingABC somehow does the wrong thing
+  def keys(self):
+    ''' Proxy `.keys` via `self.mapping`.
+    '''
+    return self.mapping.keys()
+
+  def __getitem__(self, field_name: str):
     ''' Fetch the value for `field_name`.
         If the value is callable, call `value(self.obj)` to get the value.
     '''
