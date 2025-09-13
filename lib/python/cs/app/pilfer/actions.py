@@ -26,7 +26,6 @@ from .parse import get_name_and_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 
 @dataclass
-@dataclass
 class _Action(BaseToken):
 
   pilfer: Pilfer = None
