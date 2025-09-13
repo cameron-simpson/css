@@ -1571,7 +1571,7 @@ class FormatAsError(LookupError):
   def __str__(self):
     return self.error_sep.join(
         (
-            f'format fails, missing key {getattr(self,"_",self.key)}:',
+            f'missing key {getattr(self,"_",self.key)}:',
             f'format string was {self.format_s!r}',
             f'available keys: {" ".join(sorted(self.format_mapping.keys()))}',
         )
@@ -1602,8 +1602,10 @@ def format_as(
     format_s: str,
     format_mapping,
     formatter=None,
+    *,
     error_sep=None,
     missing: Optional[Callable[[Mapping, Any], Any]] = None,
+    strict=False,
 ):
   ''' Format the string `format_s` using `Formatter.vformat`,
       return the formatted result.
@@ -1625,12 +1627,13 @@ def format_as(
   '''
   if formatter is None:
     formatter = FormatableFormatter(format_mapping)
-  if missing is not None:
-    format_mapping = FormatMapping(None, FormatMapping, missing)
+  if missing is not None or not strict:
+    format_mapping = FormatMapping(
+        None, format_mapping, missing, strict=strict
+    )
   try:
     formatted = formatter.vformat(format_s, (), format_mapping)
   except KeyError as e:
-    printt([f'format_as({format_s=})'], *sorted(format_mapping.items()))
     raise FormatAsError(
         ##e.args[0],
         e._,
@@ -1859,7 +1862,7 @@ class FormatableFormatter(Formatter):
 class FormatMapping(MappingABC):
   ''' A `Mapping` subclass based on an object and a mapping
       intended for use by the `FormatableMixin.format_as` method.
-      The mapping maps field names to values, where the values may be 
+      The mapping maps field names to values, where the values may be
       callables accepting an object.
       Fetching a value from the mapping will call `value(obj)` if
       the value is callable.
@@ -1873,10 +1876,13 @@ class FormatMapping(MappingABC):
       obj,
       base_format_mapping: Mapping,
       missing: Optional[Callable[[Mapping, Any], Any]] = None,
+      *,
+      strict=True,
   ):
     self.obj = obj
     self.mapping = base_format_mapping
     self.missing = missing
+    self.strict = strict
 
   def __len__(self):
     return len(self.mapping)
@@ -1884,7 +1890,20 @@ class FormatMapping(MappingABC):
   def __iter__(self):
     return iter(self.mapping)
 
-  def __getitem__(self, field_name):
+  # the .items from MappingABC somehow does the wrong thing
+  def items(self):
+    ''' Proxy `.items` via `self.mapping`.
+    '''
+    for key in self.keys():
+      yield key, self[key]
+
+  # the .keys from MappingABC somehow does the wrong thing
+  def keys(self):
+    ''' Proxy `.keys` via `self.mapping`.
+    '''
+    return self.mapping.keys()
+
+  def __getitem__(self, field_name: str):
     ''' Fetch the value for `field_name`.
         If the value is callable, call `value(self.obj)` to get the value.
     '''
@@ -1892,11 +1911,17 @@ class FormatMapping(MappingABC):
       value = self.mapping[field_name]
     except KeyError:
       if field_name == 'self':
-        value = self.obj
-      elif self.missing is not None:
-        value = self.missing(self.mapping, field_name)
+        return self.obj
+      if self.missing is None:
+        if not self.strict:
+          return f'{{{field_name}}}'
       else:
-        raise
+        try:
+          value = self.missing(self.mapping, field_name)
+        except KeyError:
+          if not self.strict:
+            return f'{{{field_name}}}'
+      raise
     else:
       if callable(value):
         value = value(self.obj)
@@ -2056,28 +2081,39 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
   def format_as(
       self,
       format_s: str,
+      *,
       error_sep: Optional[str] = None,
       missing: Optional[Callable[[Mapping, Any], Any]] = None,
-      **control_kw
+      strict=True,
+      **format_kwargs_kw,
   ):
     ''' Return the string `format_s` formatted using the mapping
-        returned by `self.format_kwargs(**control_kw)`.
+        returned by `self.format_kwargs(**format_kwargs_kw)`.
 
-        If a class using the mixin has no `format_kwargs(**control_kw)` method
+        If a class using the mixin has no `format_kwargs()` method
         to provide a mapping for `str.format_map`
         then the instance itself is used as the mapping.
     '''
     with Pfx(f'{self.__class__.__name__}.format_as'):  ##({format_s=},...)'):
-      get_format_mapping = getattr(self, 'format_kwargs', None)
-      if get_format_mapping is None:
-        if control_kw:
+      try:
+        format_kwargs_method = self.format_kwargs
+      except AttributeError:
+        if format_kwargs_kw:
           # pylint: disable=raise-missing-from
           raise ValueError(
-              f'{r(self)}: no .format_kwargs() method, but {control_kw=}'
+              f'{r(self)}: no .format_kwargs() method, but {format_kwargs_kw=}'
           )
         format_mapping = self
       else:
-        format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
+        if callable(format_kwargs_method):
+          # this is what we expect, a method to obtain the mapping
+          format_mapping = format_kwargs_method(**format_kwargs_kw)
+        else:
+          # surprise! maybe it's a property
+          warning(
+              f'{r(self)}.format_kwargs ({type(format_kwargs_method).__name__}) is not callable, using directly'
+          )
+          format_mapping = format_kwargs_method
       # wrap the mapping in FormatMapping, which provides "self"
       # if missing and calls callable mapping values
       format_mapping = FormatMapping(self, format_mapping, missing)
@@ -2086,6 +2122,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
           format_mapping,
           formatter=self,
           error_sep=error_sep,
+          strict=strict,
       )
 
   # Utility methods for formats.
