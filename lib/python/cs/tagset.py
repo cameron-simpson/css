@@ -3268,7 +3268,7 @@ class UsesTagSets:
             artist_uuid = UUID('a417f0e5-2c14-445a-9a07-5a7ad2bdeafa')
             artist = mbdb[Artist, artist_uuid]
     '''
-    with Pfx("%s[%s]", s(self), r(index), print=True):
+    with Pfx("%s[%s]", s(self), r(index)):
       if isinstance(index, str):
         type_, key = index.rsplit('.', 1)
         zone = self.TYPE_ZONE
@@ -3281,7 +3281,6 @@ class UsesTagSets:
           zone, type_, key = index
         else:
           zone = self.TYPE_ZONE
-          print(f'  {zone=}, {type_=}, {key=}')
         if isinstance(type_, type):
           type_ = type_.TYPE_SUBNAME
         if isinstance(key, (int, UUID)):
