@@ -73,7 +73,7 @@ cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063
 cs.obj pypi.release="20250306" ok_revision="7bc383c11106fbc6c6f841dfc9106c690eb7e236" features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"],"20241005":["public_subclasses"]}
 cs.other_command
 cs.packetstream pypi.release="20240630" ok_revision="1bc8c692373663edd0678222e3a7c30fd5292116" features={"20240630":["BaseRequest","HasPacketConnection"]}
-cs.pfx pypi.release="20250613" ok_revision="8bd9a36417e4089c0d6546d5cad1c8d35945fabf" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
+cs.pfx pypi.release="20250613" ok_revision=cbb33e15bb851541fd05bd48b3e4b08fd5cf9f25 features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
 cs.pipeline pypi.release="20191007.1" ok_revision="2a26b6f06610394b6c7e6fb6f9a5228e50367db9"
 cs.pop3 ok_revision="64592a92c8db0e90cf818f6ccf415f6cfb53c90d" pypi.release="20240316"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
@@ -83,6 +83,7 @@ cs.psutils pypi.release="20250513" ok_revision=be91b550b3dba0e68b96be8810a8e0c50
 cs.py.doc pypi.release="20250426" ok_revision=f3ab8e29f48276fe14775575f12e06c5263880e1
 cs.py.func pypi.release="20250914" ok_revision="2f4b463f8596f710acb1e3fefcbb512e96f3b771" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
 cs.py.modules pypi.release="20250724" ok_revision="24982698d37a9f61120ce717f4c0fee530986d4f" features={"20220606":["import_extra"]}
+cs.py.pfx
 cs.py.stack pypi.release="20250724" ok_revision=eaabd52273e7d3de35c7ab1db6fda136cab56b62 features={"20240412":["stack_dump__select"]}
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
 cs.queues pypi.release="20250426" ok_revision=e9f02ca056291fecded4a9e9a0d9747d2681c42d features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"],"20240211":["ListQueue__unique"],"20240305":["get_batch"],"20240412":["QueueIterator__iter_batch","QueueIterator__next_batch"]}
