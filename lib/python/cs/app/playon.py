@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
 from functools import cached_property
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 from netrc import netrc
 import os
 from os import environ
@@ -39,10 +39,8 @@ from cs.lex import (
     cutprefix,
     cutsuffix,
     format_attribute,
-    FormatableMixin,
     get_prefix_n,
     get_suffix_part,
-    has_format_attributes,
     printt,
 )
 from cs.logutils import warning
@@ -53,8 +51,8 @@ from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.rfc2616 import content_length
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
-from cs.sqltags import SQLTags, UsesSQLTags
-from cs.tagset import HasTags, TagSet
+from cs.sqltags import SQLTags
+from cs.tagset import HasTags
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
