@@ -1,0 +1,7 @@
+New single_space(s[,sep=]) function to split a string and rejoin, with a single space by default.
+Obsolete the @has_format_attributes decorator, how covered by FormatableMixin automatically.
+New FormatMapping(obj,base_format_mapping[,missing]) class presenting a mapping where some entries are callable, used by FormatableMixin.format_as.
+FStr: rename lc to lc_ to reflect the use of the lc_() function.
+format_as: new optional `missing(mapping,key)` parameter to supply values for keys not in `format_mapping`.
+FormatAsError: annotate the error with .key, .format_s, .format_mapping.
+Many small internal changes.
