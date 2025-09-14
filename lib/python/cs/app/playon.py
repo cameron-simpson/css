@@ -763,13 +763,14 @@ class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
         episode_title.lower(), 'e', n=playon_episode, offset=offset
     )
     if offset > 0:
-      # strip the sSSeEE and any following spaces or dashes
+      # strip the sSSeEE and any spaces or dashes which follow it
       episode_title = episode_title[offset:].lstrip(' -')
     # fall back from provided stuff to inferred stuff
     return cls(
         series=playon_series or browse_series,
         season=playon_season or episode_title_season or browse_season,
         episode=playon_episode or episode_title_episode,
+        episode_title=episode_title,
         episode_part=episode_part,
     )
 
