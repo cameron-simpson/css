@@ -659,12 +659,16 @@ def pfx(func, message=None, *message_args):
         height = len(pfx_stack)
         # add on the generator's stack from before
         pfx_stack.extend(gen_pfx_stack)
-        with Pfx(pfxf, *pfxav):
-          result = next(gen)
-        # stash the in-generator Pfx stack
-        gen_pfx_stack = pfx_stack[height:]
-        # restore to how it was
-        pfx_stack[height:] = []
+        try:
+          with Pfx(pfxf, *pfxav):
+            result = next(gen)
+        except StopIteration:
+          break
+        finally:
+          # stash the in-generator Pfx stack
+          gen_pfx_stack = pfx_stack[height:]
+          # restore to how it was
+          pfx_stack[height:] = []
         yield result
 
     return pfx_generator_wrapper
