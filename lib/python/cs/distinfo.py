@@ -1561,7 +1561,6 @@ class CSReleaseCommand(BaseCommand):
       except AttributeError:
         return False
 
-    verbose: bool = field(default_factory=stderr_isatty)
     colourise: bool = field(default_factory=stderr_isatty)
     pkg_tagsets: TagFile = field(
         default_factory=lambda:
