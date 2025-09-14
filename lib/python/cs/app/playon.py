@@ -294,7 +294,6 @@ class PlayOnCommand(BaseCommand):
     options = self.options
     dl_jobs = options.dl_jobs
     no_download = options.dry_run
-    sqltags = options.sqltags
     if not argv:
       argv = ['pending']
     api = options.api
@@ -305,7 +304,7 @@ class PlayOnCommand(BaseCommand):
     @typechecked
     def _dl(dl_id: int, sem):
       try:
-        with sqltags:
+        with api:
           filename = api[dl_id].filename(filename_format)
           try:
             api.download(dl_id, filename=filename, runstate=runstate)
@@ -320,13 +319,13 @@ class PlayOnCommand(BaseCommand):
     Rs = []
     for arg in argv:
       with Pfx(arg):
-        recording_ids = sqltags.recording_ids_from_str(arg)
+        recording_ids = api.recording_ids_from_str(arg)
         if not recording_ids:
           if sys.stderr.isatty():
             warning("no recording ids")
           continue
         for dl_id in recording_ids:
-          recording = sqltags[dl_id]
+          recording = api[dl_id]
           with Pfx(recording.name):
             citation = recording.nice_name()
             if recording.is_expired():
@@ -357,7 +356,7 @@ class PlayOnCommand(BaseCommand):
     if Rs:
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
-        recording = sqltags[dl_id]
+        recording = api[dl_id]
         try:
           dl = R()
         except CancellationError as e:
