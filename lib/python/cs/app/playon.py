@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
 from functools import cached_property
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 from netrc import netrc
 import os
 from os import environ
@@ -39,10 +39,8 @@ from cs.lex import (
     cutprefix,
     cutsuffix,
     format_attribute,
-    FormatableMixin,
     get_prefix_n,
     get_suffix_part,
-    has_format_attributes,
     printt,
 )
 from cs.logutils import warning
@@ -53,8 +51,8 @@ from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.rfc2616 import content_length
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
-from cs.sqltags import SQLTags, UsesSQLTags
-from cs.tagset import HasTags, TagSet
+from cs.sqltags import SQLTags
+from cs.tagset import HasTags
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -294,7 +292,6 @@ class PlayOnCommand(BaseCommand):
     options = self.options
     dl_jobs = options.dl_jobs
     no_download = options.dry_run
-    sqltags = options.sqltags
     if not argv:
       argv = ['pending']
     api = options.api
@@ -305,7 +302,7 @@ class PlayOnCommand(BaseCommand):
     @typechecked
     def _dl(dl_id: int, sem):
       try:
-        with sqltags:
+        with api:
           filename = api[dl_id].filename(filename_format)
           try:
             api.download(dl_id, filename=filename, runstate=runstate)
@@ -320,13 +317,13 @@ class PlayOnCommand(BaseCommand):
     Rs = []
     for arg in argv:
       with Pfx(arg):
-        recording_ids = sqltags.recording_ids_from_str(arg)
+        recording_ids = api.recording_ids_from_str(arg)
         if not recording_ids:
           if sys.stderr.isatty():
             warning("no recording ids")
           continue
         for dl_id in recording_ids:
-          recording = sqltags[dl_id]
+          recording = api[dl_id]
           with Pfx(recording.name):
             citation = recording.nice_name()
             if recording.is_expired():
@@ -357,7 +354,7 @@ class PlayOnCommand(BaseCommand):
     if Rs:
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
-        recording = sqltags[dl_id]
+        recording = api[dl_id]
         try:
           dl = R()
         except CancellationError as e:
@@ -764,13 +761,14 @@ class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
         episode_title.lower(), 'e', n=playon_episode, offset=offset
     )
     if offset > 0:
-      # strip the sSSeEE and any following spaces or dashes
+      # strip the sSSeEE and any spaces or dashes which follow it
       episode_title = episode_title[offset:].lstrip(' -')
     # fall back from provided stuff to inferred stuff
     return cls(
         series=playon_series or browse_series,
         season=playon_season or episode_title_season or browse_season,
         episode=playon_episode or episode_title_episode,
+        episode_title=episode_title,
         episode_part=episode_part,
     )
 
