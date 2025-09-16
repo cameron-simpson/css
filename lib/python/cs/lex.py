@@ -1254,6 +1254,51 @@ def cutsuffix(s, suffix):
   # no match, return the original object
   return s
 
+def without_prefix(s, prefix):
+  ''' Remove `prefix` from `s` and return the suffix, or `None` if not present.
+      As with `str.endswith`, `prefix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching prefix from the tuple will be removed.
+
+      Example:
+
+          >>> if attr := without_prefix("obj.attrname", "obj."):
+          ...     print("attribute is", attr)
+          ...
+          attribute is attrname
+          >>> if attr := without_prefix("notobj.attrname", "obj."):
+          ...     print("processing", attr, "now")
+          ... else:
+          ...     print("expected leading 'obj.'")
+          ...
+          expected leading 'obj.'
+          >>>
+  '''
+  suffix = cutprefix(s, prefix)
+  return None if suffix is s else suffix
+
+def without_suffix(s, suffix):
+  ''' Remove `suffix` from `s` and return the prefix, or `None` if not present.
+      As with `str.endswith`, `suffix` may be a `str` or a `tuple` of `str`.
+      If a tuple, the first matching suffix from the tuple will be removed.
+
+      Example:
+
+          >>> if typename := without_suffix("ComicPageConnection", "Connection"):
+          ...     print("typename is", typename)
+          ...
+          typename is ComicPage
+          >>> edgetypename = "ComicCoverObject"
+          >>> if edgetype := without_suffix(edgetypename, "Edge"):
+          ...     print("processing edge for type", edgetype)
+          ... else:
+          ...     print("unexpected edge type name", edgetypename)
+          ...
+          unexpected edge type name ComicCoverObject
+          >>>
+  '''
+  prefix = cutsuffix(s, suffix)
+  return None if prefix is s else prefix
+
 def common_prefix(*strs):
   ''' Return the common prefix of the strings `strs`.
 
