@@ -111,20 +111,21 @@
     The direct subclassing approach scales poorly.
 
     Instead the preferred approach is to use the `HasTags` and
-    `UsesTagSets` base classes. The `HasTags` class stored the
-    entityt state in its `.tags` attribute, a `TagSet` and has a
-    reference to a `.tags_db`, which is an instance of a `UsesTagSets`,
-    the larger collection of `TagSet`s.  The `UsesTagSets` class
-    has a `.tagsets` attribute referring to an instance of a
-    `BaseTagSets`, a collection of `TagSets`.
+    `UsesTagSets` base classes. The `HasTags` class is essentially
+    a proxy which stores the entityt state in its `.tags` attribute,
+    a `TagSet` and has a reference to a `.tags_db`, which is an
+    instance of a `UsesTagSets`, the larger collection of `TagSet`s.
+    The `UsesTagSets` class has a `.tagsets` attribute referring
+    to an instance of a `BaseTagSets`, a collection of `TagSets`.
 
     It's important to know that `BaseTagSets`, `HasTags`, and
     `UsesTagSets` all have a `.deref()` method for dereferencing
     tags which refer to other entity ids.
 
     Setting up a class for a particular knowledge domain requires
-    defining 2 classes: a base entity class for `HasTags` members
-    of the domain, and a `UsesTagSets` class for the domain itself.
+    defining 2 classes: a `HasTags` subclass to be the base class
+    for members of the domain and a `UsesTagSets` class for the
+    domain itself.
     Here is the basis of the MusicBrainzNG domain from `cs.cdrip`:
 
         class _MBEntity(HasTags):
@@ -175,7 +176,11 @@
         disc = mbdb['disc', discid]
 
     which will return an `MBDisc` instance, creating it in the
-    database if necessary.
+    database if necessary. To Avoid wiring in the type subname string
+    you can also use the subclass:
+
+        disc = mbdb[MBDisc, discid]
+
 
     ## Ontologies
 
