@@ -656,14 +656,12 @@ class SiteEntity(HasTags):
           upper case leading letter such as `URL_DOMAIN`
     '''
     kwargs = super().format_kwargs()
-    kwargs.update(
-        {
-            k: v
-            for k, v in self.tags.__class__.__dict__.items()
-            if k[:1].isupper()
-        }
-    )
-    return kwargs
+    etags = {
+        k: v
+        for k, v in self.tags.__class__.__dict__.items()
+        if k[:1].isupper()
+    }
+    return ChainMap(etags, kwargs) if etags else kwargs
 
   @property
   def sitemap(self):
