@@ -7,8 +7,9 @@ from collections import ChainMap, defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import datetime
 from fnmatch import fnmatch
-from functools import cached_property
+from functools import cached_property, partial
 from itertools import zip_longest
+import json
 import re
 from threading import Thread
 import time
@@ -21,8 +22,10 @@ from cs.deco import (
     decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose
 )
+from cs.excutils import unattributable
 from cs.lex import (
-    cutprefix, cutsuffix, FormatAsError, get_nonwhite, printt, r, s, skipwhite
+    cutprefix, cutsuffix, FormatAsError, FormatMapping, get_nonwhite, printt,
+    r, s, skipwhite
 )
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
