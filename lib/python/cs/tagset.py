@@ -2852,7 +2852,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       value = te[tag_name]
     except KeyError:
       return None
-    if isinstance(value, Sequence):
+    if not isinstance(value, str) and isinstance(value, Sequence):
       if subtype is None:
         subtype = cutsuffix(tag_name, '_id')
       if attr is None:
