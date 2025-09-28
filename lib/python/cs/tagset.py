@@ -477,49 +477,51 @@ def jsonable(obj, converted: Optional[dict] = None):
     return converted[id(obj)]
   except KeyError:
     pass
-  t = type(obj)
-  if t in (int, float, str, bool):
-    # return unchanged - no need to record the convobj
+  if type(obj) in (int, float, str, bool):
+    # return the basic types unchanged
     return obj
   # see if the object has a for_json() method
-  try:
-    for_json = obj.for_json
-  except AttributeError:
-    pass
+  for_json = getattr(obj, 'for_json', None)
+  if for_json is not None and callable(for_json):
+    convobj = for_json()
   else:
-    converted[id(obj)] = convobj = for_json()
-    return convobj
-  if isinstance(obj, pathlib.PurePath):
-    return str(obj)
-  if isinstance(t, (set, tuple, list)):
-    # convert to list
-    converted[id(obj)] = convobj = []
-    convobj.extend(jsonable(item, converted) for item in obj)
-    return convobj
-  # a mapping?
-  try:
-    keys = obj.keys
-  except AttributeError:
-    # an iterable?
-    try:
-      it = iter(obj)
-    except TypeError:
-      raise TypeError(f'jsoanble({r(obj)}): cannot convert for JSON')
-    else:
-      if it is obj:
-        raise TypeError(
-            f'jsonable({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
-        )
+    if isinstance(obj, (int, float, str, bool)):
+      # subtypes of the basics
+      return obj
+    if isinstance(obj, (datetime, pathlib.PurePath)):
+      # return in string form
+      convobj = str(obj)
+    elif isinstance(obj, (set, tuple, list)) or isinstance(obj, Sequence):
       # convert to list
-      converted[id(obj)] = convobj = []
-      convobj.extend(jsonable(item, converted) for item in it)
-      return convobj
-  else:
-    # a mapping
-    converted[id(obj)] = convobj = {}
-    for k in keys():
-      convobj[k] = jsonable(obj[k], converted)
-    return convobj
+      convobj = []
+      converted[id(obj)] = convobj
+      convobj.extend(jsonable(item, converted) for item in obj)
+    else:
+      # a mapping?
+      try:
+        keys = obj.keys
+      except AttributeError:
+        # an iterable?
+        try:
+          it = iter(obj)
+        except TypeError:
+          raise TypeError(f'jsoanble({r(obj)}): cannot convert for JSON')
+        if it is obj:
+          raise TypeError(
+              f'jsonable({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
+          )
+        # convert to list
+        convobj = []
+        converted[id(obj)] = convobj
+        convobj.extend(jsonable(item, converted) for item in it)
+      else:
+        # a mapping, convert to dict
+        convobj = {}
+        converted[id(obj)] = convobj
+        for k in keys():
+          convobj[k] = jsonable(obj[k], converted)
+  converted[id(obj)] = convobj
+  return convobj
 
 class _FormatStringTagProxy:
   ''' A proxy for a `Tag` where `__str__` returns `str(self.value)`.
