@@ -589,7 +589,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     # I have seen these misplaced into the META tags,
     # so get those then overwrite from the properties.
     return {
-        f'opengraph.{cutprefix(k,"og:")}': v
+        k.removeprefix("og:"): v
         for k, v in (*self.meta.tags.items(), *self.meta.properties.items())
         if k.startswith("og:")
     }
