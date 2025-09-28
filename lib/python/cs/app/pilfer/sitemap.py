@@ -581,10 +581,10 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     return links_by_rel
 
   @cached_property
-  def opengraph_tags(self) -> dict:
-    ''' The open graph properties, see https://ogp.me/
-        Each key has the form `'opengraph.`*prop*`'`
-        for the OpenGraph property named `og:`*prop*.
+  def opengraph(self) -> dict:
+    ''' The open graph properties as a dict, with their leading
+        `"og:"` prefix removed.
+        See https://ogp.me/
     '''
     # I have seen these misplaced into the META tags,
     # so get those then overwrite from the properties.
