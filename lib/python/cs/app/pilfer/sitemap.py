@@ -594,6 +594,15 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
         if k.startswith("og:")
     }
 
+  @cached_property
+  def opengraph_tags(self) -> dict:
+    ''' The open graph properties as a dict of tag names.
+        Each tag name has the form `'opengraph.`*prop*`'`
+        for the OpenGraph property named `og:`*prop*.
+        See https://ogp.me/
+    '''
+    return {f'opengraph.{k}': v for k, v in self.opengraph.items()}
+
 uses_flowstate = default_params(flowstate=FlowState.default)
 
 class SiteEntity(HasTags):
