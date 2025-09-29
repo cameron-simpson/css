@@ -3088,6 +3088,11 @@ class HasTags(TagSetTyping, FormatableMixin):
     '''
     return self.tags.items()
 
+  def setdefault(self, key, default_value):
+    ''' Set `self[key]=default_value` if `key` is not present.
+    '''
+    return self.tags.setdefault(key, default_value)
+
   def update(self, *update_a, **update_kw):
     ''' Update the tags, tupically from a mapping or keyword arguments.
     '''
