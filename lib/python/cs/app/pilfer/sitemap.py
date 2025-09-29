@@ -1717,20 +1717,16 @@ class SiteMap(UsesTagSets, Promotable):
               case _:
                 warning("unhandled prefetch arg")
 
-  @staticmethod
-  @uses_pilfer
-  def update_tagset_from_meta(
-      te: str | TagSet,
+  def update_mapping_from_meta(
+      self,
+      te: str | tuple | Mapping[str, Any],
       flowstate: FlowState,
-      *,
-      P: "Pilfer",  # noqa: F821
       **update_kw,
   ):
-    ''' Update a `TagSet` from `flowstate.meta`.
-        Return the `TagSet`.
+    ''' Update a mapping from `flowstate.meta`.
+        Return the mapping.
 
-        If `te` is a string, obtain the `TagSet` from `P.sqltags[te]`,
-        thus the need to return the `TagSet`.
+        If `te` is a string or tuple, obtain the mapping from `self[te]`.
 
         This applies the following updates:
         - `meta`: `flowstate.meta.tags`
@@ -1739,16 +1735,17 @@ class SiteMap(UsesTagSets, Promotable):
         - *type*`.*`: from properties commencing with *type*`:`
           where *type* comes from the `og:type` property
     '''
-    # promote a tagset name to an SQLTagSet from P.sqltags
-    if isinstance(te, str):
-      te = P.sqltags[te]
+    # promote a SiteMap index to a SiteEntity
+    if isinstance(te, (str, tuple)):
+      te = self[te]
     # stash the raw meta and properties
-    te.meta = flowstate.meta.tags
-    te.properties = flowstate.meta.properties
+    te["meta"] = flowstate.meta.tags.as_dict()
+    te["properties"] = flowstate.meta.properties.as_dict()
     og = flowstate.opengraph_tags
     te.update(**og)
     og_type = og.get('opengraph.type')
     if og_type:
+      # if there's a type, add the type:* properties also
       type_prefix = f'{og_type}:'
       te.update(
           **{
