@@ -629,6 +629,31 @@ class SiteEntity(HasTags):
       prefetching queue in `SiteMap.updated_entities()`.
   '''
 
+  # keys which can be obtained by grokking a web page
+  DERIVED_KEYS = {}
+
+  def __getitem__(self, key):
+    super_getitem = super().__getitem__
+    try:
+      return super_getitem(key)
+    except KeyError as super_ee:
+      # the key is not (yet) present, see if we can fetch it by
+      # grokking some web page
+      try:
+        method_name = self.DERIVED_KEYS[key]
+      except KeyError:
+        raise super_ee
+      if isinstance(method_name, str):
+        # a string naming an instance attribute such as .sitepage
+        # and a grokking method such as .grok_sitepage
+        attr = getattr(self, method_name)
+        grok_method = getattr(self, f'grok_{method_name}')
+        grok_method(attr)
+        return super_getitem(key)
+      raise TypeError(
+          f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(method_name)}'
+      )
+
   def __getattr__(self, attr):
     if attr.islower():
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
