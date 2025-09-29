@@ -3329,13 +3329,16 @@ class UsesTagSets:
         )
     )
 
-  def find(self, criteria) -> List[HasTags]:
+  def find(self, *criteria, **crit_kw) -> List[HasTags]:
     ''' Find entities in the database.
 
         This runs a find of the `BaseTagSets` and returns the associated
         `HasTagSetsClass` instances.
     '''
-    return [self.HasTagsClass(te, self) for te in self.tagsets.find(criteria)]
+    return [
+        self.HasTagsClass(te, self)
+        for te in self.tagsets.find(*criteria, **crit_kw)
+    ]
 
   @typechecked
   def deref(
