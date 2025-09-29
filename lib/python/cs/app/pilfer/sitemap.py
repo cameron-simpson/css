@@ -1163,6 +1163,10 @@ class SiteMap(UsesTagSets, Promotable):
           a regular expression to apply against the URL path;
           a leading slash anchors the regexp against the start of the path
           otherwise it may match anywhere in the path
+        - a regular expression object to apply against the URL path
+        - subclass of `SiteEntity`:
+          use its `.URL_RE` as a regular expression to apply against
+          the URL path
         - a callable: a function accepting a `FlowState` and the
           current match `TagSet`;
           it may return `None` or `False` for no match,
@@ -1202,6 +1206,12 @@ class SiteMap(UsesTagSets, Promotable):
     conditions = []
     for pattern in patterns:
       with Pfx(f'pattern={r(pattern)}'):
+        if isinstance(pattern, type) and issubclass(pattern, SiteEntity):
+          pattern = pattern.URL_RE
+          assert isinstance(pattern, str) and '/' in pattern, (
+              f'pattern.URL_RE={r(pattern)} is not a string containing a slash'
+          )
+
         if isinstance(pattern, str):
           if pattern.isupper():
             # a method name
@@ -1218,8 +1228,8 @@ class SiteMap(UsesTagSets, Promotable):
 
           elif '/' in pattern:
             # a path match
-            def maketest(regexp):
-              regexp = pfx_call(re.compile, pattern)
+            def maketest(regexp_s):
+              regexp = pfx_call(re.compile, regexp_s)
               if pattern.startswith('/'):
                 # match at the start of the path
                 test_name = f'flowstate.url.path ~ ^{regexp}'
@@ -1253,6 +1263,21 @@ class SiteMap(UsesTagSets, Promotable):
               test.__name__ = f'flowstate.url.hostname ~ {glob=}'
               test.glob = glob
               return test
+
+        elif isinstance(pattern, re.Pattern):
+          # a path match
+          def maketest(regexp):
+            test_name = f'flowstate.url.path ~ {regexp}'
+
+            def test(flowstate, match):
+              vprint(f'@on: {flowstate.url.path=} ~ {regexp}')
+              m = pfx_call(regexp.search, flowstate.url.path)
+              if m is None:
+                return None
+              return m.groupdict()
+
+            test.__name__ = test_name
+            return test
 
         elif callable(pattern):
           # it should be a callable accepting a FlowState and the match TagSet
