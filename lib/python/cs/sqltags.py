@@ -1537,6 +1537,15 @@ class SQLTagSet(SingletonMixin, TagSet):
         with self.db_session():
           self.add_db_tag(tag_name, self.to_polyvalue(tag_name, value))
 
+  def setdefault(self, tag_name, value):
+    ''' Return `self[tag_name]`, setting it to `value` if not already present.
+    '''
+    try:
+      return self[tag_name]
+    except KeyError:
+      self.set(tag_name, value)
+      return value
+
   @pfx_method
   @typechecked
   def add_db_tag(self, tag_name, pv: PolyValue):
