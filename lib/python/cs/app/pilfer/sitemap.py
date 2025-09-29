@@ -1502,7 +1502,7 @@ class SiteMap(UsesTagSets, Promotable):
 
   @staticmethod
   @decorator
-  def grok_entity_sitepage(func, *, ent_class):
+  def grok_entity_sitepage(func, *, ent_class, page='sitepage', type_key=None):
     ''' A decorator for sitepage `grok_*` methods which apply grokked
         information to a `SiteEntity`.
         This obtains the `entity` from `self[ent_class,match["type_key"]]`,
@@ -1526,8 +1526,20 @@ class SiteMap(UsesTagSets, Promotable):
         flowstate: FlowState,
         match=None,
     ) -> SiteEntity:
-      entity = self[ent_class, match["type_key"]]
-      entity.grok_sitepage(flowstate)
+      try:
+        ent_type_key = match["type_key"]
+      except KeyError as e:
+        if type_key is None:
+          raise KeyError(
+              f'no "type_key" in {match=} and no type_key= in @grok_entity_sitepage decorator'
+          ) from e
+        ent_type_key = type_key
+      entity = self[ent_class, ent_type_key]
+      if flowstate is None:
+        url = getattr(entity, page)
+        flowstate = FlowState.from_URL(url)
+      grok_method = getattr(entity, f'grok_{page}')
+      grok_method(flowstate)
       func(self, flowstate, match, entity)
       return entity
 
