@@ -652,18 +652,18 @@ class SiteEntity(HasTags):
       # the key is not (yet) present, see if we can fetch it by
       # grokking some web page
       try:
-        method_name = self.DERIVED_KEYS[key]
+        page_name = self.DERIVED_KEYS[key]
       except KeyError:
         raise super_ee
-      if isinstance(method_name, str):
+      if isinstance(page_name, str):
         # a string naming an instance attribute such as .sitepage
         # and a grokking method such as .grok_sitepage
-        attr = getattr(self, method_name)
-        grok_method = getattr(self, f'grok_{method_name}')
+        attr = getattr(self, page_name)
+        grok_method = getattr(self, f'grok_{page_name}')
         grok_method(attr)
         return super_getitem(key)
       raise TypeError(
-          f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(method_name)}'
+          f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(page_name)}'
       )
 
   def __getattr__(self, attr):
