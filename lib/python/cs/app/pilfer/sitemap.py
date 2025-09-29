@@ -632,6 +632,18 @@ class SiteEntity(HasTags):
   # keys which can be obtained by grokking a web page
   DERIVED_KEYS = {}
 
+  def __init_subclass__(cls, **kw):
+    ''' `SiteEntity` subclass init - set `cls.url_re` from `cls.URL_RE` if present.
+    '''
+    super().__init_subclass__(**kw)
+    try:
+      URL_RE = cls.URL_RE
+    except AttributeError:
+      pass
+    else:
+      cls.url_re = URL_RE if isinstance(URL_RE,
+                                        re.Pattern) else re.compile(URL_RE)
+
   def __getitem__(self, key):
     super_getitem = super().__getitem__
     try:
@@ -772,21 +784,15 @@ class SiteEntity(HasTags):
       url = f'{self.url_root}{url[1:]}'
     return url
 
-  @cached_property
-  def url_re(self) -> re.Pattern:
-    ''' The compiled form of `self.URL_RE`.
     '''
-    url_re = self.URL_RE
-    if not isinstance(url_re, re.Pattern):
-      url_re = re.compile(url_re)
-    return url_re
 
+  @classmethod
   @promote
-  def url_match(self, url: URL):
+  def url_match(cls, url: URL):
     ''' Match `url.path` against `self.URL_RE`.
         Return the `re.Match` instance, or `None` on no match.
     '''
-    return self.url_re.match(url.path)
+    return cls.url_re.match(url.path)
 
   def equivalents(self):
     ''' Return a list of equivalent `SiteEntity` instances from other type zones,
