@@ -655,7 +655,20 @@ class SiteEntity(HasTags):
       )
 
   def __getattr__(self, attr):
-    if attr.islower():
+    ''' A `SiteEntity` supports various automatic attributes.
+
+        If a lowercase attribute has a corresponding class attribute
+        `{attr.upper()}_FORMAT` then `self.format_as()` is called
+        with the format string to obtain the value.
+
+        If the attribute name is present in `self.DEREFFED_PROPERTIES`,
+        a mapping of attribute name to `(tag_name,direct)` 2-tuples,
+        then the corresponding `tag_name` is obtained and returned
+        directly if `direct`.  Otherwise `self.deref(tag_name)` is
+        returned.
+    '''
+    # *_FORMAT derived attribues
+    if attr.replace('_', '').islower():
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
       fmtattr_name = f'{attr.upper()}_FORMAT'
       try:
@@ -664,13 +677,28 @@ class SiteEntity(HasTags):
         pass
       else:
         try:
-          return self.format_as(format_s)
+          pageurl = self.format_as(format_s)
         except FormatAsError as e:
           warning("%s.format_as %r: %s", self, format_s, e)
           raise AttributeError(
               f'format {self.__class__.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
           ) from e
-    return super().__getattr__(attr)
+        else:
+          # strings commencing with a / are considered path components
+          # of a site URL so we convert them to a site URL
+          if pageurl.startswith('/'):
+            pageurl = self.urlto(pageurl)
+          return pageurl
+    # indirect derived attributes
+    try:
+      tag_name, direct = self.DEREFFED_PROPERTIES[attr]
+    except KeyError:
+      return trace(super().__getattr__)(attr)
+    # obtain the value; some tags will fetch info from the web if missing
+    value = self[tag_name]
+    if not direct:
+      value = self.deref(tag_name)
+    return value
 
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
