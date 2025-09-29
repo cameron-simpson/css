@@ -768,8 +768,25 @@ class SiteEntity(HasTags):
     except KeyError:
       url = self.__getattr__('sitepage')
     if url.startswith('/'):
+      # TODO: .urlto()?
       url = f'{self.url_root}{url[1:]}'
     return url
+
+  @cached_property
+  def url_re(self) -> re.Pattern:
+    ''' The compiled form of `self.URL_RE`.
+    '''
+    url_re = self.URL_RE
+    if not isinstance(url_re, re.Pattern):
+      url_re = re.compile(url_re)
+    return url_re
+
+  @promote
+  def url_match(self, url: URL):
+    ''' Match `url.path` against `self.URL_RE`.
+        Return the `re.Match` instance, or `None` on no match.
+    '''
+    return self.url_re.match(url.path)
 
   def equivalents(self):
     ''' Return a list of equivalent `SiteEntity` instances from other type zones,
