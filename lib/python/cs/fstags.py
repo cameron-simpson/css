@@ -354,7 +354,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   @popopts(
       direct='Use the direct tags instead of the inherited tags.',
-      prefix='Prefix for the environment variable names, default "fstags_".'
+      prefix_='Prefix for the environment variable names, default "fstags_".'
   )
   def cmd_as_envvars(self, argv):
     ''' Usage: {cmd} --prefix path [tag_name...]
@@ -364,7 +364,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     options = self.options
     direct = options.direct
     fstags = options.fstags
-    prefix = options.prefix
+    prefix = options.prefix or 'fstags'
     if not argv:
       raise GetoptError('missing path')
     path = argv.pop(0)
