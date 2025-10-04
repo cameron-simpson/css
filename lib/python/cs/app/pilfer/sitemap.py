@@ -697,15 +697,21 @@ class SiteEntity(HasTags):
   def __getattr__(self, attr):
     ''' A `SiteEntity` supports various automatic attributes.
 
+        Formatted templates:
         If a lowercase attribute has a corresponding class attribute
         `{attr.upper()}_FORMAT` then `self.format_as()` is called
         with the format string to obtain the value.
 
+        Related entities:
         If the attribute name is present in `self.DEREFFED_PROPERTIES`,
         a mapping of attribute name to `(tag_name,direct)` 2-tuples,
         then the corresponding `tag_name` is obtained and returned
         directly if `direct`.  Otherwise `self.deref(tag_name)` is
         returned.
+
+        Opengraph fallback:
+        If `HasTags.__getattr__(attr)` raises `AttributeError` and
+        the tag `opengraph.{attr}` exists, return that.
     '''
     # *_FORMAT derived attribues
     if attr.replace('_', '').islower():
@@ -731,12 +737,29 @@ class SiteEntity(HasTags):
           return pageurl
     # indirect derived attributes
     try:
-      tag_name, direct = self.DEREFFED_PROPERTIES[attr]
+      DEREFFED_PROPERTIES = self.__class__.DEREFFED_PROPERTIES
+    except AttributeError as e:
+      warning("no %s.DEREFFED_PROPERTIES: %s", self.__class__.__name__, e)
+      raise
+    try:
+      tag_name, direct = DEREFFED_PROPERTIES[attr]
     except KeyError:
-      return trace(super().__getattr__)(attr)
+      # not a DEREFFED_PROPERTIES, try the superclass
+      try:
+        return super().__getattr__(attr)
+      except AttributeError as e:
+        # no superclass attribute, try the opengraph property
+        og_tag_name = f'opengraph.{attr}'
+        try:
+          return self[og_tag_name]
+        except KeyError:
+          raise e
     # obtain the value; some tags will fetch info from the web if missing
+    # NB: always access the tag, triggers page fetch if missing
     value = self[tag_name]
-    if not direct:
+    if direct:
+      return value
+    else:
       value = self.deref(tag_name)
     return value
 
