@@ -884,6 +884,81 @@ class SiteEntity(HasTags):
     '''
     return SiteMap.by_db_key(db_key)
 
+  @staticmethod
+  @decorator
+  def paginated(grok_page):
+    ''' A decorator for methods to process a URL (such as `grok_sitepage`)
+        where the information is spread out across multiple numbered pages.
+
+        Classes whose methods utilise this decorator must implement:
+        - `soup_count_pages(soup)->int` to compute how many pages
+          there are from the soup of the first page
+        - `page_url(base_url:str,page_num:int)->str` to compute the
+          URL of the page numbered `pagenum` from a base URL
+        Typically these would be implemented on the base `SiteEntity` subclass.
+
+        The method being decorated should look like:
+
+            def method(self, flowstate:FlowState, *a, pagenum:int, **kw):
+
+        and the wrapped method which results looks like:
+
+            def method(self,flowstate:FlowState, *a, pagenum:int|Ellipsis=Ellipsis, **kw):
+
+        If `pagenum` is an `int`, to process a single page, the inner
+        method will be called directly.
+
+        If `pagenum` is `...` (`Ellipsis`, the default), the number
+        of pages with be be obtained from the `flowstate.soup` via
+        the `self.soup_count_pages` method and each page will be
+        processed in turn. The URL of each page is computed with the
+        `self.page_url(base_url,pagenum)` method.
+
+        Note: the underlying method should expect to be accruing information
+        to the information already in `self`. If the information
+        should be reset, that should happen conditionally when
+        `pagenum==1` so that the subsequent pages do not undo the
+        work of previous pages.
+
+        Example:
+
+            @paginated
+            def grok_sitepage(self,flowstate:FlowState,method=None,*,pagenum:int):
+                # process the flowstate, expecting to be called one for each page
+    '''
+
+    @uses_runstate
+    @promote
+    def grok_pages_wrapper(
+        self,
+        flowstate: FlowState,
+        *grok_a,
+        runstate: RunState,
+        pagenum: int | type(Ellipsis) = ...,
+        **grok_kw,
+    ):
+      if pagenum is ...:
+        base_url = str(flowstate.url)
+        page_count = self.soup_count_pages(flowstate.soup)
+        grok_page(self, flowstate, *grok_a, pagenum=1, **grok_kw)
+        runstate.raiseif()
+        pagenums = range(2, page_count + 1)
+        for pagenum, flowstate in zip(
+            pagenums,
+            FlowState.iterable_flowstates(
+                (self.page_url(base_url, n) for n in pagenums),
+                unordered=False,
+            ),
+        ):
+          runstate.raiseif()
+          grok_page(self, flowstate, *grok_a, pagenum=pagenum, **grok_kw)
+      else:
+        grok_page(self, flowstate, *grok_a, pagenum=pagenum, **grok_kw)
+
+    return grok_pages_wrapper
+
+paginated = SiteEntity.paginated
+
 class RSSCommon(ABC):
   ''' Common methods for RSS channel and item entities.
   '''
