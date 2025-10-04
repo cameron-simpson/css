@@ -3,6 +3,7 @@
 ''' Base class for site maps.
 '''
 
+from abc import ABC, abstractmethod
 from collections import ChainMap, defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -28,18 +29,21 @@ from cs.lex import (
     r, s, skipwhite
 )
 from cs.logutils import warning
+from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite
 from cs.queues import IterableQueue, ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import content_encodings, content_type
-from cs.seq import ClonedIterator
+from cs.seq import ClonedIterator, not_none
 from cs.tagset import BaseTagSets, HasTags, TagSet, TagSetTyping, UsesTagSets
 from cs.threads import HasThreadState, ThreadState
 from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag as BS4Tag
+from lxml import etree as ET
+from lxml.builder import E
 from mitmproxy.flow import Flow
 import requests
 from typeguard import typechecked
@@ -1191,7 +1195,7 @@ class SiteMap(UsesTagSets, Promotable):
 
   @property
   def name__(self):
-    ''' The `SiteMap.name` with slashes replaced be double underscores.
+    ''' The `SiteMap.name` with slashes replaced by double underscores.
     '''
     return self.name.replace("/", "__")
 
