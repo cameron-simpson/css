@@ -878,6 +878,184 @@ class SiteEntity(HasTags):
     '''
     return SiteMap.by_db_key(db_key)
 
+class RSSCommon(ABC):
+  ''' Common methods for RSS channel and item entities.
+  '''
+
+  @staticmethod
+  def rss_date_string(timestamp):
+    ''' Return the UNIX `timestamp` as an RFC822 date time string.
+    '''
+    return datetime.fromtimestamp(timestamp
+                                  ).strftime('%a, %d %b %Y %H:%M:%S %Z')
+
+  def rss_title(self):
+    return self.title
+
+  def rss_image_url(self):
+    return self.get('opengraph.image')
+
+  def rss_link(self):
+    return self.sitepage
+
+  def rss_description(self):
+    return getattr(self, 'description', None)
+
+  def rss_language(self):
+    og_locale = self.get('opengraph.locale')
+    if not og_locale:
+      return None
+    return og_locale.lower().replace('_', '-')
+
+class RSSChannelMixin(RSSCommon, ABC):
+
+  def rss_category(self):
+    return None
+
+  @abstractmethod
+  def rss_content_signature(self):
+    raise NotImplementedError(
+        'no signature, something like `sorted(self["article_id"])` is required'
+    )
+
+  def rss_last_build_timestamp(self):
+    return self.update_content_timestamp(
+        'rss_content', self.rss_content_signature()
+    )
+
+  @abstractmethod
+  def rss_items(self):
+    raise NotImplementedError
+
+  def rss(
+      self,
+      build_timestamp=None,
+      category=None,
+      description=None,
+      generator=None,
+      image_url=None,
+      image_size=None,
+      language=None,
+      link=None,
+      title=None,
+      items=None,
+  ):
+    ''' Return the RSS for this entity as an `lxml rss Element`.
+        It can be converted to text with `ElementTree.tostring()`.
+
+        Optional parameters:
+        * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
+          default from `self.rss_last_build_timestamp()`
+          which is help in the `timestamp.rss_content` tag
+        * `category`: the channel title, default from `self.rss_category()`
+        * `description`: the channel title, default from `self.rss_description()`
+        * `generator`: the name of the RSS generator, default from the `Pilfer` package name
+        * `image_url`: an optional URL for an image for this channel
+        * `image_size`: optional size information for the image as a `(width,height)` 2-tuple
+        * `language`: the channel title, default from `self.rss_language()`
+        * `link`: the channel title, default from `self.rss_link()`
+        * `title`: the channel title, default from `self.rss_title()`
+    '''
+    if category is None: category = self.rss_category()
+    if description is None: description = self.rss_description()
+    if generator is None:
+      generator = self.sitemap.pilfer.__class__.__module__.rsplit('.', 1)[0]
+    if image_url is None: image_url = self.rss_image_url()
+    if image_size:
+      image_width, image_height = image_size
+    else:
+      image_width = self.get('opengraph.image:width')
+      if image_width: image_width = int(image_width)
+      image_height = self.get('opengraph.image:height')
+      if image_height: image_height = int(image_height)
+    if image_width and image_height: image_size = image_width, image_height
+    if link is None: link = self.rss_link()
+    if title is None: title = self.rss_title()
+    rss = E.rss( # TODO: version="2.0"
+          E.channel(
+              E.title(title),
+              E.link(link),
+              E.description(description),
+              E.generator(generator),
+              E.lastBuildDate(self.rss_date_string(self.rss_last_build_timestamp())),
+              E.docs('https://www.rssboard.org/rss-specification'),
+              *not_none((
+                  language and E.language(language),
+                  category and E.category(category),
+                  image_url and E.image(
+                      E.url(image_url),
+                      E.link(self.rss_link()),
+                      ##E.width(str(topic['opengraph.image:width'])),
+                      ##E.height(str(topic['opengraph.image:height'])),
+                  ),
+              )),
+              ##E( 'atom:link', href="https://www.rssboard.org/files/sample-rss-2.xml", rel="self", type="application/rss+xml"),
+              *(
+                item.rss() for item in items or self.rss_items()
+                ),
+          ),
+      )
+    return rss
+
+class RSSChannelItemMixin(RSSCommon, ABC):
+
+  def rss(
+      self,
+      description=None,
+      image_url=None,
+      image_size=None,
+      language=None,
+      link=None,
+      title=None,
+  ):
+    ''' Return the RSS for this entity as an `lxml item Element`.
+        It can be converted to text with `ElementTree.tostring()`.
+
+        Optional parameters:
+        * `description`: the channel title, default from `self.rss_description()`
+        * `image_url`: an optional URL for an image for this item
+        * `image_size`: optional size information for the image as a `(width,height)` 2-tuple
+        * `language`: the channel title, default from `self.rss_language()`
+        * `link`: the channel title, default from `self.rss_link()`
+        * `title`: the channel title, default from `self.rss_title()`
+    '''
+    if description is None: description = self.rss_description()
+    if image_size:
+      image_width, image_height = image_size
+    else:
+      image_width = self.get('opengraph.image:width')
+      if image_width: image_width = int(image_width)
+      image_height = self.get('opengraph.image:height')
+      if image_height: image_height = int(image_height)
+    if image_width and image_height: image_size = image_width, image_height
+    if link is None: link = self.rss_link()
+    if title is None: title = self.rss_title()
+    rss = E.item(
+        *not_none(
+            (
+                E.title(title),
+                description and E.description(description),
+                E.link(link),
+                *not_none(
+                    (
+                        image_url and E.image(
+                            E.url(image_url),
+                            E.link(self.rss_link()),
+                            *not_none(
+                                (
+                                    image_width and E.width(str(image_width)),
+                                    image_height
+                                    and E.height(str(image_height)),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+    return rss
+
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
   ''' A pattern match result:
