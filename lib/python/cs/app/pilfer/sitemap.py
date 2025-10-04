@@ -644,6 +644,26 @@ class SiteEntity(HasTags):
       cls.url_re = URL_RE if isinstance(URL_RE,
                                         re.Pattern) else re.compile(URL_RE)
 
+  @classmethod
+  def from_URL(cls, url: URL, sitemap: "SiteMap"):
+    ''' Return the `SiteEntity` from `sitemap` matching `url`.
+        Raises `ValueError` if the `url.path` does not match `cls.url_re`.
+    '''
+    with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
+      try:
+        url_re = cls.url_re
+      except AttributeError:
+        raise ValueError('no .URL_RE')
+      m = url_re.match(url.path)
+      if not m:
+        raise ValueError(f'{url.path=} does not match {url_re}')
+      try:
+        type_key = trace(m.group)('type_key')
+      except IndexError as e:
+        warning("no type_key in match %r", m.groupdict())
+        raise
+      return sitemap[cls, type_key]
+
   def __getitem__(self, key):
     super_getitem = super().__getitem__
     try:
