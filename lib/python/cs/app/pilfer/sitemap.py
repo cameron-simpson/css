@@ -250,6 +250,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     return cls(url=URL(url_s))
 
   @classmethod
+  @promote
   def from_URL(cls, url: URL):
     ''' Promote a `URL` URL to a `FlowState`.
     '''
