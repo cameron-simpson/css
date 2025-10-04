@@ -2361,7 +2361,8 @@ class BaseToken(Promotable):
         Raises `SyntaxError` on a parse failure.
         This is a wrapper for the `parse` class method.
     '''
-    token = cls.parse(text)
+    token, offset = cls.parse(text)
+    assert offset == token.end_offset
     if token.end_offset != len(text):
       raise SyntaxError(
           f'unparsed text at offset {token.end_offset}:'
@@ -2382,11 +2383,10 @@ class BaseToken(Promotable):
     '''
     while True:
       try:
-        token = cls.parse(text, offset, skip=skip)
+        token, offset = cls.parse(text, offset, skip=skip)
       except EOFError:
         break
       yield token
-      offset = token.end_offset
 
 class CoreTokens(BaseToken):
   ''' A mixin for token dataclasses whose subclasses include `Identifier`,
