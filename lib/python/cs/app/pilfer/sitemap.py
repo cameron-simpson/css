@@ -1562,8 +1562,8 @@ class SiteMap(UsesTagSets, Promotable):
 
   @staticmethod
   @decorator
-  def grok_entity_sitepage(func, *, ent_class, page='sitepage', type_key=None):
-    ''' A decorator for sitepage `grok_*` methods which apply grokked
+  def grok_entity_page(func, *, ent_class, page='sitepage', type_key=None):
+    ''' A decorator for web page `grok_*` methods which apply grokked
         information to a `SiteEntity`.
         This obtains the `entity` from `self[ent_class,match["type_key"]]`,
         calls `entity.grok_sitepage(flowstate)`,
@@ -1576,7 +1576,7 @@ class SiteMap(UsesTagSets, Promotable):
                 URL_DOMAIN,
                 r'/something/(?P<type_key>[^/+])/....',
             )
-            @grok_entity_sitepage(ent_class=FrogEntity)
+            @grok_entity_page(ent_class=FrogEntity)
             def grok_frog_sitepage(self, flowstate: FlowState, match, entity:FrogEntity):
                 pass # this example does no additional work
     '''
@@ -1591,7 +1591,7 @@ class SiteMap(UsesTagSets, Promotable):
       except KeyError as e:
         if type_key is None:
           raise KeyError(
-              f'no "type_key" in {match=} and no type_key= in @grok_entity_sitepage decorator'
+              f'no "type_key" in {match=} and no type_key= in @grok_entity_page decorator'
           ) from e
         ent_type_key = type_key
       entity = self[ent_class, ent_type_key]
@@ -1910,9 +1910,9 @@ class SiteMap(UsesTagSets, Promotable):
         for (attr, subents) in ent.related():
           print(attr, '->', [subent.name for subent in subents])
 
-# expose the @on and @grok_entity_sitepage decorators globally
+# expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on
-grok_entity_sitepage = SiteMap.grok_entity_sitepage
+grok_entity_page = SiteMap.grok_entity_page
 
 # Some presupplied site maps.
 
