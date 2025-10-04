@@ -835,7 +835,11 @@ class SiteEntity(HasTags):
       url = f'{self.url_root}{url[1:]}'
     return url
 
+  @promote
+  def grok_sitepage(self, flowstate: FlowState, match=None):
+    ''' The basic sitepage grok: record the metadta.
     '''
+    self.update_from_meta(flowstate)
 
   @classmethod
   @promote
@@ -844,6 +848,11 @@ class SiteEntity(HasTags):
         Return the `re.Match` instance, or `None` on no match.
     '''
     return cls.url_re.match(url.path)
+
+  def update_from_meta(self, flowstate: FlowState, **update_kw):
+    ''' Update this entity from the `flowstate.meta`.
+    '''
+    self.sitemap.update_mapping_from_meta(self, flowstate, **update_kw)
 
   def equivalents(self):
     ''' Return a list of equivalent `SiteEntity` instances from other type zones,
