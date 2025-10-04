@@ -686,6 +686,14 @@ class SiteEntity(HasTags):
           f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(page_name)}'
       )
 
+  def get(self, key, default=None):
+    ''' The `Mapping.get` method, to ensure that it goes through `__getitem__`.
+    '''
+    try:
+      return self[key]
+    except KeyError:
+      return default
+
   def __getattr__(self, attr):
     ''' A `SiteEntity` supports various automatic attributes.
 
