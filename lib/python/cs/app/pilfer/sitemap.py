@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from fnmatch import fnmatch
 from functools import cached_property, partial
+from getopt import GetoptError
 from itertools import zip_longest
 import json
 import re
@@ -2077,6 +2078,13 @@ class SiteMap(UsesTagSets, Promotable):
       return 0
     subname = argv.pop(0)
     if argv:
+      ok = True
+      for type_key in argv:
+        if '.' in type_key:
+          warning("invalid dot in type_key %r", type_key)
+          ok = False
+      if not ok:
+        raise GetoptError('invalid type keys')
       keys = [(subname, key) for key in argv]
     else:
       # list all entities of this type
