@@ -635,7 +635,11 @@ class SiteEntity(HasTags):
   '''
 
   # keys which can be obtained by grokking a web page
+  # a mapping of tag_name to page name eg "sitepage"
   DERIVED_KEYS = {}
+  # properties which are obtained by defer()ing keys
+  # a mapping of property name to tag_name
+  DEREFFED_PROPERTIES = {}
 
   def __init_subclass__(cls, **kw):
     ''' `SiteEntity` subclass init - set `cls.url_re` from `cls.URL_RE` if present.
@@ -741,11 +745,7 @@ class SiteEntity(HasTags):
             pageurl = self.urlto(pageurl)
           return pageurl
     # indirect derived attributes
-    try:
-      DEREFFED_PROPERTIES = self.__class__.DEREFFED_PROPERTIES
-    except AttributeError as e:
-      warning("no %s.DEREFFED_PROPERTIES: %s", self.__class__.__name__, e)
-      raise
+    DEREFFED_PROPERTIES = self.__class__.DEREFFED_PROPERTIES
     try:
       tag_name, direct = DEREFFED_PROPERTIES[attr]
     except KeyError:
