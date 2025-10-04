@@ -678,9 +678,9 @@ class SiteEntity(HasTags):
       if isinstance(page_name, str):
         # a string naming an instance attribute such as .sitepage
         # and a grokking method such as .grok_sitepage
-        attr = getattr(self, page_name)
+        page_url = getattr(self, page_name)
         grok_method = getattr(self, f'grok_{page_name}')
-        grok_method(attr)
+        grok_method(page_url)
         return super_getitem(key)
       raise TypeError(
           f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(page_name)}'
