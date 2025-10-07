@@ -1244,12 +1244,12 @@ class PlayOnAPI(HTTPServiceAPI):
     fullpath = realpath(filename)
     recording = self[download_id]
     if dl_rsp is not None:
-      recording.set('download_path', fullpath)
-    # apply the SQLTagSet to the FSTags TagSet
+      recording['download_path'] = fullpath
     tagged = self.fstags[fullpath]
-    tagged[f'{recording.type_zone}.id'] = recording.type_zone_key
-    # and also the Series/Season/Episode info
+    # add the Series/Season/Episode info
     tagged.update(recording.sei.as_dict())
+    # add a reference to the recording
+    recording.type_reference_apply_to(tagged)
     return recording
 
 if __name__ == '__main__':
