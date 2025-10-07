@@ -324,7 +324,7 @@ from cs.lex import (
     cropped, cropped_repr, cutprefix, cutsuffix, get_dotted_identifier,
     get_nonwhite, is_dotted_identifier, is_identifier, skipwhite,
     FormatMapping, FormatableMixin, has_format_attributes, format_attribute,
-    FStr, printt, r, s
+    FStr, printt, r, s, without_suffix
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
@@ -699,6 +699,59 @@ class TagSetTyping:
         For example the `.type_subname` of an entity named `tvdb.series.1234` is `series`.
     '''
     return self.type_subname_of(self.name)
+
+  @classmethod
+  def type_reference_of(cls, name: str):
+    ''' Return a 2-tuple of `(`*type_zone*`.zone_key,`*zone_key*`)`
+        to be used as a tag name and value to annotate a `TagSet`
+        to refer to an entity `name`.
+
+        For example, the type reference to an entity named `tvdb.series.1234`
+        is `('tvdb.zone_key`,'series.1234')`.
+    '''
+    return f'{cls.type_zone_of(name)}.zone_key', cls.type_zone_key_of(name)
+
+  @property
+  def type_reference(self):
+    ''' The foreign reference to this `TagSet` as a `(tag_name,reference)` 2-tuple.
+        The `tag_name` is *zone*`.zone_key` and the reference is the zone key.
+
+        For example, the type reference to an entity named `tvdb.series.1234`
+        is `('tvdb.zone_key`,'series.1234')`.
+    '''
+    return f'{self.type_zone}.zone_key', self.type_zone_key
+
+  def type_reference_apply_to(self, other):
+    ''' Apply a reference to `self` to `other`.
+        This applies `self.type_reference` to `other` as a tag.
+
+        For example, adding a foreign reference for an entity named
+        `tvdb.series.1234` would set `other['tvdb.zone_key']='series.1234'`.
+    '''
+    ref, key = self.type_reference
+    other[ref] = key
+
+  def type_references(self,
+                      tags_db: "UsesTagSets",
+                      zones=None) -> Mapping[str, "HasTags"]:
+    ''' Return a `dict` mapping ` `type_zone` to the entity from that zone
+        in `tags_db` for all tags whose tag name has the form *zone*`.zone_key`.
+
+        Parameters:
+        * `tags_db`: the `HasTags` from which to obtain the entities
+        * `zones`: an optional list or tuple of zone names of interest
+
+        For example, `tags.type_references(sitemap,('tvdb',))`
+        where `tags` had a `tvdb.zone_key='series.1234'` tag
+        would return a `dict` with a key of `'tvdb'` and a corresponding
+        `TVDBSeries` instance for series 1234.
+    '''
+    entities = {}
+    for tag_name, zone_key in self.items():
+      if (zone := without_suffix(tag_name, '.zone_key')) is not None:
+        if zones is None or zone in zones:
+          entities[zone] = tags_db[zone, zone_key]
+    return entities
 
 class TagSet(
     dict,
