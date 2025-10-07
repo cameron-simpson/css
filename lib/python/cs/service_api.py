@@ -19,7 +19,10 @@ from typing import Mapping, Set
 
 from icontract import require
 import requests
-from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
+try:
+  from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
+except ImportError:
+  RequestsJSONDecodeError = JSONDecodeError
 
 from cs.deco import uses_verbose
 from cs.fstags import FSTags, uses_fstags
