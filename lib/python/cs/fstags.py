@@ -626,8 +626,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             )
     return 0
 
-  @uses_runstate
-  def cmd_ls(self, argv, *, runstate: RunState):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd} [-dlr] [--direct] [-o output_format] [paths...]
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
@@ -641,6 +640,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
+    runstate = options.runstate
     options.update(
         directories_like_files=False,
         use_direct_tags=False,
