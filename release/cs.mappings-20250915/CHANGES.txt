@@ -1,0 +1,3 @@
+lib/python/cs/mappings.py: cs.mappings: change_mapping: fix test for modified mapping value
+lib/python/cs/mappings.py: merge default ==> pilfer
+lib/python/cs/mappings.py: cs.mapping: tweak docstring

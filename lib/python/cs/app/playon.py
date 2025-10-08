@@ -9,7 +9,7 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from functools import cached_property
 from getopt import GetoptError
 from netrc import netrc
@@ -895,7 +895,8 @@ class PlayOnAPI(HTTPServiceAPI):
     '''
     for time_format in "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S":
       try:
-        return datetime.strptime(date_s, time_format).replace(tzinfo=UTC)
+        return datetime.strptime(date_s,
+                                 time_format).replace(tzinfo=timezone.utc)
       except ValueError:
         pass
     raise ValueError(f'failed to parse PlayOn time string {date_s=}')
@@ -1243,12 +1244,12 @@ class PlayOnAPI(HTTPServiceAPI):
     fullpath = realpath(filename)
     recording = self[download_id]
     if dl_rsp is not None:
-      recording.set('download_path', fullpath)
-    # apply the SQLTagSet to the FSTags TagSet
+      recording['download_path'] = fullpath
     tagged = self.fstags[fullpath]
-    tagged[f'{recording.type_zone}.id'] = recording.type_zone_key
-    # and also the Series/Season/Episode info
+    # add the Series/Season/Episode info
     tagged.update(recording.sei.as_dict())
+    # add a reference to the recording
+    recording.type_reference_apply_to(tagged)
     return recording
 
 if __name__ == '__main__':

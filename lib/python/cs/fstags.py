@@ -103,6 +103,7 @@ from os.path import (
     samefile,
 )
 from pathlib import Path
+from shlex import quote as shquote
 import shutil
 import sys
 from threading import Lock, RLock
@@ -121,7 +122,7 @@ from typing import (
 from icontract import ensure, require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.deco import default_params, fmtdoc, promote, Promotable, uses_verbose
 from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
@@ -350,6 +351,33 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         elif not fstags.edit_dirpath(path, all_names=all_names):
           xit = 1
     return xit
+
+  @popopts(
+      direct='Use the direct tags instead of the inherited tags.',
+      prefix_='Prefix for the environment variable names, default "fstags_".'
+  )
+  def cmd_as_envvars(self, argv):
+    ''' Usage: {cmd} --prefix path [tag_name...]
+          Export the tags of path as shell command to set 
+          Dots in names are translated into "__".
+    '''
+    options = self.options
+    direct = options.direct
+    fstags = options.fstags
+    prefix = options.prefix or 'fstags'
+    if not argv:
+      raise GetoptError('missing path')
+    path = argv.pop(0)
+    tags = fstags[path]
+    if not direct:
+      tags = tags.merged_tags()
+    tag_names = argv or sorted(tags.keys())
+    for tag_name in tag_names:
+      try:
+        value = tags[tag_name]
+      except KeyError:
+        continue
+      print(f'{prefix}_{tag_name.replace(".","__")}={shquote(str(value))}')
 
   @uses_runstate
   def cmd_export(self, argv, *, runstate: RunState):

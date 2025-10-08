@@ -33,7 +33,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20250528-post'
+__version__ = '20250915-post'
 
 DISTINFO = {
     'description':
