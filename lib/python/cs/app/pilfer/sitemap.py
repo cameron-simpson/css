@@ -644,7 +644,7 @@ class SiteEntity(HasTags):
 
   # keys which can be obtained by grokking a web page
   # a mapping of tag_name to page name eg "sitepage"
-  DERIVED_KEYS = {}
+  DERIVED_KEYS = {"_request": "sitepage"}
   # properties which are obtained by defer()ing keys
   # a mapping of property name to tag_name
   DEREFFED_PROPERTIES = {}
@@ -852,6 +852,18 @@ class SiteEntity(HasTags):
   def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' The basic sitepage grok: record the metadta.
     '''
+    self["_request"] = {
+        "method": flowstate.method,
+        "request": {
+            hdr.lower(): value
+            for hdr, value in sorted(flowstate.request.headers.items())
+            if hdr.lower() != 'authorization'
+        },
+        "response": {
+            hdr.lower(): value
+            for hdr, value in sorted(flowstate.response.headers.items())
+        },
+    }
     self.update_from_meta(flowstate)
 
   @classmethod
