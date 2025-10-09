@@ -457,6 +457,13 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
     return rsp
 
   @cached_property
+  def request(self):
+    ''' Cached request object, obtained via `self.GET()` if needed.
+    '''
+    self.GET()
+    return self.request
+
+  @cached_property
   def response(self):
     ''' Cached response object, obtained via `self.GET()` if needed.
     '''
