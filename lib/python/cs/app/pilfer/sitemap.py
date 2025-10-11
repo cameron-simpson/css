@@ -982,6 +982,9 @@ class RSSCommon(ABC):
   ''' Common methods for RSS channel and item entities.
   '''
 
+  def rss_category(self):
+    return getattr(self, 'category', None)
+
   @staticmethod
   def rss_date_string(timestamp):
     ''' Return the UNIX `timestamp` as an RFC822 date time string.
@@ -994,6 +997,9 @@ class RSSCommon(ABC):
 
   def rss_image_url(self):
     return self.get('opengraph.image')
+
+  def rss_image_title(self):
+    return self.rss_title()
 
   def rss_link(self):
     return self.sitepage
@@ -1008,9 +1014,6 @@ class RSSCommon(ABC):
     return og_locale.lower().replace('_', '-')
 
 class RSSChannelMixin(RSSCommon, ABC):
-
-  def rss_category(self):
-    return None
 
   @abstractmethod
   def rss_content_signature(self):
@@ -1047,7 +1050,7 @@ class RSSChannelMixin(RSSCommon, ABC):
         * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
           default from `self.rss_last_build_timestamp()`
           which is help in the `timestamp.rss_content` tag
-        * `category`: the channel title, default from `self.rss_category()`
+        * `category`: the item category, default from `self.rss_category()`
         * `description`: the channel title, default from `self.rss_description()`
         * `generator`: the name of the RSS generator, default from the `Pilfer` package name
         * `image_url`: an optional URL for an image for this channel
@@ -1057,6 +1060,12 @@ class RSSChannelMixin(RSSCommon, ABC):
         * `title`: the channel title, default from `self.rss_title()`
     '''
     if category is None: category = self.rss_category()
+    if category is None:
+      categories = ()
+    elif isinstance(category, str):
+      categories = category,
+    else:
+      categories = list(category)
     if description is None: description = self.rss_description()
     if generator is None:
       generator = self.sitemap.pilfer.__class__.__module__.rsplit('.', 1)[0]
@@ -1104,21 +1113,34 @@ class RSSChannelItemMixin(RSSCommon, ABC):
       description=None,
       image_url=None,
       image_size=None,
+      image_title=None,
       language=None,
       link=None,
       title=None,
+      category=None,
   ):
     ''' Return the RSS for this entity as an `lxml item Element`.
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `description`: the channel title, default from `self.rss_description()`
+        * `category`: the item category, default from `self.rss_category()`
+        * `description`: the item description, default from `self.rss_description()`
         * `image_url`: an optional URL for an image for this item
         * `image_size`: optional size information for the image as a `(width,height)` 2-tuple
+        * `image_title`: an optional title associate with the image,
+          default from `self.rss-image_title()`
         * `language`: the channel title, default from `self.rss_language()`
         * `link`: the channel title, default from `self.rss_link()`
         * `title`: the channel title, default from `self.rss_title()`
     '''
+    if category is None:
+      category = self.rss_category()
+    if category is None:
+      categories = ()
+    elif isinstance(category, str):
+      categories = category,
+    else:
+      categories = list(category)
     if description is None: description = self.rss_description()
     if image_size:
       image_width, image_height = image_size
@@ -1128,28 +1150,24 @@ class RSSChannelItemMixin(RSSCommon, ABC):
       image_height = self.get('opengraph.image:height')
       if image_height: image_height = int(image_height)
     if image_width and image_height: image_size = image_width, image_height
+    if image_title is None: image_title = self.rss_image_title()
     if link is None: link = self.rss_link()
     if title is None: title = self.rss_title()
+    if category is None: category = self.rss_category()
     rss = E.item(
         *not_none(
             (
+                E.guid(self.name, isPermaLink="false"),
                 E.title(title),
                 description and E.description(description),
                 E.link(link),
-                *not_none(
-                    (
-                        image_url and E.image(
-                            E.url(image_url),
-                            E.link(self.rss_link()),
-                            *not_none(
-                                (
-                                    image_width and E.width(str(image_width)),
-                                    image_height
-                                    and E.height(str(image_height)),
-                                ),
-                            ),
-                        ),
-                    ),
+                *(E.category(cat) for cat in categories),
+                image_url and E.image(
+                    E.url(image_url),
+                    E.title(image_title),
+                    E.link(self.rss_link()),
+                    image_width and E.width(str(image_width)),
+                    image_height and E.height(str(image_height)),
                 ),
             ),
         ),
