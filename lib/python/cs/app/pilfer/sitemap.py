@@ -662,6 +662,7 @@ class SiteEntity(HasTags):
                                         re.Pattern) else re.compile(URL_RE)
 
   @classmethod
+  @promote
   def from_URL(cls, url: URL, sitemap: "SiteMap"):
     ''' Return the `SiteEntity` from `sitemap` matching `url`.
         Raises `ValueError` if the `url.path` does not match `cls.url_re`.
