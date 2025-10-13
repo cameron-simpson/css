@@ -664,8 +664,9 @@ class SiteEntity(HasTags):
     except AttributeError:
       pass
     else:
-      cls.url_re = URL_RE if isinstance(URL_RE,
-                                        re.Pattern) else re.compile(URL_RE)
+      cls.url_re = (
+          URL_RE if isinstance(URL_RE, re.Pattern) else re.compile(URL_RE)
+      )
 
   @classmethod
   @promote
