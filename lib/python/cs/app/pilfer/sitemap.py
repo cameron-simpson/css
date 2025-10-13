@@ -628,20 +628,20 @@ class SiteEntity(HasTags):
 
       If the entity class has a *FOO*`_FORMAT` attribute
       then `self.`*foo*` will return that formatted against the entity
-      A common example is to provide a `SITEPAGE_FORMAT` class
-      attribute to enable a `.sitepage` attribute which returns the
+      A common example is to provide a `SITEPAGE_URL_FORMAT` class
+      attribute to enable a `.sitepage_url` attribute which returns the
       primary web page for the entity.
 
       Entity update: support for `SiteMap.updated_entities(Iterabe[SiteEntity])`:
       - if the entity has a `.update_entity()` method, this will be
         called to update the entity
-      - otherwise if the entity has a `.sitepage` then
+      - otherwise if the entity has a `.sitepage_url` then
         `entity.grok_sitepage(FlowState)` will be called to update
-        the entity; often the `.sitepage` is derived from the `SITEPAGE_FORMAT`
+        the entity; often the `.sitepage_url` is derived from the `SITEPAGE_URL_FORMAT`
         format string
 
       Design note: there is no default `.update_entity()` based on
-      eg `.sitepage` because that would prevent use of the concurrent
+      eg `.sitepage_url` because that would prevent use of the concurrent
       prefetching queue in `SiteMap.updated_entities()`.
   '''
 
@@ -697,9 +697,9 @@ class SiteEntity(HasTags):
       except KeyError:
         raise super_ee
       if isinstance(page_name, str):
-        # a string naming an instance attribute such as .sitepage
+        # a string naming an instance attribute such as .sitepage_url
         # and a grokking method such as .grok_sitepage
-        page_url = getattr(self, page_name)
+        page_url = getattr(self, f'{page_name}_url')
         grok_method = getattr(self, f'grok_{page_name}')
         grok_method(page_url)
         return super_getitem(key)
@@ -744,18 +744,20 @@ class SiteEntity(HasTags):
         pass
       else:
         try:
-          pageurl = self.format_as(format_s)
+          formatted = self.format_as(format_s)
         except FormatAsError as e:
           warning("%s.format_as %r: %s", self, format_s, e)
           raise AttributeError(
               f'format {self.__class__.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
           ) from e
         else:
-          # strings commencing with a / are considered path components
-          # of a site URL so we convert them to a site URL
-          if pageurl.startswith('/'):
-            pageurl = self.urlto(pageurl)
-          return pageurl
+          # for attributes ending in _url, such as .sitepage_url_url
+          # if the result commences with a / we consider it a subpath
+          # of the site domain
+          # TODO: maybe test for :// ?
+          if attr.endswith('_url') and formatted.startswith('/'):
+            formatted = self.urlto(formatted)
+          return formatted
     # indirect derived attributes
     DEREFFED_PROPERTIES = self.__class__.DEREFFED_PROPERTIES
     try:
@@ -779,6 +781,18 @@ class SiteEntity(HasTags):
     else:
       value = self.deref(tag_name)
     return value
+
+  @property
+  def sitepage_url(self):
+    ''' Allow `self["sitepage"]` to override `self.SITEPAGE_URL_FORMAT`.
+    '''
+    try:
+      page_url = self.tags["sitepage"]
+    except KeyError:
+      page_url = self.__getattr__('sitepage_url')
+    if page_url.startswith('/'):
+      page_url = self.urlto(page_url)
+    return page_url
 
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
@@ -1006,7 +1020,7 @@ class RSSCommon(ABC):
     return self.rss_title()
 
   def rss_link(self):
-    return self.sitepage
+    return self.sitepage_url
 
   def rss_description(self):
     return getattr(self, 'description', None)
@@ -1345,7 +1359,7 @@ class SiteMap(UsesTagSets, Promotable):
         Note that the updated entities may not be yielded in the
         same order as `entities`, depending on delays in fetching
         their sitepages; in particular entities with missing
-        `.sitepage` or `.grok_sitepage()` will appear ahead of
+        `.sitepage_url` or `.grok_sitepage()` will appear ahead of
         entities requiring a fetch.
 
         Parameters:
@@ -1354,7 +1368,7 @@ class SiteMap(UsesTagSets, Promotable):
           entity does not appear stale
 
         This functions by considering each entity in `entities`;
-        if an entity has a `.sitepage` attribute and if it stale
+        if an entity has a `.sitepage_url` attribute and if it stale
         or `force`, place it on a queue of entities to have their
         `sitepage` URL fetched and grokked. Other entities are
         passed through immediately.
@@ -1387,7 +1401,7 @@ class SiteMap(UsesTagSets, Promotable):
     def process_entities():
       ''' Process the iterable of entities.
           Entities with a custom `.update_entity` method or with no
-          `.sitepage` or which are not stale are put directly only
+          `.sitepage_url` or which are not stale are put directly only
           `ent_fsQ` with `None` for the `flowstate`.  Other entities
           are put on `flowstateQ` to be fetched.
       '''
@@ -1402,14 +1416,14 @@ class SiteMap(UsesTagSets, Promotable):
           # TODO: maybe a .prefetch_update_url property allowing use of
           # the prefetch queue in conjunction with .update_entity()?
           # That would (a) allow prefetch for this and (b) allow a
-          # default .sitepage based .update_entity() method.
+          # default .sitepage_url based .update_entity() method.
           update_entity = getattr(entity, 'update_entity', None)
           if callable(update_entity):
             # the entity has a custom update method
             ent_fsQ.put((entity, update_entity))
             continue
           # Why isn't there a default .update_entity() which uses
-          # the .sitepage? Because it would prevent this prefetching
+          # the .sitepage_url? Because it would prevent this prefetching
           # queue.
           # TODO: skip entities with no .grok_sitepage method
           sitepage = getattr(entity, "sitepage", None)
