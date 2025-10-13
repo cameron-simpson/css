@@ -645,6 +645,9 @@ class SiteEntity(HasTags):
       prefetching queue in `SiteMap.updated_entities()`.
   '''
 
+  # default staleness is 1 day
+  STALE_LIFESPAN = 86400
+
   # keys which can be obtained by grokking a web page
   # a mapping of tag_name to page name eg "sitepage"
   DERIVED_KEYS = {"_request": "sitepage"}
