@@ -19,12 +19,13 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping
 
 from cs.binary import bs
-from cs.cmdutils import popopts, vprint
+from cs.cmdutils import popopts, qvprint, vprint
 from cs.deco import (
     decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose
 )
 from cs.excutils import unattributable
+from cs.fileutils import atomic_filename
 from cs.lex import (
     cutprefix, cutsuffix, FormatAsError, FormatMapping, get_nonwhite, printt,
     r, s, skipwhite
@@ -33,12 +34,14 @@ from cs.logutils import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite
+from cs.progress import progressbar
 from cs.queues import IterableQueue, ListQueue
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
-from cs.rfc2616 import content_encodings, content_type
+from cs.rfc2616 import content_encodings, content_type, datetime_from_http_date
 from cs.seq import ClonedIterator, not_none
 from cs.tagset import BaseTagSets, HasTags, TagSet, TagSetTyping, UsesTagSets
 from cs.threads import HasThreadState, ThreadState
+from cs.units import BINARY_BYTES_SCALE
 from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
