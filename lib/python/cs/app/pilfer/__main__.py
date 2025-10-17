@@ -103,6 +103,7 @@ class PilferCommand(BaseCommand):
     jobs: int = DEFAULT_JOBS
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
     db_url: str = None
+    dl_output_format: str = '{basename}'
 
     @property
     def configpaths(self):
@@ -250,6 +251,27 @@ class PilferCommand(BaseCommand):
     if argv:
       raise GetoptError(f'extra arguments: {argv=}')
     self.options.pilfer.dbshell()
+
+  @popopts(
+      o=(
+          'dl_output_format', 'Output format string for the download filename.'
+      )
+  )
+  def cmd_dl(self, argv):
+    ''' Usage: {cmd} URLs...
+          Download the specified URLs. "-" may be used to read URLs from stdin.
+    '''
+    if not argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    dl_output_format = options.dl_output_format
+    runstate = options.runstate
+    for url_s in argv:
+      runstate.raiseif()
+      with Pfx("%r", url_s):
+        url = URL(url_s)
+        flowstate = FlowState(url=url)
+        flowstate.download(url.format_as(dl_output_format))
 
   @popopts(
       content=(
