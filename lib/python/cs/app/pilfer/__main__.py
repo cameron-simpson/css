@@ -37,8 +37,10 @@ from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
-    DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
-    DEFAULT_MITM_LISTEN_PORT
+    DEFAULT_JOBS,
+    DEFAULT_FLAGS_CONJUNCTION,
+    DEFAULT_MITM_LISTEN_HOST,
+    DEFAULT_MITM_LISTEN_PORT,
 )
 from .parse import get_action_args, get_delim_regexp, import_name
 from .pilfer import Pilfer
@@ -247,6 +249,9 @@ class PilferCommand(BaseCommand):
 
   @popopts
   def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Open a dbshell on the Pilfer SQLTags.
+    '''
     if argv:
       raise GetoptError(f'extra arguments: {argv=}')
     self.options.pilfer.dbshell()
