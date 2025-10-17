@@ -5,8 +5,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 import logging
 import os
-import os.path
-from os.path import expanduser
+from os.path import expanduser, exists as existspath
 from getopt import GetoptError
 from pprint import pformat, pprint
 import sys
@@ -266,12 +265,23 @@ class PilferCommand(BaseCommand):
     options = self.options
     dl_output_format = options.dl_output_format
     runstate = options.runstate
+    xit = 0
     for url_s in argv:
       runstate.raiseif()
       with Pfx("%r", url_s):
         url = URL(url_s)
         flowstate = FlowState(url=url)
-        flowstate.download(url.format_as(dl_output_format))
+        save_filename = flowstate.format_as(dl_output_format)
+        if existspath(save_filename):
+          warning("skip, output path already exists: %r", save_filename)
+          xit = 1
+          continue
+        try:
+          flowstate.download(save_filename)
+        except OSError as e:
+          warning("error saving to %r: %s", save_filename, e)
+          xit = 1
+    return xit
 
   @popopts(
       content=(
