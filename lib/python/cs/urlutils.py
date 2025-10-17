@@ -42,7 +42,7 @@ from typeguard import typechecked
 
 from cs.deco import promote, Promotable
 from cs.excutils import unattributable
-from cs.lex import parseUC_sAttr, r
+from cs.lex import FormatableMixin, parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
 from cs.pfx import Pfx, pfx_call
 from cs.rfc2616 import datetime_from_http_date
@@ -84,7 +84,7 @@ def urljoin(url, other_url):
   '''
   return up_urljoin(str(url), str(other_url))
 
-class URL(HasThreadState, Promotable):
+class URL(HasThreadState, FormatableMixin, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
@@ -149,6 +149,27 @@ class URL(HasThreadState, Promotable):
       return node
     # look up method on equivalent Unicode string
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
+  def format_kwargs(self):
+    ''' Return a dict for use with `FormatableMixin.format_as()`.
+    '''
+    return dict(
+        basename=self.basename or 'index.html',
+        cleanpath=self.cleanpath,
+        cleanrpath=self.cleanrpath,
+        content_length=self.content_length,
+        dirname=self.dirname,
+        domain=self.domain,
+        ext=self.ext,
+        hostname=self.hostname,
+        mtime=self.last_modified,
+        netloc=self.netloc,
+        path=self.path,
+        rpath=self.rpath,
+        scheme=self.scheme,
+        short=self.short,
+        url=self.url_s,
+    )
 
   @contextmanager
   def session(self, session=None):
