@@ -103,7 +103,6 @@ class URL(HasThreadState, FormatableMixin, Promotable):
     self.url_s = str(url_s)
     self._lock = RLock()
     self._parts = None
-    self._info = None
     self.flush()
 
   def __str__(self):
@@ -224,12 +223,10 @@ class URL(HasThreadState, FormatableMixin, Promotable):
 
   @property
   @unattributable
-  @locked
   def headers(self):
     ''' A `requests.Response` headers mapping.
     '''
-    r = self.HEAD_response
-    return r.headers
+    return self.HEAD_response.headers
 
   # TODO: use functions from cs.rfc2616? they do return an email.BaseHeader :-(
   @cached_property
@@ -266,9 +263,7 @@ class URL(HasThreadState, FormatableMixin, Promotable):
   def last_modified(self):
     ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
     '''
-    if self._info is None:
-      self.HEAD_response
-    value = self._info['Last-Modified']
+    value = self.headers.get('Last-Modified')
     if value is not None:
       # parse HTTP-date into datetime object
       dt_last_modified = datetime_from_http_date(value.strip())
@@ -280,9 +275,7 @@ class URL(HasThreadState, FormatableMixin, Promotable):
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
     '''
-    if self._content is None:
-      self.HEAD_response
-    return self._info.getencoding()
+    return self.headers.getencoding()
 
   @property
   @unattributable
