@@ -11,7 +11,6 @@ from itertools import product
 import threading
 
 from cs.context import push_cmgr, pop_cmgr
-from cs.debug import thread_dump
 from cs.deco import decorator
 
 __version__ = '20250426-post'
@@ -26,7 +25,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
-        'cs.debug',
         'cs.deco',
     ],
 }
@@ -122,8 +120,13 @@ def assertSingleThread(include_daemon=False, exclude=None):
   ]
   if not Ts:
     return True
-  with open('/dev/tty', 'w') as tty:
-    thread_dump(Ts, fp=tty)
+  try:
+    from cs.debug import thread_dump
+  except ImportError:
+    print('no cs.debug.thread_dump', sys.stderr)
+  else:
+    with open('/dev/tty', 'w') as tty:
+      thread_dump(Ts, fp=tty)
   raise AssertionError(
       "%d excess %s Threads: %s" % (
           len(Ts),
@@ -138,7 +141,8 @@ if __name__ == '__main__':
   from contextlib import contextmanager
   import sys
   import unittest
-  from cs.debug import trace
+
+  ##from cs.debug import trace
 
   class TestSetupTeardownMixin(SetupTeardownMixin, unittest.TestCase):
 
