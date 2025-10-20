@@ -7,6 +7,7 @@
 ''' Hacks to assist with testing.
 '''
 
+from contextlib import contextmanager
 from itertools import product
 import sys
 import threading
@@ -104,6 +105,11 @@ class SetupTeardownMixin:
     '''
     pop_cmgr(self, '_SetupTeardownMixin__tearDown')
     super().tearDown()
+
+  @contextmanager
+  def setupTeardown(self):
+    '''Base class `setupTeardown` context manager which does nothing.'''
+    yield
 
 def assertSingleThread(include_daemon=False, exclude=None):
   ''' Test that there is only one `Thread` still running.
