@@ -1,3 +1,4 @@
+tyupe safety for zone_keys - prevent eg None for an int etc
 SQLTags.preload still seems to do a per entity SQL query
 pilfer rss subcommand
 SiteMap.updated_entities: can we set start_time to just before the request is dispatched?
