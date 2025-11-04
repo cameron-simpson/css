@@ -1,3 +1,4 @@
+cs.py.doc cli to query an arbitrary module and produce md docs
 PolyValue.promote? how to acocmodate caller specific promotions as in SQLTagSet?
 asn.1 binary encode/decode? https://pypi.org/project/pyasn1/ ?
 rewriteif in python fileutils?
