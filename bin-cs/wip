@@ -41,7 +41,7 @@ case "$branch" in
         exit 1
         ;;
 esac
-wip_branch=$branch-WIP-noci
+wip_branch=WIP-$branch-noci
 
 if $trace git stash
 then
