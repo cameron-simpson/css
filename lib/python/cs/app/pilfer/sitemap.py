@@ -155,7 +155,8 @@ class URLMatcher(Promotable):
       return super().promote(obj)
     return cls(hostname_fnmatch=hostname_fnmatch, url_regexp=url_regexp)
 
-class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
+class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
+                Promotable):
   ''' An object with some resemblance to a `mitmproxy` `Flow` object
       with various utility properties and methods.
       It may be initialised from lesser objects such as just a URL.
@@ -620,6 +621,30 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
         See https://ogp.me/
     '''
     return {f'opengraph.{k}': v for k, v in self.opengraph.items()}
+
+  def format_kwargs(self):
+    ''' Return a `dict` for use with `FormatableMixin.format_as()`.
+    '''
+    url = self.url
+    kwargs = dict(
+        basename=url.basename or 'index.html',
+        cleanpath=url.cleanpath,
+        cleanrpath=url.cleanrpath,
+        dirname=url.dirname,
+        domain=url.domain,
+        ext=url.ext,
+        hostname=url.hostname,
+        netloc=url.netloc,
+        path=url.path,
+        rpath=url.rpath,
+        scheme=url.scheme,
+        short=url.short,
+        url=url.url_s,
+    )
+    if 'response' in self.__dict__:
+      hdrs = self.response.headers
+      kwargs.update(content_length=content_length(hdrs),)
+    return kwargs
 
 uses_flowstate = default_params(flowstate=FlowState.default)
 
