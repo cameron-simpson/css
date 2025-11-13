@@ -1103,6 +1103,15 @@ class SiteEntity(HasTags):
 
     return grok_pages_wrapper
 
+  def download(self, save_filename: str = None, **fsdl_kw) -> str:
+    ''' Download this entity to `save_filename` (default from the
+        `self.download_url` basename).
+    '''
+    url = URL(self.download_url)
+    if save_filename is None:
+      save_filename = url.basename or 'index.html'
+    return FlowState.download_url(url, save_filename, **fsdl_kw)
+
 paginated = SiteEntity.paginated
 
 class RSSCommon(ABC):
