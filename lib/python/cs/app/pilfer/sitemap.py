@@ -950,19 +950,48 @@ class SiteEntity(HasTags):
   def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' The basic sitepage grok: record the metadta.
     '''
-    self["_request"] = {
-        "method": flowstate.method,
-        "request": {
-            hdr.lower(): value
-            for hdr, value in sorted(flowstate.request.headers.items())
-            if hdr.lower() != 'authorization'
-        },
-        "response": {
-            hdr.lower(): value
-            for hdr, value in sorted(flowstate.response.headers.items())
-        },
-    }
+    self.tags.setdefault("_request", {}).setdefault("sitepage", {})[
+        flowstate.method] = {
+            "request": {
+                hdr.lower(): value
+                for hdr, value in sorted(flowstate.request.headers.items())
+                if hdr.lower() != 'authorization'
+            },
+            "response": {
+                hdr.lower(): value
+                for hdr, value in sorted(flowstate.response.headers.items())
+            },
+        }
     self.update_from_meta(flowstate)
+    self.update(flowstate.opengraph_tags)
+
+  def _request(self, page="sitepage", *, method="GET"):
+    ''' Return the `self.tags["_request"][page][method]` entry, or `None`.
+    '''
+    return self.tags.get("_request", {}).get(page, {}).get(method)
+
+  def refresh(self, *, force=False, lifespan=STALE_LIFESPAN):
+    ''' Refetch and reparse `self.sitepage_url` via `self.grok_sitepage()`
+        if the page is stale (or if `force` is true).
+    '''
+    if not force and not self.is_stale(lifespan):
+      return
+    self.grok_sitepage(self.sitepage_url)
+
+  def is_stale(self, lifespan, page="sitepage", method="GET"):
+    ''' Test if the sitepgae response timestamp is more than `lifespan` seconds older than `time.time()`.
+        This always returns `True` is there is no `"_request"` item.
+    '''
+    if "_request" not in self:
+      return True
+    return time.time() - self.rq_timestamp > lifespan
+
+  @property
+  def rq_timestamp(self):
+    ''' The HTTP Response `Date` field as a UNIX timestamp.
+    '''
+    return datetime_from_http_date(self["_request"]["response"]["date"]
+                                   ).timestamp()
 
   @classmethod
   @promote
