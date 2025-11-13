@@ -487,7 +487,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
       # no mitmproxy.http.HTTPFlow, use requests
       # requests.Response.iter_content?
       iter_content = self.response.iter_content
-      return ClonedIterator(iter_content(chunk_size=None))
+      return ClonedIterator(iter_content(chunk_size=65536))
     # TODO: can we accomodate a flow whose content is streaming in?
     return [flow.response.content]
 
