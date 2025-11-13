@@ -158,7 +158,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, Promotable):
       with various utility properties and methods.
       It may be initialised from lesser objects such as just a URL.
 
-      This is intented as a common basis for working in a `mitmproxy`
+      This is intended as a common basis for working in a `mitmproxy`
       flow or from outside via the `requests` package.
 
       Note that its `.request` and `.response` objects might be from `mitmproxy`
@@ -1299,7 +1299,7 @@ class SiteMap(UsesTagSets, Promotable):
     super().__init__(tagsets=self.pilfer.sqltags)
 
   @classmethod
-  def by_db_key(cls, db_key: str):
+  def by_db_key(cls, db_key: str) -> SiteEntity:
     ''' Return the `SiteEntity` for the database wide `key`.
     '''
     try:
@@ -2137,6 +2137,7 @@ class SiteMap(UsesTagSets, Promotable):
     return te
 
   @classmethod
+  @OBSOLETE
   @promote
   def entity_key(cls, flowstate: FlowState, **match) -> str | None:
     ''' Given a URL or `FlowState`, return the name of its primary `TagSet`.
@@ -2284,6 +2285,8 @@ class DocSite(SiteMap):
 
 @dataclass
 class Wikipedia(SiteMap):
+  ''' The SiteMap for `wikipedia.org'.
+  '''
 
   TYPE_ZONE = 'wikipedia'
 
