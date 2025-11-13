@@ -946,27 +946,6 @@ class SiteEntity(HasTags):
     '''
     return self.sitemap.urlto(path)
 
-  @property
-  def sitepage(self) -> str:
-    ''' The `sitepage` is derived from `self["sitepage"]`
-        and failing that from `self.SITEPAGE_FORMAT`.
-        If this value commences with a `/` then `self.url_root` is
-        prepended to it before return.
-
-        This means that entities which record their page as `["sitepage"]`
-        fetch that exact URL.
-        Otherwise the sitepage is computed from `self.SITEPAGE_FORMAT`,
-        which need only specify the path component.
-    '''
-    try:
-      url = self["sitepage"]
-    except KeyError:
-      url = self.__getattr__('sitepage')
-    if url.startswith('/'):
-      # TODO: .urlto()?
-      url = f'{self.url_root}{url[1:]}'
-    return url
-
   @promote
   def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' The basic sitepage grok: record the metadta.
