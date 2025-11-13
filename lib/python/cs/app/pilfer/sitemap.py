@@ -1216,30 +1216,41 @@ class RSSChannelMixin(RSSCommon, ABC):
     if image_width and image_height: image_size = image_width, image_height
     if link is None: link = self.rss_link()
     if title is None: title = self.rss_title()
-    rss = E.rss( # TODO: version="2.0"
-          E.channel(
-              E.title(title),
-              E.link(link),
-              E.description(description),
-              E.generator(generator),
-              E.lastBuildDate(self.rss_date_string(self.rss_last_build_timestamp())),
-              E.docs('https://www.rssboard.org/rss-specification'),
-              *not_none((
-                  language and E.language(language),
-                  category and E.category(category),
-                  image_url and E.image(
-                      E.url(image_url),
-                      E.link(self.rss_link()),
-                      ##E.width(str(topic['opengraph.image:width'])),
-                      ##E.height(str(topic['opengraph.image:height'])),
-                  ),
-              )),
-              ##E( 'atom:link', href="https://www.rssboard.org/files/sample-rss-2.xml", rel="self", type="application/rss+xml"),
-              *(
-                item.rss() for item in items or self.rss_items()
-                ),
-          ),
-      )
+    rss = E.rss(
+        E.channel(
+            E.title(title),
+            E.link(link),
+            E.description(description),
+            E.generator(generator),
+            E.lastBuildDate(
+                self.rss_date_string(self.rss_last_build_timestamp())
+            ),
+            E.docs('https://www.rssboard.org/rss-specification'),
+            *not_none(
+                (
+                    language and E.language(language),
+                    category and E.category(category),
+                    image_url and E.image(
+                        E.url(image_url),
+                        E.link(self.rss_link()),
+                        ##E.width(str(topic['opengraph.image:width'])),
+                        ##E.height(str(topic['opengraph.image:height'])),
+                    ),
+                )
+            ),
+            ##E( 'atom:link', href="https://www.rssboard.org/files/sample-rss-2.xml", rel="self", type="application/rss+xml"),
+            *(item.rss() for item in items or self.rss_items()),
+        ),
+        version="2.0",
+        **{
+            ##"xmlns:content": "http://purl.org/rss/1.0/modules/content/",
+            ##"xmlns:dc": "http://purl.org/dc/elements/1.1/",
+            ##"xmlns:atom": "http://www.w3.org/2005/Atom",
+            ##"xmlns:sy": "http://purl.org/rss/1.0/modules/syndication/",
+            ##"xmlns:slash": "http://purl.org/rss/1.0/modules/slash/",
+            ##"xmlns:webfeeds": "http://webfeeds.org/rss/1.0",
+        },
+    )
     return rss
 
 class RSSChannelItemMixin(RSSCommon, ABC):
