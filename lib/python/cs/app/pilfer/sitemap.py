@@ -782,7 +782,13 @@ class SiteEntity(HasTags):
         # and a grokking method such as .grok_sitepage
         page_url = getattr(self, f'{page_name}_url')
         grok_method = getattr(self, f'grok_{page_name}')
+        vprint(f'{self.name}[{key!r}] -> grok_{page_name}({page_url!r})')
         grok_method(page_url)
+        # infill keys not obtained so as to not pointlessly refetch
+        for k, kpage in self.DERIVED_KEYS.items():
+          if kpage == page_name and k not in self.tags:
+            vprint(f'{self.name}[{key!r}]=None (not set by {grok_method})')
+            self.tags[k] = None
         return super_getitem(key)
       raise TypeError(
           f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(page_name)}'
