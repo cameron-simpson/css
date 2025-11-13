@@ -511,6 +511,56 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     self._new_content()
     self.content = content
 
+  @uses_runstate
+  def download(
+      self,
+      save_filename,
+      *,
+      format_filename=False,
+      runstate: RunState,
+      **atfn_kw,
+  ):
+    ''' Download this `FlowState` to `save_filename`.
+        Return the saved save_filename.
+
+        The optional argument `format_filename` may be set to true
+        to treat the `save_filename` as a format string to format using
+        `self.format_as()`.
+    '''
+    filename0 = save_filename
+    if format_filename:
+      save_filename = self.format_as(save_filename)
+    content = self.iterable_content
+    dl_length = self.url.content_length
+    with pfx_call(atomic_filename, save_filename, **atfn_kw) as f:
+      for chunk in progressbar(
+          content,
+          label=save_filename,
+          total=dl_length,
+          units_scale=BINARY_BYTES_SCALE,
+          itemlenfunc=len,
+          report_print=qvprint,
+      ):
+        runstate.raiseif()
+        offset = 0
+        length = len(chunk)
+        while offset < length:
+          with Pfx("write %d bytes", length - offset):
+            written = f.write(chunk[offset:])
+            if written < 1:
+              warning("fewer than 1 bytes written: %s", written)
+            else:
+              offset += written
+              assert offset <= length
+        assert offset == length
+    return save_filename
+
+  @classmethod
+  def download_url(cls, url: URL, save_filename: str, **dl_kw):
+    ''' A convenience class method to download `url` to `save_filename`.
+    '''
+    return cls(url=url).download(save_filename, **dl_kw)
+
   @cached_property
   def text(self) -> str:
     ''' The text content of the URL.
