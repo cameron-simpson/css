@@ -809,6 +809,11 @@ class SiteEntity(HasTags):
         If a lowercase attribute has a corresponding class attribute
         `{attr.upper()}_FORMAT` then `self.format_as()` is called
         with the format string to obtain the value.
+        If `attr` ends with `_url` and the format result starts with a slash
+        it is promoted to a URL by prepending the sitemap URL base
+        (via `self.urlto()`).
+        Example: `.sitepage_url` can be derived from `.SITEPAGE_URL_FORMAT`
+        and the format string need only specify the path after the domain.
 
         Related entities:
         If the attribute name is present in `self.DEREFFED_PROPERTIES`,
@@ -816,6 +821,7 @@ class SiteEntity(HasTags):
         then the corresponding `tag_name` is obtained and returned
         directly if `direct`.  Otherwise `self.deref(tag_name)` is
         returned.
+        This may also be just the `tag_name`, and `direct` will be set to `False`.
 
         Opengraph fallback:
         If `HasTags.__getattr__(attr)` raises `AttributeError` and
@@ -848,18 +854,26 @@ class SiteEntity(HasTags):
     # indirect derived attributes
     DEREFFED_PROPERTIES = self.__class__.DEREFFED_PROPERTIES
     try:
-      tag_name, direct = DEREFFED_PROPERTIES[attr]
+      deref_from = DEREFFED_PROPERTIES[attr]
     except KeyError:
       # not a DEREFFED_PROPERTIES, try the superclass
       try:
         return super().__getattr__(attr)
       except AttributeError as e:
-        # no superclass attribute, try the opengraph property
-        og_tag_name = f'opengraph.{attr}'
+        # try from the tags, may autofetch
         try:
-          return self[og_tag_name]
+          return self[attr]
         except KeyError:
-          raise e
+          # no superclass attribute, try the opengraph property
+          og_tag_name = f'opengraph.{attr}'
+          try:
+            return self[og_tag_name]
+          except KeyError:
+            raise e
+    if isinstance(deref_from, str):
+      tag_name, direct = deref_from, False
+    else:
+      tag_name, direct = deref_from
     # obtain the value; some tags will fetch info from the web if missing
     # NB: always access the tag, triggers page fetch if missing
     value = self[tag_name]
