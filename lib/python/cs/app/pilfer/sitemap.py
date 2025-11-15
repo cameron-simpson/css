@@ -982,7 +982,7 @@ class SiteEntity(HasTags):
 
   @promote
   @pagemethod
-  def grok_sitepage(self, flowstate: FlowState = None, match=None):
+  def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' The basic sitepage grok: record the metadta.
     '''
     self.tags.setdefault("_request", {}).setdefault("sitepage", {})[
