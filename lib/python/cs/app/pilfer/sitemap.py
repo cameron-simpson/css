@@ -770,6 +770,12 @@ class SiteEntity(HasTags):
     ''' `SiteEntity` subclass init - set `cls.url_re` from `cls.URL_RE` if present.
     '''
     super().__init_subclass__(**kw)
+    # default TYPE_SUBNAME derived from the class name
+    try:
+      TYPE_SUBNAME = cls.__dict__['TYPE_SUBNAME']
+    except KeyError:
+      cls.TYPE_SUBNAME = cls.__name__.lower()
+    # .url_re is the compiled form of .URL_RE if present and not an re.Pattern
     try:
       URL_RE = cls.URL_RE
     except AttributeError:
