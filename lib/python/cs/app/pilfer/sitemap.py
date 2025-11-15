@@ -16,7 +16,7 @@ import re
 from threading import Thread
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 from cs.binary import bs
 from cs.cmdutils import popopts, qvprint, vprint
@@ -82,6 +82,40 @@ def uses_pilfer(func):
       return func(*a, P=P, **kw)
 
   return func_with_Pilfer
+
+@decorator
+def pagemethod(method):
+  ''' A decorator for `SiteEntity` methods whose names end in
+      `_`*nom*`page` to provide a default URL for the flowstate
+      parameter from `self.`*nom*`page_url`.
+
+      Note that the optional `flowstate` parameter must be the first
+      positional parameter after `self`.
+
+      This allows method definitions like:
+
+          @pagemethod
+          def grok_sitepage(self, flowstate: FlowState):
+
+      so that the method can be called directly on the entity
+      without providing a URL.
+
+      This decorator also applies the `@promote` decorator.
+  '''
+  _, pagename = method.__name__.split('_', 1)
+  if not pagename.endswith('page') or len(pagename) == 4:
+    raise ValueError(
+        f'cannot derive default page attribute name from {method.__name__=},'
+        ' which should end in _*nom*page, such as grok_sitepage'
+    )
+  promoting_method = promote(method)
+
+  def with_flowstate(self, flowstate: Optional[FlowState] = None, *a, **kw):
+    if flowstate is None:
+      flowstate = getattr(self, f'{pagename}_url')
+    return trace(promoting_method)(self, flowstate, *a, **kw)
+
+  return with_flowstate
 
 def parse_img_srcset(srcset, offset=0) -> Mapping[str, list[str]]:
   ''' Parse an `IMG` tag `srcset` attribute into a mapping of URL to conditions.
@@ -947,7 +981,8 @@ class SiteEntity(HasTags):
     return self.sitemap.urlto(path)
 
   @promote
-  def grok_sitepage(self, flowstate: FlowState, match=None):
+  @pagemethod
+  def grok_sitepage(self, flowstate: FlowState = None, match=None):
     ''' The basic sitepage grok: record the metadta.
     '''
     self.tags.setdefault("_request", {}).setdefault("sitepage", {})[
@@ -1055,7 +1090,7 @@ class SiteEntity(HasTags):
         method will be called directly.
 
         If `pagenum` is `...` (`Ellipsis`, the default), the number
-        of pages with be be obtained from the `flowstate.soup` via
+        of pages will be be obtained from the `flowstate.soup` via
         the `self.soup_count_pages` method and each page will be
         processed in turn. The URL of each page is computed with the
         `self.page_url(base_url,pagenum)` method.
@@ -1417,6 +1452,7 @@ class SiteMap(UsesTagSets, Promotable):
       try:
         other_map = sitemap_by_type_zone[self.TYPE_ZONE]
       except KeyError:
+        # not already taken
         pass
       else:
         warning(f'replacing {self.TYPE_ZONE=} -> {other_map} with {self}')
