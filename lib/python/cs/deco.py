@@ -576,6 +576,20 @@ def strable(func, open_func=None):
 
   return accepts_str
 
+def with_(func, obj):
+  ''' A decorator to run `func` inside a `with obj:`.
+
+      Example:
+
+          T = Thread(target=with_(some_context, target_func))
+  '''
+
+  def with_obj(*a, **kw):
+    with obj:
+      return func(*a, **kw)
+
+  return with_obj
+
 def observable_class(property_names, only_unequal=False):
   ''' Class decorator to make various instance attributes observable.
 
