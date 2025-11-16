@@ -115,15 +115,6 @@ async def unseen_sfunc(
       seen.add(item_sig)
       yield item, P
 
-@dataclass
-class PseudoFlow:
-  ''' A class resembling `mitmproxy`'s `http.Flow` class in basic ways
-      so that I can use it with the pilfer.cache.ContentCache` class.
-  '''
-
-  request: requests.Request = None
-  response: requests.Response = None
-
 def cache_url(item_P):
   ''' Pilfer base action for caching a UR.
       Passes theough `item_P`, a 2-tuple of `(url,Pilfer)`.
