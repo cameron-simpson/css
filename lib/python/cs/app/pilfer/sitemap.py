@@ -1136,13 +1136,18 @@ class SiteEntity(HasTags):
         grok_page(self, flowstate, *grok_a, pagenum=1, **grok_kw)
         runstate.raiseif()
         pagenums = range(2, page_count + 1)
-        for pagenum, flowstate in zip(
-            pagenums,
-            FlowState.iterable_flowstates(
-                (self.page_url(base_url, n) for n in pagenums),
-                unordered=False,
+        pagenum_flowstate = progressbar(
+            zip(
+                pagenums,
+                FlowState.iterable_flowstates(
+                    (self.page_url(base_url, n) for n in pagenums),
+                    unordered=False,
+                ),
             ),
-        ):
+            "pages",
+            total=len(pagenums)
+        )
+        for pagenum, flowstate in pagenum_flowstate:
           runstate.raiseif()
           grok_page(self, flowstate, *grok_a, pagenum=pagenum, **grok_kw)
       else:
