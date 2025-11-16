@@ -740,6 +740,19 @@ class PilferCommand(BaseCommand):
       print(method, match_tags)
     print(flowstate.soup)
 
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} entity...
+          Refresh the specified entities by fetching and grokking their site pages.
+    '''
+    if not argv:
+      raise GetoptError("missing entities")
+    for ent_spec in argv:
+      with Pfx("entity %r", ent_spec):
+        ent = SiteMap.by_db_key(ent_spec)
+        ent.printt()
+        ent.grok_sitepage(ent.sitepage_url)
+        ent.printt()
+
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
     ''' Usage: {cmd} URL savepath
