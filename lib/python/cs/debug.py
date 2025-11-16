@@ -698,7 +698,10 @@ def trace(
             e.__class__.__name__,
             e,
             indent,
-            e.__traceback__.tb_next.tb_frame,
+            (
+                "no-frame" if e.__traceback__.tb_next is None else
+                e.__traceback__.tb_next.tb_frame
+            ),
             indent,
             end_time - start_time,
             **xlog_kw,
