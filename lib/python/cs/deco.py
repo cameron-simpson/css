@@ -846,6 +846,7 @@ def uses_cmd_options(
                  ... do the thing ...
               ... etc ...
   '''
+  from cs.context import stackattrs
 
   def uses_cmd_wrapper(*func_a, **func_kw):
     # fill in the func_kw from the defaults
@@ -853,7 +854,6 @@ def uses_cmd_options(
     # run with the prevailing BaseCommand suitably updated
     try:
       from cs.cmdutils import BaseCommand
-      from cs.context import stackattrs
     except ImportError:
       # missing cs.cmdutils or cs.context,
       # make an options with no attributes
