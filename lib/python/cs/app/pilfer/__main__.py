@@ -45,7 +45,7 @@ from . import (
 from .parse import get_action_args, get_delim_regexp, import_name
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .sitemap import FlowState
+from .sitemap import FlowState, SiteEntity, SiteMap
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -167,6 +167,17 @@ class PilferCommand(BaseCommand):
             if self.options.load_cookies:
               pilfer.load_browser_cookies(pilfer.session.cookies)
             yield
+
+  def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
+    ''' Return a `SiteEntity` bound to the entity-name at `argv[0]`.
+    '''
+    if not argv:
+      raise GetoptError('missing site-entity')
+    entity_name = argv.pop(0)
+    try:
+      ent = SiteMap.by_db_key(entity_name)
+    except KeyError as e:
+      raise GetoptError(f'unrecognised {entity_name=}: {e}') from e
 
   @staticmethod
   def get_argv_pipespec(argv, argv_offset=0):
