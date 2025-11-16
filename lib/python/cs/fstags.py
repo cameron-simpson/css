@@ -1740,7 +1740,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   @property
   def parent(self):
     ''' A reference to the parent of this `TaggedPath`, or `None`.
-      '''
+    '''
     keypath = self.keypath
     parent_path = dirname(keypath)
     if parent_path == keypath:
