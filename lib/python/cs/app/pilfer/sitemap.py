@@ -825,9 +825,15 @@ class SiteEntity(HasTags):
         vprint(f'{self.name}[{key!r}] -> grok_{page_name}({page_url!r})')
         grok_method(page_url)
         # infill keys not obtained so as to not pointlessly refetch
-        for k, kpage in self.DERIVED_KEYS.items():
-          if kpage == page_name and k not in self.tags:
-            vprint(f'{self.name}[{key!r}]=None (not set by {grok_method})')
+        missing_expected_keys = sorted(
+            k for k, kpage in self.DERIVED_KEYS.items()
+            if kpage == page_name and k not in self.tags
+        )
+        if missing_expected_keys:
+          vprint(
+              f'{self.name}.tags missing {missing_expected_keys=}, (not set by {grok_method.__name__})'
+          )
+          for k in missing_expected_keys:
             self.tags[k] = None
         return super_getitem(key)
       raise TypeError(
