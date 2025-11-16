@@ -19,10 +19,10 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping, Optional
 
 from cs.binary import bs
-from cs.cmdutils import popopts, qvprint, vprint
+from cs.cmdutils import BaseCommand, popopts, qvprint, vprint
 from cs.deco import (
     decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
-    uses_verbose
+    uses_verbose, with_
 )
 from cs.excutils import unattributable
 from cs.fileutils import atomic_filename
@@ -992,13 +992,13 @@ class SiteEntity(HasTags):
     '''
     return self.sitemap.urlto(path)
 
-  @promote
   @pagemethod
   def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' The basic sitepage grok: record the metadta.
     '''
     self.tags.setdefault("_request", {}).setdefault("sitepage", {})[
         flowstate.method] = {
+            "url": flowstate.url.url_s,
             "request": {
                 hdr.lower(): value
                 for hdr, value in sorted(flowstate.request.headers.items())
@@ -1037,8 +1037,10 @@ class SiteEntity(HasTags):
   def rq_timestamp(self):
     ''' The HTTP Response `Date` field as a UNIX timestamp.
     '''
-    return datetime_from_http_date(self["_request"]["response"]["date"]
-                                   ).timestamp()
+    http_date = self.get("_request", {}).get("response", {}).get("date")
+    if http_date:
+      return datetime_from_http_date(http_date).timestamp()
+    return 0
 
   @classmethod
   @promote
@@ -1647,9 +1649,9 @@ class SiteMap(UsesTagSets, Promotable):
         ent_fsQ.put((None, None))
 
     # dispatch the workers
-    process_entitiesT = Thread(target=process_entities, daemon=True)
+    process_entitiesT = Thread(target=with_(process_entities, P), daemon=True)
     process_entity_sitepagesT = Thread(
-        target=process_entity_sitepages, daemon=True
+        target=with_(process_entity_sitepages, P), daemon=True
     )
     process_entitiesT.start()
     process_entity_sitepagesT.start()
