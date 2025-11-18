@@ -2362,6 +2362,19 @@ class SiteMap(UsesTagSets, Promotable):
       body.insert(0, toolbar)
     return soup
 
+  def find(self, *criteria, **crit_kw):
+    ''' Find `SiteEntity` instances matching criteria.
+        Promote a `SiteEntity` subclass in `criteria` into a `name~`
+        criterion.
+    '''
+    # convert a SiteEntity class into a name~ criterion
+    criteria = [
+        f'name~{self.TYPE_ZONE}.{criterion.TYPE_SUBNAME}.*'
+        if isinstance(criterion, type) and issubclass(criterion, SiteEntity)
+        else criterion for criterion in criteria
+    ]
+    return trace(super().find)(*criteria, **crit_kw)
+
   @popopts(
       f=('force', 'Force refresh of entities even if not stale.'),
       l=('long_mode', 'Long Mode.'),
