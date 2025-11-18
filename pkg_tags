@@ -66,7 +66,7 @@ cs.mappings pypi.release="20250915" ok_revision="334e75cab378cd3bf119fc3e2f94026
 cs.mediainfo ok_revision="211e1a295e5dd5beba0facbc1ba24c8ea3389440" pypi.release="20240519"
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mplutils ok_revision=c3516c78f9d056d621055c19e4ad3d2f597b5c23 pypi.release="20241122" features={"20220918":["FigureSize"]}
-cs.naysync ok_revision="14b3500d5f984487c4562ba17d2d0cb5e3bc81ff" features={"20241214":["afunc","agen"],"20241220":["amap","async_iter"],"20250103":["AnyIterable","AsyncPipeLine","StageMode","aqget","aqiter"]} pypi.release="20250306"
+cs.naysync ok_revision=a8517275701926b47903cc66347f5487cab5e308 features={"20241214":["afunc","agen"],"20241220":["amap","async_iter"],"20250103":["AnyIterable","AsyncPipeLine","StageMode","aqget","aqiter"]} pypi.release="20250306"
 cs.ndjson ok_revision="8b18d803a142b481a79d7ef96cb97e27c97d94ac" pypi.release="20250528" features={"20250528":["dump_ndjson","dumps_ndjson"]}
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063124469c features={"20220606":["intif"]}
