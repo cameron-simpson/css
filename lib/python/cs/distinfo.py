@@ -1239,7 +1239,7 @@ class Module:
         pass
       else:
         problems.append(
-            f'name conflicts with {third_party_listpath}:{lineno}: {line!r}'
+            f'{self.name=} conflicts with {third_party_listpath=}:{lineno=}'
         )
     # see if this package has been marked "ok" as of a particular revision
     latest_ok_rev = self.pkg_tags.get('ok_revision')
