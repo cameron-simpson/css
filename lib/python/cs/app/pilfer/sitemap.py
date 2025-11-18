@@ -1469,7 +1469,7 @@ class SiteMap(UsesTagSets, Promotable):
     try:
       self.TYPE_ZONE
     except AttributeError:
-      ##warning(f'no .TYPE_ZONE for SiteMap instance {self}')
+      warning(f'no .TYPE_ZONE for SiteMap instance {self}')
       pass
     else:
       try:
@@ -1479,6 +1479,7 @@ class SiteMap(UsesTagSets, Promotable):
         pass
       else:
         warning(f'replacing {self.TYPE_ZONE=} -> {other_map} with {self}')
+      vprint(f'sitemap_by_type_zone[{self.TYPE_ZONE=}] = {self=}')
       sitemap_by_type_zone[self.TYPE_ZONE] = self
     super().__init__(tagsets=self.pilfer.sqltags)
 
