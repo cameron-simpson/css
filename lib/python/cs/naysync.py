@@ -54,7 +54,7 @@ from typing import (
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
 
-__version__ = '20250306-post'
+__version__ = '20251119'
 
 DISTINFO = {
     'keywords': ["python3"],
