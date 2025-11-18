@@ -57,6 +57,8 @@ from typeguard import typechecked
 # The default HTML parser to use with BeautifulSoup.
 BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
 
+debug_fs_counts = False
+
 def default_Pilfer():
   ''' Obtain the ambient `Pilfer` instance via a late import.
   '''
@@ -236,8 +238,9 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
         - `.request` and `.response` are obtained from `.flow`
         - `.url` is obtained from `.request.url`
     '''
-    FlowState.nfs += 1
-    vprint("FlowStates += 1 ->", FlowState.nfs)
+    if debug_fs_counts:
+      FlowState.nfs += 1
+      vprint("FlowStates += 1 ->", FlowState.nfs)
     super().__init__(url=url, **ns_kw)
     extra_attrs = self.__dict__.keys() - (
         'bs4parser',
@@ -270,8 +273,9 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
   def __del__(self):
     ''' Close `self.response` on delete.
     '''
-    FlowState.nfs -= 1
-    vprint("FlowStates -= 1 ->", FlowState.nfs)
+    if debug_fs_counts:
+      FlowState.nfs -= 1
+      vprint("FlowStates -= 1 ->", FlowState.nfs)
     rsp = self.__dict__.get('response')
     if rsp is not None:
       try:
