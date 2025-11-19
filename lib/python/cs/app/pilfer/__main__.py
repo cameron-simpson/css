@@ -282,22 +282,44 @@ class PilferCommand(BaseCommand):
     options = self.options
     dl_output_format = options.dl_output_format
     runstate = options.runstate
+
+    def dl(url_s):
+      ''' The common logic for a download of a single URL.
+      '''
+      nonlocal dl_output_format, xit
+      try:
+        FlowState.download_url(url_s, dl_output_format, format_filename=True)
+      except FileExistsError as e:
+        warning("output path already exists: %s", e)
+        xit = 1
+      except OSError as e:
+        warning("error saving: %s", e)
+        xit = 1
+
     xit = 0
     for url_s in argv:
       runstate.raiseif()
       with Pfx("%r", url_s):
-        url = URL(url_s)
-        flowstate = FlowState(url=url)
-        save_filename = flowstate.format_as(dl_output_format)
-        if existspath(save_filename):
-          warning("skip, output path already exists: %r", save_filename)
-          xit = 1
-          continue
-        try:
-          flowstate.download(save_filename)
-        except OSError as e:
-          warning("error saving to %r: %s", save_filename, e)
-          xit = 1
+        if url_s == '-':
+          for lineno, url_line in enumerate(sys.stdin, 1):
+            url_s = url_line.rstrip('\n')
+            with Pfx("stdin:%d: %r", lineno, url_s):
+              runstate.raiseif()
+              dl(url_s)
+        else:
+          if '://' in url_s:
+            dl(url_s)
+          else:
+            try:
+              ent = SiteMap.by_db_key(url_s)
+            except KeyError as e:
+              warning("cannot get entity %r: %s", url_s, e)
+              xit = 1
+              continue
+            ent.printt()
+            save_filename = ent.format_as(dl_output_format)
+            print("  ->", save_filename)
+            trace(ent.download, save_filename)
     return xit
 
   @popopts(
