@@ -615,7 +615,8 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
     ''' Yield a byte stream after patching its soup.
         If the content type is not `text/html`, yield the stream unchanged.
 
-        Gather the input `bss`, a _decoded_ iterable of bytes, into text and transform into BS4 `Soup`.
+        Gather the input `bss`, a _decoded_ iterable of bytes, into
+        text and transform into BS4 `Soup`.
         Call `Pilfer.
     '''
     if flowstate.content_type != 'text/html':
@@ -720,7 +721,7 @@ class MITMHookAction(Promotable):
       action = cls.HOOK_SPEC_MAP[name]
     except KeyError as e:
       raise ValueError(
-          f'unknown action name {name!r} (not in {cls.__name__}.HOOK_SPEC_MAP)'
+          f'unknown action name {name!r}, not in {cls.__name__}.HOOK_SPEC_MAP:{sorted(cls.HOOK_SPEC_MAP)}'
       ) from e
     return cls(action=action, args=args, kwargs=kwargs)
 
