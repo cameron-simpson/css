@@ -46,7 +46,7 @@ import sys
 from subprocess import run
 from threading import RLock
 import time
-from typing import List, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import List, Iterable, Mapping, Optional, Sequence, Set, Tuple
 from uuid import UUID
 
 from icontract import ensure, require
@@ -2010,6 +2010,18 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         if all(criterion.match_tagged_entity(te)
                for criterion in post_criteria):
           yield te
+
+  @pfx_method
+  def preload(self, *criteria) -> Set[SQLTagSet]:
+    ''' Preload the `SQLTagSets` matching each criterion in `criteria`.
+        Note that is is effectively an OR of the `criteria`, not an AND.
+        Return a `set` of the entities.
+    '''
+    tes = set()
+    for criterion in criteria:
+      with Pfx("criterion %r", criterion):
+        tes.update(self.find(criterion))
+    return tes
 
   def import_csv_file(self, f, *, update_mode=False):
     ''' Import CSV data from the file `f`.
