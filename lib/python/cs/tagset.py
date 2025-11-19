@@ -2916,9 +2916,11 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       value = te[tag_name]
     except KeyError:
       return None
+    if value is None:
+      return None
+    if subtype is None:
+      subtype = cutsuffix(tag_name, '_id')
     if not isinstance(value, str) and isinstance(value, Sequence):
-      if subtype is None:
-        subtype = cutsuffix(tag_name, '_id')
       if attr is None:
         # use the entity name
         return [self[f'{type_zone}.{subtype}.{key}'] for key in value]
@@ -2929,8 +2931,6 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
           for key in value
       ]
       return result
-    if subtype is None:
-      subtype = tag_name
     if attr is None:
       return self[f'{type_zone}.{subtype}.{value}']
     return list(self.find(deref_name_condition, **{attr: value}))
