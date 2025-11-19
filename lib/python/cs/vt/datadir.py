@@ -473,7 +473,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
 
   def WDFclose(self):
     ''' Close the current writable `DataFileState` if open.
-   '''
+    '''
     with self._lock:
       WDFstate = self._WDFstate
       if WDFstate is not None:
@@ -1116,6 +1116,9 @@ class PlatonicDir(FilesDir):
       self._scan_datatree(upd_proxy=upd_proxy)
 
   def _scan_datatree(self, *, upd_proxy: UpdProxy):
+    ''' Walk `self.datapath` looking for new or updates files.
+        Update `self.topdir:Dir`.
+    '''
     topdir = self.topdir
     # scan for new datafiles
     seen = set()
