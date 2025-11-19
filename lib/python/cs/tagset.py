@@ -313,7 +313,7 @@ from weakref import WeakValueDictionary
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, vprint
 from cs.context import withall
 from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable, uses_verbose
@@ -321,10 +321,9 @@ from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
 from cs.lex import (
-    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier,
-    get_nonwhite, is_dotted_identifier, is_identifier, skipwhite,
-    FormatMapping, FormatableMixin, format_attribute,
-    FStr, printt, r, s, without_suffix
+    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
+    is_dotted_identifier, is_identifier, skipwhite, FormatMapping,
+    FormatableMixin, format_attribute, FStr, printt, r, s, without_suffix
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
