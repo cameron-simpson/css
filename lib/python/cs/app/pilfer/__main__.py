@@ -156,6 +156,7 @@ class PilferCommand(BaseCommand):
             sqltags_db_url=options.db_url,
         )
         with pilfer:
+          pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
               later=later,
