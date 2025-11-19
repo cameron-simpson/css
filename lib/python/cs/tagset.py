@@ -492,7 +492,7 @@ def jsonable(obj, converted: Optional[dict] = None):
     if isinstance(obj, (int, float, str, bool)):
       # subtypes of the basics
       return obj
-    if isinstance(obj, (datetime, pathlib.PurePath)):
+    if isinstance(obj, (date, datetime, pathlib.PurePath)):
       # return in string form
       convobj = str(obj)
     elif isinstance(obj, (set, tuple, list)) or isinstance(obj, Sequence):
