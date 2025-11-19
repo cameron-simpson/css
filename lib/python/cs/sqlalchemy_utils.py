@@ -309,7 +309,7 @@ class ORM(MultiOpenMixin, ABC):
     '''
     self.db_url = self.norm_db_url(db_url)
     self.db_fspath = self.fspath_for_db_url(self.db_url)
-    is_sqlite = self.db_url.startswith('sqlite://')
+    is_sqlite = self.is_sqlite = self.db_url.startswith('sqlite://')
     if serial_sessions is None:
       # serial SQLite sessions by default
       serial_sessions = is_sqlite
@@ -427,24 +427,26 @@ class ORM(MultiOpenMixin, ABC):
   def serialif(self):
     ''' A context manager to serialise sessions if `self.serial_sessions`.
     '''
-    if self.serial_sessions:
-      existing_session = self.sqla_state.session
-      if existing_session is not None:
-        T = current_thread()
-        raise RuntimeError(
-            f'Thread:{T.ident}:{T.name}'
-            f': this Thread already has an ORM session: {existing_session}'
-        )
-      with self._serial_sessions_lock:
-        with contextif(
-            bool(self.db_fspath),
-            lockfile,
-            self.db_fspath,
-            poll_interval=2,
-        ):
-          yield
-    else:
+    if not self.serial_sessions:
       yield
+      return
+    existing_session = self.sqla_state.session
+    if existing_session is not None:
+      T = current_thread()
+      raise RuntimeError(
+          f'Thread:{T.ident}:{T.name}'
+          f': this Thread already has an ORM session: {existing_session}'
+      )
+    with self._serial_sessions_lock:
+      with contextif(
+          False and bool(self.db_fspath),
+          lockfile,
+          self.db_fspath,
+          poll_interval=2,
+      ):
+        ##print("==== ORM SERIALIF ===")
+        ##breakpoint()
+        yield
 
   @contextmanager
   @pfx_method(use_str=True)
