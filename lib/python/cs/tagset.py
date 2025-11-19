@@ -3036,6 +3036,13 @@ class HasTags(TagSetTyping, FormatableMixin):
     for subclass in public_subclasses(cls):
       if getattr(subclass, 'TYPE_SUBNAME', None) == type_subname:
         return super().__new__(subclass)
+    strict = getattr(cls, 'STRICT_SUBTYPES', True)
+    if strict:
+      raise ValueError(
+          f'no subclass of {cls.__name__} found for {type_subname=}'
+          f' and {cls.__name__}.STRICT_SUBTYPES={strict}'
+          f'; public subclasses are {", ".join(sorted(map(lambda subcls: subcls.__name__, public_subclasses(cls))))}'
+      )
     # return the generic version
     return super().__new__(cls)
 
