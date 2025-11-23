@@ -3,11 +3,16 @@
 ''' RSS XML.
 '''
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from xml.etree.ElementTree import ElementTree
 
-@dataclass
+from lxml.builder import E
+
+from cs.seq import not_none
+
+@dataclass(kw_only=True)
 class RSS:
   ''' A class for generating an RSS feed.
 
@@ -21,7 +26,7 @@ class RSS:
   language: str = None
   copyright: str = None
   # email of the editor
-  managingEditor: str
+  managingEditor: str = None
   # email of the webmaster
   webmaster: str = None
   # using a UNIX timestamp
