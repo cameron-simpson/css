@@ -1012,6 +1012,24 @@ class SiteEntity(HasTags):
           f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(page_name)}'
       )
 
+  @classmethod
+  @promote
+  @typechecked
+  def on_test(cls, url: URL, match=None):
+    ''' Test `url` to see if it is matched by this kind of `SiteEntity`.
+        This default implementation tests against
+        `cls.SITEPAGE_URL_PATTERN` if defined,
+        otherwise it compares `cls.url_re` against `url.path`.
+    '''
+    ptn = cls.pattern()
+    if ptn is not None:
+      return ptn.match(url)
+    # fall back to
+    m = cls.url_re.match(url.path)
+    if not m:
+      return False
+    return m.groupdict()
+
   def get(self, key, default=None):
     ''' The `Mapping.get` method, to ensure that it goes through `__getitem__`.
     '''
