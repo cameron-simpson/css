@@ -1065,8 +1065,17 @@ class SiteEntity(HasTags):
         If `HasTags.__getattr__(attr)` raises `AttributeError` and
         the tag `opengraph.{attr}` exists, return that.
     '''
-    # *_FORMAT derived attribues
     if attr.replace('_', '').islower():
+      # *_PATTERN derived attributes
+      ptnattr_name = f'{attr.upper()}_PATTERN'
+      try:
+        pattern_s = getattr(self.__class__, ptnattr_name)
+      except AttributeError:
+        pass
+      else:
+        pattern = self.patterns[attr]
+        return pattern.url_path_for(self)
+      # *_FORMAT derived attributes
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
       fmtattr_name = f'{attr.upper()}_FORMAT'
       try:
