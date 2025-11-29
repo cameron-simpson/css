@@ -2122,6 +2122,32 @@ class SiteMap(UsesTagSets, Promotable):
 
     return _grok_sitepage_wrapper
 
+  @promote
+  def url_entity(self, url: URL):
+    ''' Return the `SiteEntity` associated with this URL, or `None`
+        for an unrecognised URL.
+        Raise `ValueError` if multiple entities match the URL.
+    '''
+    try:
+      base_entity_class = self.HasTagsClass
+    except AttributeError as e:
+      vprint(
+          f'{self.__class__.__name__}.url_entity: no .HasTagsClass, skipping'
+      )
+      return None
+    entities = []
+    for ent_class in public_subclasses(base_entity_class):
+      try:
+        entity = ent_class.from_URL(url, self)
+      except ValueError as e:
+        vprint(f'url_entity({url=}): does not match {ent_class=}: {e}')
+        continue
+      entities.append(entity)
+    if not entities:
+      return None
+    entity, = entities
+    return entity
+
   def matches(
       self,
       url: URL,
