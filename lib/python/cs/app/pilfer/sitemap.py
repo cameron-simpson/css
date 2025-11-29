@@ -1020,6 +1020,26 @@ class SiteEntity(HasTags):
     except KeyError:
       return default
 
+  @classmethod
+  def pattern(cls, pattern_name="sitepage_url") -> URLPattern | None:
+    ''' Return a `URLPattern` for the specified page name, default `"sitepage_url"`.
+    '''
+    try:
+      pattern_s = getattr(cls, f'{pattern_name.upper()}_PATTERN')
+    except AttributeError as e:
+      return None
+    return URLPattern(pattern_s)
+
+  @mapped_property
+  def patterns(self, pattern_name: str):
+    ''' A mapping of `pattern_name` to the `URLPattern`
+        derived from `getattr(self,f'{pattern_name.upper()}_PATTERN')`.
+    '''
+    ptn = self.pattern(pattern_name)
+    if ptn is None:
+      raise KeyError(pattern_name)
+    return ptn
+
   def __getattr__(self, attr):
     ''' A `SiteEntity` supports various automatic attributes.
 
