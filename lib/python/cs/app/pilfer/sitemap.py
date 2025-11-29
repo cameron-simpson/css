@@ -958,17 +958,23 @@ class SiteEntity(HasTags):
         Raises `ValueError` if the `url.path` does not match `cls.url_re`.
     '''
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
+      ptn = cls.pattern()
+      if ptn is not None:
+        match = ptn.match(url)
+      else:
+        # fall back to .url_re from .URL_RE
+        try:
+          url_re = cls.url_re
+        except AttributeError:
+          raise ValueError('no .URL_RE')
+        m = url_re.match(url.path)
+        if not m:
+          raise ValueError(f'{url.path=} does not match {url_re}')
+        match = m.groupdict()
       try:
-        url_re = cls.url_re
-      except AttributeError:
-        raise ValueError('no .URL_RE')
-      m = url_re.match(url.path)
-      if not m:
-        raise ValueError(f'{url.path=} does not match {url_re}')
-      try:
-        type_key = trace(m.group)('type_key')
-      except IndexError as e:
-        warning("no type_key in match %r", m.groupdict())
+        type_key = match["type_key"]
+      except KeyError as e:
+        warning("no type_key in match %r", match)
         raise
       return sitemap[cls, type_key]
 
