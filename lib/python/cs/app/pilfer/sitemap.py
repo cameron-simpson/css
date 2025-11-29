@@ -444,6 +444,11 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
 
   # NB: no __getattr__, it preemptys @cached_property
 
+  def as_URL(self) -> URL:
+    ''' Return the `URL` from this `FlowState`, utilised by `@promote`.
+    '''
+    return self.url
+
   @classmethod
   def from_str(cls, url_s: str):
     ''' Promote a `str` URL to a `FlowState`.
