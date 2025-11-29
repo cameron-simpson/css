@@ -1784,12 +1784,17 @@ class SiteMap(UsesTagSets, Promotable):
     for pattern in patterns:
       with Pfx(f'pattern={r(pattern)}'):
         if isinstance(pattern, type) and issubclass(pattern, SiteEntity):
-          pattern = pattern.URL_RE
-          assert isinstance(pattern, str) and '/' in pattern, (
-              f'pattern.URL_RE={r(pattern)} is not a string containing a slash'
-          )
 
-        if isinstance(pattern, str):
+          def maketest(entity_class):
+            test_name = f'{entity_class.__name__}.on_test(flowstate)'
+
+            def test(flowstate, match):
+              vprint(f'@on: {test_name}')
+              return entity_class.on_test(flowstate, match)
+
+            test.__name__ = test_name
+            return test
+        elif isinstance(pattern, str):
           if pattern.isupper():
             # a method name
             def maketest(method_name):
