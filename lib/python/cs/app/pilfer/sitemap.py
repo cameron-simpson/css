@@ -31,6 +31,7 @@ from cs.lex import (
     get_nonwhite, printt, r, s, skipwhite
 )
 from cs.logutils import warning
+from cs.mappings import mapped_property
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite
@@ -48,8 +49,6 @@ from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag as BS4Tag
-from lxml import etree as ET
-from lxml.builder import E
 from mitmproxy.flow import Flow
 import requests
 from typeguard import typechecked
@@ -1455,7 +1454,7 @@ class SiteMap(UsesTagSets, Promotable):
   pilfer: object = None
   tagsets: BaseTagSets = None
 
-  # a registry of SiteMap subclasses nstancesby their TYPE_ZONE
+  # a registry of SiteMap subclasses by their TYPE_ZONE
   sitemap_by_type_zone = {}
 
   URL_KEY_PATTERNS = ()
