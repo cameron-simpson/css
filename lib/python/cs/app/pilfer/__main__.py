@@ -12,10 +12,12 @@ import sys
 from typing import Iterable
 
 from bs4 import NavigableString
+from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
+from cs.fileutils import atomic_filename
 from cs.later import Later
 from cs.lex import (
     cutprefix,
@@ -775,6 +777,31 @@ class PilferCommand(BaseCommand):
         ent.printt()
         ent.grok_sitepage(ent.sitepage_url)
         ent.printt()
+
+  @popopts(o_=('output_fspath', 'Output the RSS to the file output_fspath.'))
+  def cmd_rss(self, argv):
+    ''' Usage: {cmd} entity|URL
+          Generate an RSS feed for the specified entity or URL.
+    '''
+    pilfer = self.options.pilfer
+    if not argv:
+      raise GetoptError('missing entity or URL')
+    entity_spec = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
+    if '://' in entity_spec:
+      entity = pilfer.url_entity(entity_spec)
+    else:
+      entity = SiteMap.by_db_key(entity_spec)
+    output_fspath = self.options.output_fspath or f'{entity.sitemap.URL_DOMAIN}-{entity.name}.rss'
+    rss = entity.rss()
+    with atomic_filename(output_fspath, mode='w') as T:
+      print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+      print(
+          xml_tostring(rss, encoding='unicode', pretty_print=True),
+          end='',
+          file=T
+      )
 
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
