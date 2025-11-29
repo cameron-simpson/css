@@ -138,6 +138,163 @@ def parse_img_srcset(srcset, offset=0) -> Mapping[str, list[str]]:
   return mapping
 
 @dataclass
+class URLPattern(Promotable):
+  ''' A class for matching a `URL` against a `(hostname_fnmatch,url_regexp)` pair.
+  '''
+
+  path_pattern: str
+  hostname_fnmatch: str | None = None
+
+  class Converter:
+
+    @typechecked
+    def __init__(
+        self,
+        match_re: str | re.Pattern,
+        from_str: Callable[str, Any],
+        to_str: Callable[Any, str],
+    ):
+      if isinstance(match_re, str):
+        match_re = re.compile(match_re)
+      self.match_re = match_re
+      self.from_str = from_str
+      self.to_str = to_str
+
+    def __repr__(self):
+      return f'{self.__class__.__qualname__}({self.match_re},{self.from_str}->{self.to_str})'
+
+  # converter specifications, a mapping of name -> (re,convert,deconvert)
+  CONVERTERS = {
+      '': Converter(r'[^/]+', str, str),
+      'int': Converter(r'0|[1-9]\d+', int, str)
+  }
+
+  class ParsedPattern(namedtuple('ParsedPattern',
+                                 'pattern parts placeholders'), Promotable):
+
+    # a <converter:name> placeholder
+    PLACEHOLDER_re = re.compile(
+        r'<((?P<converter>[a-z][a-z0-9_]*):)?(?P<name>[a-z][a-z0-9_]*)>'
+    )
+
+    @classmethod
+    def from_str(cls, pattern: str, converters=None):
+      ''' Parse `pattern` as a `weukzeug`-like pattern, but simpler.
+          Return a `ParsedPattern` where `.parts` is a
+          list of the pattern components and `.placeholders` is a
+          mapping of placeholder name to a `URLPattern.Converter`
+          instance.
+      '''
+      if converters is None:
+        converters = URLPattern.CONVERTERS
+      parts = []
+      placeholders = {}
+      offset = 0
+      while offset < len(pattern):
+        with Pfx("offset %d", offset):
+          if pattern.startswith('<', offset):
+            m = cls.PLACEHOLDER_re.match(pattern, offset)
+            if m is None:
+              raise ValueError(
+                  f'expected placeholder at {offset=}, found {pattern[offset:]!r}'
+              )
+            matched = m.groupdict()
+            name = matched['name']
+            converter_name = m.group('converter') or ''
+            converter = converters[converter_name]
+            if name in placeholders:
+              raise ValueError(f'repeated definition of <{name=}>')
+            placeholders[name] = converter
+            parts.append((name, converter))
+            offset = m.end()
+          else:
+            nextpos = pattern.find('<', offset)
+            if nextpos == -1:
+              nextpos = len(pattern)
+            else:
+              assert nextpos > offset
+            parts.append(pattern[offset:nextpos])
+            offset = nextpos
+      return cls(pattern=pattern, parts=parts, placeholders=placeholders)
+
+  def __post_init__(self):
+    ''' Parse the pattern immediately for validation purposes.
+    '''
+    self._parsed = self.ParsedPattern.from_str(self.path_pattern)
+
+  @classmethod
+  def from_str(cls, pattern: str):
+    return cls(pattern)
+
+  @cached_property
+  def pattern_re(self):
+    ''' The compiled regular expression from `self._parts`.
+    '''
+    re_s = ''.join(
+        (
+            part if isinstance(part, str) else
+            f'(?P<{part[0]}>{part[1].match_re.pattern})'
+        ) for part in self._parsed.parts
+    )
+    return pfx_call(re.compile, re_s)
+
+  def url_path_for(self, fields: Mapping[str, Any]):
+    ''' Return the URL path derived from `fields`, a mapping from
+        placeholder names to values which might typically be a `SiteEntity`.
+    '''
+    subpaths = []
+    for part in self._parsed.parts:
+      print("url_path_for: part =", part)
+      if isinstance(part, str):
+        subpaths.append(part)
+      else:
+        name, converter = part
+        value = fields[name]
+        value_s = converter.to_str(value)
+        try:
+          vaule2 = converter.from_str(value_s)
+        except ValueError as e:
+          warning(
+              "url_path_for: fields[%r]=%s does not round trip via %s: %s",
+              name, r(value), s(converter), e
+          )
+        subpaths.append(value_s)
+    return ''.join(subpaths)
+
+  @promote
+  def match(
+      self,
+      url: URL,
+      extra: Mapping | None = None,
+  ) -> dict | None:
+    ''' Compare `url` against this matcher.
+        Return `None` on no match.
+        Return the regexp `groupdict()` on a match.
+    '''
+    if self.hostname_fnmatch is not None and not fnmatch(
+        url.hostname, self.hostname_fnmatch):
+      return None
+    m = self.pattern_re.match(url.path)
+    if m is None:
+      return None
+    return m.groupdict()
+
+  @classmethod
+  def promote(cls, obj):
+    ''' Promote `obj` to `URLMatcher`:
+        - `(hostname_fnmatch,url_regexp)` 2-tuples
+        - `url_regexp` strings
+    '''
+    if isinstance(obj, cls):
+      return obj
+    try:
+      hostname_fnmatch, path_pattern = obj
+    except (TypeError, ValueError):
+      return super().promote(obj)
+    # obj is a 2-tuple of (hostname_fnmatch,path_pattern)
+    return cls(hostname_fnmatch=hostname_fnmatch, path_pattern=path_pattern)
+
+@dataclass
 class URLMatcher(Promotable):
   ''' A class for matching a `URL` against a `(hostname_fnmatch,url_regexp)` pair.
   '''
