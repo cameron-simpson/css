@@ -661,7 +661,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         for err in errors:
           error(err)
         raise ValueError('invalid pipe specification')
-    return pipeline(self.later, pipe_funcs, name=name, inputs=inputs)
+    return pipeline(self.later, pipe_funcs, name=name)
 
   @cached_property
   @pfx_method
