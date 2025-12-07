@@ -115,7 +115,7 @@ def pagemethod(method):
   def with_flowstate(self, flowstate: Optional[FlowState] = None, *a, **kw):
     if flowstate is None:
       flowstate = getattr(self, f'{pagename}_url')
-    return trace(promoting_method)(self, flowstate, *a, **kw)
+    return promoting_method(self, flowstate, *a, **kw)
 
   return with_flowstate
 
@@ -248,7 +248,7 @@ class URLPattern(Promotable):
     '''
     subpaths = []
     for part in self._parsed.parts:
-      print("url_path_for: part =", part)
+      ##print("url_path_for: part =", part)
       if isinstance(part, str):
         subpaths.append(part)
       else:
@@ -1352,7 +1352,7 @@ class SiteEntity(HasTags):
 
             @paginated
             def grok_sitepage(self,flowstate:FlowState,method=None,*,pagenum:int):
-                # process the flowstate, expecting to be called one for each page
+                # process the flowstate, expecting to be called once for each page
     '''
 
     @uses_runstate
@@ -1491,7 +1491,7 @@ class SiteMap(UsesTagSets, Promotable):
     try:
       self.TYPE_ZONE
     except AttributeError:
-      warning(f'no .TYPE_ZONE for SiteMap instance {self}')
+      vprint(f'no .TYPE_ZONE for SiteMap instance {self}')
       pass
     else:
       try:
@@ -1992,7 +1992,7 @@ class SiteMap(UsesTagSets, Promotable):
             with Pfx("on_matches: test %r vs %s", method_name, cond_spec):
               if verbose:
                 print('ON_MATCHES', f'{method_name} vs {cond_spec}')
-                printt(*sorted(match.items()), indent='  ')
+                ##printt(*sorted(match.items()), indent='  ')
               try:
                 test_result = pfx_call(condition, flowstate, match)
               except Exception as e:
@@ -2155,7 +2155,9 @@ class SiteMap(UsesTagSets, Promotable):
       try:
         entity = ent_class.from_URL(url, self)
       except ValueError as e:
-        vprint(f'url_entity({url=}): does not match {ent_class=}: {e}')
+        vprint(
+            f'url_entity({url=}): SKIP {ent_class=}, does not match {ent_class=}: {e}'
+        )
         continue
       entities.append(entity)
     if not entities:
@@ -2431,7 +2433,7 @@ class SiteMap(UsesTagSets, Promotable):
         if isinstance(criterion, type) and issubclass(criterion, SiteEntity)
         else criterion for criterion in criteria
     ]
-    return trace(super().find)(*criteria, **crit_kw)
+    return super().find(*criteria, **crit_kw)
 
   @popopts(
       f=('force', 'Force refresh of entities even if not stale.'),
