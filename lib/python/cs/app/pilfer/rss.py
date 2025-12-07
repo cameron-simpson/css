@@ -98,12 +98,14 @@ class RSSCommon(ABC):
     return og_locale.lower().replace('_', '-')
 
 class RSSChannelMixin(RSSCommon, ABC):
+  '''" The RSS top level.
+  '''
 
-  @abstractmethod
   def rss_content_signature(self):
-    raise NotImplementedError(
-        'no signature, something like `sorted(self["article_id"])` is required'
-    )
+    ''' Return an object which should change if the content changes.
+        This default base method returns `sorted(self[self.RSS_ITEM_KEYS])`.
+    '''
+    return sorted(self[self.RSS_ITEM_KEYS])
 
   def rss_last_build_timestamp(self):
     return self.update_content_timestamp(
