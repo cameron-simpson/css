@@ -2154,7 +2154,7 @@ class SiteMap(UsesTagSets, Promotable):
         ent_type_key = type_key
       entity = self[ent_class, ent_type_key]
       if flowstate is None:
-        url = getattr(entity, page)
+        url = getattr(entity, f'{page}_url')
         flowstate = FlowState.from_URL(url)
       grok_method = getattr(entity, f'grok_{page}')
       grok_method(flowstate)
