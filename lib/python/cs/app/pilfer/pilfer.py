@@ -879,14 +879,17 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
 
-  def cache_keys_for_url(self, url, rq_headers=None) -> set[str]:
-    ''' Return a set of cache keys for `url`.
+  @promote
+  def cache_keys_for_url(self,
+                         flowstate: FlowState,
+                         rq_headers=None) -> set[str]:
+    ''' Return a set of cache keys for a `URL` or `FlowState`.
 
         These are obtained by calling every `SiteMap.cache_key_*`
-        method matching the `url`.
+        method matching the `URL`.
     '''
+    url = flowstate.url
     PR = lambda *a, **kw: print("cache_keys_for", url, *a, **kw)
-    flowstate = FlowState(url=url)
     cache = self.content_cache
     cache_keys = set()
     with self:
@@ -899,13 +902,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return cache_keys
 
   @promote
-  def cache_url(self, url: URL, mode='missing', *, extra=None):
-    ''' Cache the content of `url` in the cache if missing/updated
-        as indicated by `mode`.
+  def cache_url(self, flowstate: FlowState, mode='missing', *, extra=None):
+    ''' Cache the content of a `URL` or `FlowState` in the cache
+        if missing/updated as indicated by `mode`.
         Return a mapping of each cache key to the cached metadata.
     '''
     return self.content_cache.cache_url(
-        url, self.cache_keys_for_url(url), mode=mode
+        flowstate, self.cache_keys_for_url(flowstate), mode=mode
     )
 
   @promote
