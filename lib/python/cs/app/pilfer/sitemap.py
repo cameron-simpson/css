@@ -1526,6 +1526,12 @@ class SiteMap(UsesTagSets, Promotable):
     super().__init__(tagsets=self.pilfer.sqltags)
 
   @classmethod
+  def zone_sitemap(cls, type_zone: str):
+    ''' The `SiteMap` associated with `type_zone`.
+    '''
+    return cls.sitemap_by_type_zone[type_zone]
+
+  @classmethod
   def by_db_key(cls, db_key: str) -> SiteEntity:
     ''' Return the `SiteEntity` for the database wide `key`.
     '''
