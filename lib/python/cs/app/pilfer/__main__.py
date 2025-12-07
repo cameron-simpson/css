@@ -47,6 +47,7 @@ from . import (
 from .parse import get_action_args, get_delim_regexp, import_name
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
+from .rss import RSSChannelMixin
 from .sitemap import FlowState, SiteEntity, SiteMap
 
 def main(argv=None):
