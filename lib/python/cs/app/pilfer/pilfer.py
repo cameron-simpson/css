@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import errno
 from fnmatch import fnmatch
 from functools import cached_property
-from http.cookies import Morsel
+from http.cookies import CookieError, Morsel
 from itertools import zip_longest
 import os
 import os.path
@@ -233,7 +233,11 @@ class PilferSession(MultiOpenMixin, HasFSPath):
     needdir(cookies_dirpath)
     with atomic_filename(cookiespath, mode='w', exists_ok=True) as f:
       for cookie in self.cookies:
-        m = self.cookie_as_morsel(cookie)
+        try:
+          m = self.cookie_as_morsel(cookie)
+        except CookieError as e:
+          warning("save_cookies: skip %r: %s", cookie.name, e)
+          continue
         d = dict(name=m.key, value=m.value)
         d.update(dict(m))
         dump_ndjson(d, f)
