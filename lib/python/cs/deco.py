@@ -1057,7 +1057,7 @@ def promote(func, params=None, types=None):
     return func
 
   def promote_args(a, kw):
-    ''' Promote the position and keyword arguments.
+    ''' Promote the positional and keyword arguments.
     '''
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
@@ -1106,7 +1106,7 @@ def promote(func, params=None, types=None):
             else:
               # assuming a property or even a plain attribute
               as_value = as_annotation
-            arg_value = as_value
+            promoted_value = as_value
       except TypeError:
         # promotion fails
         if (optional and arg_value is param.default
