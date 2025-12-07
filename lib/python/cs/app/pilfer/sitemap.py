@@ -958,6 +958,12 @@ class SiteEntity(HasTags):
       )
 
   @classmethod
+  def default_sitemap(cls) -> "SiteMap":
+    ''' Return the default `SiteMap` instance for `cls.TYPE_ZONE`.
+    '''
+    return SiteMap.zone_sitemap(cls.TYPE_ZONE)
+
+  @classmethod
   @promote
   def from_URL(cls, url: URL, sitemap: "SiteMap"):
     ''' Return the `SiteEntity` from `sitemap` matching `url`.
