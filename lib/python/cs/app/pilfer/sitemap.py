@@ -28,7 +28,7 @@ from cs.excutils import unattributable
 from cs.fileutils import atomic_filename
 from cs.lex import (
     cutprefix, cutsuffix, FormatableMixin, FormatAsError, FormatMapping,
-    get_nonwhite, printt, r, s, skipwhite
+    get_nonwhite, lc_, printt, r, s, skipwhite
 )
 from cs.logutils import warning
 from cs.mappings import mapped_property
@@ -164,8 +164,12 @@ class URLPattern(Promotable):
 
   # converter specifications, a mapping of name -> (re,convert,deconvert)
   CONVERTERS = {
-      '': Converter(r'[^/]+', str, str),
-      'int': Converter(r'0|[1-9]\d+', int, str)
+      # the default stops at / or &
+      '': Converter(r'[^/?&]+', str, str),
+      # a nonnegative integer
+      'int': Converter(r'0|[1-9]\d*', int, str),
+      'lc_': Converter(r'[^/&A-Z]+', str, lc_),
+      'wordpath': Converter(r'\w+(/\w+)*', str, str),
   }
 
   class ParsedPattern(namedtuple('ParsedPattern',
