@@ -1279,11 +1279,26 @@ class SiteEntity(HasTags):
 
   @classmethod
   @promote
-  def url_match(cls, url: URL):
+  def url_match(cls, url: URL) -> dict:
     ''' Match `url.path` against `self.URL_RE`.
-        Return the `re.Match` instance, or `None` on no match.
+        Return the matched fields or raise `ValueError` on no mach.
     '''
-    return cls.url_re.match(url.path)
+    ptn = cls.pattern()
+    if ptn is not None:
+      match = ptn.match(url)
+      if match is None:
+        raise ValueError(f'{url=} does not match {ptn}')
+    else:
+      # fall back to .url_re from .URL_RE
+      try:
+        url_re = cls.url_re
+      except AttributeError:
+        raise ValueError('no .SITEPAGE_URL_PATTERN and no .URL_RE')
+      m = url_re.match(url.path)
+      if not m:
+        raise ValueError(f'{url.path=} does not match {url_re}')
+      match = m.groupdict()
+    return match
 
   def update_from_meta(self, flowstate: FlowState, **update_kw):
     ''' Update this entity from the `flowstate.meta`.
