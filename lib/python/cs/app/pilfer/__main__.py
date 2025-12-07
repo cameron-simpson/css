@@ -778,7 +778,10 @@ class PilferCommand(BaseCommand):
         ent.grok_sitepage(ent.sitepage_url)
         ent.printt()
 
-  @popopts(o_=('output_fspath', 'Output the RSS to the file output_fspath.'))
+  @popopts(
+      f=('force', 'Force overwrite of the RSS file if it already exists.'),
+      o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
+  )
   def cmd_rss(self, argv):
     ''' Usage: {cmd} entity|URL
           Generate an RSS feed for the specified entity or URL.
@@ -790,18 +793,33 @@ class PilferCommand(BaseCommand):
     if argv:
       raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
     if '://' in entity_spec:
-      entity = pilfer.url_entity(entity_spec)
+      url = entity_spec
+      entity = pilfer.url_entity(url)
+      if entity is None:
+        raise GetoptError(
+            f'{entity_spec=} does not match a known SiteEntity subclass'
+        )
+      print(entity)
     else:
       entity = SiteMap.by_db_key(entity_spec)
-    output_fspath = self.options.output_fspath or f'{entity.sitemap.URL_DOMAIN}-{entity.name}.rss'
+      url = entity.sitepage_url
+      print(f'{entity} -> {url}')
+    entity.grok_sitepage(url)
+    if not isinstance(entity, RSSChannelMixin):
+      raise GetoptError(
+          f'entity {entity} is not an instance of RSSChannelMixin'
+      )
+    output_fspath = self.options.output_fspath or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
     rss = entity.rss()
-    with atomic_filename(output_fspath, mode='w') as T:
+    with atomic_filename(output_fspath, mode='w',
+                         exists_ok=self.options.force) as T:
       print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
       print(
           xml_tostring(rss, encoding='unicode', pretty_print=True),
           end='',
           file=T
       )
+    print(output_fspath)
 
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
