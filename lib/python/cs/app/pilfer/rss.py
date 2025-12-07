@@ -189,7 +189,7 @@ class RSSChannelMixin(RSSCommon, ABC):
                 )
             ),
             ##E( 'atom:link', href="https://www.rssboard.org/files/sample-rss-2.xml", rel="self", type="application/rss+xml"),
-            *(item.rss() for item in items or self.rss_items()),
+            *(item.rss_item() for item in (items or self.rss_items())),
         ),
         version="2.0",
         **{
@@ -205,7 +205,7 @@ class RSSChannelMixin(RSSCommon, ABC):
 
 class RSSChannelItemMixin(RSSCommon, ABC):
 
-  def rss(
+  def rss_item(
       self,
       description=None,
       image_url=None,
