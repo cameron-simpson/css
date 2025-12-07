@@ -281,6 +281,8 @@ class URLPattern(Promotable):
     m = self.pattern_re.match(url.path)
     if m is None:
       return None
+    if m.end() < len(url.path):
+      return None
     return m.groupdict()
 
   @classmethod
