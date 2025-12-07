@@ -12,6 +12,7 @@ from functools import cached_property, partial
 from getopt import GetoptError
 from itertools import zip_longest
 import json
+from os.path import abspath
 import re
 from threading import Thread
 import time
@@ -33,7 +34,7 @@ from cs.lex import (
 from cs.logutils import warning
 from cs.mappings import mapped_property
 from cs.obj import public_subclasses
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py.func import funccite
 from cs.progress import progressbar
 from cs.queues import IterableQueue, ListQueue
