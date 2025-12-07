@@ -778,6 +778,14 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       if patterns:
         yield from sitemap.matches(url, patterns, extra=extra)
 
+  @promote
+  def url_entity(self, url: URL, *, methodglob='grok_*', **match_kw):
+    for sitemap in self.sitemaps_for(url):
+      entity = sitemap.url_entity(url)
+      if entity is not None:
+        return entity
+    return None
+
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
     if kw:
