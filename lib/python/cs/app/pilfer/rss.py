@@ -91,9 +91,6 @@ class RSSCommon(ABC):
   def rss_link(self):
     return self.sitepage_url
 
-  def rss_description(self):
-    return getattr(self, 'description', None)
-
   def rss_language(self):
     og_locale = self.get('opengraph.locale')
     if not og_locale:
