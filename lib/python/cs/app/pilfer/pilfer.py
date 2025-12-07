@@ -939,6 +939,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       raise FileExistsError(fspath)
     cache_keys = self.cache_keys_for_url(url)
     cache = self.content_cache
+    print(f'    {cache_keys}')
     try:
       cache_key, cache_md, cache_fspath = cache.find_cache_fspath(cache_keys)
     except KeyError:
@@ -946,15 +947,20 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       flowstate = FlowState(url)
       if cache_keys:
         # fetch via the cache
+        print(f'    cache_url({url},{cache_keys})')
         cached_map = cache.cache_url(flowstate, cache_keys)
         cache_key, cache_md, cache_fspath = cache.find_cache_fspath(cache_keys)
+        print('    -> cache_fspath', cache_fspath)
       else:
         # fetch directly, do not bother with the cache
+        print('    GET', url)
         bss = flowstate.iterable_content
         with open(fspath, 'xb') as f:
           for bs in bss:
             f.write(bs)
+        print('    ->', fspath)
         return fspath
+    print('    cache_fspath', cache_fspath)
     try:
       pfx_call(os.link, cache_fspath, fspath)
     except OSError as e:
