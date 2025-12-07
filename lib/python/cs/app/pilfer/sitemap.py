@@ -1414,7 +1414,10 @@ class SiteEntity(HasTags):
     url = URL(self.download_url)
     if save_filename is None:
       save_filename = url.basename or 'index.html'
-    return FlowState.download_url(url, save_filename, **fsdl_kw)
+    save_filename = FlowState.download_url(url, save_filename, **fsdl_kw)
+    self['download_fspath'] = abspath(save_filename)
+    self.add('downloaded')
+    return save_filename
 
 paginated = SiteEntity.paginated
 
