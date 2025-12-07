@@ -964,31 +964,25 @@ class SiteEntity(HasTags):
     return SiteMap.zone_sitemap(cls.TYPE_ZONE)
 
   @classmethod
+  @pfx
   @promote
-  def from_URL(cls, url: URL, sitemap: "SiteMap"):
+  def from_URL(cls, url: URL, sitemap: "SiteMap" = None):
     ''' Return the `SiteEntity` from `sitemap` matching `url`.
         Raises `ValueError` if the `url.path` does not match `cls.url_re`.
     '''
+    if sitemap is None:
+      sitemap = cls.default_sitemap()
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
-      ptn = cls.pattern()
-      if ptn is not None:
-        match = ptn.match(url)
-      else:
-        # fall back to .url_re from .URL_RE
-        try:
-          url_re = cls.url_re
-        except AttributeError:
-          raise ValueError('no .URL_RE')
-        m = url_re.match(url.path)
-        if not m:
-          raise ValueError(f'{url.path=} does not match {url_re}')
-        match = m.groupdict()
+      match = cls.url_match(url)
       try:
         type_key = match["type_key"]
       except KeyError as e:
-        warning("no type_key in match %r", match)
-        raise
-      return sitemap[cls, type_key]
+        raise ValueError("no type_key in match %r: %s", match, e) from e
+      # fill in from the match if not already set
+      entity = sitemap[cls, type_key]
+      for match_key, value in match.items():
+        entity.setdefault(match_key, value)
+      return entity
 
   def __getitem__(self, key):
     super_getitem = super().__getitem__
