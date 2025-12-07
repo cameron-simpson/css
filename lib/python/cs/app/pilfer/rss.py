@@ -77,7 +77,7 @@ class RSSCommon(ABC):
                                   ).strftime('%a, %d %b %Y %H:%M:%S %Z')
 
   def rss_description(self):
-    return getattr(self, 'description', None)
+    return getattr(self, 'description', '')
 
   def rss_title(self):
     return self.title
