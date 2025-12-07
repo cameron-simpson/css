@@ -34,7 +34,6 @@ from string import (
 )
 import sys
 from textwrap import dedent
-from threading import Lock
 from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
 
 from dateutil.tz import tzlocal
@@ -1894,7 +1893,7 @@ class FormatableFormatter(Formatter):
           if format_subspec[0].isalpha():
             try:
               value, offset = value.convert_via_method_or_attr(format_subspec)
-            except (AttributeError, TypeError) as e:
+            except (AttributeError, TypeError):
               value = format(value, format_subspec)
               offset = len(format_subspec)
             if offset < len(format_subspec):
@@ -2101,7 +2100,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     # use format_attributes by preference
     try:
       attribute = self.format_attributes[attr]
-    except KeyError as e:
+    except KeyError:
       try:
         attribute = getattr(self, attr)
       except AttributeError:
