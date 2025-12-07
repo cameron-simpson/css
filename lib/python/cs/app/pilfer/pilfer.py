@@ -530,6 +530,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return actions
 
   @mapped_property
+  def actions(self, action_name: str):
+    ''' A mapping of action name to `ActionSpecification`.
+    '''
+    from .actions import _Action
+    return _Action.from_action_section(action_name, self.rc_map['actions'])
+
+  @mapped_property
   def pipe_specs(self, pipe_name):
     ''' An on demand mapping of `pipe_name` to `PipeLineSpec`s
         derived from `self.rc_map['pipes']`.
