@@ -274,8 +274,9 @@ class URLPattern(Promotable):
         Return `None` on no match.
         Return the regexp `groupdict()` on a match.
     '''
-    if self.hostname_fnmatch is not None and not fnmatch(
-        url.hostname, self.hostname_fnmatch):
+    if self.hostname_fnmatch is not None and (
+        not isinstance(url.hostname, str)
+        or not fnmatch(url.hostname, self.hostname_fnmatch)):
       return None
     m = self.pattern_re.match(url.path)
     if m is None:
