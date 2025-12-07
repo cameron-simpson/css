@@ -1106,7 +1106,9 @@ class SiteEntity(HasTags):
         pass
       else:
         pattern = self.patterns[attr]
-        return pattern.url_path_for(self)
+        fields = dict(self)
+        fields.setdefault('type_key', self.type_key)
+        return pattern.url_path_for(fields)
       # *_FORMAT derived attributes
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
       fmtattr_name = f'{attr.upper()}_FORMAT'
