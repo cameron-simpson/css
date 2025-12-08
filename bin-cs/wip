@@ -3,7 +3,7 @@
 # Create, push, and discard a WIP branch for visibility.
 # - get the current diff, quit if empty
 # - stash, make new wip branch, patch, commit, push
-# - switch back, unstash, delete branch
+# - switch back, unstash, delete wip branch
 #
 # - Cameron Simpson <cs@cskk.id.au> 08nov2025
 #
