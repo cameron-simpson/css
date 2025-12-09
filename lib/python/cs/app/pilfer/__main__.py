@@ -808,7 +808,10 @@ class PilferCommand(BaseCommand):
       raise GetoptError(
           f'entity {entity} is not an instance of RSSChannelMixin'
       )
-    output_fspath = self.options.output_fspath or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
+    output_fspath = (
+        self.options.output_fspath
+        or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
+    )
     rss = entity.rss()
     with atomic_filename(output_fspath, mode='w',
                          exists_ok=self.options.force) as T:
