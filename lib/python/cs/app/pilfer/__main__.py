@@ -775,18 +775,18 @@ class PilferCommand(BaseCommand):
       print(method, match_tags)
     print(flowstate.soup)
 
+  @popopts(f='Force: refresh the entity even if it is not stale.')
   def cmd_refresh(self, argv):
     ''' Usage: {cmd} entity...
           Refresh the specified entities by fetching and grokking their site pages.
     '''
     if not argv:
       raise GetoptError("missing entities")
-    for ent_spec in argv:
-      with Pfx("entity %r", ent_spec):
-        ent = SiteMap.by_db_key(ent_spec)
-        ent.printt()
-        ent.grok_sitepage(ent.sitepage_url)
-        ent.printt()
+    while argv:
+      ent = self.popentity(argv)
+      ent.printt()
+      ent.refresh(force=self.options.force)
+      ent.printt()
 
   @popopts(
       f=('force', 'Force overwrite of the RSS file if it already exists.'),
@@ -802,19 +802,8 @@ class PilferCommand(BaseCommand):
     entity_spec = argv.pop(0)
     if argv:
       raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
-    if '://' in entity_spec:
-      url = entity_spec
-      entity = pilfer.url_entity(url)
-      if entity is None:
-        raise GetoptError(
-            f'{entity_spec=} does not match a known SiteEntity subclass'
-        )
-      print(entity)
-    else:
-      entity = SiteMap.by_db_key(entity_spec)
-      url = entity.sitepage_url
-      print(f'{entity} -> {url}')
-    entity.grok_sitepage(url)
+    entity = self.popentity(argv)
+    entity.refresh()
     if not isinstance(entity, RSSChannelMixin):
       raise GetoptError(
           f'entity {entity} is not an instance of RSSChannelMixin'
