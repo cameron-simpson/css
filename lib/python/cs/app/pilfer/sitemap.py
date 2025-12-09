@@ -1231,26 +1231,61 @@ class SiteEntity(HasTags):
   def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' The basic sitepage grok: record the metadta.
     '''
-    self.tags.setdefault("_request", {}).setdefault("sitepage", {})[
-        flowstate.method] = {
-            "url": flowstate.url.url_s,
-            "request": {
-                hdr.lower(): value
-                for hdr, value in sorted(flowstate.request.headers.items())
-                if hdr.lower() != 'authorization'
-            },
-            "response": {
-                hdr.lower(): value
-                for hdr, value in sorted(flowstate.response.headers.items())
-            },
-        }
+    self._request_update(flowstate, page="sitepage")
     self.update_from_meta(flowstate)
     self.update(flowstate.opengraph_tags)
 
-  def _request(self, page="sitepage", *, method="GET"):
-    ''' Return the `self.tags["_request"][page][method]` entry, or `None`.
+  def _request(self, *, page="sitepage", method="GET"):
+    ''' Return the dict which caches the HTTP Response from the last request for `page`.
+
+        Note that just updating this dict does not reflect in the database.
+        Instead the `._request_update(flowstate)` method should be called.
     '''
-    return self.tags.get("_request", {}).get(page, {}).get(method)
+    return self.setdefault("_request",
+                           {}).setdefault(page, {}).setdefault(method, {})
+
+  def _request_update(
+      self, flowstate: FlowState, *, page="sitepage", method="GET"
+  ):
+    ''' Update the cached HTTP response information for `page` from `flowstate`.
+    '''
+    _request = self._request(page="sitepage", method=flowstate.method)
+    _request.update(
+        url=flowstate.url.url_s,
+        request={
+            hdr.lower(): value
+            for hdr, value in sorted(flowstate.request.headers.items())
+            if hdr.lower() != 'authorization'
+        },
+        response={
+            hdr.lower(): value
+            for hdr, value in sorted(flowstate.response.headers.items())
+        },
+    )
+    # update the database
+    self.tags.set('_request', self['_request'])
+
+  def rq_timestamp(self, *, page="sitepage", method="GET"):
+    ''' Return the cached HTTP Response `Date` field for `page` as a UNIX timestamp.
+    '''
+    http_date = self._request(
+        page=page, method=method
+    ).get("response", {}).get("date")
+    if http_date:
+      return datetime_from_http_date(http_date).timestamp()
+    return 0
+
+  @trace(retval=True)
+  def is_stale(
+      self, lifespan=STALE_LIFESPAN, *, page="sitepage", method="GET"
+  ):
+    ''' Test if the sitepage response timestamp is more than `lifespan` seconds older than `time.time()`.
+    '''
+    is_stale = time.time() - self.rq_timestamp(
+        page=page, method=method
+    ) > lifespan
+    if is_stale: breakpoint()
+    return is_stale
 
   def refresh(self, *, force=False, lifespan=STALE_LIFESPAN):
     ''' Refetch and reparse `self.sitepage_url` via `self.grok_sitepage()`
@@ -1259,23 +1294,6 @@ class SiteEntity(HasTags):
     if not force and not self.is_stale(lifespan):
       return
     self.grok_sitepage(self.sitepage_url)
-
-  def is_stale(self, lifespan, page="sitepage", method="GET"):
-    ''' Test if the sitepgae response timestamp is more than `lifespan` seconds older than `time.time()`.
-        This always returns `True` is there is no `"_request"` item.
-    '''
-    if "_request" not in self:
-      return True
-    return time.time() - self.rq_timestamp > lifespan
-
-  @property
-  def rq_timestamp(self):
-    ''' The HTTP Response `Date` field as a UNIX timestamp.
-    '''
-    http_date = self.get("_request", {}).get("response", {}).get("date")
-    if http_date:
-      return datetime_from_http_date(http_date).timestamp()
-    return 0
 
   @classmethod
   @promote
