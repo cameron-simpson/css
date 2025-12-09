@@ -177,11 +177,20 @@ class PilferCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError('missing site-entity')
-    entity_name = argv.pop(0)
-    try:
-      ent = SiteMap.by_db_key(entity_name)
-    except KeyError as e:
-      raise GetoptError(f'unrecognised {entity_name=}: {e}') from e
+    entity_spec = argv.pop(0)
+    if '://' in entity_spec:
+      # match a URL to an entity
+      ent = self.options.pilfer.url_entity(entity_spec)
+      if ent is None:
+        raise GetoptError(
+            f'{entity_spec=} does not match a known SiteEntity subclass'
+        )
+    else:
+      try:
+        ent = SiteMap.by_db_key(entity_spec)
+      except KeyError as e:
+        raise GetoptError(f'unrecognised {entity_spec=}: {e}') from e
+    return ent
 
   @staticmethod
   def get_argv_pipespec(argv, argv_offset=0):
