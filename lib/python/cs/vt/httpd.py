@@ -51,9 +51,15 @@ def StoreApp(name, *, S):
   ''' Factory method to create the app and attach routes.
   '''
   app = _StoreApp(name, S=S)
+  hashclass = S.hashclass
+  hashname = hashclass.hashname
 
-  @app.route('/h/<hashname>/<hashcode_s>')
-  def h(hashname, hashcode_s):
+  @app.route(f'/d/{hashname}:<hashcode_s>')
+  def d(hashcode_s):
+    raise NotImplemenetedError
+
+  @app.route(f'/h/{hashname}:<hashcode_s>')
+  def h(hashcode_s):
     ''' Return a direct hashcode block.
     '''
     try:
@@ -74,8 +80,8 @@ def StoreApp(name, *, S):
     rsp.headers.set('ETag', h.etag)
     return rsp
 
-  @app.route('/vt/i/<hashname>/<hashcode_s>')
-  def i(hashname, hashcode_s):
+  @app.route(f'/i/{hashname}:<hashcode_s>')
+  def i(hashcode_s):
     ''' Return an indirect hashcode block.
     '''
     try:
