@@ -80,14 +80,36 @@ def hexify(data):
 class Transcribable(Promotable):  ##, ABC):
   ''' Abstract base class for objects which can be transcribed.
 
-      Transcribables implement the following methods:
+      The core `cs.vt` ojects (`Block`s, `Dir`s etc) can all be transcribed
+      and parsed from their transcriptions.
+      The transcription is just `str(obj)`, and the parse is
+      `cls.parse(s)` for any `cls` which subclasses `Transcribable`.
+
+      `Transcribable`s are also `Promotable`, which in this case
+      means that an function decorated with `@promote` will accept
+      the text transcription of a `Transcribable`.
+
+      `Transcribable`s implement the following methods:
       * `str_inner(T)`: to transcribe the inner part of *prefix*`{`*inner*`}` as a string
       * `parse_inner(T,s,offset,*,stopchar='}',prefix=None)`:
         to parse an inner transcription of this class up to `stopchar`.
 
-      Optional attribute:
+      Optional class attribute:
       * `str_prefix`:
         the default prefix for the "prefix{....}" markers.
+
+      The usual transcription takes the form:
+
+          prefix{inner}
+
+      where *prefix* denotes the object type/class such as `H` for a hashcode
+      and the *inner* contains the details of the object.
+      Some basic Python types are transcribed more directly:
+      * `int`: using `str`
+      * `float`: using `'%f'`
+      * `str` and `dict`: using compact JSON
+      * `bool`: as a 1 or 0
+      * `bytes`: using `hexify()`
   '''
 
   __slots__ = ()
