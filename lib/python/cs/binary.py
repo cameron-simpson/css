@@ -243,7 +243,7 @@
     The transcription yields corresponding values.
 '''
 
-from abc import ABC, abstractmethod, abstractclassmethod
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from dataclasses import dataclass, fields
 from inspect import signature, Signature
@@ -529,15 +529,13 @@ class AbstractBinary(Promotable, ABC):
     ]
     return "%s(%s)" % (
         self.__class__.__name__,
-        ','.join(
-            ("%s=%s" % (attr, str_func(obj)) for attr, obj in attr_values)
-        ),
+        ','.join(f'{attr}={str_func(obj)}' for attr, obj in attr_values),
     )
 
   def __repr__(self):
     return "%s(%s)" % (
         self.__class__.__name__, ",".join(
-            "%s=%s:%s" % (attr, type(value).__name__, cropped_repr(value))
+            f'{attr}={type(value).__name__}:{cropped_repr(value)}'
             for attr, value in self.__dict__.items()
         )
     )
@@ -547,7 +545,8 @@ class AbstractBinary(Promotable, ABC):
     return self.__dict__.keys()
 
   # pylint: disable=deprecated-decorator
-  @abstractclassmethod
+  @classmethod
+  @abstractmethod
   def parse(cls, bfr: CornuCopyBuffer):
     ''' Parse an instance of `cls` from the buffer `bfr`.
     '''
@@ -1091,6 +1090,8 @@ class ListOfBinary(list, AbstractBinary):
     return self
 
   def transcribe(self):
+    ''' Transcribe by transcribing each item.
+    '''
     return self
 
 # TODO: can this just be ListOfBinary above?
@@ -1271,7 +1272,7 @@ def BinaryStruct(
           >>> UInt16BE.format
           '>H'
           >>> UInt16BE.struct   #doctest: +ELLIPSIS
-          <_struct.Struct object at ...>
+          Struct('>H')
           >>> field = UInt16BE.from_bytes(bytes((2,3)))
           >>> field
           UInt16BE('>H',value=515)
@@ -1376,12 +1377,7 @@ def BinaryStruct(
         '''
         if isinstance(obj, cls):
           return obj
-        return cls(
-            **{
-                field_name: item
-                for field_name, item in zip(field_names, obj)
-            }
-        )
+        return cls(**dict(zip(field_names, obj)))
 
   assert isinstance(struct_class, type)
   struct_class.__name__ = class_name
@@ -1549,7 +1545,7 @@ class BSUInt(BinarySingleValue, value_type=int):
 
   @staticmethod
   def decode_bytes(data, offset=0) -> Tuple[int, int]:
-    ''' Decode an extensible byte serialised unsigned `int` from `data` at `offset`.
+    r'''Decode an extensible byte serialised unsigned `int` from `data` at `offset`.
         Return value and new offset.
 
         Continuation octets have their high bit set.
@@ -1560,7 +1556,7 @@ class BSUInt(BinarySingleValue, value_type=int):
 
         Examples:
 
-            >>> BSUInt.decode_bytes(b'\\0')
+            >>> BSUInt.decode_bytes(b'\0')
             (0, 1)
 
         Note: there is of course the usual `AbstractBinary.parse_bytes`
@@ -1636,6 +1632,8 @@ class BSData(BinarySingleValue, value_type=Buffer):
 
   @classmethod
   def promote(cls, obj):
+    ''' Promote a buffer.
+    '''
     if isinstance(obj, cls):
       return obj
     if isinstance(obj, Buffer):
@@ -1749,7 +1747,7 @@ class _BinaryMultiValue_Base(SimpleBinary):
         cropped(
             ','.join(
                 [
-                    "%s=%s" % (k, cropped_repr(v, max_length=crop_length))
+                    f'{k}={cropped_repr(v, max_length=crop_length)}'
                     for k, v in sorted(self.__dict__.items())
                     if choose_name(k)
                 ]
@@ -1813,8 +1811,7 @@ class _BinaryMultiValue_Base(SimpleBinary):
         field = cls.FIELDS[field_name]
         value = field.parse(bfr)
         field_values[field_name] = value
-    self = cls(**field_values)
-    return self
+    return cls(**field_values)
 
   def parse_field(
       self, field_name: str, bfr: CornuCopyBuffer, **field_parse_kw

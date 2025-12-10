@@ -1,0 +1,1 @@
+New ClonedIterator class to provide a reiterable clone of an iterator.

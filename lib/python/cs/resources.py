@@ -32,7 +32,7 @@ from cs.result import CancellationError
 from cs.semantics import ClosedError, not_closed
 from cs.threads import ThreadState, HasThreadState, NRLock
 
-__version__ = '20250325-post'
+__version__ = '20250915-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -57,6 +57,13 @@ DISTINFO = {
         'typeguard',
     ],
 }
+
+@OBSOLETE('cs.semantics.not_closed')
+def not_closed(method):
+  ''' Obsolete shim for `cs.sendmatics.not_closed`
+  '''
+  from cs.semantics import not_closed
+  return not_closed(method)
 
 # pylint: disable=too-few-public-methods,too-many-instance-attributes
 if sys.version_info >= (3, 10):

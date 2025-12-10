@@ -25,7 +25,7 @@ venv_dir = $(TMPDIR)/venv--$(.F)--$(ARCH)
 venv_requirements = $./venv-requirements.txt
 venv_python = $(venv_dir)/bin/python
 venv_pip = $(venv_python) -m pip
-uv = env 'VIRTUAL_ENV=$(venv_dir)' $(base_python) -m uv
+venv_uv = env 'VIRTUAL_ENV=$(venv_dir)' $(venv_dir)/bin/uv
 
 srcdev = export 'ENV_DEV_DIR=$.'; . "$ENV_DEV_DIR/.env.sh"
 dev = env-dev -d $. -x
@@ -104,23 +104,30 @@ _setup:
     :make _tags _venv
 
 _venv:
-    set -uex \
-    [ -d $(venv_dir) ] || { \
-        : SKIP $(base_python) -m ensurepip \
-        $(base_pip) install -U pip wheel build uv \
-        $(uv) venv --python $(base_python) --seed $(venv_dir) \
-    }
-    uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
-    if grep -i '^ *[a-z]' $(venv_requirements) >"$$uv_reqs" \
-    then  $(trace) $(uv) pip install -p '$(venv_python)' -r "$$uv_reqs" \
-    fi
-    pip_reqs=$$TMPDIR/reqs-pip-$$$$.txt \
-    if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
-    then  $(trace) $(venv_pip) install -r "$$pip_reqs" \
-    fi
-    if [ -n "$${VENV_EXTRAS:-}" ] \
-    then  $(trace) $(uv) pip install -p '$(venv_python)' $$VENV_EXTRAS \
-    fi
+    @set -ue \
+     [ -d $(venv_dir) ] || { \
+        $(trace) $./bin/venv init '$(base_python)' $(venv_dir) \
+        $(trace) env VIRTUAL_ENV=$(venv_dir) $(venv_pip) install uv \
+        ##: SKIP $(base_python) -m ensurepip \
+        ##$(base_pip) install -U pip wheel build uv \
+        ##$(venv_uv) venv --python $(base_python) --seed $(venv_dir) \
+     }
+    @pip_reqs=$$TMPDIR/reqs-pip-$$$$.txt \
+     if grep -i '^ *[^a-z#]' $(venv_requirements) >"$$pip_reqs" \
+     then \
+      $(trace) $(venv_uv) pip install -r "$$pip_reqs" \
+      uv_reqs=$$TMPDIR/reqs-uv-$$$$.txt \
+      if grep -i '^ *[a-z]' $(venv_requirements) >"$$uv_reqs" \
+      then  $(trace) $(venv_uv) pip install -r "$$uv_reqs" \
+      fi \
+     else \
+      $(trace) $(venv_uv) pip install -r $(venv_requirements) \
+     fi
+    @[ -z "$${VENV_EXTRAS:-}" ] || \\
+       $(trace) $(venv_uv) pip install $$VENV_EXTRAS
+    case $$( uname -s ) in \
+      Darwin)   $(trace) $(venv_uv) pip install 'pyobjc[allbindings]' ;; \
+    esac
 
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)

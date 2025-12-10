@@ -47,7 +47,7 @@ class DirectHashCodeMapping(FilenameMapping):
   def deref(self, filename):
     ''' Dereference `filename` and return a `Block`.
     '''
-    return Block(hashcode=HashCode.from_filename(filename))
+    return Block(hashcode=HashCode.from_hash_based_filename(filename))
 
 class IndirectHashCodeMapping(FilenameMapping):
   ''' A `FilenameMapping` which maps hex hashcodes to `IndirectBlock`s.
@@ -56,7 +56,9 @@ class IndirectHashCodeMapping(FilenameMapping):
   def deref(self, filename):
     ''' Dereference `filename` and return an `IndirectBlock`.
     '''
-    return IndirectBlock.from_hashcode(HashCode.from_filename(filename))
+    return IndirectBlock.from_hashcode(
+        HashCode.from_hash_based_filename(filename)
+    )
 
 class DirMapping(FilenameMapping):
   ''' A `FilenameMapping` which maps hex hashcodes to `Dir`s
@@ -68,5 +70,7 @@ class DirMapping(FilenameMapping):
     '''
     return Dir(
         filename,
-        IndirectBlock.from_hashcode(HashCode.from_filename(filename))
+        IndirectBlock.from_hashcode(
+            HashCode.from_hash_based_filename(filename)
+        )
     )

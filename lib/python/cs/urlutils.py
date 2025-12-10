@@ -430,7 +430,16 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def basename(self):
+    ''' The URL basename.
+    '''
     return os.path.basename(self.path)
+
+  @property
+  @unattributable
+  def ext(self):
+    ''' The URL basename file extension, as from `os.path.splitext`.
+    '''
+    return os.path.splitext(self.basename)[1]
 
   def find_all(self, *a, **kw):
     ''' Convenience routine to call BeautifulSoup's .find_all() method.

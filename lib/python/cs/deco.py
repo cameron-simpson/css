@@ -18,7 +18,7 @@ import typing
 from cs.gimmicks import warning
 from cs.typingutils import is_optional
 
-__version__ = '20250601-post'
+__version__ = '20250914-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1017,10 +1017,10 @@ def promote(func, params=None, types=None):
             func.__module__,
         )
         continue
-      warning(
-          "@promote(%s): param %s: %r -> %r", func, param_name, annotation,
-          resolved
-      )
+      ##warning(
+      ##    "@promote(%s): param %s: str:%r -> %r", func, param_name, annotation,
+      ##    resolved
+      ##)
       annotation = resolved
     # recognise optional parameters and use their primary type
     optional = False

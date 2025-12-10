@@ -1215,7 +1215,7 @@ class Module:
     return self.DISTINFO.get('install_requires', [])
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  @cache
+  @cached_property
   @uses_runstate
   def problems(self, *, runstate=RunState):
     ''' Sanity check of this module.
@@ -1238,7 +1238,7 @@ class Module:
         pass
       else:
         problems.append(
-            f'name conflicts with {third_party_listpath}:{lineno}: {line!r}'
+            f'{self.name=} conflicts with {third_party_listpath=}:{lineno=}'
         )
     # see if this package has been marked "ok" as of a particular revision
     latest_ok_rev = self.pkg_tags.get('ok_revision')
@@ -1310,7 +1310,7 @@ class Module:
           runstate.raiseif()
           if not import_name.startswith(MODULE_PREFIX):
             continue
-          import_problems = self.modules[import_name].problems()
+          import_problems = self.modules[import_name].problems
           if import_problems:
             subproblems[import_name] = import_problems
     for required_name in sorted(self.requires):
@@ -1560,7 +1560,6 @@ class CSReleaseCommand(BaseCommand):
       except AttributeError:
         return False
 
-    verbose: bool = field(default_factory=stderr_isatty)
     colourise: bool = field(default_factory=stderr_isatty)
     pkg_tagsets: TagFile = field(
         default_factory=lambda:
@@ -1616,7 +1615,7 @@ class CSReleaseCommand(BaseCommand):
       with Pfx(pkg_name):
         status("...")
         pkg = options.modules[pkg_name]
-        problems = pkg.problems()
+        problems = pkg.problems
         status('')
         if problems:
           xit = 1
@@ -2011,7 +2010,7 @@ class CSReleaseCommand(BaseCommand):
             pkg = options.modules[pkg_name]
             pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
             if pypi_release is not None:
-              problems = pkg.problems()
+              problems = pkg.problems
               if not problems:
                 proxy.text = "ok"
               else:

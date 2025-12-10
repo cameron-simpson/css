@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Create, push, and discard a WIP branch for visibility.
+# - get the current diff, quit if empty
+# - stash, make new wip branch, patch, commit, push
+# - switch back, unstash, delete wip branch
+#
+# - Cameron Simpson <cs@cskk.id.au> 08nov2025
+#
+
+set -ue
+
+cmd=$0
+trace=
+[ -t 2 ] && trace=set-x
+
+tmppfx=${TMPDIR:-/tmp}/wip-$$
+trap 'set -x; rm -f "$tmppfx"*' 0 1 15
+
+diff=$tmppfx.diff
+$trace git diff >"$diff"
+
+# find modified files and untracked .py files
+for_wip=$( $trace git status --porcelain | $trace awk '$1 == "M" || ($1 == "??" && $2 ~ /\.py$/) { print $2 }' )
+[ -n "$for_wip" ] || {
+  echo "$cmd: nothing modified or extra" >&2
+  exit 1
+}
+mfok=1
+for mf in $for_wip
+do  [ -f "$mf" ] || {
+      echo "$cmd: modified/extra $mf: not a file?" >&2
+      mfok=
+    }
+done
+[ $mfok ] || exit 1
+
+branch=$( git branch --show-current )
+case "$branch" in
+  *:*)  echo "$cmd: cannot use a branch with a colon: $branch" >&2
+        exit 1
+        ;;
+esac
+wip_branch=WIP-$branch-noci
+
+if $trace git stash
+then
+  $trace git co -b "$wip_branch"
+  $trace patch -p1 <"$diff"
+  $trace git add $for_wip
+  $trace git commit -m "WIP for $branch as of `date`"
+  $trace git push --atomic --force origin "+$branch:refs/heads/$wip_branch"
+  $trace git co "$branch"
+  $trace git stash pop
+  $trace git branch -f -d "$wip_branch"
+fi

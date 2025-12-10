@@ -21,7 +21,7 @@ from typing import Tuple
 from cs.deco import OBSOLETE, Promotable, promote
 from cs.lex import get_chars, get_decimal, r, skipwhite
 
-__version__ = '20250601-post'
+__version__ = '20250915-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

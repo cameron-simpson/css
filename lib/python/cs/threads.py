@@ -284,8 +284,9 @@ class HasThreadState(ContextManagerMixin):
 
         The `HasThreadState.Thread` factory duplicates the current `Thread`'s
         `HasThreadState` current objects as current in the new `Thread`.
-        Additionally it enters the contexts of various objects using
-        `with obj` according to the `enter_objects` parameter.
+        Additionally, and optionally, it enters the contexts of
+        various objects using `with obj` according to the `enter_objects`
+        parameter.
 
         The value of the optional parameter `enter_objects` governs
         which objects have their context entered using `with obj`
@@ -294,7 +295,7 @@ class HasThreadState(ContextManagerMixin):
         - `False`: no object contexts are entered
         - `True`: all current `HasThreadState` object contexts will be entered
         - an iterable of objects whose contexts will be entered;
-          pass `()` to enter no objects
+          pass `()` (or `False` as above) to enter no objects
     '''
     cls = type(self)
     if enter_objects is None:

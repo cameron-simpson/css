@@ -3,11 +3,12 @@
 import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+import logging
 import os
 import os.path
 from os.path import expanduser
 from getopt import GetoptError
-from pprint import pformat
+from pprint import pformat, pprint
 import sys
 from typing import Iterable
 
@@ -21,8 +22,10 @@ from cs.lex import (
     cutprefix,
     cutsuffix,
     get_dotted_identifier,
+    get_identifier,
     is_identifier,
     printt,
+    s,
     skipwhite,
 )
 import cs.logutils
@@ -30,6 +33,7 @@ from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
+from cs.sqltags import SQLTagSet
 from cs.tagset import TagSet
 from cs.urlutils import URL
 
@@ -121,7 +125,7 @@ class PilferCommand(BaseCommand):
             'Flags which must be true for operation to continue.',
             lambda s: s.replace(',', ' ').split(),
         ),
-        load_cookies='Load the browser cookie state into the Pilfer seesion.',
+        load_cookies='Load the browser cookie state into the Pilfer session.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
@@ -241,31 +245,87 @@ class PilferCommand(BaseCommand):
             )
         )
 
-  @popopts(soup='Dump the page soup, normally omitted.')
+  @popopts
+  def cmd_dbshell(self, argv):
+    if argv:
+      raise GetoptError(f'extra arguments: {argv=}')
+    self.options.pilfer.dbshell()
+
+  @popopts(
+      content=(
+          'dump_content',
+          ''' Dump the page content, normally omitted.
+              Currently supports HTML (text/html) and JSON (application/json).
+          ''',
+      ),
+      no_redirects='Do not follow redirects.',
+  )
   def cmd_dump(self, argv):
-    ''' Usage: {cmd} URL
-          Fetch URL and dump information from it.
+    ''' Usage: {cmd} [METHOD] url [header:value...] [param=value...]
+          Fetch url and dump information from it.
     '''
+    options = self.options
+    P = options.pilfer
+    # optional leading METHOD
+    if argv and argv[0].isupper():
+      method = argv.pop(0)
+    else:
+      method = 'GET'
+    # url
     if not argv:
       raise GetoptError("missing URL")
     url = argv.pop(0)
+    # optional header:value
+    rqhdrs = {}
+    while argv:
+      name, offset = get_identifier(argv[0], extra='_-')
+      if not name or not name.startswith(':'):
+        # not a header
+        break
+      rqhdrs[name] = name[offset + 1:]
+      argv.pop(0)
+    # optional param=value
+    params = {}
+    while argv:
+      name, offset = get_identifier(argv[0], extra='_-')
+      if not name or not name.startswith('='):
+        # not a parameter
+        break
+      params[name] = name[offset + 1:]
+      argv.pop(0)
     if argv:
-      raise GetoptError(f'extra arguments after URL: {argv!r}')
-    print(url)
-    flowstate = FlowState(url=url)
-    flowstate.GET()  # implicit these days, but let's be overt about failure
-    if flowstate.response.status_code != 200:
-      warning("GET %s -> status_code %r", url, flowstate.response.status_code)
+      raise GetoptError(f'extra arguments after URL/headers/params: {argv!r}')
+    print(
+        method,
+        url,
+        *(f'{name}:{value}' for name, value in rqhdrs.items()),
+        *(f'{param}={value}' for param, value in params.items()),
+    )
+    rsp = P.request(
+        url,
+        method=method,
+        headers=rqhdrs,
+        params=(None if not params or method == 'POST' else params),
+        data=(None if not params or method != 'POST' else params),
+        allow_redirects=not options.no_redirects,
+    )
+    if rsp.status_code != 200:
+      warning("%s %s -> status_code %r", method, url, rsp.status_code)
+    flowstate = FlowState(
+        url=url,
+        request=rsp.request,
+        response=rsp,
+    )
     printt(
-        (
-            f'{flowstate.request.method} response {flowstate.response.status_code} headers:',
-        ),
-        *[
-            (f'  {key}', value) for key, value in sorted(
+        [
+            f'{flowstate.request.method} response {flowstate.response.status_code} headers:'
+        ],
+        *(
+            [f'  {key}', value] for key, value in sorted(
                 flowstate.response.headers.items(),
                 key=lambda kv: kv[0].lower()
             )
-        ],
+        ),
     )
     soup = flowstate.soup
     if soup is None:
@@ -331,45 +391,73 @@ class PilferCommand(BaseCommand):
         for k, v in grokked.items():
           table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
     printt(*table)
-    if soup is not None and self.options.soup:
+    if self.options.dump_content:
       print("Content:", flowstate.content_type)
-      table = []
-      q = ListQueue([('', soup.head), ('', soup.body)])
-      for indent, tag in q:
-        subindent = indent + '  '
-        # TODO: looks like commants are also NavigableStrings, intercept here
-        if isinstance(tag, NavigableString):
-          text = str(tag).strip()
-          if text:
-            table.append(('', text))
-          continue
-        if tag.name == 'script':
-          continue
-        # sorted copy of the attributes
-        attrs = dict(sorted(tag.attrs.items()))
-        label = tag.name
-        # pop off the id attribute if present, include in the label
-        try:
-          id_attr = attrs.pop('id')
-        except KeyError:
-          pass
+      if flowstate.content_type in ('text/html',):
+        soup = flowstate.soup
+        table = []
+        q = ListQueue([('', soup.head), ('', soup.body)])
+        for indent, tag in q:
+          subindent = indent + '  '
+          # TODO: looks like commants are also NavigableStrings, intercept here
+          if isinstance(tag, NavigableString):
+            text = str(tag).strip()
+            if text:
+              table.append(('', text))
+            continue
+          if tag.name == 'script':
+            continue
+          # sorted copy of the attributes
+          attrs = dict(sorted(tag.attrs.items()))
+          label = tag.name
+          # pop off the id attribute if present, include in the label
+          try:
+            id_attr = attrs.pop('id')
+          except KeyError:
+            pass
+          else:
+            label += f' #{id_attr}'
+          children = list(tag.children)
+          if not attrs and len(children) == 1 and isinstance(children[0],
+                                                             NavigableString):
+            desc = str(children[0].strip())
+          else:
+            desc = "\n".join(
+                f'{attr}={value!r}' for attr, value in attrs.items()
+            ) if attrs else ''
+            for index, subtag in enumerate(children):
+              q.insert(index, (subindent, subtag))
+          table.append((
+              f'{indent}{label}',
+              desc,
+          ))
+        printt(*table)
+      elif flowstate.content_type in ('application/json',):
+        jdata = flowstate.json
+        if isinstance(jdata, dict):
+          jkeys = list(jdata.keys())
+          if len(jkeys) == 0:
+            pprint(jdata)
+          elif len(jkeys) > 1:
+            printt(
+                ['{'],
+                *sorted(jdata.items()),
+                ['}'],
+            )
+          else:
+            jkey, = jkeys
+            printt(
+                [f'{{ {pformat(jkey)}'],
+                *(
+                    [f'    {pformat(k)}', v]
+                    for k, v in sorted(jdata[jkey].items())
+                ),
+                ['}'],
+            )
         else:
-          label += f' #{id_attr}'
-        children = list(tag.children)
-        if not attrs and len(children) == 1 and isinstance(children[0],
-                                                           NavigableString):
-          desc = str(children[0].strip())
-        else:
-          desc = "\n".join(
-              f'{attr}={value!r}' for attr, value in attrs.items()
-          ) if attrs else ''
-          for index, subtag in enumerate(children):
-            q.insert(index, (subindent, subtag))
-        table.append((
-            f'{indent}{label}',
-            desc,
-        ))
-      printt(*table)
+          pprint(jdata)
+      else:
+        warning("No content dump for %s.", flowstate.content_type)
 
   @popopts
   def cmd_from(self, argv):
@@ -441,15 +529,17 @@ class PilferCommand(BaseCommand):
               "\n".join(map(str, sorted(match_tags)))
           )
       )
-      if grokked is not None:
+      if grokked is None:
+        table.append(('    grokked =>', 'None'))
+      else:
+        if isinstance(grokked, SQLTagSet):
+          table.append(
+              ('    grokked =>', f'{grokked.sqltags}[{grokked.name}]')
+          )
+        else:
+          table.append(('    grokked =>', s(grokked)))
         for k, v in grokked.items():
-          try:
-            items = v.items()
-          except AttributeError:
-            table.append((f'    {k}', v))
-          else:
-            for i, (vk, vv) in enumerate(sorted(items)):
-              table.append([f'    {k}' if i == 0 else '', vk, vv])
+          table.append((f'      {k}', v))
     printt(*table)
 
   @popopts
@@ -477,16 +567,16 @@ class PilferCommand(BaseCommand):
           - a dotted name followed by a colon and another dotted subname,
             which specifies a callable object from an importable module
           Examples:
-            cache   The predefined "cache" action on its default hooks.
-            dump@requestheaders
-                    The predefined "dump" action on the "requestheaders" hook.
-            my.module:handler:3,x=4@requestheaders
-                    Call handler(3,hook_name,flow,x=4) from module my.module
-                    on the "requestheaders" hook.
+          - `cache`: the predefined "cache" action on its default hooks.
+          - `dump@requestheaders`: the predefined "dump" action on
+            the "requestheaders" hook.
+          - `my.module:handler:3,x=4@requestheaders`: call
+            `handler(3,hook_name,flow,x=4)` from module `my.module`
+            on the "requestheaders" hook.
           It is generally better to use named parameters in actions because
           it is easier to give them default values in the function.
     '''
-    from .mitm import (MITMAddon, run_proxy)
+    from .mitm import MITMAddon, run_proxy
     listen_host = DEFAULT_MITM_LISTEN_HOST
     listen_port = DEFAULT_MITM_LISTEN_PORT
     # leading optional @[host:]port
@@ -503,7 +593,7 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError('missing actions')
     bad_actions = False
-    mitm_addon = MITMAddon()
+    mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
     for action in argv:
       with Pfx("action %r", action):
         hook_names = None
@@ -580,7 +670,11 @@ class PilferCommand(BaseCommand):
           bad_actions = True
     if bad_actions:
       raise GetoptError("invalid action specifications")
-    asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
+    asyncio.run(run_proxy(
+        listen_host,
+        listen_port,
+        addon=mitm_addon,
+    ))
 
   def cmd_patch(self, argv):
     ''' Usage: {cmd} URL
@@ -598,12 +692,32 @@ class PilferCommand(BaseCommand):
       print(method, match_tags)
     print(flowstate.soup)
 
+  @popopts(p=('makedirs', 'Make required intermeditate directories.'))
+  def cmd_save(self, argv):
+    ''' Usage: {cmd} URL savepath
+          Save URL to the file savepath.
+    '''
+    try:
+      url_s, savepath = argv
+    except ValueError as e:
+      raise GetoptError(f'expected URL and savepath: {e}')
+    url = URL(url_s)
+    options = self.options
+    rsp = options.pilfer.save(url, savepath, makedirs=options.makedirs)
+    if options.verbose:
+      printt(
+          [f'GET {url.short} => {rsp.status_code}'],
+          *([f'  {hdr}', value] for hdr, value in rsp.headers.items()),
+      )
+
   def cmd_sitemap(self, argv):
-    ''' Usage: {cmd} [sitemap|domain [URL...]]
+    ''' Usage: {cmd} [sitemap|domain {{sitecmd [args...] | [URL...]}}]
           List or query the site maps from the config.
           With no arguments, list the sitemaps.
-          With a sitemap name (eg "docs"), list the sitemap.
-          WIth additional URLs, print the key for each URL.
+          With a sitemap name (eg "docs") and no further arguments, list the sitemap.
+          If a word follows the sitemap name, treat it as a subcommand of the sitemap.
+          Otherwise assume all remaining arguments are URLs and print the the key for
+          each URL.
     '''
     options = self.options
     P = options.pilfer
@@ -619,7 +733,6 @@ class PilferCommand(BaseCommand):
       return 0
     # use a particular sitemap
     map_name = argv.pop(0)
-    print("map_name", map_name)
     for domain_glob, sitemap in P.sitemaps:
       if map_name == sitemap.name:
         break
@@ -636,6 +749,18 @@ class PilferCommand(BaseCommand):
             ('  Format:', format_s),
         )
       return 0
+    # a subcommand?
+    argv0_ = argv[0].replace('-', '_')
+    if is_identifier(argv0_):
+      sitecmd = argv0_
+      argv.pop(0)
+      with Pfx(sitecmd):
+        try:
+          cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
+        except AttributeError:
+          raise GetoptError("unknown sitemap command")
+        with stackattrs(sitemap, options=self.options):
+          return cmdmethod(argv)
     # match URLs against the sitemap
     table = []
     for url in argv:

@@ -68,7 +68,7 @@ from cs.threads import ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20250325-post'
+__version__ = '20250728-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -88,6 +88,7 @@ DISTINFO = {
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
+        'cs.threads',
         'cs.upd',
         'cs.x',
     ],
@@ -485,26 +486,6 @@ class DebuggingThread(threading_Thread, DebugWrapper):
     _debug_threads.discard(self)
     return retval
 
-def trace_caller(func):
-  ''' Decorator to report the caller of a function when called.
-  '''
-
-  def subfunc(*a, **kw):
-    frame = caller()
-    D(
-        "CALL %s()<%s:%d> FROM %s()<%s:%d>",
-        func.__name__,
-        func.__code__.co_filename,
-        func.__code__.co_firstlineno,
-        frame.name,
-        frame.filename,
-        frame.lineno,
-    )
-    return func(*a, **kw)
-
-  subfunc.__name__ = "trace_caller/subfunc/" + func.__name__
-  return subfunc
-
 class TracingObject(Proxy):
 
   def __init__(self, other):
@@ -674,7 +655,6 @@ def trace(
       * `with_caller`: include the caller if this function, default `True`
       * `with_pfx`: include the current `Pfx` prefix, default `False`
   '''
-
   citation = funcname(func)  ## funccite(func)
   fmtv = pformat if use_pformat else cropped_repr
 
@@ -710,11 +690,16 @@ def trace(
         if xlog is X:
           xlog_kw['colour'] = 'white'  ## 'red'
         xlog(
-            "%sRAISE  %s => %s:%s at %gs",
+            "%sRAISE  %s => %s:%s\n"
+            "%s  at %s\n"
+            "%s  elapsed %gs",
             indent,
             log_cite,
             e.__class__.__name__,
             e,
+            indent,
+            e.__traceback__.tb_next.tb_frame,
+            indent,
             end_time - start_time,
             **xlog_kw,
         )
@@ -752,10 +737,16 @@ def trace(
               if xlog is X:
                 xlog_kw['colour'] = 'red'
               xlog(
-                  "%sRAISE  %s => %s at %gs",
+                  "%sRAISE  %s => %s:%s\n"
+                  "%s  at %s\n"
+                  "%s  elapsed %gs\n",
                   indent,
                   log_cite,
+                  e.__class__.__name__,
                   e,
+                  indent,
+                  e.__traceback__.tb_next.tb_frame,
+                  indent,
                   end_time - start_time,
                   **xlog_kw,
               )
@@ -776,9 +767,10 @@ def trace(
     else:
       if retval:
         xlog(
-            "%sRETURN %s => %s in %gs",
+            "%sRETURN %s => %s:%s in %gs",
             indent,  ##_trace_state.indent,
             log_cite,
+            result.__class__.__name__,
             fmtv(result),
             end_time - start_time,
         )

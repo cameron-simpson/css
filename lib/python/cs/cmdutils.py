@@ -45,7 +45,6 @@ from inspect import isclass
 from itertools import chain
 import os
 from os.path import basename
-from pprint import pformat
 import re
 # this enables readline support in the docmd stuff
 try:
@@ -81,7 +80,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20250531.1-post'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1093,8 +1092,8 @@ class BaseCommandOptions(HasThreadState):
 
 @decorator
 def popopts(cmd_method, **opt_specs_kw):
-  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`
-      and update `self.options`. This also updates the method's usage message.
+  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`,
+      updating `self.options`. This also updates the method's usage message.
 
       Example:
 
@@ -1384,6 +1383,7 @@ class BaseCommand:
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
+        subcmd = None
         try:
           main = self.main
         except AttributeError:
@@ -1393,11 +1393,7 @@ class BaseCommand:
         self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
-        subcmd = argv[0] if argv else None
-        if subcmd is not None and re.match(r'^[a-z][-_\w]*$', subcmd):
-          # looks like a subcommand name, take it
-          argv.pop(0)
-        else:
+        if not argv or not re.match(r'^[a-z][-_\w]*$', argv[0]):
           # not a command name, is there a default command?
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
@@ -1412,7 +1408,7 @@ class BaseCommand:
             if isinstance(default_argv, str):
               default_argv = [default_argv]
             argv = [*default_argv, *argv]
-          subcmd = argv.pop(0)
+        subcmd = argv.pop(0)
         try:
           subcommand = self.subcommand(subcmd)
         except KeyError:
@@ -1428,6 +1424,7 @@ class BaseCommand:
           with Pfx(subcmd):
             return subcommand(argv)
 
+        self.subcmd = subcmd
         self._argv = argv
         self._run = _run
     except GetoptError as e:
@@ -1958,27 +1955,29 @@ class BaseCommand:
           if k and not k.startswith('_')
       }
       local = pub_mapping(self.__dict__)
-      del local['options']
-      local.update(
-          {
-              f'options.{k}': v
-              for k, v in sorted(pub_mapping(options.__dict__).items())
-          }
-      )
       local.update(argv=argv, cmd=self.cmd, self=self)
     if banner is None:
-      vars_banner = indent(
-          "\n".join(
-              tabulate(
-                  *(
-                      [k, pformat(v, compact=True)]
-                      for k, v in sorted(local.items())
-                      if k and not k.startswith('_')
-                  )
-              )
+      banner_mapping = dict(local)
+      del banner_mapping['options']
+      banner_mapping.update(
+          {
+              f'options.{k}': v
+              for k, v in pub_mapping(options.__dict__).items()
+          }
+      )
+      del banner_mapping['self']
+      banner_mapping.update(
+          {
+              f'self.{k}': v
+              for k, v in pub_mapping(self.__dict__).items()
+          }
+      )
+      banner = "\n".join(
+          tabulate(
+              [f'{self.cmd} {self.subcmd}:'],
+              *([f'  {k}', v] for k, v in sorted(banner_mapping.items()))
           )
       )
-      banner = f'{self.cmd}\n\n{vars_banner}\n'
     try:
       # pylint: disable=import-outside-toplevel
       from bpython import embed

@@ -29,7 +29,7 @@ from cs.cmdutils import BaseCommand as CSBaseCommand
 from cs.gimmicks import warning
 from cs.lex import cutprefix, stripped_dedent
 
-__version__ = '20250609-post'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -255,7 +255,8 @@ def model_batches_qs(
       * `field_name`: default `'pk'`, the name of the field on which
         to order the batches
       * `after`: an optional field value - iteration commences
-        immediately after this value
+        immediately after this value; this may also be a `Model` instance,
+        in which case the value is obtained via `getattr(after,field_name)`
       * `chunk_size`: the maximum size of each chunk
       * `desc`: default `False`; if true then order the batches in
         descending order instead of ascending order
@@ -297,6 +298,8 @@ def model_batches_qs(
   if chunk_size <= 0:
     raise ValueError(f'{chunk_size=} must be > 0')
   ordering = f'-{field_name}' if desc else field_name
+  if isinstance(after, model):
+    after = getattr(after, field_name)
   after_condition = f'{field_name}__lt' if desc else f'{field_name}__gt'
   mgr = model.objects
   # initial batch

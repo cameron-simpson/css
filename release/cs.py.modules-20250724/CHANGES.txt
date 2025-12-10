@@ -1,0 +1,9 @@
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: fix resolution of relative imports
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: our simplistic parse reads docstrings as code, skip self import from examples
+lib/python/cs/py/modules.py: cs.py.modules: import_extra: fix warning incantation
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: module_name parameter not required, improvements to the relative import resolution logic
+lib/python/cs/py/modules.py: cs.py.modules: @pfx for import_module_name, drop pretence at Python 2 support, upgrade exception construction
+lib/python/cs/py/modules.py: merge pilfer ==> default: pilfer command, now with a working content cache
+lib/python/cs/py/modules.py: cs.py.modules: import_module_name: tweak exception message
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: skip names which are not dotted identifiers (they arrive from misparses)
+lib/python/cs/py/modules.py: cs.py.modules: docstring tweaks, an indent change

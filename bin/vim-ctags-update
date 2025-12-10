@@ -6,6 +6,5 @@
 #
 
 set -ue
-
-tags=$( ctags-update -- "$@" 2>/dev/null & )
+tags=$( ctags-update -- --append "$@" 2>/dev/null & )
 echo "set tags=$tags"

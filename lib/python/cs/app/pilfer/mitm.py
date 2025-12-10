@@ -4,11 +4,13 @@
 #
 
 import asyncio
-from collections import ChainMap, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import partial
 from inspect import isgeneratorfunction
+import logging
 import os
+from pprint import pprint
 from signal import SIGINT
 import sys
 from threading import Thread
@@ -17,7 +19,6 @@ from typing import Callable, Iterable, Optional
 from icontract import require
 from mitmproxy import http
 import mitmproxy.addons.dumper
-from mitmproxy.http import Request as MITMRequest, Response as MITMResponse
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
@@ -26,18 +27,19 @@ from typeguard import typechecked
 
 from cs.cmdutils import vprint
 from cs.context import stackattrs
-from cs.deco import attr, Promotable, promote
+from cs.deco import attr, Promotable, promote, uses_verbose
 from cs.fileutils import atomic_filename
 from cs.fs import shortpath
+from cs.fsm import CancellationError
 from cs.gimmicks import Buffer
-from cs.lex import printt
+from cs.lex import printt, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
-from cs.rfc2616 import content_encodings, content_length
+from cs.rfc2616 import content_encodings, content_length, content_type
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
@@ -282,6 +284,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   assert P is not None
   rq = flow.request
   url = URL(rq.url)
+  PR = partial(print, 'CACHED_FLOW', rq.method, url.short)
   if rq.method not in ('GET', 'HEAD'):
     ##PR(rq.method, "is not GET or HEAD")
     return
@@ -372,10 +375,63 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       )
       flow.from_cache = True
 
-@attr(default_hooks=('requestheaders', 'responseheaders', 'response'))
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
 @uses_pilfer
 @typechecked
-def dump_flow(hook_name, flow, *, P: Pilfer = None):
+def reject_flow(hook_name, flow, *, P: Pilfer, **reject_kw):
+  ''' Reject flows matching all of `reject_kw`.
+      If all the conditions specified by `reject_kw` are matched,
+      raise `MITMCancelActions` which the caller (`MITMAddon.call_hooks_for`)
+      uses to cancel application of following actions.
+  '''
+  assert P is not None
+  rq = flow.request
+  url = URL(rq.url)
+  PR = lambda *a: print(
+      'SELECT', hook_name, flow.request.method, url.short, *a
+  )
+  for attr, value in reject_kw.items():
+    r_value = r(value)
+    with Pfx("%s=%s", attr, r_value):
+      url_attr = getattr(url, attr)
+      if url_attr != value:
+        return
+  raise MITMCancelActions(f'reject_flow: URL:{url.short}) matches {reject_kw}')
+
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
+@uses_pilfer
+@typechecked
+def select_flow(hook_name, flow, *, P: Pilfer, **select_kw):
+  ''' Select flows matching all of `select_kw`.
+      Failue to match a condition raises `MITMCancelActions` which
+      the caller (`MITMAddon.call_hooks_for`) uses to cancel
+      application of following actions.
+  '''
+  assert P is not None
+  rq = flow.request
+  url = URL(rq.url)
+  PR = lambda *a: print(
+      'SELECT', hook_name, flow.request.method, url.short, *a
+  )
+  for attr, value in select_kw.items():
+    r_value = r(value)
+    with Pfx("%s=%s", attr, r_value):
+      url_attr = getattr(url, attr)
+      if url_attr != value:
+        raise MITMCancelActions(
+            f'select_flow: {attr}={r_value}: url.{attr}={r(url_attr)} does not match'
+        )
+
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
+@uses_pilfer
+@typechecked
+def dump_flow(hook_name, flow, *, P: Pilfer):
   ''' Dump request information: headers and query parameters.
   '''
   assert P is not None
@@ -415,6 +471,11 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
             ],
             indent="    ",
         )
+  if hook_name == 'request':
+    PR("  Request Content:", len(flow.request.content))
+    ct = content_type(flow.request.headers)
+    if ct and ct.content_type == 'application/json':
+      pprint(flow.request.json())
   if hook_name == 'responseheaders':
     print("  Response Headers:")
     printt(
@@ -422,7 +483,13 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
         indent="    ",
     )
   if hook_name == 'response':
-    PR("  Content:", len(flow.response.content))
+    PR("  Response Content:", len(flow.response.content))
+    flowstate = FlowState.from_Flow(flow)
+    if rq.method == "POST":
+      if flowstate.content_type == 'application/json':
+        pprint(flow.response.json)
+      else:
+        print(flow.response.content)
 
 @require(lambda flow: not flow.response.stream)
 @typechecked
@@ -583,10 +650,10 @@ def grok_flow(hook_name, flow, *, P: Pilfer = None):
     return
 
   def grok_stream(bss: Iterable[bytes]):
+    ''' Fetch stream content then call `Pilfer.grok`.
+    '''
     content_bs = b''.join(bss)
-    # TODO: consult the content_type_full for charset
-    flowstate.content = content_bs.decode('utf-8')
-    # update the flowstate.soup
+    flowstate.content = content_bs
     for _ in P.grok(flowstate):
       pass
 
@@ -618,7 +685,9 @@ class MITMHookAction(Promotable):
       'prefetch': prefetch_urls,
       'patch_soup': patch_soup,
       'print': print_rq,
+      'reject': reject_flow,
       'save': save_stream,
+      'select': select_flow,
   }
 
   action: Callable
@@ -669,13 +738,19 @@ class MITMHookAction(Promotable):
       return cls(action=obj)
     return super().promote(obj)
 
+class MITMCancelActions(CancellationError):
+  ''' The exception is raise to cancel the chain of actions
+      during the `MITMAddon.call_hook_for` method.
+  '''
+
 class MITMAddon:
   ''' A mitmproxy addon class which collects multiple actions per
       hook and calls each in order.
   '''
 
-  def __init__(self):
+  def __init__(self, logging_handlers=None):
     self.hook_map = defaultdict(list)
+    self.logging_handlers = logging_handlers
 
   @promote
   @typechecked
@@ -708,7 +783,17 @@ class MITMAddon:
       hook_actions = self.hook_map[hook_name]
       if not hook_actions:
         raise AttributeError(f'no actions for {hook_name=}')
-      return partial(self.call_hooks_for, hook_name)
+
+      def call_hooks(*a, **kw):
+        root_logger = logging.getLogger()
+        with stackattrs(
+            root_logger,
+            handlers=(root_logger.handlers if self.logging_handlers is None
+                      else list(self.logging_handlers)),
+        ):
+          self.call_hooks_for(hook_name, *a, **kw)
+
+      return call_hooks
 
   def load(self, loader):
     loader.add_option(
@@ -749,12 +834,17 @@ class MITMAddon:
     if flow.runstate.running:
       flow.runstate.stop()
 
-  @pfx_method
-  def call_hooks_for(self, hook_name: str, flow, *mitm_hook_a, **mitm_hook_kw):
+  @uses_verbose
+  def call_hooks_for(
+      self, hook_name: str, flow, *mitm_hook_a, verbose: bool, **mitm_hook_kw
+  ):
     ''' This calls all the actions for the specified `hook_name`.
     '''
-    url = URL(flow.request.url)
-    PR = lambda *a, **kw: print("call_hooks_for", hook_name, *a, **kw)
+    rq = flow.request
+    url = URL(rq.url)
+    PR = lambda *a, **kw: print(
+        "call_hooks_for", hook_name, rq.method, url.short, *a, **kw
+    )
     ##PR("URL", flow.request.method, url.short)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
@@ -764,6 +854,7 @@ class MITMAddon:
     prep_excs = []
     # for collating any .stream functions during responseheaders
     stream_funcs = [] if hook_name == 'responseheaders' else None
+    cancelled = False
     for i, (
         action,
         action_args,
@@ -792,6 +883,10 @@ class MITMAddon:
             **action_kwargs,
             **mitm_hook_kw,
         )
+      except MITMCancelActions as e:
+        if verbose:
+          PR("cancelling further actions:", e._)
+        cancelled = True
       except Exception as e:
         warning("exception calling hook_action[%d]: %s", i, e)
         prep_excs.append(e)
@@ -806,6 +901,9 @@ class MITMAddon:
           if stream:
             stream_funcs.append(stream)
           flow.response.stream = stream0
+      # perform no further actions is we got a MITMCancelActions
+      if cancelled:
+        break
     if stream_funcs:
       # After the actions have run, define the stream attribute
       # to run whatever stream functions were applied.
@@ -877,6 +975,10 @@ async def run_proxy(
     runstate: RunState,
     P: Pilfer,
 ):
+  ''' Asynchronous function to run a `mitmproxy.tools.dump.DumpMaster`
+      proxy, listening on `listen_host:listen_port` and processing flows
+      via the actions in `addon`.
+  '''
   opts = Options(
       listen_host=listen_host,
       listen_port=listen_port,
@@ -905,14 +1007,19 @@ async def run_proxy(
     loop.add_signal_handler(SIGINT, runstate.cancel)
     # Hold the root Pilfer open.
     with P:
-      try:
-        prefetcher = URLFetcher(pilfer=P)
-        with prefetcher as worker_task:
-          with stackattrs(P.state, prefetcher=prefetcher):
-            await proxy.run()  # Run inside the event loop
-        await worker_task
-      finally:
-        loop.remove_signal_handler(SIGINT)
-        vprint("Stopping mitmproxy.")
-        proxy.shutdown()
-        runstate.fsm_callback_discard('STOPPING', on_cancel)
+      # by default, requests through the Pilfer use this mitm proxy
+      with stackattrs(P.session, proxies=dict(
+          http=f'{listen_host}:{listen_port}',
+          https=f'{listen_host}:{listen_port}',
+      )):
+        try:
+          prefetcher = URLFetcher(pilfer=P)
+          with prefetcher as worker_task:
+            with stackattrs(P.state, prefetcher=prefetcher):
+              await proxy.run()  # Run inside the event loop
+          await worker_task
+        finally:
+          loop.remove_signal_handler(SIGINT)
+          vprint("Stopping mitmproxy.")
+          proxy.shutdown()
+          runstate.fsm_callback_discard('STOPPING', on_cancel)

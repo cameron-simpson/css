@@ -61,7 +61,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20250613-post'
+__version__ = '20250914-post'
 
 DISTINFO = {
     'description':
@@ -612,13 +612,13 @@ def PfxThread(target, **kw):
   return HasThreadState.Thread(target=PfxThread_run, **kw)
 
 @decorator
-def pfx(func, message=None, message_args=()):
+def pfx(func, message=None, *message_args):
   ''' General purpose @pfx for generators, methods etc.
 
       Parameters:
       * `func`: the function or generator function to decorate
       * `message`: optional prefix to use instead of the function name
-      * `message_args`: optional arguments to embed in the preifx using `%`
+      * `message_args`: optional arguments to embed in the prefix using `%`
 
       Example usage:
 
@@ -630,51 +630,62 @@ def pfx(func, message=None, message_args=()):
   if message is None:
     if message_args:
       raise ValueError("no message, but message_args=%r" % (message_args,))
+    message = fname
+
+  def make_message_args(*a, **kw):
+    ''' Compute the message args to use inside the called function.
+    '''
+    return [
+        a[ma] if isinstance(ma, int) else
+        kw[ma] if isinstance(ma, str) else "%s:%r" %
+        (ma.__class__.__name__, repr(ma)) for ma in message_args
+    ]
 
   if isgeneratorfunction(func):
+    # a generator function must stash any Pfx state from the generator as it runs
 
-    # persistent in-generator stack to be reused across calls to
-    # the context manager
-    saved_stack = []
-    if message is None:
-      message = funcname
-
-    @contextdecorator
-    def cmgrdeco(func, a, kw):
-      ''' Context manager to note the entry `Pfx` stack height, append saved
-          `Pfx` stack from earlier run, then after the iteration step save the
-          top of the `Pfx` stack for next time.
-      '''
+    def pfx_generator_wrapper(*a, **kw):
+      # obtain the generator from the generator function
+      gen = pfx_call(func, *a, **kw)
+      if message is None:
+        pfxf, pfxav = func_a_kw_fmt(func, *a, **kw)
+      else:
+        pfxf = message
+        pfxav = make_message_args(*a, **kw)
       pfx_stack = Pfx._state.stack
-      height = len(pfx_stack)
-      pfx_stack.extend(saved_stack)
-      with Pfx(message, *message_args):
-        yield
-      saved_stack[:] = pfx_stack[height:]
-      pfx_stack[height:] = []
+      gen_pfx_stack = []
+      while True:
+        # note the height of the Pfx stackwithout the generator's tsack
+        height = len(pfx_stack)
+        # add on the generator's stack from before
+        pfx_stack.extend(gen_pfx_stack)
+        try:
+          with Pfx(pfxf, *pfxav):
+            result = next(gen)
+        except StopIteration:
+          break
+        finally:
+          # stash the in-generator Pfx stack
+          gen_pfx_stack = pfx_stack[height:]
+          # restore to how it was
+          pfx_stack[height:] = []
+        yield result
 
-    wrapper = cmgrdeco(func)
+    return pfx_generator_wrapper
 
-  else:
+  # TODO: async functions? much like generators?
 
+  # an ordinary function
+  def pfx_function_wrapper(*a, **kw):
     if message is None:
-
-      def wrapper(*a, **kw):
-        ''' Run function inside `Pfx` context manager.
-        '''
-        return pfx_call(func, *a, **kw)
-
+      pfxf, pfxav = func_a_kw_fmt(func, *a, **kw)
     else:
+      pfxf = message
+      pfxav = make_message_args(*a, **kw)
+    with Pfx(pfxf, *pfxav):
+      return func(*a, **kw)
 
-      def wrapper(*a, **kw):
-        ''' Run function inside `Pfx` context manager.
-        '''
-        with Pfx(message, *message_args):
-          return func(*a, **kw)
-
-  wrapper.__name__ = "@pfx(%s)" % (fname,)
-  wrapper.__doc__ = func.__doc__
-  return wrapper
+  return pfx_function_wrapper
 
 @decorator
 def pfx_method(method, use_str=False, with_args=False):
@@ -711,7 +722,6 @@ def pfx_method(method, use_str=False, with_args=False):
               def foo3(self, a, b, c, *, x=1, y):
                   ....
   '''
-
   fname = getattr(method, '__name__', repr(method))
 
   def pfx_method_wrapper(self, *a, **kw):
