@@ -46,10 +46,11 @@ class _StoreApp(Flask, RunStateMixin):
       with self.store:
         super().run(*a, **kw)
 
-def StoreApp(name, S):
+@uses_Store
+def StoreApp(name, *, S):
   ''' Factory method to create the app and attach routes.
   '''
-  app = _StoreApp(name, S)
+  app = _StoreApp(name, S=S)
 
   @app.route('/h/<hashname>/<hashcode_s>')
   def h(hashname, hashcode_s):
