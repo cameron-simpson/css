@@ -1,3 +1,4 @@
+actual async support?
 adler32 can be had from the zlib stdlib module
 cs.vt.DEFAULT_BASEDIR: base off the xdg stuff
 we can mmap a bloom filter as a bitmap in a file
