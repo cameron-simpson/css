@@ -98,7 +98,7 @@ def StoreApp(name, *, S):
     rsp = Response(IB.datafrom(start=start))
     rsp.headers.set('Content-Type', 'application/octet-stream')
     rsp.headers.set('Content-Length', str(length))
-    rsp.headers.set('ETag', '"VTI:' + h.bare_etag) + '"'
+    rsp.headers.set('ETag', '"vti:{h.bare_etag}"')
     return rsp
 
   return app
