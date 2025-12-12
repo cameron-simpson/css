@@ -711,7 +711,8 @@ def trace(
             e.__class__.__name__,
             e,
             indent,
-            e.__traceback__.tb_next.tb_frame,
+            e.__traceback__.tb_next.tb_frame
+            if e.__traceback__.tb_next else None,
             indent,
             end_time - start_time,
             **xlog_kw,
