@@ -588,6 +588,8 @@ class DataDirStore(MappingStore):
         * `rollover`: passed to the data dir
         * `lock`: optional `RLock`, passed to the `DataDir` mapping
     '''
+    if hashclass is None:
+      hashclass = Store.get_default_hashclass()
     if lock is None:
       lock = RLock()
     self._lock = lock
