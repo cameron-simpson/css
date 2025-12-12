@@ -239,8 +239,8 @@ class Transcribable(Promotable):  ##, ABC):
     return ','.join(tokens)
 
   @classmethod
-  @typechecked  # TODO: remove, too expensive for final use
   @pfx_method
+  @typechecked  # TODO: remove, too expensive for final use
   def parse(
       cls,
       src: str | CornuCopyBuffer,
