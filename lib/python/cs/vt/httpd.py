@@ -6,7 +6,8 @@
 import os
 import sys
 from flask import (
-    Flask, render_template, request, session as flask_session, jsonify, abort
+    Flask, Response, render_template, request, session as flask_session,
+    jsonify, abort
 )
 
 from cs.logutils import warning
@@ -56,7 +57,7 @@ def StoreApp(name, *, S):
 
   @app.route(f'/d/{hashname}:<hashcode_s>')
   def d(hashcode_s):
-    raise NotImplemenetedError
+    raise NotImplementedError
 
   @app.route(f'/h/{hashname}:<hashcode_s>')
   def h(hashcode_s):

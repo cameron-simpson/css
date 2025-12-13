@@ -345,7 +345,7 @@ class VTCmd(BaseCommand):
                 else:
                   # open the default Store
                   if options.store_spec is None:
-                    if cmd == "serve":
+                    if subcmd == "serve":
                       options.store_spec = '[server]'
                   S = options.store
                   with S:
