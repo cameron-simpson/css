@@ -1242,7 +1242,7 @@ class Box(SimpleBinary):
           )
       )
     elif box_type == 'free':
-      table.tappend((f'{indent}Free space', geek(len(self))))
+      table.append((f'{indent}Free space', geek(len(self))))
     elif box_type == 'mdat':
       table.append((f'{indent}Media data', geek(len(self.body))))
     elif box_type == 'moov':
