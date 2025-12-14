@@ -2061,10 +2061,8 @@ class ELSTBoxBody(FullBoxBody):
     '''
     super().parse_fields(bfr)
     assert self.version in (0, 1)
-    self.parse_field('entry_count', bfr, UInt32BE)
-    self.entries = list(
-        self.entry_class.scan(bfr, count=self.entry_count.value)
-    )
+    entry_count = UInt32BE.parse_value(bfr)
+    self.entries = list(self.entry_class.scan(bfr, count=entry_count))
 
   def transcribe(self):
     ''' Transcribe an `ELSTBoxBody`.
