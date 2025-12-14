@@ -6,7 +6,8 @@
 import os
 import sys
 from flask import (
-    Flask, render_template, request, session as flask_session, jsonify, abort
+    Flask, Response, render_template, request, session as flask_session,
+    jsonify, abort
 )
 
 from cs.logutils import warning
@@ -46,13 +47,20 @@ class _StoreApp(Flask, RunStateMixin):
       with self.store:
         super().run(*a, **kw)
 
-def StoreApp(name, S):
+@uses_Store
+def StoreApp(name, *, S):
   ''' Factory method to create the app and attach routes.
   '''
-  app = _StoreApp(name, S)
+  app = _StoreApp(name, S=S)
+  hashclass = S.hashclass
+  hashname = hashclass.hashname
 
-  @app.route('/h/<hashname>/<hashcode_s>')
-  def h(hashname, hashcode_s):
+  @app.route(f'/d/{hashname}:<hashcode_s>')
+  def d(hashcode_s):
+    raise NotImplementedError
+
+  @app.route(f'/h/{hashname}:<hashcode_s>')
+  def h(hashcode_s):
     ''' Return a direct hashcode block.
     '''
     try:
@@ -73,8 +81,8 @@ def StoreApp(name, S):
     rsp.headers.set('ETag', h.etag)
     return rsp
 
-  @app.route('/vt/i/<hashname>/<hashcode_s>')
-  def i(hashname, hashcode_s):
+  @app.route(f'/i/{hashname}:<hashcode_s>')
+  def i(hashcode_s):
     ''' Return an indirect hashcode block.
     '''
     try:
@@ -91,7 +99,7 @@ def StoreApp(name, S):
     rsp = Response(IB.datafrom(start=start))
     rsp.headers.set('Content-Type', 'application/octet-stream')
     rsp.headers.set('Content-Length', str(length))
-    rsp.headers.set('ETag', '"VTI:' + h.bare_etag) + '"'
+    rsp.headers.set('ETag', '"vti:{h.bare_etag}"')
     return rsp
 
   return app

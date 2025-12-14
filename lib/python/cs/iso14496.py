@@ -15,7 +15,7 @@ ISO make the standard available here:
 from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import closing, contextmanager
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from functools import cached_property
 from getopt import GetoptError
 import os
@@ -521,7 +521,7 @@ class TimeStampMixin:
                       0xfffffffffffffffe, 0xffffffffffffffff):
       return None
     try:
-      dt = pfx_call(datetime.fromtimestamp, self.value, UTC)
+      dt = pfx_call(datetime.fromtimestamp, self.value, timezone.utc)
     except (OverflowError, OSError) as e:
       warning("%s.datetime: returning None", type(self).__name__, e)
       return None

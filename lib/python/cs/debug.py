@@ -29,6 +29,7 @@ The allowed names are the list `cs.debug.__all__` and include:
 '''
 
 from __future__ import print_function
+import builtins
 from cmd import Cmd
 from contextlib import redirect_stdout
 import inspect
@@ -643,6 +644,8 @@ def trace(
     with_caller=True,
     with_pfx=False,
     xlog=None,
+    verbose=False,
+    breakpoint=False,
 ):
   ''' Decorator to report the call and return of a function.
 
@@ -677,9 +680,19 @@ def trace(
     indent = _trace_state.indent
     if call:
       fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL   " + fmt, old_indent, *av)
+      if verbose and (a or kw):
+        xlog("%sCALL   %s(", old_indent, log_cite)
+        for arg in a:
+          xlog("%s         %s,", old_indent, r(arg, None))
+        for kwname, kwarg in kw.items():
+          xlog("%s         %s=%s,", old_indent, kwname, r(kwarg, None))
+        xlog("%s       )", old_indent)
+      else:
+        xlog("%sCALL   " + fmt, old_indent, *av)
       if with_caller:
         xlog("%sFROM %s", indent, caller(-4))
+      if breakpoint:
+        breakpoint() if callable(breakpoint) else builtins.breakpoint()
     start_time = time.time()
     try:
       result = func(*a, **kw)
@@ -698,7 +711,8 @@ def trace(
             e.__class__.__name__,
             e,
             indent,
-            e.__traceback__.tb_next.tb_frame,
+            e.__traceback__.tb_next.tb_frame
+            if e.__traceback__.tb_next else None,
             indent,
             end_time - start_time,
             **xlog_kw,

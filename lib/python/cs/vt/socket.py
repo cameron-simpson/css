@@ -177,7 +177,7 @@ class TCPClientStore(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
   '''
 
-  def __init__(self, name, bind_addr, on_demand=True, **streamstore_kw):
+  def __init__(self, name, bind_addr, addif=True, on_demand=True, **streamstore_kw):
     if name is None:
       name = "%s(bind_addr=%r)" % (self.__class__.__name__, bind_addr)
     self.sock_bind_addr = bind_addr
@@ -185,6 +185,7 @@ class TCPClientStore(StreamStore):
         self,
         name,
         self._tcp_client_connect,
+        addif=addif,
         on_demand=on_demand,
         **streamstore_kw,
     )

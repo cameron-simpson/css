@@ -251,7 +251,7 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
       release_version = pkg.release_with_features(feature_set)
       if release_version is None:
         raise ValueError(
-            "no release version satifying feature set %r" % (feature_set,)
+            f'no release version satifying feature set {feature_set!r}'
         )
       release_versions.add(release_version)
     if not release_versions:
@@ -259,15 +259,14 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
     if self.op == '=':
       if len(release_versions) > 1:
         raise ValueError(
-            "conflicting release versions for %r: %r" %
-            (self.op, release_versions)
+            f'conflicting release versions for {self.op!r}: {release_versions!r}'
         )
       release_version = release_versions.pop()
     elif self.op == '>=':
       # the release versions are minima: pick their maximum
       release_version = max(release_versions)
     else:
-      raise RuntimeError("onimplemenented op %r" % (self.op,))
+      raise RuntimeError(f'unimplemented op {self.op!r}')
     return ''.join((self.module_name, self.op, release_version))
 
 def release_tags(vcs):

@@ -16,7 +16,7 @@ from cs.pfx import Pfx
 
 from . import PATHSEP
 from .dir import _Dirent
-from .transcribe import Transcriber
+from .transcribe import Transcribable
 
 class Control:
   ''' Command line interface to perform operations on Dirents.
@@ -62,7 +62,7 @@ class Control:
     if argv:
       raise GetoptError("extra arguments after dirent_spec: %r" % (argv,))
     try:
-      E = Transcriber.parse(dirent_spec)
+      E = Transcribable.parse(dirent_spec)
     except ValueError as e:
       raise GetoptError("parse failure: %r: %s" % (dirent_spec, e)) from e
     if not isinstance(E, _Dirent):

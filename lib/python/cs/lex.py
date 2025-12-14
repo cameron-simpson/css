@@ -164,6 +164,7 @@ def tabpadding(padlen: int, tabsize: int = 8, offset: int = 0) -> str:
 
 def typed_str(
     obj: Any,
+    *,
     use_cls: bool = False,
     use_repr: bool = False,
     max_length: Optional[int] = 32,
