@@ -3,7 +3,6 @@
 ''' Unit tests for cs.iso14496.
 '''
 
-from __future__ import print_function
 import sys
 import os
 import os.path
@@ -30,7 +29,6 @@ class Test_iso14496(unittest.TestCase):
       nboxes += 1
       print(box.box_type_s)
     self.assertEqual(box.end_offset, mp4_size)
-    breakpoint()
 
 class TestISO14496BinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Test the `PacketField`s in `cs.iso14496`.

@@ -109,6 +109,14 @@ class Decomposed(list):
     '''
     return int(self.sum())
 
+  def __getitem__(self, index):
+    ''' Index this `Decomposed`; returns a new `Decomposed` if the index is a slice.
+    '''
+    indexed = super().__getitem__(index)
+    if isinstance(index, slice):
+      indexed = self.__class__(indexed)
+    return indexed
+
 class UnitScale(Promotable):
   ''' A representation of a unit scale as a list of unit terms and scale factors.
   '''
