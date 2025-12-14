@@ -2139,11 +2139,18 @@ def binclass(cls, kw_only=True):
     except KeyError:
       method = func
       method._desc = f'BinClass:{name0}.{methodname} from BinClass for {cls.__name__}'
+    else:
+      if isinstance(method, classmethod):
+        method0 = method
+
+        def method(mcls, *a, **kw):
+          return method0.__wrapped__(mcls, *a, **kw)
+
     return method
 
   class BinClass(cls, AbstractBinary):
     ''' The wrapper class for the `@binclass` class.
-        This subclasses `cls` so a to inherit its methods.
+        This subclasses `cls` so as to inherit its methods.
     '''
 
     # the class being wrapped
