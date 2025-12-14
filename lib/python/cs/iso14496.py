@@ -12,7 +12,7 @@ ISO make the standard available here:
 * [zip file download](http://standards.iso.org/ittf/PubliclyAvailableStandards/c068960_ISO_IEC_14496-12_2015.zip)
 '''
 
-from base64 import b64encode, b64decode
+from base64 import b64decode
 from collections import namedtuple
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
@@ -43,7 +43,6 @@ from cs.binary import (
     BinarySingleValue,
     ListOfBinary,
     binclass,
-    is_single_value,
     parse_offsets,
     pt_spec,
 )
@@ -52,8 +51,6 @@ from cs.cmdutils import BaseCommand, popopts
 from cs.deco import decorator
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
-from cs.gimmicks import Buffer
-from cs.imageutils import sixel_from_image_bytes
 from cs.lex import (
     cropped_repr,
     cutsuffix,
