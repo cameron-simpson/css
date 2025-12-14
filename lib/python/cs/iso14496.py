@@ -2809,41 +2809,41 @@ class ILSTBoxBody(ContainerBoxBody):
               attribute_name = f'{mean_box.text}.{name_box.text}'
               setattr(subbox, attribute_name, value)
               tags.add(attribute_name, value)
-        # single data box
-        elif not inner_boxes:
-          warning("no inner boxes, expected 1 data box")
-        else:
-          data_box, = inner_boxes
-          with data_box.reparse_buffer() as databfr:
-            data_box.parse_field('_n1', databfr, UInt32BE)
-            data_box.parse_field('_n2', databfr, UInt32BE)
-            subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
-            if subbox_schema is None:
-              # no specific schema, just stash the bytes
-              bs = databfr.take(...)
-              warning("no schema, stashing bytes %s", cropped_repr(bs))
-              subbox.add_field(f'subbox__{subbox_type.decode("ascii")}', bs)
-            else:
-              attribute_name, binary_cls = subbox_schema
-              with Pfx("%s:%s", attribute_name, binary_cls):
-                try:
-                  subbox.parse_field(attribute_name, databfr, binary_cls)
-                except (ValueError, TypeError) as e:
-                  warning("decode fails: %s", e)
-                else:
-                  data_attr = getattr(subbox, attribute_name)
-                  tag_value = data_attr.value if is_single_value(
-                      data_attr
-                  ) else data_attr
-                if isinstance(tag_value, bytes):
-                  # record bytes in base64 in the Tag
-                  tag_value = b64encode(tag_value).decode('ascii')
-                setattr(subbox, 'attribute_name', attribute_name)
-                setattr(subbox, attribute_name, tag_value)
-        # Any trailing Boxes.
-        if data_boxes:
-          subbox.add_field('extra_boxes', data_boxes)
-          warning("%d unexpected extra boxes: %r", len(data_boxes), data_boxes)
+        ### single data box
+        ##elif not inner_boxes:
+        ##  warning("no inner boxes, expected 1 data box")
+        ##else:
+        ##  data_box, = inner_boxes
+        ##  with data_box.reparse_buffer() as databfr:
+        ##    data_box.parse_field('_n1', databfr, UInt32BE)
+        ##    data_box.parse_field('_n2', databfr, UInt32BE)
+        ##    subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
+        ##    if subbox_schema is None:
+        ##      # no specific schema, just stash the bytes
+        ##      bs = databfr.take(...)
+        ##      warning("no schema, stashing bytes %s", cropped_repr(bs))
+        ##      subbox.add_field(f'subbox__{subbox_type.decode("ascii")}', bs)
+        ##    else:
+        ##      attribute_name, binary_cls = subbox_schema
+        ##      with Pfx("%s:%s", attribute_name, binary_cls):
+        ##        try:
+        ##          subbox.parse_field(attribute_name, databfr, binary_cls)
+        ##        except (ValueError, TypeError) as e:
+        ##          warning("decode fails: %s", e)
+        ##        else:
+        ##          data_attr = getattr(subbox, attribute_name)
+        ##          tag_value = data_attr.value if is_single_value(
+        ##              data_attr
+        ##          ) else data_attr
+        ##        if isinstance(tag_value, bytes):
+        ##          # record bytes in base64 in the Tag
+        ##          tag_value = b64encode(tag_value).decode('ascii')
+        ##        setattr(subbox, 'attribute_name', attribute_name)
+        ##        setattr(subbox, attribute_name, tag_value)
+        ### Any trailing Boxes.
+        ##if data_boxes:
+        ##  subbox.add_field('extra_boxes', data_boxes)
+        ##  warning("%d unexpected extra boxes: %r", len(data_boxes), data_boxes)
     return dict(boxes=subboxes)
 
   def __getattr__(self, attr):
