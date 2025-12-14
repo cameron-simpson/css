@@ -1160,7 +1160,6 @@ class Box(SimpleBinary):
       dump_fields=False,
       dump_offsets=False,
       recurse=False,
-      file=None
   ) -> List[Tuple[str, str]]:
     ''' Dump this `Box` as a table of descriptions.
         Return a list of `(title,description)` 2-tuples
@@ -2801,9 +2800,10 @@ class ILSTBoxBody(ContainerBoxBody):
                   "data_boxes[%d].box_type is not b'data': got %r", i,
                   data_box.box_type
               )
+              value = value.value
               decoder = subsubbox_schema.get(name_box.text.value)
               if decoder is not None:
-                value = decoder(value.value)
+                value = decoder(value)
               # annotate the subbox and the ilst
               attribute_name = f'{mean_box.text}.{name_box.text}'
               setattr(subbox, attribute_name, value)
