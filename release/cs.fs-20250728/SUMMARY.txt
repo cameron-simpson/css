@@ -1,0 +1,2 @@
+remove_protecting: truncate the portion of the basename in the temp file prefix, can blow the filesystem limit.
+shortpath: cope if there is no pwd.getpwuid function (nonUNIX).

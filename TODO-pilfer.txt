@@ -1,3 +1,16 @@
+SQLTags.preload still seems to do a per entity SQL query
+pilfer rss subcommand
+SiteMap.updated_entities: can we set start_time to just before the request is dispatched?
+common format-shaped pattern to make @on regeps and sitepage formats, custom Formatter class?
+should the cache update the X-Cache and X-Cache-Hits headers? MISS/HIT, hit counts
+mitm export files to public locations?
+some kind of sitemap reload functionality?
+a hook after the SNI or CONNECT and before the requestheaders to pass the TLS stream straight through, eg for icloud
+SiteMap.patch_soup_top_index to put a toolbar across the top of a page with RSS, dl, etc etc
+get the content-length through to stream processing and progressbar
+@decorator to preserve the iscoroutineness of the decorated function? And check it works via @OBSOLETE? suggestion by fixerror
+cmd_dump: intercept html comments before nav strings
+sitemaps: an @on(selector....) instead of the opaque pattern stuff in use presently, flexible generator/return types etc
 expose the site-by-sitemap stuff etc as methods on sitemaps?
 multiple @listen ? could listen on localhost and fleet2-wg
 autoreload modified sitemaps if modified and syntax ok?

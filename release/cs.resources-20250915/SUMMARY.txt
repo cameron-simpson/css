@@ -1,0 +1,1 @@
+Obsolete @not_closed, now a stub for cs.semantics.not_closed.

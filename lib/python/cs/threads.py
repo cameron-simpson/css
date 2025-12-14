@@ -34,7 +34,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Seq
 
-__version__ = '20250325-post'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'description':
@@ -113,7 +113,7 @@ class HasThreadState(ContextManagerMixin):
 
       *NOTE*: `HasThreadState.Thread` is a _class_ method whose default
       is to push state for all active `HasThreadState` subclasses.
-      Contrast with `HasThreadState.bg` which is an _instance_method
+      Contrast with `HasThreadState.bg` which is an _instance_ method
       whose default is to push state for just that instance.
       The top level `cs.threads.bg` function calls `HasThreadState.Thread`
       to obtain its `Thread`.
@@ -284,8 +284,9 @@ class HasThreadState(ContextManagerMixin):
 
         The `HasThreadState.Thread` factory duplicates the current `Thread`'s
         `HasThreadState` current objects as current in the new `Thread`.
-        Additionally it enters the contexts of various objects using
-        `with obj` according to the `enter_objects` parameter.
+        Additionally, and optionally, it enters the contexts of
+        various objects using `with obj` according to the `enter_objects`
+        parameter.
 
         The value of the optional parameter `enter_objects` governs
         which objects have their context entered using `with obj`
@@ -294,7 +295,7 @@ class HasThreadState(ContextManagerMixin):
         - `False`: no object contexts are entered
         - `True`: all current `HasThreadState` object contexts will be entered
         - an iterable of objects whose contexts will be entered;
-          pass `()` to enter no objects
+          pass `()` (or `False` as above) to enter no objects
     '''
     cls = type(self)
     if enter_objects is None:
@@ -337,12 +338,13 @@ def bg(
       * `pre_enter_objects`: an optional iterable of objects which
         should be entered using `with`
 
-      If `pre_enter_objects` is supplied, these objects will be
-      entered before the `Thread` is started and exited when the
+      If `pre_enter_objects` is supplied, these context manager
+      objects will be entered using `with` via the `closeall()`
+      function before the `Thread` is started and exited when the
       `Thread` target function ends.
       If the `Thread` is _not_ started (`no_start=True`, very
-      unusual) then it will be the caller's responsibility to manage
-      to entered objects.
+      unusual) then the objects will still be entered and it will
+      be the caller's responsibility to manage the entered objects.
   '''
   if name is None:
     name = funcname(func)

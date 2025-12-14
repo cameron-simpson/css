@@ -29,6 +29,7 @@ from code import interact
 from collections import ChainMap
 from contextlib import contextmanager
 from dataclasses import dataclass, field, fields
+from datetime import datetime
 try:
   from functools import cache  # 3.9 onward
 except ImportError:
@@ -41,9 +42,9 @@ except ImportError:
 
 from getopt import getopt, GetoptError
 from inspect import isclass
+from itertools import chain
 import os
 from os.path import basename
-from pprint import pformat
 import re
 # this enables readline support in the docmd stuff
 try:
@@ -62,7 +63,7 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import decorator, OBSOLETE, uses_cmd_options
+from cs.deco import decorator, OBSOLETE, uses_cmd_options, uses_quiet
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -82,7 +83,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20250426-post'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -92,7 +93,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
-        'cs.deco',
+        'cs.deco>=decorator__attrs',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -269,7 +270,7 @@ class OptionSpec:
       field_name = spec0[1:]
       if needs_arg:
         raise ValueError(
-            f'field name {field_name!r} expects an aegument'
+            f'field name {field_name!r} expects an argument'
             ': inverted options only make sense for Boolean options'
         )
       field_default = True
@@ -771,9 +772,8 @@ class SubCommand:
         if common_subcmds:
           subusage_listing.append(indent(common_subcmds_line))
         subusage_listing.extend(map(indent, subusages))
-      else:
-        if common_subcmds:
-          subusage_listing.append(common_subcmds_line)
+      elif common_subcmds:
+        subusage_listing.append(common_subcmds_line)
     if subusage_listing:
       subusage = "\n".join(subusage_listing)
       usage = f'{usage}\n{indent(subusage)}'
@@ -847,6 +847,11 @@ class BaseCommandOptions(HasThreadState):
   opt_spec_class = OptionSpec
 
   perthread_state = ThreadState()
+
+  def __post_init__(self):
+    ''' A empty base post `__init__` method so that all subclasses'
+        `__post_init__`s  can call their `super().__post_init__`.
+    '''
 
   def as_dict(self):
     ''' Return the options as a `dict`.
@@ -935,19 +940,20 @@ class BaseCommandOptions(HasThreadState):
          where `opt` is as from `opt,val` from `getopt()`
          and `opt_spec` is the associated `OptionSpec` instance
     '''
+    if common_opt_specs is None:
+      common_opt_specs = cls.COMMON_OPT_SPECS
     opt_spec_cls = cls.opt_spec_class
     shortopts = ''
     longopts = []
     getopt_spec_map = {}
     # gather up the option specifications and make getopt arguments
-    for opt_k, opt_specs in ChainMap(
-        opt_specs_kw,
-        cls.COMMON_OPT_SPECS if common_opt_specs is None else common_opt_specs,
-    ).items():
+    for opt_k, opt_specs in chain(opt_specs_kw.items(),
+                                  common_opt_specs.items()):
       with Pfx("opt_spec[%r]=%r", opt_k, opt_specs):
         opt_spec = opt_spec_cls.from_opt_kw(opt_k, opt_specs)
         if opt_spec.getopt_opt in getopt_spec_map:
-          raise ValueError(f'repeated spec for {opt_spec.getopt_opt}')
+          # keep the earlier definition
+          continue
         getopt_spec_map[opt_spec.getopt_opt] = opt_spec
         # update the arguments for getopt()
         shortopts += opt_spec.getopt_short
@@ -1089,8 +1095,8 @@ class BaseCommandOptions(HasThreadState):
 
 @decorator
 def popopts(cmd_method, **opt_specs_kw):
-  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`
-      and update `self.options`. This also updates the method's usage message.
+  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`,
+      updating `self.options`. This also updates the method's usage message.
 
       Example:
 
@@ -1108,10 +1114,11 @@ def popopts(cmd_method, **opt_specs_kw):
       inside the method.
   '''
 
-  def popopts_cmd_method_wrapper(self, argv, *method_a, **method_kw):
+  def _popopts_cmd_method_wrapper(self, argv, *method_a, **method_kw):
     self.options.popopts(argv, **opt_specs_kw)
     return cmd_method(self, argv, *method_a, **method_kw)
 
+  wrapper_attrs = {}
   if opt_specs_kw:
     # patch the cmd_method usage text
     pre_usage, usage_format, post_usage = split_usage(cmd_method.__doc__ or '')
@@ -1125,10 +1132,22 @@ def popopts(cmd_method, **opt_specs_kw):
               )
           )
       )
-    cmd_method.__doc__ = f'{pre_usage}\n\n{usage_format}\n\n{post_usage}'.strip(
-    )
+      wrapper_attrs.update(
+          __doc__=f'{pre_usage}\n\n{usage_format}\n\n{post_usage}'.strip(),
+      )
 
-  return popopts_cmd_method_wrapper
+  return _popopts_cmd_method_wrapper, wrapper_attrs
+
+def cli_datetime(dt_s: str) -> datetime:
+  ''' Parse an ISO8601 date into a datetime.
+      Being for the command line, this assumes the local timezone
+      if a UTC offset is not specified.
+  '''
+  dt = datetime.fromisoformat(dt_s)
+  if dt.tzinfo is None:
+    # create a nonnaive datetime in the local zone
+    dt = dt.astimezone()
+  return dt
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
@@ -1367,6 +1386,7 @@ class BaseCommand:
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
+        subcmd = None
         try:
           main = self.main
         except AttributeError:
@@ -1376,11 +1396,7 @@ class BaseCommand:
         self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
-        subcmd = argv[0] if argv else None
-        if subcmd is not None and re.match(r'^[a-z][-_\w]*$', subcmd):
-          # looks like a subcommand name, take it
-          argv.pop(0)
-        else:
+        if not argv or not re.match(r'^[a-z][-_\w]*$', argv[0]):
           # not a command name, is there a default command?
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
@@ -1395,7 +1411,7 @@ class BaseCommand:
             if isinstance(default_argv, str):
               default_argv = [default_argv]
             argv = [*default_argv, *argv]
-          subcmd = argv.pop(0)
+        subcmd = argv.pop(0)
         try:
           subcommand = self.subcommand(subcmd)
         except KeyError:
@@ -1411,6 +1427,7 @@ class BaseCommand:
           with Pfx(subcmd):
             return subcommand(argv)
 
+        self.subcmd = subcmd
         self._argv = argv
         self._run = _run
     except GetoptError as e:
@@ -1521,7 +1538,7 @@ class BaseCommand:
       else:
         # default usage text - include the docstring below a header
         paragraph1 = doc.split("\n\n", 1)[0]
-        subusage_format = f'{cmd} ...\n  {paragraph1}'
+        subusage_format = f'{{cmd}} ...\n  {paragraph1}'
     if subusage_format:
       if short:
         subusage_format, *_ = subusage_format.split('\n', 1)
@@ -1978,27 +1995,29 @@ class BaseCommand:
           if k and not k.startswith('_')
       }
       local = pub_mapping(self.__dict__)
-      del local['options']
-      local.update(
-          {
-              f'options.{k}': v
-              for k, v in sorted(pub_mapping(options.__dict__).items())
-          }
-      )
       local.update(argv=argv, cmd=self.cmd, self=self)
     if banner is None:
-      vars_banner = indent(
-          "\n".join(
-              tabulate(
-                  *(
-                      [k, pformat(v, compact=True)]
-                      for k, v in sorted(local.items())
-                      if k and not k.startswith('_')
-                  )
-              )
+      banner_mapping = dict(local)
+      del banner_mapping['options']
+      banner_mapping.update(
+          {
+              f'options.{k}': v
+              for k, v in pub_mapping(options.__dict__).items()
+          }
+      )
+      del banner_mapping['self']
+      banner_mapping.update(
+          {
+              f'self.{k}': v
+              for k, v in pub_mapping(self.__dict__).items()
+          }
+      )
+      banner = "\n".join(
+          tabulate(
+              [f'{self.cmd} {self.subcmd}:'],
+              *([f'  {k}', v] for k, v in sorted(banner_mapping.items()))
           )
       )
-      banner = f'{self.cmd}\n\n{vars_banner}\n'
     try:
       # pylint: disable=import-outside-toplevel
       from bpython import embed
@@ -2103,11 +2122,24 @@ def qvprint(*print_a, quiet, verbose, **print_kw):
   if verbose and not quiet:
     print(*print_a, **print_kw)
 
+@uses_quiet
+def qprint(*print_a, quiet: bool, **qvprint_kw):
+  ''' Call `print()` if `not options.quiet`.
+      This is a compatibility shim for `qvprint()` with `verbose=not
+      quiet` and `quiet=False`.
+  '''
+  qvprint_kw.update(
+      quiet=False,
+      verbose=not quiet,
+  )
+  return qvprint(*print_a, **qvprint_kw)
+
 def vprint(*print_a, **qvprint_kw):
   ''' Call `print()` if `options.verbose`.
       This is a compatibility shim for `qvprint()` with `quiet=False`.
   '''
-  return qvprint(*print_a, quiet=False, **qvprint_kw)
+  qvprint_kw.update(quiet=False)
+  return qvprint(*print_a, **qvprint_kw)
 
 if __name__ == '__main__':
 

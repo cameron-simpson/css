@@ -33,14 +33,14 @@ from typing import Callable, Optional
 from icontract import ensure
 from typeguard import typechecked
 
-from cs.deco import decorator, fmtdoc, uses_quiet
+from cs.deco import decorator, fmtdoc, uses_verbose
 from cs.logutils import debug, exception
 from cs.py.func import funcname
 from cs.queues import IterableQueue, QueueIterator
 from cs.resources import RunState, uses_runstate
 from cs.seq import seq
 from cs.units import (
-    transcribe_time,
+    human_time,
     transcribe as transcribe_units,
     BINARY_BYTES_SCALE,
     DECIMAL_SCALE,
@@ -49,7 +49,7 @@ from cs.units import (
 )
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20250412-post'
+__version__ = '20250530-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -61,6 +61,7 @@ DISTINFO = {
         'cs.deco',
         'cs.logutils',
         'cs.py.func',
+        'cs.queues',
         'cs.resources',
         'cs.seq',
         'cs.units',
@@ -77,7 +78,7 @@ DEFAULT_THROUGHPUT_WINDOW = 5
 DEFAULT_UPDATE_PERIOD = 0.3
 
 @functools.total_ordering
-class BaseProgress(object):
+class BaseProgress:
   ''' The base class for `Progress` and `OverProcess`
       with various common methods.
 
@@ -341,7 +342,7 @@ class BaseProgress(object):
       if remaining:
         remaining = int(remaining)
       if remaining is not None:
-        rightv.append('ETA ' + transcribe_time(remaining))
+        rightv.append(f'ETA {human_time(remaining)}')
     if self.total is not None and self.total > 0:
       leftv.append(self.text_pos_of_total())
     else:
@@ -386,7 +387,7 @@ class BaseProgress(object):
 
   # pylint: disable=blacklisted-name,too-many-arguments
   @contextmanager
-  @uses_quiet
+  @uses_verbose
   @uses_upd
   @fmtdoc
   def bar(
@@ -401,7 +402,7 @@ class BaseProgress(object):
       insert_pos=1,
       poll: Optional[Callable[["BaseProgress"], None]] = None,
       update_period=DEFAULT_UPDATE_PERIOD,
-      quiet: bool,
+      verbose: bool,
       upd: Upd,
   ):
     ''' A context manager to create and withdraw a progress bar.
@@ -447,7 +448,7 @@ class BaseProgress(object):
     if label is None:
       label = self.name
     if report_print is None:
-      report_print = not quiet
+      report_print = verbose
     if statusfunc is None:
 
       def statusfunc(P, label, width):
@@ -835,7 +836,7 @@ class Progress(BaseProgress):
     positions = self._positions
     # scan for first item still in time window,
     # never discard the last 2 positions
-    for ndx in range(0, len(positions) - 1):
+    for ndx in range(len(positions) - 1):
       posn = positions[ndx]
       if posn.time >= oldest:
         # this is the first element to keep, discard preceeding (if any)
@@ -876,8 +877,7 @@ class Progress(BaseProgress):
       return None
     now = time.time()
     time0 = now - time_window
-    if time0 < self.start_time:
-      time0 = self.start_time
+    time0 = max(time0, self.start_time)
     # lowest time and position
     # low_time will be time0
     # low_pos will be the matching position, probably interpolated

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' A command and utility functions for making listings of file content hashcodes
+r'''A command and utility functions for making listings of file content hashcodes
     and manipulating directory trees based on such a hash index.
 
     This largely exists to solve my "what has changed remotely?" or
@@ -56,7 +56,7 @@
     remote location and copy them to a transfer drive for carrying
     to the remote site when opportune. Example:
 
-        hashindex comm -1 -o '{fspath}' src rhost:dst \\
+        hashindex comm -1 -o '{fspath}' src rhost:dst \
         | rsync -a --files-from=- src/ xferdir/
 
     I've got a script [`pref-xfer`](https://hg.sr.ht/~cameron-simpson/css/browse/bin-cs/prep-xfer)
@@ -71,7 +71,6 @@ from getopt import GetoptError
 from io import TextIOBase
 import os
 from os.path import (
-    abspath,
     basename,
     dirname,
     exists as existspath,
@@ -80,11 +79,11 @@ from os.path import (
     isfile as isfilepath,
     islink,
     join as joinpath,
-    realpath,
     relpath,
     samefile,
 )
 import shlex
+import shutil
 from stat import S_ISREG
 from subprocess import CalledProcessError
 import sys
@@ -93,10 +92,10 @@ from typing import Iterable, List, Mapping, Optional, Tuple, Union
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, popopts, vprint
+from cs.cmdutils import BaseCommand, popopts, qprint
 from cs.context import contextif
-from cs.deco import fmtdoc, uses_verbose, uses_cmd_options
-from cs.fs import needdir, RemotePath, shortpath
+from cs.deco import fmtdoc, uses_quiet, uses_cmd_options
+from cs.fs import needdir, RemotePath, remove_protecting, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.hashutils import BaseHashCode
 from cs.lex import r
@@ -108,11 +107,9 @@ from cs.upd import (
     above as above_upd,
     print,
     run_task,  # pylint: disable=redefined-builtin
-    Upd,
-    uses_upd,
 )
 
-__version__ = '20241207-post'
+__version__ = '20250531-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -191,6 +188,8 @@ class HashIndexCommand(BaseCommand):
   @contextmanager
   @uses_fstags
   def run_context(self, *, fstags: FSTags, **kw):
+    ''' Sanity check the hashname, open the fstags.
+    '''
     hashname = self.options.hashname
     try:
       pfx_call(BaseHashCode.hashclass, hashname)
@@ -301,8 +300,7 @@ class HashIndexCommand(BaseCommand):
       )
   )
   @uses_runstate
-  @uses_upd
-  def cmd_ls(self, argv, *, runstate: RunState, upd: Upd):
+  def cmd_ls(self, argv, *, runstate: RunState):
     ''' Usage: {cmd} [options...] [[host:]path...]
           Walk filesystem paths and emit a listing.
           The default path is the current directory.
@@ -338,6 +336,7 @@ class HashIndexCommand(BaseCommand):
     return xit
 
   @popopts(
+      _1=('once', 'Rearrange only one file.'),
       ln=('link_mode', 'Hard link files instead of moving them.'),
       s='symlink_mode',
   )
@@ -359,6 +358,7 @@ class HashIndexCommand(BaseCommand):
     doit = options.doit
     hashname = options.hashname
     move_mode = not options.link_mode
+    once = options.once
     quiet = options.quiet
     verbose = options.verbose or not quiet
     symlink_mode = options.symlink_mode
@@ -394,7 +394,7 @@ class HashIndexCommand(BaseCommand):
       with run_task(f'scan refdir {refdir}'):
         fspaths_by_hashcode = hashindex_map(refdir, relative=True)
     if not fspaths_by_hashcode:
-      quiet or print("no files in refdir, nothing to rearrange")
+      qprint("no files in refdir, nothing to rearrange")
       return xit
     # rearrange the source directory.
     assert srcdir.host == dstdir.host
@@ -404,9 +404,11 @@ class HashIndexCommand(BaseCommand):
           srcdir.fspath,
           fspaths_by_hashcode,
           dstdir.fspath,
+          doit=doit,
           move_mode=move_mode,
+          once=once,
+          quiet=quiet,
           symlink_mode=symlink_mode,
-          verbose=verbose,
       )
     else:
       # remote srcdir and dstdir
@@ -416,8 +418,9 @@ class HashIndexCommand(BaseCommand):
           dstdir.fspath,
           fspaths_by_hashcode,
           move_mode=move_mode,
+          once=once,
+          quiet=quiet,
           symlink_mode=symlink_mode,
-          verbose=verbose,
       )
     return xit
 
@@ -428,7 +431,7 @@ class HashIndexCommand(BaseCommand):
       partial='Keep partially transferred files, passed to rsync.',
   )
   def cmd_rsync(self, argv, *, fstags: FSTags):
-    ''' Usage: {cmd} [options] srcdir dstdir
+    ''' Usage: {cmd} [options] srcdir dstdir [rsync-options...]
           Rearrange dstdir according to srcdir then rsync srcdir into dstdir.
     '''
     options = self.options
@@ -442,6 +445,7 @@ class HashIndexCommand(BaseCommand):
     verbose = options.verbose
     srcdir = self.poppathspec(argv, 'srcdir', check_isdir=True)
     dstdir = self.poppathspec(argv, 'dstdir', check_isdir=True)
+    rsync_opts = argv
     with run_task(f'scan srcdir {srcdir}'):
       fspaths_by_hashcode = hashindex_map(srcdir, relative=True)
     xit = 0
@@ -453,6 +457,7 @@ class HashIndexCommand(BaseCommand):
             srcdir.fspath,
             fspaths_by_hashcode,
             dstdir.fspath,
+            doit=doit,
             move_mode=True,
             symlink_mode=False,
         )
@@ -460,9 +465,10 @@ class HashIndexCommand(BaseCommand):
         # remote srcdir and dstdir
         xit = remote_rearrange(
             dstdir.host,
-            srcdir.fspath,
+            dstdir.fspath,
             dstdir.fspath,
             fspaths_by_hashcode,
+            doit=doit,
             move_mode=True,
             symlink_mode=False,
         )
@@ -482,11 +488,12 @@ class HashIndexCommand(BaseCommand):
                 '-ar',
                 delete and '--delete',
                 f'--exclude={fstags.tagsfile_basename}',
+                *rsync_opts,
                 '--',
                 f'{srcdir}/',
                 f'{dstdir}/',
             ],
-            doit=True,
+            doit=True,  # let rsync -n do this
             quiet=quiet,
         )
 
@@ -780,7 +787,7 @@ def dir_remap(
       dir_filepaths(srcdirpath), fspaths_by_hashcode, hashname=hashname
   )
 
-@uses_cmd_options(doit=True, hashname=None, verbose=True)
+@uses_cmd_options(doit=True, hashname=None, quiet=True)
 @uses_fstags
 @uses_runstate
 @require(
@@ -799,11 +806,12 @@ def rearrange(
     *,
     hashname: str,
     move_mode: bool = False,
+    once: bool = False,
     symlink_mode=False,
     doit: bool,
     fstags: FSTags,
     runstate: RunState,
-    verbose: bool,
+    quiet: bool,
 ):
   ''' Rearrange the files in `dirpath` according to the
       hashcode->[relpaths] `fspaths_by_hashcode`.
@@ -828,53 +836,59 @@ def rearrange(
     task_label = f'rearrange {shortpath(srcdirpath)} into {shortpath(dstdirpath)}'
   with run_task(task_label) as proxy:
     to_remove = set()
-    for srcpath, rfspaths in dir_remap(srcdirpath, rfspaths_by_hashcode,
-                                       hashname=hashname):
-      runstate.raiseif()
-      if not rfspaths:
-        continue
-      filename = basename(srcpath)
-      if filename.startswith('.') or filename == fstags.tagsfile_basename:
-        # skip hidden or fstags files
-        continue
-      opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
-      with Pfx(srcpath):
-        rsrcpath = relpath(srcpath, srcdirpath)
-        ##assert is_valid_rpath(rsrcpath), (
-        ##    "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
-        ##)
-        proxy.text = rsrcpath
-        for rdstpath in rfspaths:
-          ##assert is_valid_rpath(rdstpath), (
-          ##    "rdstpath:%r is not a clean subpath" % (rdstpath,)
+    try:
+      for srcpath, rfspaths in dir_remap(
+          srcdirpath,
+          rfspaths_by_hashcode,
+          hashname=hashname,
+      ):
+        runstate.raiseif()
+        if not rfspaths:
+          continue
+        filename = basename(srcpath)
+        if filename.startswith('.') or filename == fstags.tagsfile_basename:
+          # skip hidden or fstags files
+          continue
+        opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
+        with Pfx(srcpath):
+          rsrcpath = relpath(srcpath, srcdirpath)
+          ##assert is_valid_rpath(rsrcpath), (
+          ##    "rsrcpath:%r is not a clean subpath" % (rsrcpath,)
           ##)
-          if rsrcpath == rdstpath:
-            # already there, skip
-            continue
-          dstpath = joinpath(dstdirpath, rdstpath)
-          if doit:
-            needdir(dirname(dstpath), use_makedirs=True, log=warning)
-          # merge the src to the dst
-          # do a real move if there is only one rfspaths
-          # otherwise a link and then a later remove
-          try:
-            merge(
-                srcpath,
-                dstpath,
-                opname=opname,
-                hashname=hashname,
-                move_mode=move_mode and len(rfspaths) == 1,
-                symlink_mode=symlink_mode,
-                fstags=fstags,
-                doit=doit,
-                verbose=True,
-            )
-          except FileExistsError as e:
-            warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
-          else:
-            if move_mode and len(rfspaths) > 1 and rsrcpath not in rfspaths:
-              if doit:
-                to_remove.add(srcpath)
+          proxy.text = rsrcpath
+          for rdstpath in rfspaths:
+            ##assert is_valid_rpath(rdstpath), (
+            ##    "rdstpath:%r is not a clean subpath" % (rdstpath,)
+            ##)
+            if rsrcpath == rdstpath:
+              # already there, skip
+              continue
+            dstpath = joinpath(dstdirpath, rdstpath)
+            if doit:
+              needdir(dirname(dstpath), use_makedirs=True, log=warning)
+            # merge the src to the dst
+            try:
+              merged = merge(
+                  srcpath,
+                  dstpath,
+                  opname=opname,
+                  hashname=hashname,
+                  move_mode=move_mode and len(rfspaths) == 1,
+                  symlink_mode=symlink_mode,
+                  fstags=fstags,
+                  doit=doit,
+                  quiet=quiet,
+              )
+            except FileExistsError as e:
+              warning("%s %s -> %s: %s", opname, srcpath, dstpath, e)
+            else:
+              if move_mode and len(rfspaths) > 1 and rsrcpath not in rfspaths:
+                if doit:
+                  to_remove.add(srcpath)
+            if merged and once:
+              raise StopIteration
+    except StopIteration:
+      pass
     # purge the srcpaths last because we might want them multiple
     # times during the main loop (files with the same hashcode)
     if doit and to_remove:
@@ -887,9 +901,9 @@ def rearrange(
     hashindex_exe=HASHINDEX_EXE_DEFAULT,
     hashname=HASHNAME_DEFAULT,
     move_mode=True,
+    once=False,
     quiet=False,
     symlink_mode=False,
-    verbose=False,
 )
 @typechecked
 def remote_rearrange(
@@ -902,9 +916,9 @@ def remote_rearrange(
     hashindex_exe: str,
     hashname: str,
     move_mode: bool,
+    once: bool,
     quiet: bool,
     symlink_mode: bool,
-    verbose: bool,
 ):
   ''' Rearrange a remote directory `srcdir` on `rhost` into `dstdir`
       on `rhost` according to the hashcode mapping `fspaths_by_hashcode`.
@@ -922,8 +936,8 @@ def remote_rearrange(
           'rearrange',
           not doit and '-n',
           ('-h', hashname),
+          once and '-1',
           quiet and '-q',
-          verbose and '-v',
           not (move_mode or symlink_mode) and '--ln',
           symlink_mode and '-s',
           '-',
@@ -939,7 +953,7 @@ def remote_rearrange(
 
 @pfx
 @uses_fstags
-@uses_verbose
+@uses_quiet
 @require(
     lambda move_mode, symlink_mode: not (move_mode and symlink_mode),
     'move_mode and symlink_mode may not both be true'
@@ -954,65 +968,116 @@ def merge(
     symlink_mode=False,
     doit=False,
     fstags: FSTags,
-    verbose: bool,
-):
-  ''' Merge `srcpath` to `dstpath`.
+    quiet: bool,
+) -> bool:
+  ''' Merge `srcpath` to `dstpath`, _preserving `dstpath` if present_.
+      Return `True` if something was done, `False` if this was a no-op.
+      Raise `FileExistsError` if `dstpath` exists with different content.
 
+      This is aimed at situations such as merging downloads with
+      an existing corpus, which might have hard links etc, so
+      `dstpath` is the important half of the pair.
+
+      NB: `symlink_mode` is currently disabled.
+
+      If 'dstpath' exists, checksum their contents and raise
+      `FileExistsError` if they differ.
       If `dstpath` does not exist, move/link/symlink `srcpath` to `dstpath`.
-      Otherwise checksum their contents and raise `FileExistsError` if they differ.
+      This also merges the fstags from `srcpath` to `dstpath`.
+
+      Otherwise the files have the same content, merge while preserving `dstpath`.
   '''
+  if symlink_mode:
+    raise RuntimeError("symlink_mode disabled for now, untrusted")
   if opname is None:
     opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
   if dstpath == srcpath:
-    return
-  if symlink_mode:
-    # check for existing symlink
-    sympath = abspath(srcpath)
-    try:
-      dstsympath = os.readlink(dstpath)
-    except FileNotFoundError:
-      pass
-    except OSError as e:
-      if e.errno == errno.EINVAL:
-        # not a symlink
-        raise FileExistsError(f'dstpath {dstpath!r} not a symlink: {e}') from e
-      raise
-    else:
-      if dstsympath == sympath:
-        # identical symlinks, just update the tags
-        fstags[dstpath].update(fstags[srcpath])
-        return
-      raise FileExistsError(
-          f'dstpath {dstpath!r} already exists as a symlink to {dstsympath!r}'
-      )
-  elif existspath(dstpath):
-    if (samefile(srcpath, dstpath)
-        or (file_checksum(dstpath, hashname=hashname) == file_checksum(
-            srcpath, hashname=hashname))):
-      # same content - update tags and remove source
-      if doit:
-        fstags[dstpath].update(fstags[srcpath])
-      if move_mode and realpath(srcpath) != realpath(dstpath):
-        vprint(
-            "remove",
-            shortpath(srcpath),
-            "# identical content at",
-            shortpath(dstpath),
-            verbose=verbose,
-            flush=True,
-        )
-        if doit:
-          pfx_call(os.remove, srcpath)
-      return
+    # fast no-op
+    return False
+  if not existspath(srcpath):
+    # fast failure
+    raise FileNotFoundError(srcpath)
+  assert not symlink_mode
+  if not existspath(dstpath):
+    # link or move to dstpath
+    qprint(
+        opname,
+        shortpath(srcpath),
+        "->",
+        shortpath(dstpath),
+        quiet=quiet,
+        flush=True,
+    )
+    if doit:
+      # safe rename - link to dst them remove src
+      needdir(dirname(dstpath))
+      try:
+        pfx_call(os.link, srcpath, dstpath)
+      except OSError as e:
+        if e.errno == errno.EXDEV:
+          pfx_call(shutil.move, srcpath, dstpath)
+        else:
+          raise
+      else:
+        remove_protecting(srcpath, dstpath)
+      fstags[dstpath].update(fstags[srcpath])
+    return True
+  if samefile(srcpath, dstpath):
+    # links to same file, merge the tags from srcpath -> dstpath
+    fstags[dstpath].update(fstags[srcpath])
+    if not move_mode:
+      # we're done
+      return False
+    # Remove srcpath.
+    qprint(
+        "remove",
+        shortpath(srcpath),
+        "# same file as",
+        shortpath(dstpath),
+        quiet=quiet,
+        flush=True,
+    )
+    if doit:
+      remove_protecting(srcpath, dstpath)
+    return True
+  # distinct files, compare their contents
+  srchashcode = file_checksum(srcpath, hashname=hashname)
+  dsthashcode = file_checksum(dstpath, hashname=hashname)
+  if srchashcode != dsthashcode:
     # different content, fail
     raise FileExistsError(
-        f'dstpath {dstpath!r} already exists with different hashcode'
+        'dstpath already exists with different content hashcode'
+        f': {srchashcode=} != {dsthashcode=}'
     )
-  vprint(opname, shortpath(srcpath), shortpath(dstpath), verbose=verbose)
+  # same content
+  if not move_mode:
+    # Link dstpath to srcpath.
+    qprint(
+        "link",
+        shortpath(dstpath),
+        "to",
+        shortpath(srcpath),
+        "# same content",
+        quiet=quiet,
+        flush=True,
+    )
+    if doit:
+      remove_protecting(srcpath, dstpath)
+      pfx_call(os.link, dstpath, srcpath)
+      fstags[srcpath].update(fstags[dstpath])
+    return True
+  # Remove srcpath.
+  qprint(
+      "remove",
+      shortpath(srcpath),
+      "# identical content at",
+      shortpath(dstpath),
+      quiet=quiet,
+      flush=True,
+  )
   if doit:
-    pfx_call(
-        fstags.mv, srcpath, dstpath, symlink=symlink_mode, remove=move_mode
-    )
+    remove_protecting(srcpath, dstpath)
+  return True
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

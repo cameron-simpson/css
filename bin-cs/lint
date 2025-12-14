@@ -30,6 +30,7 @@ cmd=$0
 usage="Usage: $cmd [-2] [-3] filenames...
   -2    Use Python 2 for Python linting.
   -3    Use Python 3 for Python linting.
+  -3.x  Use Python 3 for Python linting and tell ruff to use this version.
   -q    Quick. Skip the more expensive lints."
 
 badopts=
@@ -123,7 +124,18 @@ do
         xit=0
         if [ $ruff ]
         then
-          $trace ruff check --output-format=concise "--target-version=$RUFF_PYTHON_VERSION" "$lintfile" || xit=1
+          if [ $quick ]
+          then
+            $trace ruff check \
+              --output-format=concise \
+              "--target-version=$RUFF_PYTHON_VERSION" \
+              "$lintfile" | egrep -i '\[\*\]|syntaxerror|undefined|unused' && xit=1
+          else
+            $trace ruff check \
+              --output-format=concise \
+              "--target-version=$RUFF_PYTHON_VERSION" \
+              "$lintfile" || xit=1
+          fi
         else
           $trace $python -We:invalid -m py_compile "$lintfile" || exit 1
           $trace $pyflakes "$lintfile" || xit=1

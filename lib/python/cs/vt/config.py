@@ -586,7 +586,7 @@ class Config(SingletonMixin, HasFSPath, HasThreadState, Promotable):
       host=None,
       port=None,
       hashclass=None,
-      addif=False,
+      addif=True,
   ):
     ''' Construct a TCPClientStore from a "tcp" clause.
     '''

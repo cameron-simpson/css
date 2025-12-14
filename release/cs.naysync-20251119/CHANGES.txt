@@ -1,0 +1,2 @@
+lib/python/cs/naysync.py: cs.naysync: AsyncPipeLine.from_stages: add a TODO for a "fast" mode setting
+lib/python/cs/naysync.py: cs.naysync: make most optional parameters keyword only

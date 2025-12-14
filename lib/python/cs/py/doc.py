@@ -158,7 +158,7 @@ def module_doc(
                   indent("Usage: " + usage_text, "    "),
               )
           )
-        full_docs.append(doc_item(Mname, f'Class `{classname_etc}`', obj_doc))
+        full_docs.append(doc_item(Mname, f'class {classname_etc}', obj_doc))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order

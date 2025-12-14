@@ -53,7 +53,7 @@ from cs.result import CancellationError
 from cs.threads import locked, NRLock
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20250429-post'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -985,6 +985,7 @@ def byteses_as_fd(bss, **kw):
   '''
   return CornuCopyBuffer(bss).as_fd(**kw)
 
+# TODO: how is this different to read_data()?
 def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   ''' General purpose reader for file descriptors yielding data from `offset`.
       **Note**: This does not move the file descriptor position
@@ -1103,10 +1104,10 @@ class ReadMixin(object):
   ''' Useful read methods to accomodate modes not necessarily available in a class.
 
       Note that this mixin presumes that the attribute `self._lock`
-      is a threading.RLock like context manager.
+      is a `threading.RLock`-like context manager.
 
       Classes using this mixin should consider overriding the default
-      .datafrom method with something more efficient or direct.
+      `.datafrom` method with something more efficient or direct.
   '''
 
   def datafrom(self, offset, readsize=None):
@@ -1487,12 +1488,17 @@ class NullFile(object):
     ''' Flush buffered data to the subsystem.
     '''
 
+# TODO: how is this different to datafrom()?
+@fmtdoc
 def file_data(fp, nbytes=None, rsize=None):
   ''' Read `nbytes` of data from `fp` and yield the chunks as read.
 
       Parameters:
-      * `nbytes`: number of bytes to read; if None read until EOF.
-      * `rsize`: read size, default DEFAULT_READSIZE.
+      * `nbytes`: number of bytes to read; if `None` read until EOF.
+      * `rsize`: read size, default {DEFAULT_READSIZE==}`.
+
+      This tries to use the file's `.read1` "short read" method if
+      available, otherwise it uses `.read`.
   '''
   # try to use the "short read" flavour of read if available
   if rsize is None:
@@ -1549,6 +1555,7 @@ def read_data(fp, nbytes, rsize=None):
     return bss[0]
   return b''.join(bss)
 
+# TODO: how is this different to datafrom()
 def read_from(fp, rsize=None, tail_mode=False, tail_delay=None):
   ''' Generator to present text or data from an open file until EOF.
 

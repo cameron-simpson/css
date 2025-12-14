@@ -10,7 +10,6 @@
 
 from dataclasses import dataclass, field
 from inspect import isclass
-from itertools import chain
 import os
 import sys
 from typing import Iterable, List, Mapping
@@ -30,7 +29,7 @@ from cs.cmdutils import BaseCommand as CSBaseCommand
 from cs.gimmicks import warning
 from cs.lex import cutprefix, stripped_dedent
 
-__version__ = '20250219-post'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -52,7 +51,7 @@ if (settings._wrapped is djf_empty
   settings.configure()
 
 class DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass):
-  ''' A subclass of `cs.cmdutils.SubCOmmand` with additional support
+  ''' A subclass of `cs.cmdutils.SubCommand` with additional support
       for Django's `BaseCommand`.
   '''
 
@@ -239,6 +238,7 @@ def model_batches_qs(
     exclude=None,
     filter=None,  # noqa: A002
     only=None,
+    yield_base_qs=False,
 ) -> Iterable[QuerySet]:
   ''' A generator yielding `QuerySet`s which produce nonoverlapping
       batches of `Model` instances.
@@ -255,13 +255,17 @@ def model_batches_qs(
       * `field_name`: default `'pk'`, the name of the field on which
         to order the batches
       * `after`: an optional field value - iteration commences
-        immediately after this value
+        immediately after this value; this may also be a `Model` instance,
+        in which case the value is obtained via `getattr(after,field_name)`
       * `chunk_size`: the maximum size of each chunk
       * `desc`: default `False`; if true then order the batches in
         descending order instead of ascending order
       * `exclude`: optional mapping of Django query terms to exclude by
       * `filter`: optional mapping of Django query terms to filter by
       * `only`: optional sequence of field names for a Django query `.only()`
+      * `yield_base_qs`: if true (default `False`) yield the base
+        `QuerySet` ahead of the `QuerySet`s for each batch;
+        this can be useful for a count or other preanalysis
 
       Example iteration of a `Model` would look like:
 
@@ -294,6 +298,8 @@ def model_batches_qs(
   if chunk_size <= 0:
     raise ValueError(f'{chunk_size=} must be > 0')
   ordering = f'-{field_name}' if desc else field_name
+  if isinstance(after, model):
+    after = getattr(after, field_name)
   after_condition = f'{field_name}__lt' if desc else f'{field_name}__gt'
   mgr = model.objects
   # initial batch
@@ -316,7 +322,11 @@ def model_batches_qs(
     qs = qs0
     if after is not None:
       qs = qs.filter(**{after_condition: after})
-    qs = qs.order_by(ordering)[:chunk_size]
+    qs = qs.order_by(ordering)
+    if yield_base_qs:
+      yield_base_qs = False
+      yield qs
+    qs = qs[:chunk_size]
     key_list = list(qs.only(field_name).values_list(field_name, flat=True))
     if not key_list:
       break
@@ -326,14 +336,40 @@ def model_batches_qs(
 def model_instances(
     model: Model,
     field_name='pk',
+    prefetch_related=None,
+    select_related=None,
+    yield_base_qs=False,
     **mbqs_kw,
 ) -> Iterable[Model]:
-  ''' A generator yielding Model instances.
-      This is a wrapper for `model_batches_qs` and accepts the same arguments.
+  ''' A generator yielding `Model` instances.
+      This is a wrapper for `model_batches_qs` and accepts the same arguments,
+      and some additional parameters.
+
+      If you need to extend the `QuerySet`s beyond what the
+      `model_batches_qs` parameters support it may be better to use
+      that and extend each returned `QuerySet`.
+
+      If `yield_base_qs` is true (default `False`), yield the base
+      `QuerySet` ahead of the model instances; this can be useful
+      for a count or other preanalysis.
+
+      Additional parameters beyond those for `model_batches_qs`:
+      * `prefetch_related`: an optional list of fields to apply to
+        each query with `.prefetch_related()`
+      * `select_related`: an optional list of fields to apply to
+        each query with `.select_related()`
 
       Efficient behaviour requires the field to be indexed.
       Correct behaviour requires the field values to be unique.
   '''
-  return chain.from_iterable(
-      model_batches_qs(model, field_name=field_name, **mbqs_kw)
+  batch_qses = model_batches_qs(
+      model, field_name=field_name, yield_base_qs=yield_base_qs, **mbqs_kw
   )
+  if yield_base_qs:
+    yield next(batch_qses)
+  for batch_qs in batch_qses:
+    if prefetch_related is not None:
+      batch_qs = batch_qs.prefetch_related(*select_related)
+    if select_related is not None:
+      batch_qs = batch_qs.select_related(*select_related)
+    yield from batch_qs

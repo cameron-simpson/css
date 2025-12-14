@@ -9,7 +9,8 @@ from inspect import isgeneratorfunction
 import logging
 import os
 from os.path import abspath
-from threading import current_thread, Lock
+import sys
+from threading import current_thread
 from typing import Any, Optional, Union, List, Tuple
 
 from icontract import require
@@ -22,12 +23,13 @@ from typeguard import typechecked
 from cs.context import contextif
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import lockfile
-from cs.lex import cutprefix
+from cs.lex import cutprefix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
+from cs.psutils import run
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
-from cs.threads import ThreadState
+from cs.threads import NRLock, ThreadState
 
 ##def CHECK():
 ##  ''' Debug function to check for open sqltags.sqlite files,
@@ -198,14 +200,14 @@ def with_session(function, *a, orm=None, session=None, **kw):
   with using_session(orm=orm, session=session):
     return function(*a, **kw)
 
+@decorator
 def auto_session(function):
-  ''' Decorator to run a function in a session if one is not presupplied.
+  ''' A decorator to run a function in a session if one is not presupplied.
       The function `function` runs within a transaction,
       nested if the session already exists.
 
       See `with_session` for details.
   '''
-
   if isgeneratorfunction(function):
 
     def auto_session_generator_wrapper(*a, orm=None, session=None, **kw):
@@ -226,9 +228,6 @@ def auto_session(function):
 
     wrapper = auto_session_function_wrapper
 
-  wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
-  wrapper.__doc__ = function.__doc__
-  wrapper.__module__ = getattr(function, '__module__', None)
   return wrapper
 
 @contextdecorator
@@ -253,26 +252,26 @@ class ORM(MultiOpenMixin, ABC):
   ''' A convenience base class for an ORM class.
 
       This defines a `.Base` attribute which is a new `DeclarativeBase`
-      and provides various Session related convenience methods.
+      and provides various `Session` related convenience methods.
       It is also a `MultiOpenMixin` subclass
       supporting nested open/close sequences and use as a context manager.
   '''
 
-  @pfx_method
-  def __init__(self, db_url, serial_sessions=None):
-    ''' Initialise the ORM.
-
-        If `serial_sessions` is true (default `True` for SQLite, `False` otherwise)
-        then allocate a lock to serialise session allocation.
-        This might be chosen with SQL backends which do not support
-        concurrent sessions such as SQLite.
-
-        In the case of SQLite there's a small inbuilt timeout in
-        an attempt to serialise transactions but it is possible to
-        exceed it easily and recovery is usually infeasible.
-        Instead we use the `serial_sessions` option to obtain a
-        mutex before allocating a session.
+  @staticmethod
+  def norm_db_url(db_url: str) -> str:
+    ''' Promote a `/`*path*`.sqlite` filesystem path to an `sqlite:///` URL.
+        Return other strings unchanged.
     '''
+    if db_url.startswith('/') and db_url.endswith('.sqlite'):
+      db_url = f'sqlite:///{db_url}'
+    return db_url
+
+  @classmethod
+  def fspath_for_db_url(cls, db_url):
+    ''' Return the filesystem path for a `db_url`, or `None`.
+        This extracts the path from `sqlite:///` URLs.
+    '''
+    db_url = cls.norm_db_url(db_url)
     db_fspath = cutprefix(db_url, 'sqlite:///')
     if db_fspath is db_url:
       # unchanged - no leading "sqlite:///"
@@ -286,19 +285,39 @@ class ORM(MultiOpenMixin, ABC):
     else:
       # starts with sqlite:///, we have the db_fspath from the cutprefix
       pass
-    self.db_url = db_url
-    self.db_fspath = db_fspath
-    is_sqlite = db_url.startswith('sqlite://')
+    return db_fspath
+
+  @pfx_method
+  def __init__(self, db_url, serial_sessions=None):
+    ''' Initialise the ORM.
+
+        The `db_url` is any database URL of the form `dbtype://...`.
+        It may also be an absolute filesystem path, starting with
+        `/` and ending in `.sqlite`. This is transformed into an
+        `sqlite:///fspath` URL.
+
+        If `serial_sessions` is true (default `True` for SQLite, `False` otherwise)
+        then allocate a lock to serialise session allocation.
+        This might be chosen with SQL backends which do not support
+        concurrent sessions such as SQLite.
+
+        In the case of SQLite there's a small inbuilt timeout in
+        an attempt to serialise transactions but it is possible to
+        exceed it easily and recovery is usually infeasible.
+        Instead we use the `serial_sessions` option to obtain a
+        mutex before allocating a session.
+    '''
+    self.db_url = self.norm_db_url(db_url)
+    self.db_fspath = self.fspath_for_db_url(self.db_url)
+    is_sqlite = self.db_url.startswith('sqlite://')
     if serial_sessions is None:
-      # serial SQLite sessions
+      # serial SQLite sessions by default
       serial_sessions = is_sqlite
     elif not serial_sessions:
       if is_sqlite:
         warning(
-            "serial_sessions specified as %r, but is_sqlite=%s:"
-            " this may cause trouble with multithreaded use",
-            serial_sessions,
-            is_sqlite,
+            f'{serial_sessions=} but {is_sqlite=}'
+            '; this may cause trouble with concurrent use'
         )
     self.serial_sessions = serial_sessions or is_sqlite
     self.Base = declarative_base()
@@ -306,11 +325,12 @@ class ORM(MultiOpenMixin, ABC):
         orm=self, engine=None, sessionmaker=None, session=None
     )
     if serial_sessions:
-      self._serial_sessions_lock = Lock()
+      self._serial_sessions_lock = NRLock(
+          f'ORM:{self} session serialiser lock'
+      )
     else:
       self._engine = None
       self._sessionmaker_raw = None
-    self.db_url = db_url
     self.engine_keywords = dict(
         ##case_sensitive=True,
         echo='SQL' in map(str.upper,
@@ -352,26 +372,26 @@ class ORM(MultiOpenMixin, ABC):
   @contextmanager
   def startup_shutdown(self):
     ''' Default startup/shutdown context manager.
-
-        This base method operates a lockfile to manage concurrent access
-        by other programmes (which would also need to honour this file).
-        If you actually expect this to be common
-        you should try to keep the `ORM` "open" as briefly as possible.
-        The lock file is only operated if `self.db_fspath`,
-        currently set only for filesystem SQLite database URLs.
+        This updates the database schema on first use.
     '''
-    with contextif(
-        bool(self.db_fspath),
-        lockfile,
-        self.db_fspath,
-        poll_interval=2,
-    ):
-      # make sure that the db tables are up to date
-      if self.__first_use:
-        with self.sqla_state.auto_session() as session:
-          self.Base.metadata.create_all(bind=self.engine)
-        self.__first_use = False
-      yield
+    # make sure that the db tables are up to date
+    if self.__first_use:
+      with self.sqla_state.auto_session() as session:
+        self.Base.metadata.create_all(bind=self.engine)
+      self.__first_use = False
+    yield
+
+  # TODO: psql for postgresql
+  def dbshell(self):
+    ''' Run an interactive database prompt.
+    '''
+    db_url = self.db_url
+    if db_url.startswith("sqlite://"):
+      db_fspath = self.db_fspath
+      print("sqlite3", db_fspath)
+      run(['sqlite3', db_fspath], check=True, stdin=sys.stdin)
+    else:
+      raise ValueError(f'I do not know how to get a db shell for {db_url=}')
 
   @property
   def engine(self):
@@ -404,33 +424,43 @@ class ORM(MultiOpenMixin, ABC):
     return sessionmaker
 
   @contextmanager
+  def serialif(self):
+    ''' A context manager to serialise sessions if `self.serial_sessions`.
+    '''
+    if self.serial_sessions:
+      existing_session = self.sqla_state.session
+      if existing_session is not None:
+        T = current_thread()
+        raise RuntimeError(
+            f'Thread:{T.ident}:{T.name}'
+            f': this Thread already has an ORM session: {existing_session}'
+        )
+      with self._serial_sessions_lock:
+        with contextif(
+            bool(self.db_fspath),
+            lockfile,
+            self.db_fspath,
+            poll_interval=2,
+        ):
+          yield
+    else:
+      yield
+
+  @contextmanager
   @pfx_method(use_str=True)
   def orchestrated_session(self):
-    ''' Orchestrate a new session for this `Thread`,
-        honouring `self.serial_session`.
+    ''' A context manager to orchestrate a *new* session for this `Thread`,
+        honouring `self.serial_session` and yielding the new `Session`.
     '''
     orm_state = self.sqla_state
     with self:
-      if self.serial_sessions:
-        if orm_state.session is not None:
-          T = current_thread()
-          tid = "Thread:%d:%s" % (T.ident, T.name)
-          raise RuntimeError(
-              "%s: this Thread already has an ORM session: %s" % (
-                  tid,
-                  orm_state.session,
-              )
-          )
-        with self._serial_sessions_lock:
-          new_session = self._sessionmaker()
+      with self.serialif():
+        new_session = self._sessionmaker()
+        try:
           with new_session.begin_nested():
             yield new_session
+        finally:
           new_session.close()
-      else:
-        new_session = self._sessionmaker()
-        with new_session.begin_nested():
-          yield new_session
-        new_session.close()
 
   @property
   def default_session(self):
@@ -438,14 +468,14 @@ class ORM(MultiOpenMixin, ABC):
     '''
     return self.sqla_state.session
 
+@decorator
 def orm_auto_session(method):
-  ''' Decorator to run a method in a session derived from `self.orm`
+  ''' A decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
-      Intended to assist classes with a `.orm` attribute.
+      This is intended to assist classes with a `.orm` attribute.
 
       See `with_session` for details.
   '''
-
   if isgeneratorfunction(method):
 
     def orm_auto_session_wrapper(self, *a, session=None, **kw):
@@ -461,11 +491,6 @@ def orm_auto_session(method):
       with using_session(orm=self.orm, session=session) as active_session:
         return method(self, *a, session=active_session, **kw)
 
-  orm_auto_session_wrapper.__name__ = "@orm_auto_session(%s)" % (
-      funcname(method),
-  )
-  orm_auto_session_wrapper.__doc__ = method.__doc__
-  orm_auto_session_wrapper.__module__ = getattr(method, '__module__', None)
   return orm_auto_session_wrapper
 
 class BasicTableMixin:

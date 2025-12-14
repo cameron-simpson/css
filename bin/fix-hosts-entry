@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# Update the record of the IP for a DNS name in a hosts file then run a command.
+# - Cameron Simpson <cs@cskk.id.au> 14may2025
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+hosts=/etc/hosts
+
+cmd=$0
+usage="Usage: $cmd [-f hostsfile] [-q] [-x] dnsname [post-command...]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f) hosts=$2; shift ;;
+    -q) trace= ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing dnsname" >&2
+      badopts=1
+else  dnsname=$1; shift
+fi
+
+[ -f "$hosts" ] || {
+  echo "$cmd: not a file: $hosts" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ip_current=$( sed -n "/^ *[^ #]/!d; / $dnsname\$/{s/ .*//p;q}" < "$hosts" )
+[ -n "$ip_current" ] || {
+  echo "$cmd: no entry for $dnsname in $hosts" >&2
+  exit 1
+}
+
+ip_dns=$(
+  host "$dnsname" \
+  | tr '[A-Z]' '[a-z]' \
+  | tee /dev/tty \
+  | sed -n "s/^$dnsname has address \\([1-9][.0-9]*\\)\$/\\1/p"
+)
+[ -n "$ip_dns" ] || {
+  echo "$cmd: host lookup failed" >&2
+  exit 1
+}
+
+[ "x$ip_current" = "x$ip_dns" ] || {
+  $trace bsed "/ $dnsname\$/s/^$ip_current /$ip_dns /" "$hosts"
+}
+
+[ $# = 0 ] || exec $trace "$@"

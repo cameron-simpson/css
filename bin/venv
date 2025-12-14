@@ -6,11 +6,14 @@
 
 set -ue
 
-
 # the base location of the venvs
 : "${VENV_DIR:="$HOME/var/venv"}"
 
 # this was inline, but vim's syntax highlighting broke
+#
+# Usage: pyver python-exe
+#   Print the version of python-exe.
+#
 pyver() {
   # NB: before python 3.4 "python --version" wrote to stderr
   # http://bugs.python.org/issue18338
@@ -21,16 +24,17 @@ cmd=$( basename "$0" )
 usage="Usage $cmd [subcmd ...]
   version   Target Python version, eg 3.12.
   Subcommands:
-  info      Recite virtualenv information. (Default.)
-  init [pyexe] venvpath [{package|-r requirements-file}...]
+    info    Recite virtualenv information. (Default.)
+    init [pyexe] venvpath [{package|-r requirements-file}...]
             Create new environment at venvpath with the specified
             additional packages.
             pyexe is an optional base python executable for the
             venv, otherwise python3.
             venvpath specifies the venv location.
-  exec command ...
+    exec command ...
             Execute command with the venv/bin at the from of \$PATH."
 
+            modern=1
 trace=
 [ -t 2 ] && trace=set-x
 
@@ -40,25 +44,44 @@ if [ $# = 0 ]
 then op=info
 else op=$1; shift
 fi
-
 cmd="$cmd $op"
+
 case "$op" in
   info)
     echo "VIRTUAL_ENV=$VIRTUAL_ENV"
     pyver "$VIRTUAL_ENV/bin/python"
     ;;
   init)
-    if [ $# -gt 0 ] && [ -f "$1" -a -x "$1" ]
-    then  pyexe=$1; shift
-    else  pyexe=$( which python3 )
+    # optional leading python exe path
+    if [ $# -gt 0 ]
+    then
+      case "$1" in
+        3.*)  pyver=$1; shift
+              pyre=^cpython-$pyver\\.
+              pyexe=$( $trace uv python list | awk "/$pyre/ { print(\$NF); exit }" )
+              [ -x "$pyexe" ] || {
+                $trace uv python install --no-bin "$pyver" || exit $?
+                pyexe=$( $trace uv python list | awk "/$pyre/ { print(\$NF); exit }" )
+                [ -x "$pyexe" ] || exit 1
+              }
+              ;;
+        *)    if [ -f "$1" -a -x "$1" ]
+              then  pyexe=$1; shift
+              else  pyexe=$( which python3 )
+              fi
+              ;;
+      esac
     fi
+    # python version
     pyver=$( pyver "$pyexe" ) || exit 1
+    # venv directory path
     if [ $# = 0 ]
     then
       echo "$cmd: missing venvpath" >&2
       badopts=1
     else
       venvpath=$1; shift
+      # relative paths are inside $VENV_DIR
       case "$venvpath" in
         /* | ./* | ../* ) ;;
         *)    venvpath=$VENV_DIR/$venvpath ;;
@@ -69,13 +92,24 @@ case "$op" in
       }
     fi
     [ $badopts ] && { echo "$usage" >&2; exit 2; }
-    $trace "$pyexe" -m venv "$venvpath"
-    venvpath=$( cd "$venvpath" && pwd )
+    if [ $modern ]
+    then
+      ##$trace "$pyexe" -m pip install uv
+      $trace uv venv --python "$pyexe" --no-project --seed "$venvpath"
+      VIRTUAL_ENV=$venvpath $trace uv pip install -p "$venvpath/bin/python3" uv
+    else
+      $trace "$pyexe" -m venv "$venvpath"
+      venvpath=$( cd "$venvpath" && pwd )
+      pyexe=$VIRTUAL_ENV/bin/python3
+      $trace "$pyexe" -m pip install -U pip wheel uv
+    fi
     VIRTUAL_ENV=$venvpath
     export VIRTUAL_ENV
-    pyexe=$VIRTUAL_ENV/bin/python3
-    $trace "$pyexe" -m pip install -U pip wheel uv
-    [ $# = 0 ] || $trace "$VIRTUAL_ENV/bin/uv" pip install "$@"
+    if [ $# -gt 0 ]
+    then
+      $trace uv pip install -p "$VIRTUAL_ENV/bin/python" uv
+      $trace "$VIRTUAL_ENV/bin/uv" pip install "$@"
+    fi
     ;;
   exec)
     [ $# -gt 0 ] || {

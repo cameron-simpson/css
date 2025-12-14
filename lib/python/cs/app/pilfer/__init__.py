@@ -64,6 +64,8 @@ DISTINFO = {
         'cs.threads',
         'cs.upd',
         'cs.urlutils',
+        'bs4',
+        'lxml',  # default bs4/BeautifulSoup parser
         'icontract',
         'mitmproxy',
         'requests',

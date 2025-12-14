@@ -14,7 +14,7 @@ from functools import cache
 from itertools import takewhile
 from string import ascii_uppercase, ascii_lowercase, digits
 import sys
-from typing import Mapping, Optional, Union
+from typing import List, Mapping, Optional, Union
 
 from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
@@ -133,33 +133,51 @@ def header(
     headers: Mapping[str, str],
     header_name: str,
     registry: Optional[HeaderRegistry] = None,
+    *,
+    default=None,
 ) -> Union[None, BaseHeader]:
   ''' Return a header parsed into an instance of `email.headerregistry.BaseHeader`
-      or `None` if `header_name` is not present.
+      or `default` if `header_name` is not present.
   '''
   value = headers.get(header_name)
   if value is None:
-    return None
+    return default
   if registry is None:
     registry = default_headerregistry()
   return registry(header_name, value)
 
-def content_length(headers: Mapping[str, str]) -> Union[None, int]:
+def content_encodings(headers: Mapping[str, str], **header_kw) -> List[str]:
+  ''' A list of the encodings named in the `Content-Encoding` header.
+  '''
+  return [
+      enc for enc in map(
+          lambda enc: enc.strip().lower(),
+          header(
+              headers,
+              'content-encoding',
+              default='',
+              **header_kw,
+          ).split('.')
+      ) if enc
+  ]
+
+def content_length(headers: Mapping[str, str],
+                   **header_kw) -> Union[None, int]:
   ''' Return the value of the `Content-Length` header, or `None`.
 
       Note that `headers` is expected to be a case insensitive mapping.
   '''
-  hdr = header(headers, 'content-length')
+  hdr = header(headers, 'content-length', **header_kw)
   if hdr is None:
     return None
   return int(hdr)
 
-def content_type(headers: Mapping[str, str]) -> ContentTypeHeader:
+def content_type(headers: Mapping[str, str], **header_kw) -> ContentTypeHeader:
   ''' Return the parsed value of the `Content-Type` header, or `None`.
 
       Note that `headers` is expected to be a case insensitive mapping.
   '''
-  return header(headers, 'content-type')
+  return header(headers, 'content-type', **header_kw)
 
 def parse_chunk_line1(bline):
   ''' Parse the opening line of a chunked-encoding chunk.

@@ -118,8 +118,11 @@ class URLFetcher(MultiOpenMixin):
       eoq = object()
       try:
         with stackattrs(self, _q=q):
-          t = asyncio.create_task(self.prefetch_worker(aqiter(q, eoq)))
-          yield t
+          t = asyncio.create_task(
+              self.prefetch_worker(aqiter(q, sentinel=eoq))
+          )
+          with stackattrs(self.pilfer.state, prefetcher=self):
+            yield t
       finally:
         q.put(eoq)
 
