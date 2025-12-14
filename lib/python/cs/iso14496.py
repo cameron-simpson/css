@@ -228,7 +228,7 @@ class MP4Command(BaseCommand):
             ofp.write(chunk)
             need -= len(chunk)
 
-  def cmd_info(self, argv):
+  def cmd_probe(self, argv):
     ''' Usage: {cmd} [{{-|filename}}]...]
           Print informative report about each source.
     '''
