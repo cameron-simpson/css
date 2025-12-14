@@ -2686,7 +2686,7 @@ class ILSTBoxBody(ContainerBoxBody):
               )
               decoder = subsubbox_schema.get(name_box.text.value)
               if decoder is not None:
-                value = decoder(value)
+                value = decoder(value.value)
               # annotate the subbox and the ilst
               attribute_name = f'{mean_box.text}.{name_box.text}'
               setattr(subbox, attribute_name, value)
