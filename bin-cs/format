@@ -141,6 +141,7 @@ do
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
           black)  $trace black -q -t py38 $black_opts "$srcfile" ;;
+          ruff)   $trace ruff format -q "$srcfile" ;;
           *)      echo "$cmd: unsupported Python formatter: $pyformat" >&2
                   exit 1
                   ;;

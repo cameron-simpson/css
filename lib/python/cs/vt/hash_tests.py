@@ -15,7 +15,7 @@ from cs.binary_tests import BaseTestBinaryClasses
 
 from . import hash as hash_module
 from .hash import HashCode, decode as decode_hash
-from .transcribe import Transcriber
+from .transcribe import Transcribable
 
 class TestHashBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Hook to test the hash `AbstractBinary` subclasses.
@@ -40,9 +40,9 @@ class TestHashing(unittest.TestCase):
           rs = bytes(random.randint(0, 255) for _ in range(100))
           H = cls.from_data(rs)
           self.assertEqual(cls.hashfunc(rs).digest(), bytes(H))
-          self.assertTrue(isinstance(H, Transcriber))
+          self.assertTrue(isinstance(H, Transcribable))
           Hs = str(H)
-          H2, offset = Transcriber.parse(Hs)
+          H2, offset = Transcribable.parse(Hs)
           self.assertTrue(offset == len(Hs))
           self.assertEqual(H, H2)
           # bytes(hash_num + hash_bytes)

@@ -120,18 +120,22 @@ def module_names(M):
 # TODO: use the AST module to do a real parse?
 # pylint: disable=too-many-branches
 @pfx
-def direct_imports(src_filename, module_name):
+def direct_imports(src_filename, module_name, *, include_indented=False):
   ''' Crudely parse `src_filename` for `import` statements.
       Return the set of directly imported module names.
 
       Resolve relative imports against `module_name`.
 
-      This is a very simple minded source parse.
+      This is a very simple minded source parse which understands
+      nearly nothing about Python.
   '''
   subnames = set()
   with open(src_filename, encoding='utf-8') as codefp:
     for lineno, line in enumerate(codefp, 1):
-      line = line.strip()
+      if include_indented:
+        line = line.strip()
+      else:
+        line = line.rstrip()
       with Pfx("%d: %s", lineno, line):
         if line.startswith('import ') or line.startswith('from '):
           # quick hack to strip trailing "; second-statement"

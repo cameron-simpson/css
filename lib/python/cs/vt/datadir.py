@@ -454,7 +454,7 @@ class FilesDir(SingletonMixin, HasFSPath, HashCodeUtilsMixin, MultiOpenMixin,
       if WDFstate is None:
         # create a new data file
         while True:
-          filename = str(uuid4()) + self.DATA_DOT_EXT
+          filename = f'{uuid4()}{self.DATA_DOT_EXT}'
           pathname = self.datapathto(filename)
           if existspath(pathname):
             error("new datafile path already exists, retrying: %r", pathname)
@@ -809,7 +809,7 @@ class DataDir(FilesDir):
     with self._lock:
       WDFstate = self.WDFstate
       with WDFstate.datafile as df:
-        DR, file_offset, length = df.append(data)
+        (DR, file_offset, length), = df.extend([data])
       index_entry = FileDataIndexEntry(
           filenum=WDFstate.filenum,
           data_offset=file_offset + DR.data_offset,

@@ -163,9 +163,10 @@ def tabpadding(padlen: int, tabsize: int = 8, offset: int = 0) -> str:
 
 def typed_str(
     obj: Any,
+    *,
     use_cls: bool = False,
     use_repr: bool = False,
-    max_length: int = 32,
+    max_length: Optional[int] = 32,
 ) -> str:
   ''' Return "type(obj).__name__:str(obj)" for some object `obj`.
       This is available as both `typed_str` and `s`.
@@ -259,7 +260,7 @@ def texthexify(
     bs: bytes,
     shiftin: str = '[',
     shiftout: str = ']',
-    whitelist: Optional[str] = None
+    whitelist: Optional[Union[str, bytes]] = None
 ) -> str:
   ''' Transcribe the bytes `bs` to text using compact text runs for
       some common text values.
@@ -302,7 +303,7 @@ def texthexify(
   if whitelist is None:
     whitelist = _texthexify_white_chars
   if isinstance(whitelist, str):
-    whitelist = bytes(ord(ch) for ch in whitelist)
+    whitelist: bytes = bytes(ord(ch) for ch in whitelist)
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
   offset = 0
@@ -343,7 +344,7 @@ def texthexify(
   return ''.join(chunks)
 
 # pylint: disable=redefined-outer-name
-def untexthexify(s: str, shiftin: str = '[', shiftout: str = ']') -> str:
+def untexthexify(s: str, shiftin: str = '[', shiftout: str = ']') -> bytes:
   ''' Decode a textual representation of binary data into binary data.
 
       This is the reverse of the `texthexify` function.
@@ -415,7 +416,7 @@ def get_white(s: str, offset: int = 0) -> Tuple[str, int]:
   return get_chars(s, offset, whitespace)
 
 # pylint: disable=redefined-outer-name
-def skipwhite(s: str, offset: int = 0) -> Tuple[str, int]:
+def skipwhite(s: str, offset: int = 0) -> int:
   ''' Convenience routine for skipping past whitespace;
       returns the offset of the next nonwhitespace character.
   '''
@@ -489,8 +490,12 @@ def stripped_dedent(
 
 @require(lambda offset: offset >= 0)
 def get_prefix_n(
-    s: str, prefix: str, n: Optional[int] = None, *, offset: int = 0
-) -> str:
+    s: str,
+    prefix: str,
+    n: Optional[int] = None,
+    *,
+    offset: int = 0,
+) -> Tuple[Union[str, None], Union[int, None], int]:
   ''' Strip a leading `prefix` and numeric value `n` from the string `s`
       starting at `offset` (default `0`).
       Return the matched prefix, the numeric value and the new offset.
@@ -641,7 +646,7 @@ def get_decimal(s: str, offset: int = 0) -> Tuple[str, int]:
   return get_chars(s, offset, digits)
 
 # pylint: disable=redefined-outer-name
-def get_decimal_value(s: str, offset: int = 0) -> Tuple[str, int]:
+def get_decimal_value(s: str, offset: int = 0) -> Tuple[int, int]:
   ''' Scan the string `s` for a decimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
@@ -658,7 +663,7 @@ def get_hexadecimal(s: str, offset: int = 0) -> Tuple[str, int]:
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 # pylint: disable=redefined-outer-name
-def get_hexadecimal_value(s: str, offset: int = 0) -> Tuple[str, int]:
+def get_hexadecimal_value(s: str, offset: int = 0) -> Tuple[int, int]:
   ''' Scan the string `s` for a hexadecimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
@@ -668,7 +673,9 @@ def get_hexadecimal_value(s: str, offset: int = 0) -> Tuple[str, int]:
   return int('0x' + value_s), offset
 
 # pylint: disable=redefined-outer-name
-def get_decimal_or_float_value(s: int, offset: int = 0) -> Tuple[str, int]:
+def get_decimal_or_float_value(s: str,
+                               offset: int = 0
+                               ) -> Tuple[Union[int, float], int]:
   ''' Fetch a decimal or basic float (nnn.nnn) value
       from the str `s` at `offset` (default `0`).
       Return `(value,new_offset)`.

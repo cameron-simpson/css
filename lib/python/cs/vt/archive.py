@@ -104,7 +104,7 @@ class BaseArchive(ABC):
     ''' Parse lines from an open archive file, yield `(when, E)`.
     '''
     for lineno, line in enumerate(fp, first_lineno):
-      with Pfx(str(lineno)):
+      with Pfx(lineno):
         if not line.endswith('\n'):
           raise ValueError("incomplete? no trailing newline")
         line = line.strip()
@@ -142,21 +142,15 @@ class BaseArchive(ABC):
     # produce a local time with knowledge of its timezone offset
     dt = datetime.fromtimestamp(when).astimezone()
     assert dt.tzinfo is not None
-    # precompute strings to avoid corrupting the archive file
-    iso_s = dt.isoformat()
-    when_s = str(when)
-    Es = E if isinstance(E, str) else str(E)
-    etc_s = None if etc is None else unctrl(etc)
-    fp.write(iso_s)
-    fp.write(' ')
-    fp.write(when_s)
-    fp.write(' ')
-    fp.write(Es)
-    if etc is not None:
-      fp.write(' ')
-      fp.write(etc_s)
-    fp.write('\n')
-    fp.flush()
+    Es = str(E)
+    print(
+        df.isoformat(),
+        when,
+        Es,
+        *(() if etc is None else (f'# {etc}',)),
+        file=fp,
+        flush=True,
+    )
     return Es
 
   def append(self, E, when, etc):

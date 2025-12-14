@@ -15,7 +15,7 @@ ISO make the standard available here:
 from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import closing, contextmanager
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from functools import cached_property
 from getopt import GetoptError
 import os
@@ -521,7 +521,7 @@ class TimeStampMixin:
                       0xfffffffffffffffe, 0xffffffffffffffff):
       return None
     try:
-      dt = pfx_call(datetime.fromtimestamp, self.value, UTC)
+      dt = pfx_call(datetime.fromtimestamp, self.value, timezone.utc)
     except (OverflowError, OSError) as e:
       warning("%s.datetime: returning None", type(self).__name__, e)
       return None
@@ -2061,10 +2061,8 @@ class ELSTBoxBody(FullBoxBody):
     '''
     super().parse_fields(bfr)
     assert self.version in (0, 1)
-    self.parse_field('entry_count', bfr, UInt32BE)
-    self.entries = list(
-        self.entry_class.scan(bfr, count=self.entry_count.value)
-    )
+    entry_count = UInt32BE.parse_value(bfr)
+    self.entries = list(self.entry_class.scan(bfr, count=entry_count))
 
   def transcribe(self):
     ''' Transcribe an `ELSTBoxBody`.
@@ -2688,7 +2686,7 @@ class ILSTBoxBody(ContainerBoxBody):
               )
               decoder = subsubbox_schema.get(name_box.text.value)
               if decoder is not None:
-                value = decoder(value)
+                value = decoder(value.value)
               # annotate the subbox and the ilst
               attribute_name = f'{mean_box.text}.{name_box.text}'
               setattr(subbox, attribute_name, value)

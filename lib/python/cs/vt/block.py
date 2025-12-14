@@ -57,7 +57,7 @@ from cs.result import ResultSet
 from cs.threads import locked
 
 from .hash import HashCode, io_fail
-from .transcribe import Transcriber, hexify
+from .transcribe import Transcribable, hexify
 
 F_BLOCK_INDIRECT = 0x01  # indirect block
 F_BLOCK_TYPED = 0x02  # block type provided, otherwise BT_HASHCODE
@@ -73,7 +73,7 @@ class BlockType(IntEnum):
   BT_LITERAL = 2  # span raw-data
   BT_SUBBLOCK = 3  # a SubBlock of another Block
 
-class Block(Transcriber, ABC, prefix=None):
+class Block(Transcribable, ABC, prefix=None):
   ''' The base class for all `Block`s.
   '''
 
@@ -484,7 +484,7 @@ class Block(Transcriber, ABC, prefix=None):
         )
     raise TypeError(f'{cls.__name__}.promote: cannot promote {r(blockish)}')
 
-class BlockRecord(BinarySingleValue):
+class BlockRecord(BinarySingleValue, value_type=Block):
   ''' Support for binary parsing and transcription of blockrefs.
   '''
 
@@ -627,7 +627,8 @@ class BlockRecord(BinarySingleValue):
     else:
       raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
     block_bs = b''.join(flatten_transcription(transcription))
-    return BSData(block_bs).transcribe()
+    # wrap it all in a BSData
+    return bytes(BSData(block_bs))
 
 class HashCodeBlock(Block, prefix='B'):
   ''' A Block reference based on a Store hashcode.
@@ -789,13 +790,13 @@ class HashCodeBlock(Block, prefix='B'):
     else:
       yield bs[start:end]
 
-  def transcribe_inner(self) -> str:
+  def str_inner(self) -> str:
     ''' Transcribe this `HashCodeBlock` as text.
     '''
     m = {'hash': self.hashcode}
     if self._span is not None:
       m['span'] = self._span
-    return self.transcribe_mapping_inner(m)
+    return self.str_mapping_inner(m)
 
   @classmethod
   # pylint: disable=too-many-arguments
@@ -933,10 +934,10 @@ class IndirectBlock(Block, prefix='I'):
       blocks = self._subblocks = self.decode_subblocks(self.superblock.data)
     return blocks
 
-  def transcribe_inner(self) -> str:
+  def str_inner(self) -> str:
     ''' Transcribe "span:Block".
     '''
-    return self.transcribe_obj(self.superblock)
+    return self.str_obj(self.superblock)
 
   @classmethod
   # pylint: disable=too-many-arguments
@@ -949,7 +950,7 @@ class IndirectBlock(Block, prefix='I'):
           "offset %d: missing colon after span(%d)" % (offset2, span)
       )
     offset = offset2 + 1
-    superB, offset = Transcriber.parse(s, offset)
+    superB, offset = Transcribable.parse(s, offset)
     return cls(superB, span), offset
 
   def datafrom(self, start=0, end=None):
@@ -1045,8 +1046,8 @@ class RLEBlock(Block, prefix='RLE'):
       raise ValueError("end(%s) < start(%s)" % (end, start))
     yield self.octet * length
 
-  def transcribe_inner(self) -> str:
-    return self.transcribe_mapping_inner(
+  def str_inner(self) -> str:
+    return self.str_mapping_inner(
         {
             'span': self.span,
             'octet': self.octet
@@ -1101,7 +1102,7 @@ class LiteralBlock(Block, prefix='LB'):
     from . import Store
     return Store.default().add(self._data)
 
-  def transcribe_inner(self) -> str:
+  def str_inner(self) -> str:
     ''' Transcribe the block data in texthexified form.
     '''
     return hexify(self._data)
@@ -1203,8 +1204,8 @@ class _SubBlock(Block, prefix='SubB'):
       raise IndexError("index %d outside span %d" % (index, self.span))
     return self.superblock[self.offset + index]
 
-  def transcribe_inner(self) -> str:
-    return self.transcribe_mapping_inner(
+  def str_inner(self) -> str:
+    return self.str_mapping_inner(
         {
             'block': self.superblock,
             'offset': self.offset,

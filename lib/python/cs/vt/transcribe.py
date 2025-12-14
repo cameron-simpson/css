@@ -45,6 +45,9 @@ from typing import (
 )
 from uuid import UUID
 
+from typeguard import typechecked
+
+from cs.buffer import CornuCopyBuffer
 from cs.deco import decorator, Promotable
 from cs.gimmicks import warning
 from cs.lex import (
@@ -74,17 +77,39 @@ def hexify(data):
   '''
   return texthexify(data, whitelist=_TEXTHEXIFY_WHITE_CHARS)
 
-class Transcriber(Promotable):  ##, ABC):
+class Transcribable(Promotable):  ##, ABC):
   ''' Abstract base class for objects which can be transcribed.
 
-      Transcribers implement the following methods:
-      * `transcribe_inner(T, fp)`: to transcribe to the file `fp`.
-      * `parse_inner(T,s,offset,*,stopchar='}',prefix=None)`:
-        to parse this class up to `stopchar`.
+      The core `cs.vt` ojects (`Block`s, `Dir`s etc) can all be transcribed
+      and parsed from their transcriptions.
+      The transcription is just `str(obj)`, and the parse is
+      `cls.parse(s)` for any `cls` which subclasses `Transcribable`.
 
-      Optional attribute:
-      * `transcribe_prefix`:
+      `Transcribable`s are also `Promotable`, which in this case
+      means that an function decorated with `@promote` will accept
+      the text transcription of a `Transcribable`.
+
+      `Transcribable`s implement the following methods:
+      * `str_inner(T)`: to transcribe the inner part of *prefix*`{`*inner*`}` as a string
+      * `parse_inner(T,s,offset,*,stopchar='}',prefix=None)`:
+        to parse an inner transcription of this class up to `stopchar`.
+
+      Optional class attribute:
+      * `str_prefix`:
         the default prefix for the "prefix{....}" markers.
+
+      The usual transcription takes the form:
+
+          prefix{inner}
+
+      where *prefix* denotes the object type/class such as `H` for a hashcode
+      and the *inner* contains the details of the object.
+      Some basic Python types are transcribed more directly:
+      * `int`: using `str`
+      * `float`: using `'%f'`
+      * `str` and `dict`: using compact JSON
+      * `bool`: as a 1 or 0
+      * `bytes`: using `hexify()`
   '''
 
   __slots__ = ()
@@ -135,7 +160,7 @@ class Transcriber(Promotable):  ##, ABC):
   def __str__(self):
     ''' Return the transcription of this object.
     '''
-    return type(self).transcribe_obj(self)
+    return type(self).str_obj(self)
 
   @classmethod
   def from_str(cls, s: str):
@@ -152,21 +177,21 @@ class Transcriber(Promotable):  ##, ABC):
       return obj
 
   @classmethod
-  def transcribe_obj(cls, obj, prefix: Optional[str] = None) -> str:
+  def str_obj(cls, obj, prefix: Optional[str] = None) -> str:
     ''' Class method to transcribe `obj` as a string.
 
         If `obj` is an instance of one of the predefined compact
         types (`int` et al) defined in `cls.class_transcribers`
         then use the compact transcription otherwise use
-        *prefix*`{`*obj.transcribe_inner()*`}`.
+        *prefix*`{`*obj.str_inner()*`}`.
     '''
     obj_type = type(obj)
     to_str = cls.class_transcribers.get(obj_type)
     if to_str is None:
-      # prefix based use of obj.transcribe_inner()
+      # prefix based use of obj.str_inner()
       if prefix is None:
         prefix = cls.prefix_by_class[obj_type]
-      return f'{prefix}{{{obj.transcribe_inner()}}}'
+      return f'{prefix}{{{obj.str_inner()}}}'
     # use the predefined transcription; prefix should be None
     if prefix is not None:
       raise ValueError(
@@ -175,9 +200,9 @@ class Transcriber(Promotable):  ##, ABC):
     return to_str(obj)
 
   @abstractmethod
-  def transcribe_inner(self) -> str:
-    ''' Write the inner textual form of this object to the file `fp`.
-        The result becomes "prefix{transcribe_inner()}".
+  def str_inner(self) -> str:
+    ''' Return the inner textual form of this object, the text
+        inside the `{` and `}` markers.
     '''
     raise NotImplementedError
 
@@ -196,7 +221,7 @@ class Transcriber(Promotable):  ##, ABC):
     raise NotImplementedError
 
   @pfx
-  def transcribe_mapping_inner(self, m: Mapping[str, Any]) -> str:
+  def str_mapping_inner(self, m: Mapping[str, Any]) -> str:
     ''' Transcribe the mapping `m` as a `str`.
         This returns the inner items comma separated without the
         usual surronding `{...}` markers.
@@ -210,37 +235,55 @@ class Transcriber(Promotable):  ##, ABC):
           raise ValueError("key is not an identifier")
         if v is None:
           continue
-        tokens.append(f'{k}:{self.transcribe_obj(v)}')
+        tokens.append(f'{k}:{self.str_obj(v)}')
     return ','.join(tokens)
 
   @classmethod
   @pfx_method
+  @typechecked  # TODO: remove, too expensive for final use
   def parse(
       cls,
-      s: str,
+      src: str | CornuCopyBuffer,
       offset: int = 0,
       *,
       expected_cls: Optional[Type] = None,
   ) -> Tuple[Any, int]:
-    ''' Parse an object from the string `s` starting at `offset`.
-        Return the object and the new offset.
+    ''' Parse an object `src`, which may be a string starting at `offset`
+        or a `CornuCopyBuffer` for parsing binary.
+        For a string, return the parsed object and the new offset.
+        For a buffer, return the parsed object directly.
 
         Parameters:
-        * `s`: the source string
-        * `offset`: optional string offset, default 0
+        * `src`: the source string or buffer
+        * `offset`: optional string offset, default `0`
         * `expected_cls`: optional; if provided, require an instance of `expected_cls`
 
-        If `parse` is called via a subclass of `Transcriber` and
-        `expected_cls` omitted then it defaults to the subclass,
+        If `parse` is called via a subclass of `Transcribable` and
+        `expected_cls` is omitted then it defaults to the subclass,
         so that:
 
             _Dirent.parse(s)
 
         will ensure that some instance of `_Dirent` is found.
     '''
+    # divert binary parse to theAbstractBinary superclass .parse method
+    if isinstance(src, CornuCopyBuffer):
+      if offset != 0:
+        raise ValueError(
+            f'nonzero {offset=} supplied with CornuCopyBuffer src:{type(src)}'
+        )
+      # parse the binary object
+      obj = super().parse(src)
+      if expected_cls is not None and not isinstance(obj, expected_cls):
+        raise ValueError(
+            f'unexpected object type at {offset=}: expected {expected_cls=} but got {r(obj)}'
+        )
+      return obj
+    assert isinstance(src, str)
+    s = src
     if expected_cls is Any:
       expected_cls = None
-    elif expected_cls is None and cls is not Transcriber:
+    elif expected_cls is None and cls is not Transcribable:
       expected_cls = cls
     # strings
     obj, offset2 = cls.parse_qs(s, offset, optional=True)
@@ -273,6 +316,7 @@ class Transcriber(Promotable):  ##, ABC):
           prefix_cls = cls.class_by_prefix.get(prefix)
           if prefix_cls is None:
             raise ValueError("prefix not registered")
+          # call parse_inner after the {
           with Pfx("prefix_cls=%s", prefix_cls.__name__):
             obj, offset = prefix_cls.parse_inner(
                 s, offset, stopchar='}', prefix=prefix
@@ -286,9 +330,7 @@ class Transcriber(Promotable):  ##, ABC):
           raise ValueError("missing closing '}' at offset %d" % (offset,))
         offset += 1
     else:
-      raise ValueError(
-          f'parse error at offset {offset}: {s[offset:offset+16]!r}'
-      )
+      raise ValueError(f'parse error at {offset=}: {s[offset:offset+16]!r}')
     if expected_cls is not None and not isinstance(obj, expected_cls):
       raise ValueError(
           f'unexpected object type at offset {offset}: expected {expected_cls} but got {r(obj)}'
