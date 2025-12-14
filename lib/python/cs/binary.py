@@ -1232,8 +1232,8 @@ def struct_field_types(
       field_names = field_names.split()
     else:
       field_names = list(field_names)
-    for fn in field_names:
-      print(fn)
+    ##for fn in field_names:
+    ##  print(fn)
     fieldmap = {}
     fmtcs = list(struct_format)
     first = True
