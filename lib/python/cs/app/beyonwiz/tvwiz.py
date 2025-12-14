@@ -15,7 +15,7 @@ import struct
 from tempfile import NamedTemporaryFile
 from typing import Tuple
 
-from cs.binary import BinaryStruct, BinarySingleStruct
+from cs.binary import BinaryStruct
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.fileutils import datafrom
@@ -109,9 +109,7 @@ class TVWizTSPoint(BinaryStruct(
     ''' The start time of the recording as a UNIX timestamp. '''
     return (self.mod_julian_date - 40587) * DAY + self.start
 
-TVWizFileOffset = BinarySingleStruct(
-    'TVWizFileOffset', '<Q', field_name='offset'
-)
+TVWizFileOffset = BinaryStruct('TVWizFileOffset', '<Q', field_names='offset')
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
