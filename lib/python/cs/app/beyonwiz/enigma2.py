@@ -38,8 +38,8 @@ class Enigma2(_Recording):
   '''
 
   DEFAULT_FILENAME_BASIS = (
-      '{meta.title:lc}--{file.datetime:lc}--{file.channel:lc}'
-      '--beyonwiz--{meta.description:lc}'
+      '{meta.title:lc_}--{file.datetime:lc_}--{file.channel:lc_}'
+      '--beyonwiz--{meta.description:lc_}'
   )
 
   FFMPEG_METADATA_MAPPINGS = {
