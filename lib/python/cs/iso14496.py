@@ -65,7 +65,7 @@ from cs.logutils import warning, debug
 from cs.pfx import Pfx, pfx_call, pfx_method, XP
 from cs.tagset import TagSet, Tag
 from cs.threads import locked_property, ThreadState
-from cs.units import transcribe_bytes_geek as geek, transcribe_time
+from cs.units import geek_bytes, human_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
 __version__ = '20241122-post'
@@ -256,7 +256,7 @@ class MP4Command(BaseCommand):
                 table.append((f'  {box.box_type_s}',))
                 for tag_name, tag_value in tags.items():
                   table.append((f'    {tag_name}', tag_value))
-        trace(printt)(*table)
+        printt(*table)
     return xit
 
   @popopts(
@@ -1242,9 +1242,11 @@ class Box(SimpleBinary):
           )
       )
     elif box_type == 'free':
-      table.append((f'{indent}Free space', geek(len(self))))
+      table.append((f'{indent}Free space', str(geek_bytes(len(self))[-2:])))
     elif box_type == 'mdat':
-      table.append((f'{indent}Media data', geek(len(self.body))))
+      table.append(
+          (f'{indent}Media data', str(geek_bytes(len(self.body))[-2:]))
+      )
     elif box_type == 'moov':
       mvhd = self.MVHD
       table.append(
@@ -1272,7 +1274,7 @@ class Box(SimpleBinary):
       tkhd = trak.TKHD
       table.append((f'{indent}Track', f'duration={tkhd.duration}'))
       table.append((f'{indent2}EDTS', ('No EDTS' if edts is None else edts)))
-      duration_s = transcribe_time(mdhd.duration.value / mdhd.timescale.value)
+      duration_s = human_time(mdhd.duration.value / mdhd.timescale.value)
       table.append(
           (
               f'{indent2}Media',
