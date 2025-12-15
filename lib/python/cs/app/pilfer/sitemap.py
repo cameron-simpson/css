@@ -236,7 +236,7 @@ class URLPattern(Promotable):
     '''
     re_s = ''.join(
         (
-            part if isinstance(part, str) else
+            re.escape(part) if isinstance(part, str) else
             f'(?P<{part[0]}>{part[1].match_re.pattern})'
         ) for part in self._parsed.parts
     )
