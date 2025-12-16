@@ -1100,6 +1100,22 @@ class SiteEntity(HasTags):
       return None
     return URLPattern(pattern_s, sitemap.URL_DOMAIN)
 
+  @classmethod
+  def match_url(cls, url: URL, *, pattern_name="sitepage_url"):
+    ''' Test whether this `SiteEntity` subclass matches `url`.
+        Return `None` if there is no pattern for `pattern_name`
+        (default `"sitepage_url"`), otherwise the result of the
+        pattern's `.match(url)` method (`None` on no match, a mapping
+        on a match).
+        If the optional argument `match` is not `None` it should
+        be a mapping, and will be updated by the mapping from a
+        successful match.
+    '''
+    ptn = cls.pattern(pattern_name=pattern_name)
+    if ptn is None:
+      return None
+    return ptn.match(url)
+
   @mapped_property
   def patterns(self, pattern_name: str):
     ''' A mapping of `pattern_name` to the `URLPattern`
