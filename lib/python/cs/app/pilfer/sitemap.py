@@ -283,15 +283,26 @@ class URLPattern(Promotable):
       url: URL,
       extra: Mapping | None = None,
   ) -> dict | None:
-    ''' Compare `url` against this matcher.
+    ''' Compare `url` against this pattern.
         Return `None` on no match.
         Return the regexp `groupdict()` on a match.
     '''
     if self.hostname_fnmatch is not None and (
         not isinstance(url.hostname, str)
         or not fnmatch(url.hostname, self.hostname_fnmatch)):
+      # hostname mismatch
       return None
-    m = self.pattern_re.match(url.path)
+    if self.path_pattern is None:
+      # no pattern, accept and return empty match dict
+      return {}
+    qpath = url.path
+    if url.query:
+      qpath = f'{qpath}?{url.query}'
+    # first try /path?query
+    m = self.pattern_re.match(qpath)
+    if m is None:
+      # otherwise try /path
+      m = self.pattern_re.match(url.path)
     if m is None:
       return None
     if m.end() < len(url.path):
