@@ -228,7 +228,19 @@ class URLPattern(Promotable):
 
   @classmethod
   def from_str(cls, pattern: str):
-    return cls(pattern)
+    if pattern.isupper():
+      raise ValueError(
+          f'cannot promote {pattern!r} to URLPattern, looks like an HTTP METHOD name'
+      )
+    if '/' in pattern:
+      if not pattern.startswith('/'):
+        pattern = f'/<*:preamble>{pattern}'
+      hostname_fnmatch = None
+      path_pattern = pattern
+    else:
+      hostname_fnmatch = pattern
+      path_pattern = None
+    return cls(hostname_fnmatch, path_pattern)
 
   @cached_property
   def pattern_re(self):
