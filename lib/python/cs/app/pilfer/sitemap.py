@@ -1831,6 +1831,7 @@ class SiteMap(UsesTagSets, Promotable):
           otherwise it may match anywhere in the path
         - a regular expression object to apply against the URL path
         - subclass of `SiteEntity`: use its `.match_url()` class method
+        - a `URLPattern`: use its `.match()` method
         - a callable: a function accepting a `FlowState` and the
           current match `TagSet`;
           it may return `None` or `False` for no match,
@@ -1878,6 +1879,20 @@ class SiteMap(UsesTagSets, Promotable):
             def test(flowstate, match):
               vprint(f'@on: {test_name}')
               m = entity_class.match_url(flowstate.url)
+              if m is not None and match is not None:
+                match.update(m)
+              return m
+
+            test.__name__ = test_name
+            return test
+        elif isinstance(pattern, type) and issubclass(pattern, URLPattern):
+
+          def maketest(entity_class):
+            test_name = f'{pattern}.match(flowstate.url)'
+
+            def test(flowstate, match):
+              vprint(f'@on: {test_name}')
+              m = pattern.match(flowstate.url)
               if m is not None and match is not None:
                 match.update(m)
               return m
