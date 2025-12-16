@@ -311,16 +311,36 @@ class URLPattern(Promotable):
 
   @classmethod
   def promote(cls, obj):
-    ''' Promote `obj` to `URLMatcher`:
-        - `(hostname_fnmatch,url_regexp)` 2-tuples
-        - `url_regexp` strings
+    ''' Promote `obj` to `URLPattern`:
+        - `SiteEntity` subclass: use `obj.pattern()`
+        - str:UPPERCASE: rejected, should be a method test
+        - str:no-slashes: hostname_fnmatch
+        - str:with-slashes: path-pattern
+        - `re.Pattern` -> path regexp
+        - `(hostname_fnmatch,path-pattern|url_regexp)` 2-tuples
     '''
     if isinstance(obj, cls):
       return obj
-    try:
-      hostname_fnmatch, path_pattern = obj
-    except (TypeError, ValueError):
-      return super().promote(obj)
+    if isinstance(obj, str):
+      return cls.from_str(obj)
+    if isinstance(obj, type) and issubclass(obj, SiteEntity):
+      # a SiteEntity - use its URLPattern
+      ptn = SiteEntity.pattern()
+      if ptn is None:
+        raise TypeError(
+            f'cannot promote SiteEntity subclass {obj} to URLPattern: no SITEPAGE_URL_PATTERN?'
+        )
+      return ptn
+    if isinstance(obj, re.Pattern):
+      # regexp -> path regexp
+      hostname_fnmatch, path_pattern = None, obj
+    else:
+      if isinstance(obj, str):
+        return cls.from_str(obj)
+      try:
+        hostname_fnmatch, path_pattern = obj
+      except (TypeError, ValueError):
+        return super().promote(obj)
     # obj is a 2-tuple of (hostname_fnmatch,path_pattern)
     return cls(hostname_fnmatch=hostname_fnmatch, path_pattern=path_pattern)
 
