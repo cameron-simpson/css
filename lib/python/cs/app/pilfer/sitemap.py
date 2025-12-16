@@ -1075,24 +1075,6 @@ class SiteEntity(HasTags):
           f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(page_name)}'
       )
 
-  @classmethod
-  @promote
-  @typechecked
-  def on_test(cls, url: URL, match=None):
-    ''' Test `url` to see if it is matched by this kind of `SiteEntity`.
-        This default implementation tests against
-        `cls.SITEPAGE_URL_PATTERN` if defined,
-        otherwise it compares `cls.url_re` against `url.path`.
-    '''
-    ptn = cls.pattern()
-    if ptn is not None:
-      return ptn.match(url)
-    # fall back to
-    m = cls.url_re.match(url.path)
-    if not m:
-      return False
-    return m.groupdict()
-
   def get(self, key, default=None):
     ''' The `Mapping.get` method, to ensure that it goes through `__getitem__`.
     '''
@@ -1350,29 +1332,6 @@ class SiteEntity(HasTags):
     if not force and not self.is_stale(lifespan):
       return
     self.grok_sitepage(self.sitepage_url)
-
-  @classmethod
-  @promote
-  def url_match(cls, url: URL) -> dict:
-    ''' Match `url.path` against `self.URL_RE`.
-        Return the matched fields or raise `ValueError` on no mach.
-    '''
-    ptn = cls.pattern()
-    if ptn is not None:
-      match = ptn.match(url)
-      if match is None:
-        raise ValueError(f'{url=} does not match {ptn}')
-    else:
-      # fall back to .url_re from .URL_RE
-      try:
-        url_re = cls.url_re
-      except AttributeError:
-        raise ValueError('no .SITEPAGE_URL_PATTERN and no .URL_RE')
-      m = url_re.match(url.path)
-      if not m:
-        raise ValueError(f'{url.path=} does not match {url_re}')
-      match = m.groupdict()
-    return match
 
   def update_from_meta(self, flowstate: FlowState, **update_kw):
     ''' Update this entity from the `flowstate.meta`.
@@ -1855,9 +1814,7 @@ class SiteMap(UsesTagSets, Promotable):
           a leading slash anchors the regexp against the start of the path
           otherwise it may match anywhere in the path
         - a regular expression object to apply against the URL path
-        - subclass of `SiteEntity`:
-          use its `.URL_RE` as a regular expression to apply against
-          the URL path
+        - subclass of `SiteEntity`: use its `.match_url()` class method
         - a callable: a function accepting a `FlowState` and the
           current match `TagSet`;
           it may return `None` or `False` for no match,
@@ -1900,11 +1857,14 @@ class SiteMap(UsesTagSets, Promotable):
         if isinstance(pattern, type) and issubclass(pattern, SiteEntity):
 
           def maketest(entity_class):
-            test_name = f'{entity_class.__name__}.on_test(flowstate)'
+            test_name = f'{entity_class.__name__}.match_url(flowstate.url)'
 
             def test(flowstate, match):
               vprint(f'@on: {test_name}')
-              return entity_class.on_test(flowstate, match)
+              m = entity_class.match_url(flowstate.url)
+              if m is not None and match is not None:
+                match.update(m)
+              return m
 
             test.__name__ = test_name
             return test
