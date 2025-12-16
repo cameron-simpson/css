@@ -1010,18 +1010,31 @@ class SiteEntity(HasTags):
   @classmethod
   @pfx
   @promote
-  def from_URL(cls, url: URL, sitemap: "SiteMap" = None):
+  def from_URL(
+      cls,
+      url: URL,
+      sitemap: "SiteMap" = None,
+      *,
+      pattern_name="sitepage_url",
+  ):
     ''' Return the `SiteEntity` from `sitemap` matching `url`.
-        Raises `ValueError` if the `url.path` does not match `cls.url_re`.
+        Raises `ValueError` if the `url.path` does not match via
+        `cls.match_url(,url,pattern_name=pattern_name)`.
     '''
     if sitemap is None:
       sitemap = cls.default_sitemap()
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
-      match = cls.url_match(url)
+      match = cls.match_url(url, pattern_name=pattern_name)
+      if match is None:
+        raise ValueError(
+            f'no match from {cls.__name__}.match_url({url},{pattern_name=})'
+        )
       try:
         type_key = match["type_key"]
       except KeyError as e:
-        raise ValueError("no type_key in match %r: %s", match, e) from e
+        raise ValueError(
+            f'no type_key in match from {cls.__name__}.match_url({url},{pattern_name=}): {match=}'
+        )
       # fill in from the match if not already set
       entity = sitemap[cls, type_key]
       for match_key, value in match.items():
