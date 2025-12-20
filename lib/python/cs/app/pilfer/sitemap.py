@@ -25,7 +25,8 @@ from cs.deco import (
 )
 from cs.fileutils import atomic_filename
 from cs.lex import (
-    cutprefix, cutsuffix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s, skipwhite
+    cutprefix, cutsuffix, FormatableMixin, FormatAsError, get_nonwhite, lc_,
+    printt, r, s, skipwhite
 )
 from cs.logutils import warning
 from cs.mappings import mapped_property
@@ -1325,7 +1326,6 @@ class SiteEntity(HasTags):
       return datetime_from_http_date(http_date).timestamp()
     return 0
 
-  @trace(retval=True)
   def is_stale(
       self, lifespan=STALE_LIFESPAN, *, page="sitepage", method="GET"
   ):
