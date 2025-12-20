@@ -777,6 +777,12 @@ def infill_from_batches(
         objs, obj_keys=obj_keys, existing_keys=existing_keys, all=all
     )
 
+def not_none(*iterables):
+  ''' Filter the iterables for items which are not `None`.
+  '''
+  for iterable in iterables:
+    yield from filter(lambda item: item is not None, iterable)
+
 if __name__ == '__main__':
   import sys
   import cs.seq_tests

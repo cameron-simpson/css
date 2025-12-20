@@ -10,7 +10,6 @@ import os
 from os.path import (
     basename,
     exists as existspath,
-    isfile as isfilepath,
     join as joinpath,
     splitext,
 )
@@ -21,7 +20,6 @@ import time
 from typing import Iterable, Mapping, Optional, Tuple
 
 from icontract import require
-import requests
 
 from cs.cmdutils import vprint
 from cs.context import stackattrs

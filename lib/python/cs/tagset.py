@@ -313,7 +313,7 @@ from weakref import WeakValueDictionary
 from icontract import require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, vprint
 from cs.context import withall
 from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable, uses_verbose
@@ -321,10 +321,9 @@ from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
 from cs.lex import (
-    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier,
-    get_nonwhite, is_dotted_identifier, is_identifier, skipwhite,
-    FormatMapping, FormatableMixin, format_attribute,
-    FStr, printt, r, s, without_suffix
+    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
+    is_dotted_identifier, is_identifier, skipwhite, FormatMapping,
+    FormatableMixin, format_attribute, FStr, printt, r, s, without_suffix
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
@@ -482,49 +481,51 @@ def jsonable(obj, converted: Optional[dict] = None):
     return converted[id(obj)]
   except KeyError:
     pass
-  t = type(obj)
-  if t in (int, float, str, bool):
-    # return unchanged - no need to record the convobj
+  if type(obj) in (int, float, str, bool):
+    # return the basic types unchanged
     return obj
   # see if the object has a for_json() method
-  try:
-    for_json = obj.for_json
-  except AttributeError:
-    pass
+  for_json = getattr(obj, 'for_json', None)
+  if for_json is not None and callable(for_json):
+    convobj = for_json()
   else:
-    converted[id(obj)] = convobj = for_json()
-    return convobj
-  if isinstance(obj, pathlib.PurePath):
-    return str(obj)
-  if isinstance(t, (set, tuple, list)):
-    # convert to list
-    converted[id(obj)] = convobj = []
-    convobj.extend(jsonable(item, converted) for item in obj)
-    return convobj
-  # a mapping?
-  try:
-    keys = obj.keys
-  except AttributeError:
-    # an iterable?
-    try:
-      it = iter(obj)
-    except TypeError:
-      raise TypeError(f'jsoanble({r(obj)}): cannot convert for JSON')
-    else:
-      if it is obj:
-        raise TypeError(
-            f'jsonable({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
-        )
+    if isinstance(obj, (int, float, str, bool)):
+      # subtypes of the basics
+      return obj
+    if isinstance(obj, (date, datetime, pathlib.PurePath)):
+      # return in string form
+      convobj = str(obj)
+    elif isinstance(obj, (set, tuple, list)) or isinstance(obj, Sequence):
       # convert to list
-      converted[id(obj)] = convobj = []
-      convobj.extend(jsonable(item, converted) for item in it)
-      return convobj
-  else:
-    # a mapping
-    converted[id(obj)] = convobj = {}
-    for k in keys():
-      convobj[k] = jsonable(obj[k], converted)
-    return convobj
+      convobj = []
+      converted[id(obj)] = convobj
+      convobj.extend(jsonable(item, converted) for item in obj)
+    else:
+      # a mapping?
+      try:
+        keys = obj.keys
+      except AttributeError:
+        # an iterable?
+        try:
+          it = iter(obj)
+        except TypeError:
+          raise TypeError(f'jsoanble({r(obj)}): cannot convert for JSON')
+        if it is obj:
+          raise TypeError(
+              f'jsonable({r(obj)}): refusing to convert an iterator for JSON because it would be consumed'
+          )
+        # convert to list
+        convobj = []
+        converted[id(obj)] = convobj
+        convobj.extend(jsonable(item, converted) for item in it)
+      else:
+        # a mapping, convert to dict
+        convobj = {}
+        converted[id(obj)] = convobj
+        for k in keys():
+          convobj[k] = jsonable(obj[k], converted)
+  converted[id(obj)] = convobj
+  return convobj
 
 class _FormatStringTagProxy:
   ''' A proxy for a `Tag` where `__str__` returns `str(self.value)`.
@@ -860,6 +861,13 @@ class TagSet(
     ''' Obsolete form of `TagSet.from_str`.
     '''
     return cls.from_str(s[offset:], **from_str_kw)
+
+  def printt(self, key_indent="  ", **printt_kw):
+    return printt(
+        [f'{self.__class__.__name__}:{id(self)}'],
+        *[[f'{key_indent}{k}', v] for k, v in sorted(self.as_dict().items())],
+        **printt_kw
+    )
 
   def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
     ''' Dump a `TagSet` in multiline format.
@@ -2908,9 +2916,11 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       value = te[tag_name]
     except KeyError:
       return None
-    if isinstance(value, Sequence):
-      if subtype is None:
-        subtype = cutsuffix(tag_name, '_id')
+    if value is None:
+      return None
+    if subtype is None:
+      subtype = cutsuffix(tag_name, '_id')
+    if not isinstance(value, str) and isinstance(value, Sequence):
       if attr is None:
         # use the entity name
         return [self[f'{type_zone}.{subtype}.{key}'] for key in value]
@@ -2921,8 +2931,6 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
           for key in value
       ]
       return result
-    if subtype is None:
-      subtype = tag_name
     if attr is None:
       return self[f'{type_zone}.{subtype}.{value}']
     return list(self.find(deref_name_condition, **{attr: value}))
@@ -3028,6 +3036,13 @@ class HasTags(TagSetTyping, FormatableMixin):
     for subclass in public_subclasses(cls):
       if getattr(subclass, 'TYPE_SUBNAME', None) == type_subname:
         return super().__new__(subclass)
+    strict = getattr(cls, 'STRICT_SUBTYPES', True)
+    if strict:
+      raise ValueError(
+          f'no subclass of {cls.__name__} found for {type_subname=}'
+          f' and {cls.__name__}.STRICT_SUBTYPES={strict}'
+          f'; public subclasses are {", ".join(sorted(map(lambda subcls: subcls.__name__, public_subclasses(cls))))}'
+      )
     # return the generic version
     return super().__new__(cls)
 
@@ -3136,6 +3151,11 @@ class HasTags(TagSetTyping, FormatableMixin):
     ''' The tags items.
     '''
     return self.tags.items()
+
+  def setdefault(self, key, default_value):
+    ''' Set `self[key]=default_value` if `key` is not present.
+    '''
+    return self.tags.setdefault(key, default_value)
 
   def update(self, *update_a, **update_kw):
     ''' Update the tags, tupically from a mapping or keyword arguments.
@@ -3373,13 +3393,16 @@ class UsesTagSets:
         )
     )
 
-  def find(self, criteria) -> List[HasTags]:
+  def find(self, *criteria, **crit_kw) -> List[HasTags]:
     ''' Find entities in the database.
 
         This runs a find of the `BaseTagSets` and returns the associated
         `HasTagSetsClass` instances.
     '''
-    return [self.HasTagsClass(te, self) for te in self.tagsets.find(criteria)]
+    return [
+        self.HasTagsClass(te, self)
+        for te in self.tagsets.find(*criteria, **crit_kw)
+    ]
 
   @typechecked
   def deref(

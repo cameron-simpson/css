@@ -6,6 +6,7 @@
 from functools import cached_property
 
 from cs.lex import printt
+from cs.logutils import warning
 
 class GraphQLDataMixin:
   ''' A mixin for dealing with the data from a GraphQL response.
@@ -46,9 +47,10 @@ class GraphQLDataMixin:
     '''
     cls = self.__class__
     nodes = []
-    assert self.dtype == f'{base_nodetype}Connection', (
-        f'{self.dtype=} does not match {base_nodetype=}'
-    )
+    if self.dtype != f'{base_nodetype}Connection':
+      warning(
+          f'connected_nodes(base_nodetype): {self.dtype=} does not match {base_nodetype=}'
+      )
     # expect edges, each edge containing a node
     edge_typename = f'{base_nodetype}Edge'
     for edge in map(cls, self["edges"]):

@@ -34,7 +34,6 @@ from string import (
 )
 import sys
 from textwrap import dedent
-from threading import Lock
 from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
 
 from dateutil.tz import tzlocal
@@ -1901,7 +1900,7 @@ class FormatableFormatter(Formatter):
           if format_subspec[0].isalpha():
             try:
               value, offset = value.convert_via_method_or_attr(format_subspec)
-            except (AttributeError, TypeError) as e:
+            except (AttributeError, TypeError):
               value = format(value, format_subspec)
               offset = len(format_subspec)
             if offset < len(format_subspec):
@@ -2108,7 +2107,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     # use format_attributes by preference
     try:
       attribute = self.format_attributes[attr]
-    except KeyError as e:
+    except KeyError:
       try:
         attribute = getattr(self, attr)
       except AttributeError:
@@ -2368,7 +2367,8 @@ class BaseToken(Promotable):
         Raises `SyntaxError` on a parse failure.
         This is a wrapper for the `parse` class method.
     '''
-    token = cls.parse(text)
+    token, offset = cls.parse(text)
+    assert offset == token.end_offset
     if token.end_offset != len(text):
       raise SyntaxError(
           f'unparsed text at offset {token.end_offset}:'
@@ -2389,11 +2389,10 @@ class BaseToken(Promotable):
     '''
     while True:
       try:
-        token = cls.parse(text, offset, skip=skip)
+        token, offset = cls.parse(text, offset, skip=skip)
       except EOFError:
         break
       yield token
-      offset = token.end_offset
 
 class CoreTokens(BaseToken):
   ''' A mixin for token dataclasses whose subclasses include `Identifier`,

@@ -1017,7 +1017,7 @@ class BinaryBytes(
 ):
   ''' A list of `bytes` parsed directly from the native iteration of the buffer.
       Subclasses are initialised with a `consume=` class parameter
-      indicating how many bytes to console on parse; the default
+      indicating how many bytes to consume on parse; the default
       is `...` meaning to consume the entire remaining buffer, but
       a positive integer can also be supplied to consume exactly
       that many bytes.

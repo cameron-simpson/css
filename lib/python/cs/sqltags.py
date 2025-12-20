@@ -46,7 +46,7 @@ import sys
 from subprocess import run
 from threading import RLock
 import time
-from typing import List, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import List, Iterable, Mapping, Optional, Sequence, Set, Tuple
 from uuid import UUID
 
 from icontract import ensure, require
@@ -1537,6 +1537,15 @@ class SQLTagSet(SingletonMixin, TagSet):
         with self.db_session():
           self.add_db_tag(tag_name, self.to_polyvalue(tag_name, value))
 
+  def setdefault(self, tag_name, value):
+    ''' Return `self[tag_name]`, setting it to `value` if not already present.
+    '''
+    try:
+      return self[tag_name]
+    except KeyError:
+      self.set(tag_name, value)
+      return value
+
   @pfx_method
   @typechecked
   def add_db_tag(self, tag_name, pv: PolyValue):
@@ -2001,6 +2010,18 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         if all(criterion.match_tagged_entity(te)
                for criterion in post_criteria):
           yield te
+
+  @pfx_method
+  def preload(self, *criteria) -> Set[SQLTagSet]:
+    ''' Preload the `SQLTagSets` matching each criterion in `criteria`.
+        Note that is is effectively an OR of the `criteria`, not an AND.
+        Return a `set` of the entities.
+    '''
+    tes = set()
+    for criterion in criteria:
+      with Pfx("criterion %r", criterion):
+        tes.update(self.find(criterion))
+    return tes
 
   def import_csv_file(self, f, *, update_mode=False):
     ''' Import CSV data from the file `f`.

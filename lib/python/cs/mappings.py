@@ -1421,6 +1421,14 @@ class RemappedMappingProxy:
       )
     return map(self.key, subkey_iter)
 
+  def items(self):
+    for k in self.keys():
+      yield k, self[k]
+
+  def values(self):
+    for k in self.keys():
+      yield self[k]
+
   def __contains__(self, key):
     return self.subkey(key) in self.mapping
 

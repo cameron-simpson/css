@@ -1154,7 +1154,7 @@ class BaseCommand:
 
       This class provides the basic parse and dispatch mechanisms
       for command lines.
-      To implement a command line one instantiates a subclass of `BaseCommand`:
+      To implement a command line one defines a subclass of `BaseCommand`:
 
           class MyCommand(BaseCommand):
               """ My command to do something. """
@@ -1162,7 +1162,8 @@ class BaseCommand:
       and provides either a `main` method if the command has no subcommands
       or a suite of `cmd_`*subcommand* methods, one per subcommand.
 
-      Running a command is done by:
+      Running a command is done by instantiating it with `argv` and
+      then calling `.run()`:
 
           MyCommand(argv).run()
 
@@ -1185,7 +1186,7 @@ class BaseCommand:
       The `self.options` object is an instance of the class' `Options` class.
       The default comes from `BaseCommand.Options` (aka `BaseCommandOptions`)
       but classes with additional command line options will usually
-      provide their own subclass:
+      provide their own `Options` subclass:
 
           class MyCommand(BaseCommand):
 

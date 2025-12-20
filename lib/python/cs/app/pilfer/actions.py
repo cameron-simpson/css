@@ -19,11 +19,52 @@ from typeguard import typechecked
 from cs.lex import BaseToken, cutprefix
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import pfx_call
 from cs.urlutils import URL
 
 from .parse import get_name_and_args, import_name
 from .pilfer import Pilfer, uses_pilfer
+
+@dataclass
+class ActionSpecification:
+  r'''An action specification parsed from the `[actions]` section of a `pilferrc` file.
+
+      Such a section contains fields of the form:
+
+          action_name = action_argv
+          action_name.mode = mode_value
+
+      where:
+      * `action_name` is a name containing no dots, specifying the
+        argument list for an action
+      * `action_argv` is a shell compatible argument list parsed by `shlex.split`
+      * `action_name.mode` specifies a value for the mode of `action_name` named `mode`;
+        there may be several of these
+      The `action_name=action_argv` line may be omitted, or have
+      an empty `action_argv`; this configuration is expected to be
+      for a builtin action such as `dump`.
+
+      Example:
+
+          [actions]
+          untrack = s/\?.*//
+          dump.ignore_hosts = analytics.example.com beacon.example.com
+  '''
+  name: str
+  argv: list[str]
+  modes: Mapping[str, str]
+
+  def from_actions_section(cls, name: str, section: Mapping[str, str]):
+    ''' Make a new `_Action` from the action name and an `[actions]` pilferrc section mapping.
+    '''
+    argv = shlex.split(section.get(name, '').strip())
+    mode_prefix = f'{name}.'
+    modes = {
+        cutprefix(mode_field, mode_prefix): mode_value.strip()
+        for mode_field, mode_value in section.items()
+        if mode_field.startswith(mode_prefix)
+    }
+    return cls(name=name, argv=argv, modes=modes)
 
 @dataclass
 class _Action(BaseToken):
@@ -52,7 +93,7 @@ class _Action(BaseToken):
         stage functions.
     '''
     action = super().from_str(text)
-    action.pilfer = Pilfer
+    action.pilfer = P
     return action
 
 @dataclass(kw_only=True)
@@ -82,8 +123,9 @@ class ActionByName(_Action):
     ''' Produce the stage specification for this action.
     '''
     P = self.pilfer
+    action_map = P.action_map
     try:
-      return P.action_map[self.name]
+      return action_map[self.name]
     except KeyError:
       return import_name(self.name)
 

@@ -514,6 +514,7 @@ class BaseProgress:
         )
 
   # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
+  @fmtdoc
   @uses_runstate
   def iterbar(
       self,
@@ -544,7 +545,7 @@ class BaseProgress:
           made as items are obtained or only after items are processed
           by whatever is consuming this generator.
           The default is `False`, advancing after processing.
-        * `update_period`: default `DEFAULT_UPDATE_PERIOD`; if `0`
+        * `update_period`: default `{DEFAULT_UPDATE_PERIOD=}`; if `0`
           then update on every iteration, otherwise every `update_period`
           seconds
         * `cancelled`: an optional callable to test for iteration cancellation

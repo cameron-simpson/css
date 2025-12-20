@@ -6,7 +6,7 @@
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import partial
+from functools import cached_property, partial
 from inspect import isgeneratorfunction
 import logging
 import os
@@ -14,7 +14,7 @@ from pprint import pprint
 from signal import SIGINT
 import sys
 from threading import Thread
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Tuple
 
 from icontract import require
 from mitmproxy import http
@@ -32,7 +32,7 @@ from cs.fileutils import atomic_filename
 from cs.fs import shortpath
 from cs.fsm import CancellationError
 from cs.gimmicks import Buffer
-from cs.lex import printt, r
+from cs.lex import get_dotted_identifier, printt, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
@@ -44,7 +44,7 @@ from cs.upd import print as upd_print
 from cs.urlutils import URL
 
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
-from .parse import get_name_and_args
+from .parse import get_action_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 from .prefetch import URLFetcher
 from .sitemap import FlowState
@@ -615,7 +615,8 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
     ''' Yield a byte stream after patching its soup.
         If the content type is not `text/html`, yield the stream unchanged.
 
-        Gather the input `bss`, a _decoded_ iterable of bytes, into text and transform into BS4 `Soup`.
+        Gather the input `bss`, a _decoded_ iterable of bytes, into
+        text and transform into BS4 `Soup`.
         Call `Pilfer.
     '''
     if flowstate.content_type != 'text/html':
@@ -678,7 +679,7 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
 @dataclass
 class MITMHookAction(Promotable):
 
-  HOOK_SPEC_MAP = {
+  BUILTIN_ACTION_MAP = {
       'cache': cached_flow,
       'dump': dump_flow,
       'grok': grok_flow,
@@ -690,45 +691,78 @@ class MITMHookAction(Promotable):
       'select': select_flow,
   }
 
-  action: Callable
+  name: str
+  module_name: Optional[str] = None
   args: list = field(default_factory=list)
   kwargs: dict = field(default_factory=dict)
 
   def __str__(self):
     return (
         self.__class__.__name__ + ':' +
-        func_a_kw(self.action, *self.args, **self.kwargs)
+        func_a_kw(self.__call__, *self.args, **self.kwargs)
     )
 
   @property
   def default_hooks(self):
-    return self.action.default_hooks
+    return self.__call__.default_hooks
 
   # TODO: proper parse of hook_spec
   @classmethod
-  def from_str(cls, hook_spec: str):
-    ''' Promote `hook_spec` to a callable from `cls.HOOK_SPEC_MAP`.
+  def from_str(cls, action_spec: str, offset=0) -> "MITMHookAction":
+    ''' Promote `action_spec` to a callable from `cls.BUILTIN_ACTION_MAP`.
     '''
-    name, args, kwargs, offset = get_name_and_args(hook_spec)
-    if not name:
-      raise ValueError(f'expected dotted identifier: {hook_spec=}')
-    if offset < len(hook_spec):
+    self, offset = cls.parse(action_spec, offset=offset)
+    if offset < len(action_spec):
       raise ValueError(
-          f'unparsed text after params: {hook_spec[offset:]!r} in {hook_spec=}'
+          f'unparsed text after {action_spec[:offset]}: { action_spec[offset:]=}'
       )
-    try:
-      action = cls.HOOK_SPEC_MAP[name]
-    except KeyError as e:
-      raise ValueError(
-          f'unknown action name {name!r} (not in {cls.__name__}.HOOK_SPEC_MAP)'
-      ) from e
-    return cls(action=action, args=args, kwargs=kwargs)
+    return self
 
-  def __call__(self, *a, **kw):
-    ''' Calling a hook action calls its action with the supplied arguments.
+  @classmethod
+  def parse(cls, action_spec: str, offset=0) -> Tuple["MITMHookAction", int]:
+    args = []
+    kwargs = {}
+    criteria = []
+    with Pfx(offset):
+      name, offset = get_dotted_identifier(action_spec, offset)
+      if not name:
+        raise ValueError(f'no action name')
+    if action_spec.startswith(':', offset):
+      module_name = name
+      offset += 1
+      with Pfx(offset):
+        name, offset = get_dotted_identifier(action_spec, offset)
+        if not name:
+          raise ValueError(
+              f'missing module "subname" after module {module_name+":"!r}'
+          )
+    else:
+      module_name = None
+    if action_spec.startswith('(', offset):
+      # (args...)
+      offset += 1
+      with Pfx(offset):
+        a, kw, offset = get_action_args(action_spec, offset, '@')
+      with Pfx(offset):
+        if not action_spec.startswith(')', offset):
+          raise ValueError('missing closing bracket')
+    return cls(
+        name=name, module_name=module_name, args=args, kwargs=kwargs
+    ), offset
+
+  @cached_property
+  def __call__(self):
+    ''' The callable form of this action.
     '''
-    return self.action(*self.args, *a, **self.kwargs, **kw)
-    return pfx_call(self.action, *self.args, *a, **self.kwargs, **kw)
+    if self.module_name is None:
+      # builtin name
+      action = self.BUILTIN_ACTION_MAP[self.name]
+    else:
+      # import module_name:name
+      action = pfx_call(import_name, f'{self.module_name}:{self.name}')
+    if self.args or self.kwargs:
+      action = partial(action, *self.args, **self.kwargs)
+    return trace(action)
 
   @classmethod
   def promote(cls, obj):
@@ -749,6 +783,7 @@ class MITMAddon:
   '''
 
   def __init__(self, logging_handlers=None):
+    # a list of (MITMAction,criteria)
     self.hook_map = defaultdict(list)
     self.logging_handlers = logging_handlers
 
@@ -756,20 +791,18 @@ class MITMAddon:
   @typechecked
   def add_action(
       self,
-      hook_names: list[str] | tuple[str, ...] | None,
-      hook_action: MITMHookAction,
-      args,
-      kwargs,
-      url_regexps=(),
+      action: MITMHookAction,
+      hook_names: Optional[Iterable[str]] = (),
+      criteria: Optional[Iterable[Callable[str, bool]]] = (),
   ):
     ''' Add a `MITMHookAction` to a list of hooks for `hook_name`.
     '''
-    if hook_names is None:
-      hook_names = hook_action.default_hooks
+    if not hook_names:
+      hook_names = action.default_hooks
+      assert hook_names
     for hook_name in hook_names:
-      self.hook_map[hook_name].append(
-          (hook_action, args, kwargs, list(url_regexps))
-      )
+      vprint(hook_name, "+", action, criteria)
+      self.hook_map[hook_name].append((action, criteria))
 
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
@@ -855,15 +888,11 @@ class MITMAddon:
     # for collating any .stream functions during responseheaders
     stream_funcs = [] if hook_name == 'responseheaders' else None
     cancelled = False
-    for i, (
-        action,
-        action_args,
-        action_kwargs,
-        url_regexps,
-    ) in enumerate(hook_actions):
-      if url_regexps:
-        for regexp in url_regexps:
-          if regexp.search(flow.request.url):
+    for i, (action, criteria) in enumerate(hook_actions):
+      if criteria:
+        PR(criteria)
+        for criterion in criteria:
+          if pfx_call(trace(criterion), flow.request.url):
             break
         else:
           PR("SKIP, does not match URL")
@@ -876,11 +905,9 @@ class MITMAddon:
       try:
         pfx_call(
             action,
-            *action_args,
             hook_name,
             flow,
             *mitm_hook_a,
-            **action_kwargs,
             **mitm_hook_kw,
         )
       except MITMCancelActions as e:
@@ -974,10 +1001,18 @@ async def run_proxy(
     addon: MITMAddon,
     runstate: RunState,
     P: Pilfer,
+    upstream_proxy_url: Optional[str] = None,
 ):
   ''' Asynchronous function to run a `mitmproxy.tools.dump.DumpMaster`
       proxy, listening on `listen_host:listen_port` and processing flows
       via the actions in `addon`.
+
+      Parameters:
+      * `addon`: a `MITMAddon` for processing `Flow`s
+      * `upstream_proxy_url`: an optional specification of the
+        upstream proxy used to fetch the originals; if `None`, fall
+        back to the `$https_proxy` environment variable; pass `""`
+        to use no proxy
   '''
   opts = Options(
       listen_host=listen_host,
@@ -985,10 +1020,11 @@ async def run_proxy(
       ssl_insecure=True,
   )
   mitm_proxy_url = f'http://{listen_host}:{listen_port}/'
-  https_proxy = os.environ.get('https_proxy')
-  if https_proxy:
-    upstream_proxy_url = https_proxy
-    opts.mode = (f'upstream:{https_proxy}',)
+  if upstream_proxy_url is None:
+    upstream_proxy_url = os.environ.get('https_proxy')
+  if upstream_proxy_url:
+    # None or empty string
+    opts.mode = (f'upstream:{upstream_proxy_url}',)
   else:
     upstream_proxy_url = None
   proxy = DumpMaster(opts)

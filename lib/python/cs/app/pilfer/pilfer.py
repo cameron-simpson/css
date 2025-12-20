@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import errno
 from fnmatch import fnmatch
 from functools import cached_property
-from http.cookies import Morsel
+from http.cookies import CookieError, Morsel
 from itertools import zip_longest
 import os
 import os.path
@@ -114,15 +114,6 @@ async def unseen_sfunc(
     if item_sig not in seen:
       seen.add(item_sig)
       yield item, P
-
-@dataclass
-class PseudoFlow:
-  ''' A class resembling `mitmproxy`'s `http.Flow` class in basic ways
-      so that I can use it with the pilfer.cache.ContentCache` class.
-  '''
-
-  request: requests.Request = None
-  response: requests.Response = None
 
 def cache_url(item_P):
   ''' Pilfer base action for caching a UR.
@@ -242,7 +233,11 @@ class PilferSession(MultiOpenMixin, HasFSPath):
     needdir(cookies_dirpath)
     with atomic_filename(cookiespath, mode='w', exists_ok=True) as f:
       for cookie in self.cookies:
-        m = self.cookie_as_morsel(cookie)
+        try:
+          m = self.cookie_as_morsel(cookie)
+        except CookieError as e:
+          warning("save_cookies: skip %r: %s", cookie.name, e)
+          continue
         d = dict(name=m.key, value=m.value)
         d.update(dict(m))
         dump_ndjson(d, f)
@@ -535,6 +530,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return actions
 
   @mapped_property
+  def actions(self, action_name: str):
+    ''' A mapping of action name to `ActionSpecification`.
+    '''
+    from .actions import _Action
+    return _Action.from_action_section(action_name, self.rc_map['actions'])
+
+  @mapped_property
   def pipe_specs(self, pipe_name):
     ''' An on demand mapping of `pipe_name` to `PipeLineSpec`s
         derived from `self.rc_map['pipes']`.
@@ -659,7 +661,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         for err in errors:
           error(err)
         raise ValueError('invalid pipe specification')
-    return pipeline(self.later, pipe_funcs, name=name, inputs=inputs)
+    return pipeline(self.later, pipe_funcs, name=name)
 
   @cached_property
   @pfx_method
@@ -758,8 +760,10 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         This is a shim for `SiteMap.grok`.
     '''
     with self:
-      if flowstate.response.status_code != 200:
-        warning(f'{flowstate.response.status_code=} != 200, not grokking')
+      if not (200 <= flowstate.response.status_code < 300):
+        warning(
+            f'{flowstate.url.short} {flowstate.response.status_code=} != 2xx, not grokking'
+        )
         return
       for sitemap in self.sitemaps_for(flowstate.url):
         yield from sitemap.grok(flowstate, flowattr, **grok_kw)
@@ -773,6 +777,14 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       patterns = getattr(sitemap, f'{pattern_type}_PATTERNS', None)
       if patterns:
         yield from sitemap.matches(url, patterns, extra=extra)
+
+  @promote
+  def url_entity(self, url: URL, *, methodglob='grok_*', **match_kw):
+    for sitemap in self.sitemaps_for(url):
+      entity = sitemap.url_entity(url)
+      if entity is not None:
+        return entity
+    return None
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
@@ -867,14 +879,17 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
 
-  def cache_keys_for_url(self, url, rq_headers=None) -> set[str]:
-    ''' Return a set of cache keys for `url`.
+  @promote
+  def cache_keys_for_url(self,
+                         flowstate: FlowState,
+                         rq_headers=None) -> set[str]:
+    ''' Return a set of cache keys for a `URL` or `FlowState`.
 
         These are obtained by calling every `SiteMap.cache_key_*`
-        method matching the `url`.
+        method matching the `URL`.
     '''
+    url = flowstate.url
     PR = lambda *a, **kw: print("cache_keys_for", url, *a, **kw)
-    flowstate = FlowState(url=url)
     cache = self.content_cache
     cache_keys = set()
     with self:
@@ -887,13 +902,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return cache_keys
 
   @promote
-  def cache_url(self, url: URL, mode='missing', *, extra=None):
-    ''' Cache the content of `url` in the cache if missing/updated
-        as indicated by `mode`.
+  def cache_url(self, flowstate: FlowState, mode='missing', *, extra=None):
+    ''' Cache the content of a `URL` or `FlowState` in the cache
+        if missing/updated as indicated by `mode`.
         Return a mapping of each cache key to the cached metadata.
     '''
     return self.content_cache.cache_url(
-        url, self.cache_keys_for_url(url), mode=mode
+        flowstate, self.cache_keys_for_url(flowstate), mode=mode
     )
 
   @promote
@@ -924,6 +939,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       raise FileExistsError(fspath)
     cache_keys = self.cache_keys_for_url(url)
     cache = self.content_cache
+    print(f'    {cache_keys}')
     try:
       cache_key, cache_md, cache_fspath = cache.find_cache_fspath(cache_keys)
     except KeyError:
@@ -931,15 +947,20 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       flowstate = FlowState(url)
       if cache_keys:
         # fetch via the cache
+        print(f'    cache_url({url},{cache_keys})')
         cached_map = cache.cache_url(flowstate, cache_keys)
         cache_key, cache_md, cache_fspath = cache.find_cache_fspath(cache_keys)
+        print('    -> cache_fspath', cache_fspath)
       else:
         # fetch directly, do not bother with the cache
+        print('    GET', url)
         bss = flowstate.iterable_content
         with open(fspath, 'xb') as f:
           for bs in bss:
             f.write(bs)
+        print('    ->', fspath)
         return fspath
+    print('    cache_fspath', cache_fspath)
     try:
       pfx_call(os.link, cache_fspath, fspath)
     except OSError as e:

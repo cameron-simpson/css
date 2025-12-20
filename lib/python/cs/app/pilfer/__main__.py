@@ -5,23 +5,24 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 import logging
 import os
-import os.path
 from os.path import expanduser
 from getopt import GetoptError
 from pprint import pformat, pprint
+import re
 import sys
 from typing import Iterable
 
 from bs4 import NavigableString
+from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
+from cs.fileutils import atomic_filename
 from cs.later import Later
 from cs.lex import (
     cutprefix,
     cutsuffix,
-    get_dotted_identifier,
     get_identifier,
     is_identifier,
     printt,
@@ -38,13 +39,16 @@ from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
-    DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
-    DEFAULT_MITM_LISTEN_PORT
+    DEFAULT_JOBS,
+    DEFAULT_FLAGS_CONJUNCTION,
+    DEFAULT_MITM_LISTEN_HOST,
+    DEFAULT_MITM_LISTEN_PORT,
 )
-from .parse import get_action_args, get_delim_regexp, import_name
+from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .sitemap import FlowState
+from .rss import RSSChannelMixin
+from .sitemap import FlowState, SiteEntity, SiteMap
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -103,6 +107,7 @@ class PilferCommand(BaseCommand):
     jobs: int = DEFAULT_JOBS
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
     db_url: str = None
+    dl_output_format: str = '{basename}'
 
     @property
     def configpaths(self):
@@ -154,6 +159,7 @@ class PilferCommand(BaseCommand):
             sqltags_db_url=options.db_url,
         )
         with pilfer:
+          pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
               later=later,
@@ -165,6 +171,27 @@ class PilferCommand(BaseCommand):
             if self.options.load_cookies:
               pilfer.load_browser_cookies(pilfer.session.cookies)
             yield
+
+  # TODO: accept a URL and look it up?
+  def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
+    ''' Return a `SiteEntity` bound to the entity-name at `argv[0]`.
+    '''
+    if not argv:
+      raise GetoptError('missing site-entity')
+    entity_spec = argv.pop(0)
+    if '://' in entity_spec:
+      # match a URL to an entity
+      ent = self.options.pilfer.url_entity(entity_spec)
+      if ent is None:
+        raise GetoptError(
+            f'{entity_spec=} does not match a known SiteEntity subclass'
+        )
+    else:
+      try:
+        ent = SiteMap.by_db_key(entity_spec)
+      except KeyError as e:
+        raise GetoptError(f'unrecognised {entity_spec=}: {e}') from e
+    return ent
 
   @staticmethod
   def get_argv_pipespec(argv, argv_offset=0):
@@ -247,9 +274,66 @@ class PilferCommand(BaseCommand):
 
   @popopts
   def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Open a dbshell on the Pilfer SQLTags.
+    '''
     if argv:
       raise GetoptError(f'extra arguments: {argv=}')
     self.options.pilfer.dbshell()
+
+  @popopts(
+      o=(
+          'dl_output_format', 'Output format string for the download filename.'
+      )
+  )
+  def cmd_dl(self, argv):
+    ''' Usage: {cmd} URLs...
+          Download the specified URLs. "-" may be used to read URLs from stdin.
+    '''
+    if not argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    dl_output_format = options.dl_output_format
+    runstate = options.runstate
+
+    def dl(url_s):
+      ''' The common logic for a download of a single URL.
+      '''
+      nonlocal dl_output_format, xit
+      try:
+        FlowState.download_url(url_s, dl_output_format, format_filename=True)
+      except FileExistsError as e:
+        warning("output path already exists: %s", e)
+        xit = 1
+      except OSError as e:
+        warning("error saving: %s", e)
+        xit = 1
+
+    xit = 0
+    for url_s in argv:
+      runstate.raiseif()
+      with Pfx("%r", url_s):
+        if url_s == '-':
+          for lineno, url_line in enumerate(sys.stdin, 1):
+            url_s = url_line.rstrip('\n')
+            with Pfx("stdin:%d: %r", lineno, url_s):
+              runstate.raiseif()
+              dl(url_s)
+        else:
+          if '://' in url_s:
+            dl(url_s)
+          else:
+            try:
+              ent = SiteMap.by_db_key(url_s)
+            except KeyError as e:
+              warning("cannot get entity %r: %s", url_s, e)
+              xit = 1
+              continue
+            ent.printt()
+            save_filename = ent.format_as(dl_output_format)
+            print("  ->", save_filename)
+            trace(ent.download, save_filename)
+    return xit
 
   @popopts(
       content=(
@@ -543,8 +627,52 @@ class PilferCommand(BaseCommand):
     printt(*table)
 
   @popopts
+  def pop_mitm_action(self, argv):
+    ''' Pop a mitm action specification, return `(action,hook_names,criteria)`.
+    '''
+    from .mitm import MITMHookAction
+    if not argv:
+      raise GetoptError("missing mitm action")
+    action_s = argv.pop(0)
+    criteria = []
+    with Pfx("%r", action_s):
+      try:
+        action, offset = MITMHookAction.parse(action_s)
+        with Pfx(offset):
+          # @hook,...
+          if action_s.startswith('@', offset):
+            offset += 1
+            # TODO: gather commas separated identifiers
+            end_hooks = action_s.find('~', offset)
+            if end_hooks == -1:
+              hook_names = action_s[offset:].split(',')
+              offset = len(action_s)
+            else:
+              hook_names = action_s[offset:end_hooks].split(',')
+              offset = end_hooks
+          else:
+            hook_names = []
+        while offset < len(action_s):
+          with Pfx(offset):
+            # ~ /url-regexp/
+            if action_s.startswith('~', offset):
+              offset = skipwhite(action_s, offset + 1)
+              regexp_s, offset = get_delim_regexp(action_s, offset)
+              regexp = pfx_call(re.compile, regexp_s)
+              criteria.append(lambda url_s: regexp.match(url_s))
+            else:
+              raise ValueError('unparsed text: {action_s[offset:]!r}')
+      except ValueError as e:
+        raise GetoptError("bad action: %s", e) from e
+    return action, hook_names, criteria
+
+  @popopts(
+      proxy_=''' Upstream proxy to use, default from $https_proxy.
+                 Supply an empty string to force no proxy.
+             '''
+  )
   def cmd_mitm(self, argv):
-    ''' Usage: {cmd} [@[address]:port] action[:params...][@hook,...]...
+    ''' Usage: {cmd} [@[address]:port] action[(params...)][@hook,...][~/url-regexp/...]...
           Run a mitmproxy for traffic filtering.
           @[address]:port   Specify the listen address and port.
                             Default: {DEFAULT_MITM_LISTEN_HOST}:{DEFAULT_MITM_LISTEN_PORT}
@@ -570,7 +698,7 @@ class PilferCommand(BaseCommand):
           - `cache`: the predefined "cache" action on its default hooks.
           - `dump@requestheaders`: the predefined "dump" action on
             the "requestheaders" hook.
-          - `my.module:handler:3,x=4@requestheaders`: call
+          - `my.module:handler(3,x=4)@requestheaders`: call
             `handler(3,hook_name,flow,x=4)` from module `my.module`
             on the "requestheaders" hook.
           It is generally better to use named parameters in actions because
@@ -594,87 +722,25 @@ class PilferCommand(BaseCommand):
       raise GetoptError('missing actions')
     bad_actions = False
     mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
-    for action in argv:
-      with Pfx("action %r", action):
-        hook_names = None
-        args = []
-        kwargs = {}
-        url_regexps = []
-        name, offset = get_dotted_identifier(action)
-        if not name:
-          warning("no action name")
-          bad_actions = True
-          continue
-        if '.' not in name:
-          # a built in name
-          mitm_action = name
-        else:
-          # a callable imported from a module
-          if not action.startswith(':', offset):
-            warning('missing module ":subname" after module %r', name)
-            bad_actions = True
-            continue
-          offset += 1
-          subname, offset = get_dotted_identifier(action, offset)
-          if not subname:
-            warning('missing module "subname" after module "%s:"', name)
-            bad_actions = True
-            continue
-          try:
-            mitm_action = pfx_call(import_name, action[:offset])
-          except ImportError as e:
-            warning("cannot import %r: %s", action[:offset], e._)
-            bad_actions = True
-            continue
-        # gather @hooks and :params suffixes
-        while offset < len(action):
-          print("action", action, offset)
-          with Pfx("offset %d", offset):
-            # :params
-            if action.startswith(':', offset):
-              offset += 1
-              a, kw, offset = get_action_args(action, offset, '@')
-              args.extend(a)
-              kwargs.update(kw)
-            # @hook,...
-            elif action.startswith('@', offset):
-              offset += 1
-              # TODO: gather commas separated identifiers
-              end_hooks = action.find(':', offset)
-              if end_hooks == -1:
-                hook_names = action[offset:].split(',')
-                offset = len(action)
-              else:
-                hook_names = action[offset:end_hooks].split(',')
-                offset = end_hooks
-            # ~ /url-regexp/
-            elif action.startswith('~', offset):
-              offset = skipwhite(action, offset + 1)
-              regexp, offset = get_delim_regexp(action, offset)
-              url_regexps.append(regexp)
-            else:
-              warning("unparsed text: %r", action[offset:])
-              bad_actions = True
-              break
-        try:
-          pfx_call(
-              mitm_addon.add_action,
-              hook_names,
-              mitm_action,
-              args,
-              kwargs,
-              url_regexps=url_regexps,
-          )
-        except ValueError as e:
-          warning("invalid action spec: %s", e)
-          bad_actions = True
+    while argv:
+      try:
+        action, hook_names, criteria = self.pop_mitm_action(argv)
+      except GetoptError as e:
+        warning(str(e))
+        bad_actions = True
+      pfx_call(
+          mitm_addon.add_action, action, hook_names, criteria or None
+      )
     if bad_actions:
       raise GetoptError("invalid action specifications")
-    asyncio.run(run_proxy(
-        listen_host,
-        listen_port,
-        addon=mitm_addon,
-    ))
+    asyncio.run(
+        run_proxy(
+            listen_host,
+            listen_port,
+            addon=mitm_addon,
+            upstream_proxy_url=self.options.proxy,
+        )
+    )
 
   def cmd_patch(self, argv):
     ''' Usage: {cmd} URL
@@ -691,6 +757,53 @@ class PilferCommand(BaseCommand):
         flowstate, 'soup', 'patch_soup_*'):
       print(method, match_tags)
     print(flowstate.soup)
+
+  @popopts(f='Force: refresh the entity even if it is not stale.')
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} entity...
+          Refresh the specified entities by fetching and grokking their site pages.
+    '''
+    if not argv:
+      raise GetoptError("missing entities")
+    while argv:
+      ent = self.popentity(argv)
+      ent.printt()
+      ent.refresh(force=self.options.force)
+      ent.printt()
+
+  @popopts(
+      f=('force', 'Force overwrite of the RSS file if it already exists.'),
+      o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
+  )
+  def cmd_rss(self, argv):
+    ''' Usage: {cmd} entity|URL
+          Generate an RSS feed for the specified entity or URL.
+    '''
+    pilfer = self.options.pilfer
+    if not argv:
+      raise GetoptError('missing entity or URL')
+    entity = self.popentity(argv)
+    if argv:
+      raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
+    entity.refresh()
+    if not isinstance(entity, RSSChannelMixin):
+      raise GetoptError(
+          f'entity {entity} is not an instance of RSSChannelMixin'
+      )
+    output_fspath = (
+        self.options.output_fspath
+        or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
+    )
+    rss = entity.rss()
+    with atomic_filename(output_fspath, mode='w',
+                         exists_ok=self.options.force) as T:
+      print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+      print(
+          xml_tostring(rss, encoding='unicode', pretty_print=True),
+          end='',
+          file=T
+      )
+    print(output_fspath)
 
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
