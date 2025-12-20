@@ -300,7 +300,7 @@ class URLPattern(Promotable):
       qpath = f'{qpath}?{url.query}'
     # first try /path?query
     m = self.pattern_re.match(qpath)
-    if m is None:
+    if m is None and qpath != url.path:
       # otherwise try /path
       m = self.pattern_re.match(url.path)
     if m is None:
