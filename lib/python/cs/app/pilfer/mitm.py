@@ -1002,10 +1002,18 @@ async def run_proxy(
     addon: MITMAddon,
     runstate: RunState,
     P: Pilfer,
+    upstream_proxy_url: Optional[str] = None,
 ):
   ''' Asynchronous function to run a `mitmproxy.tools.dump.DumpMaster`
       proxy, listening on `listen_host:listen_port` and processing flows
       via the actions in `addon`.
+
+      Parameters:
+      * `addon`: a `MITMAddon` for processing `Flow`s
+      * `upstream_proxy_url`: an optional specification of the
+        upstream proxy used to fetch the originals; if `None`, fall
+        back to the `$https_proxy` environment variable; pass `""`
+        to use no proxy
   '''
   opts = Options(
       listen_host=listen_host,
@@ -1013,10 +1021,11 @@ async def run_proxy(
       ssl_insecure=True,
   )
   mitm_proxy_url = f'http://{listen_host}:{listen_port}/'
-  https_proxy = os.environ.get('https_proxy')
-  if https_proxy:
-    upstream_proxy_url = https_proxy
-    opts.mode = (f'upstream:{https_proxy}',)
+  if upstream_proxy_url is None:
+    upstream_proxy_url = os.environ.get('https_proxy')
+  if upstream_proxy_url:
+    # None or empty string
+    opts.mode = (f'upstream:{upstream_proxy_url}',)
   else:
     upstream_proxy_url = None
   proxy = DumpMaster(opts)
