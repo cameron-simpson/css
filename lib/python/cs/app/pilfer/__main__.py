@@ -783,10 +783,9 @@ class PilferCommand(BaseCommand):
     pilfer = self.options.pilfer
     if not argv:
       raise GetoptError('missing entity or URL')
-    entity_spec = argv.pop(0)
+    entity = self.popentity(argv)
     if argv:
       raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
-    entity = self.popentity(argv)
     entity.refresh()
     if not isinstance(entity, RSSChannelMixin):
       raise GetoptError(
