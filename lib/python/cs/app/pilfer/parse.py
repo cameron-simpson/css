@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import copy
 import re
 from string import whitespace
 from typing import Iterable, Tuple

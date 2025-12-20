@@ -19,7 +19,7 @@ from typeguard import typechecked
 from cs.lex import BaseToken, cutprefix
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import pfx_call
 from cs.urlutils import URL
 
 from .parse import get_name_and_args, import_name

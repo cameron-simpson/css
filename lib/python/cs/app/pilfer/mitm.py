@@ -4,14 +4,13 @@
 #
 
 import asyncio
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, partial
 from inspect import isgeneratorfunction
 import logging
 import os
 from pprint import pprint
-import re
 from signal import SIGINT
 import sys
 from threading import Thread
@@ -33,9 +32,9 @@ from cs.fileutils import atomic_filename
 from cs.fs import shortpath
 from cs.fsm import CancellationError
 from cs.gimmicks import Buffer
-from cs.lex import get_dotted_identifier, printt, r, skipwhite
+from cs.lex import get_dotted_identifier, printt, r
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
@@ -45,7 +44,7 @@ from cs.upd import print as upd_print
 from cs.urlutils import URL
 
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
-from .parse import get_action_args, get_delim_regexp, get_name_and_args, import_name
+from .parse import get_action_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 from .prefetch import URLFetcher
 from .sitemap import FlowState

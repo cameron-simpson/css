@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 import logging
 import os
-from os.path import expanduser, exists as existspath
+from os.path import expanduser
 from getopt import GetoptError
 from pprint import pformat, pprint
 import re
@@ -23,7 +23,6 @@ from cs.later import Later
 from cs.lex import (
     cutprefix,
     cutsuffix,
-    get_dotted_identifier,
     get_identifier,
     is_identifier,
     printt,
@@ -45,7 +44,7 @@ from . import (
     DEFAULT_MITM_LISTEN_HOST,
     DEFAULT_MITM_LISTEN_PORT,
 )
-from .parse import get_action_args, get_delim_regexp, import_name
+from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 from .rss import RSSChannelMixin

@@ -3,15 +3,13 @@
 ''' Base class for site maps.
 '''
 
-from abc import ABC, abstractmethod
 from collections import ChainMap, defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import datetime
 from fnmatch import fnmatch
-from functools import cached_property, partial
+from functools import cached_property
 from getopt import GetoptError
 from itertools import zip_longest
-import json
 from os.path import abspath
 import re
 from threading import Thread
@@ -20,16 +18,14 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Iterable, Mapping, Optional
 
 from cs.binary import bs
-from cs.cmdutils import BaseCommand, popopts, qvprint, vprint
+from cs.cmdutils import popopts, qvprint, vprint
 from cs.deco import (
     decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
 )
-from cs.excutils import unattributable
 from cs.fileutils import atomic_filename
 from cs.lex import (
-    cutprefix, cutsuffix, FormatableMixin, FormatAsError, FormatMapping,
-    get_nonwhite, lc_, printt, r, s, skipwhite
+    cutprefix, cutsuffix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s, skipwhite
 )
 from cs.logutils import warning
 from cs.mappings import mapped_property
@@ -42,7 +38,7 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import (
     content_encodings, content_length, content_type, datetime_from_http_date
 )
-from cs.seq import ClonedIterator, not_none
+from cs.seq import ClonedIterator
 from cs.tagset import BaseTagSets, HasTags, TagSet, TagSetTyping, UsesTagSets
 from cs.threads import HasThreadState, ThreadState
 from cs.units import BINARY_BYTES_SCALE
