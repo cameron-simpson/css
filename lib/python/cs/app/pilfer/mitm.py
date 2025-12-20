@@ -784,6 +784,7 @@ class MITMAddon:
   '''
 
   def __init__(self, logging_handlers=None):
+    # a list of (MITMAction,criteria)
     self.hook_map = defaultdict(list)
     self.logging_handlers = logging_handlers
 
@@ -791,20 +792,18 @@ class MITMAddon:
   @typechecked
   def add_action(
       self,
-      hook_names: list[str] | tuple[str, ...] | None,
-      hook_action: MITMHookAction,
-      args,
-      kwargs,
-      url_regexps=(),
+      action: MITMHookAction,
+      hook_names: Optional[Iterable[str]] = (),
+      criteria: Optional[Iterable[Callable[str, bool]]] = (),
   ):
     ''' Add a `MITMHookAction` to a list of hooks for `hook_name`.
     '''
-    if hook_names is None:
-      hook_names = hook_action.default_hooks
+    if not hook_names:
+      hook_names = action.default_hooks
+      assert hook_names
     for hook_name in hook_names:
-      self.hook_map[hook_name].append(
-          (hook_action, args, kwargs, list(url_regexps))
-      )
+      vprint(hook_name, "+", action, criteria)
+      self.hook_map[hook_name].append((action, criteria))
 
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
@@ -890,15 +889,11 @@ class MITMAddon:
     # for collating any .stream functions during responseheaders
     stream_funcs = [] if hook_name == 'responseheaders' else None
     cancelled = False
-    for i, (
-        action,
-        action_args,
-        action_kwargs,
-        url_regexps,
-    ) in enumerate(hook_actions):
-      if url_regexps:
-        for regexp in url_regexps:
-          if regexp.search(flow.request.url):
+    for i, (action, criteria) in enumerate(hook_actions):
+      if criteria:
+        PR(criteria)
+        for criterion in criteria:
+          if pfx_call(trace(criterion), flow.request.url):
             break
         else:
           PR("SKIP, does not match URL")
@@ -911,11 +906,9 @@ class MITMAddon:
       try:
         pfx_call(
             action,
-            *action_args,
             hook_name,
             flow,
             *mitm_hook_a,
-            **action_kwargs,
             **mitm_hook_kw,
         )
       except MITMCancelActions as e:
