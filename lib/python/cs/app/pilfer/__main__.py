@@ -332,7 +332,7 @@ class PilferCommand(BaseCommand):
             ent.printt()
             save_filename = ent.format_as(dl_output_format)
             print("  ->", save_filename)
-            trace(ent.download, save_filename)
+            ent.download(save_filename)
     return xit
 
   @popopts(
@@ -728,9 +728,7 @@ class PilferCommand(BaseCommand):
       except GetoptError as e:
         warning(str(e))
         bad_actions = True
-      pfx_call(
-          mitm_addon.add_action, action, hook_names, criteria or None
-      )
+      pfx_call(mitm_addon.add_action, action, hook_names, criteria or None)
     if bad_actions:
       raise GetoptError("invalid action specifications")
     asyncio.run(

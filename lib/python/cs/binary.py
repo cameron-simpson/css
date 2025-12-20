@@ -904,6 +904,16 @@ class SimpleBinary(SimpleNamespace, AbstractBinary):
               super().__init__(field1=field1, field2=field2)
   '''
 
+  def __str__(self, attr_names=None):
+    if attr_names is None:
+      attr_names = sorted(
+          attr for attr in self.__dict__ if not attr.startswith('_')
+      )
+    fields_s = ",".join(
+        f'{attr}={getattr(self,attr,None)}' for attr in attr_names
+    )
+    return f'{self.__class__.__name__}({fields_s})'
+
 class BinarySingleValue(AbstractBinary, Promotable):
   ''' A representation of a single value as the attribute `.value`.
 
@@ -930,7 +940,8 @@ class BinarySingleValue(AbstractBinary, Promotable):
   def __repr__(self):
     return "%s(%r)" % (
         type(self).__name__,
-        getattr(self, 'value', f'<NO-{self.__class__.__name__}.value>')
+        getattr(self, 'value', None)
+        or f'<NO-{self.__class__.__name__}.value>',
     )
 
   def __str__(self):
@@ -1221,8 +1232,8 @@ def struct_field_types(
       field_names = field_names.split()
     else:
       field_names = list(field_names)
-    for fn in field_names:
-      print(fn)
+    ##for fn in field_names:
+    ##  print(fn)
     fieldmap = {}
     fmtcs = list(struct_format)
     first = True
@@ -2187,6 +2198,7 @@ def binclass(cls, kw_only=True):
           self._data, field_types=self.FIELD_TYPES
       )
 
+    @bcmethod
     def __str__(self):
       cls = self.__class__
       fieldnames = self._field_names
@@ -2201,6 +2213,7 @@ def binclass(cls, kw_only=True):
           ),
       )
 
+    @bcmethod
     def __repr__(self):
       cls = self.__class__
       data = self.__dict__.get('_data')

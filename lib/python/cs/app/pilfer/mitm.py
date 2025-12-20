@@ -762,7 +762,7 @@ class MITMHookAction(Promotable):
       action = pfx_call(import_name, f'{self.module_name}:{self.name}')
     if self.args or self.kwargs:
       action = partial(action, *self.args, **self.kwargs)
-    return trace(action)
+    return action
 
   @classmethod
   def promote(cls, obj):
@@ -892,7 +892,7 @@ class MITMAddon:
       if criteria:
         PR(criteria)
         for criterion in criteria:
-          if pfx_call(trace(criterion), flow.request.url):
+          if pfx_call(criterion, flow.request.url):
             break
         else:
           PR("SKIP, does not match URL")
