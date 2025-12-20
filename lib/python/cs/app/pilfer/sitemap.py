@@ -1378,6 +1378,27 @@ class SiteEntity(HasTags):
     '''
     return SiteMap.by_db_key(db_key)
 
+  def update_content_timestamp(self, purpose, content_signature) -> float:
+    ''' Update the UNIX time recorded for `purpose` based on
+        `content_signature`. Return the old time if there was one
+        and its signature equals `content_signature`.  Otherwise
+        update the timestamp and record it and the new signature.
+    '''
+    tag_name = f'timestamp.{purpose}'
+    try:
+      last_sig = self[tag_name]
+    except KeyError:
+      # no previous timestamp
+      pass
+    else:
+      when, old_signature = last_sig
+      if old_signature == content_signature:
+        # unchanged
+        return when
+    when = time.time()
+    self[tag_name] = [when, content_signature]
+    return when
+
   @staticmethod
   @decorator
   def paginated(grok_page):
