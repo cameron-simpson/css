@@ -4,17 +4,18 @@
 #
 
 import asyncio
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from dataclasses import dataclass, field
-from functools import partial
+from functools import cached_property, partial
 from inspect import isgeneratorfunction
 import logging
 import os
 from pprint import pprint
+import re
 from signal import SIGINT
 import sys
 from threading import Thread
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Tuple
 
 from icontract import require
 from mitmproxy import http
@@ -32,9 +33,9 @@ from cs.fileutils import atomic_filename
 from cs.fs import shortpath
 from cs.fsm import CancellationError
 from cs.gimmicks import Buffer
-from cs.lex import printt, r
+from cs.lex import get_dotted_identifier, printt, r, skipwhite
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
@@ -44,7 +45,7 @@ from cs.upd import print as upd_print
 from cs.urlutils import URL
 
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
-from .parse import get_name_and_args
+from .parse import get_action_args, get_delim_regexp, get_name_and_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 from .prefetch import URLFetcher
 from .sitemap import FlowState
@@ -679,7 +680,7 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
 @dataclass
 class MITMHookAction(Promotable):
 
-  HOOK_SPEC_MAP = {
+  BUILTIN_ACTION_MAP = {
       'cache': cached_flow,
       'dump': dump_flow,
       'grok': grok_flow,
@@ -691,45 +692,78 @@ class MITMHookAction(Promotable):
       'select': select_flow,
   }
 
-  action: Callable
+  name: str
+  module_name: Optional[str] = None
   args: list = field(default_factory=list)
   kwargs: dict = field(default_factory=dict)
 
   def __str__(self):
     return (
         self.__class__.__name__ + ':' +
-        func_a_kw(self.action, *self.args, **self.kwargs)
+        func_a_kw(self.__call__, *self.args, **self.kwargs)
     )
 
   @property
   def default_hooks(self):
-    return self.action.default_hooks
+    return self.__call__.default_hooks
 
   # TODO: proper parse of hook_spec
   @classmethod
-  def from_str(cls, hook_spec: str):
-    ''' Promote `hook_spec` to a callable from `cls.HOOK_SPEC_MAP`.
+  def from_str(cls, action_spec: str, offset=0) -> "MITMHookAction":
+    ''' Promote `action_spec` to a callable from `cls.BUILTIN_ACTION_MAP`.
     '''
-    name, args, kwargs, offset = get_name_and_args(hook_spec)
-    if not name:
-      raise ValueError(f'expected dotted identifier: {hook_spec=}')
-    if offset < len(hook_spec):
+    self, offset = cls.parse(action_spec, offset=offset)
+    if offset < len(action_spec):
       raise ValueError(
-          f'unparsed text after params: {hook_spec[offset:]!r} in {hook_spec=}'
+          f'unparsed text after {action_spec[:offset]}: { action_spec[offset:]=}'
       )
-    try:
-      action = cls.HOOK_SPEC_MAP[name]
-    except KeyError as e:
-      raise ValueError(
-          f'unknown action name {name!r}, not in {cls.__name__}.HOOK_SPEC_MAP:{sorted(cls.HOOK_SPEC_MAP)}'
-      ) from e
-    return cls(action=action, args=args, kwargs=kwargs)
+    return self
 
-  def __call__(self, *a, **kw):
-    ''' Calling a hook action calls its action with the supplied arguments.
+  @classmethod
+  def parse(cls, action_spec: str, offset=0) -> Tuple["MITMHookAction", int]:
+    args = []
+    kwargs = {}
+    criteria = []
+    with Pfx(offset):
+      name, offset = get_dotted_identifier(action_spec, offset)
+      if not name:
+        raise ValueError(f'no action name')
+    if action_spec.startswith(':', offset):
+      module_name = name
+      offset += 1
+      with Pfx(offset):
+        name, offset = get_dotted_identifier(action_spec, offset)
+        if not name:
+          raise ValueError(
+              f'missing module "subname" after module {module_name+":"!r}'
+          )
+    else:
+      module_name = None
+    if action_spec.startswith('(', offset):
+      # (args...)
+      offset += 1
+      with Pfx(offset):
+        a, kw, offset = get_action_args(action_spec, offset, '@')
+      with Pfx(offset):
+        if not action_spec.startswith(')', offset):
+          raise ValueError('missing closing bracket')
+    return cls(
+        name=name, module_name=module_name, args=args, kwargs=kwargs
+    ), offset
+
+  @cached_property
+  def __call__(self):
+    ''' The callable form of this action.
     '''
-    return self.action(*self.args, *a, **self.kwargs, **kw)
-    return pfx_call(self.action, *self.args, *a, **self.kwargs, **kw)
+    if self.module_name is None:
+      # builtin name
+      action = self.BUILTIN_ACTION_MAP[self.name]
+    else:
+      # import module_name:name
+      action = pfx_call(import_name, f'{self.module_name}:{self.name}')
+    if self.args or self.kwargs:
+      action = partial(action, *self.args, **self.kwargs)
+    return trace(action)
 
   @classmethod
   def promote(cls, obj):
