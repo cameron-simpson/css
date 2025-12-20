@@ -8,6 +8,7 @@ import os
 from os.path import expanduser, exists as existspath
 from getopt import GetoptError
 from pprint import pformat, pprint
+import re
 import sys
 from typing import Iterable
 
@@ -172,6 +173,7 @@ class PilferCommand(BaseCommand):
               pilfer.load_browser_cookies(pilfer.session.cookies)
             yield
 
+  # TODO: accept a URL and look it up?
   def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
     ''' Return a `SiteEntity` bound to the entity-name at `argv[0]`.
     '''
@@ -626,8 +628,52 @@ class PilferCommand(BaseCommand):
     printt(*table)
 
   @popopts
+  def pop_mitm_action(self, argv):
+    ''' Pop a mitm action specification, return `(action,hook_names,criteria)`.
+    '''
+    from .mitm import MITMHookAction
+    if not argv:
+      raise GetoptError("missing mitm action")
+    action_s = argv.pop(0)
+    criteria = []
+    with Pfx("%r", action_s):
+      try:
+        action, offset = MITMHookAction.parse(action_s)
+        with Pfx(offset):
+          # @hook,...
+          if action_s.startswith('@', offset):
+            offset += 1
+            # TODO: gather commas separated identifiers
+            end_hooks = action_s.find('~', offset)
+            if end_hooks == -1:
+              hook_names = action_s[offset:].split(',')
+              offset = len(action_s)
+            else:
+              hook_names = action_s[offset:end_hooks].split(',')
+              offset = end_hooks
+          else:
+            hook_names = []
+        while offset < len(action_s):
+          with Pfx(offset):
+            # ~ /url-regexp/
+            if action_s.startswith('~', offset):
+              offset = skipwhite(action_s, offset + 1)
+              regexp_s, offset = get_delim_regexp(action_s, offset)
+              regexp = pfx_call(re.compile, regexp_s)
+              criteria.append(lambda url_s: regexp.match(url_s))
+            else:
+              raise ValueError('unparsed text: {action_s[offset:]!r}')
+      except ValueError as e:
+        raise GetoptError("bad action: %s", e) from e
+    return action, hook_names, criteria
+
+  @popopts(
+      proxy_=''' Upstream proxy to use, default from $https_proxy.
+                 Supply an empty string to force no proxy.
+             '''
+  )
   def cmd_mitm(self, argv):
-    ''' Usage: {cmd} [@[address]:port] action[:params...][@hook,...]...
+    ''' Usage: {cmd} [@[address]:port] action[(params...)][@hook,...][~/url-regexp/...]...
           Run a mitmproxy for traffic filtering.
           @[address]:port   Specify the listen address and port.
                             Default: {DEFAULT_MITM_LISTEN_HOST}:{DEFAULT_MITM_LISTEN_PORT}
@@ -653,7 +699,7 @@ class PilferCommand(BaseCommand):
           - `cache`: the predefined "cache" action on its default hooks.
           - `dump@requestheaders`: the predefined "dump" action on
             the "requestheaders" hook.
-          - `my.module:handler:3,x=4@requestheaders`: call
+          - `my.module:handler(3,x=4)@requestheaders`: call
             `handler(3,hook_name,flow,x=4)` from module `my.module`
             on the "requestheaders" hook.
           It is generally better to use named parameters in actions because
@@ -677,80 +723,15 @@ class PilferCommand(BaseCommand):
       raise GetoptError('missing actions')
     bad_actions = False
     mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
-    for action in argv:
-      with Pfx("action %r", action):
-        hook_names = None
-        args = []
-        kwargs = {}
-        url_regexps = []
-        name, offset = get_dotted_identifier(action)
-        if not name:
-          warning("no action name")
-          bad_actions = True
-          continue
-        if '.' not in name:
-          # a built in name
-          mitm_action = name
-        else:
-          # a callable imported from a module
-          if not action.startswith(':', offset):
-            warning('missing module ":subname" after module %r', name)
-            bad_actions = True
-            continue
-          offset += 1
-          subname, offset = get_dotted_identifier(action, offset)
-          if not subname:
-            warning('missing module "subname" after module "%s:"', name)
-            bad_actions = True
-            continue
-          try:
-            mitm_action = pfx_call(import_name, action[:offset])
-          except ImportError as e:
-            warning("cannot import %r: %s", action[:offset], e._)
-            bad_actions = True
-            continue
-        # gather @hooks and :params suffixes
-        while offset < len(action):
-          print("action", action, offset)
-          with Pfx("offset %d", offset):
-            # :params
-            if action.startswith(':', offset):
-              offset += 1
-              a, kw, offset = get_action_args(action, offset, '@')
-              args.extend(a)
-              kwargs.update(kw)
-            # @hook,...
-            elif action.startswith('@', offset):
-              offset += 1
-              # TODO: gather commas separated identifiers
-              end_hooks = action.find(':', offset)
-              if end_hooks == -1:
-                hook_names = action[offset:].split(',')
-                offset = len(action)
-              else:
-                hook_names = action[offset:end_hooks].split(',')
-                offset = end_hooks
-            # ~ /url-regexp/
-            elif action.startswith('~', offset):
-              offset = skipwhite(action, offset + 1)
-              regexp, offset = get_delim_regexp(action, offset)
-              url_regexps.append(regexp)
-            else:
-              warning("unparsed text: %r", action[offset:])
-              bad_actions = True
-              break
-        try:
-          pfx_call(
-              mitm_addon.add_action,
-              hook_names,
-              mitm_action,
-              args,
-              kwargs,
-              url_regexps=url_regexps,
-          )
-        except ValueError as e:
-          warning("invalid action spec: %s", e)
-          bad_actions = True
+    while argv:
+      try:
+        action, hook_names, criteria = self.pop_mitm_action(argv)
+      except GetoptError as e:
+        warning(str(e))
+        bad_actions = True
+      pfx_call(
+          mitm_addon.add_action, action, hook_names, criteria or None
+      )
     if bad_actions:
       raise GetoptError("invalid action specifications")
     asyncio.run(run_proxy(
