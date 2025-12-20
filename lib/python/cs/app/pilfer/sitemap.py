@@ -2166,6 +2166,11 @@ class SiteMap(UsesTagSets, Promotable):
         method result is not `None` then the result is set as an
         updated value on `flowstate`.
     '''
+    ent = self.url_entity(flowstate.url)
+    if ent is not None:
+      ent.grok_sitepage(flowstate)
+    else:
+      vprint(f'{self}.run_matches: no entity for {flowstate.url}')
     for method, match in self.on_matches(flowstate, methodglob, **match_kw):
       with Pfx("call %s", method.__qualname__):
         try:
