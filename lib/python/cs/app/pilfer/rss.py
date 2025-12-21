@@ -121,6 +121,7 @@ class RSSChannelMixin(RSSCommon, ABC):
       link=None,
       title=None,
       items=None,
+      refresh=False,
   ):
     ''' Return the RSS for this entity as an `lxml rss Element`.
         It can be converted to text with `ElementTree.tostring()`.
@@ -136,8 +137,11 @@ class RSSChannelMixin(RSSCommon, ABC):
         * `image_size`: optional size information for the image as a `(width,height)` 2-tuple
         * `language`: the channel title, default from `self.rss_language()`
         * `link`: the channel title, default from `self.rss_link()`
+        * `refresh`: optional flag, default `False`; if true call `self.refresh()`
         * `title`: the channel title, default from `self.rss_title()`
     '''
+    if refresh:
+      self.refresh()
     if category is None: category = self.rss_category()
     if category is None:
       categories = ()
@@ -182,7 +186,10 @@ class RSSChannelMixin(RSSCommon, ABC):
                 )
             ),
             ##E( 'atom:link', href="https://www.rssboard.org/files/sample-rss-2.xml", rel="self", type="application/rss+xml"),
-            *(item.rss_item() for item in (items or self.rss_items())),
+            *(
+                item.rss_item(refresh=refresh)
+                for item in (items or self.rss_items())
+            ),
         ),
         version="2.0",
         **{
@@ -208,6 +215,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
       link=None,
       title=None,
       category=None,
+      refresh=False,
   ):
     ''' Return the RSS for this entity as an `lxml item Element`.
         It can be converted to text with `ElementTree.tostring()`.
@@ -221,8 +229,11 @@ class RSSChannelItemMixin(RSSCommon, ABC):
           default from `self.rss-image_title()`
         * `language`: the channel title, default from `self.rss_language()`
         * `link`: the channel title, default from `self.rss_link()`
+        * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
         * `title`: the channel title, default from `self.rss_title()`
     '''
+    if refresh:
+      self.refresh()
     if category is None:
       category = self.rss_category()
     if category is None:
