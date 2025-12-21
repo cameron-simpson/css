@@ -783,7 +783,6 @@ class PilferCommand(BaseCommand):
     entity = self.popentity(argv)
     if argv:
       raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
-    entity.refresh()
     if not isinstance(entity, RSSChannelMixin):
       raise GetoptError(
           f'entity {entity} is not an instance of RSSChannelMixin'
@@ -792,7 +791,7 @@ class PilferCommand(BaseCommand):
         self.options.output_fspath
         or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
     )
-    rss = entity.rss()
+    rss = entity.rss(refresh=True)
     with atomic_filename(output_fspath, mode='w',
                          exists_ok=self.options.force) as T:
       print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
