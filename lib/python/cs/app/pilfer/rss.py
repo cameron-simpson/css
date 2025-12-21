@@ -42,18 +42,6 @@ class RSS:
     raise NotImplementedError
 
   @staticmethod
-  def date_time_s(dt: float | datetime):
-    ''' Return a timestamp (a UNIX time or a timezone aware `datetime`)
-        as an RFC822 date and time with a 4 digit year.
-
-        RSS dates and times: https://www.rssboard.org/rss-profile#data-types-datetime
-        RFC822 date and time specification: https://datatracker.ietf.org/doc/html/rfc822#section-5
-    '''
-    if not isinstance(dt, datetime):
-      dt = datetime.fromtimestamp(dt, tz=timezone.utc)
-    return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
-
-  @staticmethod
   def encoded_plain_text(s: str) -> str:
     ''' Return the text `s` with the characters `&`, `<` and `>`
         replaced by hex escapes.
@@ -70,11 +58,16 @@ class RSSCommon(ABC):
     return getattr(self, 'category', None)
 
   @staticmethod
-  def rss_date_string(timestamp):
-    ''' Return the UNIX `timestamp` as an RFC822 date time string.
+  def rss_date_string(dt: float | datetime):
+    ''' Return a timestamp (a UNIX time or a timezone aware `datetime`)
+        as an RFC822 date and time with a 4 digit year.
+
+        RSS dates and times: https://www.rssboard.org/rss-profile#data-types-datetime
+        RFC822 date and time specification: https://datatracker.ietf.org/doc/html/rfc822#section-5
     '''
-    return datetime.fromtimestamp(timestamp
-                                  ).strftime('%a, %d %b %Y %H:%M:%S %Z')
+    if not isinstance(dt, (date, datetime)):
+      dt = datetime.fromtimestamp(dt, tz=timezone.utc)
+    return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
   def rss_description(self):
     return getattr(self, 'description', '')
