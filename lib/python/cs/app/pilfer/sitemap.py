@@ -983,6 +983,7 @@ class SiteEntity(HasTags):
     ''' `SiteEntity` subclass init - set `cls.url_re` from `cls.URL_RE` if present.
     '''
     super().__init_subclass__(**kw)
+    cls.WIDGET_CLASSES = []
     # default TYPE_SUBNAME derived from the class name
     try:
       TYPE_SUBNAME = cls.__dict__['TYPE_SUBNAME']
@@ -1278,6 +1279,16 @@ class SiteEntity(HasTags):
     '''
     return self.sitemap.urlto(path)
 
+  @classmethod
+  def grok_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteEntity"]:
+    ''' Scan the soup for the widgets associated with this `SiteEntity` type.
+    '''
+    for widget_class in cls.WIDGET_CLASSES:
+      vprint("scan soup for", widget_class)
+      for widget in widget_class.scan_soup(soup, sitemap):
+        widget.grok()
+        yield widget.entity
+
   @pagemethod
   def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' The basic sitepage grok: record the metadta.
@@ -1486,6 +1497,49 @@ class SiteEntity(HasTags):
     return save_filename
 
 paginated = SiteEntity.paginated
+
+@dataclass
+class SiteWidget(ABC):
+  ''' A base class for classes representing known widgets on a site web page.
+  '''
+
+  sitemap: "SiteMap"
+  tag: BS4Tag
+
+  def __init_subclass__(cls, **kw):
+    ''' Record this widget class against its entity type.
+    '''
+    super().__init_subclass__(**kw)
+    cls.ENTITY_CLASS.WIDGET_CLASSES.append(cls)
+
+  # most site widgets are DIVs
+  TAG_NAME = 'div'
+
+  @property
+  @abstractmethod
+  def entity_key(self):
+    ''' Return the `type_key` derived from `self.tag`.
+    '''
+    raise NotImplementedError
+
+  @cached_property
+  def entity(self):
+    ''' The `SiteEntity` associated with this `SiteWidget`.
+    '''
+    return self.sitemap[self.__class__.ENTITY_CLASS, self.entity_key]
+
+  @abstractmethod
+  def grok(self):
+    ''' Examine the content of `self.tag`, apply to `self.entity`.
+    '''
+    raise NotImplementedError
+
+  @classmethod
+  def scan_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
+    ''' Scan some soup for this kind of widget, yield instances of `cls`.
+    '''
+    for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
+      yield cls(sitemap=sitemap, tag=tag)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
