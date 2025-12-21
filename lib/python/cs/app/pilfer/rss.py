@@ -5,7 +5,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from xml.etree.ElementTree import ElementTree
 
 from lxml.builder import E
@@ -207,14 +207,16 @@ class RSSChannelItemMixin(RSSCommon, ABC):
 
   def rss_item(
       self,
+      *,
+      category=None,
       description=None,
       image_url=None,
       image_size=None,
       image_title=None,
       language=None,
       link=None,
+      pub_date=None,
       title=None,
-      category=None,
       refresh=False,
   ):
     ''' Return the RSS for this entity as an `lxml item Element`.
@@ -263,6 +265,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
                 description and E.description(description),
                 E.link(link),
                 *(E.category(cat) for cat in categories),
+                pub_date and E.pubDate(self.rss_date_string(pub_date)),
                 image_url and E.image(
                     E.url(image_url),
                     E.title(image_title),
