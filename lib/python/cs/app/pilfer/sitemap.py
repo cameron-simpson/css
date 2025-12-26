@@ -2670,6 +2670,18 @@ class SiteMap(UsesTagSets, Promotable):
         for (attr, subents) in ent.related():
           print(attr, '->', [subent.name for subent in subents])
 
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} entity...
+          Refresh the specified entities by fetching and grokking their site pages.
+    '''
+    if not argv:
+      raise GetoptError("missing entities")
+    for ent_spec in argv:
+      with Pfx("entity %r", ent_spec):
+        ent = self[ent_spec]
+        ent.printt()
+        ent.grok_sitepage()
+
 # expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on
 grok_entity_page = SiteMap.grok_entity_page
