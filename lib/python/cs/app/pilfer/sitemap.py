@@ -3,6 +3,7 @@
 ''' Base class for site maps.
 '''
 
+from abc import ABC, abstractmethod
 from collections import ChainMap, defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,15 +11,17 @@ from fnmatch import fnmatch
 from functools import cached_property
 from getopt import GetoptError
 from itertools import zip_longest
+import json
 from os.path import abspath
 import re
 from threading import Thread
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import Any, Callable, Generator, Iterable, Mapping, Optional
+from uuid import UUID
 
 from cs.binary import bs
-from cs.cmdutils import popopts, qvprint, vprint
+from cs.cmdutils import BaseCommand, popopts, qvprint, vprint
 from cs.deco import (
     decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
@@ -1146,8 +1149,8 @@ class SiteEntity(HasTags):
         and the format string need only specify the path after the domain.
 
         Related entities:
-        If the attribute name is present in `self.DEREFFED_PROPERTIES`,
-        a mapping of attribute name to `(tag_name,direct)` 2-tuples,
+        If the attribute name is present in `self.DEREFFED_PROPERTIES`
+        (a mapping of attribute name to `(tag_name,direct)` 2-tuples)
         then the corresponding `tag_name` is obtained and returned
         directly if `direct`.  Otherwise `self.deref(tag_name)` is
         returned.
@@ -1157,11 +1160,12 @@ class SiteEntity(HasTags):
         If `HasTags.__getattr__(attr)` raises `AttributeError` and
         the tag `opengraph.{attr}` exists, return that.
     '''
+    cls = self.__class__
     if attr.replace('_', '').islower():
       # *_PATTERN derived attributes
       ptnattr_name = f'{attr.upper()}_PATTERN'
       try:
-        pattern_s = getattr(self.__class__, ptnattr_name)
+        pattern_s = getattr(cls, ptnattr_name)
       except AttributeError:
         pass
       else:
@@ -1173,7 +1177,7 @@ class SiteEntity(HasTags):
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
       fmtattr_name = f'{attr.upper()}_FORMAT'
       try:
-        format_s = getattr(self.__class__, fmtattr_name)
+        format_s = getattr(cls, fmtattr_name)
       except AttributeError:
         pass
       else:
@@ -1182,7 +1186,7 @@ class SiteEntity(HasTags):
         except FormatAsError as e:
           warning("%s.format_as %r: %s", self, format_s, e)
           raise AttributeError(
-              f'format {self.__class__.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
+              f'format {cls.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
           ) from e
         else:
           # for attributes ending in _url, such as .sitepage_url_url
@@ -1193,7 +1197,7 @@ class SiteEntity(HasTags):
             formatted = self.urlto(formatted)
           return formatted
     # indirect derived attributes
-    DEREFFED_PROPERTIES = self.__class__.DEREFFED_PROPERTIES
+    DEREFFED_PROPERTIES = cls.DEREFFED_PROPERTIES
     try:
       deref_from = DEREFFED_PROPERTIES[attr]
     except KeyError:
