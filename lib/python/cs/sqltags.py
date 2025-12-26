@@ -1329,9 +1329,11 @@ class SQLTagSet(SingletonMixin, TagSet):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
-      super().__init__(_id=_id, **kw)
+      super().__init__(**kw)
       # pylint: disable=unexpected-keyword-arg
-      self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=_sqltags)
+      self.__dict__.update(
+          _id=_id, _name=name, _unixtime=unixtime, sqltags=_sqltags
+      )
       self._singleton_also_index()
     else:
       assert pre_sqltags is _sqltags, f'pre_sqltags is not sqltags: {pre_sqltags} vs {_sqltags}'
@@ -1364,8 +1366,14 @@ class SQLTagSet(SingletonMixin, TagSet):
       raise
 
   @property
+  def id(self):
+    ''' The `.id` aka `self._id`.
+    '''
+    return self._id
+
+  @property
   def name(self):
-    ''' Return the `.name`.
+    ''' The `.name` aka `self._name`.
     '''
     return self._name
 
