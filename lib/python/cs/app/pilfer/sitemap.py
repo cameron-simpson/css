@@ -163,11 +163,19 @@ class URLPattern(Promotable):
   # converter specifications, a mapping of name -> (re,convert,deconvert)
   CONVERTERS = {
       # the default stops at / or &
-      '': Converter(r'[^/?&]+', str, str),
+      '':
+      Converter(r'[^/?&]+', str, str),
       # a nonnegative integer
-      'int': Converter(r'0|[1-9]\d*', int, str),
-      'lc_': Converter(r'[^/&A-Z]+', str, lc_),
-      'wordpath': Converter(r'\w+(/\w+)*', str, str),
+      'int':
+      Converter(r'0|[1-9]\d*', int, str),
+      'lc_':
+      Converter(r'[^/&A-Z]+', str, lc_),
+      'uuid':
+      Converter(
+          r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}', UUID, str
+      ),
+      'wordpath':
+      Converter(r'\w+(/\w+)*', str, str),
   }
 
   class ParsedPattern(namedtuple('ParsedPattern',
