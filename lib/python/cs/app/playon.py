@@ -1042,10 +1042,9 @@ class PlayOnAPI(HTTPServiceAPI):
           r_text = r_text[:-1]
         r = pfx_call(re.compile, r_text, re.I)
         for recording in self:
-          pl_tags = recording.subtags('playon')
-          name = getattr(pl_tags, 'Name', '')
-          series = getattr(pl_tags, 'Series', '')
-          if (series and r.search(series)) or (name and r.search(name)):
+          name = recording.get('playon.Name') or ''
+          series = recording.get('playon.Series') or ''
+          if r.search(series) or r.search(name):
             recordings.append(recording)
       else:
         # integer recording id
