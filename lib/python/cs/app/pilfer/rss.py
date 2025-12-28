@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from xml.etree.ElementTree import ElementTree
 
-from lxml.builder import E
+from lxml.builder import ElementMaker
 
 from cs.lex import r
 from cs.seq import not_none
@@ -54,6 +54,22 @@ class RSS:
 class RSSCommon(ABC):
   ''' Common methods for RSS channel and item entities.
   '''
+
+  @staticmethod
+  def ElementMaker():
+    ''' Return an `lxml.builder.ElementMaker` instance for making RSS XML.
+    '''
+    return ElementMaker(
+        ##namespace=?,
+        nsmap=dict(
+            content="http://purl.org/rss/1.0/modules/content/",
+            dc="http://purl.org/dc/elements/1.1/",
+            atom="http://www.w3.org/2005/Atom",
+            sy="http://purl.org/rss/1.0/modules/syndication/",
+            slash="http://purl.org/rss/1.0/modules/slash/",
+            webfeeds="http://webfeeds.org/rss/1.0",
+        ),
+    )
 
   def rss_category(self):
     return getattr(self, 'category', None)
@@ -125,6 +141,8 @@ class RSSChannelMixin(RSSCommon, ABC):
 
   def rss(
       self,
+      *,
+      E=None,
       build_timestamp=None,
       category=None,
       description=None,
@@ -141,6 +159,7 @@ class RSSChannelMixin(RSSCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
+        * `E`: optional `ElementMaker` instance; the default comes from `RSSCommon.ElementMaker()`
         * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
           default from `self.rss_last_build_timestamp()`
           which is help in the `timestamp.rss_content` tag
@@ -154,6 +173,8 @@ class RSSChannelMixin(RSSCommon, ABC):
         * `refresh`: optional flag, default `False`; if true call `self.refresh()`
         * `title`: the channel title, default from `self.rss_title()`
     '''
+    if E is None:
+      E = self.ElementMaker()
     if refresh:
       self.refresh()
     if category is None: category = self.rss_category()
@@ -201,19 +222,11 @@ class RSSChannelMixin(RSSCommon, ABC):
             ),
             ##E( 'atom:link', href="https://www.rssboard.org/files/sample-rss-2.xml", rel="self", type="application/rss+xml"),
             *(
-                item.rss_item(refresh=refresh)
+                item.rss_item(refresh=refresh, E=E)
                 for item in (items or self.rss_items())
             ),
         ),
         version="2.0",
-        **{
-            ##"xmlns:content": "http://purl.org/rss/1.0/modules/content/",
-            ##"xmlns:dc": "http://purl.org/dc/elements/1.1/",
-            ##"xmlns:atom": "http://www.w3.org/2005/Atom",
-            ##"xmlns:sy": "http://purl.org/rss/1.0/modules/syndication/",
-            ##"xmlns:slash": "http://purl.org/rss/1.0/modules/slash/",
-            ##"xmlns:webfeeds": "http://webfeeds.org/rss/1.0",
-        },
     )
     return rss
 
@@ -222,6 +235,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
   def rss_item(
       self,
       *,
+      E=None,
       category=None,
       description=None,
       image_url=None,
@@ -237,6 +251,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
+        * `E`: optional `ElementMaker` instance; the default comes from `RSSCommon.ElementMaker()`
         * `category`: the item category, default from `self.rss_category()`
         * `description`: the item description, default from `self.rss_description()`
         * `image_url`: an optional URL for an image for this item
@@ -248,6 +263,8 @@ class RSSChannelItemMixin(RSSCommon, ABC):
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
         * `title`: the channel title, default from `self.rss_title()`
     '''
+    if E is None:
+      E = self.ElementMaker()
     if refresh:
       self.refresh()
     if category is None: category = self.rss_category()
