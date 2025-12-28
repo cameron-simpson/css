@@ -1529,9 +1529,12 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   # pylint: disable=arguments-differ
   @tag_or_tag_value
-  def set(self, tag_name, value, *, skip_db=False, verbose=None):
+  def set(self, tag_name, value, *, skip_db=False, force=False, verbose=None):
     if tag_name == 'id':
       raise ValueError(f'may not set pseudoTag {tag_name!r}')
+    if not force and self.get(tag_name) == value:
+      # unchanged, do not update the db
+      return
     if not skip_db:
       vprint(f'{self.name or self.id} + {tag_name}={value}')
     if tag_name in ('name', 'unixtime'):
