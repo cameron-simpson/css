@@ -772,6 +772,7 @@ class PilferCommand(BaseCommand):
   @popopts(
       f=('force', 'Force overwrite of the RSS file if it already exists.'),
       o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
+      refresh='Refresh the required web pages even if not stale.',
   )
   def cmd_rss(self, argv):
     ''' Usage: {cmd} entity|URL
@@ -791,7 +792,7 @@ class PilferCommand(BaseCommand):
         self.options.output_fspath
         or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
     )
-    rss = entity.rss(refresh=True)
+    rss = entity.rss(refresh=self.options.refresh)
     with atomic_filename(output_fspath, mode='w',
                          exists_ok=self.options.force) as T:
       print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
