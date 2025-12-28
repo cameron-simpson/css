@@ -1162,7 +1162,7 @@ class TagSet(
   def _set(self, tag_name, value):
     ''' This is the "raw" setitem for a `TagSet`.
         It should set `tag_name=value` on the underlying mapping
-        (`dict.__setitem__` for a pure `TgaSet`)
+        (`dict.__setitem__` for a pure `TagSet`)
         with no checks or side effects.
 
         This is presented for methods like `TagFile.save()`
@@ -1179,10 +1179,6 @@ class TagSet(
         If `verbose`, emit an info message if this changes the previous value.
     '''
     self.modified = True
-    if verbose:
-      print(
-          f'{self.name or self.id or f"{self.__class__.__name__}:id(self)"} + {tag_name}={value}'
-      )
     self._set(tag_name, value)
 
   # "set" mode
