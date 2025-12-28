@@ -111,6 +111,12 @@ class URL(HasThreadState, FormatableMixin, Promotable):
   def __repr__(self):
     return f'{self.__class__.__name__}:{self.url_s!r}'
 
+  def isabs(self):
+    ''' Test whether this `URL` is absolute, having a hostname and
+        a path commencing with `'/'`.
+    '''
+    return bool(self.hostname) and self.path.startswith('/')
+
   @property
   def short(self):
     ''' A shortened form of the URL for use in messages.
