@@ -10,6 +10,7 @@ from xml.etree.ElementTree import ElementTree
 
 from lxml.builder import E
 
+from cs.lex import r
 from cs.seq import not_none
 
 @dataclass(kw_only=True)
@@ -58,7 +59,7 @@ class RSSCommon(ABC):
     return getattr(self, 'category', None)
 
   @staticmethod
-  def rss_date_string(dt: float | datetime):
+  def rss_date_string(dt: float | str | date | datetime):
     ''' Return a timestamp (a UNIX time or a timezone aware `datetime`)
         as an RFC822 date and time with a 4 digit year.
 
@@ -66,8 +67,21 @@ class RSSCommon(ABC):
         RFC822 date and time specification: https://datatracker.ietf.org/doc/html/rfc822#section-5
     '''
     if not isinstance(dt, (date, datetime)):
-      dt = datetime.fromtimestamp(dt, tz=timezone.utc)
+      if isinstance(dt, float):
+        dt = datetime.fromtimestamp(dt, tz=timezone.utc)
+      elif isinstance(dt, str):
+        try:
+          dt = datetime.fromisoformat(dt)
+        except ValueError:
+          dt = datetime.strptime("%a, %d %b %Y %H:%M:%S %z")
+      else:
+        raise TypeError(f'cannot convert {r(dt)} to a datetime')
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
+
+  def rss_pubdate(self) -> None | str:
+    ''' Return the publication date, or `None` if not available.
+    '''
+    return None
 
   def rss_description(self):
     return getattr(self, 'description', '')
