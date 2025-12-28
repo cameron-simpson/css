@@ -250,8 +250,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
     '''
     if refresh:
       self.refresh()
-    if category is None:
-      category = self.rss_category()
+    if category is None: category = self.rss_category()
     if category is None:
       categories = ()
     elif isinstance(category, str):
@@ -259,6 +258,8 @@ class RSSChannelItemMixin(RSSCommon, ABC):
     else:
       categories = list(category)
     if description is None: description = self.rss_description()
+    if image_url is None:
+      image_url = self.rss_image_url()
     if image_size:
       image_width, image_height = image_size
     else:
@@ -269,8 +270,8 @@ class RSSChannelItemMixin(RSSCommon, ABC):
     if image_width and image_height: image_size = image_width, image_height
     if image_title is None: image_title = self.rss_image_title()
     if link is None: link = self.rss_link()
+    if pub_date is None: pub_date = self.rss_pubdate()
     if title is None: title = self.rss_title()
-    if category is None: category = self.rss_category()
     rss = E.item(
         *not_none(
             (
