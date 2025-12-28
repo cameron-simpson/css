@@ -6,50 +6,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+from typing import Iterable
 from xml.etree.ElementTree import ElementTree
 
 from lxml.builder import ElementMaker
 
 from cs.lex import r
 from cs.seq import not_none
-
-@dataclass(kw_only=True)
-class RSS:
-  ''' A class for generating an RSS feed.
-
-      Based on information from https://www.rssboard.org/rss-specification.
-  '''
-  title: str
-  link: str
-  description: str
-  # W3C language codes:
-  # https://www.w3.org/TR/REC-html40/struct/dirlang.html#langcodes
-  language: str = None
-  copyright: str = None
-  # email of the editor
-  managingEditor: str = None
-  # email of the webmaster
-  webmaster: str = None
-  # using a UNIX timestamp
-  pubDate: float
-  # last time the content of the channel changed, using a UNIX timestamp
-  lastBuildDate: float = None
-  category: list[str] = field(default_factory=list)
-
-  def __init__(self):
-    self.tree = ElementTree()
-
-  def xml(self):
-    raise NotImplementedError
-
-  @staticmethod
-  def encoded_plain_text(s: str) -> str:
-    ''' Return the text `s` with the characters `&`, `<` and `>`
-        replaced by hex escapes.
-        See: https://www.rssboard.org/rss-profile#data-types-characterdata
-    '''
-    return s.replace('&', '&#x26;').replace('<',
-                                            '&#x2C').replace('>', '&#x3E;')
 
 class RSSCommon(ABC):
   ''' Common methods for RSS channel and item entities.
@@ -136,7 +99,7 @@ class RSSChannelMixin(RSSCommon, ABC):
     )
 
   @abstractmethod
-  def rss_items(self):
+  def rss_items(self) -> Iterable["RSSChannelItemMixin"]:
     raise NotImplementedError
 
   def rss(
