@@ -12,6 +12,7 @@ will consume some or all of the derived iterator
 in the course of its function.
 '''
 
+from builtins import range as builtin_range
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
@@ -782,6 +783,112 @@ def not_none(*iterables):
   '''
   for iterable in iterables:
     yield from filter(lambda item: item is not None, iterable)
+
+class range:
+  ''' A class like the builtin `range` exceppt that it will
+      accept `...` as the stop value, indicating an unbound range.
+      Note that if initialised like a normal range it returns a
+      builtin `range` instance.
+
+      Examples:
+
+      Normal instantiation returns a builin `range`:
+
+          >>> r = range(9)
+          >>> type(r)
+          <class 'range'>
+          >>> r
+          range(0, 9)
+
+      The basic unbound range:
+
+          >>> r0 = range(...)
+          >>> type(r0)
+          <class 'cs.seq.range'>
+          >>> r0
+          range(0:...:1)
+          >>> str(r0)
+          '0...'
+          >>> list(r0[:10])
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+          >>> 99999999999999999 in r0
+          True
+          >>> -10 in r0
+          False
+
+      An unbound instantiation starting at 9:
+
+          >>> r = range(9,...)
+          >>> type(r)
+          <class 'cs.seq.range'>
+          >>> r
+          range(9:...:1)
+          >>> r[:10]
+          range(9, 19)
+          >>> r2 = r[:10]
+          >>> type(r2)
+          <class 'range'>
+          >>> r2
+          range(9, 19)
+
+  '''
+
+  def __new__(cls, start, stop=None, step=1):
+    if stop is None:
+      stop = start
+      start = 0
+    if stop is not ...:
+      return builtin_range(start, stop, step)
+    return super().__new__(cls)
+
+  def __init__(self, start, stop=None, step=1):
+    if stop is None:
+      stop = start
+      start = 0
+    assert stop is ...
+    self.start = start
+    self.step = step
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}({self.start}:...:{self.step})'
+
+  def __str__(self):
+    if self.step == 1:
+      return f'{self.start}...'
+    return f'{self.start}:...:{self.step}'
+
+  def __contains__(self, index):
+    if index < self.start:
+      return False
+    return (index - self.start) % self.step == 0
+
+  def __getitem__(self, index):
+    if isinstance(index, int):
+      return range(0, index + 1)[index]
+    if isinstance(index, slice):
+      start, stop, step = index.start, index.stop, index.step
+      if start is None:
+        start = 0
+      elif start < 0:
+        raise ValueError(f'{start=} may not be negative')
+      if stop is ...:
+        stop = None
+      elif stop is not None and stop < 0:
+        raise ValueError(f'{stop=} may not be negative')
+      if step is None:
+        step = 1
+      if stop is not None:
+        return builtin_range(
+            self.start + start, self.start + stop, self.step * step
+        )
+      return self.__class__(self.start + start, ..., self.step * step)
+    raise TypeError(repr(type(index)))
+
+  def __iter__(self):
+    i = self.start
+    while True:
+      yield i
+      i += self.step
 
 if __name__ == '__main__':
   import sys
