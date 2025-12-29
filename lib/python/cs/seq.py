@@ -16,7 +16,7 @@ from builtins import range as builtin_range
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
-from typing import Callable, Hashable, Iterable, Iterator, Optional, Tuple, TypeVar
+from typing import Callable, Hashable, Iterable, Optional, Tuple, TypeVar
 
 from cs.deco import decorator
 from cs.gimmicks import warning
@@ -39,7 +39,7 @@ DISTINFO = {
     '>=3',
 }
 
-class Seq(object):
+class Seq:
   ''' A numeric sequence implemented as a thread safe wrapper for
       `itertools.count()`.
 
@@ -271,7 +271,7 @@ def common_suffix_length(*seqs):
   '''
   return common_prefix_length(list(map(lambda s: list(reversed(s)), *seqs)))
 
-class TrackingCounter(object):
+class TrackingCounter:
   ''' A wrapper for a counter which can be incremented and decremented.
 
       A facility is provided to wait for the counter to reach a specific value.
@@ -370,7 +370,7 @@ class TrackingCounter(object):
       watcher.acquire()
     watcher.wait()
 
-class StatefulIterator(object):
+class StatefulIterator:
   ''' A trivial iterator which wraps another iterator to expose some tracking state.
 
       This has 2 attributes:
