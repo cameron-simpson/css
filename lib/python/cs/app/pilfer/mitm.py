@@ -878,10 +878,12 @@ class MITMAddon:
     PR = lambda *a, **kw: print(
         "call_hooks_for", hook_name, rq.method, url.short, *a, **kw
     )
-    ##PR("URL", flow.request.method, url.short)
+    PR("URL", flow.request.method, url.short)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
+    PR("hooks", hook_actions)
     if not hook_actions:
+      PR("no hooks")
       return
     # any exceptions from the actions
     prep_excs = []
