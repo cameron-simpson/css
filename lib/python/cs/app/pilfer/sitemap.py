@@ -834,7 +834,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     ''' A python object decoded from the response JSON payload, an
         alias for `self.response.json`.
     '''
-    return self.response.json()
+    content = self.content
+    return json.loads(content)
 
   @cached_property
   def soup(self):
@@ -865,7 +866,6 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       else:
         for tag in soup.head.descendants:
           if isinstance(tag, str):
-            ##if tag.strip(): warning("SKIP HEAD tag %r", tag[:40])
             continue
           if tag.name != 'meta':
             continue
@@ -1357,7 +1357,6 @@ class SiteEntity(HasTags):
     is_stale = time.time() - self.rq_timestamp(
         page=page, method=method
     ) > lifespan
-    if is_stale: breakpoint()
     return is_stale
 
   def refresh(self, *, force=False, lifespan=STALE_LIFESPAN):
@@ -1776,7 +1775,6 @@ class SiteMap(UsesTagSets, Promotable):
       '''
       try:
         for entity in entities:
-          ##print(f'PROCESS_ENTITIES: entity {entity}')
           # TODO: a better staleness criterion
           if not force and "sitepage.last_update_unixtime" in entity:
             # do not update
@@ -1798,7 +1796,6 @@ class SiteMap(UsesTagSets, Promotable):
           sitepage = getattr(entity, "sitepage", None)
           if sitepage is None:
             # no sitepage, do not update
-            ##print("  NO SITEPAGE")
             ent_fsQ.put((entity, None))
             continue
           if not hasattr(entity, 'grok_sitepage'):
@@ -1827,7 +1824,6 @@ class SiteMap(UsesTagSets, Promotable):
                 unordered=False,
             ),
         ):
-          ##print(f'process_entity_sitepages: ent_fsQ <- ({entity=},flowstate)')
           ent_fsQ.put((entity, flowstate))
       finally:
         # send one of the 2 end markers
@@ -1850,7 +1846,6 @@ class SiteMap(UsesTagSets, Promotable):
     # TODO: this also needs to be a worker running a Later.map()
     n_end_markers = 0
     for qitem in ent_fsQ:
-      ##print("ent_fsQ ->", r(qitem))
       entity, update_from = qitem
       if entity is None:
         # should be a (None,None) end marker
@@ -2164,17 +2159,12 @@ class SiteMap(UsesTagSets, Promotable):
           for condition in conjunction:
             cond_spec = getattr(condition, "__name__", str(condition))
             with Pfx("on_matches: test %r vs %s", method_name, cond_spec):
-              if verbose:
-                print('ON_MATCHES', f'{method_name} vs {cond_spec}')
-                ##printt(*sorted(match.items()), indent='  ')
               try:
                 test_result = pfx_call(condition, flowstate, match)
               except Exception as e:
                 warning("exception in condition: %s", e)
                 # TODO: just fail? print a traceback if we do this
                 raise
-              if verbose:
-                print(f'  -> {test_result=}')
               # test ran, examine result
               if test_result is None or test_result is False:
                 # failure
