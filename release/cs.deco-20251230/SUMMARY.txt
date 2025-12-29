@@ -1,0 +1,1 @@
+New @with_(func,obj) decorator to call func inside with obj:, primarily for Thread targets.
