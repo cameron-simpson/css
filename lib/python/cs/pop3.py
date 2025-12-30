@@ -547,13 +547,17 @@ class POP3Command(BaseCommand):
   '''
 
   # pylint: disable=no-self-use,too-many-locals
-  @popopts(_1=('once', "Download only 1 message."))
+  @popopts(
+      _1=('once', "Download only 1 message."),
+      limit_=("Limit the number of messages fetched.", int),
+  )
   def cmd_dl(self, argv):
     ''' Usage: {cmd} [{{ssl,tcp}}:]{{netrc_account|[user@]host[!sni_name][:port]}} maildir
           Collect messages from a POP3 server and deliver to a Maildir.
     '''
     doit = self.options.doit
     once = self.options.once
+    limit = self.options.limit
     runstate = self.options.runstate
     pop_target = argv.pop(0)
     maildir_path = argv.pop(0)
@@ -580,6 +584,10 @@ class POP3Command(BaseCommand):
                 retrRs.add(pop3.dl_bg(msg_n, M, deleRs if doit else None))
                 if once:
                   break
+                if limit is not None:
+                  limit -= 1
+                  if limit <= 0:
+                    break
               pop3.flush()
               retrRs.wait()
             # now the deleRs are all queued
