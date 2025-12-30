@@ -1,3 +1,4 @@
+cs.pfx: open() func returning context manager which does a filename pfx?
 PR for pyicontract-lint to use pyproject.toml?
 @pfx: format string for the intended prefix?
 HasThreadState to use contextvars instead of threading.local? It'd need to have the whole state be a single ContextVar
