@@ -327,12 +327,13 @@ class HashIndexCommand(BaseCommand):
         with run_task("scan") as proxy:
           for h, fspath in hashindex(path, relative=relative):
             runstate.raiseif()
-            dirpath = dirname(fspath)
-            if dirpath != current_dirpath:
-              proxy.text = shortpath(dirpath)
-              current_dirpath = dirpath
-            if h is not None:
-              quiet or print(output_format.format(hashcode=h, fspath=fspath))
+            with Pfx(fspath):
+              dirpath = dirname(fspath)
+              if dirpath != current_dirpath:
+                proxy.text = shortpath(dirpath)
+                current_dirpath = dirpath
+              if h is not None:
+                quiet or print(output_format.format(hashcode=h, fspath=fspath))
     return xit
 
   @popopts(
