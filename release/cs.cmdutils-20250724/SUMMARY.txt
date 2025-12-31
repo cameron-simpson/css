@@ -1,0 +1,2 @@
+BaseCommandOptions: new empty __post_init__ so that subclasses can call super().__post_init__() unconditionally.
+New cli_datetime to parse a CLI supplied datetime specification, accepts ISO8601.

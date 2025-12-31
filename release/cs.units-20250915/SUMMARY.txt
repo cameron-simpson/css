@@ -1,0 +1,1 @@
+Drop slots=True from dataclass, too new.

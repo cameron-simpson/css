@@ -15,6 +15,7 @@ from os import SEEK_SET
 from os.path import realpath
 import sys
 from threading import Lock, RLock
+from typing import Iterable, List, Tuple
 from zlib import compress, decompress
 
 from icontract import require
@@ -22,7 +23,7 @@ from icontract import require
 from cs.binary import BSUInt, BSData, SimpleBinary
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.fs import HasFSPath
+from cs.fs import HasFSPath, FSPathBasedSingleton
 from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call, pfx_method
@@ -90,7 +91,7 @@ class DataRecord(SimpleBinary):
     return self.data == other.data
 
   @classmethod
-  def parse(cls, bfr):
+  def parse(cls, bfr: CornuCopyBuffer):
     ''' Parse a `DataRecord` from a buffer.
     '''
     flags = BSUInt.parse_value(bfr)
@@ -175,22 +176,18 @@ class DataFilePushable:
         progress += len(data)
     return True
 
-class DataFile(SingletonMixin, HasFSPath, MultiOpenMixin):
+class DataFile(FSPathBasedSingleton, MultiOpenMixin):
   ''' Management for a `.vtd` data file.
   '''
 
-  @classmethod
-  def _singleton_key(cls, fspath: str):
-    return realpath(fspath)
-
   @pfx_method
   def __init__(self, fspath: str):
+    if '_lock' in self.__dict__:
+      return
     if not fspath.endswith(DATAFILE_DOT_EXT):
       warning(f'fspath does not end with {DATAFILE_DOT_EXT!r}')
-    self.fspath = fspath
-    self.rf = None
+    super().__init__(fspath, lock=RLock())
     self._af = None
-    self._lock = RLock()
 
   @contextmanager
   def startup_shutdown(self):
@@ -206,51 +203,76 @@ class DataFile(SingletonMixin, HasFSPath, MultiOpenMixin):
               self._af.close()
               self._af = None
 
-  def get_record(self, offset: int) -> DataRecord:
+  def __getitem__(self, offset: int) -> DataRecord:
     ''' Read the `DataRecord` at `offset`.
     '''
-    bfr = CornuCopyBuffer.from_file(self.rf)
-    with self._lock:
-      self.rf.seek(offset, SEEK_SET)
-      DR = DataRecord.parse(bfr)
-    return DR
+    with self:
+      with self._lock:
+        for DR in self.scanfrom(offset, rf=self.rf):
+          return DR
+    raise IndexError(f'{offset=}')
 
-  def scanfrom(self, *, offset=0, **scan_kw):
+  def scanfrom(self,
+               offset=0,
+               *,
+               rf=None,
+               with_offsets=False) -> Iterable[DataRecord]:
     ''' Scan the file from `offset` (default `0`)
         and yield `DataRecord` instances.
-        This honours the `AbstractBinary.scan` parameters
-        such as `with_offsets`.
+        If `with_offsets`, yield `(offset,DataRecord,post_offset)` 3-tuples.
+        The optional `rf` parameter may specify an open binary file
+        for the scan such as `self.rf`; if supplied then the caller
+        must arrange exclusive access to the file for the duration
+        of the scan.
+        For example, `__getitem__` passes `rf=self.rf` while holding `self._lock`.
     '''
-    with pfx_call(open, self.fspath, 'rb') as rf:
-      if offset > 0:
-        rf.seek(offset, SEEK_SET)
-      bfr = CornuCopyBuffer.from_file(rf, offset=offset)
-      yield from DataRecord.scan(bfr, **scan_kw)
+    if rf is None:
+      # open our own file for the scan
+      with pfx_call(open, self.fspath, 'rb') as rf:
+        yield from self.scanfrom(offset, rf=rf, with_offsets=with_offsets)
+      return
+    if offset > 0:
+      rf.seek(offset, SEEK_SET)
+    bfr = CornuCopyBuffer.from_file(rf, offset=offset)
+    yield from DataRecord.scan(bfr, with_offsets=with_offsets)
 
   @property
-  def wf(self):
+  def _wf(self):
     ''' The writable file for appending records to the `DataFile`.
-
-        Note that the file is opened for append with no buffering.
+        Note that the file is opened for append and that it must be flushed after use.
     '''
     with self._lock:
       if self._af is None:
-        self._af = pfx_call(open, self.fspath, 'ab', buffering=0)
+        self._af = pfx_call(open, self.fspath, 'ab')
       return self._af
 
-  def append(self, data: bytes):
-    ''' Append the `data` to the file.
-        Return `(DR,offset,length)` being the `DataRecord` and the
-        location and length of the resulting binary record.
+  def add(self, data: bytes) -> Tuple[DataRecord, int, int]:
+    ''' Add the `data` to the file.
+        Return a `(DataRecord,offset,length)` 3-tuple.
     '''
-    DR = DataRecord(data)
-    wf = self.wf
-    bs = bytes(DR)
+    added, = self.extend([data])
+    return added
+
+  def extend(self,
+             chunks: Iterable[bytes]) -> List[Tuple[DataRecord, int, int]]:
+    ''' Add data chunks to the `DataFile` in a burst.
+        Return a list of `(DataRecord,offset,raw_length)` 3-tuples.
+    '''
+    added = []
     with self._lock:
+      wf = self._wf
       offset = wf.tell()
-      length = wf.write(bs)
-    assert length == len(bs)
-    return DR, offset, length
+      try:
+        for data in chunks:
+          DR = DataRecord(data)
+          bs = bytes(DR)
+          written = wf.write(bs)
+          assert written == len(bs)
+          added.append((DR, offset, written))
+          offset += written
+      finally:
+        wf.flush()
+    return added
 
 if __name__ == '__main__':
   from .datafile_tests import selftest

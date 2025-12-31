@@ -26,17 +26,18 @@ cs.app.ydl pypi.release="20220318" ok_revision="6c4e9e800dde94ed935a1b31a532f68c
 cs.binary pypi.release="20250501" ok_revision=bf27ebd353dcdc58c68bf7e0d6309bb38e22faa7 features={"20230212":["BinaryMixin_load","BinaryMixin_save"],"20240630":["AbstractBinary__write","BinarySingleValue__value_from_bytes"],"20250501":["BinaryStruct","ListOfBinary","bs","is_single_value","struct_field_types"]}
 cs.buffer pypi.release="20250428" ok_revision=a554bd4b6973914b04d75e84055783dfffc1e16a features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"],"20240630":["CornuCopyBuffer__final_offset"],"20250428":["CornuCopyBuffer__from_cli_filespec"]}
 cs.cache pypi.release="20250111" ok_revision="707f72e21fdea1728fa5e45dae2eb7148fceb7b9" features={"20240412":["CachingMapping"],"20240422":["ConvCache","convof"],"20250103":["cachedmethod","file_based","file_property"]}
+cs.cdrip
 cs.clockutils pypi.release=20190101
-cs.cmdutils pypi.release="20250531.1" ok_revision="7827c0ecd86376d02e339491588a91f6bc417bce" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"],"20240630":["BaseCommandOptions__as_dict"],"20241005":["vprint"],"20241110":["vqprint"],"20241119":["BaseCommand__SubCommandClass"],"20241206":["popopts__decorator"],"20241218":["cmd_repl"],"20250528":["qprint"]}
+cs.cmdutils pypi.release="20250724" ok_revision="43d0359d70b1dd21fe33df70c4e5332b30a0efde" features={"20210913":["apply_preargv"],"20220429":["dashed_subcommands","dotted_subcommand","popargv","runstate_signals"],"20220605":["poparg","popopts"],"20220626":["poparg_unpop"],"20220918":["BaseCommand_DEFAULT_SIGNALS"],"20230407":["BaseCommandOptions_dataclass","BaseCommand_cmdloop"],"20240316":["uses_cmd_options"],"20240630":["BaseCommandOptions__as_dict"],"20241005":["vprint"],"20241110":["vqprint"],"20241119":["BaseCommand__SubCommandClass"],"20241206":["popopts__decorator"],"20241218":["cmd_repl"],"20250528":["qprint"]}
 cs.configutils pypi.release="20250103" ok_revision=dee19836696005b95121c3f5b1bc3b0173c26c26 features={"20220430":["HasConfigIni"],"20220606":["info_dict"]}
 cs.context pypi.release="20250528" ok_revision="2a322797fe488e7f27ad62bfd9be1aa5bdc23021" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"],"20230109":["contextif"],"20230125":["ContextManagerMixin_as_contextmanager"],"20230212":["stackset"],"20240212":["reconfigure_file"],"20240412":["withall","withif"],"20240630":["closeall","with_self"],"20250306":["setup_cmgr__enter_value__next2"]}
 cs.csvutils pypi.release="20220606" ok_revision=e10878892741e99dfdc3a0137a657ecad337a613
 cs.curlytplt
-cs.dateutils ok_revision="8d0cd6ae028e8feece9fe66b3deb636e8fee1408" pypi.release="20230210"
-cs.debug pypi.release="20250325" ok_revision="4b1017effb33726b53ec441d68a67e1f2fd9ea8a" features={"20230613":["patch_builtins"],"20241005":["CS_DEBUG_TRACE","abrk","log_via_print"]}
-cs.deco pypi.release="20250601" ok_revision="691b7514eb3b8fd80a42418f1ea8a2691cd17c2e" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"],"20241109":["uses_doit","uses_force","uses_quiet","uses_verbose"],"20250306":["attr"],"20250531":["decorator__attrs"]}
+cs.dateutils ok_revision=c67b8704ea5b854f8cdb0abba226d6e0c73c33d0 pypi.release="20250724"
+cs.debug pypi.release="20250728" ok_revision="20a83d3a45b79c64a9ffe4474a8e20773ca41a67" features={"20230613":["patch_builtins"],"20241005":["CS_DEBUG_TRACE","abrk","log_via_print"]}
+cs.deco pypi.release="20251230" ok_revision="431dedff45a9ce82a478d7aa93236370922b9650" features={"20220905":["ALL","default_params"],"20221106":["promote"],"20221106.1":["promote_optional"],"20230210":["promote_dot_as_typename"],"20230212":["Promotable"],"20241003":["uses_cmd_option"],"20241109":["uses_doit","uses_force","uses_quiet","uses_verbose"],"20250306":["attr"],"20250531":["decorator__attrs"],"20251230":["with_"]}
 cs.delta ok_revision=b5ee8df7f2f919ad4881022e26959dfc74653967 pypi.release="20240622"
-cs.djutils ok_revision="743586d7c7e0c0d54a75f4131660e9348865b734" features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"],"20241222":["options_settings"],"20250111":["model_batches_qs"],"20250213":["model_instances"],"20250606":["model_batches_qs__after","model_instances__prefetch_related","model_instances__select_related"],"20250609":["model_batches_qs__yield_base_qs","model_instances__yield_base_qs"]} pypi.release="20250609"
+cs.djutils ok_revision=d3293f5ade1a014ccd8cdcaa019bab9b92b330e3 features={"20241110":["DjangoBaseCommand"],"20241119":["DjangoSpecificSubCommand"],"20241222":["options_settings"],"20250111":["model_batches_qs"],"20250213":["model_instances"],"20250606":["model_batches_qs__after","model_instances__prefetch_related","model_instances__select_related"],"20250609":["model_batches_qs__yield_base_qs","model_instances__yield_base_qs"],"20250724":["after_Model"]} pypi.release="20250724"
 cs.dockerutils ok_revision=f846ece6e9f9353b443df14f81512ae6438681e6 pypi.release="20240519" features={"20240305":["DockerRun__network"]}
 cs.ebooks ok_revision="3379fcbf1eb008df3cd38e9afd40f1d0db9afbd4" pypi.release="20241007" features={"20230110":["dedrm"],"20240201.4":["cbz","kobo","pdf"]}
 cs.edit pypi.release="20220429" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65" features={"20220429":["edit_obj"]}
@@ -45,7 +46,7 @@ cs.excutils pypi.release="20250306" ok_revision="98b5effd951fd57952508ffff3a1fbc
 cs.ffmpegutils ok_revision="67dd2032154d8a0aeb4d80e51edecf6198ecc95d" pypi.release="20241122" features={"20241122":["FFMPEG_DOCKER_IMAGE"]}
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20250528" ok_revision="0de42f1f6a25d0b70086424d169c198ae703d5f4" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"],"20241122":["atomic_copy2"],"20250103":["rename_excl"]}
-cs.fs ok_revision=f9337b8ad5f46f71d2cb27c271e09d9df4a4100b pypi.release="20250528" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"],"20240422":["scandirpaths","scandirtree"],"20250325":["update_linkdir"],"20250414":["HasFSPath__lt","RemotePath"],"20250528":["remove_protecting"]}
+cs.fs ok_revision="7b24a2f49ef560e4dbca67c9f268dfb22c6a02b8" pypi.release="20250728" features={"20220429":["FSPathBasedSingleton","HasFSPath","fnmatchdir","is_clean_subpath","longpath","needdir","shortpath"],"20240422":["scandirpaths","scandirtree"],"20250325":["update_linkdir"],"20250414":["HasFSPath__lt","RemotePath"],"20250528":["remove_protecting"]}
 cs.fsm ok_revision=b05a07abe155bbb10776c7a8ee7aaeba13177a13 pypi.release="20250120" features={"20231018":["fsm_transitions_as_dot__history_style"],"20240630":["CancellationError"],"20240721":["FSM__fsm_print_state_diagram"]}
 cs.fstags pypi.release="20250528" ok_revision="4a5f0b31e4f5695ddad441df958520bf5afebc43" features={"20220918":["uses_fstags"],"20230212":["TaggedPath_findup","TaggedPath_keypath","TaggedPath_parent"],"20240422":["fix_fstags__repr"],"20240709":["CachedValue"],"20250528":["TaggedPathSet"]}
 cs.gimmicks ok_revision=e3a39d35d32d5baa1566f6e6250b27a4e55432b9 pypi.release="20250428" features={"20211208":["TimeoutError"],"20220429":["devnull"],"20230212":["gimmick_r","gimmick_s"],"20230331":["open_append"],"20250428":["Buffer"]}
@@ -58,40 +59,41 @@ cs.imageutils ok_revision="1f307905c3dd39927aebaa421d0100ba88edd6d8" features={"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.iso14496 pypi.release="20241122" ok_revision=d119731d38eed9058fcf6dd4e344b78244965f1f
 cs.later pypi.release="20240630" ok_revision="819a6782e492719c8ec508be77bebd84117e8cfc" features={"20240305":["Later__thread_states"]}
-cs.lex pypi.release="20250428" ok_revision="0656e553c8190b3e106e718f62ed9d0376f9ea3e" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"],"20241109":["tabulate"],"20241119":["stripped_dedent__sub_indent"],"20241207":["tabulate__newlines"],"20250103":["BaseToken__token_classes","Identifier","NumericValue","QuotedString"],"20250323":["printt"]}
+cs.lex pypi.release="20250914" ok_revision=dbece742d267618cd67fbbbedbb308381365f4b9 features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"],"20241109":["tabulate"],"20241119":["stripped_dedent__sub_indent"],"20241207":["tabulate__newlines"],"20250103":["BaseToken__token_classes","Identifier","NumericValue","QuotedString"],"20250323":["printt"],"20250914":["FormatMapping","single_space"]}
 cs.logutils pypi.release="20250323" ok_revision=a3b20bbeb0e556fdbe18407a812abddf5c818380 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"],"20240630":["LoggingState"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
-cs.mappings pypi.release="20250528" ok_revision="51fd8f0fcdcf168f31c454b9927e98a8a772f245" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"],"20250306":["mapped_property","missingdict"],"20250528":["change_mapping"]}
+cs.mappings pypi.release="20250915" ok_revision="334e75cab378cd3bf119fc3e2f94026c8715e09c" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"],"20250306":["mapped_property","missingdict"],"20250528":["change_mapping"]}
 cs.mediainfo ok_revision="211e1a295e5dd5beba0facbc1ba24c8ea3389440" pypi.release="20240519"
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mplutils ok_revision=c3516c78f9d056d621055c19e4ad3d2f597b5c23 pypi.release="20241122" features={"20220918":["FigureSize"]}
-cs.naysync ok_revision="14b3500d5f984487c4562ba17d2d0cb5e3bc81ff" features={"20241214":["afunc","agen"],"20241220":["amap","async_iter"],"20250103":["AnyIterable","AsyncPipeLine","StageMode","aqget","aqiter"]} pypi.release="20250306"
+cs.naysync ok_revision=a8517275701926b47903cc66347f5487cab5e308 features={"20241214":["afunc","agen"],"20241220":["amap","async_iter"],"20250103":["AnyIterable","AsyncPipeLine","StageMode","aqget","aqiter"]} pypi.release="20251119"
 cs.ndjson ok_revision="8b18d803a142b481a79d7ef96cb97e27c97d94ac" pypi.release="20250528" features={"20250528":["dump_ndjson","dumps_ndjson"]}
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release="20220606" ok_revision=b55e44581d06b3015d0203ca7fea5c063124469c features={"20220606":["intif"]}
 cs.obj pypi.release="20250306" ok_revision="7bc383c11106fbc6c6f841dfc9106c690eb7e236" features={"20210717":["SingletonMixin_key_is_none"],"20220530":["set_membership"],"20220918":["Sentinel"],"20241005":["public_subclasses"]}
 cs.other_command
 cs.packetstream pypi.release="20240630" ok_revision="1bc8c692373663edd0678222e3a7c30fd5292116" features={"20240630":["BaseRequest","HasPacketConnection"]}
-cs.pfx pypi.release="20250613" ok_revision="8bd9a36417e4089c0d6546d5cad1c8d35945fabf" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
+cs.pfx pypi.release="20250914" ok_revision=cbb33e15bb851541fd05bd48b3e4b08fd5cf9f25 features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"],"20220429":["scope_push"]}
 cs.pipeline pypi.release="20191007.1" ok_revision="2a26b6f06610394b6c7e6fb6f9a5228e50367db9"
 cs.pop3 ok_revision="64592a92c8db0e90cf818f6ccf415f6cfb53c90d" pypi.release="20240316"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.prgress
 cs.progress pypi.release="20250530" ok_revision="1f69999fd1115ff99272305a58a745acd8359fdd" features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"],"20250306":["Progress__qbar"],"20250412":["fix_progressbar_no_tty"]}
-cs.psutils pypi.release="20250513" ok_revision=be91b550b3dba0e68b96be8810a8e0c509add7ba features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"],"20241206":["run__remote"],"20250108":["run__fold"],"20250513":["print_argv__as_str"]}
+cs.psutils pypi.release="20250513" ok_revision="5d19b14e04551ce78bd269ec844d78b934533ee9" features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"],"20241206":["run__remote"],"20250108":["run__fold"],"20250513":["print_argv__as_str"]}
 cs.py.doc pypi.release="20250426" ok_revision=f3ab8e29f48276fe14775575f12e06c5263880e1
-cs.py.func pypi.release="20240630" ok_revision="0dd7f10b229df7807892a255ae6983d2136b819e" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
-cs.py.modules pypi.release="20241122" ok_revision="494204872267e1baa6abbc034af40932ae28a095" features={"20220606":["import_extra"]}
-cs.py.stack pypi.release="20250306" ok_revision="2bddd66695de848f04309ca54c28c40af262ea57" features={"20240412":["stack_dump__select"]}
+cs.py.func pypi.release="20250914" ok_revision="2f4b463f8596f710acb1e3fefcbb512e96f3b771" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"]}
+cs.py.modules pypi.release="20250724" ok_revision="24982698d37a9f61120ce717f4c0fee530986d4f" features={"20220606":["import_extra"]}
+cs.py.pfx
+cs.py.stack pypi.release="20250724" ok_revision=eaabd52273e7d3de35c7ab1db6fda136cab56b62 features={"20240412":["stack_dump__select"]}
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
 cs.queues pypi.release="20250426" ok_revision=e9f02ca056291fecded4a9e9a0d9747d2681c42d features={"20210913":["ListQueue"],"20210924":["iterable_channel"],"20220805":["ListQueue_append"],"20220918":["QueueIterator"],"20240211":["ListQueue__unique"],"20240305":["get_batch"],"20240412":["QueueIterator__iter_batch","QueueIterator__next_batch"]}
 cs.range pypi.release="20230701" ok_revision=e733b04f48fcd613a257210411883fe0522ea424 features={"20230518":["as_list"]}
-cs.resources pypi.release="20250325" ok_revision=ffa945d8eb38d0ed3e05bbf069c434c37cf36ca3 features={"20220429":["catch_signal"],"20220918":["openif"],"20230503":["RunState_poll_cancel"],"20231221":["Runstate_raiseif"],"20240201":["MultiOpenMixin_is_open"],"20240412":["RunState__iter"],"20250103":["RunState__raiseif"],"20250325":["RunState__PAUSED"]}
+cs.resources pypi.release="20250915" ok_revision="77a59c8722b9566060358291c81b5c151ba7ad13" features={"20220429":["catch_signal"],"20220918":["openif"],"20230503":["RunState_poll_cancel"],"20231221":["Runstate_raiseif"],"20240201":["MultiOpenMixin_is_open"],"20240412":["RunState__iter"],"20250103":["RunState__raiseif"],"20250325":["RunState__PAUSED"]}
 cs.result pypi.release="20250306" ok_revision=aeacc5f3862e4354d902beb99a402a6f99d7bfda features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"],"20250103":["not_cancelled"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release="20250306" ok_revision="74bf122de126cda4642d6030ed3cd6e992b971db" features={"20250306":["content_length","content_type","default_headerregistry","header"]}
 cs.semantics ok_revision=efc3bbb8a0e9059323f57e8b97c7d8b51093c6b7 features={"20250103":["ClosedError","not_closed"]} pypi.release="20250103"
-cs.seq pypi.release="20250306" ok_revision=a4926c3e492c2bc61337766160197176611a8640 featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"]}
+cs.seq pypi.release="20251231.1" ok_revision=fd5acdb9c78d6386520fe53e000bb71b34128710 featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"],"20250724":["ClonedIterator"],"20251230":["not_none","unbound_range"],"20251231":["range__class_getitem"],"20251231.1":["range__genericalias"]}
 cs.service_api ok_revision=d682ce35a261867118ef07bd49e2c0808c740ff9 pypi.release="20241007"
 cs.sh ok_revision="3af3cf2c5da8cc18eafa8a65437eaf1e7b7f1db3"
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
@@ -102,14 +104,14 @@ cs.sqltags ok_revision="977113cd5173742347762aea02a88b7773f64d01" pypi.release="
 cs.tagset ok_revision="83c4e893a68556f28b9757221d24f905df373927" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"],"20240422":["fix_Tag__str__bad_TypeError","jsonable"],"20240422.2":["jsonable__for_json"],"20250528":["Tag__parse"]} pypi.release="20250528"
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
 cs.taskqueue ok_revision="879d12f2e8d786307b2bee942c38f08ff73d8633" features={"20221207":["BaseTask"]} pypi.release="20250120"
-cs.testutils ok_revision="5720c3a86f1611bdb5323168d3c4e3ed6e46cdd2" features={"20230109":["SetupTeardownMixin","product_test"],"20240623":["assertSingleThread"]} pypi.release="20250426"
-cs.threads ok_revision=f50f0f121110f1087cc87b403b3f0fa59d3262b8 pypi.release="20250528" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"]}
+cs.testutils ok_revision="0972084494fc61d065c4a0864224eff7c0c94781" features={"20230109":["SetupTeardownMixin","product_test"],"20240623":["assertSingleThread"]} pypi.release="20251020"
+cs.threads ok_revision=fe55fe1acc17c2b2facb493db005b49ea11b5201 pypi.release="20250528" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"]}
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.tty
 cs.typeutils
 cs.typingutils ok_revision="52320a5ef1df5436b63defe2d1eda1dd5bbcd998" features={"20230331":["subtype"],"20250428":["is_optional"]} pypi.release="20250503"
-cs.units ok_revision="7c7aa1557f021d428ed75b43d30c77a2f0afcc17" pypi.release="20250601"
+cs.units ok_revision=a4d7b95037a2a74ab95e7272a4ba613dd55465b4 pypi.release="20250915"
 cs.upd ok_revision="37f6ffd00d1c80db5ad1d7d983dbaed669a65613" pypi.release="20250426" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"],"20240216":["without"],"20240412":["without"]}
 cs.urlutils ok_revision="7eeaa1d7ef5d4e82b88e9d614e8646d80a5344e7" pypi.release="20231129"
 cs.x ok_revision="04993b7bcc25b66e2477a5efa3b3ae9f12c7dcd6" pypi.release="20240630" features={"20231129":["via_logger"]}

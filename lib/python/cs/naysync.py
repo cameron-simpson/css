@@ -54,7 +54,7 @@ from typing import (
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
 
-__version__ = '20250306-post'
+__version__ = '20251119-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -103,7 +103,7 @@ def agen(genfunc, *, fast=None):
   return agenerator
 
 @decorator
-def afunc(func, fast=False):
+def afunc(func, *, fast=False):
   ''' A decorator for a synchronous function which turns it into
       an asynchronous function.
       If `func` is already an asynchronous function it is returned unchanged.
@@ -136,7 +136,7 @@ def afunc(func, fast=False):
 
   return partial(to_thread, func)
 
-async def async_iter(it: AnyIterable, fast=None):
+async def async_iter(it: AnyIterable, *, fast=None):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
       An asynchronous iterable returns `aiter(it)` directly.
 
@@ -193,7 +193,7 @@ async def aqget(q: Queue):
 
 _aqiter_NO_SENTINEL = object()
 
-async def aqiter(q: Queue, sentinel=_aqiter_NO_SENTINEL):
+async def aqiter(q: Queue, *, sentinel=_aqiter_NO_SENTINEL):
   ''' An asynchronous generator to yield items from a `queue.Queue`like object `q`.
       It must support the `.get()` and `.get_nowait()` methods.
 
@@ -214,6 +214,7 @@ async def aqiter(q: Queue, sentinel=_aqiter_NO_SENTINEL):
 async def amap(
     func: Callable[[Any], Any],
     it: AnyIterable,
+    *,
     concurrent=False,
     unordered=False,
     indexed=False,

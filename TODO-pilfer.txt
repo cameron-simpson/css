@@ -1,3 +1,12 @@
+drop all use of URL_re and .url_re, replace with URLPatterns
+URLPattern: host and path matches may be any callable returning a mapping?
+tyupe safety for zone_keys - prevent eg None for an int etc
+SQLTags.preload still seems to do a per entity SQL query
+pilfer rss subcommand
+SiteMap.updated_entities: can we set start_time to just before the request is dispatched?
+common format-shaped pattern to make @on regeps and sitepage formats, custom Formatter class?
+should the cache update the X-Cache and X-Cache-Hits headers? MISS/HIT, hit counts
+mitm export files to public locations?
 some kind of sitemap reload functionality?
 a hook after the SNI or CONNECT and before the requestheaders to pass the TLS stream straight through, eg for icloud
 SiteMap.patch_soup_top_index to put a toolbar across the top of a page with RSS, dl, etc etc

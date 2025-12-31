@@ -7,6 +7,7 @@
 ''' Various Store classes.
 '''
 
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
@@ -18,6 +19,7 @@ from icontract import require
 from cs.cache import CachingMapping, ConvCache
 from cs.deco import fmtdoc, promote
 from cs.hashindex import file_checksum
+from cs.lex import r
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
@@ -54,6 +56,116 @@ class StoreError(Exception):
       if k and k[0].isalpha() and k not in ('args', 'with_traceback'):
         s += ":%s=%r" % (k, getattr(self, k))
     return s
+
+class StoreImplementation(Store, ABC):
+  ''' This is just like `Store` bt an abstract class to ensure
+      subclasses implement the core methods, usually via `StoreSyncBase`
+      or `StoreAsyncBase`.
+  '''
+
+  ##########################################################################
+  # Core StoreImplementation methods, all abstract.
+  @abstractmethod
+  def add(self, data):
+    ''' Add the `data` to the Store, return its hashcode.
+    '''
+    raise NotImplementedError
+
+  @abstractmethod
+  def add_bg(self, data):
+    ''' Dispatch the add request in the background, return a `Result`.
+    '''
+    raise NotImplementedError
+
+  def __setitem__(self, h, data):
+    if not isinstance(h, self.hashclass):
+      raise TypeError(f'h should be a {self.hashclass}, got {r(h)}')
+    if h != self.hashclass.from_bytes(data):
+      raise ValueError(f'{h=} != {self.hashclass.hashname}({data=})')
+    h2 = self.add(data)
+    assert h == h2
+
+  @abstractmethod
+  # pylint: disable=unused-argument
+  def get(self, h, default=None):
+    ''' Fetch the data for hashcode `h` from the Store, or `None`.
+    '''
+    raise NotImplementedError
+
+  @abstractmethod
+  def get_bg(self, h):
+    ''' Dispatch the get request in the background, return a `Result`.
+    '''
+    raise NotImplementedError
+
+  @abstractmethod
+  def contains(self, h):
+    ''' Test whether the hashcode `h` is present in the Store.
+    '''
+    raise NotImplementedError
+
+  @abstractmethod
+  def contains_bg(self, h):
+    ''' Dispatch the contains request in the background, return a `Result`.
+    '''
+    raise NotImplementedError
+
+  def __contains__(self, h):
+    return self.contains(h)
+
+  @abstractmethod
+  def flush(self):
+    ''' Flush outstanding tasks to the next lowest abstraction.
+    '''
+    raise NotImplementedError
+
+  @abstractmethod
+  def flush_bg(self):
+    ''' Dispatch the flush request in the background, return a `Result`.
+    '''
+    raise NotImplementedError
+
+class StoreSyncBase(StoreImplementation):
+  ''' Subclass of `StoreImplementation` expecting synchronous operations
+      and providing asynchronous hooks, the dual of `StoreAsyncBase`.
+  '''
+
+  #####################################
+  ## Background versions of operations.
+  ##
+
+  def add_bg(self, data):
+    return self._defer(self.add, data)
+
+  def get_bg(self, h):
+    return self._defer(self.get, h)
+
+  def contains_bg(self, h):
+    return self._defer(self.contains, h)
+
+  def flush_bg(self):
+    return self._defer(self.flush)
+
+class StoreAsyncBase(Store):
+  ''' Subclass of `StoreImplementation` expecting asynchronous operations
+      and providing synchronous hooks, the dual of `StoreSyncBase`.
+  '''
+
+  #####################################
+  ## Background versions of operations.
+  ##
+
+  def add(self, data):
+    return self.add_bg(data)()
+
+  def get(self, h, default=None):
+    return self.get_bg(h, default=default)()
+
+  def contains(self, h):
+    return self.contains_bg(h)()
+
+  def flush(self):
+    return self.flush_bg()()
 
 class MappingStore(StoreSyncBase):
   ''' A Store built on an arbitrary mapping object.
@@ -476,6 +588,8 @@ class DataDirStore(MappingStore):
         * `rollover`: passed to the data dir
         * `lock`: optional `RLock`, passed to the `DataDir` mapping
     '''
+    if hashclass is None:
+      hashclass = Store.get_default_hashclass()
     if lock is None:
       lock = RLock()
     self._lock = lock

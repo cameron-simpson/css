@@ -1,0 +1,1 @@
+lib/python/cs/seq.py: cs.seq: range: support range[type] returning a GenericAlias with apologies to Mr Pink

@@ -1,0 +1,1 @@
+tabulate: new optional ppcls argument to supply a custom PrettyPrinter class for formatting, use a date and datetime aware class by default.

@@ -9,7 +9,8 @@ from inspect import isgeneratorfunction
 import logging
 import os
 from os.path import abspath
-from threading import current_thread, Lock
+import sys
+from threading import current_thread
 from typing import Any, Optional, Union, List, Tuple
 
 from icontract import require
@@ -22,9 +23,10 @@ from typeguard import typechecked
 from cs.context import contextif
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import lockfile
-from cs.lex import cutprefix
+from cs.lex import cutprefix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
+from cs.psutils import run
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import NRLock, ThreadState
@@ -198,14 +200,14 @@ def with_session(function, *a, orm=None, session=None, **kw):
   with using_session(orm=orm, session=session):
     return function(*a, **kw)
 
+@decorator
 def auto_session(function):
-  ''' Decorator to run a function in a session if one is not presupplied.
+  ''' A decorator to run a function in a session if one is not presupplied.
       The function `function` runs within a transaction,
       nested if the session already exists.
 
       See `with_session` for details.
   '''
-
   if isgeneratorfunction(function):
 
     def auto_session_generator_wrapper(*a, orm=None, session=None, **kw):
@@ -226,9 +228,6 @@ def auto_session(function):
 
     wrapper = auto_session_function_wrapper
 
-  wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
-  wrapper.__doc__ = function.__doc__
-  wrapper.__module__ = getattr(function, '__module__', None)
   return wrapper
 
 @contextdecorator
@@ -310,7 +309,7 @@ class ORM(MultiOpenMixin, ABC):
     '''
     self.db_url = self.norm_db_url(db_url)
     self.db_fspath = self.fspath_for_db_url(self.db_url)
-    is_sqlite = self.db_url.startswith('sqlite://')
+    is_sqlite = self.is_sqlite = self.db_url.startswith('sqlite://')
     if serial_sessions is None:
       # serial SQLite sessions by default
       serial_sessions = is_sqlite
@@ -382,6 +381,18 @@ class ORM(MultiOpenMixin, ABC):
       self.__first_use = False
     yield
 
+  # TODO: psql for postgresql
+  def dbshell(self):
+    ''' Run an interactive database prompt.
+    '''
+    db_url = self.db_url
+    if db_url.startswith("sqlite://"):
+      db_fspath = self.db_fspath
+      print("sqlite3", db_fspath)
+      run(['sqlite3', db_fspath], check=True, stdin=sys.stdin)
+    else:
+      raise ValueError(f'I do not know how to get a db shell for {db_url=}')
+
   @property
   def engine(self):
     ''' SQLAlchemy engine, made on demand.
@@ -416,24 +427,26 @@ class ORM(MultiOpenMixin, ABC):
   def serialif(self):
     ''' A context manager to serialise sessions if `self.serial_sessions`.
     '''
-    if self.serial_sessions:
-      existing_session = self.sqla_state.session
-      if existing_session is not None:
-        T = current_thread()
-        raise RuntimeError(
-            f'Thread:{T.ident}:{T.name}'
-            f': this Thread already has an ORM session: {existing_session}'
-        )
-      with self._serial_sessions_lock:
-        with contextif(
-            bool(self.db_fspath),
-            lockfile,
-            self.db_fspath,
-            poll_interval=2,
-        ):
-          yield
-    else:
+    if not self.serial_sessions:
       yield
+      return
+    existing_session = self.sqla_state.session
+    if existing_session is not None:
+      T = current_thread()
+      raise RuntimeError(
+          f'Thread:{T.ident}:{T.name}'
+          f': this Thread already has an ORM session: {existing_session}'
+      )
+    with self._serial_sessions_lock:
+      with contextif(
+          False and bool(self.db_fspath),
+          lockfile,
+          self.db_fspath,
+          poll_interval=2,
+      ):
+        ##print("==== ORM SERIALIF ===")
+        ##breakpoint()
+        yield
 
   @contextmanager
   @pfx_method(use_str=True)
@@ -457,6 +470,7 @@ class ORM(MultiOpenMixin, ABC):
     '''
     return self.sqla_state.session
 
+@decorator
 def orm_auto_session(method):
   ''' A decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
@@ -464,7 +478,6 @@ def orm_auto_session(method):
 
       See `with_session` for details.
   '''
-
   if isgeneratorfunction(method):
 
     def orm_auto_session_wrapper(self, *a, session=None, **kw):
@@ -480,11 +493,6 @@ def orm_auto_session(method):
       with using_session(orm=self.orm, session=session) as active_session:
         return method(self, *a, session=active_session, **kw)
 
-  orm_auto_session_wrapper.__name__ = "@orm_auto_session(%s)" % (
-      funcname(method),
-  )
-  orm_auto_session_wrapper.__doc__ = method.__doc__
-  orm_auto_session_wrapper.__module__ = getattr(method, '__module__', None)
   return orm_auto_session_wrapper
 
 class BasicTableMixin:

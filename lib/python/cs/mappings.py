@@ -33,7 +33,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20250528-post'
+__version__ = '20250915-post'
 
 DISTINFO = {
     'description':
@@ -762,7 +762,7 @@ class MappingChain(object):
     return ks
 
 class SeenSet(object):
-  ''' A set-like collection with optional backing store file.
+  ''' A set-like collection with an optional backing store file.
   '''
 
   def __init__(self, name, backing_path=None):
@@ -1420,6 +1420,14 @@ class RemappedMappingProxy:
           lambda subkey: select_key(self.key(subkey)), subkey_iter
       )
     return map(self.key, subkey_iter)
+
+  def items(self):
+    for k in self.keys():
+      yield k, self[k]
+
+  def values(self):
+    for k in self.keys():
+      yield self[k]
 
   def __contains__(self, key):
     return self.subkey(key) in self.mapping

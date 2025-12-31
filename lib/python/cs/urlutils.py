@@ -42,7 +42,7 @@ from typeguard import typechecked
 
 from cs.deco import promote, Promotable
 from cs.excutils import unattributable
-from cs.lex import parseUC_sAttr, r
+from cs.lex import FormatableMixin, parseUC_sAttr, r
 from cs.logutils import debug, error, warning, exception
 from cs.pfx import Pfx, pfx_call
 from cs.rfc2616 import datetime_from_http_date
@@ -84,7 +84,7 @@ def urljoin(url, other_url):
   '''
   return up_urljoin(str(url), str(other_url))
 
-class URL(HasThreadState, Promotable):
+class URL(HasThreadState, FormatableMixin, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
@@ -103,7 +103,6 @@ class URL(HasThreadState, Promotable):
     self.url_s = str(url_s)
     self._lock = RLock()
     self._parts = None
-    self._info = None
     self.flush()
 
   def __str__(self):
@@ -149,6 +148,27 @@ class URL(HasThreadState, Promotable):
       return node
     # look up method on equivalent Unicode string
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
+  def format_kwargs(self):
+    ''' Return a dict for use with `FormatableMixin.format_as()`.
+    '''
+    return dict(
+        basename=self.basename or 'index.html',
+        cleanpath=self.cleanpath,
+        cleanrpath=self.cleanrpath,
+        content_length=self.content_length,
+        dirname=self.dirname,
+        domain=self.domain,
+        ext=self.ext,
+        hostname=self.hostname,
+        mtime=self.last_modified,
+        netloc=self.netloc,
+        path=self.path,
+        rpath=self.rpath,
+        scheme=self.scheme,
+        short=self.short,
+        url=self.url_s,
+    )
 
   @contextmanager
   def session(self, session=None):
@@ -203,12 +223,10 @@ class URL(HasThreadState, Promotable):
 
   @property
   @unattributable
-  @locked
   def headers(self):
     ''' A `requests.Response` headers mapping.
     '''
-    r = self.HEAD_response
-    return r.headers
+    return self.HEAD_response.headers
 
   # TODO: use functions from cs.rfc2616? they do return an email.BaseHeader :-(
   @cached_property
@@ -245,9 +263,7 @@ class URL(HasThreadState, Promotable):
   def last_modified(self):
     ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
     '''
-    if self._info is None:
-      self.HEAD_response
-    value = self._info['Last-Modified']
+    value = self.headers.get('Last-Modified')
     if value is not None:
       # parse HTTP-date into datetime object
       dt_last_modified = datetime_from_http_date(value.strip())
@@ -259,9 +275,7 @@ class URL(HasThreadState, Promotable):
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
     '''
-    if self._content is None:
-      self.HEAD_response
-    return self._info.getencoding()
+    return self.headers.getencoding()
 
   @property
   @unattributable
@@ -430,7 +444,16 @@ class URL(HasThreadState, Promotable):
   @property
   @unattributable
   def basename(self):
+    ''' The URL basename.
+    '''
     return os.path.basename(self.path)
+
+  @property
+  @unattributable
+  def ext(self):
+    ''' The URL basename file extension, as from `os.path.splitext`.
+    '''
+    return os.path.splitext(self.basename)[1]
 
   def find_all(self, *a, **kw):
     ''' Convenience routine to call BeautifulSoup's .find_all() method.

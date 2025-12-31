@@ -45,7 +45,6 @@ from inspect import isclass
 from itertools import chain
 import os
 from os.path import basename
-from pprint import pformat
 import re
 # this enables readline support in the docmd stuff
 try:
@@ -56,10 +55,13 @@ import shlex
 from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 import sys
 from textwrap import dedent
-from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
+from typing import (
+    Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
+)
 
 from typeguard import typechecked
 
+from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
 from cs.deco import decorator, OBSOLETE, uses_cmd_options, uses_quiet
 from cs.lex import (
@@ -81,7 +83,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20250531.1-post'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1093,8 +1095,8 @@ class BaseCommandOptions(HasThreadState):
 
 @decorator
 def popopts(cmd_method, **opt_specs_kw):
-  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`
-      and update `self.options`. This also updates the method's usage message.
+  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`,
+      updating `self.options`. This also updates the method's usage message.
 
       Example:
 
@@ -1152,7 +1154,7 @@ class BaseCommand:
 
       This class provides the basic parse and dispatch mechanisms
       for command lines.
-      To implement a command line one instantiates a subclass of `BaseCommand`:
+      To implement a command line one defines a subclass of `BaseCommand`:
 
           class MyCommand(BaseCommand):
               """ My command to do something. """
@@ -1160,7 +1162,8 @@ class BaseCommand:
       and provides either a `main` method if the command has no subcommands
       or a suite of `cmd_`*subcommand* methods, one per subcommand.
 
-      Running a command is done by:
+      Running a command is done by instantiating it with `argv` and
+      then calling `.run()`:
 
           MyCommand(argv).run()
 
@@ -1183,7 +1186,7 @@ class BaseCommand:
       The `self.options` object is an instance of the class' `Options` class.
       The default comes from `BaseCommand.Options` (aka `BaseCommandOptions`)
       but classes with additional command line options will usually
-      provide their own subclass:
+      provide their own `Options` subclass:
 
           class MyCommand(BaseCommand):
 
@@ -1384,6 +1387,7 @@ class BaseCommand:
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
+        subcmd = None
         try:
           main = self.main
         except AttributeError:
@@ -1393,11 +1397,7 @@ class BaseCommand:
         self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
-        subcmd = argv[0] if argv else None
-        if subcmd is not None and re.match(r'^[a-z][-_\w]*$', subcmd):
-          # looks like a subcommand name, take it
-          argv.pop(0)
-        else:
+        if not argv or not re.match(r'^[a-z][-_\w]*$', argv[0]):
           # not a command name, is there a default command?
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
@@ -1412,7 +1412,7 @@ class BaseCommand:
             if isinstance(default_argv, str):
               default_argv = [default_argv]
             argv = [*default_argv, *argv]
-          subcmd = argv.pop(0)
+        subcmd = argv.pop(0)
         try:
           subcommand = self.subcommand(subcmd)
         except KeyError:
@@ -1428,6 +1428,7 @@ class BaseCommand:
           with Pfx(subcmd):
             return subcommand(argv)
 
+        self.subcmd = subcmd
         self._argv = argv
         self._run = _run
     except GetoptError as e:
@@ -1699,6 +1700,43 @@ class BaseCommand:
         argv.insert(0, arg0)
       raise
 
+  @staticmethod
+  def pop_buffers(
+      argv: List[str]
+  ) -> Iterable[Tuple[str, Optional[CornuCopyBuffer]]]:
+    ''' A generator yielding `(filespec,CornuCopyBuffer)` 2-tuples
+        for each string in `argv` specifying a file.
+        The name `"-"` means the standard input (`sys.stdin`).
+        If a file is missing or stdin is a tty the yielded buffer is `None`.
+        Filespecs are consumed from `argv` one at a time, so ceasing
+        iteration of the generator leaves the tail of argv unconsumed.
+    '''
+    while argv:
+      filespec = argv.pop(0)
+      with Pfx(filespec):
+        if filespec == '-' and sys.stdin.isatty():
+          warning('stdin is a tty, not reading from it')
+          bfr = None
+        else:
+          try:
+            bfr = CornuCopyBuffer.from_cli_filespec(filespec)
+          except FileNotFoundError as e:
+            warning("not found: %s", e)
+            bfr = None
+      yield filespec, bfr
+
+  @classmethod
+  def pop_buffer(cls,
+                 argv: List[str]) -> Tuple[str, Optional[CornuCopyBuffer]]:
+    ''' Return a `(filespec,CornuCopyBuffer)` 2-tuple
+        from thw first string in `argv`.
+        The name `"-"` means the standard input (`sys.stdin`).
+        If the file is missing or stdin is a tty the yielded buffer is `None`.
+    '''
+    for filespec, bfr in cls.pop_buffers(argv):
+      return filespec, bfr
+    raise GetoptError("missing filespec, expected \"-\" or filesystem path")
+
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
     ''' Run a command.
@@ -1958,27 +1996,29 @@ class BaseCommand:
           if k and not k.startswith('_')
       }
       local = pub_mapping(self.__dict__)
-      del local['options']
-      local.update(
-          {
-              f'options.{k}': v
-              for k, v in sorted(pub_mapping(options.__dict__).items())
-          }
-      )
       local.update(argv=argv, cmd=self.cmd, self=self)
     if banner is None:
-      vars_banner = indent(
-          "\n".join(
-              tabulate(
-                  *(
-                      [k, pformat(v, compact=True)]
-                      for k, v in sorted(local.items())
-                      if k and not k.startswith('_')
-                  )
-              )
+      banner_mapping = dict(local)
+      del banner_mapping['options']
+      banner_mapping.update(
+          {
+              f'options.{k}': v
+              for k, v in pub_mapping(options.__dict__).items()
+          }
+      )
+      del banner_mapping['self']
+      banner_mapping.update(
+          {
+              f'self.{k}': v
+              for k, v in pub_mapping(self.__dict__).items()
+          }
+      )
+      banner = "\n".join(
+          tabulate(
+              [f'{self.cmd} {self.subcmd}:'],
+              *([f'  {k}', v] for k, v in sorted(banner_mapping.items()))
           )
       )
-      banner = f'{self.cmd}\n\n{vars_banner}\n'
     try:
       # pylint: disable=import-outside-toplevel
       from bpython import embed

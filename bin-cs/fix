@@ -3,13 +3,23 @@
 # Fix various things. - Cameron Simpson <cs@cskk.id.au> 10jan2025
 #
 
+set -ue
+
+: ${TMPDIR:='/tmp'}
+
+# F401 unused import
+# UP004 class inherits from object
+ruff_fixes=${RUFF_FIXES:-'D207,F401,UP004'}
+ruff_pyver=${RUFF_PYTHON_VERSION:-'py38'}
+
 cmd=$0
 usage="Usage: $( basename "$cmd" ) [-n] [-q] [-x] [--] things...
+  Fix things - apply lint autofixes to files.
   -n    No action. Recite actions.
   -q    Quiet. RUn actions without tracing.
   -x    Trace execution of actions.
   Known things:
-    *.py  ruff check --fix"
+    *.py  ruff check --fix --select $ruff_fixes"
 
 trace=
 [ -t 2 ] && trace=set-x
@@ -41,10 +51,19 @@ done
 for thing
 do
   case "$thing" in
-    *.py)   set -- ruff check --fix "--target-version=$RUFF_PYTHON_VERSION" "$thing" ;;
-    *)      echo "$cmd: how to fix? $thing" >&2
-            exit 1
-            ;;
+    *.py)
+        tmpf=$TMPDIR/.fix.$$.$( basename "$thing" )
+        cp -- "$thing" "$tmpf"
+        $trace ruff check \
+                 --fix --fix-only \
+                 "--target-version=$ruff_pyver" \
+                 --select "$ruff_fixes" \
+                 "$tmpf"
+        rewriteif -d "$thing" < "$tmpf"
+        rm -f "$tmpf"
+        ;;
+    *)  echo "$cmd: how to fix? $thing" >&2
+        exit 1
+        ;;
   esac
-  $trace "$@"
 done

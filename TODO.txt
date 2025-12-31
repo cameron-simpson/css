@@ -1,3 +1,22 @@
+cs.pfx: open() func returning context manager which does a filename pfx?
+PR for pyicontract-lint to use pyproject.toml?
+@pfx: format string for the intended prefix?
+HasThreadState to use contextvars instead of threading.local? It'd need to have the whole state be a single ContextVar
+cs.py.doc cli to query an arbitrary module and produce md docs
+PolyValue.promote? how to acocmodate caller specific promotions as in SQLTagSet?
+asn.1 binary encode/decode? https://pypi.org/project/pyasn1/ ?
+rewriteif in python fileutils?
+cs.seq.in_order(iterable,processor,it_key,result_key) to yield results from processor(iterable) in the original order
+cs.seq.in_order(items,process_items,item_key=None,result_key=None)
+cs.cmdutils cmd_shell_completion to emit shell completion for $SHELL, see https://mill-build.org/blog/14-bash-zsh-completion.html
+histbackup: --reflink to be deprecaded in favour of --link-mode=default,reflink,clonefile, use reflink on linux, clonefile/cp -c on macos
+redo grepall in python, the sed is getting tricky
+dl FOO: puts a literal +when into the log entry in dlog-quick, likely elsewhere
+vq: scan a file eg a hashindex?
+hasindex comm: accept a file containing a hash index, like we accept - ?
+icontract and icontract-lint's build process uses setup.py, needs updating
+cs.cmdutils: BaseCommand.poppreargv to replace apply_preargv, saving returning the argv which we are modifying in place anyway
+cs.psutils et al: SIGKILL does not exist on Windows - possibly only SIGTERM exists on Windows - check and make a bit portable
 cs.cmdutils: auto print the relevant environment variables in the usage?
 printt,tabulate: some kind of width support - tty width is easy, per column widths harder
 docmd: set rl_completer for the cmd_* commands

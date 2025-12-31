@@ -4,10 +4,11 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
+from contextlib import contextmanager
 import os
-import sys
 import random
-import tempfile
+import sys
+from tempfile import NamedTemporaryFile
 import unittest
 
 try:
@@ -19,9 +20,10 @@ from cs.binary_tests import BaseTestBinaryClasses
 from cs.buffer import CornuCopyBuffer
 ##from cs.debug import thread_dump
 from cs.randutils import rand0, make_randblock
+from cs.testutils import SetupTeardownMixin
 
 from . import datafile
-from .datafile import DataRecord, DataFilePushable
+from .datafile import DataRecord, DataFile, DataFilePushable
 
 # from .hash_tests import _TestHashCodeUtils
 # TODO: run _TestHashCodeUtils on DataDirs as separate test suite?
@@ -35,21 +37,17 @@ class TestDataFileBinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   '''
   test_module = datafile
 
-class TestDataFile(unittest.TestCase):
+class TestDataFile(SetupTeardownMixin, unittest.TestCase):
   ''' Tests for `DataFile`.
   '''
 
-  def setUp(self):
+  @contextmanager
+  def setupTeardown(self):
     random.seed()
-    tfd, pathname = tempfile.mkstemp(
-        prefix="datafile-test", suffix=".vtd", dir='.'
-    )
-    os.close(tfd)
-    self.pathname = pathname
-    self.rdatafile = DataFilePushable(pathname)
-
-  def tearDown(self):
-    os.remove(self.pathname)
+    with NamedTemporaryFile(prefix="datafile-test", suffix=".vtd",
+                            dir='.') as T:
+      self.pathname = T.name
+      yield
 
   # TODO: tests:
   #   scan datafile
@@ -58,27 +56,28 @@ class TestDataFile(unittest.TestCase):
     ''' Save RUN_SIZE random blocks, close, retrieve in random order.
     '''
     # save random blocks to a file
-    blocks = {}
-    with open(self.pathname, 'wb') as f:
-      for n in range(RUN_SIZE):
-        with self.subTest(put_block_n=n):
-          data = make_randblock(rand0(MAX_BLOCK_SIZE + 1))
-          dr = DataRecord(data)
-          offset = f.tell()
-          blocks[offset] = data
-          f.write(bytes(dr))
+    blocks_by_offset = {}
+    with DataFile(self.pathname) as DF:
+      added = DF.extend(
+          make_randblock(rand0(MAX_BLOCK_SIZE + 1)) for _ in range(RUN_SIZE)
+      )
+      prev_offset = None
+      prev_length = None
+      for DR, offset, length in added:
+        assert offset >= 0
+        assert length > 0
+        if prev_offset is not None:
+          self.assertEqual(offset, prev_offset + prev_length)
+        blocks_by_offset[offset] = DR.data
+        prev_offset = offset
+        prev_length = length
     # shuffle the block offsets
-    offsets = list(blocks.keys())
+    offsets = list(blocks_by_offset.keys())
     random.shuffle(offsets)
     # retrieve the blocks in random order, check for correct content
-    with open(self.pathname, 'rb') as f:
-      for n, offset in enumerate(offsets):
-        with self.subTest(shuffled_offsets_n=n, offset=offset):
-          f.seek(offset)
-          bfr = CornuCopyBuffer.from_file(f)
-          dr = DataRecord.parse(bfr)
-          data = dr.data
-          self.assertTrue(data == blocks[offset])
+    for offset in offsets:
+      DR = DF[offset]
+      self.assertEqual(DR.data, blocks_by_offset[offset])
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

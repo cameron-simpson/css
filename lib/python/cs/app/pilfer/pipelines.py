@@ -11,7 +11,7 @@ from cs.logutils import warning
 from cs.naysync import async_iter, AnyIterable, AsyncPipeLine, StageMode
 from cs.pfx import Pfx, pfx_method
 
-from .actions import Action
+from .actions import _Action
 from .pilfer import Pilfer, uses_pilfer
 
 @dataclass
@@ -36,7 +36,7 @@ class PipeLineSpec(Promotable):
 
         This scans `self.stage_specs` and handles the spacial
         specifications `"*"` and `"**"`, which spawn subpipelines.
-        Other specifications are passed through to `Action.from_str`.
+        Other specifications are passed through to `_Action.from_str`.
 
         The parameter `P` is a `Pilfer` instance used to translate
         action names to stage functions.
@@ -146,8 +146,8 @@ class PipeLineSpec(Promotable):
           specs = []
           continue
 
-        # regular Action
-        action = Action.from_str(spec, P=P)
+        # regular _Action
+        action = _Action.from_str(spec, P=P)
         stage_funcs.append(action.stage_spec)
     return stage_funcs
 

@@ -1,0 +1,3 @@
+lib/python/cs/lex.py: cs.lex: tabulate: new optional ppcls argument to supply a custom PrettyPrinter class for formatting, use a date and datetime aware class by default
+lib/python/cs/lex.py: cs.lex: tabulate: ppr.format: return the expected 3-tuple
+lib/python/cs/lex.py: cs.lex: fixup previous commit

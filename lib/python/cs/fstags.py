@@ -103,6 +103,7 @@ from os.path import (
     samefile,
 )
 from pathlib import Path
+from shlex import quote as shquote
 import shutil
 import sys
 from threading import Lock, RLock
@@ -121,7 +122,7 @@ from typing import (
 from icontract import ensure, require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.deco import default_params, fmtdoc, promote, Promotable, uses_verbose
 from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
@@ -138,14 +139,17 @@ from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.seq import unrepeated
 from cs.tagset import (
-    Tag,
-    TagSet,
-    TagBasedTest,
-    TagsOntology,
-    TagFile,
-    TagsOntologyCommand,
-    TagsCommandMixin,
+    BaseTagSets,
+    HasTags,
     RegexpTagRule,
+    Tag,
+    TagBasedTest,
+    TagFile,
+    TagSet,
+    TagsCommandMixin,
+    TagsOntology,
+    TagsOntologyCommand,
+    UsesTagSets,
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property, State
@@ -347,6 +351,33 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         elif not fstags.edit_dirpath(path, all_names=all_names):
           xit = 1
     return xit
+
+  @popopts(
+      direct='Use the direct tags instead of the inherited tags.',
+      prefix_='Prefix for the environment variable names, default "fstags_".'
+  )
+  def cmd_as_envvars(self, argv):
+    ''' Usage: {cmd} --prefix path [tag_name...]
+          Export the tags of path as shell command to set 
+          Dots in names are translated into "__".
+    '''
+    options = self.options
+    direct = options.direct
+    fstags = options.fstags
+    prefix = options.prefix or 'fstags'
+    if not argv:
+      raise GetoptError('missing path')
+    path = argv.pop(0)
+    tags = fstags[path]
+    if not direct:
+      tags = tags.merged_tags()
+    tag_names = argv or sorted(tags.keys())
+    for tag_name in tag_names:
+      try:
+        value = tags[tag_name]
+      except KeyError:
+        continue
+      print(f'{prefix}_{tag_name.replace(".","__")}={shquote(str(value))}')
 
   @uses_runstate
   def cmd_export(self, argv, *, runstate: RunState):
@@ -595,8 +626,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             )
     return 0
 
-  @uses_runstate
-  def cmd_ls(self, argv, *, runstate: RunState):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd} [-dlr] [--direct] [-o output_format] [paths...]
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
@@ -610,6 +640,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     options = self.options
     fstags = options.fstags
+    runstate = options.runstate
     options.update(
         directories_like_files=False,
         use_direct_tags=False,
@@ -653,7 +684,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
                   direct=options.use_direct_tags,
               )
             except FormatAsError as e:
-              error(str(e))
+              if not options.quiet:
+                error(str(e))
               xit = 1
               continue
             print(listing)
@@ -1060,16 +1092,18 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
 
 # pylint: disable=too-many-public-methods
-class FSTags(MultiOpenMixin):
+class FSTags(MultiOpenMixin, UsesTagSets):
   ''' A class to examine filesystem tags.
   '''
 
   @fmtdoc
   def __init__(
       self,
+      *,
       tagsfile_basename=None,
       ontology_filepath=None,
       physical=None,
+      tagsets: Optional[BaseTagSets] = None,
       update_mapping: Optional[Mapping] = None,
       update_prefix: Optional[str] = __name__,
       update_uuid_tag_name: Optional[str] = 'uuid',
@@ -1083,6 +1117,7 @@ class FSTags(MultiOpenMixin):
         * `physical`: optional flag for the associated `FSTagsConfig`
           specifying whether `TagFile`s are indexed by their physical or logical
           filesystem paths
+        * `tagsets`: an optional `BaseTagSets` to be used via the `UsesTagSets` methods
         * `update_mapping`: optional secondary mapping to which to mirror
           tags, such as an `SQLTags`;
           the default comes from an `SQLTags` specified by the
@@ -1099,6 +1134,10 @@ class FSTags(MultiOpenMixin):
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
       ontology_filepath = tagsfile_basename + '-ontology'
+    if tagsets is None:
+      self.tagsets = None
+    else:
+      UsesTagSets.__init__(self, tagsets=tagsets)
     if update_mapping is None:
       update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
       if update_mapping:
@@ -1701,7 +1740,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   @property
   def parent(self):
     ''' A reference to the parent of this `TaggedPath`, or `None`.
-      '''
+    '''
     keypath = self.keypath
     parent_path = dirname(keypath)
     if parent_path == keypath:

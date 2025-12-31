@@ -3,26 +3,30 @@
 import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+import logging
 import os
-import os.path
 from os.path import expanduser
 from getopt import GetoptError
-from pprint import pformat
+from pprint import pformat, pprint
+import re
 import sys
 from typing import Iterable
 
 from bs4 import NavigableString
+from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
+from cs.fileutils import atomic_filename
 from cs.later import Later
 from cs.lex import (
     cutprefix,
     cutsuffix,
-    get_dotted_identifier,
+    get_identifier,
     is_identifier,
     printt,
+    s,
     skipwhite,
 )
 import cs.logutils
@@ -30,17 +34,21 @@ from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.queues import ListQueue
+from cs.sqltags import SQLTagSet
 from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
-    DEFAULT_JOBS, DEFAULT_FLAGS_CONJUNCTION, DEFAULT_MITM_LISTEN_HOST,
-    DEFAULT_MITM_LISTEN_PORT
+    DEFAULT_JOBS,
+    DEFAULT_FLAGS_CONJUNCTION,
+    DEFAULT_MITM_LISTEN_HOST,
+    DEFAULT_MITM_LISTEN_PORT,
 )
-from .parse import get_action_args, get_delim_regexp, import_name
+from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .sitemap import FlowState
+from .rss import RSSChannelMixin
+from .sitemap import FlowState, SiteEntity, SiteMap
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -99,6 +107,7 @@ class PilferCommand(BaseCommand):
     jobs: int = DEFAULT_JOBS
     flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
     db_url: str = None
+    dl_output_format: str = '{basename}'
 
     @property
     def configpaths(self):
@@ -121,7 +130,7 @@ class PilferCommand(BaseCommand):
             'Flags which must be true for operation to continue.',
             lambda s: s.replace(',', ' ').split(),
         ),
-        load_cookies='Load the browser cookie state into the Pilfer seesion.',
+        load_cookies='Load the browser cookie state into the Pilfer session.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
@@ -150,6 +159,7 @@ class PilferCommand(BaseCommand):
             sqltags_db_url=options.db_url,
         )
         with pilfer:
+          pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
               later=later,
@@ -161,6 +171,27 @@ class PilferCommand(BaseCommand):
             if self.options.load_cookies:
               pilfer.load_browser_cookies(pilfer.session.cookies)
             yield
+
+  # TODO: accept a URL and look it up?
+  def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
+    ''' Return a `SiteEntity` bound to the entity-name at `argv[0]`.
+    '''
+    if not argv:
+      raise GetoptError('missing site-entity')
+    entity_spec = argv.pop(0)
+    if '://' in entity_spec:
+      # match a URL to an entity
+      ent = self.options.pilfer.url_entity(entity_spec)
+      if ent is None:
+        raise GetoptError(
+            f'{entity_spec=} does not match a known SiteEntity subclass'
+        )
+    else:
+      try:
+        ent = SiteMap.by_db_key(entity_spec)
+      except KeyError as e:
+        raise GetoptError(f'unrecognised {entity_spec=}: {e}') from e
+    return ent
 
   @staticmethod
   def get_argv_pipespec(argv, argv_offset=0):
@@ -241,31 +272,144 @@ class PilferCommand(BaseCommand):
             )
         )
 
-  @popopts(soup='Dump the page soup, normally omitted.')
-  def cmd_dump(self, argv):
-    ''' Usage: {cmd} URL
-          Fetch URL and dump information from it.
+  @popopts
+  def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Open a dbshell on the Pilfer SQLTags.
     '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv=}')
+    self.options.pilfer.dbshell()
+
+  @popopts(
+      o=(
+          'dl_output_format', 'Output format string for the download filename.'
+      )
+  )
+  def cmd_dl(self, argv):
+    ''' Usage: {cmd} URLs...
+          Download the specified URLs. "-" may be used to read URLs from stdin.
+    '''
+    if not argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    dl_output_format = options.dl_output_format
+    runstate = options.runstate
+
+    def dl(url_s):
+      ''' The common logic for a download of a single URL.
+      '''
+      nonlocal dl_output_format, xit
+      try:
+        FlowState.download_url(url_s, dl_output_format, format_filename=True)
+      except FileExistsError as e:
+        warning("output path already exists: %s", e)
+        xit = 1
+      except OSError as e:
+        warning("error saving: %s", e)
+        xit = 1
+
+    xit = 0
+    for url_s in argv:
+      runstate.raiseif()
+      with Pfx("%r", url_s):
+        if url_s == '-':
+          for lineno, url_line in enumerate(sys.stdin, 1):
+            url_s = url_line.rstrip('\n')
+            with Pfx("stdin:%d: %r", lineno, url_s):
+              runstate.raiseif()
+              dl(url_s)
+        else:
+          if '://' in url_s:
+            dl(url_s)
+          else:
+            try:
+              ent = SiteMap.by_db_key(url_s)
+            except KeyError as e:
+              warning("cannot get entity %r: %s", url_s, e)
+              xit = 1
+              continue
+            ent.printt()
+            save_filename = ent.format_as(dl_output_format)
+            print("  ->", save_filename)
+            ent.download(save_filename)
+    return xit
+
+  @popopts(
+      content=(
+          'dump_content',
+          ''' Dump the page content, normally omitted.
+              Currently supports HTML (text/html) and JSON (application/json).
+          ''',
+      ),
+      no_redirects='Do not follow redirects.',
+  )
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd} [METHOD] url [header:value...] [param=value...]
+          Fetch url and dump information from it.
+    '''
+    options = self.options
+    P = options.pilfer
+    # optional leading METHOD
+    if argv and argv[0].isupper():
+      method = argv.pop(0)
+    else:
+      method = 'GET'
+    # url
     if not argv:
       raise GetoptError("missing URL")
     url = argv.pop(0)
+    # optional header:value
+    rqhdrs = {}
+    while argv:
+      name, offset = get_identifier(argv[0], extra='_-')
+      if not name or not name.startswith(':'):
+        # not a header
+        break
+      rqhdrs[name] = name[offset + 1:]
+      argv.pop(0)
+    # optional param=value
+    params = {}
+    while argv:
+      name, offset = get_identifier(argv[0], extra='_-')
+      if not name or not name.startswith('='):
+        # not a parameter
+        break
+      params[name] = name[offset + 1:]
+      argv.pop(0)
     if argv:
-      raise GetoptError(f'extra arguments after URL: {argv!r}')
-    print(url)
-    flowstate = FlowState(url=url)
-    flowstate.GET()  # implicit these days, but let's be overt about failure
-    if flowstate.response.status_code != 200:
-      warning("GET %s -> status_code %r", url, flowstate.response.status_code)
+      raise GetoptError(f'extra arguments after URL/headers/params: {argv!r}')
+    print(
+        method,
+        url,
+        *(f'{name}:{value}' for name, value in rqhdrs.items()),
+        *(f'{param}={value}' for param, value in params.items()),
+    )
+    rsp = P.request(
+        url,
+        method=method,
+        headers=rqhdrs,
+        params=(None if not params or method == 'POST' else params),
+        data=(None if not params or method != 'POST' else params),
+        allow_redirects=not options.no_redirects,
+    )
+    if rsp.status_code != 200:
+      warning("%s %s -> status_code %r", method, url, rsp.status_code)
+    flowstate = FlowState(
+        url=url,
+        request=rsp.request,
+        response=rsp,
+    )
     printt(
-        (
-            f'{flowstate.request.method} response {flowstate.response.status_code} headers:',
-        ),
-        *[
-            (f'  {key}', value) for key, value in sorted(
+        [
+            f'{flowstate.request.method} response {flowstate.response.status_code} headers:'
+        ],
+        *(
+            [f'  {key}', value] for key, value in sorted(
                 flowstate.response.headers.items(),
                 key=lambda kv: kv[0].lower()
             )
-        ],
+        ),
     )
     soup = flowstate.soup
     if soup is None:
@@ -331,45 +475,73 @@ class PilferCommand(BaseCommand):
         for k, v in grokked.items():
           table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
     printt(*table)
-    if soup is not None and self.options.soup:
+    if self.options.dump_content:
       print("Content:", flowstate.content_type)
-      table = []
-      q = ListQueue([('', soup.head), ('', soup.body)])
-      for indent, tag in q:
-        subindent = indent + '  '
-        # TODO: looks like commants are also NavigableStrings, intercept here
-        if isinstance(tag, NavigableString):
-          text = str(tag).strip()
-          if text:
-            table.append(('', text))
-          continue
-        if tag.name == 'script':
-          continue
-        # sorted copy of the attributes
-        attrs = dict(sorted(tag.attrs.items()))
-        label = tag.name
-        # pop off the id attribute if present, include in the label
-        try:
-          id_attr = attrs.pop('id')
-        except KeyError:
-          pass
+      if flowstate.content_type in ('text/html',):
+        soup = flowstate.soup
+        table = []
+        q = ListQueue([('', soup.head), ('', soup.body)])
+        for indent, tag in q:
+          subindent = indent + '  '
+          # TODO: looks like commants are also NavigableStrings, intercept here
+          if isinstance(tag, NavigableString):
+            text = str(tag).strip()
+            if text:
+              table.append(('', text))
+            continue
+          if tag.name == 'script':
+            continue
+          # sorted copy of the attributes
+          attrs = dict(sorted(tag.attrs.items()))
+          label = tag.name
+          # pop off the id attribute if present, include in the label
+          try:
+            id_attr = attrs.pop('id')
+          except KeyError:
+            pass
+          else:
+            label += f' #{id_attr}'
+          children = list(tag.children)
+          if not attrs and len(children) == 1 and isinstance(children[0],
+                                                             NavigableString):
+            desc = str(children[0].strip())
+          else:
+            desc = "\n".join(
+                f'{attr}={value!r}' for attr, value in attrs.items()
+            ) if attrs else ''
+            for index, subtag in enumerate(children):
+              q.insert(index, (subindent, subtag))
+          table.append((
+              f'{indent}{label}',
+              desc,
+          ))
+        printt(*table)
+      elif flowstate.content_type in ('application/json',):
+        jdata = flowstate.json
+        if isinstance(jdata, dict):
+          jkeys = list(jdata.keys())
+          if len(jkeys) == 0:
+            pprint(jdata)
+          elif len(jkeys) > 1:
+            printt(
+                ['{'],
+                *sorted(jdata.items()),
+                ['}'],
+            )
+          else:
+            jkey, = jkeys
+            printt(
+                [f'{{ {pformat(jkey)}'],
+                *(
+                    [f'    {pformat(k)}', v]
+                    for k, v in sorted(jdata[jkey].items())
+                ),
+                ['}'],
+            )
         else:
-          label += f' #{id_attr}'
-        children = list(tag.children)
-        if not attrs and len(children) == 1 and isinstance(children[0],
-                                                           NavigableString):
-          desc = str(children[0].strip())
-        else:
-          desc = "\n".join(
-              f'{attr}={value!r}' for attr, value in attrs.items()
-          ) if attrs else ''
-          for index, subtag in enumerate(children):
-            q.insert(index, (subindent, subtag))
-        table.append((
-            f'{indent}{label}',
-            desc,
-        ))
-      printt(*table)
+          pprint(jdata)
+      else:
+        warning("No content dump for %s.", flowstate.content_type)
 
   @popopts
   def cmd_from(self, argv):
@@ -441,20 +613,66 @@ class PilferCommand(BaseCommand):
               "\n".join(map(str, sorted(match_tags)))
           )
       )
-      if grokked is not None:
+      if grokked is None:
+        table.append(('    grokked =>', 'None'))
+      else:
+        if isinstance(grokked, SQLTagSet):
+          table.append(
+              ('    grokked =>', f'{grokked.sqltags}[{grokked.name}]')
+          )
+        else:
+          table.append(('    grokked =>', s(grokked)))
         for k, v in grokked.items():
-          try:
-            items = v.items()
-          except AttributeError:
-            table.append((f'    {k}', v))
-          else:
-            for i, (vk, vv) in enumerate(sorted(items)):
-              table.append([f'    {k}' if i == 0 else '', vk, vv])
+          table.append((f'      {k}', v))
     printt(*table)
 
   @popopts
+  def pop_mitm_action(self, argv):
+    ''' Pop a mitm action specification, return `(action,hook_names,criteria)`.
+    '''
+    from .mitm import MITMHookAction
+    if not argv:
+      raise GetoptError("missing mitm action")
+    action_s = argv.pop(0)
+    criteria = []
+    with Pfx("%r", action_s):
+      try:
+        action, offset = MITMHookAction.parse(action_s)
+        with Pfx(offset):
+          # @hook,...
+          if action_s.startswith('@', offset):
+            offset += 1
+            # TODO: gather commas separated identifiers
+            end_hooks = action_s.find('~', offset)
+            if end_hooks == -1:
+              hook_names = action_s[offset:].split(',')
+              offset = len(action_s)
+            else:
+              hook_names = action_s[offset:end_hooks].split(',')
+              offset = end_hooks
+          else:
+            hook_names = []
+        while offset < len(action_s):
+          with Pfx(offset):
+            # ~ /url-regexp/
+            if action_s.startswith('~', offset):
+              offset = skipwhite(action_s, offset + 1)
+              regexp_s, offset = get_delim_regexp(action_s, offset)
+              regexp = pfx_call(re.compile, regexp_s)
+              criteria.append(lambda url_s: regexp.match(url_s))
+            else:
+              raise ValueError('unparsed text: {action_s[offset:]!r}')
+      except ValueError as e:
+        raise GetoptError("bad action: %s", e) from e
+    return action, hook_names, criteria
+
+  @popopts(
+      proxy_=''' Upstream proxy to use, default from $https_proxy.
+                 Supply an empty string to force no proxy.
+             '''
+  )
   def cmd_mitm(self, argv):
-    ''' Usage: {cmd} [@[address]:port] action[:params...][@hook,...]...
+    ''' Usage: {cmd} [@[address]:port] action[(params...)][@hook,...][~/url-regexp/...]...
           Run a mitmproxy for traffic filtering.
           @[address]:port   Specify the listen address and port.
                             Default: {DEFAULT_MITM_LISTEN_HOST}:{DEFAULT_MITM_LISTEN_PORT}
@@ -477,16 +695,16 @@ class PilferCommand(BaseCommand):
           - a dotted name followed by a colon and another dotted subname,
             which specifies a callable object from an importable module
           Examples:
-            cache   The predefined "cache" action on its default hooks.
-            dump@requestheaders
-                    The predefined "dump" action on the "requestheaders" hook.
-            my.module:handler:3,x=4@requestheaders
-                    Call handler(3,hook_name,flow,x=4) from module my.module
-                    on the "requestheaders" hook.
+          - `cache`: the predefined "cache" action on its default hooks.
+          - `dump@requestheaders`: the predefined "dump" action on
+            the "requestheaders" hook.
+          - `my.module:handler(3,x=4)@requestheaders`: call
+            `handler(3,hook_name,flow,x=4)` from module `my.module`
+            on the "requestheaders" hook.
           It is generally better to use named parameters in actions because
           it is easier to give them default values in the function.
     '''
-    from .mitm import (MITMAddon, run_proxy)
+    from .mitm import MITMAddon, run_proxy
     listen_host = DEFAULT_MITM_LISTEN_HOST
     listen_port = DEFAULT_MITM_LISTEN_PORT
     # leading optional @[host:]port
@@ -503,84 +721,24 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError('missing actions')
     bad_actions = False
-    mitm_addon = MITMAddon()
-    for action in argv:
-      with Pfx("action %r", action):
-        hook_names = None
-        args = []
-        kwargs = {}
-        url_regexps = []
-        name, offset = get_dotted_identifier(action)
-        if not name:
-          warning("no action name")
-          bad_actions = True
-          continue
-        if '.' not in name:
-          # a built in name
-          mitm_action = name
-        else:
-          # a callable imported from a module
-          if not action.startswith(':', offset):
-            warning('missing module ":subname" after module %r', name)
-            bad_actions = True
-            continue
-          offset += 1
-          subname, offset = get_dotted_identifier(action, offset)
-          if not subname:
-            warning('missing module "subname" after module "%s:"', name)
-            bad_actions = True
-            continue
-          try:
-            mitm_action = pfx_call(import_name, action[:offset])
-          except ImportError as e:
-            warning("cannot import %r: %s", action[:offset], e._)
-            bad_actions = True
-            continue
-        # gather @hooks and :params suffixes
-        while offset < len(action):
-          print("action", action, offset)
-          with Pfx("offset %d", offset):
-            # :params
-            if action.startswith(':', offset):
-              offset += 1
-              a, kw, offset = get_action_args(action, offset, '@')
-              args.extend(a)
-              kwargs.update(kw)
-            # @hook,...
-            elif action.startswith('@', offset):
-              offset += 1
-              # TODO: gather commas separated identifiers
-              end_hooks = action.find(':', offset)
-              if end_hooks == -1:
-                hook_names = action[offset:].split(',')
-                offset = len(action)
-              else:
-                hook_names = action[offset:end_hooks].split(',')
-                offset = end_hooks
-            # ~ /url-regexp/
-            elif action.startswith('~', offset):
-              offset = skipwhite(action, offset + 1)
-              regexp, offset = get_delim_regexp(action, offset)
-              url_regexps.append(regexp)
-            else:
-              warning("unparsed text: %r", action[offset:])
-              bad_actions = True
-              break
-        try:
-          pfx_call(
-              mitm_addon.add_action,
-              hook_names,
-              mitm_action,
-              args,
-              kwargs,
-              url_regexps=url_regexps,
-          )
-        except ValueError as e:
-          warning("invalid action spec: %s", e)
-          bad_actions = True
+    mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
+    while argv:
+      try:
+        action, hook_names, criteria = self.pop_mitm_action(argv)
+      except GetoptError as e:
+        warning(str(e))
+        bad_actions = True
+      pfx_call(mitm_addon.add_action, action, hook_names, criteria or None)
     if bad_actions:
       raise GetoptError("invalid action specifications")
-    asyncio.run(run_proxy(listen_host, listen_port, addon=mitm_addon))
+    asyncio.run(
+        run_proxy(
+            listen_host,
+            listen_port,
+            addon=mitm_addon,
+            upstream_proxy_url=self.options.proxy,
+        )
+    )
 
   def cmd_patch(self, argv):
     ''' Usage: {cmd} URL
@@ -598,12 +756,79 @@ class PilferCommand(BaseCommand):
       print(method, match_tags)
     print(flowstate.soup)
 
+  @popopts(f='Force: refresh the entity even if it is not stale.')
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} entity...
+          Refresh the specified entities by fetching and grokking their site pages.
+    '''
+    if not argv:
+      raise GetoptError("missing entities")
+    while argv:
+      ent = self.popentity(argv)
+      ent.printt()
+      ent.refresh(force=self.options.force)
+      ent.printt()
+
+  @popopts(
+      f=('force', 'Force overwrite of the RSS file if it already exists.'),
+      o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
+  )
+  def cmd_rss(self, argv):
+    ''' Usage: {cmd} entity|URL
+          Generate an RSS feed for the specified entity or URL.
+    '''
+    pilfer = self.options.pilfer
+    if not argv:
+      raise GetoptError('missing entity or URL')
+    entity = self.popentity(argv)
+    if argv:
+      raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
+    entity.refresh()
+    if not isinstance(entity, RSSChannelMixin):
+      raise GetoptError(
+          f'entity {entity} is not an instance of RSSChannelMixin'
+      )
+    output_fspath = (
+        self.options.output_fspath
+        or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
+    )
+    rss = entity.rss()
+    with atomic_filename(output_fspath, mode='w',
+                         exists_ok=self.options.force) as T:
+      print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+      print(
+          xml_tostring(rss, encoding='unicode', pretty_print=True),
+          end='',
+          file=T
+      )
+    print(output_fspath)
+
+  @popopts(p=('makedirs', 'Make required intermeditate directories.'))
+  def cmd_save(self, argv):
+    ''' Usage: {cmd} URL savepath
+          Save URL to the file savepath.
+    '''
+    try:
+      url_s, savepath = argv
+    except ValueError as e:
+      raise GetoptError(f'expected URL and savepath: {e}')
+    url = URL(url_s)
+    options = self.options
+    rsp = options.pilfer.save(url, savepath, makedirs=options.makedirs)
+    if options.verbose:
+      printt(
+          [f'GET {url.short} => {rsp.status_code}'],
+          *([f'  {hdr}', value] for hdr, value in rsp.headers.items()),
+      )
+
   def cmd_sitemap(self, argv):
-    ''' Usage: {cmd} [sitemap|domain [URL...]]
+    ''' Usage: {cmd} [sitemap|domain {{sitecmd [args...] | [URL...]}}]
           List or query the site maps from the config.
           With no arguments, list the sitemaps.
-          With a sitemap name (eg "docs"), list the sitemap.
-          WIth additional URLs, print the key for each URL.
+          With a sitemap name (eg "docs") and no further arguments, list the sitemap.
+          If a word follows the sitemap name, treat it as a subcommand of the sitemap.
+          Otherwise assume all remaining arguments are URLs and print the the key for
+          each URL.
     '''
     options = self.options
     P = options.pilfer
@@ -619,7 +844,6 @@ class PilferCommand(BaseCommand):
       return 0
     # use a particular sitemap
     map_name = argv.pop(0)
-    print("map_name", map_name)
     for domain_glob, sitemap in P.sitemaps:
       if map_name == sitemap.name:
         break
@@ -636,6 +860,18 @@ class PilferCommand(BaseCommand):
             ('  Format:', format_s),
         )
       return 0
+    # a subcommand?
+    argv0_ = argv[0].replace('-', '_')
+    if is_identifier(argv0_):
+      sitecmd = argv0_
+      argv.pop(0)
+      with Pfx(sitecmd):
+        try:
+          cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
+        except AttributeError:
+          raise GetoptError("unknown sitemap command")
+        with stackattrs(sitemap, options=self.options):
+          return cmdmethod(argv)
     # match URLs against the sitemap
     table = []
     for url in argv:

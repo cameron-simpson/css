@@ -20,42 +20,35 @@ from cs.pfx import Pfx, pfx_call
 @typechecked
 def make_cbz(
     fspath: str,
-    *,
     images,
-    metadata=None,
-    metadata_encoding=None,
+    *,
     compression=ZIP_STORED,
+    metadata=None,
     **zipkw,
 ):
   ''' A context manager for creating a CBZ archive file,
       yielding an open `ZipFile` instance.
+      On return the `ZipFile` is closed and the CBZ file is present at `fspath`.
 
       Parameters:
       * `fspath`: the filesystem path for the new CBZ file
-      * `images`: an iterable of images to save in the CBZ file
+      * `images`: an iterable of images to save in the CBZ file in reading order
       * `metadata`: optional metadata, which may be a `str` or a JSNONable mapping
-      * `metadata_encoding`: optional metadata encoding;
-        setting this is only supported in Python 3.11 onward
-        but if not supplied, a default of `'utf-8'` will be used in 3.11 onward
       Other keyword parameters are passed to the `ZipFile` creation
       along with an `'x'` open mode.
 
       The `images` iterable may yield either `str` or `(str,str)` tuples.
-      A plain `str` is replaced by a `(str,basename(str))` tuple.
+      A plain `str` is replaced by a `(str,arcname)` tuple.
       The first `str` is the filesystem path of an image file.
       The second `str` is the `arcname` used when storing the file
       into the archive.
   '''
-  if metadata_encoding is None:
-    if sys.version_info >= (3, 11):
-      metadata_encoding = 'utf-8'
-  if metadata_encoding is not None:
-    zipkw.update(metadata_encoding=metadata_encoding)
+  images = tuple(images)
   with atomic_filename(fspath) as T:
     with pfx_call(
         ZipFile,
         T.name,
-        'w',
+        'w',  # not 'x' because the temp file T.name exists
         compression=compression,
         **zipkw,
     ) as cbz:
@@ -64,10 +57,11 @@ def make_cbz(
           cbz.metadata = metadata
         else:
           cbz.metadata = json.dumps(metadata, separators=(',', ':'))
-      for img in images:
+      pagen_width = len(str(len(images)))
+      for pagen, img in enumerate(images, 1):
         with Pfx(img):
           if isinstance(img, str):
-            imgfspath, arcname = img, basename(img)
+            imgfspath, arcname = img, f'pages/{pagen:0{pagen_width}d}--{basename(img)}'
           # TODO: Path instances?
           else:
             imgfspath, arcname = img

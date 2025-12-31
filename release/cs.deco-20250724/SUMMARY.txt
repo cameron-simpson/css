@@ -1,0 +1,2 @@
+@fmtdoc: support {name=} and {name==} format.
+Promotable.promote: improve the final TypeError on failure of the fallback cls(obj).

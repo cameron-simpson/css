@@ -18,7 +18,7 @@ import typing
 from cs.gimmicks import warning
 from cs.typingutils import is_optional
 
-__version__ = '20250601-post'
+__version__ = '20251230-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -576,6 +576,20 @@ def strable(func, open_func=None):
 
   return accepts_str
 
+def with_(func, obj):
+  ''' A decorator to run `func` inside a `with obj:`.
+
+      Example:
+
+          T = Thread(target=with_(some_context, target_func))
+  '''
+
+  def with_obj(*a, **kw):
+    with obj:
+      return func(*a, **kw)
+
+  return with_obj
+
 def observable_class(property_names, only_unequal=False):
   ''' Class decorator to make various instance attributes observable.
 
@@ -832,6 +846,7 @@ def uses_cmd_options(
                  ... do the thing ...
               ... etc ...
   '''
+  from cs.context import stackattrs
 
   def uses_cmd_wrapper(*func_a, **func_kw):
     # fill in the func_kw from the defaults
@@ -839,7 +854,6 @@ def uses_cmd_options(
     # run with the prevailing BaseCommand suitably updated
     try:
       from cs.cmdutils import BaseCommand
-      from cs.context import stackattrs
     except ImportError:
       # missing cs.cmdutils or cs.context,
       # make an options with no attributes
@@ -1017,10 +1031,10 @@ def promote(func, params=None, types=None):
             func.__module__,
         )
         continue
-      warning(
-          "@promote(%s): param %s: %r -> %r", func, param_name, annotation,
-          resolved
-      )
+      ##warning(
+      ##    "@promote(%s): param %s: str:%r -> %r", func, param_name, annotation,
+      ##    resolved
+      ##)
       annotation = resolved
     # recognise optional parameters and use their primary type
     optional = False
@@ -1043,7 +1057,7 @@ def promote(func, params=None, types=None):
     return func
 
   def promote_args(a, kw):
-    ''' Promote the position and keyword arguments.
+    ''' Promote the positional and keyword arguments.
     '''
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
@@ -1092,7 +1106,7 @@ def promote(func, params=None, types=None):
             else:
               # assuming a property or even a plain attribute
               as_value = as_annotation
-            arg_value = as_value
+            promoted_value = as_value
       except TypeError:
         # promotion fails
         if (optional and arg_value is param.default

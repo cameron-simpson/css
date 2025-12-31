@@ -22,6 +22,7 @@ from typeguard import typechecked
 
 from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
+from cs.lex import r
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx, pfx_method
 from cs.py.stack import stack_dump
@@ -36,7 +37,7 @@ from .file import RWBlockFile
 from .hash import io_fail
 from .meta import Meta, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
 from .paths import path_split, DirLike, FileLike
-from .transcribe import Transcriber, hexify
+from .transcribe import Transcribable, hexify
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -62,117 +63,7 @@ class DirentFlags(IntFlag):
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
   EXTENDED = 0x20  # extended BSData field
 
-class DirentRecord(BinarySingleValue):
-  ''' `BaseBinaryMultiValue` subclass to parsing and transcribing Dirents in binary form.
-
-      The serialisation format is:
-
-            BSUint(type)
-            BSUint(flags)
-            [BSString(name)]
-            [BSString(str(meta))]
-            [uuid:16]
-            blockref
-            [blockref(pref_dirent)]
-            [BSData(extended_data)]
-
-      Note that all additional future implementation detail needs
-      to go in the metadata or the optional extended_data.
-  '''
-
-  @property
-  def dirent(self):
-    ''' The dirent comes from `.value`.
-    '''
-    return self.value
-
-  @classmethod
-  def parse_value(cls, bfr) -> "_Dirent":
-    ''' Unserialise a single serialised Dirent from `bfr`.
-    '''
-    type_ = BSUInt.parse_value(bfr)
-    flags = DirentFlags(BSUInt.parse_value(bfr))
-    if flags & DirentFlags.HASNAME:
-      flags ^= DirentFlags.HASNAME
-      name = BSString.parse_value(bfr)
-    else:
-      name = ""
-    if flags & DirentFlags.HASMETA:
-      flags ^= DirentFlags.HASMETA
-      metatext = BSString.parse_value(bfr)
-    else:
-      metatext = None
-    uu = None
-    if flags & DirentFlags.HASUUID:
-      flags ^= DirentFlags.HASUUID
-      uu = UUID(bytes=bfr.take(16))
-    if flags & DirentFlags.NOBLOCK:
-      flags ^= DirentFlags.NOBLOCK
-      block = None
-    else:
-      block = BlockRecord.parse_value(bfr)
-    if flags & DirentFlags.HASPREVDIRENT:
-      flags ^= DirentFlags.HASPREVDIRENT
-      prev_dirent_blockref = BlockRecord.parse_value(bfr)
-    else:
-      prev_dirent_blockref = None
-    if flags & DirentFlags.EXTENDED:
-      flags ^= DirentFlags.EXTENDED
-      extended_data = BSData.parse_value(bfr)
-    else:
-      extended_data = None
-    if flags:
-      warning(
-          "%s.parse_value: unexpected extra flags: 0x%02x", cls.__name__, flags
-      )
-    E = _Dirent.from_components(
-        type_, name, meta=metatext, uuid=uu, block=block
-    )
-    E._prev_dirent_blockref = prev_dirent_blockref
-    E.ingest_extended_data(extended_data)
-    return E
-
-  def transcribe(self):
-    ''' Serialise to binary format.
-    '''
-    E = self.dirent
-    flags = 0
-    type_ = E.type
-    if E.name:
-      flags |= DirentFlags.HASNAME
-    meta = None if E.isindirect else E.meta
-    if meta:
-      flags |= DirentFlags.HASMETA
-    if E.uuid:
-      flags |= DirentFlags.HASUUID
-    block = None if type_ is DirentType.INDIRECT else E.block
-    if block is None:
-      flags |= DirentFlags.NOBLOCK
-    if E._prev_dirent_blockref is not None:
-      flags |= DirentFlags.HASPREVDIRENT
-    extended_data = E.get_extended_data()
-    if extended_data:
-      flags |= DirentFlags.EXTENDED
-    yield BSUInt.transcribe_value(type_)
-    yield BSUInt.transcribe_value(flags)
-    if flags & DirentFlags.HASNAME:
-      yield BSString.transcribe_value(E.name)
-    if flags & DirentFlags.HASMETA:
-      yield BSString.transcribe_value(meta.textencode())
-    if flags & DirentFlags.HASUUID:
-      bs = E.uuid.bytes
-      if len(bs) != 16:
-        raise RuntimeError("len(E.uuid.bytes) != 16: %r" % (bs,))
-      yield bs
-    if not flags & DirentFlags.NOBLOCK:
-      yield BlockRecord.transcribe_value(block)
-    if flags & DirentFlags.HASPREVDIRENT:
-      assert isinstance(E._prev_dirent_blockref, Block)
-      yield BlockRecord.transcribe_value(E._prev_dirent_blockref)
-    if flags & DirentFlags.EXTENDED:
-      yield extended_data
-
-class _Dirent(Transcriber, prefix=None):
+class _Dirent(Transcribable, prefix=None):
   ''' Incomplete base class for *`Dirent` objects.
 
       Special notes:
@@ -209,10 +100,10 @@ class _Dirent(Transcriber, prefix=None):
         * `uuid`: optional identifying UUID;
           *note*: for `IndirectDirent`s this is a reference to another
           `Dirent`'s UUID.
-        * `parent`: optional parent Dirent
-        * `prev_dirent_blockref`: optional Block whose contents are the binary
-          transcription of this Dirent's previous state - another
-          Dirent
+        * `parent`: optional parent `Dirent`
+        * `prev_dirent_blockref`: optional `Block` whose contents are the binary
+          transcription of this `Dirent`'s previous state - another
+          `Dirent`
     '''
     with Pfx("_Dirent(type_=%s,name=%r,...)", type_, name):
       if not isinstance(type_, int):
@@ -272,8 +163,8 @@ class _Dirent(Transcriber, prefix=None):
   # TODO: remove all uses of _Dirent.from_bytes
   @staticmethod
   def from_bytes(data, offset=0):
-    ''' Factory to extract a Dirent from binary data at `offset` (default 0).
-        Returns the Dirent and the new offset.
+    ''' Factory to extract a `Dirent` from binary data at `offset` (default 0).
+        Returns the `Dirent` and the new offset.
     '''
     return DirentRecord.parse_value_from_bytes(data, offset=offset)
 
@@ -290,20 +181,19 @@ class _Dirent(Transcriber, prefix=None):
     return True
 
   def ingest_extended_data(self, extended_data):
-    ''' The basic _Dirent subclasses do not use extended data.
+    ''' The basic `_Dirent` subclasses do not use extended data.
     '''
     if extended_data:
       raise ValueError(
-          "expected extended_data to be None or empty, got: %r" %
-          (extended_data,)
+          f'expected extended_data to be None or empty, got: {r(extended_data)}'
       )
 
   def get_extended_data(self):
-    ''' The basic _Dirent subclasses do not use extended data.
+    ''' The basic `_Dirent` subclasses do not use extended data.
     '''
     return None
 
-  def __bytes__(self):
+  def __bytes__(self) -> bytes:
     ''' Serialise this Dirent to bytes.
     '''
     return bytes(DirentRecord(self))
@@ -315,14 +205,14 @@ class _Dirent(Transcriber, prefix=None):
     '''
     return id(self)
 
-  def transcribe_inner(self, attrs=None) -> str:
+  def str_inner(self, attrs=None) -> str:
     ''' Transcribe the inner components of the `Dirent` as text.
     '''
     if attrs is None:
       attrs = {}
     tokens = []
     if self.name and self.name != '.':
-      tokens.append(self.transcribe_obj(self.name))
+      tokens.append(self.str_obj(self.name))
       tokens.append(':')
     if type(self) is _Dirent:
       attrs['type'] = self.type
@@ -337,7 +227,7 @@ class _Dirent(Transcriber, prefix=None):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
       attrs['prev_dirent_blockref'] = prev_blockref
-    tokens.append(self.transcribe_mapping_inner(attrs))
+    tokens.append(self.str_mapping_inner(attrs))
     return ''.join(tokens)
 
   @classmethod
@@ -610,10 +500,10 @@ class InvalidDirent(_Dirent, prefix='INVALIDDirent'):
     '''
     return self.chunk
 
-  def transcribe_inner(self) -> str:
+  def str_inner(self) -> str:
     ''' Transcribe the inner components of this InvalidDirent's transcription.
     '''
-    return super().transcribe_inner({'chunks': self.chunk})
+    return super().str_inner({'chunks': self.chunk})
 
 class SymlinkDirent(_Dirent, prefix='SymLink'):
   ''' A symbolic link.
@@ -645,7 +535,7 @@ class IndirectDirent(_Dirent, prefix='Indirect'):
       `Dirent` requires dereferencing through a `FileSystem`.
   '''
 
-  transcribe_prefix = 'Indirect'
+  str_prefix = 'Indirect'
 
   def __init__(self, name, uuid, meta=None, block=None):
     if block is not None:
@@ -900,21 +790,21 @@ class Dir(_Dirent, DirLike, prefix='D'):
 
       Special attributes:
       * `changed`:
-        Starts False, becomes true if this or any subdirectory gets changed
-        or has a file opened; stays True from then on.
-        This accepts an ongoing compute cost for .block to avoid
-        setting the flag on every file.write etc.
+        Starts `False`, becomes true if this or any subdirectory gets changed
+        or has a file opened; stays `True` from then on.
+        This accepts an ongoing compute cost for `.block` to avoid
+        setting the flag on every file `.write` etc.
   '''
 
-  def __init__(self, name, block=None, **kw):
+  def __init__(self, name, block=None, **dirent_kw):
     ''' Initialise this directory.
 
         Parameters:
-        * `meta`: meta information
-        * `parent`: parent Dir
-        * `block`: pre-existing Block with initial Dir content
+        * `name`: the name of this `Dir`
+        * `parent`: parent `Dir`
+        Other keyword arguments are as for `_Dirent.__init__`.
     '''
-    _Dirent.__init__(self, DirentType.DIR, name, **kw)
+    _Dirent.__init__(self, DirentType.DIR, name, **dirent_kw)
     if block is None:
       self._block = None
       self._entries = {}
@@ -1294,6 +1184,116 @@ class Dir(_Dirent, DirLike, prefix='D'):
         if not E.fsck(recurse=recurse):
           ok = False
     return ok
+
+class DirentRecord(BinarySingleValue, value_type=_Dirent):
+  ''' `BaseBinaryMultiValue` subclass to parsing and transcribing Dirents in binary form.
+
+      The serialisation format is:
+
+            BSUint(type)
+            BSUint(flags)
+            [BSString(name)]
+            [BSString(str(meta))]
+            [uuid:16]
+            blockref
+            [blockref(pref_dirent)]
+            [BSData(extended_data)]
+
+      Note that all additional future implementation detail needs
+      to go in the metadata or the optional extended_data.
+  '''
+
+  @property
+  def dirent(self):
+    ''' The dirent comes from `.value`.
+    '''
+    return self.value
+
+  @classmethod
+  def parse_value(cls, bfr) -> "_Dirent":
+    ''' Unserialise a single serialised Dirent from `bfr`.
+    '''
+    type_ = BSUInt.parse_value(bfr)
+    flags = DirentFlags(BSUInt.parse_value(bfr))
+    if flags & DirentFlags.HASNAME:
+      flags ^= DirentFlags.HASNAME
+      name = BSString.parse_value(bfr)
+    else:
+      name = ""
+    if flags & DirentFlags.HASMETA:
+      flags ^= DirentFlags.HASMETA
+      metatext = BSString.parse_value(bfr)
+    else:
+      metatext = None
+    uu = None
+    if flags & DirentFlags.HASUUID:
+      flags ^= DirentFlags.HASUUID
+      uu = UUID(bytes=bfr.take(16))
+    if flags & DirentFlags.NOBLOCK:
+      flags ^= DirentFlags.NOBLOCK
+      block = None
+    else:
+      block = BlockRecord.parse_value(bfr)
+    if flags & DirentFlags.HASPREVDIRENT:
+      flags ^= DirentFlags.HASPREVDIRENT
+      prev_dirent_blockref = BlockRecord.parse_value(bfr)
+    else:
+      prev_dirent_blockref = None
+    if flags & DirentFlags.EXTENDED:
+      flags ^= DirentFlags.EXTENDED
+      extended_data = BSData.parse_value(bfr)
+    else:
+      extended_data = None
+    if flags:
+      warning(
+          "%s.parse_value: unexpected extra flags: 0x%02x", cls.__name__, flags
+      )
+    E = _Dirent.from_components(
+        type_, name, meta=metatext, uuid=uu, block=block
+    )
+    E._prev_dirent_blockref = prev_dirent_blockref
+    E.ingest_extended_data(extended_data)
+    return E
+
+  def transcribe(self):
+    ''' Serialise to binary format.
+    '''
+    E = self.dirent
+    flags = 0
+    type_ = E.type
+    if E.name:
+      flags |= DirentFlags.HASNAME
+    meta = None if E.isindirect else E.meta
+    if meta:
+      flags |= DirentFlags.HASMETA
+    if E.uuid:
+      flags |= DirentFlags.HASUUID
+    block = None if type_ is DirentType.INDIRECT else E.block
+    if block is None:
+      flags |= DirentFlags.NOBLOCK
+    if E._prev_dirent_blockref is not None:
+      flags |= DirentFlags.HASPREVDIRENT
+    extended_data = E.get_extended_data()
+    if extended_data:
+      flags |= DirentFlags.EXTENDED
+    yield BSUInt.transcribe_value(type_)
+    yield BSUInt.transcribe_value(flags)
+    if flags & DirentFlags.HASNAME:
+      yield BSString.transcribe_value(E.name)
+    if flags & DirentFlags.HASMETA:
+      yield BSString.transcribe_value(meta.textencode())
+    if flags & DirentFlags.HASUUID:
+      bs = E.uuid.bytes
+      if len(bs) != 16:
+        raise RuntimeError("len(E.uuid.bytes) != 16: %r" % (bs,))
+      yield bs
+    if not flags & DirentFlags.NOBLOCK:
+      yield BlockRecord.transcribe_value(block)
+    if flags & DirentFlags.HASPREVDIRENT:
+      assert isinstance(E._prev_dirent_blockref, Block)
+      yield BlockRecord.transcribe_value(E._prev_dirent_blockref)
+    if flags & DirentFlags.EXTENDED:
+      yield extended_data
 
 if __name__ == '__main__':
   from .dir_tests import selftest

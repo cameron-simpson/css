@@ -251,7 +251,7 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
       release_version = pkg.release_with_features(feature_set)
       if release_version is None:
         raise ValueError(
-            "no release version satifying feature set %r" % (feature_set,)
+            f'no release version satifying feature set {feature_set!r}'
         )
       release_versions.add(release_version)
     if not release_versions:
@@ -259,15 +259,14 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
     if self.op == '=':
       if len(release_versions) > 1:
         raise ValueError(
-            "conflicting release versions for %r: %r" %
-            (self.op, release_versions)
+            f'conflicting release versions for {self.op!r}: {release_versions!r}'
         )
       release_version = release_versions.pop()
     elif self.op == '>=':
       # the release versions are minima: pick their maximum
       release_version = max(release_versions)
     else:
-      raise RuntimeError("onimplemenented op %r" % (self.op,))
+      raise RuntimeError(f'unimplemented op {self.op!r}')
     return ''.join((self.module_name, self.op, release_version))
 
 def release_tags(vcs):
@@ -1216,7 +1215,7 @@ class Module:
     return self.DISTINFO.get('install_requires', [])
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  @cache
+  @cached_property
   @uses_runstate
   def problems(self, *, runstate=RunState):
     ''' Sanity check of this module.
@@ -1239,7 +1238,7 @@ class Module:
         pass
       else:
         problems.append(
-            f'name conflicts with {third_party_listpath}:{lineno}: {line!r}'
+            f'{self.name=} conflicts with {third_party_listpath=}:{lineno=}'
         )
     # see if this package has been marked "ok" as of a particular revision
     latest_ok_rev = self.pkg_tags.get('ok_revision')
@@ -1311,7 +1310,7 @@ class Module:
           runstate.raiseif()
           if not import_name.startswith(MODULE_PREFIX):
             continue
-          import_problems = self.modules[import_name].problems()
+          import_problems = self.modules[import_name].problems
           if import_problems:
             subproblems[import_name] = import_problems
     for required_name in sorted(self.requires):
@@ -1561,7 +1560,6 @@ class CSReleaseCommand(BaseCommand):
       except AttributeError:
         return False
 
-    verbose: bool = field(default_factory=stderr_isatty)
     colourise: bool = field(default_factory=stderr_isatty)
     pkg_tagsets: TagFile = field(
         default_factory=lambda:
@@ -1617,7 +1615,7 @@ class CSReleaseCommand(BaseCommand):
       with Pfx(pkg_name):
         status("...")
         pkg = options.modules[pkg_name]
-        problems = pkg.problems()
+        problems = pkg.problems
         status('')
         if problems:
           xit = 1
@@ -2012,7 +2010,7 @@ class CSReleaseCommand(BaseCommand):
             pkg = options.modules[pkg_name]
             pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
             if pypi_release is not None:
-              problems = pkg.problems()
+              problems = pkg.problems
               if not problems:
                 proxy.text = "ok"
               else:

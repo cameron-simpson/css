@@ -3,14 +3,13 @@
 ''' Unit tests for cs.iso14496.
 '''
 
-from __future__ import print_function
 import sys
 import os
 import os.path
 import unittest
 from cs.logutils import setup_logging
 from .binary_tests import BaseTestBinaryClasses
-from .iso14496 import parse
+from .iso14496 import Box
 from . import iso14496 as iso14496_module
 
 TESTFILE = 'TEST.mp4'
@@ -25,15 +24,11 @@ class Test_iso14496(unittest.TestCase):
     '''
     S = os.stat(TESTFILE)
     mp4_size = S.st_size
-    with open(TESTFILE, 'rb') as mp4fp:
-      over_box = parse(mp4fp)
-      self.assertEqual(over_box.end_offset - over_box.offset, mp4fp.tell())
-    self.assertEqual(over_box.offset, 0)
-    self.assertEqual(
-        over_box.end_offset, mp4_size,
-        "over_box.end_offset=%d, mp4fp.tell=%d" %
-        (over_box.end_offset, mp4_size)
-    )
+    nboxes = 0
+    for box in Box.scan(TESTFILE):
+      nboxes += 1
+      print(box.box_type_s)
+    self.assertEqual(box.end_offset, mp4_size)
 
 class TestISO14496BinaryClasses(BaseTestBinaryClasses, unittest.TestCase):
   ''' Test the `PacketField`s in `cs.iso14496`.

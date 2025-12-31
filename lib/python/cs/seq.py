@@ -12,15 +12,16 @@ will consume some or all of the derived iterator
 in the course of its function.
 '''
 
+from builtins import range as builtin_range
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
-from typing import Callable, Hashable, Iterable, Iterator, Optional, Tuple, TypeVar
+from typing import Callable, GenericAlias, Hashable, Iterable, Optional, Tuple, TypeVar
 
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20250306-post'
+__version__ = '20251231.1-post'
 
 DISTINFO = {
     'description':
@@ -38,7 +39,7 @@ DISTINFO = {
     '>=3',
 }
 
-class Seq(object):
+class Seq:
   ''' A numeric sequence implemented as a thread safe wrapper for
       `itertools.count()`.
 
@@ -270,7 +271,7 @@ def common_suffix_length(*seqs):
   '''
   return common_prefix_length(list(map(lambda s: list(reversed(s)), *seqs)))
 
-class TrackingCounter(object):
+class TrackingCounter:
   ''' A wrapper for a counter which can be incremented and decremented.
 
       A facility is provided to wait for the counter to reach a specific value.
@@ -369,7 +370,7 @@ class TrackingCounter(object):
       watcher.acquire()
     watcher.wait()
 
-class StatefulIterator(object):
+class StatefulIterator:
   ''' A trivial iterator which wraps another iterator to expose some tracking state.
 
       This has 2 attributes:
@@ -377,13 +378,13 @@ class StatefulIterator(object):
       * `.state`: the last state value from the internal iterator
 
       The originating use case is resuse of an iterator by independent
-      calls that are typically sequential, specificly the .read
+      calls that are typically sequential, specificly the `.read`
       method of file like objects. Naive sequential reads require
       the underlying storage to locate the data on every call, even
       though the previous call has just performed this task for the
       previous read. Saving the iterator used from the preceeding
       call allows the iterator to pick up directly if the file
-      offset hasn't been fiddled in the meantime.
+      offset hasn't been modified in the meantime.
   '''
 
   def __init__(self, it):
@@ -409,8 +410,8 @@ class ClonedIterator(Iterable):
       iterator in memory.
   '''
 
-  def __init__(self, it: Iterator):
-    ''' Initialise the clone with its original iterator.
+  def __init__(self, it: Iterable):
+    ''' Initialise the clone with the iterable `it`.
     '''
     self._iterator = iter(it)
     self._cloned = []
@@ -422,12 +423,13 @@ class ClonedIterator(Iterable):
     with self._lock:
       item = next(self._iterator)
       self._cloned.append(item)
+    return item
 
   def __iter__(self):
     ''' Iterate over the clone, returning a new iterator.
 
         In mild violation of the iterator protocol, instead of
-        returning `self`` iter(self)` returns a generator yielding
+        returning `self`, `iter(self)` returns a generator yielding
         the historic and then current contents of the original iterator.
     '''
     i = 0
@@ -775,6 +777,126 @@ def infill_from_batches(
     yield from infill(
         objs, obj_keys=obj_keys, existing_keys=existing_keys, all=all
     )
+
+def not_none(*iterables):
+  ''' Filter the iterables for items which are not `None`.
+  '''
+  for iterable in iterables:
+    yield from filter(lambda item: item is not None, iterable)
+
+class range:
+  ''' A class like the builtin `range` exceppt that it will
+      accept `...` as the stop value, indicating an unbound range.
+      Note that if initialised like a normal range it returns a
+      builtin `range` instance.
+
+      Examples:
+
+      Normal instantiation returns a builin `range`:
+
+          >>> r = range(9)
+          >>> type(r)
+          <class 'range'>
+          >>> r
+          range(0, 9)
+
+      The basic unbound range:
+
+          >>> r0 = range(...)
+          >>> type(r0)
+          <class 'cs.seq.range'>
+          >>> r0
+          range(0:...:1)
+          >>> str(r0)
+          '0...'
+          >>> list(r0[:10])
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+          >>> 99999999999999999 in r0
+          True
+          >>> -10 in r0
+          False
+
+      An unbound instantiation starting at 9:
+
+          >>> r = range(9,...)
+          >>> type(r)
+          <class 'cs.seq.range'>
+          >>> r
+          range(9:...:1)
+          >>> r[:10]
+          range(9, 19)
+          >>> r2 = r[:10]
+          >>> type(r2)
+          <class 'range'>
+          >>> r2
+          range(9, 19)
+
+  '''
+
+  def __new__(cls, start, stop=None, step=1):
+    if stop is None:
+      stop = start
+      start = 0
+    if stop is not ...:
+      return builtin_range(start, stop, step)
+    return super().__new__(cls)
+
+  def __init__(self, start, stop=None, step=1):
+    if stop is None:
+      stop = start
+      start = 0
+    assert stop is ...
+    self.start = start
+    self.step = step
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}({self.start}:...:{self.step})'
+
+  def __str__(self):
+    if self.step == 1:
+      return f'{self.start}...'
+    return f'{self.start}:...:{self.step}'
+
+  def __contains__(self, index):
+    if index < self.start:
+      return False
+    return (index - self.start) % self.step == 0
+
+  def __getitem__(self, index):
+    if isinstance(index, int):
+      return range(0, index + 1)[index]
+    if isinstance(index, slice):
+      start, stop, step = index.start, index.stop, index.step
+      if start is None:
+        start = 0
+      elif start < 0:
+        raise ValueError(f'{start=} may not be negative')
+      if stop is ...:
+        stop = None
+      elif stop is not None and stop < 0:
+        raise ValueError(f'{stop=} may not be negative')
+      if step is None:
+        step = 1
+      if stop is not None:
+        return builtin_range(
+            self.start + start, self.start + stop, self.step * step
+        )
+      return self.__class__(self.start + start, ..., self.step * step)
+    raise TypeError(repr(type(index)))
+
+  @classmethod
+  def __class_getitem__(cls, index):
+    if isinstance(index, slice):
+      return range(...)[index]
+    if isinstance(index, type):
+      return GenericAlias(cls, (index,))
+    raise TypeError(f'{type(index)}:{index!r} is not a slice')
+
+  def __iter__(self):
+    i = self.start
+    while True:
+      yield i
+      i += self.step
 
 if __name__ == '__main__':
   import sys

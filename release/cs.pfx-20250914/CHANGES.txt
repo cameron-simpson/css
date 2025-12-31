@@ -1,0 +1,2 @@
+lib/python/cs/pfx.py: cs.pfx: pfx(): initial support for controlling the prefix in the decorator, not as useful as I'd hoped
+lib/python/cs/pfx.py: cs.pfx: pfx: pfx_generator_wrapper: handle StopIteration from next() call

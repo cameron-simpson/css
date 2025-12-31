@@ -89,7 +89,7 @@ from .scan import (
 )
 from .server import serve_tcp, serve_socket
 from .store import DataDirStore
-from .transcribe import Transcriber
+from .transcribe import Transcribable
 from .uri import VTURI
 
 RANDOM_DEV = '/dev/urandom'
@@ -322,7 +322,7 @@ class VTCmd(BaseCommand):
     ''' Set up and tear down the surrounding context.
     '''
     with super().run_context():
-      cmd = self.cmd
+      subcmd = self.subcmd
       options = self.options
       config = options.config
       show_progress = options.show_progress
@@ -339,13 +339,13 @@ class VTCmd(BaseCommand):
             # redo these because defaults is already initialised
             with stackattrs(run_modes, show_progress=show_progress):
               with fstags:
-                if cmd in ("config", "datadir", "dump", "help", "init",
-                           "profile", "scan"):
+                if subcmd in ("config", "datadir", "dump", "help", "init",
+                              "profile", "scan"):
                   yield
                 else:
                   # open the default Store
                   if options.store_spec is None:
-                    if cmd == "serve":
+                    if subcmd == "serve":
                       options.store_spec = '[server]'
                   S = options.store
                   with S:
@@ -602,7 +602,7 @@ class VTCmd(BaseCommand):
     for arg in argv:
       with Pfx(arg):
         try:
-          o, offset = Transcriber.parse(arg)
+          o, offset = Transcribable.parse(arg)
         except ValueError as e:
           error("does not seem to be a transcription: %s", e)
           xit = 1
@@ -1045,7 +1045,7 @@ class VTCmd(BaseCommand):
       except ValueError:
         # try an object transcription eg "D{...}"
         try:
-          obj, offset = Transcriber.parse(pushable_spec)
+          obj, offset = Transcribable.parse(pushable_spec)
         except ValueError:
           # fall back: relative path to .vtd file
           if pushable_spec.endswith('.vtd') and isfilepath(pushable_spec):

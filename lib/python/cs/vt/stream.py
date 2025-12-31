@@ -112,7 +112,7 @@ class AddRequest(
     '''
     return HashCodeField.value_from_bytes(payload)
 
-class GetRequest(BaseRequest, HashCodeField):
+class GetRequest(BaseRequest, HashCodeField, value_type=HashCode):
   ''' A get(hashcode) request, returning the associated bytes.
   '''
 
@@ -139,7 +139,7 @@ class GetRequest(BaseRequest, HashCodeField):
     '''
     return None if flags == 0 else payload
 
-class ContainsRequest(BaseRequest, HashCodeField):
+class ContainsRequest(BaseRequest, HashCodeField, value_type=HashCode):
   ''' A request to test for the presence of a hashcode.
   '''
 
@@ -162,7 +162,7 @@ class ContainsRequest(BaseRequest, HashCodeField):
   def decode_response_payload(self, flags: int, payload: bytes) -> bool:
     return bool(flags)
 
-class ContainsIndirectRequest(BaseRequest, HashCodeField):
+class ContainsIndirectRequest(BaseRequest, HashCodeField, value_type=HashCode):
   ''' A request to test for the presence all of the blocks
       of an indirect block hashcode.
   '''

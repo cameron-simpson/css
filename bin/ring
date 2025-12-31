@@ -44,6 +44,7 @@ def main(argv=None):
   if badopts:
     print(usage, file=sys.stderr)
     return 2
+  found = False
   for path in paths:
     if not path:
       continue
@@ -53,7 +54,6 @@ def main(argv=None):
       lines = gpgfrom(path)
     else:
       lines = txtfrom(path)
-    found = False
     for clause_lines in clausesof(lines):
       clause = "\n".join(clause_lines).rstrip()
       matched = True

@@ -27,10 +27,10 @@ from cs.resources import (
     RunState,
     RunStateMixin,
     uses_runstate,
-    not_closed,
     ClosedError,
 )
 from cs.result import CancellationError
+from cs.semantics import not_closed
 from cs.seq import seq, unrepeated
 
 __version__ = '20250426-post'

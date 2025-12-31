@@ -11,10 +11,9 @@ from threading import Lock
 from typing import Iterable, Mapping, Optional, Tuple, Union
 
 from cs.context import stackattrs
-from cs.deco import promote
 from cs.logutils import warning
 from cs.naysync import amap, aqiter
-from cs.pfx import pfx_call, pfx_method
+from cs.pfx import pfx_method
 from cs.resources import MultiOpenMixin
 from cs.result import Result
 from cs.upd import print
@@ -22,7 +21,6 @@ from cs.urlutils import URL
 
 from .pilfer import Pilfer, uses_pilfer
 
-from cs.debug import trace, X
 
 @dataclass
 class URLFetcher(MultiOpenMixin):
@@ -118,7 +116,9 @@ class URLFetcher(MultiOpenMixin):
       eoq = object()
       try:
         with stackattrs(self, _q=q):
-          t = asyncio.create_task(self.prefetch_worker(aqiter(q, eoq)))
+          t = asyncio.create_task(
+              self.prefetch_worker(aqiter(q, sentinel=eoq))
+          )
           with stackattrs(self.pilfer.state, prefetcher=self):
             yield t
       finally:

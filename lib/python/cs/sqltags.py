@@ -46,7 +46,8 @@ import sys
 from subprocess import run
 from threading import RLock
 import time
-from typing import List, Mapping, Optional, Sequence
+from typing import List, Iterable, Mapping, Optional, Sequence, Set, Tuple
+from uuid import UUID
 
 from icontract import ensure, require
 from sqlalchemy import (
@@ -62,7 +63,7 @@ from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, cli_datetime, popopts
+from cs.cmdutils import BaseCommand, cli_datetime, popopts, vprint
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
@@ -79,8 +80,18 @@ from cs.sqlalchemy_utils import (
     HasIdMixin,
 )
 from cs.tagset import (
-    TagSet, Tag, TagFile, TagSetCriterion, TagBasedTest, TagsCommandMixin,
-    TagsOntology, BaseTagSets, tag_or_tag_value, as_unixtime
+    BaseTagSets,
+    HasTags,
+    Tag,
+    TagBasedTest,
+    TagFile,
+    TagSet,
+    TagSetCriterion,
+    TagsCommandMixin,
+    TagsOntology,
+    UsesTagSets,
+    as_unixtime,
+    tag_or_tag_value,
 )
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -441,7 +452,7 @@ class SQTCriterion(TagSetCriterion):
     ''' Subclasses must return am `SQLParameters` instance
         parameterising the SQL queries that follow.
     '''
-    raise NotImplementedError("sql_parameters")
+    raise NotImplementedError
 
   @abstractmethod
   def match_tagged_entity(self, te: TagSet) -> bool:
@@ -450,7 +461,7 @@ class SQTCriterion(TagSetCriterion):
         cannot be sufficiently implemented in SQL.
         If `self.SQL_COMPLETE` it is not necessary to call this method.
     '''
-    raise NotImplementedError("sql_parameters")
+    raise NotImplementedError
 
   @staticmethod
   def from_equality(tag_name, tag_value):
@@ -658,7 +669,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         alias = aliased(entities)
       entity_id_column = alias.id
       if tag_name == 'name':
-        if not isinstance(tag_value, str):
+        if tag_value is not None and not isinstance(tag_value, str):
           raise ValueError(
               f'name comparison requires a str, got {r(tag_value)}'
           )
@@ -1231,7 +1242,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         raise ValueError("unrecognised mode")
     return query
 
-@has_format_attributes(inherit=True)
 class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
 
@@ -1294,6 +1304,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       'bigint': (int, str, int),  # for ints which do not round trip with float
       'date': (date, date.isoformat, date.fromisoformat),
       'datetime': (datetime, datetime.isoformat, datetime.fromisoformat),
+      'uuid': (UUID, str, UUID),
   }
 
   @staticmethod
@@ -1326,7 +1337,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       assert pre_sqltags is _sqltags, f'pre_sqltags is not sqltags: {pre_sqltags} vs {_sqltags}'
 
   def __str__(self):
-    return f'id={self.id!r}:{self.name}({super().__str__()})'
+    return f'id={self.id!r}:{self.name} {super().__str__()}'
 
   def __hash__(self):
     return id(self)
@@ -1468,7 +1479,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       return value.isoformat()
     # mapping?
     if (isinstance(value, Mapping)
-        or hasattr(value, 'items') and callable(value.items)):
+        or (hasattr(value, 'items') and callable(value.items))):
       # mapping
       return {
           str(field): cls.jsonable(subvalue)
@@ -1513,16 +1524,27 @@ class SQLTagSet(SingletonMixin, TagSet):
   def set(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
       raise ValueError(f'may not set pseudoTag {tag_name!r}')
-    with self.db_session():
-      if tag_name in ('name', 'unixtime'):
-        setattr(self, '_' + tag_name, value)
-        if not skip_db:
-          ifverbose(verbose, "+ %s", Tag(tag_name, value))
+    if not skip_db:
+      vprint(f'{self.name or self.id} + {tag_name}={value}')
+    if tag_name in ('name', 'unixtime'):
+      setattr(self, '_' + tag_name, value)
+      if not skip_db:
+        with self.db_session():
           setattr(self._get_db_entity(), tag_name, value)
-      else:
-        super().set(tag_name, value, verbose=verbose)
-        if not skip_db:
+    else:
+      super().set(tag_name, value, verbose=False)
+      if not skip_db:
+        with self.db_session():
           self.add_db_tag(tag_name, self.to_polyvalue(tag_name, value))
+
+  def setdefault(self, tag_name, value):
+    ''' Return `self[tag_name]`, setting it to `value` if not already present.
+    '''
+    try:
+      return self[tag_name]
+    except KeyError:
+      self.set(tag_name, value)
+      return value
 
   @pfx_method
   @typechecked
@@ -1582,6 +1604,9 @@ class SQLTagSet(SingletonMixin, TagSet):
 class SQLTags(SingletonMixin, BaseTagSets, Promotable):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
+
+  DBURL_ENVVAR = DBURL_ENVVAR
+  DBURL_DEFAULT = DBURL_DEFAULT
 
   @classmethod
   def _singleton_key(cls, db_url=None, ontology=None):
@@ -1656,6 +1681,11 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     '''
     with self.orm:
       yield self
+
+  def dbshell(self):
+    ''' Run a database shell connected to the ORM database.
+    '''
+    return self.orm.dbshell()
 
   @contextmanager
   def db_session(self, *, new=False):
@@ -1755,7 +1785,14 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     tes = list(tes)
     if not tes:
       return default
-    te, = tes
+    try:
+      te, = tes
+    except ValueError as e:
+      warning("%s[%r]: %s: found %d", self, index, e, len(tes))
+      for te in tes:
+        # TODO: really this should  go to the same logger as the warning
+        printt([f'{te.id}:{te.name}'], *sorted(te.items()), file=sys.stderr)
+      te = tes[0]
     return te
 
   @locked
@@ -1836,12 +1873,12 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         f'no {self.__class__.__name__}.__delitem__({r(index)})'
     )
 
-  def items(self, *, prefix=None):
+  def items(self, *, prefix=None) -> Iterable[Tuple[str, SQLTagSet]]:
     ''' Return an iterable of `(tagset_name,TagSet)`.
         Excludes unnamed `TagSet`s.
 
         Constrain the names to those starting with `prefix`
-        if not `None`.
+        if `prefix` is not `None`.
     '''
     return map(lambda te: (te.name, te), self.values(prefix=prefix))
 
@@ -1861,21 +1898,21 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       criterion = 'name~' + prefix + '?*'
     return self.find(criterion)
 
-  @staticmethod
+  @classmethod
   @fmtdoc
-  def infer_db_url(envvar=None, default_path=None):
+  def infer_db_url(cls, envvar=None, default_path=None):
     ''' Infer the database URL.
 
         Parameters:
         * `envvar`: environment variable to specify a default,
-          default from `DBURL_ENVVAR` i.e. from `${DBURL_ENVVAR}`.
+          default from `cls.DBURL_ENVVAR` i.e. from `${DBURL_ENVVAR}`.
         * `default_path`: optional default db URL if no environment
-          variable, default from `DBURL_DEFAULT` (`{DBURL_DEFAULT}`).
+          variable, default from `cls.DBURL_DEFAULT` (`{DBURL_DEFAULT}`).
     '''
     if envvar is None:
-      envvar = DBURL_ENVVAR
+      envvar = cls.DBURL_ENVVAR
     if default_path is None:
-      default_path = DBURL_DEFAULT
+      default_path = cls.DBURL_DEFAULT
     db_url = os.environ.get(envvar)
     if not db_url:
       db_url = expanduser(default_path)
@@ -1974,6 +2011,18 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
                for criterion in post_criteria):
           yield te
 
+  @pfx_method
+  def preload(self, *criteria) -> Set[SQLTagSet]:
+    ''' Preload the `SQLTagSets` matching each criterion in `criteria`.
+        Note that is is effectively an OR of the `criteria`, not an AND.
+        Return a `set` of the entities.
+    '''
+    tes = set()
+    for criterion in criteria:
+      with Pfx("criterion %r", criterion):
+        tes.update(self.find(criterion))
+    return tes
+
   def import_csv_file(self, f, *, update_mode=False):
     ''' Import CSV data from the file `f`.
 
@@ -2001,21 +2050,41 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       entities = self.orm.entities
       if te.name is None:
         # new log entry
-        e = entities(name=None, unixtime=te.unixtime)
-        session.add(e)
+        dbe = entities(name=None, unixtime=te.unixtime)
+        session.add(dbe)
       else:
-        e = entities.lookup1(name=te.name, session=session)
-        if e:
+        dbe = entities.lookup1(name=te.name, session=session)
+        if dbe:
           if not update_mode:
             raise ValueError(f'entity named {te.name!r} already exists')
         else:
           # new named entry
-          e = entities(name=te.name, unixtime=te.unixtime)
-          session.add(e)
+          dbe = entities(name=te.name, unixtime=te.unixtime)
+          session.add(dbe)
       # update the db entry
       for tag in te.tags:
         with Pfx(tag):
-          e.add_tag(tag)
+          dbe.add_tag(tag)
+
+class UsesSQLTags(UsesTagSets):
+  ''' A mixin subclassing `UsesTagSets` to support classes which
+      use an `SQLTags` to store their data.
+
+      As with `cs.tagset.UsesTagSets`, subclasses must supply a
+      `hastags_class` and _may_ supply a `tagsets_class` if it
+      should not be `SQLTags`. The subclass must also define a
+      `.TYPE_ZONE` class attribute.
+      An example from `cs.cdrip`:
+
+          class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin:
+
+              TYPE_ZONE = 'mbdb'
+              HasTagsClass = _MBEntity
+              TagSetsClass = MBSQLTags
+
+  '''
+
+  TagSetsClass = SQLTags
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
@@ -2044,6 +2113,15 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
         )
     )
 
+  def cmd_dbinit(self, argv):
+    ''' Usage: {cmd}
+          Initialise the database supporting `self.sqltags`.
+          This includes defining the schema and making the root metanode.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    self.sqltags.init()
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database shell.
@@ -2057,6 +2135,7 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
       print("sqlite3", db_fspath)
       run(['sqlite3', db_fspath], check=True)
       return 0
+    # TODO: psql for postgresql
     error("I do not know how to get a db shell for %r", db_url)
     return 1
 
@@ -2218,15 +2297,6 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
           with open(srcpath) as f:
             sqltags.import_csv_file(f, update_mode=update_mode)
 
-  def cmd_init(self, argv):
-    ''' Usage: {cmd}
-          Initialise the database.
-          This includes defining the schema and making the root metanode.
-    '''
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    self.sqltags.init()
-
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
   @popopts(
       c_=(
@@ -2302,8 +2372,8 @@ class SQLTagsCommandsMixin(TagsCommandMixin):
     xit = 0
     use_stdin = cmdline_headline == '-'
     sqltags = self.sqltags
-    for lineno, headline in enumerate((sys.stdin if use_stdin else
-                                       (cmdline_headline,))):
+    for lineno, headline in enumerate(sys.stdin if use_stdin else (
+        cmdline_headline,)):
       with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))):
         headline = headline.rstrip('\n')
         unixtime = None
@@ -2432,16 +2502,11 @@ class BaseSQLTagsCommand(BaseCommand, SQLTagsCommandsMixin):
     ''' Options for the `BaseSQLTagsCommand` class.
     '''
 
-    db_url: str = os.environ.get(DBURL_ENVVAR) or expanduser(DBURL_DEFAULT)
+    db_url: str = None  ## os.environ.get(DBURL_ENVVAR) or expanduser(DBURL_DEFAULT)
 
     COMMON_OPT_SPECS = dict(
         **BaseCommand.Options.COMMON_OPT_SPECS,
-        db_=(
-            'db_url',
-            '''SQLTags database URL.
-               Default from ${DBURL_ENVVAR} or {DBURL_DEFAULT!r}.
-            ''',
-        ),
+        db_=('db_url', 'SQLTags database URL.'),
     )
 
   @cached_property

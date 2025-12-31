@@ -3,13 +3,13 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 import dbm.sqlite3
+from functools import partial
 import json
 import mimetypes
 import os
 from os.path import (
     basename,
     exists as existspath,
-    isfile as isfilepath,
     join as joinpath,
     splitext,
 )
@@ -20,7 +20,6 @@ import time
 from typing import Iterable, Mapping, Optional, Tuple
 
 from icontract import require
-import requests
 
 from cs.cmdutils import vprint
 from cs.context import stackattrs
@@ -44,6 +43,8 @@ MIN_DURATION = 1.0  # minimum duration for a cache entry
 
 @dataclass
 class ContentCache(HasFSPath, MultiOpenMixin):
+  ''' A cache for URL content.
+  '''
 
   # present a progress bar for objects of 200KiB or more
   PROGRESS_THRESHOLD = 204800
@@ -239,11 +240,14 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     except KeyError:
       return default
 
-  def find_content(self,
-                   keys: str | Iterable[str]) -> Tuple[str, Mapping, bytes]:
+  def find_content(
+      self,
+      keys: str | Iterable[str],
+  ) -> Tuple[str, Mapping, bytes]:
     ''' Look for the cached content for `keys`,
         return a `(key,md,content_bs)` 3-tuple being the found `key`,
         its associated metadata `md` and the cached `content_bs` as a `bytes`.
+        Raise `KeyError` if no cache files are can be read.
     '''
     for key, md in self.findall(keys):
       content_rpath = md.get('content_rpath', None)
@@ -258,6 +262,26 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         ##warning("find_content: %r->%r: %s", key, fspath, e)
         continue
       return key, md, content_bs
+    raise KeyError(keys)
+
+  def find_cache_fspath(
+      self,
+      keys: str | Iterable[str],
+  ) -> Tuple[str, Mapping, str]:
+    ''' Look for a cache file for `keys`,
+        return a `(key,md,fspath)` 3-tuple being the found `key`,
+        its associated metadata `md` and filesystem path of the cache file.
+        Raise `KeyError` if no cache files are found.
+    '''
+    for key, md in self.findall(keys):
+      content_rpath = md.get('content_rpath', None)
+      if content_rpath is None:
+        warning("find_content: %r: no content_rpath", key)
+        continue
+      fspath = self.cached_pathto(content_rpath)
+      if not existspath(fspath):
+        continue
+      return key, md, fspath
     raise KeyError(keys)
 
   @typechecked
@@ -276,7 +300,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     ''' Compute the cache key from a `SiteMap` and a URL key.
         This is essentially the URL key prefixed with the sitemap name.
     '''
-    site_prefix = sitemap.name.replace("/", "__")
+    site_prefix = sitemap.name__
     cache_key = f'{site_prefix}/{url_key.lstrip("/")}' if url_key else site_prefix
     validate_rpath(cache_key.rstrip('/'))
     return cache_key
@@ -302,11 +326,12 @@ class ContentCache(HasFSPath, MultiOpenMixin):
         * `mode`: the cache mode, as for `ContentCache.cache_stream`
         * `duration`: optional duration for the cache entry
     '''
+    md_map = {}
     cache_keys = set(cache_keys)
     if not cache_keys:
-      return
+      # early return with an empty map if there are no keys
+      return md_map
     # check the validity of any keys already present
-    md_map = {}
     missing_keys = []
     latest_md = None
     for cache_key in cache_keys:
@@ -347,30 +372,30 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       bss: Iterable[bytes],
       cache_keys: str | Iterable[str],
       *,
-      mode: str = 'modified',
-      duration: Optional[float] = None,
-      progress_name=None,
-      runstate: Optional[RunState] = None,
       url: URL,
       rq_headers: Mapping[str, str],
       rsp_headers: Mapping[str, str],
+      mode: str = 'modified',
+      duration: Optional[float] = None,
+      progress_name: Optional[str] = None,
+      runstate: RunState = None,
   ) -> Mapping[str, dict]:
     ''' Cache `bss`, the decoded content of a URL, against `cache_keys`.
         Return a mapping of each cache key to the cached metadata.
 
-        Parameters:
+        Required parameters:
         * `bss`: an iterable of `bytes` containing the decoded content
         * `cache_keys`: an iterable of cache keys to associate with the response
         * `url`: the URL being cached
         * `rq_headers`: the request headers
         * `rsp_headers`: the response headers
-        * `mode`: optional cache mode, as for `ContentCache.cache_response`
-        * `duration`: optional duration for the cache entry
-        * `progress_name`: optional progress bar name
+
+        Optional parameters:
+        * `mode`: cache mode, default `'modified'`, as for `ContentCache.cache_response`
+        * `duration`: duration for the cache entry
+        * `progress_name`: progress bar name
     '''
-    PR = lambda *a, **kw: print(
-        "CACHE_STREAM", f'{url.hostname}/...{url.path[-16:]}', *a, **kw
-    )
+    PR = partial(print, "CACHE_STREAM", url.short)
     if isinstance(cache_keys, str):
       cache_keys = set((cache_keys,))
     else:
@@ -390,6 +415,7 @@ class ContentCache(HasFSPath, MultiOpenMixin):
       bss = progressbar(
           bss,
           progress_name,
+          itemlenfunc=len,
           total=content_length(rsp_headers),
           report_print=True,
       )
@@ -412,6 +438,8 @@ class ContentCache(HasFSPath, MultiOpenMixin):
     if duration is not None:
       base_md['expiry'] = now + duration
     md_map = {}
+    # We are not using atomic_filename here
+    # because we link the cached file to multiple locations.
     with NamedTemporaryFile(
         dir=self.cached_path,
         prefix='.cache_stream--',

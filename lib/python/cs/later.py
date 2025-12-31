@@ -302,7 +302,7 @@ class Later(MultiOpenMixin, HasThreadState):
       after a delay or after other pending functions. These methods
       return `LateFunction`s, a subclass of `cs.result.Result`.
 
-      A Later instance' close method closes the Later for further
+      A `Later` instance's `close` method closes the `Later` for further
       submission.
       Shutdown does not imply that all submitted functions have
       completed or even been dispatched.
@@ -911,6 +911,94 @@ class Later(MultiOpenMixin, HasThreadState):
     )
     self.defer(pfx(iterate_once))
     return R
+
+  def map(
+      self,
+      func: Callable,
+      it: Iterable,
+      *,
+      concurrent=True,
+      unordered=False,
+      indexed=False,
+      fast=False,
+  ):
+    ''' A generator yielding the results of `func(item)`
+        for each `item` in the iterable `it`,
+        using this `Later` to manage dispatch.
+
+        `func` must be a callable.
+
+        If `fast` is true (default `False`) assume that `func` does
+        not block or otherwise take a long time; the calls will
+        simply be called in sequence.
+
+        If `concurrent` is `False` (the default), run each `func(item)`
+        call in series.
+        If `concurrent` is true run the function calls in `Thread`s
+        concurrently.
+
+        If `unordered` is true (default `False`) yield results as
+        they arrive, otherwise yield results in the order of the items
+        in `it`, but as they arrive - tasks still evaluate concurrently
+        if `concurrent` is true.
+
+        If `indexed` is true (default `False`) yield 2-tuples of
+        `(i,result)` instead of just `result`, where `i` is the index
+        if each item from `it` counting from `0`.
+
+        Example of an async function to fetch URLs in parallel.
+
+            async def get_urls(urls : List[str]):
+                """ Fetch `urls` in parallel.
+                    Yield `(url,response)` 2-tuples.
+                """
+                async for i, response in amap(
+                    requests.get, urls,
+                    concurrent=True, unordered=True, indexed=True,
+                ):
+                    yield urls[i], response
+    '''
+    if fast or not concurrent:
+      # we do not bother with any concurrency
+      if indexed:
+        yield from enumerate(map(func, it))
+      else:
+        yield from map(func, it)
+      return
+    # dispatch concurrently via the Later
+    Rs = set()
+    for i, item in enumerate(it):
+      R = self.defer(func, item)
+      R.extra.update(i=i)
+      Rs.add(R)
+    if unordered:
+      # yield results as they come in
+      for R in report(Rs):
+        Rs.remove(R)
+        result = R()
+        if indexed:
+          yield R.extra.i, R
+        else:
+          yield R
+      return
+    # gather results in a heap
+    # yield results as their number arrives
+    results = []
+    unqueued = 0
+    for R in report(Rs):
+      Rs.remove(R)
+      result = R()
+      i = R.extra.i
+      heappush(results, (i, result))
+      while results and results[0][0] == unqueued:
+        i, result = heappop(results)
+        if indexed:
+          yield i, result
+        else:
+          yield result
+        unqueued += 1
+    # this should have cleared the heap
+    assert len(results) == 0
 
   @contextmanager
   def priority(self, pri):

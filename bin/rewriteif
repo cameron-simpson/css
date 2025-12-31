@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Rewrite the named file if the input differs.
-#	- Cameron Simpson <cs@cskk.id.au> 19may2000
+# - Cameron Simpson <cs@cskk.id.au> 19may2000
 #
 
 set -ue
@@ -11,6 +11,7 @@ set -ue
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] filename [command args...]
+  Rewrite filename if the input differs.
   -0        Rewrite the file even if the input is empty.
   -c        Create the file if missing.
   -C        Require the file to change; error if the new file is the same.
@@ -43,22 +44,22 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -0)	rw0=1 ;;
+    -0) rw0=1 ;;
     -c) docreate=1 ;;
     -C) mustchange=1 ;;
-    -d)	dodiff=1 ;;
+    -d) dodiff=1 ;;
     -D) dodiff=1 diffto=$2; shift ;;
     --diff-decode)
         diffdecode=$2; shift ;;
     -n) trace=eecho doit= dodiff= ;;
     -N) newfile=1 ;;
-    -v)	verbose=1 ;;
+    -v) verbose=1 ;;
     -x) trace=set-x ;;
-    --)	shift; break ;;
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
-	badopts=1
-	;;
-    *)	break ;;
+        badopts=1
+        ;;
+    *)  break ;;
   esac
   shift
 done
@@ -90,9 +91,9 @@ trap 'rm -f "$tmp" "$tmp2"' 0 1 2 13 15
 || { $trace rm -f "$tmp"; exit 1; }
 
 [ $rw0 ] || [ -s "$tmp" ] || { echo "$cmd: empty input, rewrite aborted" >&2
-			       $trace rm -f "$tmp"
-			       exit 1
-			     }
+                               $trace rm -f "$tmp"
+                               exit 1
+                             }
 
 if [ $docreate ] && [ ! -e "$file" ]
 then
@@ -131,6 +132,6 @@ then
     exit 0
 else
     echo "$cmd: rewrite of $file fails, probably damaged" >&2
-    echo "	rewrite content left in $tmp" >&2
+    echo "      rewrite content left in $tmp" >&2
     exit 1
 fi

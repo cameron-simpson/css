@@ -939,6 +939,18 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
         It yields the proxy.
+
+        Parameters:
+        * `label`: the label to display during the task
+        * `report_print`: optional flag, default `False`
+        * `tick_delay`: optional frequency of updating the ticker, default `0.3`
+        * `tick_chars`: optional character sequence for the ticker
+
+        If `report_print` is not `False` it may be:
+        * a callable like `print()` to print the elapsed time for the task
+        * a numeric value; if the elapsed time is equal to or
+          greater than this then `print()` will be uses to print the
+          elapsed time for the task
     '''
     with Pfx(label):
       if tick_delay < 0:
@@ -968,8 +980,9 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           end_time = time.time()
           cancel_ticker = True
       elapsed_time = end_time - start_time
-      if report_print:
-        if isinstance(report_print, bool):
+      if ((report_print > 0.0 and report_print <= elapsed_time)
+          if isinstance(report_print, (int, float)) else report_print):
+        if isinstance(report_print, (bool, int, float)):
           report_print = print
         report_print(
             label + ': in',

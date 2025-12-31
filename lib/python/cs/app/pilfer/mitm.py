@@ -4,20 +4,21 @@
 #
 
 import asyncio
-from collections import ChainMap, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import partial
+from functools import cached_property, partial
 from inspect import isgeneratorfunction
+import logging
 import os
+from pprint import pprint
 from signal import SIGINT
 import sys
 from threading import Thread
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Tuple
 
 from icontract import require
 from mitmproxy import http
 import mitmproxy.addons.dumper
-from mitmproxy.http import Request as MITMRequest, Response as MITMResponse
 from mitmproxy.options import Options
 ##from mitmproxy.proxy.config import ProxyConfig
 ##from mitmproxy.proxy.server import ProxyServer
@@ -26,23 +27,24 @@ from typeguard import typechecked
 
 from cs.cmdutils import vprint
 from cs.context import stackattrs
-from cs.deco import attr, Promotable, promote
+from cs.deco import attr, Promotable, promote, uses_verbose
 from cs.fileutils import atomic_filename
 from cs.fs import shortpath
+from cs.fsm import CancellationError
 from cs.gimmicks import Buffer
-from cs.lex import printt
+from cs.lex import get_dotted_identifier, printt, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
-from cs.rfc2616 import content_encodings, content_length
+from cs.rfc2616 import content_encodings, content_length, content_type
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
 from . import DEFAULT_MITM_LISTEN_HOST, DEFAULT_MITM_LISTEN_PORT
-from .parse import get_name_and_args
+from .parse import get_action_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 from .prefetch import URLFetcher
 from .sitemap import FlowState
@@ -282,6 +284,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   assert P is not None
   rq = flow.request
   url = URL(rq.url)
+  PR = partial(print, 'CACHED_FLOW', rq.method, url.short)
   if rq.method not in ('GET', 'HEAD'):
     ##PR(rq.method, "is not GET or HEAD")
     return
@@ -372,10 +375,63 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
       )
       flow.from_cache = True
 
-@attr(default_hooks=('requestheaders', 'responseheaders', 'response'))
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
 @uses_pilfer
 @typechecked
-def dump_flow(hook_name, flow, *, P: Pilfer = None):
+def reject_flow(hook_name, flow, *, P: Pilfer, **reject_kw):
+  ''' Reject flows matching all of `reject_kw`.
+      If all the conditions specified by `reject_kw` are matched,
+      raise `MITMCancelActions` which the caller (`MITMAddon.call_hooks_for`)
+      uses to cancel application of following actions.
+  '''
+  assert P is not None
+  rq = flow.request
+  url = URL(rq.url)
+  PR = lambda *a: print(
+      'SELECT', hook_name, flow.request.method, url.short, *a
+  )
+  for attr, value in reject_kw.items():
+    r_value = r(value)
+    with Pfx("%s=%s", attr, r_value):
+      url_attr = getattr(url, attr)
+      if url_attr != value:
+        return
+  raise MITMCancelActions(f'reject_flow: URL:{url.short}) matches {reject_kw}')
+
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
+@uses_pilfer
+@typechecked
+def select_flow(hook_name, flow, *, P: Pilfer, **select_kw):
+  ''' Select flows matching all of `select_kw`.
+      Failue to match a condition raises `MITMCancelActions` which
+      the caller (`MITMAddon.call_hooks_for`) uses to cancel
+      application of following actions.
+  '''
+  assert P is not None
+  rq = flow.request
+  url = URL(rq.url)
+  PR = lambda *a: print(
+      'SELECT', hook_name, flow.request.method, url.short, *a
+  )
+  for attr, value in select_kw.items():
+    r_value = r(value)
+    with Pfx("%s=%s", attr, r_value):
+      url_attr = getattr(url, attr)
+      if url_attr != value:
+        raise MITMCancelActions(
+            f'select_flow: {attr}={r_value}: url.{attr}={r(url_attr)} does not match'
+        )
+
+@attr(
+    default_hooks=('requestheaders', 'request', 'responseheaders', 'response')
+)
+@uses_pilfer
+@typechecked
+def dump_flow(hook_name, flow, *, P: Pilfer):
   ''' Dump request information: headers and query parameters.
   '''
   assert P is not None
@@ -415,6 +471,11 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
             ],
             indent="    ",
         )
+  if hook_name == 'request':
+    PR("  Request Content:", len(flow.request.content))
+    ct = content_type(flow.request.headers)
+    if ct and ct.content_type == 'application/json':
+      pprint(flow.request.json())
   if hook_name == 'responseheaders':
     print("  Response Headers:")
     printt(
@@ -422,7 +483,13 @@ def dump_flow(hook_name, flow, *, P: Pilfer = None):
         indent="    ",
     )
   if hook_name == 'response':
-    PR("  Content:", len(flow.response.content))
+    PR("  Response Content:", len(flow.response.content))
+    flowstate = FlowState.from_Flow(flow)
+    if rq.method == "POST":
+      if flowstate.content_type == 'application/json':
+        pprint(flow.response.json)
+      else:
+        print(flow.response.content)
 
 @require(lambda flow: not flow.response.stream)
 @typechecked
@@ -548,7 +615,8 @@ def patch_soup(hook_name, flow, *, P: Pilfer = None):
     ''' Yield a byte stream after patching its soup.
         If the content type is not `text/html`, yield the stream unchanged.
 
-        Gather the input `bss`, a _decoded_ iterable of bytes, into text and transform into BS4 `Soup`.
+        Gather the input `bss`, a _decoded_ iterable of bytes, into
+        text and transform into BS4 `Soup`.
         Call `Pilfer.
     '''
     if flowstate.content_type != 'text/html':
@@ -583,10 +651,10 @@ def grok_flow(hook_name, flow, *, P: Pilfer = None):
     return
 
   def grok_stream(bss: Iterable[bytes]):
+    ''' Fetch stream content then call `Pilfer.grok`.
+    '''
     content_bs = b''.join(bss)
-    # TODO: consult the content_type_full for charset
-    flowstate.content = content_bs.decode('utf-8')
-    # update the flowstate.soup
+    flowstate.content = content_bs
     for _ in P.grok(flowstate):
       pass
 
@@ -611,55 +679,90 @@ def save_stream(save_as_format: str, hook_name, flow, *, P: Pilfer = None):
 @dataclass
 class MITMHookAction(Promotable):
 
-  HOOK_SPEC_MAP = {
+  BUILTIN_ACTION_MAP = {
       'cache': cached_flow,
       'dump': dump_flow,
       'grok': grok_flow,
       'prefetch': prefetch_urls,
       'patch_soup': patch_soup,
       'print': print_rq,
+      'reject': reject_flow,
       'save': save_stream,
+      'select': select_flow,
   }
 
-  action: Callable
+  name: str
+  module_name: Optional[str] = None
   args: list = field(default_factory=list)
   kwargs: dict = field(default_factory=dict)
 
   def __str__(self):
     return (
         self.__class__.__name__ + ':' +
-        func_a_kw(self.action, *self.args, **self.kwargs)
+        func_a_kw(self.__call__, *self.args, **self.kwargs)
     )
 
   @property
   def default_hooks(self):
-    return self.action.default_hooks
+    return self.__call__.default_hooks
 
   # TODO: proper parse of hook_spec
   @classmethod
-  def from_str(cls, hook_spec: str):
-    ''' Promote `hook_spec` to a callable from `cls.HOOK_SPEC_MAP`.
+  def from_str(cls, action_spec: str, offset=0) -> "MITMHookAction":
+    ''' Promote `action_spec` to a callable from `cls.BUILTIN_ACTION_MAP`.
     '''
-    name, args, kwargs, offset = get_name_and_args(hook_spec)
-    if not name:
-      raise ValueError(f'expected dotted identifier: {hook_spec=}')
-    if offset < len(hook_spec):
+    self, offset = cls.parse(action_spec, offset=offset)
+    if offset < len(action_spec):
       raise ValueError(
-          f'unparsed text after params: {hook_spec[offset:]!r} in {hook_spec=}'
+          f'unparsed text after {action_spec[:offset]}: { action_spec[offset:]=}'
       )
-    try:
-      action = cls.HOOK_SPEC_MAP[name]
-    except KeyError as e:
-      raise ValueError(
-          f'unknown action name {name!r} (not in {cls.__name__}.HOOK_SPEC_MAP)'
-      ) from e
-    return cls(action=action, args=args, kwargs=kwargs)
+    return self
 
-  def __call__(self, *a, **kw):
-    ''' Calling a hook action calls its action with the supplied arguments.
+  @classmethod
+  def parse(cls, action_spec: str, offset=0) -> Tuple["MITMHookAction", int]:
+    args = []
+    kwargs = {}
+    criteria = []
+    with Pfx(offset):
+      name, offset = get_dotted_identifier(action_spec, offset)
+      if not name:
+        raise ValueError(f'no action name')
+    if action_spec.startswith(':', offset):
+      module_name = name
+      offset += 1
+      with Pfx(offset):
+        name, offset = get_dotted_identifier(action_spec, offset)
+        if not name:
+          raise ValueError(
+              f'missing module "subname" after module {module_name+":"!r}'
+          )
+    else:
+      module_name = None
+    if action_spec.startswith('(', offset):
+      # (args...)
+      offset += 1
+      with Pfx(offset):
+        a, kw, offset = get_action_args(action_spec, offset, '@')
+      with Pfx(offset):
+        if not action_spec.startswith(')', offset):
+          raise ValueError('missing closing bracket')
+    return cls(
+        name=name, module_name=module_name, args=args, kwargs=kwargs
+    ), offset
+
+  @cached_property
+  def __call__(self):
+    ''' The callable form of this action.
     '''
-    return self.action(*self.args, *a, **self.kwargs, **kw)
-    return pfx_call(self.action, *self.args, *a, **self.kwargs, **kw)
+    if self.module_name is None:
+      # builtin name
+      action = self.BUILTIN_ACTION_MAP[self.name]
+    else:
+      # import module_name:name
+      action = pfx_call(import_name, f'{self.module_name}:{self.name}')
+    if self.args or self.kwargs:
+      action = partial(action, *self.args, **self.kwargs)
+    return action
 
   @classmethod
   def promote(cls, obj):
@@ -669,32 +772,37 @@ class MITMHookAction(Promotable):
       return cls(action=obj)
     return super().promote(obj)
 
+class MITMCancelActions(CancellationError):
+  ''' The exception is raise to cancel the chain of actions
+      during the `MITMAddon.call_hook_for` method.
+  '''
+
 class MITMAddon:
   ''' A mitmproxy addon class which collects multiple actions per
       hook and calls each in order.
   '''
 
-  def __init__(self):
+  def __init__(self, logging_handlers=None):
+    # a list of (MITMAction,criteria)
     self.hook_map = defaultdict(list)
+    self.logging_handlers = logging_handlers
 
   @promote
   @typechecked
   def add_action(
       self,
-      hook_names: list[str] | tuple[str, ...] | None,
-      hook_action: MITMHookAction,
-      args,
-      kwargs,
-      url_regexps=(),
+      action: MITMHookAction,
+      hook_names: Optional[Iterable[str]] = (),
+      criteria: Optional[Iterable[Callable[str, bool]]] = (),
   ):
     ''' Add a `MITMHookAction` to a list of hooks for `hook_name`.
     '''
-    if hook_names is None:
-      hook_names = hook_action.default_hooks
+    if not hook_names:
+      hook_names = action.default_hooks
+      assert hook_names
     for hook_name in hook_names:
-      self.hook_map[hook_name].append(
-          (hook_action, args, kwargs, list(url_regexps))
-      )
+      vprint(hook_name, "+", action, criteria)
+      self.hook_map[hook_name].append((action, criteria))
 
   def __getattr__(self, hook_name):
     ''' Return a callable which calls all the hooks for `hook_name`.
@@ -708,7 +816,17 @@ class MITMAddon:
       hook_actions = self.hook_map[hook_name]
       if not hook_actions:
         raise AttributeError(f'no actions for {hook_name=}')
-      return partial(self.call_hooks_for, hook_name)
+
+      def call_hooks(*a, **kw):
+        root_logger = logging.getLogger()
+        with stackattrs(
+            root_logger,
+            handlers=(root_logger.handlers if self.logging_handlers is None
+                      else list(self.logging_handlers)),
+        ):
+          self.call_hooks_for(hook_name, *a, **kw)
+
+      return call_hooks
 
   def load(self, loader):
     loader.add_option(
@@ -749,12 +867,17 @@ class MITMAddon:
     if flow.runstate.running:
       flow.runstate.stop()
 
-  @pfx_method
-  def call_hooks_for(self, hook_name: str, flow, *mitm_hook_a, **mitm_hook_kw):
+  @uses_verbose
+  def call_hooks_for(
+      self, hook_name: str, flow, *mitm_hook_a, verbose: bool, **mitm_hook_kw
+  ):
     ''' This calls all the actions for the specified `hook_name`.
     '''
-    url = URL(flow.request.url)
-    PR = lambda *a, **kw: print("call_hooks_for", hook_name, *a, **kw)
+    rq = flow.request
+    url = URL(rq.url)
+    PR = lambda *a, **kw: print(
+        "call_hooks_for", hook_name, rq.method, url.short, *a, **kw
+    )
     ##PR("URL", flow.request.method, url.short)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
@@ -764,15 +887,12 @@ class MITMAddon:
     prep_excs = []
     # for collating any .stream functions during responseheaders
     stream_funcs = [] if hook_name == 'responseheaders' else None
-    for i, (
-        action,
-        action_args,
-        action_kwargs,
-        url_regexps,
-    ) in enumerate(hook_actions):
-      if url_regexps:
-        for regexp in url_regexps:
-          if regexp.search(flow.request.url):
+    cancelled = False
+    for i, (action, criteria) in enumerate(hook_actions):
+      if criteria:
+        PR(criteria)
+        for criterion in criteria:
+          if pfx_call(criterion, flow.request.url):
             break
         else:
           PR("SKIP, does not match URL")
@@ -785,13 +905,15 @@ class MITMAddon:
       try:
         pfx_call(
             action,
-            *action_args,
             hook_name,
             flow,
             *mitm_hook_a,
-            **action_kwargs,
             **mitm_hook_kw,
         )
+      except MITMCancelActions as e:
+        if verbose:
+          PR("cancelling further actions:", e._)
+        cancelled = True
       except Exception as e:
         warning("exception calling hook_action[%d]: %s", i, e)
         prep_excs.append(e)
@@ -806,6 +928,9 @@ class MITMAddon:
           if stream:
             stream_funcs.append(stream)
           flow.response.stream = stream0
+      # perform no further actions is we got a MITMCancelActions
+      if cancelled:
+        break
     if stream_funcs:
       # After the actions have run, define the stream attribute
       # to run whatever stream functions were applied.
@@ -876,17 +1001,30 @@ async def run_proxy(
     addon: MITMAddon,
     runstate: RunState,
     P: Pilfer,
+    upstream_proxy_url: Optional[str] = None,
 ):
+  ''' Asynchronous function to run a `mitmproxy.tools.dump.DumpMaster`
+      proxy, listening on `listen_host:listen_port` and processing flows
+      via the actions in `addon`.
+
+      Parameters:
+      * `addon`: a `MITMAddon` for processing `Flow`s
+      * `upstream_proxy_url`: an optional specification of the
+        upstream proxy used to fetch the originals; if `None`, fall
+        back to the `$https_proxy` environment variable; pass `""`
+        to use no proxy
+  '''
   opts = Options(
       listen_host=listen_host,
       listen_port=listen_port,
       ssl_insecure=True,
   )
   mitm_proxy_url = f'http://{listen_host}:{listen_port}/'
-  https_proxy = os.environ.get('https_proxy')
-  if https_proxy:
-    upstream_proxy_url = https_proxy
-    opts.mode = (f'upstream:{https_proxy}',)
+  if upstream_proxy_url is None:
+    upstream_proxy_url = os.environ.get('https_proxy')
+  if upstream_proxy_url:
+    # None or empty string
+    opts.mode = (f'upstream:{upstream_proxy_url}',)
   else:
     upstream_proxy_url = None
   proxy = DumpMaster(opts)
@@ -905,14 +1043,19 @@ async def run_proxy(
     loop.add_signal_handler(SIGINT, runstate.cancel)
     # Hold the root Pilfer open.
     with P:
-      try:
-        prefetcher = URLFetcher(pilfer=P)
-        with prefetcher as worker_task:
-          with stackattrs(P.state, prefetcher=prefetcher):
-            await proxy.run()  # Run inside the event loop
-        await worker_task
-      finally:
-        loop.remove_signal_handler(SIGINT)
-        vprint("Stopping mitmproxy.")
-        proxy.shutdown()
-        runstate.fsm_callback_discard('STOPPING', on_cancel)
+      # by default, requests through the Pilfer use this mitm proxy
+      with stackattrs(P.session, proxies=dict(
+          http=f'{listen_host}:{listen_port}',
+          https=f'{listen_host}:{listen_port}',
+      )):
+        try:
+          prefetcher = URLFetcher(pilfer=P)
+          with prefetcher as worker_task:
+            with stackattrs(P.state, prefetcher=prefetcher):
+              await proxy.run()  # Run inside the event loop
+          await worker_task
+        finally:
+          loop.remove_signal_handler(SIGINT)
+          vprint("Stopping mitmproxy.")
+          proxy.shutdown()
+          runstate.fsm_callback_discard('STOPPING', on_cancel)

@@ -99,7 +99,6 @@ def read_firefox_cookies(cookie_dbpath) -> List[FirefoxCookie]:
 if __name__ == '__main__':
   import sys
   import requests
-  from cs.debug import trace
   with requests.Session() as session:
     cookies = session.cookies
     ffcookies = read_firefox_cookies(sys.argv[1])

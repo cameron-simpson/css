@@ -10,9 +10,7 @@ Convenience facilities related to Python functions.
 
 from functools import partial
 
-from cs.py3 import raise_from
-
-__version__ = '20240630-post'
+__version__ = '20250914-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -21,9 +19,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [
-        'cs.py3',
-    ],
+    'python_requires':
+    '>=3',
 }
 
 def funcname(func):
@@ -40,7 +37,8 @@ def funcname(func):
         name = "partial(%s)" % (funcname(func.func),)
       else:
         name = str(func)
-  return "%s:%s" % (getattr(func, '__module__', '?'), name)
+  module_name = getattr(func, '__module__', None)
+  return "%s:%s" % (module_name, name) if module_name else name
 
 def funccite(func):
   ''' Return a citation for a function (name and code location).
@@ -139,7 +137,7 @@ def prop(func):
     try:
       return func(*a, **kw)
     except AttributeError as e:
-      raise_from(RuntimeError("inner function %s raised %s" % (func, e)), e)
+      raise RuntimeError("inner function %s raised %s" % (func, e)) from e
 
   prop_wrapper.__name__ = "@prop(%s)" % (funcname(func),)
   return property(prop_wrapper)
@@ -180,7 +178,7 @@ def derived_property(
             setattr(self, property_name, p)
             setattr(self, property_revision_name, o_revision)
     except AttributeError as e:
-      raise_from(RuntimeError("AttributeError: %s" % (e,)), e)
+      raise RuntimeError("AttributeError: %s" % (e,)) from e
     return p
 
   return property(property_value)

@@ -66,6 +66,7 @@ r'''A command and utility functions for making listings of file content hashcode
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
+import errno
 from getopt import GetoptError
 from io import TextIOBase
 import os
@@ -82,6 +83,7 @@ from os.path import (
     samefile,
 )
 import shlex
+import shutil
 from stat import S_ISREG
 from subprocess import CalledProcessError
 import sys
@@ -325,12 +327,13 @@ class HashIndexCommand(BaseCommand):
         with run_task("scan") as proxy:
           for h, fspath in hashindex(path, relative=relative):
             runstate.raiseif()
-            dirpath = dirname(fspath)
-            if dirpath != current_dirpath:
-              proxy.text = shortpath(dirpath)
-              current_dirpath = dirpath
-            if h is not None:
-              quiet or print(output_format.format(hashcode=h, fspath=fspath))
+            with Pfx(fspath):
+              dirpath = dirname(fspath)
+              if dirpath != current_dirpath:
+                proxy.text = shortpath(dirpath)
+                current_dirpath = dirpath
+              if h is not None:
+                quiet or print(output_format.format(hashcode=h, fspath=fspath))
     return xit
 
   @popopts(
@@ -1009,9 +1012,16 @@ def merge(
     if doit:
       # safe rename - link to dst them remove src
       needdir(dirname(dstpath))
-      pfx_call(os.link, srcpath, dstpath)
+      try:
+        pfx_call(os.link, srcpath, dstpath)
+      except OSError as e:
+        if e.errno == errno.EXDEV:
+          pfx_call(shutil.move, srcpath, dstpath)
+        else:
+          raise
+      else:
+        remove_protecting(srcpath, dstpath)
       fstags[dstpath].update(fstags[srcpath])
-      pfx_call(os.remove, srcpath)
     return True
   if samefile(srcpath, dstpath):
     # links to same file, merge the tags from srcpath -> dstpath

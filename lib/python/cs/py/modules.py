@@ -16,7 +16,7 @@ from cs.gimmicks import warning
 from cs.lex import is_dotted_identifier
 from cs.pfx import Pfx, pfx
 
-__version__ = '20241122-post'
+__version__ = '20250724-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -50,7 +50,7 @@ def import_module_name(module_name, name=None, sys_path=None, lock=None):
       except ImportError as e:
         # pylint: disable=raise-missing-from
         raise ImportError(
-            f'no module named {module_name!r}: {e.__class__.__name__}:{e}'
+            f'cannot import {module_name!r}: {e.__class__.__name__}: {e}'
         ) from e
     if M is not None:
       if name is None:
@@ -120,18 +120,22 @@ def module_names(M):
 # TODO: use the AST module to do a real parse?
 # pylint: disable=too-many-branches
 @pfx
-def direct_imports(src_filename, module_name):
+def direct_imports(src_filename, module_name, *, include_indented=False):
   ''' Crudely parse `src_filename` for `import` statements.
       Return the set of directly imported module names.
 
       Resolve relative imports against `module_name`.
 
-      This is a very simple minded source parse.
+      This is a very simple minded source parse which understands
+      nearly nothing about Python.
   '''
   subnames = set()
   with open(src_filename, encoding='utf-8') as codefp:
     for lineno, line in enumerate(codefp, 1):
-      line = line.strip()
+      if include_indented:
+        line = line.strip()
+      else:
+        line = line.rstrip()
       with Pfx("%d: %s", lineno, line):
         if line.startswith('import ') or line.startswith('from '):
           # quick hack to strip trailing "; second-statement"

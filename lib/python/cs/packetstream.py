@@ -12,13 +12,14 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 import os
+import sys
 from time import sleep
 from threading import Lock
 from typing import Callable, List, Mapping, Optional, Protocol, Tuple, Union, runtime_checkable
 
 from cs.binary import AbstractBinary, SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
-from cs.context import closeall, stackattrs
+from cs.context import closeall, contextif, stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, exception
@@ -407,8 +408,10 @@ class PacketConnection(MultiOpenMixin):
               runstate = self._runstate
               with runstate:
                 # runstate->RUNNING
-                with rq_in_progress.bar(stalled="idle", report_print=True):
-                  with rq_out_progress.bar(stalled="idle", report_print=True):
+                with contextif(sys.stderr.isatty(), rq_in_progress.bar,
+                               stalled="idle", report_print=True):
+                  with contextif(sys.stderr.isatty(), rq_out_progress.bar,
+                                 stalled="idle", report_print=True):
                     # dispatch Thread to process received packets
                     self._recv_thread = bg_thread(
                         self._recv_loop,
@@ -457,15 +460,15 @@ class PacketConnection(MultiOpenMixin):
                               report_print=True):
                   later.wait_outstanding()
             with run_task("%s: close sendQ, wait for sender" % (self,),
-                          report_print=True):
+                          report_print=2.0):
               self._sendQ.close(enforce_final_close=True)
               self._send_thread.join()
             if not self._sendQ.empty():
-              warning(
-                  "%s: EXTRA unsent items in _sentQ %s:", self, self._sendQ
-              )
               n_extra = 0
               for item in self._sendQ:
+                if item in (PacketConnection.EOF_Packet,
+                            PacketConnection.ERQ_Packet):
+                  continue
                 n_extra += 1
                 warning(
                     "  EXTRA %s:%s %s",
@@ -477,13 +480,17 @@ class PacketConnection(MultiOpenMixin):
                         if item == PacketConnection.ERQ_Packet else ""
                     ),
                 )
-              assert n_extra > 0
+              if n_extra > 0:
+                warning(
+                    "%s: %d EXTRA unsent items in _sentQ %s", self, n_extra,
+                    self._sendQ
+                )
             with run_task(
                 "%s: wait for _recv_thread %s" % (
                     self,
                     self._recv_thread.name,
                 ),
-                report_print=True,
+                report_print=2.0,
             ):
               self._recv_thread.join()
           finally:
@@ -983,8 +990,9 @@ class PacketConnection(MultiOpenMixin):
             sendf.flush()
       self.trace_log("::: END SEND LOOP %s", self)
       self.EOF_Packet.write(sendf, flush=True, log=self.trace_log)
+      sendf.flush()
 
-class BaseRequest(AbstractBinary):
+class BaseRequest:
   ''' A base class for request classes to use with `HasPacketConnection`.
 
       This is a mixin aimed at `*Binary` classes representing the
@@ -1028,7 +1036,7 @@ class BaseRequest(AbstractBinary):
       Approach 1 does not necessarily need a distinct class;
       a binary class can often be constructed in the class header.
       For example, the `cs.vt.stream.AddRequest` payload is an `int`
-      representing the hash class and the data to add. The class
+      representing the hash class and then the data to add. The class
       header looks like this:
 
           class AddRequest(
@@ -1061,9 +1069,9 @@ class BaseRequest(AbstractBinary):
         A typical implementation looks like this:
 
             def fulfil(self, context):
-                return context.come_method(params...)
+                return context.some_method(params...)
 
-        where `params` come from the request attributes.
+        where the `params` come from the request attributes.
     '''
     raise NotImplementedError
 
