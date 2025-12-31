@@ -29,7 +29,7 @@ from cs.cmdutils import BaseCommand as CSBaseCommand
 from cs.gimmicks import warning
 from cs.lex import cutprefix, stripped_dedent
 
-__version__ = '20250724-post'
+__version__ = '20251231'
 
 DISTINFO = {
     'keywords': ["python3"],
