@@ -884,6 +884,12 @@ class range:
       return self.__class__(self.start + start, ..., self.step * step)
     raise TypeError(repr(type(index)))
 
+  @classmethod
+  def __class_getitem__(cls, index):
+    if isinstance(index, slice):
+      return range(...)[index]
+    raise TypeError(f'{type(index)}:{index!r} is not a slice')
+
   def __iter__(self):
     i = self.start
     while True:
