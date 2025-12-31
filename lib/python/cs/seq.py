@@ -16,7 +16,7 @@ from builtins import range as builtin_range
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
-from typing import Callable, Hashable, Iterable, Optional, Tuple, TypeVar
+from typing import Callable, GenericAlias, Hashable, Iterable, Optional, Tuple, TypeVar
 
 from cs.deco import decorator
 from cs.gimmicks import warning
@@ -888,6 +888,8 @@ class range:
   def __class_getitem__(cls, index):
     if isinstance(index, slice):
       return range(...)[index]
+    if isinstance(index, type):
+      return GenericAlias(cls, (index,))
     raise TypeError(f'{type(index)}:{index!r} is not a slice')
 
   def __iter__(self):
