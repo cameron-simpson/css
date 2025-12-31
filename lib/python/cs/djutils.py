@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 
 ''' My collection of things for working with Django.
-
-    Presently this provides:
-    * `BaseCommand`: a drop in replacement for `django.core.management.base.BaseCommand`
-      which uses a `cs.cmdutils.BaseCommand` style of implementation
-    * `model_batches_qs`: a generator yielding `QuerySet`s for batches of a `Model`
 '''
 
 from dataclasses import dataclass, field
@@ -375,7 +370,7 @@ def model_instances(
     yield from batch_qs
 
 class IndexByPK:
-  ''' A mixin for `Model` classes which povides a `__class_getitem__`
+  ''' A mixin for `Model` classes which provides a `__class_getitem__`
       method to fetch an instance by its `pk`.
 
       Example:
