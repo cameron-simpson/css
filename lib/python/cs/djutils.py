@@ -373,3 +373,22 @@ def model_instances(
     if select_related is not None:
       batch_qs = batch_qs.select_related(*select_related)
     yield from batch_qs
+
+class IndexByPK:
+  ''' A mixin for `Model` classes which povides a `__class_getitem__`
+      method to fetch an instance by its `pk`.
+
+      Example:
+
+          book9 = BookModel[9]
+  '''
+
+  @classmethod
+  def __class_getitem__(cls, pk):
+    ''' Index the class by `pk`, a primary key value.
+
+        This is just a shim for:
+
+            cls.objects.get(pk=pk)
+    '''
+    return cls.objects.get(pk=pk)
