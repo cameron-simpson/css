@@ -93,7 +93,7 @@ cs.result pypi.release="20250306" ok_revision=aeacc5f3862e4354d902beb99a402a6f99
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release="20250306" ok_revision="74bf122de126cda4642d6030ed3cd6e992b971db" features={"20250306":["content_length","content_type","default_headerregistry","header"]}
 cs.semantics ok_revision=efc3bbb8a0e9059323f57e8b97c7d8b51093c6b7 features={"20250103":["ClosedError","not_closed"]} pypi.release="20250103"
-cs.seq pypi.release="20251231" ok_revision=fd5acdb9c78d6386520fe53e000bb71b34128710 featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"],"20250724":["ClonedIterator"],"20251230":["not_none","unbound_range"],"20251231":["range__class_getitem"],"20251231.1":["range__genericalias"]}
+cs.seq pypi.release="20251231.1" ok_revision=fd5acdb9c78d6386520fe53e000bb71b34128710 featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"],"20250724":["ClonedIterator"],"20251230":["not_none","unbound_range"],"20251231":["range__class_getitem"],"20251231.1":["range__genericalias"]}
 cs.service_api ok_revision=d682ce35a261867118ef07bd49e2c0808c740ff9 pypi.release="20241007"
 cs.sh ok_revision="3af3cf2c5da8cc18eafa8a65437eaf1e7b7f1db3"
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
