@@ -1,3 +1,4 @@
+ffmpegutils: run the ffmpeg remotely from local files
 cs.pfx: open() func returning context manager which does a filename pfx?
 PR for pyicontract-lint to use pyproject.toml?
 @pfx: format string for the intended prefix?
