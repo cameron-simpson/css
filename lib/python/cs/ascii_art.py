@@ -1,25 +1,37 @@
 #!/usr/bin/env python3
 
 ''' Utilities to assist with ASCII art such as railroad diagrams;
-    since these use Unicode box drawing characters and
-    are better for diagrams such as railroad diagrams, this is neither ASCII nor art.
+    since these use Unicode box drawing characters and are better
+    for diagrams such as railroad diagrams, this is neither ASCII
+    nor art.
 
-    This is still pretty alpha. 
-
+    This is still pretty alpha.
 
     This is the current test function:
 
         def test_railroad():
-            box = TextBox("one\ntwo\nthree\nfour\nfive")
-            print(box)
-            rep = Repeat(box)
-            print(rep)
-            rep2 = Optional(rep, above=True)
-            print(rep2)
-            choice = Choice(("one", rep2, "three"))
-            print(choice)
-            seq = Sequence((START, rep2, "2 lines\naaaa", choice, END))
+            box5 = TextBox("one\ntwo\nthree\nfour\nfive")
+            print(box5)
+            seq = Sequence(
+                (
+                    START, Repeat("repeat me"), "2 lines\naaaa",
+                    Choice(("one", "two", "three", box5)), END
+                )
+            )
             print(seq)
+
+    which prints:
+
+                                      ╭┤one├──╮
+                                      ├┤two├──┤
+                                      ├┤three├┤
+                           ╭───────╮  │╭─────╮│
+                           │2 lines│  ││one  ││
+        ├┼──┬┤repeat me├┬──┤aaaa   ├──┤│two  │├──┼┤
+            ╰─────←─────╯  ╰───────╯  ╰┤three├╯
+                                       │four │
+                                       │five │
+                                       ╰─────╯
 
 '''
 
@@ -37,7 +49,7 @@ def box_char_name(
 
       Parameters:
       * `arc`: return an arc character instead of a rectangluar box corner
-      * `heavy`: the light wieght: `HEAVY` for `True`, `LIGHT` for `False`
+      * `heavy`: the line wieght: `HEAVY` for `True`, `LIGHT` for `False`
       * `up`: with a line upward from the centre
       * `down`: with a line downward from the centre
       * `left`: with a line leftward from the centre
@@ -89,7 +101,7 @@ def box_char(
 
       Parameters:
       * `arc`: return an arc character instead of a rectangluar box corner
-      * `heavy`: the light wieght: `HEAVY` for `True`, `LIGHT` for `False`
+      * `heavy`: the line wieght: `HEAVY` for `True`, `LIGHT` for `False`
       * `up`: with a line upward from the centre
       * `down`: with a line downward from the centre
       * `left`: with a line leftward from the centre
