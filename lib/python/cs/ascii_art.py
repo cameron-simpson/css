@@ -96,7 +96,7 @@ def box_char_name(
 def box_char(
     heavy=False, arc=False, up=False, down=False, left=False, right=False
 ):
-  ''' Retrun the Unicode entity for a box drawing glyph with
+  ''' Return the Unicode entity for a box drawing glyph with
       the specified line weight and lines.
 
       Parameters:
@@ -466,6 +466,9 @@ class _RailRoadMulti(Boxy):
         self.from_str(box) if isinstance(box, str) else box
         for box in self.content
     ]
+
+  def append(self, box):
+    self.content.append(self.from_str(box) if isinstance(box, str) else box)
 
 @dataclass
 class Choice(_RailRoadMulti):
