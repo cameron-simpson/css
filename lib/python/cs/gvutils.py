@@ -265,14 +265,13 @@ class DOTNodeMixin:
 
   @property
   def dot_node_id(self):
-    ''' An id for this DOT node.
+    ''' An id for this DOT node, also the default index into the palettes.
     '''
     return str(id(self))
 
   @property
   def dot_node_palette_key(self):
-    ''' Default palette index is `self.fsm_state`,
-        overriding `DOTNodeMixin.dot_node_palette_key`.
+    ''' The default palette index is `self.dot_node_id``.
     '''
     return self.dot_node_id
 
@@ -323,7 +322,7 @@ class DOTNodeMixin:
 
   def dot_node_label(self) -> str:
     ''' The default node label.
-        This implementation returns `str(serlf)`
+        This implementation returns `str(self)`
         and a common implementation might return `self.name` or similar.
     '''
     return str(self)
