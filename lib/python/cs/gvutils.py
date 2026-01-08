@@ -30,12 +30,18 @@ DISTINFO = {
     ],
 }
 
+DOT_KEYWORDS = ('strict', 'graph', 'digraph', 'subgraph', 'node', 'edge')
+
 def quote(s):
   ''' Quote a string for use in DOT syntax.
-      This implementation passes identifiers and sequences of decimal numerals
-      through unchanged and double quotes other strings.
+      This implementation passes non-keyword identifiers and sequences
+      of decimal numerals through unchanged and double quotes other
+      strings.
   '''
-  if s.isalnum() or s.replace('_', '').isalnum():
+  if isinstance(s, (int, float)):
+    return str(s)
+  if ((s.isalnum() or s.replace('_', '').isalnum())
+      and s.lower() not in DOT_KEYWORDS):
     return s
   return (
       '"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') +
