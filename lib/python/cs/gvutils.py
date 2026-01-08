@@ -9,7 +9,6 @@
 
 from base64 import b64encode
 from dataclasses import dataclass, field
-from os.path import exists as existspath
 from subprocess import Popen, PIPE
 import sys
 from threading import Thread
@@ -527,6 +526,6 @@ if __name__ == '__main__':
   G.join("b", g1)
   G.join("gb", g2)
   print(G.as_dot(fold=True))
-  for layout in 'neato fdp sfdp circo twopi osage patchwork dot'.split():
+  for layout in 'neato', 'fdp', 'sfdp', 'circo', 'twopi', 'osage', 'patchwork', 'dot':
     print("LAYOUT", layout)
     G.print(layout=layout)
