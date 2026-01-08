@@ -249,6 +249,12 @@ class Symbol(Boxy):
   text: str
   height: int = 1
 
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
+
   def render_lines(self, **_):
     return [self.text]
 
@@ -260,6 +266,12 @@ class Symbol(Boxy):
 class Terminal(Symbol):
   ''' Like a symbol, but with a marker either side.
   '''
+
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
 
   def render_lines(self, heavy=False, attach_w=False, attach_e=False, **_):
     return [
@@ -287,6 +299,12 @@ class TextBox(Boxy):
   text: str
   arc: bool = False
   heavy: bool = False
+
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
 
   def render_lines(
       self,
@@ -450,9 +468,21 @@ class _RailRoadAround(Boxy):
 class Repeat(_RailRoadAround):
   middle: str = LEFT_ARROW
 
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
+
 @dataclass
 class Optional(_RailRoadAround):
   middle: str = RIGHT_ARROW
+
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
 
 @dataclass
 class _RailRoadMulti(Boxy):
@@ -472,6 +502,12 @@ class _RailRoadMulti(Boxy):
 
 @dataclass
 class Choice(_RailRoadMulti):
+
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
 
   def render_lines(
       self,
@@ -557,6 +593,12 @@ class Choice(_RailRoadMulti):
 
 @dataclass
 class Sequence(_RailRoadMulti):
+
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
 
   def render_lines(self, heavy=False, attach_e=True, attach_w=True, sep_len=2):
     # compute the required lines above and below the attach line
