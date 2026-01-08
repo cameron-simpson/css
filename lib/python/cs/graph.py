@@ -7,9 +7,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from cs.gvutils import Graph as GVGraph, Node as GVNode, gvprint
+from cs.gvutils import Graph as GVGraph, Node as GVNode
 
-from cs.debug import trace
 
 @dataclass
 class Node:
@@ -87,7 +86,7 @@ class Graph(Node):
         try:
           node, = named_nodes
         except ValueError:
-          raise valueError(
+          raise ValueError(
               f'ambiguous {name=}: multiple Nodes with that name already exist'
           )
       else:
