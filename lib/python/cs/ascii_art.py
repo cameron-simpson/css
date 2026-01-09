@@ -612,6 +612,61 @@ class Choice(Stack):
   def __eq__(self, other):
     return self is other
 
+  @property
+  def w(self):
+    return (self.ws[0] + self.ws[-1]) // 2
+
+  @property
+  def e(self):
+    return (self.es[0] + self.es[-1]) // 2
+
+  def render_lines(
+      self,
+      heavy=False,
+      attach_e=False,
+      attach_w=False,
+      **render_kw,
+  ):
+    nboxes = len(self.content)
+    lines = []
+    top_w = self.ws[0]
+    bottom_w = self.ws[-1]
+    top_e = self.es[0]
+    bottom_e = self.es[-1]
+    for li, inner_line in enumerate(super().render_lines(heavy=heavy,
+                                                         attach_e=attach_e,
+                                                         attach_w=attach_w,
+                                                         **render_kw)):
+      lines.append(
+          "".join(
+              (
+                  box_char(
+                      arc=True,
+                      heavy=heavy,
+                      left=attach_w and li == self.w,
+                      right=li in self.ws,
+                      up=li > top_w and li <= bottom_w,
+                      down=li < bottom_w and li >= top_w,
+                  ),
+                  inner_line,
+                  box_char(
+                      arc=True,
+                      heavy=heavy,
+                      left=li in self.es,
+                      right=attach_e and li == self.e,
+                      up=li > top_e and li <= bottom_e,
+                      down=li < bottom_e and li >= top_e,
+                  ),
+              )
+          )
+      )
+    assert len(lines) == self.height
+    return lines
+
+  @property
+  def width(self):
+    # TODO: should be only +1 for open_ended renders
+    return self.inner_width + 2
   def render_lines(
       self,
       heavy=False,
