@@ -663,6 +663,10 @@ class Choice(Stack):
     assert len(lines) == self.height
     return lines
 
+  @cached_property
+  def inner_width(self):
+    return max(box.width for box in self.content)
+
   @property
   def width(self):
     # TODO: should be only +1 for open_ended renders
