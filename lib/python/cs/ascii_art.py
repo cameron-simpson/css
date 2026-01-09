@@ -809,6 +809,8 @@ def test_railroad():
       )
   )
   print(seq)
+  stack = Stack(("st1", "2", "3\n4", "four five"))
+  print(stack.render(attach_e=True, align='right'))
 
 if __name__ == '__main__':
   test_railroad()
