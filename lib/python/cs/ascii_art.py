@@ -669,8 +669,7 @@ class Choice(Stack):
 
   @property
   def width(self):
-    # TODO: should be only +1 for open_ended renders
-    return self.inner_width + 2
+    return super().width + 2
   def render_lines(
       self,
       heavy=False,
