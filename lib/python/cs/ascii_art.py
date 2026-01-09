@@ -520,7 +520,91 @@ class _RailRoadMulti(Boxy):
     self.content.append(self.from_str(box) if isinstance(box, str) else box)
 
 @dataclass
-class Choice(_RailRoadMulti):
+class Stack(_RailRoadMulti):
+  ''' An unadorned vertical stack of the content.
+  '''
+
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
+
+  @cached_property
+  def height(self):
+    ''' The overall height of the content.
+    '''
+    return sum(box.height for box in self.content)
+
+  @cached_property
+  def width(self):
+    ''' The overall width of the content.
+    '''
+    return max(box.width for box in self.content)
+
+  @cached_property
+  def ws(self):
+    ''' A cached `tuple` of the line offsets of each stacked box's `.w` position.
+    '''
+    height = 0
+    ws = []
+    for box in self.content:
+      ws.append(height + box.w)
+      height += box.height
+    return tuple(ws)
+
+  @cached_property
+  def es(self):
+    ''' A cached `tuple` of the line offsets of each stacked box's `.e` position.
+    '''
+    height = 0
+    es = []
+    for box in self.content:
+      es.append(height + box.e)
+      height += box.height
+    return tuple(es)
+
+  def render_lines(
+      self,
+      align='left',  # vs centre/center and middle
+      heavy=False,
+      attach_e=False,
+      attach_w=False,
+      sep_len=2,
+      open_ended=False,
+  ):
+    nboxes = len(self.content)
+    lines = []
+    for bi, box in enumerate(self.content):
+      box_pad_length = self.width - box.width
+      box_pad_left = (
+          0 if align == 'left' else
+          box_pad_length if align == 'right' else box_pad_length // 2
+      )
+      box_pad_right = box_pad_length - box_pad_left
+      spaces_left = " " * box_pad_left
+      line_left = self.horiz(box_pad_left)
+      spaces_right = " " * box_pad_right
+      line_right = self.horiz(box_pad_right)
+      for li, box_line in enumerate(box.render_lines(
+          heavy=heavy,
+          attach_e=attach_e,
+          attach_w=attach_w,
+      )):
+        lines.append(
+            "".join(
+                (
+                    (line_left if attach_w and li == box.w else spaces_left),
+                    box_line,
+                    (line_right if attach_e and li == box.e else spaces_right),
+                )
+            )
+        )
+    assert len(lines) == self.height
+    return lines
+
+@dataclass
+class Choice(Stack):
 
   def __hash__(self):
     return id(self)
