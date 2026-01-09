@@ -217,6 +217,8 @@ class Boxy(ABC):
     '''
     raise NotImplementedError
 
+  # the default attachment points are at the midpoints of the box
+
   @property
   def n(self):
     return self.width // 2
@@ -232,6 +234,23 @@ class Boxy(ABC):
   @property
   def e(self):
     return self.height // 2
+
+  # default points with just the midpoint
+  @property
+  def ns(self):
+    return self.n,
+
+  @property
+  def ss(self):
+    return self.s,
+
+  @property
+  def ws(self):
+    return self.w,
+
+  @property
+  def es(self):
+    return self.e,
 
   def from_str(cls, s: str) -> Union["Terminal", "TextBox"]:
     ''' Promote a string to a `Terminal` or `TextBox`.
