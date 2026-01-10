@@ -207,7 +207,7 @@ def render(render_func, **render_defaults):
     apply_attrs = dict(render_defaults)
     apply_attrs.update(render_kw)
     with stackattrs(ctx, **apply_attrs):
-      return render_func(self, *a, **ctx.__dict__)
+      return render_func(self_or_cls, *a, **ctx.__dict__)
 
   return render_wrapper
 
