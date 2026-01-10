@@ -408,7 +408,8 @@ class Terminal(Symbol):
   def __eq__(self, other):
     return self is other
 
-  def render_lines(self, heavy=False, attach_w=False, attach_e=False, **_):
+  @render
+  def render_lines(self, heavy, attach_w, attach_e, **_):
     return [
         "".join(
             (
@@ -441,18 +442,8 @@ class TextBox(Boxy):
   def __eq__(self, other):
     return self is other
 
-  def render_lines(
-      self,
-      *,
-      arc=None,
-      heavy=None,
-      up=False,
-      down=False,
-      left=False,
-      right=False,
-      attach_w=False,
-      attach_e=False,
-  ):
+  @render
+  def render_lines(self, *, arc, heavy, attach_w, attach_e):
     ''' Render the text box as a list of single line strings.
     '''
     if arc is None:
@@ -543,7 +534,8 @@ class _RailRoadAround(Boxy):
     if isinstance(self.content, str):
       self.content = self.from_str(self.content)
 
-  def render_lines(self, heavy=False, attach_e=False, attach_w=False):
+  @render
+  def render_lines(self, *, heavy, attach_e, attach_w, **_):
     ie = self.content.e
     iw = self.content.w
     inner_width = self.content.width
@@ -684,15 +676,8 @@ class Stack(_RailRoadMulti):
       height += box.height
     return tuple(es)
 
-  def render_lines(
-      self,
-      align='left',  # vs centre/center and middle
-      heavy=False,
-      attach_e=False,
-      attach_w=False,
-      sep_len=2,
-      open_ended=False,
-  ):
+  @render(align='left')  # vs right and... anything else
+  def render_lines(self, *, align, heavy, attach_e, attach_w, **_):
     nboxes = len(self.content)
     lines = []
     for bi, box in enumerate(self.content):
@@ -740,13 +725,8 @@ class Choice(Stack):
   def e(self):
     return (self.es[0] + self.es[-1]) // 2
 
-  def render_lines(
-      self,
-      heavy=False,
-      attach_e=False,
-      attach_w=False,
-      **render_kw,
-  ):
+  @render
+  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
     nboxes = len(self.content)
     lines = []
     top_w = self.ws[0]
@@ -790,14 +770,8 @@ class Choice(Stack):
   @property
   def width(self):
     return super().width + 2
-  def render_lines(
-      self,
-      heavy=False,
-      attach_e=False,
-      attach_w=False,
-      sep_len=2,
-      open_ended=False,
-  ):
+  @render
+  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
     nboxes = len(self.content)
     lines = []
     for bi, box in enumerate(self.content):
@@ -881,7 +855,8 @@ class Sequence(_RailRoadMulti):
   def __eq__(self, other):
     return self is other
 
-  def render_lines(self, heavy=False, attach_e=True, attach_w=True, sep_len=2):
+  @render(sep_len=2)
+  def render_lines(self, *, heavy, attach_e, attach_w, sep_len, **_):
     # compute the required lines above and below the attach line
     boxes = self.content
     # compute padding - this assumes box.e == box.w
@@ -902,7 +877,6 @@ class Sequence(_RailRoadMulti):
           lines[row].append(pad)
           row += 1
       for box_line in box.render_lines(
-          heavy=heavy,
           attach_w=bi > 0,
           attach_e=bi < len(boxes) - 1,
       ):
