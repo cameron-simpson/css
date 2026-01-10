@@ -38,6 +38,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
+from types import SimpleNamespace
 from typing import Optional, Union
 import unicodedata
 
@@ -226,6 +227,17 @@ class Boxy(ABC):
     if s and '\n' not in s:
       return Terminal(s)
     return TextBox(s)
+
+  @cached_property
+  def render_context(self):
+    ''' The render context.
+    '''
+    return SimpleNamespace(
+        arc=True,
+        heavy=False,
+        attach_w=False,
+        attach_e=False,
+    )
 
   @staticmethod
   def horiz(
