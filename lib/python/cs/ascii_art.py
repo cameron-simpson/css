@@ -322,10 +322,24 @@ class Boxy(ABC):
     return self.w,
 
   @property
+  def top_w(self):
+    return self.ws[0]
+
+  @property
+  def bottom_w(self):
+    return self.ws[-1]
+
+  @property
   def es(self):
     return self.e,
 
-    '''
+  @property
+  def top_e(self):
+    return self.es[0]
+
+  @property
+  def bottom_e(self):
+    return self.es[-1]
 
 @dataclass(frozen=True)
 
