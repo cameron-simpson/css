@@ -83,7 +83,7 @@ def box_char_name(
       filter(
           None, (
               'BOX DRAWINGS',
-              'HEAVY' if heavy else 'LIGHT',
+              'HEAVY' if heavy and not arc else 'LIGHT',
               'ARC' if arc else '',
               (
                   'VERTICAL'
