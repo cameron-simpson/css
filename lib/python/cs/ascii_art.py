@@ -745,29 +745,24 @@ class Choice(Stack):
     bottom_w = self.ws[-1]
     top_e = self.es[0]
     bottom_e = self.es[-1]
-    for li, inner_line in enumerate(super().render_lines(heavy=heavy,
-                                                         attach_e=attach_e,
-                                                         attach_w=attach_w,
-                                                         **render_kw)):
+    for li, inner_line in enumerate(super().render_lines()):
       lines.append(
           "".join(
               (
-                  box_char(
-                      arc=True,
-                      heavy=heavy,
-                      left=attach_w and li == self.w,
-                      right=li in self.ws,
-                      up=li > top_w and li <= bottom_w,
-                      down=li < bottom_w and li >= top_w,
+                  self.conn_char(
+                      li,
+                      self.ws if attach_w else (),
+                      super().ws,
+                      arc=arc,
+                      heavy=heavy
                   ),
                   inner_line,
-                  box_char(
-                      arc=True,
-                      heavy=heavy,
-                      left=li in self.es,
-                      right=attach_e and li == self.e,
-                      up=li > top_e and li <= bottom_e,
-                      down=li < bottom_e and li >= top_e,
+                  self.conn_char(
+                      li,
+                      super().es,
+                      self.es if attach_e else (),
+                      arc=arc,
+                      heavy=heavy
                   ),
               )
           )
@@ -775,9 +770,6 @@ class Choice(Stack):
     assert len(lines) == self.height
     return lines
 
-  @cached_property
-  def inner_width(self):
-    return max(box.width for box in self.content)
 
   @property
   def width(self):
