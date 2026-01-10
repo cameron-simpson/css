@@ -719,11 +719,23 @@ class Choice(Stack):
 
   @property
   def w(self):
-    return (self.ws[0] + self.ws[-1]) // 2
+    return (super().ws[0] + super().ws[-1]) // 2
+
+  @property
+  def ws(self):
+    return self.w,
 
   @property
   def e(self):
-    return (self.es[0] + self.es[-1]) // 2
+    return (super().es[0] + super().es[-1]) // 2
+
+  @property
+  def es(self):
+    return self.e,
+
+  @property
+  def width(self):
+    return super().width + 2
 
   @render
   def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
