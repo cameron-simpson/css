@@ -869,6 +869,17 @@ class Sequence(_RailRoadMulti):
   def __eq__(self, other):
     return self is other
 
+  @property
+  @render(sep_len=2)
+  def width(self, *, sep_len, **_):
+    return sum(box.width for box in self.content) + sep_len * (
+        len(self.content) - 1
+    )
+
+  @property
+  def height(self):
+    return max(box.height for box in self.content)
+
   @render(sep_len=2)
   def render_lines(self, *, heavy, attach_e, attach_w, sep_len, **_):
     # compute the required lines above and below the attach line
@@ -877,7 +888,8 @@ class Sequence(_RailRoadMulti):
     lines_above = 0
     lines_below = 0
     for box in boxes:
-      assert box.e == box.w
+      # TODO: some kind of clever up/down progression
+      ##assert box.e == box.w, f'{box.e=} != {box.w=}'
       lines_above = max(lines_above, box.w)
       lines_below = max(lines_below, box.height - box.w - 1)
     total_lines = lines_above + lines_below + 1
