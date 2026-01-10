@@ -277,11 +277,6 @@ class Boxy(ABC):
       right_end = ''
     return left_end + HORIZ * left_length + middle + HORIZ * right_length + right_end
 
-  def render(self, **render_lines_kw):
-    ''' Render the text box as a single multiline string.
-    '''
-    return "\n".join(self.render_lines(**render_lines_kw))
-
   @abstractmethod
   def render_lines(self, **render_kw):
     ''' Render the box as a list of single line strings.
@@ -326,6 +321,12 @@ class Boxy(ABC):
     '''
 
 @dataclass(frozen=True)
+
+  # this is last to avoid replacing @render
+  def render(self, **render_kw):
+    ''' Render the text box as a single multiline string.
+    '''
+    return "\n".join(self.render_lines(**render_kw))
 class Symbol(Boxy):
   ''' A bare text based symbol like `START` or `END`.
   '''
