@@ -237,17 +237,20 @@ class Boxy(ABC):
       return Terminal(s)
     return TextBox(s)
 
-  @staticmethod
+  @classmethod
+  @render
   def horiz(
+      cls,  # used by @render
       width: int,
       middle='',
       *,
-      arc=True,
-      heavy=False,
+      arc,
+      heavy,
       left_up=False,
       left_down=False,
       right_up=False,
       right_down=False,
+      **_,
   ):
     ''' Compute a horizontal line with an optional symbol in the
         middle and up or down connections.
@@ -256,7 +259,9 @@ class Boxy(ABC):
     left_length = length // 2
     right_length = length - left_length
     if left_up or left_down:
-      left_end = box_char(arc=arc, right=True, up=left_up, down=left_down)
+      left_end = box_char(
+          arc=arc, right=True, up=left_up, down=left_down, heavy=heavy
+      )
       left_length -= 1
       if left_length < 0:
         raise ValueError(
@@ -264,8 +269,11 @@ class Boxy(ABC):
         )
     else:
       left_end = ''
+    horiz_c = HORIZ_ if heavy else HORIZ
     if right_up or right_down:
-      right_end = box_char(arc=arc, left=True, up=right_up, down=right_down)
+      right_end = box_char(
+          arc=arc, left=True, up=right_up, down=right_down, heavy=heavy
+      )
       right_length -= 1
       if right_length < 0:
         raise ValueError(
@@ -273,7 +281,7 @@ class Boxy(ABC):
         )
     else:
       right_end = ''
-    return left_end + HORIZ * left_length + middle + HORIZ * right_length + right_end
+    return left_end + horiz_c * left_length + middle + horiz_c * right_length + right_end
 
   @abstractmethod
   def render_lines(self, **render_kw):
