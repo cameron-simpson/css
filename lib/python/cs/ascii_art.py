@@ -41,6 +41,9 @@ from functools import cached_property
 from typing import Optional, Union
 import unicodedata
 
+from cs.context import stackattrs
+from cs.deco import decorator
+
 def box_char_name(
     heavy=False, arc=False, up=False, down=False, left=False, right=False
 ):
@@ -158,6 +161,53 @@ class Cell:
           right=self.right,
       )
     return glyph
+
+@decorator
+def render(render_func, **render_defaults):
+  ''' A decorator to wrap rendering methods with the prevailing
+      render context, as updated by any keyword arguments supplied
+      to the method.
+
+      The decorator may be suplied with its own defaults; these
+      will be applied to the render context first, then whatever
+      render keyword arguments as supplied to the method.
+
+      The decorated method accepts an optional `ctx` parameter
+      to use as the render context; the default comes from
+      `self.render_context` which is normally an attribute of
+      `self.__class__`.
+
+      The wrapped method is called with a keyword argument for every
+      attribute of the updated render context.
+      The render context is returned to its previous state on return
+      from the method.
+
+      This means that the render methods have an unusual signature,
+      for example:
+
+          @render(heavy=True)
+          def renderlines(self, *, heavy, attach_w, attach_e, **render_kw):
+
+      This:
+      - enumerates only thekeyword argument of interest to the method
+      - "default" values are best not supplied as `None` to the method
+      - has a `render_kw` to collect any uninteresting render parameters
+
+      The interesting parameters should arrive prefilled and also
+      do not need to be passed int interior calls to render method
+      because the render context has these values. Only values
+      different to the render context need provision.
+  '''
+
+  def render_wrapper(self, *a, ctx=None, **render_kw):
+    if ctx is None:
+      ctx = self.render_context
+    apply_attrs = dict(render_defaults)
+    apply_attrs.update(render_kw)
+    with stackattrs(ctx, **apply_attrs):
+      return render_func(self, *a, **ctx.__dict__)
+
+  return render_wrapper
 
 class Boxy(ABC):
   ''' The abstract base class for various boxes.
