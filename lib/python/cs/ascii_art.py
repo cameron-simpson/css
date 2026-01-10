@@ -770,85 +770,95 @@ class Choice(Stack):
     assert len(lines) == self.height
     return lines
 
+@dataclass
+class Merge(Stack):
+  ''' Merge multiple inputs into a single output.
+  '''
+
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
+
+  @property
+  def e(self):
+    ses = super().es
+    return (ses[0] + ses[-1]) // 2
+
+  @property
+  def es(self):
+    return self.e,
 
   @property
   def width(self):
-    return super().width + 2
+    return super().width + 1
+
   @render
   def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
     nboxes = len(self.content)
     lines = []
-    for bi, box in enumerate(self.content):
-      box_width = box.width
-      box_pad_length = self.inner_width - box_width
-      box_pad_right_line = self.horiz(box_pad_length)
-      box_pad_right_spaces = " " * box_pad_length
-      for li, box_line in enumerate(box.render_lines(heavy=heavy,
-                                                     attach_w=True,
-                                                     attach_e=not open_ended)):
-        bli = len(lines)  # the overall Choice line index
-        left_up = (
-            li > box.w if bi == 0 else li <= box.w if bi == nboxes -
-            1 else True
-        )
-        left_down = (
-            li >= box.w if bi == 0 else li < box.w if bi == nboxes -
-            1 else True
-        )
-        right_up = (
-            li > box.e if bi == 0 else li <= box.e if bi == nboxes -
-            1 else True
-        )
-        right_down = (
-            li >= box.e if bi == 0 else li < box.e if bi == nboxes -
-            1 else True
-        )
-        lines.append(
-            "".join(
-                (
-                    box_char(
-                        arc=True,
-                        heavy=heavy,
-                        left=attach_w and bli == self.w,
-                        right=li == box.w,
-                        up=left_up,
-                        down=left_down,
-                    ),
-                    box_line,
-                    box_pad_right_line
-                    if li == box.e else box_pad_right_spaces,
-                    (
-                        '' if open_ended else box_char(
-                            arc=True,
-                            heavy=heavy,
-                            left=li == box.e,
-                            right=attach_e and bli == self.e,
-                            up=right_up,
-                            down=right_down,
-                        )
-                    ),
-                )
-            )
-        )
-    assert len(lines) == self.height
+    for li, inner_line in enumerate(super().render_lines(attach_e=True)):
+      lines.append(
+          "".join(
+              (
+                  inner_line,
+                  self.conn_char(
+                      li,
+                      super().es,
+                      self.es if attach_e else (),
+                      arc=arc,
+                      heavy=heavy
+                  ),
+              )
+          )
+      )
     return lines
 
-  @cached_property
-  def inner_width(self):
-    return max(box.width for box in self.content)
+@dataclass
+class Split(Stack):
+  ''' Merge a single input into multiple outputs.
+  '''
 
-  @property
-  def width(self):
-    # TODO: should be only +1 for open_ended renders
-    return self.inner_width + 2
+  def __hash__(self):
+    return id(self)
 
-  @cached_property
-  def height(self):
-    return sum(box.height for box in self.content)
+  def __eq__(self, other):
+    return self is other
 
   @property
   def w(self):
-    return self.height // 2
+    sws = super().ws
+    return (sws[0] + sws[-1]) // 2
+
+  @property
+  def ws(self):
+    return self.w,
+
+  @property
+  def width(self):
+    return super().width + 1
+
+  @render
+  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
+    nboxes = len(self.content)
+    lines = []
+    for li, inner_line in enumerate(super().render_lines(attach_w=True)):
+      lines.append(
+          "".join(
+              (
+                  self.conn_char(
+                      li,
+                      self.ws if attach_w else (),
+                      super().ws,
+                      arc=arc,
+                      heavy=heavy
+                  ),
+                  inner_line,
+              )
+          )
+      )
+    return lines
 
 @dataclass
 class Sequence(_RailRoadMulti):
