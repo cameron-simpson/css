@@ -882,42 +882,53 @@ class Sequence(_RailRoadMulti):
 
   @render(sep_len=2)
   def render_lines(self, *, heavy, attach_e, attach_w, sep_len, **_):
-    # compute the required lines above and below the attach line
     boxes = self.content
-    # compute padding - this assumes box.e == box.w
-    lines_above = 0
-    lines_below = 0
+    # we start teh nominal attach point of the leftmost box at 0
+    attach = 0
+    box_tops = []
+    box_bottoms = []
+    # measure the high and low extends of the boxes, adjusting the
+    # attach point as we go
     for box in boxes:
-      # TODO: some kind of clever up/down progression
-      ##assert box.e == box.w, f'{box.e=} != {box.w=}'
-      lines_above = max(lines_above, box.w)
-      lines_below = max(lines_below, box.height - box.w - 1)
-    total_lines = lines_above + lines_below + 1
+      box_tops.append(attach - box.w)
+      box_bottoms.append(attach + box.height - box.w)
+      attach += box.e - box.w
+    boxes_top = min(box_tops)
+    boxes_bottom = max(box_bottoms)
+    total_lines = boxes_bottom - boxes_top + 1
     lines = [[] for _ in range(total_lines)]
-    for bi, box in enumerate(boxes):
+    attach = 0
+    sep_spaces = " " * sep_len
+    sep_line = self.horiz(sep_len)
+    for bi, (box, box_top, box_bottom) in enumerate(zip(boxes, box_tops,
+                                                        box_bottoms)):
       pad = " " * box.width
       row = 0
-      pad_above = lines_above - box.w
+      pad_above = box_top - boxes_top
+      pad_below = total_lines - pad_above - box.height
       if pad_above > 0:
         for _ in range(pad_above):
+          if bi > 0:
+            lines[row].append(sep_spaces)
           lines[row].append(pad)
           row += 1
-      for box_line in box.render_lines(
+      for li, box_line in enumerate(box.render_lines(
           attach_w=bi > 0,
           attach_e=bi < len(boxes) - 1,
-      ):
+      )):
+        if bi > 0:
+          lines[row].append(sep_line if li == box.w else sep_spaces)
         lines[row].append(box_line)
         row += 1
-      pad_below = lines_below - (box.height - box.e - 1)
       if pad_below > 0:
         for _ in range(pad_below):
+          if bi > 0:
+            lines[row].append(sep_spaces)
           lines[row].append(pad)
           row += 1
+      attach += box.e - box.w
       assert row == len(lines), f'{row=} != {len(lines)=}'
-    return [
-        (self.horiz(sep_len) if row == lines_above else " " *
-         sep_len).join(line_v) for row, line_v in enumerate(lines)
-    ]
+    return ["".join(line_v) for line_v in lines]
 
 def test_railroad():
   box5 = TextBox("one\ntwo\nthree\nfour\nfive")
