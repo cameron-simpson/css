@@ -931,6 +931,14 @@ def test_railroad():
   print(seq)
   stack = Stack(("st1", "2", "3\n4", "four five"))
   print(stack.render(attach_e=True, align='right'))
+  merge = Merge((START, Sequence(("1", "2", "33")), "something"))
+  merge.print()
+  merge.print(attach_w=True)
+  merge.print(attach_e=True)
+  merge.print(attach_w=True, attach_e=True)
+  print(merge)
+  split = Split((START, Sequence(("1", "2", "33")), "something"))
+  split.print(attach_w=True, align='right')
 
 if __name__ == '__main__':
   test_railroad()
