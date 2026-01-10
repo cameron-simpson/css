@@ -653,10 +653,14 @@ class Stack(_RailRoadMulti):
     return sum(box.height for box in self.content)
 
   @cached_property
+  def inner_width(self):
+    return max(box.width for box in self.content)
+
+  @property
   def width(self):
     ''' The overall width of the content.
     '''
-    return max(box.width for box in self.content)
+    return self.inner_width
 
   @cached_property
   def ws(self):
