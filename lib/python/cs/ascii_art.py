@@ -376,6 +376,8 @@ class Boxy(ABC):
     ''' Render the text box as a single multiline string.
     '''
     return "\n".join(self.render_lines(**render_kw))
+
+@dataclass
 class Symbol(Boxy):
   ''' A bare text based symbol like `START` or `END`.
   '''
@@ -395,7 +397,7 @@ class Symbol(Boxy):
   def width(self):
     return len(self.text)
 
-@dataclass(frozen=True)
+@dataclass
 class Terminal(Symbol):
   ''' Like a symbol, but with a marker either side.
   '''
