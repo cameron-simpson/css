@@ -52,6 +52,8 @@ def box_char_name(
   ''' Compute the Unicode entity name for a box drawing glyph with
       the specified line weight and lines.
 
+      See: https://www.unicode.org/charts/nameslist/n_2500.html
+
       Parameters:
       * `arc`: return an arc character instead of a rectangluar box corner
       * `heavy`: the line wieght: `HEAVY` for `True`, `LIGHT` for `False`
@@ -63,6 +65,7 @@ def box_char_name(
   if not (up or down or left or right):
     return 'SPACE'
   count = len(list(filter(None, (up, down, left, right))))
+  # TODO: Looks like there are single direction characters, supporting count=1
   if count < 2:
     raise ValueError(
         f'at least 2 of {up=}, {down=}, {left=}, {right=} must be true'
