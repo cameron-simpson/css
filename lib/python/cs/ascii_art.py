@@ -38,6 +38,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
+import sys
 from types import SimpleNamespace
 from typing import Optional, Union
 import unicodedata
@@ -282,6 +283,12 @@ class Boxy(ABC):
     ''' Render the box as a list of single line strings.
     '''
     raise NotImplementedError
+
+  @render
+  def print(self, file=None, **render_kw):
+    if file is None:
+      file = sys.stdout
+    print(self.render(**render_kw), file=file)
 
   # the default attachment points are at the midpoints of the box
 
