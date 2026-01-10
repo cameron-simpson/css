@@ -218,6 +218,15 @@ class Boxy(ABC):
     '''
     return self.render()
 
+  def from_str(cls, s: str) -> Union["Terminal", "TextBox"]:
+    ''' Promote a string to a `Terminal` or `TextBox`.
+        Nonempty strings with no newlines become `Terminal`s,
+        otherwise a `TextBox`.
+    '''
+    if s and '\n' not in s:
+      return Terminal(s)
+    return TextBox(s)
+
   @staticmethod
   def horiz(
       width: int,
@@ -302,14 +311,7 @@ class Boxy(ABC):
   def es(self):
     return self.e,
 
-  def from_str(cls, s: str) -> Union["Terminal", "TextBox"]:
-    ''' Promote a string to a `Terminal` or `TextBox`.
-        Nonempty strings with no newlines become `Terminal`s,
-        otherwise a `TextBox`.
     '''
-    if s and '\n' not in s:
-      return Terminal(s)
-    return TextBox(s)
 
 @dataclass(frozen=True)
 class Symbol(Boxy):
