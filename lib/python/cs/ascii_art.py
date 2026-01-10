@@ -448,13 +448,9 @@ class TextBox(Boxy):
     return self is other
 
   @render
-  def render_lines(self, *, arc, heavy, attach_w, attach_e):
+  def render_lines(self, *, arc, heavy, attach_w, attach_e, **_):
     ''' Render the text box as a list of single line strings.
     '''
-    if arc is None:
-      arc = self.arc
-    if heavy is None:
-      heavy = self.heavy
     nlines = self.height
     line_width = max(self.max_text_length, 1)
     return [
@@ -463,11 +459,17 @@ class TextBox(Boxy):
             "".join(
                 (
                     box_char(
-                        up=True, down=True, left=attach_w and i == self.w
+                        up=True,
+                        down=True,
+                        left=attach_w and i == self.w,
+                        heavy=heavy
                     ),
                     f'{text_line:<{line_width}}',
                     box_char(
-                        up=True, down=True, right=attach_e and i == self.e
+                        up=True,
+                        down=True,
+                        right=attach_e and i == self.e,
+                        heavy=heavy
                     ),
                 )
             ) for i, text_line in enumerate(self.lines, 1)
