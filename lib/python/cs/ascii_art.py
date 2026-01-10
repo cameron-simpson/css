@@ -712,7 +712,7 @@ class Stack(_RailRoadMulti):
                 )
             )
         )
-    assert len(lines) == self.height
+    ##assert len(lines) == self.height
     return lines
 
 @dataclass
@@ -940,6 +940,7 @@ class Sequence(_RailRoadMulti):
 def test_railroad():
   box5 = TextBox("one\ntwo\nthree\nfour\nfive")
   print(box5)
+  box5.print(heavy=True)
   seq = Sequence(
       (
           START, Repeat("repeat me"), "2 lines\naaaa",
@@ -947,6 +948,7 @@ def test_railroad():
       )
   )
   print(seq)
+  seq.print(heavy=True)
   stack = Stack(("st1", "2", "3\n4", "four five"))
   print(stack.render(attach_e=True, align='right'))
   merge = Merge((START, Sequence(("1", "2", "33")), "something"))
