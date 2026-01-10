@@ -341,7 +341,35 @@ class Boxy(ABC):
   def bottom_e(self):
     return self.es[-1]
 
-@dataclass(frozen=True)
+  @staticmethod
+  def conn_char(
+      li, lefts: list[int], rights: list[int], arc=True, heavy=False
+  ) -> str:
+    ''' Compute the connective `box_char` for a column of connective characters.
+    '''
+    # compute the vertical span
+    if lefts:
+      if rights:
+        top = min(lefts[0], rights[0])
+      else:
+        top = lefts[0]
+    elif rights:
+      top = rights[0]
+    if lefts:
+      if rights:
+        bottom = max(lefts[-1], rights[-1])
+      else:
+        bottom = lefts[-1]
+    elif rights:
+      bottom = rights[-1]
+    return box_char(
+        arc=arc,
+        heavy=heavy,
+        left=li in lefts,
+        right=li in rights,
+        up=(lefts or rights) and li > top and li <= bottom,
+        down=(lefts or rights) and li >= top and li < bottom,
+    )
 
   # this is last to avoid replacing @render
   def render(self, **render_kw):
