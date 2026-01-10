@@ -39,7 +39,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
 import sys
-from types import SimpleNamespace
+from types import SimpleNamespace as NS
 from typing import Optional, Union
 import unicodedata
 
@@ -201,9 +201,9 @@ def render(render_func, **render_defaults):
       different to the render context need provision.
   '''
 
-  def render_wrapper(self, *a, ctx=None, **render_kw):
+  def render_wrapper(self_or_cls, *a, ctx=None, **render_kw):
     if ctx is None:
-      ctx = self.render_context
+      ctx = self_or_cls.render_context
     apply_attrs = dict(render_defaults)
     apply_attrs.update(render_kw)
     with stackattrs(ctx, **apply_attrs):
@@ -214,6 +214,14 @@ def render(render_func, **render_defaults):
 class Boxy(ABC):
   ''' The abstract base class for various boxes.
   '''
+
+  # the render context
+  render_context = NS(
+      arc=True,
+      heavy=False,
+      attach_w=False,
+      attach_e=False,
+  )
 
   def __str__(self):
     ''' Return the default rendering of the text box.
@@ -228,17 +236,6 @@ class Boxy(ABC):
     if s and '\n' not in s:
       return Terminal(s)
     return TextBox(s)
-
-  @cached_property
-  def render_context(self):
-    ''' The render context.
-    '''
-    return SimpleNamespace(
-        arc=True,
-        heavy=False,
-        attach_w=False,
-        attach_e=False,
-    )
 
   @staticmethod
   def horiz(
