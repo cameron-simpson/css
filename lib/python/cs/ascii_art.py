@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Utilities to assist with ASCII art such as railroad diagrams;
+r'''Utilities to assist with ASCII art such as railroad diagrams;
     since these use Unicode box drawing characters and are better
     for diagrams such as railroad diagrams, this is neither ASCII
     nor art.
@@ -39,7 +39,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 import sys
-from types import SimpleNamespace as NS
+from types import SimpleNamespace as NS  # noqa: N814
 from typing import Optional, Union
 import unicodedata
 
@@ -231,6 +231,7 @@ class Boxy(ABC):
     '''
     return self.render()
 
+  @classmethod
   def from_str(cls, s: str) -> Union["Terminal", "TextBox"]:
     ''' Promote a string to a `Terminal` or `TextBox`.
         Nonempty strings with no newlines become `Terminal`s,
@@ -451,10 +452,9 @@ class TextBox(Boxy):
     return self is other
 
   @render
-  def render_lines(self, *, arc, heavy, attach_w, attach_e, **_):
+  def render_lines(self, *, heavy, attach_w, attach_e, **_):
     ''' Render the text box as a list of single line strings.
     '''
-    nlines = self.height
     line_width = max(self.max_text_length, 1)
     return [
         self.horiz(self.width, left_down=True, right_down=True),
@@ -548,8 +548,6 @@ class _RailRoadAround(Boxy):
   def render_lines(self, *, heavy, attach_e, attach_w, **_):
     ie = self.content.e
     iw = self.content.w
-    inner_width = self.content.width
-    inner_height = self.content.height
     above = self.above
     lines = []
     if above:
@@ -686,9 +684,8 @@ class Stack(_RailRoadMulti):
 
   @render(align='left')  # vs right and... anything else
   def render_lines(self, *, align, heavy, attach_e, attach_w, **_):
-    nboxes = len(self.content)
     lines = []
-    for bi, box in enumerate(self.content):
+    for box in self.content:
       box_pad_length = self.width - box.width
       box_pad_left = (
           0 if align == 'left' else
@@ -747,12 +744,7 @@ class Choice(Stack):
 
   @render
   def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
-    nboxes = len(self.content)
     lines = []
-    top_w = self.ws[0]
-    bottom_w = self.ws[-1]
-    top_e = self.es[0]
-    bottom_e = self.es[-1]
     for li, inner_line in enumerate(super().render_lines()):
       lines.append(
           "".join(
@@ -803,8 +795,7 @@ class Merge(Stack):
     return super().width + 1
 
   @render
-  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
-    nboxes = len(self.content)
+  def render_lines(self, *, arc, heavy, attach_e, **_):
     lines = []
     for li, inner_line in enumerate(super().render_lines(attach_e=True)):
       lines.append(
@@ -848,8 +839,7 @@ class Split(Stack):
     return super().width + 1
 
   @render
-  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
-    nboxes = len(self.content)
+  def render_lines(self, *, arc, heavy, attach_w, **_):
     lines = []
     for li, inner_line in enumerate(super().render_lines(attach_w=True)):
       lines.append(
@@ -891,7 +881,7 @@ class Sequence(_RailRoadMulti):
     return max(box.height for box in self.content)
 
   @render(sep_len=2)
-  def render_lines(self, *, heavy, attach_e, attach_w, sep_len, **_):
+  def render_lines(self, *, sep_len, **_):
     boxes = self.content
     # we start the nominal attach point of the leftmost box at 0
     attach = 0
@@ -910,8 +900,7 @@ class Sequence(_RailRoadMulti):
     attach = 0
     sep_spaces = " " * sep_len
     sep_line = self.horiz(sep_len)
-    for bi, (box, box_top, box_bottom) in enumerate(zip(boxes, box_tops,
-                                                        box_bottoms)):
+    for bi, (box, box_top) in enumerate(zip(boxes, box_tops)):
       pad = " " * box.width
       row = 0
       pad_above = box_top - boxes_top
