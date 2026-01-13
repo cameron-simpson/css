@@ -1,3 +1,4 @@
+a missing pilferrc should warn, also it fails the UNNAMED_SECTION key lookup
 drop all use of URL_re and .url_re, replace with URLPatterns
 URLPattern: host and path matches may be any callable returning a mapping?
 tyupe safety for zone_keys - prevent eg None for an int etc
