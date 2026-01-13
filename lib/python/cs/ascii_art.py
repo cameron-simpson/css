@@ -12,10 +12,10 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
         def test_railroad():
             box5 = TextBox("one\ntwo\nthree\nfour\nfive")
             print(box5)
-            seq = Sequence(
+            seq = RRSequence(
                 (
-                    START, Repeat("repeat me"), "2 lines\naaaa",
-                    Choice(("one", "two", "three", box5)), END
+                    START, RRRepeat("repeat me"), "2 lines\naaaa",
+                    RRChoiceg(("one", "two", "three", box5)), END
                 )
             )
             print(seq)
@@ -191,17 +191,18 @@ def render(render_func, **render_defaults):
       for example:
 
           @render(heavy=True)
-          def renderlines(self, *, heavy, attach_w, attach_e, **render_kw):
+          def renderlines(self, *, heavy, attach_w, attach_e, **_):
 
       This:
-      - enumerates only thekeyword argument of interest to the method
-      - "default" values are best not supplied as `None` to the method
-      - has a `render_kw` to collect any uninteresting render parameters
+      - enumerates only the keyword parameters of interest to the method
+      - "default" values should not be supplied as `None` in the
+        method definition
+      - has a `_` to collect any uninteresting render parameters
 
       The interesting parameters should arrive prefilled and also
-      do not need to be passed int interior calls to render method
+      do not need to be passed into interior calls to render methods
       because the render context has these values. Only values
-      different to the render context need provision.
+      different from the render context need provision.
   '''
 
   def render_wrapper(self_or_cls, *a, ctx=None, **render_kw):
@@ -600,7 +601,7 @@ class _RailRoadAround(Boxy):
     return self.content.w + int(self.above)
 
 @dataclass
-class Repeat(_RailRoadAround):
+class RRRepeat(_RailRoadAround):
   middle: str = LEFT_ARROW
 
   def __hash__(self):
@@ -610,7 +611,7 @@ class Repeat(_RailRoadAround):
     return self is other
 
 @dataclass
-class Optional(_RailRoadAround):
+class RROptional(_RailRoadAround):
   middle: str = RIGHT_ARROW
 
   def __hash__(self):
@@ -634,7 +635,7 @@ class _RailRoadMulti(Boxy):
     self.content.append(self.from_str(box) if isinstance(box, str) else box)
 
 @dataclass
-class Stack(_RailRoadMulti):
+class RRStack(_RailRoadMulti):
   ''' An unadorned vertical stack of the content.
   '''
 
@@ -714,7 +715,7 @@ class Stack(_RailRoadMulti):
     return lines
 
 @dataclass
-class Choice(Stack):
+class RRChoiceg(RRStack):
 
   def __hash__(self):
     return id(self)
@@ -771,8 +772,8 @@ class Choice(Stack):
     return lines
 
 @dataclass
-class Merge(Stack):
-  ''' Merge multiple inputs into a single output.
+class RRMerge(RRStack):
+  ''' RRMerge multiple inputs into a single output.
   '''
 
   def __hash__(self):
@@ -783,7 +784,7 @@ class Merge(Stack):
 
   @property
   def e(self):
-    ''' The east attachment points of the `Merge`, the midpoint of
+    ''' The east attachment points of the `RRMerge`, the midpoint of
         the interior top and bottom attachment points.
     '''
     ses = super().es
@@ -791,21 +792,21 @@ class Merge(Stack):
 
   @property
   def es(self):
-    ''' The east attachment points of the `Merge`, the midpoint of
+    ''' The east attachment points of the `RRMerge`, the midpoint of
         the interior top and bottom attachment points.
     '''
     return self.e,
 
   @property
   def width(self):
-    ''' The width of the `Merge`, the width of the `Stack` plus 1
+    ''' The width of the `RRMerge`, the width of the `RRStack` plus 1
         for the left attachments.
     '''
     return super().width + 1
 
   @render
   def render_lines(self, *, arc, heavy, attach_e, **_):
-    ''' Render the `Merge` as a list of strings.
+    ''' Render the `RRMerge` as a list of strings.
     '''
     lines = []
     for li, inner_line in enumerate(super().render_lines(attach_e=True)):
@@ -826,8 +827,8 @@ class Merge(Stack):
     return lines
 
 @dataclass
-class Split(Stack):
-  ''' Split a single input into multiple outputs.
+class RRSplit(RRStack):
+  ''' RRSplit a single input into multiple outputs.
   '''
 
   def __hash__(self):
@@ -846,19 +847,19 @@ class Split(Stack):
 
   @property
   def ws(self):
-    ''' The west attachment points of the `Split`.
+    ''' The west attachment points of the `RRSplit`.
     '''
     return self.w,
 
   @property
   def width(self):
-    ''' The width of the `Split` in characters.
+    ''' The width of the `RRSplit` in characters.
     '''
     return super().width + 1
 
   @render
   def render_lines(self, *, arc, heavy, attach_w, **_):
-    ''' Render the `Split` as a list of strings.
+    ''' Render the `RRSplit` as a list of strings.
     '''
     lines = []
     for li, inner_line in enumerate(super().render_lines(attach_w=True)):
@@ -879,7 +880,7 @@ class Split(Stack):
     return lines
 
 @dataclass
-class Sequence(_RailRoadMulti):
+class RRSequence(_RailRoadMulti):
   ''' A railroad sequence.
   '''
 
@@ -892,7 +893,7 @@ class Sequence(_RailRoadMulti):
   @property
   @render(sep_len=2)
   def width(self, *, sep_len, **_):
-    ''' The render width of the `Sequence` in characters..
+    ''' The render width of the `RRSequence` in characters..
     '''
     return sum(box.width for box in self.content) + sep_len * (
         len(self.content) - 1
@@ -900,13 +901,13 @@ class Sequence(_RailRoadMulti):
 
   @property
   def height(self):
-    ''' The render height ofthe `Sequence` in lines.
+    ''' The render height ofthe `RRSequence` in lines.
     '''
     return max(box.height for box in self.content)
 
   @render(sep_len=2)
   def render_lines(self, *, sep_len, **_):
-    ''' Render the `Sequence` as a list of one line strings.
+    ''' Render the `RRSequence` as a list of one line strings.
     '''
     boxes = self.content
     # we start the nominal attach point of the leftmost box at 0
@@ -961,22 +962,22 @@ def test_railroad():
   box5 = TextBox("one\ntwo\nthree\nfour\nfive")
   print(box5)
   box5.print(heavy=True)
-  seq = Sequence(
+  seq = RRSequence(
       (
-          START, Repeat("repeat me"), "2 lines\naaaa",
-          Choice(("one", "two", "three", box5)), END
+          START, RRRepeat("repeat me"), "2 lines\naaaa",
+          RRChoiceg(("one", "two", "three", box5)), END
       )
   )
   print(seq)
   seq.print(heavy=True)
-  stack = Stack(("st1", "2", "3\n4", "four five"))
+  stack = RRStack(("st1", "2", "3\n4", "four five"))
   print(stack.render(attach_e=True, align='right'))
-  merge = Merge((START, Sequence(("1", "2", "33")), "something"))
+  merge = RRMerge((START, RRSequence(("1", "2", "33")), "something"))
   merge.print()
   merge.print(attach_w=True)
   merge.print(attach_e=True)
   merge.print(attach_w=True, attach_e=True)
-  split = Split((START, Sequence(("1", "2", "33")), "something"))
+  split = RRSplit((START, RRSequence(("1", "2", "33")), "something"))
   split.print(attach_w=True, align='right')
 
 if __name__ == '__main__':
