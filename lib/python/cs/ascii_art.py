@@ -36,7 +36,7 @@
 '''
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 import sys
 from types import SimpleNamespace as NS
@@ -623,11 +623,9 @@ class Optional(_RailRoadAround):
 
 @dataclass
 class _RailRoadMulti(Boxy):
-  content: list[Boxy]
+  content: list[Boxy] = field(default_factory=list)
 
   def __post_init__(self):
-    if len(self.content) == 0:
-      raise ValueError('at least one content box is required')
     # promote str to TextBox
     self.content = [
         self.from_str(box) if isinstance(box, str) else box
