@@ -825,7 +825,7 @@ class Merge(Stack):
 
 @dataclass
 class Split(Stack):
-  ''' Merge a single input into multiple outputs.
+  ''' Split a single input into multiple outputs.
   '''
 
   def __hash__(self):
@@ -870,6 +870,8 @@ class Split(Stack):
 
 @dataclass
 class Sequence(_RailRoadMulti):
+  ''' A railroad sequence.
+  '''
 
   def __hash__(self):
     return id(self)
@@ -891,11 +893,11 @@ class Sequence(_RailRoadMulti):
   @render(sep_len=2)
   def render_lines(self, *, heavy, attach_e, attach_w, sep_len, **_):
     boxes = self.content
-    # we start teh nominal attach point of the leftmost box at 0
+    # we start the nominal attach point of the leftmost box at 0
     attach = 0
     box_tops = []
     box_bottoms = []
-    # measure the high and low extends of the boxes, adjusting the
+    # measure the high and low extents of the boxes, adjusting the
     # attach point as we go
     for box in boxes:
       box_tops.append(attach - box.w)
@@ -957,7 +959,6 @@ def test_railroad():
   merge.print(attach_w=True)
   merge.print(attach_e=True)
   merge.print(attach_w=True, attach_e=True)
-  print(merge)
   split = Split((START, Sequence(("1", "2", "33")), "something"))
   split.print(attach_w=True, align='right')
 
