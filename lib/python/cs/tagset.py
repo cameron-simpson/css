@@ -807,13 +807,12 @@ class TagSet(
       lambda _ontology: _ontology is None or
       isinstance(_ontology, TagsOntology)
   )
-  def __init__(self, *a, _id=None, _ontology=None, **kw):
+  def __init__(self, *a, _ontology=None, **kw):
     ''' Initialise the `TagSet`.
 
         Parameters:
         * positional parameters initialise the `dict`
           and are passed to `dict.__init__`
-        * `_id`: optional identity value for databaselike implementations
         * `_ontology`: optional `TagsOntology to use for this `TagSet`
         * other alphabetic keyword parameters are also used to initialise the
           `dict` and are passed to `dict.__init__`
@@ -828,7 +827,7 @@ class TagSet(
     if okw:
       raise ValueError("unrecognised keywords: %r" % (okw,))
     super().__init__(*a, **dict_kw)
-    self.__dict__.update(id=_id, ontology=_ontology, modified=False)
+    self.__dict__.update(ontology=_ontology, modified=False)
 
   def __str__(self):
     ''' The `TagSet` suitable for writing to a tag file.
@@ -911,13 +910,10 @@ class TagSet(
         )
 
   @classmethod
-  def from_tags(cls, tags, _id=None, _ontology=None):
+  def from_tags(cls, tags, _ontology=None):
     ''' Make a `TagSet` from an iterable of `Tag`s.
     '''
-    return cls(
-        _id=_id, _ontology=_ontology, **{tag.name: tag.value
-                                         for tag in tags}
-    )
+    return cls(_ontology=_ontology, **{tag.name: tag.value for tag in tags})
 
   #################################################################
   # Methods supporting FormattableMixin.
@@ -1086,7 +1082,7 @@ class TagSet(
         to set up additional ordinary instance attributes
         which are not to be treated as `Tag`s:
 
-            self.__dict__.update(id=_id, ontology=_ontology, modified=False)
+            self.__dict__.update(ontology=_ontology, modified=False)
     '''
     if attr.startswith('_') or attr in self.__dict__:
       self.__dict__[attr] = value
@@ -1166,7 +1162,7 @@ class TagSet(
   def _set(self, tag_name, value):
     ''' This is the "raw" setitem for a `TagSet`.
         It should set `tag_name=value` on the underlying mapping
-        (`dict.__setitem__` for a pure `TgaSet`)
+        (`dict.__setitem__` for a pure `TagSet`)
         with no checks or side effects.
 
         This is presented for methods like `TagFile.save()`
@@ -1183,10 +1179,6 @@ class TagSet(
         If `verbose`, emit an info message if this changes the previous value.
     '''
     self.modified = True
-    if verbose:
-      print(
-          f'{self.name or self.id or f"{self.__class__.__name__}:id(self)"} + {tag_name}={value}'
-      )
     self._set(tag_name, value)
 
   # "set" mode
@@ -2578,7 +2570,7 @@ class TagSetPrefixView(FormatableMixin):
         to set up the ordinary instance attributes
         which are not to be treated as `Tag`s:
 
-            self.__dict__.update(id=_id, ontology=_ontology, modified=False)
+            self.__dict__.update(ontology=_ontology, modified=False)
     '''
     if attr in self.__dict__:
       self.__dict__[attr] = value

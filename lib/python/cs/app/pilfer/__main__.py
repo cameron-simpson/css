@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 import logging
 import os
-from os.path import expanduser
+from os.path import expanduser, join as joinpath
 from getopt import GetoptError
 from pprint import pformat, pprint
 import re
@@ -770,8 +770,11 @@ class PilferCommand(BaseCommand):
       ent.printt()
 
   @popopts(
+      d_=('dirpath', 'Output directory for output_fspath, default ".".'),
       f=('force', 'Force overwrite of the RSS file if it already exists.'),
       o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
+      refresh='Refresh the required web pages even if not stale.',
+      xmlv='Provide a leading xml version tag.',
   )
   def cmd_rss(self, argv):
     ''' Usage: {cmd} entity|URL
@@ -783,19 +786,19 @@ class PilferCommand(BaseCommand):
     entity = self.popentity(argv)
     if argv:
       raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
-    entity.refresh()
     if not isinstance(entity, RSSChannelMixin):
       raise GetoptError(
           f'entity {entity} is not an instance of RSSChannelMixin'
       )
-    output_fspath = (
-        self.options.output_fspath
+    output_fspath = joinpath(
+        self.options.dirpath or ".", self.options.output_fspath
         or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
     )
-    rss = entity.rss()
+    rss = entity.rss(refresh=self.options.refresh)
     with atomic_filename(output_fspath, mode='w',
                          exists_ok=self.options.force) as T:
-      print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+      if self.options.xmlv:
+        print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
       print(
           xml_tostring(rss, encoding='unicode', pretty_print=True),
           end='',

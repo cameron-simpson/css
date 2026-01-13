@@ -3,6 +3,7 @@
 ''' Base class for site maps.
 '''
 
+from abc import ABC, abstractmethod
 from collections import ChainMap, defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,15 +11,17 @@ from fnmatch import fnmatch
 from functools import cached_property
 from getopt import GetoptError
 from itertools import zip_longest
+import json
 from os.path import abspath
 import re
 from threading import Thread
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import Any, Callable, Generator, Iterable, Mapping, Optional
+from uuid import UUID
 
 from cs.binary import bs
-from cs.cmdutils import popopts, qvprint, vprint
+from cs.cmdutils import BaseCommand, popopts, qvprint, vprint
 from cs.deco import (
     decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
@@ -163,11 +166,19 @@ class URLPattern(Promotable):
   # converter specifications, a mapping of name -> (re,convert,deconvert)
   CONVERTERS = {
       # the default stops at / or &
-      '': Converter(r'[^/?&]+', str, str),
+      '':
+      Converter(r'[^/?&]+', str, str),
       # a nonnegative integer
-      'int': Converter(r'0|[1-9]\d*', int, str),
-      'lc_': Converter(r'[^/&A-Z]+', str, lc_),
-      'wordpath': Converter(r'\w+(/\w+)*', str, str),
+      'int':
+      Converter(r'0|[1-9]\d*', int, str),
+      'lc_':
+      Converter(r'[^/&A-Z]+', str, lc_),
+      'uuid':
+      Converter(
+          r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}', UUID, str
+      ),
+      'wordpath':
+      Converter(r'\w+(/\w+)*', str, str),
   }
 
   class ParsedPattern(namedtuple('ParsedPattern',
@@ -823,7 +834,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     ''' A python object decoded from the response JSON payload, an
         alias for `self.response.json`.
     '''
-    return self.response.json()
+    content = self.content
+    return json.loads(content)
 
   @cached_property
   def soup(self):
@@ -854,7 +866,6 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       else:
         for tag in soup.head.descendants:
           if isinstance(tag, str):
-            ##if tag.strip(): warning("SKIP HEAD tag %r", tag[:40])
             continue
           if tag.name != 'meta':
             continue
@@ -983,6 +994,7 @@ class SiteEntity(HasTags):
     ''' `SiteEntity` subclass init - set `cls.url_re` from `cls.URL_RE` if present.
     '''
     super().__init_subclass__(**kw)
+    cls.WIDGET_CLASSES = []
     # default TYPE_SUBNAME derived from the class name
     try:
       TYPE_SUBNAME = cls.__dict__['TYPE_SUBNAME']
@@ -1137,8 +1149,8 @@ class SiteEntity(HasTags):
         and the format string need only specify the path after the domain.
 
         Related entities:
-        If the attribute name is present in `self.DEREFFED_PROPERTIES`,
-        a mapping of attribute name to `(tag_name,direct)` 2-tuples,
+        If the attribute name is present in `self.DEREFFED_PROPERTIES`
+        (a mapping of attribute name to `(tag_name,direct)` 2-tuples)
         then the corresponding `tag_name` is obtained and returned
         directly if `direct`.  Otherwise `self.deref(tag_name)` is
         returned.
@@ -1148,11 +1160,12 @@ class SiteEntity(HasTags):
         If `HasTags.__getattr__(attr)` raises `AttributeError` and
         the tag `opengraph.{attr}` exists, return that.
     '''
+    cls = self.__class__
     if attr.replace('_', '').islower():
       # *_PATTERN derived attributes
       ptnattr_name = f'{attr.upper()}_PATTERN'
       try:
-        pattern_s = getattr(self.__class__, ptnattr_name)
+        pattern_s = getattr(cls, ptnattr_name)
       except AttributeError:
         pass
       else:
@@ -1164,7 +1177,7 @@ class SiteEntity(HasTags):
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
       fmtattr_name = f'{attr.upper()}_FORMAT'
       try:
-        format_s = getattr(self.__class__, fmtattr_name)
+        format_s = getattr(cls, fmtattr_name)
       except AttributeError:
         pass
       else:
@@ -1173,7 +1186,7 @@ class SiteEntity(HasTags):
         except FormatAsError as e:
           warning("%s.format_as %r: %s", self, format_s, e)
           raise AttributeError(
-              f'format {self.__class__.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
+              f'format {cls.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
           ) from e
         else:
           # for attributes ending in _url, such as .sitepage_url_url
@@ -1184,7 +1197,7 @@ class SiteEntity(HasTags):
             formatted = self.urlto(formatted)
           return formatted
     # indirect derived attributes
-    DEREFFED_PROPERTIES = self.__class__.DEREFFED_PROPERTIES
+    DEREFFED_PROPERTIES = cls.DEREFFED_PROPERTIES
     try:
       deref_from = DEREFFED_PROPERTIES[attr]
     except KeyError:
@@ -1278,6 +1291,16 @@ class SiteEntity(HasTags):
     '''
     return self.sitemap.urlto(path)
 
+  @classmethod
+  def grok_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteEntity"]:
+    ''' Scan the soup for the widgets associated with this `SiteEntity` type.
+    '''
+    for widget_class in cls.WIDGET_CLASSES:
+      vprint("scan soup for", widget_class)
+      for widget in widget_class.scan_soup(soup, sitemap):
+        widget.grok()
+        yield widget.entity
+
   @pagemethod
   def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' The basic sitepage grok: record the metadta.
@@ -1334,7 +1357,6 @@ class SiteEntity(HasTags):
     is_stale = time.time() - self.rq_timestamp(
         page=page, method=method
     ) > lifespan
-    if is_stale: breakpoint()
     return is_stale
 
   def refresh(self, *, force=False, lifespan=STALE_LIFESPAN):
@@ -1486,6 +1508,49 @@ class SiteEntity(HasTags):
     return save_filename
 
 paginated = SiteEntity.paginated
+
+@dataclass
+class SiteWidget(ABC):
+  ''' A base class for classes representing known widgets on a site web page.
+  '''
+
+  sitemap: "SiteMap"
+  tag: BS4Tag
+
+  def __init_subclass__(cls, **kw):
+    ''' Record this widget class against its entity type.
+    '''
+    super().__init_subclass__(**kw)
+    cls.ENTITY_CLASS.WIDGET_CLASSES.append(cls)
+
+  # most site widgets are DIVs
+  TAG_NAME = 'div'
+
+  @property
+  @abstractmethod
+  def entity_key(self):
+    ''' Return the `type_key` derived from `self.tag`.
+    '''
+    raise NotImplementedError
+
+  @cached_property
+  def entity(self):
+    ''' The `SiteEntity` associated with this `SiteWidget`.
+    '''
+    return self.sitemap[self.__class__.ENTITY_CLASS, self.entity_key]
+
+  @abstractmethod
+  def grok(self):
+    ''' Examine the content of `self.tag`, apply to `self.entity`.
+    '''
+    raise NotImplementedError
+
+  @classmethod
+  def scan_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
+    ''' Scan some soup for this kind of widget, yield instances of `cls`.
+    '''
+    for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
+      yield cls(sitemap=sitemap, tag=tag)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
@@ -1710,7 +1775,6 @@ class SiteMap(UsesTagSets, Promotable):
       '''
       try:
         for entity in entities:
-          ##print(f'PROCESS_ENTITIES: entity {entity}')
           # TODO: a better staleness criterion
           if not force and "sitepage.last_update_unixtime" in entity:
             # do not update
@@ -1732,7 +1796,6 @@ class SiteMap(UsesTagSets, Promotable):
           sitepage = getattr(entity, "sitepage", None)
           if sitepage is None:
             # no sitepage, do not update
-            ##print("  NO SITEPAGE")
             ent_fsQ.put((entity, None))
             continue
           if not hasattr(entity, 'grok_sitepage'):
@@ -1761,7 +1824,6 @@ class SiteMap(UsesTagSets, Promotable):
                 unordered=False,
             ),
         ):
-          ##print(f'process_entity_sitepages: ent_fsQ <- ({entity=},flowstate)')
           ent_fsQ.put((entity, flowstate))
       finally:
         # send one of the 2 end markers
@@ -1784,7 +1846,6 @@ class SiteMap(UsesTagSets, Promotable):
     # TODO: this also needs to be a worker running a Later.map()
     n_end_markers = 0
     for qitem in ent_fsQ:
-      ##print("ent_fsQ ->", r(qitem))
       entity, update_from = qitem
       if entity is None:
         # should be a (None,None) end marker
@@ -2098,17 +2159,12 @@ class SiteMap(UsesTagSets, Promotable):
           for condition in conjunction:
             cond_spec = getattr(condition, "__name__", str(condition))
             with Pfx("on_matches: test %r vs %s", method_name, cond_spec):
-              if verbose:
-                print('ON_MATCHES', f'{method_name} vs {cond_spec}')
-                ##printt(*sorted(match.items()), indent='  ')
               try:
                 test_result = pfx_call(condition, flowstate, match)
               except Exception as e:
                 warning("exception in condition: %s", e)
                 # TODO: just fail? print a traceback if we do this
                 raise
-              if verbose:
-                print(f'  -> {test_result=}')
               # test ran, examine result
               if test_result is None or test_result is False:
                 # failure
@@ -2603,6 +2659,18 @@ class SiteMap(UsesTagSets, Promotable):
       if recurse:
         for (attr, subents) in ent.related():
           print(attr, '->', [subent.name for subent in subents])
+
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} entity...
+          Refresh the specified entities by fetching and grokking their site pages.
+    '''
+    if not argv:
+      raise GetoptError("missing entities")
+    for ent_spec in argv:
+      with Pfx("entity %r", ent_spec):
+        ent = self[ent_spec]
+        ent.printt()
+        ent.grok_sitepage()
 
 # expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on

@@ -295,7 +295,7 @@ def cached_flow(hook_name, flow, *, P: Pilfer = None, mode='missing'):
   cache = P.content_cache
   cache_keys = P.cache_keys_for_url(url)
   if not cache_keys:
-    print("CACHE NO KEYS", url.short)
+    PR("no keys")
     return
   # we want to cache this request (or use the cache for it)
   with cache:
@@ -503,7 +503,7 @@ def process_content(hook_name: str, flow, pattern_type: str, *, P: Pilfer):
       It is written to be called from `responseheaders` hook so
       that the gathering of content can be conditional on matching
       the URL.
-      A traditional `mitmproxy` content handlwr would use the `response`
+      A traditional `mitmproxy` content handler would use the `response`
       hook, but the mere existence of such a hook causes `mitmproxy`
       to gather the content for all URLs.
 
@@ -878,10 +878,12 @@ class MITMAddon:
     PR = lambda *a, **kw: print(
         "call_hooks_for", hook_name, rq.method, url.short, *a, **kw
     )
-    ##PR("URL", flow.request.method, url.short)
+    PR("URL", flow.request.method, url.short)
     # look up the actions when we're called
     hook_actions = self.hook_map[hook_name]
+    PR("hooks", hook_actions)
     if not hook_actions:
+      PR("no hooks")
       return
     # any exceptions from the actions
     prep_excs = []

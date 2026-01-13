@@ -1691,7 +1691,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
   '''
 
   @uses_fstags
-  def __init__(self, fspath, *, fstags: FSTags, _id=None, _ontology=None):
+  def __init__(self, fspath, *, fstags: FSTags, _ontology=None):
     if _ontology is None:
       _ontology = fstags.ontology_for(fspath)
     self.__dict__.update(
@@ -1701,7 +1701,7 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
         tagfile=None,
         fspath=fspath,
     )
-    TagSet.__init__(self, _id=_id, _ontology=_ontology)
+    TagSet.__init__(self, _ontology=_ontology)
 
   def __repr__(self):
     return "%s(%s):%r" % (type(self).__name__, self.fspath, self.as_dict())
