@@ -10,7 +10,7 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
     This is the current test function:
 
         def test_railroad():
-            box5 = TextBox("one\ntwo\nthree\nfour\nfive")
+            box5 = RRTextBox("one\ntwo\nthree\nfour\nfive")
             print(box5)
             seq = RRSequence(
                 (
@@ -215,7 +215,7 @@ def render(render_func, **render_defaults):
 
   return render_wrapper
 
-class Boxy(ABC):
+class RRBase(ABC):
   ''' The abstract base class for various boxes.
   '''
 
@@ -233,14 +233,14 @@ class Boxy(ABC):
     return self.render()
 
   @classmethod
-  def from_str(cls, s: str) -> Union["Terminal", "TextBox"]:
-    ''' Promote a string to a `Terminal` or `TextBox`.
+  def from_str(cls, s: str) -> Union["Terminal", "RRTextBox"]:
+    ''' Promote a string to a `Terminal` or `RRTextBox`.
         Nonempty strings with no newlines become `Terminal`s,
-        otherwise a `TextBox`.
+        otherwise a `RRTextBox`.
     '''
     if s and '\n' not in s:
       return Terminal(s)
-    return TextBox(s)
+    return RRTextBox(s)
 
   @classmethod
   @render
@@ -388,7 +388,7 @@ class Boxy(ABC):
     return "\n".join(self.render_lines(**render_kw))
 
 @dataclass
-class Symbol(Boxy):
+class Symbol(RRBase):
   ''' A bare text based symbol like `START` or `END`.
   '''
   text: str
@@ -438,7 +438,7 @@ START = Symbol(VERT_RIGHT + CROSS)
 END = Symbol(CROSS + VERT_LEFT)
 
 @dataclass
-class TextBox(Boxy):
+class RRTextBox(RRBase):
   ''' A text box with borders.
   '''
 
@@ -536,8 +536,8 @@ class TextBox(Boxy):
     return self.width // 2
 
 @dataclass
-class _RailRoadAround(Boxy):
-  content: Boxy
+class _RailRoadAround(RRBase):
+  content: RRBase
   above: bool = False
   middle: str = ''
 
@@ -621,11 +621,11 @@ class RROptional(_RailRoadAround):
     return self is other
 
 @dataclass
-class _RailRoadMulti(Boxy):
-  content: list[Boxy] = field(default_factory=list)
+class _RailRoadMulti(RRBase):
+  content: list[RRBase] = field(default_factory=list)
 
   def __post_init__(self):
-    # promote str to TextBox
+    # promote str to RRTextBox
     self.content = [
         self.from_str(box) if isinstance(box, str) else box
         for box in self.content
@@ -959,7 +959,7 @@ class RRSequence(_RailRoadMulti):
 def test_railroad():
   ''' Exercise various boxes.
   '''
-  box5 = TextBox("one\ntwo\nthree\nfour\nfive")
+  box5 = RRTextBox("one\ntwo\nthree\nfour\nfive")
   print(box5)
   box5.print(heavy=True)
   seq = RRSequence(
