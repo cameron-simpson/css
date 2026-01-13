@@ -905,7 +905,7 @@ class Sequence(_RailRoadMulti):
       attach += box.e - box.w
     boxes_top = min(box_tops)
     boxes_bottom = max(box_bottoms)
-    total_lines = boxes_bottom - boxes_top + 1
+    total_lines = boxes_bottom - boxes_top
     lines = [[] for _ in range(total_lines)]
     attach = 0
     sep_spaces = " " * sep_len
