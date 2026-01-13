@@ -774,6 +774,7 @@ class PilferCommand(BaseCommand):
       f=('force', 'Force overwrite of the RSS file if it already exists.'),
       o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
       refresh='Refresh the required web pages even if not stale.',
+      xmlv='Provide a leading xml version tag.',
   )
   def cmd_rss(self, argv):
     ''' Usage: {cmd} entity|URL
@@ -796,7 +797,8 @@ class PilferCommand(BaseCommand):
     rss = entity.rss(refresh=self.options.refresh)
     with atomic_filename(output_fspath, mode='w',
                          exists_ok=self.options.force) as T:
-      print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+      if self.options.xmlv:
+        print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
       print(
           xml_tostring(rss, encoding='unicode', pretty_print=True),
           end='',
