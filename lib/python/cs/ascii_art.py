@@ -783,19 +783,30 @@ class Merge(Stack):
 
   @property
   def e(self):
+    ''' The east attachment points of the `Merge`, the midpoint of
+        the interior top and bottom attachment points.
+    '''
     ses = super().es
     return (ses[0] + ses[-1]) // 2
 
   @property
   def es(self):
+    ''' The east attachment points of the `Merge`, the midpoint of
+        the interior top and bottom attachment points.
+    '''
     return self.e,
 
   @property
   def width(self):
+    ''' The width of the `Merge`, the width of the `Stack` plus 1
+        for the left attachments.
+    '''
     return super().width + 1
 
   @render
   def render_lines(self, *, arc, heavy, attach_e, **_):
+    ''' Render the `Merge` as a list of strings.
+    '''
     lines = []
     for li, inner_line in enumerate(super().render_lines(attach_e=True)):
       lines.append(
@@ -827,19 +838,28 @@ class Split(Stack):
 
   @property
   def w(self):
+    ''' The west attachment point, the midpoint of the top and
+        bottom interior west attachment points.
+    '''
     sws = super().ws
     return (sws[0] + sws[-1]) // 2
 
   @property
   def ws(self):
+    ''' The west attachment points of the `Split`.
+    '''
     return self.w,
 
   @property
   def width(self):
+    ''' The width of the `Split` in characters.
+    '''
     return super().width + 1
 
   @render
   def render_lines(self, *, arc, heavy, attach_w, **_):
+    ''' Render the `Split` as a list of strings.
+    '''
     lines = []
     for li, inner_line in enumerate(super().render_lines(attach_w=True)):
       lines.append(
@@ -872,16 +892,22 @@ class Sequence(_RailRoadMulti):
   @property
   @render(sep_len=2)
   def width(self, *, sep_len, **_):
+    ''' The render width of the `Sequence` in characters..
+    '''
     return sum(box.width for box in self.content) + sep_len * (
         len(self.content) - 1
     )
 
   @property
   def height(self):
+    ''' The render height ofthe `Sequence` in lines.
+    '''
     return max(box.height for box in self.content)
 
   @render(sep_len=2)
   def render_lines(self, *, sep_len, **_):
+    ''' Render the `Sequence` as a list of one line strings.
+    '''
     boxes = self.content
     # we start the nominal attach point of the leftmost box at 0
     attach = 0
@@ -930,6 +956,8 @@ class Sequence(_RailRoadMulti):
     return ["".join(line_v) for line_v in lines]
 
 def test_railroad():
+  ''' Exercise various boxes.
+  '''
   box5 = TextBox("one\ntwo\nthree\nfour\nfive")
   print(box5)
   box5.print(heavy=True)
