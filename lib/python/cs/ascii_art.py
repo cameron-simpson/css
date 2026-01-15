@@ -232,6 +232,10 @@ class RRBase(ABC):
     '''
     return self.render()
 
+  @property
+  def desc(self):
+    return f'{self.__class__.__name__}:{id(self)}'
+
   @classmethod
   def from_str(cls, s: str) -> Union["Terminal", "RRTextBox"]:
     ''' Promote a string to a `Terminal` or `RRTextBox`.
@@ -400,6 +404,10 @@ class Symbol(RRBase):
   def __eq__(self, other):
     return self is other
 
+  @property
+  def desc(self):
+    return f'{self.__class__.__name__}:{repr(self.text)}'
+
   def render_lines(self, **_):
     return [self.text]
 
@@ -451,6 +459,10 @@ class RRTextBox(RRBase):
 
   def __eq__(self, other):
     return self is other
+
+  @property
+  def desc(self):
+    return f'{self.__class__.__name__}:{repr(self.text.split("\n")[0])}...'
 
   @render
   def render_lines(self, *, heavy, attach_w, attach_e, **_):
@@ -544,6 +556,10 @@ class _RailRoadAround(RRBase):
   def __post_init__(self):
     if isinstance(self.content, str):
       self.content = self.from_str(self.content)
+
+  @property
+  def desc(self):
+    return f'{self.__class__.__name__}(",".join(rr.desc for rr in self.content))'
 
   @render
   def render_lines(self, *, heavy, attach_e, attach_w, **_):
