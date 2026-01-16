@@ -30,7 +30,7 @@ class Node:
   refobj: Any = None
 
   def __str__(self):
-    return f'{self.__class__.__name__}:{id(self)}' if self.name is None else self.name
+    return f'{self.__class__.__name__}:{id(self) if self.name is None else repr(self.name)}'
 
   def __hash__(self):
     return id(self)
