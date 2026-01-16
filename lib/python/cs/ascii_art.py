@@ -14,8 +14,8 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
             print(box5)
             seq = RRSequence(
                 (
-                    START, RRRepeat("repeat me"), "2 lines\naaaa",
-                    RRChoiceg(("one", "two", "three", box5)), END
+                    RR_START, RRRepeat("repeat me"), "2 lines\naaaa",
+                    RRChoiceg(("one", "two", "three", box5)), RR_END
                 )
             )
             print(seq)
@@ -393,7 +393,7 @@ class RRBase(ABC):
 
 @dataclass
 class Symbol(RRBase):
-  ''' A bare text based symbol like `START` or `END`.
+  ''' A bare text based symbol like `RR_START` or `RR_END`.
   '''
   text: str
   height: int = 1
@@ -442,8 +442,8 @@ class Terminal(Symbol):
   def width(self):
     return len(self.text) + 2
 
-START = Symbol(VERT_RIGHT + CROSS)
-END = Symbol(CROSS + VERT_LEFT)
+RR_START = Symbol(VERT_RIGHT + CROSS)
+RR_END = Symbol(CROSS + VERT_LEFT)
 
 @dataclass
 class RRTextBox(RRBase):
@@ -980,20 +980,20 @@ def test_railroad():
   box5.print(heavy=True)
   seq = RRSequence(
       (
-          START, RRRepeat("repeat me"), "2 lines\naaaa",
-          RRChoiceg(("one", "two", "three", box5)), END
+          RR_START, RRRepeat("repeat me"), "2 lines\naaaa",
+          RRChoiceg(("one", "two", "three", box5)), RR_END
       )
   )
   print(seq)
   seq.print(heavy=True)
   stack = RRStack(("st1", "2", "3\n4", "four five"))
   print(stack.render(attach_e=True, align='right'))
-  merge = RRMerge((START, RRSequence(("1", "2", "33")), "something"))
+  merge = RRMerge((RR_START, RRSequence(("1", "2", "33")), "something"))
   merge.print()
   merge.print(attach_w=True)
   merge.print(attach_e=True)
   merge.print(attach_w=True, attach_e=True)
-  split = RRSplit((START, RRSequence(("1", "2", "33")), "something"))
+  split = RRSplit((RR_START, RRSequence(("1", "2", "33")), "something"))
   split.print(attach_w=True, align='right')
 
 if __name__ == '__main__':
