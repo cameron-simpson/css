@@ -210,12 +210,160 @@ class Graph(Node):
     )
     gvgraph.print(**gvpkw)
 
+  def as_railroad(self) -> RRBase:
+    ''' Return a railroad node for this `Graph`.
+    '''
+    ##rr_by_node = { node:node.as_railroad() for node in self.nodes}
+    # A mapping of `Node` to railroad nodes containing them.
+    root_nodes = []
+    end_nodes = []
+    counted_nodes = []
+    # Collate root nodes (no in nodes), tail nodes (no out nodes)
+    # and interior nodes (nodes with in and out nodes.
+
+    for node in self.nodes:
+      if not node.in_edges:
+        root_nodes.append(node)
+      if not node.out_edges:
+        end_nodes.append(node)
+      if node.in_edges and node.out_edges:
+        counted_nodes.append((len(node.in_edges) * len(node.out_edges), node))
+    # We start with the root nodes.
+    # We construct sequences of singly connected nodes until we reach
+    # a tail node or a node already mapped to a railroad node.
+    rr_by_node = {}
+
+    def rr_node_for(node: Node) -> RRBase:
+      try:
+        rr_node = rr_by_node[node]
+      except KeyError:
+        rr_node = rr_by_node[node] = node.as_railroad()
+      return rr_node
+
+    @typechecked
+    def rr_from(root: Node) -> RRBase:
+      ''' Produce an `RRSequence` encompassing the `graph` from `root`.
+      '''
+      rr = None
+      container_by_node = {}
+      merges_by_node = defaultdict(trace(RRMerge))
+      seq_by_node = {}
+      seqs = []
+      q = ListQueue([root], unique=True)
+      for node in q:
+        node0 = node
+        print("partition from", node)
+        seq = RRSequence()
+        if node.in_count == 0:
+          seq.append(RR_START)
+        if rr is None:
+          rr = seq
+        seqs.append(seq)
+        seq_by_node[node] = seq
+        try:
+          container = container_by_node.pop(node)
+        except KeyError:
+          if node is not root and node.in_count == 0:
+            print(f'  unexpected {node.in_count=} for {node}')
+        else:
+          print(f'  container {container.desc} + seq {seq.desc}')
+          container.append(seq)
+          if rr is seq:
+            print(f'    seq is rr, make rr = container')
+            rr = container
+        if node.in_count > 1:
+          # start with a merge and queue the in_nodes
+          merge = RRMerge()
+          for lnode in node.in_nodes:
+            # locate the start of the left node's linear chain (sequence)
+            while lnode.in_count == 1 and lnode.in_node.out_count == 1:
+              lnode = lnode.in_node
+            print(f'  queue {lnode} for later merge into RRMerge:{node}')
+            q.append(lnode)
+            assert lnode not in container_by_node
+            container_by_node[lnode] = merge
+            print(f'  added {lnode} for new Merge {merge.desc=}')
+          seq.append(merge)
+          if node0 is root:
+            rr = merge
+        # append this Node's RR and all the following linear Nodes
+        seq.append(node.as_railroad())
+        while node.out_count == 1 and node.out_node.in_count == 1:
+          node = node.out_node
+          print(f'  seq += {node}')
+          seq.append(node.as_railroad())
+        # see why we stopped
+        if node.out_count > 1:
+          split = RRSplit()
+          seq.append(split)
+          for out_node in node.out_nodes:
+            print(f'  queue {out_node} for new Split from {node}')
+            q.append(out_node)
+            assert out_node not in container_by_node
+            container_by_node[out_node] = split
+        elif node.out_count == 1:
+          # we must have hit a merge, queue it for consideration
+          next_node = node.out_node
+          assert next_node.in_count > 1
+          merge = merges_by_node[next_node]
+          container_by_node[next_node] = merge
+          seq.append(merge)
+          print(f'  queue {node}.out_node:{next_node}, will be a merge')
+          q.append(next_node)
+        else:
+          seq.append(RR_END)
+      if container_by_node:
+        print(
+            f'  collating {len(container_by_node)} container_by_node entries'
+        )
+        for node, cont in container_by_node.items():
+          seq = seq_by_node.pop(node)
+          print(
+              f'    {node}->{cont.desc}: append({seq.desc=}:{seq.content[0].desc}...)'
+          )
+          cont.append(seq)
+          if rr is seq:
+            print(f'    seq is rr, make rr = container')
+            rr = cont
+        ##print(f'  HACK rr = last cont {cont.desc}')
+        ##rr = cont
+      return rr
+
+    for root in root_nodes:
+      rr = trace(rr_from)(root)
+      pprint(rr)
+      breakpoint()
+      print(rr)
+    breakpoint()
+
 if __name__ == '__main__':
   G = Graph("graph1")
   G.add_node("a")
   G.add_node("b")
-  G.add_node("c")
   G.add_edge("a", "b")
+  ##print("AB")
+  ##G.gvprint()
+  ##print(G.as_railroad())
+  ##breakpoint()
+  G.add_node("c")
   G.add_edge("c", "b")
+  ##print("ABC")
+  ##G.gvprint()
+  ##print(G.as_railroad())
+  ##breakpoint()
+  G.add_edge("b", "d")
+  G.add_edge("00", "c")
+  ##print(G.as_dot(fold=True))
+  ##G.gvprint()
+  ##rr = G.as_railroad()
+  ##pprint(rr)
+  ##breakpoint()
+  ##rr.print()
+  G.add_edge("x", "a")
+  G.add_edge("x", "00")
+  G.add_edge("d", "e")
   print(G.as_dot(fold=True))
-  G.gvprint()
+  G.gvprint(rank_dir='right')
+  rr = G.as_railroad()
+  print(rr.desc)
+  rr.print()
