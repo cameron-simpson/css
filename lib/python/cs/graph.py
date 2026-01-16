@@ -38,6 +38,44 @@ class Node:
   def __eq__(self, other):
     return self is other
 
+  @property
+  def in_count(self):
+    ''' The number of inbound edges.
+    '''
+    return len(self.in_edges)
+
+  @property
+  def out_count(self):
+    ''' The number of outbound edges.
+    '''
+    return len(self.out_edges)
+
+  @property
+  def in_nodes(self):
+    ''' The inbound `Node`s.
+    '''
+    return [edge.in_node for edge in self.in_edges]
+
+  @property
+  def in_node(self):
+    ''' The inbound/parent node, if there is exactly one inbound edge.
+    '''
+    edge, = self.in_edges
+    return edge.in_node
+
+  @property
+  def out_node(self):
+    ''' The outbound/child node, if there is exactly one outbound edge.
+    '''
+    edge, = self.out_edges
+    return edge.out_node
+
+  @property
+  def out_nodes(self):
+    ''' The outbound `Node`s.
+    '''
+    return [edge.out_node for edge in self.out_edges]
+
   def as_GVNode(self):
     return GVNode(id=self.name or str(id(self)), attrs=dict(self.attrs))
 
