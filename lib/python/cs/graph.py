@@ -82,9 +82,12 @@ class Node:
   def as_dot(self, *, no_attrs=False):
     return self.as_GVNode().as_dot(no_attrs=no_attrs)
 
+  def as_railroad(self):
+    return RRTextBox(str(self))
+
 @dataclass
 class Edge:
-  ''' An edge between `Noe`s in a `Graph`.
+  ''' A directed edge between `Node`s in a `Graph`.
   '''
   in_node: Node
   out_node: Node
