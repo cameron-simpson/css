@@ -191,8 +191,23 @@ class Graph(Node):
         fold=fold, indent=indent, subindent=subindent, graphtype=graphtype
     )
 
-  def gvprint(self, **gvpkw):
-    gvgraph = self.as_GVGraph()
+  def gvprint(self, **kw):
+    gvpkw = {}
+    attrs = {}
+    node_attrs = {}
+    edge_attrs = {}
+    for k, v in kw.items():
+      if k in ('file,fmt,layout,dataurl_encoding'):
+        gvpkw[k] = v
+      elif k.startswith('node_'):
+        node_attrs[k.removeprefix('node_')] = v
+      elif k.startswith('edge_'):
+        node_attrs[k.removeprefix('edge_')] = v
+      else:
+        attrs[k] = v
+    gvgraph = self.as_GVGraph(
+        graph_attrs=attrs, node_attrs=node_attrs, edge_attrs=edge_attrs
+    )
     gvgraph.print(**gvpkw)
 
 if __name__ == '__main__':
