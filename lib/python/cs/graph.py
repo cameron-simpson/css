@@ -5,8 +5,17 @@
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
+from cs.ascii_art import (
+    RRBase,
+    RRMerge,
+    RRSequence,
+    RRSplit,
+    RRTextBox,
+    RR_START,
+    RR_END,
+)
 from cs.gvutils import Graph as GVGraph, Node as GVNode
 
 
