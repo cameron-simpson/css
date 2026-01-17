@@ -1,3 +1,4 @@
+hg log use RR diagrams for the branches etc
 cs.ascii_art: mode to send terminals with the in-a-box ansi escapes? after that, colouring etc? the len() roblem remains
 cs.ascii_art: ASCII mode, possibly automatic if stdout is ascii? tricky
 cs.ascii_art: single direction box characters
