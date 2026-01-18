@@ -141,6 +141,7 @@ class Graph(Node):
           )
       else:
         node = Node(node)
+    assert node is not None
     self.nodes.add(node)
     self._nodes_by_name[node.name].add(node)
     return node
@@ -149,8 +150,11 @@ class Graph(Node):
     ''' Add an `Edge` to the `Graph`.
     '''
     node1 = self.add_node(node1)  # may promote str to Node
+    assert node1 is not None
     node2 = self.add_node(node2)  # may promote str to Node
-    edge = self.edges.add(Edge(node1, node2, **edge_attrs))
+    assert node2 is not None
+    edge = Edge(node1, node2, **edge_attrs)
+    self.edges.add(edge)
     node1.out_edges.append(edge)
     node2.in_edges.append(edge)
 
