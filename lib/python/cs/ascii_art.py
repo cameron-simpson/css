@@ -15,7 +15,7 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
             seq = RRSequence(
                 (
                     RR_START, RRRepeat("repeat me"), "2 lines\naaaa",
-                    RRChoiceg(("one", "two", "three", box5)), RR_END
+                    RRChoice(("one", "two", "three", box5)), RR_END
                 )
             )
             print(seq)
