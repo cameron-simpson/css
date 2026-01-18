@@ -38,9 +38,10 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
+from pprint import pprint
 import sys
 from types import SimpleNamespace as NS  # noqa: N814
-from typing import Optional, Union
+from typing import Any, Optional, Union
 import unicodedata
 
 from cs.context import stackattrs
@@ -218,6 +219,7 @@ def render(render_func, **render_defaults):
 class RRBase(ABC):
   ''' The abstract base class for various boxes.
   '''
+  refobj: Any = None
 
   # the render context
   render_context = NS(
@@ -232,9 +234,13 @@ class RRBase(ABC):
     '''
     return self.render()
 
-  @property
-  def desc(self):
+  def __repr__(self):
     return f'{self.__class__.__name__}:{id(self)}'
+
+  def pprint(self, **ppkw):
+    ''' Call `pprint.pprint` with this railroad node.
+    '''
+    pprint(self, **ppkw)
 
   @classmethod
   def from_str(cls, s: str) -> Union["Terminal", "RRTextBox"]:
@@ -395,8 +401,11 @@ class RRBase(ABC):
 class Symbol(RRBase):
   ''' A bare text based symbol like `RR_START` or `RR_END`.
   '''
-  text: str
+  name: str
   height: int = 1
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self.name!r}'
 
   def __hash__(self):
     return id(self)
@@ -404,16 +413,12 @@ class Symbol(RRBase):
   def __eq__(self, other):
     return self is other
 
-  @property
-  def desc(self):
-    return f'{self.__class__.__name__}:{repr(self.text)}'
-
   def render_lines(self, **_):
-    return [self.text]
+    return [self.name]
 
   @property
   def width(self):
-    return len(self.text)
+    return len(self.name)
 
 @dataclass
 class Terminal(Symbol):
@@ -432,7 +437,7 @@ class Terminal(Symbol):
         "".join(
             (
                 box_char(heavy=heavy, left=attach_w, up=True,
-                         down=True), self.text,
+                         down=True), self.name,
                 box_char(heavy=heavy, right=attach_e, up=True, down=True)
             )
         )
@@ -440,7 +445,7 @@ class Terminal(Symbol):
 
   @property
   def width(self):
-    return len(self.text) + 2
+    return len(self.name) + 2
 
 RR_START = Symbol(VERT_RIGHT + CROSS)
 RR_END = Symbol(CROSS + VERT_LEFT)
@@ -460,9 +465,8 @@ class RRTextBox(RRBase):
   def __eq__(self, other):
     return self is other
 
-  @property
-  def desc(self):
-    return f'{self.__class__.__name__}:{repr(self.text.split("\n")[0])}...'
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{repr(self.text.splitlines()[:1])}...'
 
   @render
   def render_lines(self, *, heavy, attach_w, attach_e, **_):
@@ -557,9 +561,8 @@ class _RailRoadAround(RRBase):
     if isinstance(self.content, str):
       self.content = self.from_str(self.content)
 
-  @property
-  def desc(self):
-    return f'{self.__class__.__name__}(",".join(rr.desc for rr in self.content))'
+  def __repr__(self):
+    return f'{self.__class__.__name__}(",".join(repr(rr) for rr in self.content))'
 
   @render
   def render_lines(self, *, heavy, attach_e, attach_w, **_):
