@@ -17,6 +17,7 @@ from cs.ascii_art import (
     RR_END,
 )
 from cs.gvutils import Graph as GVGraph, Node as GVNode
+from cs.queues import ListQueue
 
 
 @dataclass
@@ -237,33 +238,36 @@ class Graph(Node):
     # a tail node or a node already mapped to a railroad node.
     rr_by_node = {}
 
-    def rr_node_for(node: Node) -> RRBase:
-      try:
-        rr_node = rr_by_node[node]
-      except KeyError:
-        rr_node = rr_by_node[node] = node.as_railroad()
-      return rr_node
-
     @typechecked
     def rr_from(root: Node) -> RRBase:
       ''' Produce an `RRSequence` encompassing the `graph` from `root`.
       '''
       rr = None
+      rr_for_rrnode = {}
+
+      def root_rr(rrnode):
+        ''' Find the ancestral RR node from one of its interior RR nodes.
+        '''
+        while True:
+          try:
+            rrnode = rr_for_rrnode[rrnode]
+          except KeyError:
+            break
+        return rrnode
+
       container_by_node = {}
-      merges_by_node = defaultdict(trace(RRMerge))
-      seq_by_node = {}
+      merge_by_node = defaultdict(trace(RRMerge))
+      seq_by_node = defaultdict(RRSequence)
       seqs = []
       q = ListQueue([root], unique=True)
       for node in q:
         node0 = node
-        print("partition from", node)
-        seq = RRSequence()
-        if node.in_count == 0:
-          seq.append(RR_START)
+        seq = seq_by_node[node0]
         if rr is None:
+          # the RR diagram starts from the first RRSequence
           rr = seq
         seqs.append(seq)
-        seq_by_node[node] = seq
+        # should we record the new sequence in an enclosing RRSplit?
         try:
           container = container_by_node.pop(node)
         except KeyError:
@@ -272,48 +276,75 @@ class Graph(Node):
         else:
           print(f'  container {container.desc} + seq {seq.desc}')
           container.append(seq)
-          if rr is seq:
-            print(f'    seq is rr, make rr = container')
-            rr = container
-        if node.in_count > 1:
-          # start with a merge and queue the in_nodes
-          merge = RRMerge()
+          rr_for_rrnode[seq] = container
+
+          # for merges, record that the sequence is enclosed in the merge
+          rr_for_rrnode[seq] = container
+        if node.in_count == 0:
+          seq.append(RR_START)
+        elif node.in_count > 1:
+          # Start with a merge and queue the in_nodes.
+          # Fetch the RRMerge which leads to this node.
+          merge = merge_by_node[node]
+          rr_for_rrnode[merge] = seq
           for lnode in node.in_nodes:
             # locate the start of the left node's linear chain (sequence)
             while lnode.in_count == 1 and lnode.in_node.out_count == 1:
               lnode = lnode.in_node
-            print(f'  queue {lnode} for later merge into RRMerge:{node}')
-            q.append(lnode)
-            assert lnode not in container_by_node
-            container_by_node[lnode] = merge
-            print(f'  added {lnode} for new Merge {merge.desc=}')
+            try:
+              lseq = seq_by_node[lnode]
+            except KeyError:
+              # no sequence for this node yet, but that's ok
+              # we will include the sequence later when it's made
+              assert lnode not in container_by_node
+              container_by_node[lnode] = merge
+              q.append(lnode)
+              if lnode.name == 'b': breakpoint()
+            else:
+              # The origin sequence will always preexist.
+              # If one of these is the origin sequence, make our sequence the origin.
+              lroot = root_rr(lseq)
+              # append the existing sequence right now
+              merge.append(lroot)  ## was lseq
+              if lroot is rr:
+                rr = seq  ## was merge
+              breakpoint()
           seq.append(merge)
-          if node0 is root:
-            rr = merge
         # append this Node's RR and all the following linear Nodes
         seq.append(node.as_railroad())
-        while node.out_count == 1 and node.out_node.in_count == 1:
-          node = node.out_node
-          print(f'  seq += {node}')
-          seq.append(node.as_railroad())
+        while node.out_count == 1:
+          next_node = node.out_node
+          if next_node.in_count == 1:
+            # continue the linear chain
+            node = next_node
+            seq.append(node.as_railroad())
+          else:
+            # the is a merge
+            assert next_node.in_count > 1
+            q.append(next_node)
+            break
+
         # see why we stopped
         if node.out_count > 1:
           split = RRSplit()
           seq.append(split)
+          rr_for_rrnode[split] = seq
           for out_node in node.out_nodes:
             print(f'  queue {out_node} for new Split from {node}')
             q.append(out_node)
             assert out_node not in container_by_node
             container_by_node[out_node] = split
+            # connect the drawing hierarchy
+            rseq = seq_by_node[out_node]
+            rr_for_rrnode[out_node] = rseq
+            rr_for_rrnode[rseq] = split
+            rr_for_rrnode[split] = seq
         elif node.out_count == 1:
           # we must have hit a merge, queue it for consideration
           next_node = node.out_node
           assert next_node.in_count > 1
-          merge = merges_by_node[next_node]
-          container_by_node[next_node] = merge
-          seq.append(merge)
+          merge = merge_by_node[next_node]
           print(f'  queue {node}.out_node:{next_node}, will be a merge')
-          q.append(next_node)
         else:
           seq.append(RR_END)
       if container_by_node:
@@ -321,7 +352,7 @@ class Graph(Node):
             f'  collating {len(container_by_node)} container_by_node entries'
         )
         for node, cont in container_by_node.items():
-          seq = seq_by_node.pop(node)
+          seq = seq_by_node[node]
           print(
               f'    {node}->{cont.desc}: append({seq.desc=}:{seq.content[0].desc}...)'
           )
@@ -339,6 +370,7 @@ class Graph(Node):
       breakpoint()
       print(rr)
     breakpoint()
+    return rr
 
 if __name__ == '__main__':
   G = Graph("graph1")
@@ -367,7 +399,7 @@ if __name__ == '__main__':
   G.add_edge("x", "00")
   G.add_edge("d", "e")
   print(G.as_dot(fold=True))
-  G.gvprint(rank_dir='right')
+  G.gvprint(rank_dir='LR')
   rr = G.as_railroad()
-  print(rr.desc)
+  print(repr(rr))
   rr.print()
