@@ -216,10 +216,10 @@ def render(render_func, **render_defaults):
 
   return render_wrapper
 
+@dataclass
 class RRBase(ABC):
   ''' The abstract base class for various boxes.
   '''
-  refobj: Any = None
 
   # the render context
   render_context = NS(
@@ -402,6 +402,7 @@ class Symbol(RRBase):
   ''' A bare text based symbol like `RR_START` or `RR_END`.
   '''
   name: str
+  refobj: Any = None
   height: int = 1
 
   def __repr__(self):
@@ -456,6 +457,7 @@ class RRTextBox(RRBase):
   '''
 
   text: str
+  refobj: Any = None
   arc: bool = False
   heavy: bool = False
 
@@ -734,7 +736,7 @@ class RRStack(_RailRoadMulti):
     return lines
 
 @dataclass
-class RRChoiceg(RRStack):
+class RRChoice(RRStack):
 
   def __hash__(self):
     return id(self)
@@ -984,7 +986,7 @@ def test_railroad():
   seq = RRSequence(
       (
           RR_START, RRRepeat("repeat me"), "2 lines\naaaa",
-          RRChoiceg(("one", "two", "three", box5)), RR_END
+          RRChoice(("one", "two", "three", box5)), RR_END
       )
   )
   print(seq)
