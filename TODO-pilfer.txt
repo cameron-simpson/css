@@ -1,3 +1,4 @@
+rss: have a read of https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/nav
 rss: main element detection should fall back to finding an element with role=main
 a debug mode for showing <nav> sections https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/nav
 rss - recognise sectioning content: https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Content_categories#sectioning_content
