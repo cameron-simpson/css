@@ -1,3 +1,4 @@
+a debug mode for showing <nav> sections https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/nav
 rss - recognise sectioning content: https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Content_categories#sectioning_content
 rss: recognise <main> lements as the main article text? show exclude nav bars etc https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/main
 a missing pilferrc should warn, also it fails the UNNAMED_SECTION key lookup
