@@ -721,6 +721,7 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError('missing actions')
     bad_actions = False
+    # make a MITMAddon and attach the CLI hooks
     mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
     while argv:
       try:
@@ -805,6 +806,16 @@ class PilferCommand(BaseCommand):
           file=T
       )
     print(output_fspath)
+    print("Reparse", output_fspath)
+    from rss_parser import RSSParser
+    with open(output_fspath) as rssf:
+      parsed = RSSParser.parse(rssf.read())
+    print("Language", parsed.channel.language)
+    print("RSS", parsed.version)
+    # Iteratively print feed items
+    for item in parsed.channel.items:
+      print(item.title)
+      print(item.description[:50])
 
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
