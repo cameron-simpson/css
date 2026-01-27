@@ -1,3 +1,4 @@
+cs.cmdutils: GETOPT_SPEC works badly with no subcmds
 printt: borders=True to use the box drawing chars? mechanism in cs.ascii_art?
 cs.graph: make a graph of arbitrary python data structures
 hg log use RR diagrams for the branches etc
