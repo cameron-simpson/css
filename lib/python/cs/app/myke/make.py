@@ -83,7 +83,6 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   _makefiles: list = field(default_factory=list)
   appendfiles: list = field(default_factory=list)
   macros: dict = field(default_factory=dict)
-  targets: "TargetMap" = field(default_factory=lambda: TargetMap())
   rules: dict = field(default_factory=dict)
   precious: set = field(default_factory=set)
   active: set = field(default_factory=set)
@@ -91,6 +90,9 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   activity_lock: Any = field(default_factory=Lock)
   basic_namespaces: list = field(default_factory=list)
   cmd_ns: dict = field(default_factory=dict)
+
+  def __post_init__(self):
+    self.targets = TargetMap(self)
 
   def __str__(self):
     return (
@@ -484,18 +486,12 @@ class TargetMap(NS):
       Raise KeyError for missing Targets which are not inferrable.
   '''
 
-  def __init__(self):
+  def __init__(self, maker: Maker):
     ''' Initialise the `TargetMap`.
     '''
-    self._maker = None
+    self.maker = maker
     self.targets = {}
     self._lock = RLock()
-
-  @property
-  def maker(self):
-    ''' The `Maker` to use to make `Target`s.
-    '''
-    return self._maker or Maker.default()
 
   def __getitem__(self, name):
     ''' Return the Target for `name`.
@@ -871,10 +867,7 @@ class Action(NS):
         of the action.
     '''
     R = Result(name="%s.action(%s)" % (target, self))
-    target.maker.defer("%s:act[%s]" % (
-        self,
-        target,
-    ), self._act, R, target)
+    target.maker.defer(f'{self}:act[{target}]', self._act, R, target)
     return R
 
   def _act(self, R, target):
