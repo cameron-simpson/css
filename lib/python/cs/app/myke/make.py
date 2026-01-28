@@ -102,6 +102,48 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
         )
     )
 
+  # pylint: disable=use-dict-literal
+  COMMON_OPT_SPECS = dict(BaseCommandOptions.COMMON_OPT_SPECS)
+  COMMON_OPT_SPECS.update(
+      d=('debug', 'Debug mode.'),
+      D__=('debug_modes', 'Specific debug modes.'),
+      e=('exit_on_error', 'Run the shell with the -e (exit on error) option.'),
+      E=('env_macros', 'Import environment variables as macros.'),
+      f__=('_makefiles', 'Specify the Mykefile; accrues.'),
+      i=('ignore_errors', 'Ignore errors from commands.'),
+      j_=(
+          'parallel',
+          f'How many commands to run in parallel. Default from {DEFAULT_PARALLELISM=}.',
+          int, lambda jobs: jobs > 0
+      ),
+      k=('-fail_fast', 'Proceed with other targets if one fails.'),
+      m=('-strict_macros', 'Do not treat undefined macros as errors.'),
+      n=('no_action', 'No action: just recite planned actions.'),
+      N=(
+          'no_submakes',
+          'Really no execute mode; even lines containing the macro B<$(MAKE)> will be executed.'
+      ),
+      p=(
+          'print_macros',
+          'Print out the complete set of macro definitions and target descriptions.'
+      ),
+      q=(
+          'query_mode',
+          'Query mode; return a zero status if up to date, nonzero otherwise.'
+      ),
+      r=('no_builtin_rules', 'Ignore builtin rules.'),
+      R=('no_global_rules', 'Ignore global builtin rules.'),
+      s=('silent', 'Silent; do not print out command lines.'),
+      t=(
+          'touch_mode',
+          'Touch targets which must be remade in order to bring them up to date.'
+      ),
+      u=('unconditional', 'Unconditionally make targets.'),
+      x=(
+          'trace_commands', 'Print all actions taken, even ones silences by @.'
+      ),
+  )
+
   def __enter_exit__(self):
     ''' Run both the inherited context managers.
     '''
