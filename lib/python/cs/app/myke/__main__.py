@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from getopt import GetoptError
 import sys
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.logutils import error
 
 from .make import Maker
@@ -22,7 +22,6 @@ class MykeCommand(BaseCommand):
   ''' Command line mode for `cs.app.myke`.
   '''
 
-  GETOPT_SPEC = 'dD:eEf:ij:kmNnpqrRsS:tuvx'
   USAGE_FORMAT = "Usage: {cmd} [options...] [macro=value...] [targets...]"
 
   Options = Maker
@@ -95,6 +94,7 @@ class MykeCommand(BaseCommand):
       with M:
         yield
 
+  @popopts
   def main(self, argv):
     ''' Main body.
     '''
