@@ -1761,7 +1761,7 @@ class BaseCommand:
     '''
     for filespec, bfr in cls.pop_buffers(argv):
       return filespec, bfr
-    raise GetoptError("missing filespec, expected \"-\" or filesystem path")
+    raise GetoptError('missing filespec, expected "-" or filesystem path')
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
