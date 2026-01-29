@@ -193,7 +193,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
     '''
     self.basic_namespaces.insert(0, ns)
 
-  @propety
+  @property
   def makefiles(self):
     ''' The list of makefiles to consult, a tuple.
         It is not possible to add more makefiles after accessing this property.
