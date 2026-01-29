@@ -235,7 +235,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   def target_active(self, target):
     ''' Add this target to the set of "in progress" targets.
     '''
-    self.debug_make("note target \"%s\" as active", target.name)
+    self.debug_make('note target "%s" as active', target.name)
     with self.activity_lock:
       self.active.add(target)
 
@@ -616,8 +616,7 @@ class Target(Result):
         modify it the class; instead we extend .pending_actions
         when .require() is called the first time, just as we do for a
         :make directive.
-  '''
-
+    '''
     self._lock = RLock()
     Result.__init__(self, name=name, lock=self._lock)
     self.maker = maker
@@ -640,8 +639,7 @@ class Target(Result):
     #
 
   def __str__(self):
-    return "{}[{}]".format(self.name, self.fsm_state)
-    ##return "{}[{}]:{}:{}".format(self.name, self.fsm_state, self._prereqs, self._postprereqs)
+    return f'{self.name}[{self.fsm.state}]'
 
   def mdebug(self, msg, *a):
     ''' Emit a debug message.
@@ -809,7 +807,8 @@ class Target(Result):
       if self.was_missing or self.out_of_date:
         # proceed to normal make process
         self.Rs = []
-        return self._make_next()
+        self._make_next()
+        return
       # prereqs ok and up to date: make complete
       self.succeed()
 
@@ -945,14 +944,14 @@ class Action(NS):
             mdebug = M.debug_make
             for T in subTs:
               if T.result:
-                mdebug("submake \"%s\" OK", T)
+                mdebug('submake "%s" OK', T)
               else:
                 ok = False
-                mdebug("submake \"%s\" FAIL", T)
+                mdebug('submake "%s" FAIL', T)
             R.put(ok)
 
           for T in subTs:
-            mdebug("submake \"%s\"", T)
+            mdebug('submake "%s"', T)
             T.require()
           M.after(subTs, _act_after_make)
           return
