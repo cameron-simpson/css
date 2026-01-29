@@ -132,8 +132,9 @@ class Graph(Node):
     '''
     if isinstance(node, str):
       name = node
-      named_nodes = self._nodes_by_name[node]
+      named_nodes = self._nodes_by_name[name]
       if named_nodes:
+        # check that there's just one Node with that name
         try:
           node, = named_nodes
         except ValueError:
@@ -141,6 +142,7 @@ class Graph(Node):
               f'ambiguous {name=}: multiple Nodes with that name already exist'
           )
       else:
+        # no Nodes with that name - make one
         node = Node(node)
     assert node is not None
     self.nodes.add(node)
@@ -149,6 +151,14 @@ class Graph(Node):
 
   def add_edge(self, node1: str | Node, node2: str | Node, **edge_attrs):
     ''' Add an `Edge` to the `Graph`.
+  def __getitem__(self,node_name:str)->Node:
+    ''' Return the `Node` with `.name==node_name`.
+    '''
+    if node_name not in self._nodes_by_name:
+      raise KeyError(node_name)
+    node,=self._nodes_by_name[node_name]
+    return node
+
     '''
     node1 = self.add_node(node1)  # may promote str to Node
     assert node1 is not None
