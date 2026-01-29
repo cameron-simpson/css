@@ -639,7 +639,7 @@ class Target(Result):
     #
 
   def __str__(self):
-    return f'{self.name}[{self.fsm.state}]'
+    return f'{self.name}[{self.fsm_state}]'
 
   def mdebug(self, msg, *a):
     ''' Emit a debug message.
