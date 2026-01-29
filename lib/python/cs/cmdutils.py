@@ -166,6 +166,8 @@ class OptionSpec:
   # the argument usage name or None
   # eg "username"
   arg_name: Optional[str] = None
+  # whether multiple options accrue into a list instead of overwriting
+  accrues: bool = False
   # the name of the options field/attribute
   field_name: Optional[str] = None
   # the initial value of the option
@@ -227,15 +229,20 @@ class OptionSpec:
     '''
     # produce needs_arg and cleaned up opt_name from the opt_k
     needs_arg = False
+    accrues_arg = False
     # leading underscore for numeric options like -1
     if opt_k.startswith('_'):
       opt_k = opt_k[1:]
       if is_identifier(opt_k):
         warning("unnecessary leading underscore on valid identifier option")
     # trailing underscore indicates that the option expected an argument
+    # two underscore indicates that the argument accrues as a list
     if opt_k.endswith('_'):
       needs_arg = True
       opt_k = opt_k[:-1]
+      if opt_k.endswith('_'):
+        accrues_arg = True
+        opt_k = opt_k[:-1]
     opt_name = opt_k.replace('_', '-')
     field_name = opt_k.replace('-', '_')
     field_default = None
@@ -297,7 +304,11 @@ class OptionSpec:
       spec0 = specs.pop(0) if specs else None
     if spec0 is not None:
       raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
-    if not needs_arg:
+    if needs_arg:
+      if accrues_arg:
+        if field_default is None:
+          field_default = list
+    else:
       # sanity check Boolean option
       if field_default is None:
         field_default = False
@@ -310,6 +321,7 @@ class OptionSpec:
     self = cls(
         opt_name=opt_name,
         arg_name=(field_name.replace('_', '-') if needs_arg else None),
+        accrues=accrues_arg,
         field_name=field_name,
         field_default=field_default,
         help_text=help_text,
