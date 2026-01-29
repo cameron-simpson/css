@@ -396,7 +396,10 @@ class OptionSpec:
     '''
     parser.add_argument(
         self.getopt_opt,
-        action=('store' if self.arg_name else 'store_true'),
+        action=(
+            ('append' if self.accrues else 'store')
+            if self.arg_name else 'store_true'
+        ),
         dest=self.field_name,
         help=self.help_text,
         default=(
@@ -1057,11 +1060,15 @@ class BaseCommandOptions(HasThreadState):
             DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
     '''
     shortopts, longopts, getopt_spec_map = self.getopt_spec_map(opt_specs_kw)
-    # infill default False/None for new fields
+    # infill default False/None/etc for new fields
     for opt_spec in getopt_spec_map.values():
       field_name = opt_spec.field_name
       if not hasattr(self, field_name):
-        setattr(self, field_name, opt_spec.field_default)
+        setattr(
+            self, field_name,
+            opt_spec.field_default()
+            if callable(opt_spec.field_default) else opt_spec.field_default
+        )
     opts, argv[:] = getopt(argv, shortopts, longopts)
     for opt, val in opts:
       with Pfx(opt):
@@ -1069,9 +1076,16 @@ class BaseCommandOptions(HasThreadState):
         if opt_spec.needs_arg:
           with Pfx("%r", val):
             value = opt_spec.parse_value(val)
+          if opt_spec.accrues:
+            # append to list
+            getattr(self, opt_spec.field_name).append(value)
+          else:
+            # overwrite
+            setattr(self, opt_spec.field_name, value)
         else:
           value = not opt_spec.field_default
-        setattr(self, opt_spec.field_name, value)
+          # overwrite
+          setattr(self, opt_spec.field_name, value)
 
   @classmethod
   def usage_options_format(
