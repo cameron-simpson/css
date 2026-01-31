@@ -76,34 +76,13 @@ class BWizCmd(BaseCommand):
             start..end  Optional start and end offsets in seconds, used
               to crop the recording output.
     '''
+    options = self.options
+    doit = options.doit
+    acodec = options.acodec
+    vcodec = options.vcodec
+    outputdir = options.outputdir or '.'
+    remove_source = options.remove_source
     badopts = False
-    doit = True
-    acodec = None
-    vcodec = None
-    outputdir = '.'
-    remove_source = False
-    # parse options
-    while argv:
-      arg0 = argv.pop(0)
-      with Pfx(arg0):
-        if arg0 == '--':
-          break
-        if not arg0.startswith('-') or len(arg0) == 1:
-          argv.insert(0, arg0)
-          break
-        if arg0 == '-n':
-          doit = False
-        elif arg0.startswith('-a:'):
-          acodec = arg0[3:]
-        elif arg0.startswith('-v:'):
-          vcodec = arg0[3:]
-        elif arg0 == '--rm':
-          remove_source = True
-        elif arg0 == '-d':
-          outputdir = argv.pop(0)
-        else:
-          warning('unexpected option')
-          badopts = True
     if not isdirpath(outputdir):
       warning("outputdir is not a directory: %r", outputdir)
       badopts = True
