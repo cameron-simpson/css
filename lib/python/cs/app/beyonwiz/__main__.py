@@ -17,7 +17,7 @@ from pprint import pformat
 import shutil
 import sys
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.ffmpegutils import ffprobe
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
@@ -56,18 +56,23 @@ class BWizCmd(BaseCommand):
     return 0
 
   # pylint: disable=too-many-branches,too-many-locals
+  @popopts(
+      a_=('acodec', 'Specify output audio  format.'),
+      v_=('vcodec', 'Specify output video format.'),
+      d_=(
+          'outputdir',
+          'The derived output file should be written in outputdir.'
+      ),
+      rm=(
+          'remove_source', 'Remove the source file if the conversion succeeds.'
+      ),
+  )
   def cmd_convert(self, argv):
     ''' Convert a recording to MP4.
 
-        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [--rm] [-d outputdir] [start..end]... recording [output.mp4]
+        Usage: {cmd} [start..end]... recording [output.mp4]
           Convert the video content of the named recording, usually to an MP4.
           Most metadata are preserved.
-          Options:
-            -n          No action, dry run.
-            -a:afmt     Specify output audio format.
-            -v:vfmt     Specify output video format.
-            -d outputdir The derived output file should be written in outputdir.
-            --rm        Remove the source file if the conversion succeeds.
             start..end  Optional start and end offsets in seconds, used
               to crop the recording output.
     '''
