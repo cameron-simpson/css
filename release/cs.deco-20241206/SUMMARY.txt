@@ -1,0 +1,1 @@
+@uses_cmd_options: use an object subclass if there is no cs.cmdutils so that we can add attributes to the placeholder options object.

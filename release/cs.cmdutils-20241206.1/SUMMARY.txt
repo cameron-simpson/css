@@ -1,0 +1,1 @@
+SubComand.usage_text: normalise the show_subcmds to match the subcommands mapping.

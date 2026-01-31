@@ -52,7 +52,7 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, promote
+from cs.deco import default_params, fmtdoc, promote, Promotable
 from cs.later import Later
 from cs.lex import r
 from cs.logutils import warning
@@ -81,6 +81,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: System :: Filesystems",
     ],
+    'python_requires':
+    '>=3.10',
+    'ext-modules': [{
+        'name': 'cs.vt._scan',
+        'sources': ['_scan.c']
+    }],
     'install_requires': [
         'cs.buffer',
         'cs.app.flag',
@@ -119,13 +125,14 @@ DISTINFO = {
         'lmdb',
     ],
     'entry_points': {
-        'console_scripts': [
-            'vt = cs.vt.__main__:main',
-            'mount.vtfs = cs.vt.__main__:mount_vtfs',
-        ],
+        'console_scripts': {
+            'vt': 'vt.__main__:main',
+            'mount.vtfs': 'vt.__main__:mount_vtfs',
+        },
     },
     'extras_requires': {
         'FUSE': ['llfuse'],
+        'httpd': ['flask'],
         'plotting': ['cs.mplutils'],
     },
 }
@@ -194,23 +201,33 @@ PATHSEP = '/'
 run_modes = NS(show_progress=True,)
 
 class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
-            RunStateMixin, ABC):
-  ''' Core functions provided by all Stores.
+            RunStateMixin, Promotable, ABC):
+  ''' Core functions provided by all `Store`s.
 
-      Subclasses should not subclass this class but StoreSyncBase
-      or StoreAsyncBase; these provide the *_bg or non-*_bg sibling
+      You can also obtain the default `Store` just by calling `Store()`.
+
+      Subclasses should not subclass this class but `StoreSyncBase`
+      or `StoreAsyncBase`; these provide the *_bg or non-*_bg sibling
       methods of those described below so that a subclass need only
       implement the synchronous or asynchronous forms. Most local
       Stores will derive from StoreSyncBase and remote Stores
       derive from StoreAsyncBase.
 
-      A subclass should provide thread-safe implementations of the following
-      methods:
+      A `StoreSyncBase` subclass should provide thread-safe
+      implementations of the following methods:
 
         .add(chunk) -> hashcode
         .get(hashcode, [default=None]) -> chunk (or default)
         .contains(hashcode) -> boolean
         .flush()
+
+      An `StoreAsyncBase` subclass should provide thread-safe
+      implementations of the following methods:
+
+        .add_bg(chunk) -> Result[hashcode]
+        .get_bg(hashcode, [default=None]) -> Result[chunk (or default)]
+        .contains_bg(hashcode) -> Result[boolean]
+        .flush_bg() -> Result
 
       A subclass _may_ provide thread-safe implementations of the following
       methods:
@@ -235,6 +252,37 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   _seq = Seq()
 
   perthread_state = ThreadState()
+
+  def __new__(cls, name=None, *a, **kw):
+    ''' This provides support for `S = Store()` with no arguments at all.
+        For that case, return `Store.default()`.
+        Otherwise do the usual thing.
+        Note that subclasses need their `__init__` switched out because of
+        `__new__`'s "init again" logic, see the `__init_subclass__`.
+    '''
+    if cls is Store:
+      if name is not None or a or kw:
+        raise ValueError(
+            f'{cls.__name__}() may not have a name or other arguments'
+        )
+      return Store.default()
+    return super().__new__(cls)
+
+  def __init_subclass__(cls):
+    ''' Switch out `__init__` for one which, with no arguments,
+        checks that `self` has been initialised and then just returns.
+        Otherwise call the original `__init__`.
+    '''
+    super().__init_subclass__()
+    init0 = cls.__init__
+
+    def __init__(self, *a, **kw):
+      if not a and not kw:
+        assert hasattr(self, 'name')
+        return
+      init0(self, *a, **kw)
+
+    cls.__init__ = __init__
 
   @uses_runstate
   @fmtdoc
@@ -342,9 +390,9 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
   def default(cls, config_spec=None, store_spec=None, cache_spec=None):
     ''' Get the prevailing `Store` instance.
         This calls `HasThreadState.default()` first,
-        but falls back to constrcting the default `Store` instance
+        but falls back to constructing the default `Store` instance
         from `Store.get_default_spec` and `Store.get_default_cache_spec`.
-        As such, the returns `Store` is not necessarily "open"
+        As such, the returned `Store` is not necessarily "open"
         and users should open it for use. Example:
 
             S = Store.default()
@@ -495,51 +543,48 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
     return self.later.defer(func.__qualname__, closing_self)
 
   ##########################################################################
+  # MutableMapping
+  def __len__(self):
+    raise NotImplementedError
+
+  ##########################################################################
   # Core Store methods, all abstract.
-  @abstractmethod
   def add(self, data):
     ''' Add the `data` to the Store, return its hashcode.
     '''
     raise NotImplementedError
 
-  @abstractmethod
   def add_bg(self, data):
     ''' Dispatch the add request in the background, return a `Result`.
     '''
     raise NotImplementedError
 
-  @abstractmethod
   # pylint: disable=unused-argument
   def get(self, h, default=None):
     ''' Fetch the data for hashcode `h` from the Store, or `None`.
     '''
     raise NotImplementedError
 
-  @abstractmethod
   def get_bg(self, h):
     ''' Dispatch the get request in the background, return a `Result`.
     '''
     raise NotImplementedError
 
-  @abstractmethod
   def contains(self, h):
     ''' Test whether the hashcode `h` is present in the Store.
     '''
     raise NotImplementedError
 
-  @abstractmethod
   def contains_bg(self, h):
     ''' Dispatch the contains request in the background, return a `Result`.
     '''
     raise NotImplementedError
 
-  @abstractmethod
   def flush(self):
     ''' Flush outstanding tasks to the next lowest abstraction.
     '''
     raise NotImplementedError
 
-  @abstractmethod
   def flush_bg(self):
     ''' Dispatch the flush request in the background, return a `Result`.
     '''
@@ -786,6 +831,15 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
       return block_for(src, name=name)
 
   @classmethod
+  def from_str(cls, store_spec: str, config=None):
+    ''' Return the `Store` for the specification `store_spec`.
+    '''
+    if config is None:
+      from .config import Config  # pylint:disable=import-outside-toplevel
+      config = Config.default(factory=True)
+    return config.Store_from_spec(store_spec)
+
+  @classmethod
   @fmtdoc
   def promote(cls, obj, config=None):
     ''' Promote `obj` to a `Store` instance.
@@ -796,16 +850,9 @@ class Store(MutableMapping, HasThreadState, MultiOpenMixin, HashCodeUtilsMixin,
         variable ${VT_STORE_ENVVAR} or {VT_STORE_DEFAULT!r}
         and then promoted from `str`.
     '''
-    if isinstance(obj, cls):
-      return obj
     if obj is None:
       obj = os.environ.get(VT_STORE_ENVVAR, VT_STORE_DEFAULT)
-    if isinstance(obj, str):
-      if config is None:
-        from .config import Config  # pylint:disable=import-outside-toplevel
-        config = Config.default(factory=True)
-      return config.Store_from_spec(obj)
-    raise TypeError("%s.promote: cannot promote %s" % (cls.__name__, r(obj)))
+    return super().promote(obj, config=config)
 
 class StoreSyncBase(Store):
   ''' Subclass of Store expecting synchronous operations

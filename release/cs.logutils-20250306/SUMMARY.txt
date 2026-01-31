@@ -1,0 +1,1 @@
+ansi_mode: use white-on-red instead of red, easier to read - really needs some kind of palette from the environment and a light/dark mode.

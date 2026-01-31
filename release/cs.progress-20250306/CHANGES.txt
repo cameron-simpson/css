@@ -1,0 +1,5 @@
+lib/python/cs/progress.py: cs.progress: fix docstring typo
+lib/python/cs/progress.py: cs.progress: Progress: new .qbar() method to make a progress bar and return a queue on which to put items to track
+lib/python/cs/progress.py: cs.progress: fix docstring mistake
+lib/python/cs/progress.py: cs.progress: progressbar: return the iterable unchanged if upd is None or disabled
+lib/python/cs/progress.py: cs.progress: BaseProgress.iterbar: new optional cancelled parameter for a cancellation test callable

@@ -1,0 +1,5 @@
+ebooks mobi: new "toc" table of contents subcommand.
+ebooks dedrm: rename "remove" subcommand to "decrypt".
+ebooks calibre: new "decrypt" subcommand to decrypt books already in the library.
+Something of a code reorganise.
+Various internal updates and fixes.

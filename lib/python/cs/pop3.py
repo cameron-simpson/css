@@ -26,6 +26,7 @@
 from collections import namedtuple
 from contextlib import contextmanager
 from email.parser import BytesParser
+from getopt import GetoptError
 from mailbox import Maildir
 from netrc import netrc
 from os import geteuid
@@ -36,11 +37,11 @@ import ssl
 import sys
 from threading import RLock
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.fs import shortpath
 from cs.lex import cutprefix, cutsuffix
 from cs.logutils import debug, warning, error, exception
-from cs.pfx import Pfx, pfx, pfx_call
+from cs.pfx import Pfx, pfx_call
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
@@ -546,15 +547,18 @@ class POP3Command(BaseCommand):
   '''
 
   # pylint: disable=no-self-use,too-many-locals
+  @popopts(
+      _1=('once', "Download only 1 message."),
+      limit_=("Limit the number of messages fetched.", int),
+  )
   def cmd_dl(self, argv):
-    ''' Collect messages from a POP3 server and deliver to a Maildir.
-
-        Usage: {cmd} [-n] [{{ssl,tcp}}:]{{netrc_account|[user@]host[!sni_name][:port]}} maildir
+    ''' Usage: {cmd} [{{ssl,tcp}}:]{{netrc_account|[user@]host[!sni_name][:port]}} maildir
+          Collect messages from a POP3 server and deliver to a Maildir.
     '''
-    doit = True
-    if argv and argv[0] == '-n':
-      argv.pop(0)
-      doit = False
+    doit = self.options.doit
+    once = self.options.once
+    limit = self.options.limit
+    runstate = self.options.runstate
     pop_target = argv.pop(0)
     maildir_path = argv.pop(0)
     if argv:
@@ -575,8 +579,15 @@ class POP3Command(BaseCommand):
           )
           with ResultSet() as deleRs:
             with ResultSet() as retrRs:
-              for msg_n in msg_uid_map.keys():
+              for msg_n in sorted(msg_uid_map):
+                runstate.raiseif()
                 retrRs.add(pop3.dl_bg(msg_n, M, deleRs if doit else None))
+                if once:
+                  break
+                if limit is not None:
+                  limit -= 1
+                  if limit <= 0:
+                    break
               pop3.flush()
               retrRs.wait()
             # now the deleRs are all queued

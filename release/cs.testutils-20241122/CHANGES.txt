@@ -1,0 +1,3 @@
+lib/python/cs/testutils.py: cs.testutils :fix docstring typo
+lib/python/cs/testutils.py: cs.testutils: assertSingleThread: new optional exclude parameter which is a callable to test where a Thread should be ignored
+lib/python/cs/testutils.py: merge default -> vt

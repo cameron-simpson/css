@@ -1,0 +1,1 @@
+Moved @cachedmethod from cs.deco to cs.cache.

@@ -34,7 +34,7 @@ then
   fstags tag . "cs.dlog=$category"
 else
   format={cs.dlog}
-  category=$( fstags ls -d -o "$format" -- "$path" )
+  category=$( fstags ls -q -d -o "$format" -- "$path" )
   case "$category" in
     '' | '{}' | "$format" ) ;;
     *)  echo "$category" ;;

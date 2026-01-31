@@ -1,0 +1,7 @@
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: small internal changes
+lib/python/cs/deco.py: merge default -> ebooks
+lib/python/cs/deco.py: merge default -> ebooks
+lib/python/cs/deco.py: cs.deco: new @uses_cmd_option, @uses_quiet, @uses_verbose decorators
+lib/python/cs/deco.py: cs.deco: new @uses_doit like @uses_quiet et al
+lib/python/cs/deco.py: cs.deco: remove debug
+lib/python/cs/deco.py: merge tagger ==> default

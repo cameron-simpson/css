@@ -1,0 +1,1 @@
+Result.__del__: mention str(Result) in the warning.

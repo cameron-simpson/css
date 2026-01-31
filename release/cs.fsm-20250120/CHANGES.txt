@@ -1,0 +1,2 @@
+lib/python/cs/fsm.py: cs.fsm: FSM.callback: sanity check the state against self.FSM_TRANSITIONS
+lib/python/cs/fsm.py: cs.fsm: FSM: fix various sanity checks

@@ -1,0 +1,2 @@
+OptionSpec.getopt_long: fix construction of getopt long option specifications, lost during the recent refactor.
+Two other minor fixes.

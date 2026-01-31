@@ -1,0 +1,3 @@
+BaseCommand: honour SUBCOMMAND_ARGV_DEFAULT even when there are no subcommands.
+BaseCommand._prerun_setup: bugfix application of default argv, was setting self._argv too early.
+Some documentation updates.

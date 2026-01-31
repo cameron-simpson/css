@@ -1,0 +1,2 @@
+New @popopts decorator to run self.options.popopts and fill out the usage message.
+Add "-e ssh-command" and the .ssh_exe attribute to BaseCommandOptions.

@@ -312,7 +312,7 @@ class CloudBackupCommand(BaseCommand):
       with Pfx(subcmd):
         if subcmd == 'rewrite':
           if argv:
-            raise GetoptError("extra arguments: %r" % (argv,))
+            raise GetoptError(f'extra arguments: {argv!r}')
           state.rewrite_backend()
         else:
           raise GetoptError("unrecognised subsubcommand")
@@ -434,7 +434,7 @@ class CloudBackupCommand(BaseCommand):
           Generate a new key pair and print its name.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     cloud_backup = options.cloud_backup
     passphrase = getpass("Passphrase for new key: ")
@@ -627,7 +627,7 @@ class CloudBackupCommand(BaseCommand):
           Report the backup configuration.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     cloud_area = options.cloud_area
     print("State dir:", options.state_dirpath)

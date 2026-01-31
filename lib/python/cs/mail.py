@@ -18,7 +18,7 @@ import string
 import re
 from contextlib import closing
 from cs.seq import seq
-from cs.fileutils import saferename
+from cs.fileutils import rename_excl
 
 def mailbox(path):
   if ismaildir(path):
@@ -212,7 +212,7 @@ class Maildir:
 
     newname=self.fullpath(self.mkname(info))
     info(path, '=>', newname)
-    saferename(path,newname)
+    rename_excl(path,newname)
 
 class MaildirNewItem:
   def __init__(self,maildir):
@@ -229,7 +229,7 @@ class MaildirNewItem:
     self.__fp.close()
     oldname=self.__maildir.fullpath(self.__tmpname)
     newname=self.__maildir.fullpath(self.__newname)
-    saferename(oldname,newname)
+    rename_excl(oldname,newname)
     return newname
 
 _maildirs={}

@@ -1,0 +1,1 @@
+Replace many raises of RuntimeError with NotImplementedError, suggestion by @dimaqq on disucss.python.org.

@@ -1,0 +1,2 @@
+_COMMON_OPT_SPECS: include a --dry-run option, alter for -n.
+SubCommand.usage_text: one line listing for common subcommands.

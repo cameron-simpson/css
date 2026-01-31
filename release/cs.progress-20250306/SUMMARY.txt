@@ -1,0 +1,3 @@
+Progress: new .qbar() method to make a progress bar and return a queue on which to put items to track.
+progressbar: return the iterable unchanged if upd is None or disabled.
+BaseProgress.iterbar: new optional cancelled parameter for a cancellation test callable, passed through by progressbar etc.

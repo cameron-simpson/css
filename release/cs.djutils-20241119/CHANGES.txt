@@ -1,0 +1,9 @@
+lib/python/cs/djutils.py: cs.djutils: fill out the class docstring
+lib/python/cs/djutils.py: merge default ==> djangohacks
+lib/python/cs/djutils.py: cs.djutils: BaseCommand: update the options example, fix a mistyped name
+lib/python/cs/djutils.py: cs.djutils: new DjangoSpecificSubCommand(CSBaseCommand.SubCommandClass) to include support for pure Django BaseCommands
+lib/python/cs/djutils.py: cs.djutils: DjangoSpecificSubCommand.__call__: fix invocation of the Django BaseCommand (needs polish)
+lib/python/cs/djutils.py: cs.djutils: BaseCommand: update docstring now that we have basic support for importing pure Django BaseCommands as subcommands
+lib/python/cs/djutils.py: cs.djutils: DjangoSpecificSubCommand: new is_pure_django_command property, new usage_text method handling pure Django commands (poorly)
+lib/python/cs/djutils.py: cs.djutils: remove debug, brush off lint
+lib/python/cs/djutils.py: cs.djutils: update DISTINFO

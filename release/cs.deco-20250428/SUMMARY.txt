@@ -1,0 +1,2 @@
+@decorator: bugfix the post decorate attribute update of __name__, __doc__ etc - collect these values _before_ the decoration.
+Promotable.promote: fall back to calling cls(obj) instead of raising a TypeError - the class init can do that.

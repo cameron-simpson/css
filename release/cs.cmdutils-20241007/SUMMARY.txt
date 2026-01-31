@@ -1,0 +1,3 @@
+BaseCommand: drop __init_subclass__, was doing too much to early.
+BaseCommand.__init__: no cmd and argv[0] ends with ".py" infer cmd from the class name.
+Other minor updates.

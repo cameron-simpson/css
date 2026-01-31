@@ -1,0 +1,7 @@
+New hashindex_map(dirpath) function exposing the code to make a hashcode->[fspath,...] mapping.
+New remote_rearrange(rhost,dstdir,fspaths_by_hashcode) function to rearrange a remote directory.
+HashIndexCommand: new cmd_rsync() to rearrange a target then rsync to it.
+HashIndexCommand.cmd_rearrange: honour "-" as the refdir to read the hash index from standard input.
+HashIndexCommand.cmd_rearrange: default to move mode, change the CLI options to have --ln instead of --mv.
+HashIndexCommand.cmd_rearrange: new -1 (once) option to only do a single file rename, handy for testing.
+Redo almost the entire merge() function for clearer logic.

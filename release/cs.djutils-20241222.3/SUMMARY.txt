@@ -1,0 +1,1 @@
+Autocall settings.configure() if required because Django's settings object is a royal PITA.

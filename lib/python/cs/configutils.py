@@ -12,13 +12,13 @@ import os.path
 import sys
 from collections.abc import Mapping
 from threading import RLock
-from cs.deco import cachedmethod
-from cs.fileutils import file_property
+
+from cs.cache import cachedmethod, file_property
 from cs.py3 import ConfigParser, StringTypes
 from cs.tagset import TagSet
 from cs.threads import locked
 
-__version__ = '20220606-post'
+__version__ = '20250103-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,8 +28,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.deco',
-        'cs.fileutils',
+        'cs.cache',
         'cs.py3',
         'cs.tagset',
         'cs.threads',
@@ -223,7 +222,8 @@ class HasConfigIni:
     ''' Return an informational `dict` containing salient information
         about this `HasCOnfigIni`, handy for use with `pprint()`.
     '''
-    if d is None: d = {}
+    if d is None:
+      d = {}
     d.update(config=self.config_ini, section=self.__section)
     return d
 

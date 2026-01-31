@@ -1,0 +1,4 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: select the subusages from the additional_subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: honour show_subcmds, refactor a bit
+lib/python/cs/cmdutils.py: cs.cmdutils: new BaseCommand.SubCommandClass attribute for the SubCommand subclass, supports using additional SubCommand subclasses for eg cs.djutils
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCOmmand: regroup class attributes

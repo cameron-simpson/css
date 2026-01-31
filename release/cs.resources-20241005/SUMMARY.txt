@@ -1,0 +1,2 @@
+New RunState.sleep(delay[,step]) function to do an interruptable sleep.
+RunState.bg: override HasThreadState.bg to catch CancellationError and just issue a warning.

@@ -1,0 +1,2 @@
+lib/python/cs/logutils.py: cs.logutils: setup_logging: just amend the existing loginfo if already set up; remove the cs.pfx.cmd side effect from LogSTate.__init__, now in setup_logging
+lib/python/cs/logutils.py: cs.logutils: update DISTINFO

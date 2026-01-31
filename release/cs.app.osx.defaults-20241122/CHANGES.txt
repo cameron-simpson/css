@@ -1,0 +1,2 @@
+lib/python/cs/app/osx/defaults.py: cs.app.osx.default: fix docstring typo
+lib/python/cs/app/osx/defaults.py: cs.app.osx.defaults: run: drop quiet-False parameter, the run() inside defaults() will pick things up

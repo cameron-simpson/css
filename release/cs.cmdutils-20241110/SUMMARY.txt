@@ -1,0 +1,9 @@
+Various fixes and enhancements to the usage text generation.
+BaseCommandOptions.COMMON_OPT_SPECS stuff, including inheritance and presentation in usage.
+BaseCommand.run: if self.run_context() yields not None, exit immediately with that value.
+Rationalise and improve OptionSpec.
+Supplant vprint with qvprint which honours quiet and verbose, provide vprint as a shim with a hardwired quiet=False.
+Make cmd_info the default subcommand and make some improvements.
+BaseCommandOptions: new fields_as_dict method, update copy() to start with fields_as_dict, overlay as_dict, overlay updates.
+OptionSpec: new add_argument(parser[,options]) method to add this option to an argparse style option parser (again, for the upcoming cs.djutils module).
+A heap of small things.

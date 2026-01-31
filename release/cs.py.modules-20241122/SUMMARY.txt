@@ -1,0 +1,1 @@
+import_module_name: rename the `path` parameter to `sys_path` to match import_module_from_file, default sys_path to sys.path.

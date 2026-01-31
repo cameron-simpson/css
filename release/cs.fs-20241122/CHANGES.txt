@@ -1,0 +1,5 @@
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton: add a .promote method to promote a filesystem path to an instance
+lib/python/cs/fs.py: merge ebooks ==> default: cs.ebooks.dedrm: support for getting the DeDRM stuff from the calibre plugin zip file
+lib/python/cs/fs.py: cs.fs: FSPathBasedSingleton: new fspath_normalised(fspath) class method to produce a normalised form of the fspath for use as the key to the singleton registry
+lib/python/cs/fs.py: cs.fs: clean some lint
+lib/python/cs/fs.py: merge ebooks ==> default: many updates, mostly for the cs.cmdutils updates

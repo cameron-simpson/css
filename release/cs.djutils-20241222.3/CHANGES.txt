@@ -1,0 +1,1 @@
+lib/python/cs/djutils.py: cs.djutils: autocall settings.configure() if required because Django's settings object is a royal PITA

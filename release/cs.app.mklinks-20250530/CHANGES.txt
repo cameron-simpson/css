@@ -1,0 +1,17 @@
+lib/python/cs/app/mklinks.py: cs.*: replace a lot of runstate plumbing with @uses_runstate
+lib/python/cs/app/mklinks.py: cs.app.mklinks: checksum: do not bother with a progress bar for small files
+lib/python/cs/app/mklinks.py: cs.*: DISTINFO: update console_scripts and gui_scripts definitions
+lib/python/cs/app/mklinks.py: cs.app.mklinks: drop obsolete @prop decorator, update runstate usage
+lib/python/cs/app/mklinks.py: cs.app.mklinks: use cs.hashindex.file_checksum to obtain the checksum
+lib/python/cs/app/mklinks.py: cs.app.mklinks: update DISTINFO
+lib/python/cs/app/mklinks.py: cs.*: changes to accomodate dropping BaseCommandOptions.runstate
+lib/python/cs/app/mklinks.py: cs.*: we also dropped BaseCommandOptions.upd in favour of @uses_upd; related lint cleanups
+lib/python/cs/app/mklinks.py: cs.*: drop obsolete update_frequency from more progress bars
+lib/python/cs/app/mklinks.py: replace many raises of RuntimeError with NotImplementedError, suggestion by @dimaqq on disucss.python.org
+lib/python/cs/app/mklinks.py: cs.app.mklinks: skip comparison pass for buckets with less than 2 items
+lib/python/cs/app/mklinks.py: cs.app.mklinks: MKLinksCmd.main: modern cs.cmdutils use
+lib/python/cs/app/mklinks.py: cs.app.mklinks: MKLinksCmd.main: drop spurious runstate parameter
+lib/python/cs/app/mklinks.py: cs.app.mklinks: refactor internals with a superior Inode class etc
+lib/python/cs/app/mklinks.py: cs.app.mklinks: rename MKLinksCmd to MKLinksCommand, makes for better usage message
+lib/python/cs/app/mklinks.py: cs.app.mklinks: docstring update
+lib/python/cs/app/mklinks.py: cs.app.mklinks: update DISTINFO

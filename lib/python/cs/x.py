@@ -43,13 +43,9 @@ The following environment variables affect the initial values of the globals:
   which often divert `sys.stderr`.
 '''
 
-from __future__ import print_function
-
-from io import UnsupportedOperation
 import logging
 import os
 import os.path
-import stat
 import sys
 
 from cs.ansi_colour import colourise
@@ -61,13 +57,14 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.ansi_colour',
         'cs.gimmicks',
     ],
+    'python_requires':
+    '>=3',
 }
 
 # discard output? the default if sys.stderr is not a tty
@@ -85,7 +82,7 @@ if X_logger is not None:
 X_default_colour = os.environ.get('CS_X_COLOUR')
 
 # pylint: disable=too-many-branches
-def X(msg, *args, **kw):
+def X(msg, *args, file=None, colour=None):  # noqa: N802
   ''' Unconditionally write the message `msg`.
 
       If there are positional arguments after `msg`,
@@ -108,21 +105,20 @@ def X(msg, *args, **kw):
       `X_via_tty` is initialised from the environment variable `$CS_X_VIA_TTY`.
       `X_discard` is true unless `sys.stderr.isatty()` is true.
   '''
-  fp = kw.pop('file', None)
-  colour = kw.pop('colour', X_default_colour)
-  if kw:
-    raise ValueError("unexpected keyword arguments: %r" % (kw,))
-  msg = str(msg)
+  if colour is None:
+    colour = X_default_colour
   if args:
     try:
       msg = msg % args
     except TypeError as e:
-      X("X(%r, *%r): %s", msg, args, e, colour='red', file=fp, **kw)
-      msg = "%s %% %r" % (msg, args)
+      X("X(%r, *%r): %s", msg, args, e, colour='red', file=file)
+      msg = f'{msg} % {args!r}'
+  else:
+    msg = str(msg)
   if colour:
     msg = colourise(msg, colour=colour)
   close_fp = None
-  if fp is None:
+  if file is None:
     if X_logger:
       # NB: ignores any kwargs
       X_logger.warning(msg)
@@ -131,21 +127,21 @@ def X(msg, *args, **kw):
       # NB: ignores any kwargs
       try:
         f = open_append(X_via_tty)
-      except (IOError, OSError) as e:
+      except (IOError, OSError) as e:  # noqa: UP024
         X(
             "X: cannot append to %r: %s:%s",
             X_via_tty,
             type(e),
             e,
-            file=sys.stderr
+            file=sys.stderr,
         )
         X(msg, file=sys.stderr)
         return
       close_fp = f
     if X_discard:
       return
-    fp = sys.stderr
-  print(msg, file=fp)
+    file = sys.stderr
+  print(msg, file=file)
   if close_fp is not None:
     close_fp.close()
 
@@ -163,8 +159,10 @@ else:
     else:
       if not os.isatty(xfd):
         X(
-            "%s: open(%r): not a tty, using %r", __file__, env_via_tty,
-            X_via_tty
+            "%s: open(%r): not a tty, using %r",
+            __file__,
+            env_via_tty,
+            X_via_tty,
         )
       else:
         X_via_tty = env_via_tty
@@ -178,7 +176,7 @@ if os.environ.get('CS_X_BUILTIN', ''):
   else:
     builtins.X = X
 
-def Y(msg, *a, **kw):
+def Y(msg, *a, **kw):  # noqa: N802
   ''' Wrapper for `X()` rendering in yellow.
   '''
   X(msg, *a, colour='yellow', **kw)

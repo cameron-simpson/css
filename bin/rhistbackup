@@ -52,8 +52,9 @@ do
         "$remote" \
         sh -c '
           set -ue
-          histbackup \
-            -e "ssh -F $REVSSH_SSHCFG" \
+          histbackup -x \
+            -e "sshto -E -F $REVSSH_SSHCFG" \
+            --hashindex \
             "$REVSSH_SRCHOST:$remote_srcdir" \
             "$remote_dstdir" \
             --outbuf=line -i

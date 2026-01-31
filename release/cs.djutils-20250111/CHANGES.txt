@@ -1,0 +1,2 @@
+lib/python/cs/djutils.py: cs.djutils: new model_batches_qs() for generating QuerySets for batches of a Model
+lib/python/cs/djutils.py: merge cs.djutils model_batches_qs()

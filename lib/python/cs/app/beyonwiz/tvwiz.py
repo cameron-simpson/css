@@ -15,7 +15,7 @@ import struct
 from tempfile import NamedTemporaryFile
 from typing import Tuple
 
-from cs.binary import BinaryMultiStruct, BinarySingleStruct
+from cs.binary import BinaryStruct
 from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.fileutils import datafrom
@@ -68,7 +68,7 @@ HEADER_DATA_SZ = HDR_EXTINFO_OFF + HDR_EXTINFO_SZ
 #     uchar       unused;
 # };
 #
-TVWizFileHeader = BinaryMultiStruct(
+TVWizFileHeader = BinaryStruct(
     'TVWizFileHeader',
     '<5HBBBB',
     'hidden1 hidden2 hidden3 hidden4 hidden5 lock media_type in_rec unused',
@@ -86,7 +86,7 @@ TVWizFileHeader = BinaryMultiStruct(
 #    sec
 #    last_offset
 #    followed by 8640 fileOff
-class TVWizTSPoint(BinaryMultiStruct(
+class TVWizTSPoint(BinaryStruct(
     'TVWizTSPoint',
     '<256s256sHHLHHQ',
     'service_name_bs0 event_name_bs0 mod_julian_date pad start last sec last_offset',
@@ -109,9 +109,7 @@ class TVWizTSPoint(BinaryMultiStruct(
     ''' The start time of the recording as a UNIX timestamp. '''
     return (self.mod_julian_date - 40587) * DAY + self.start
 
-TVWizFileOffset = BinarySingleStruct(
-    'TVWizFileOffset', '<Q', field_name='offset'
-)
+TVWizFileOffset = BinaryStruct('TVWizFileOffset', '<Q', field_names='offset')
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
@@ -175,7 +173,7 @@ def unrle(bfr: CornuCopyBuffer, fmt):
 class TVWiz(_Recording):
   ''' A TVWiz specific _Recording for pre-T3 Beyonwiz devices.
   '''
-  DEFAULT_FILENAME_BASIS = '{meta.event_name:lc}--{file.datetime:lc}--{meta.service_name:lc}--beyonwiz--{meta.synopsis:lc}'
+  DEFAULT_FILENAME_BASIS = '{meta.event_name:lc_}--{file.datetime:lc_}--{meta.service_name:lc_}--beyonwiz--{meta.synopsis:lc_}'
 
   FFMPEG_METADATA_MAPPINGS = {
 
@@ -247,14 +245,16 @@ class TVWiz(_Recording):
     '''
     tvhdr = TVWiz_Header.parse(self.headerpath)
     file_title, file_dt = self._parse_path()
-    tags = TagSet({
-        'file.title': file_title,
-        'file.datetime': file_dt,
-        'meta.event_name': tvhdr.event_header.event_name,
-        'meta.service_name': tvhdr.event_header.service_name,
-        'meta.synopsis': tvhdr.synopsis,
-        'meta.start_unixtime':tvhdr.event_header.start_unixtime,
-        })
+    tags = TagSet(
+        {
+            'file.title': file_title,
+            'file.datetime': file_dt,
+            'meta.event_name': tvhdr.event_header.event_name,
+            'meta.service_name': tvhdr.event_header.service_name,
+            'meta.synopsis': tvhdr.synopsis,
+            'meta.start_unixtime': tvhdr.event_header.start_unixtime,
+        }
+    )
     episode = tvhdr.episode
     try:
       episode_num = int(episode)

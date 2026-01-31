@@ -1,0 +1,2 @@
+model_batches_qs: new yield_base_qs=False parameter to yield the base QuerySet ahead of the batch QuerySets.
+model_instances: new yield_base_qs=False parameter to yield the base QuerySet ahead of the Model instances.

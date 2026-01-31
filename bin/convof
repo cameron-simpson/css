@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # =head1 NAME
 #
@@ -19,15 +19,17 @@
 #
 # is issued to compute it,
 # placing the result on its standard output.
-# 
+#
+
+set -u
 
 : ${TMPDIR:=/tmp}
 : ${CONVCACHE_ROOT:=$HOME/var/cache/convof}
 
 cmd=`basename "$0"` || exit 1
 usage="Usage: $cmd -C convname [arg1opts...] file convertor [convargs...]
-	-C convname	Name for this conversion.
-	arg1opts	Passwd to arg1 to invoke convertor."
+        -C convname     Name for this conversion.
+        arg1opts        Passwd to arg1 to invoke convertor."
 
 badopts=
 
@@ -50,15 +52,15 @@ do
     # This string is used as a path component in the cache result
     # to designate this type of conversion.
     #
-    -C)	convname=$2; shift ;;
+    -C) convname=$2; shift ;;
     -stdin|-discard|-end|-x|-[0-9]*)
-	arg1opts="$arg1opts $1"
-	;;
-    --)	shift; break ;;
+        arg1opts="$arg1opts $1"
+        ;;
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
-	badopts=1
-	;;
-    *)	break ;;
+        badopts=1
+        ;;
+    *)  break ;;
   esac
   shift
 done
@@ -67,13 +69,13 @@ done
 #
 
 case "/$convname/" in
-  //)	echo "$cmd: missing -C convname" >&2
-	badopts=1
-	;;
+  //)   echo "$cmd: missing -C convname" >&2
+        badopts=1
+        ;;
   //* | */../* )
-	echo "$cmd: bad convname; absolute paths and .. forbidden" >&2
-	badopts=1
-	;;
+        echo "$cmd: bad convname; absolute paths and .. forbidden" >&2
+        badopts=1
+        ;;
 esac
 
 if [ $# = 0 ]

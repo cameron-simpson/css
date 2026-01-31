@@ -1,0 +1,2 @@
+Move Identifier, NumericValue, QuotedString in from cs.app.tagger.rules.
+BaseToken: expose the parsing subclass selection as a `.token_classes class method.

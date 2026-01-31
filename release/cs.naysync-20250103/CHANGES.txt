@@ -1,0 +1,24 @@
+lib/python/cs/naysync.py: cs.naysync: @afunc now accepts and async function and returns it unchanged, @agen now accepts an async generator and returns it unchanged
+lib/python/cs/naysync.py: cs.naysync: amap: comments and minor tweak, no semantic changes
+lib/python/cs/naysync.py: cs.naysync: new IterableAsyncQueue much like cs.queues.IterableQueue
+lib/python/cs/naysync.py: cs.naysync: whitespace
+lib/python/cs/naysync.py: cs.naysync: async_iter: accept an async iterable, return aiter(it) directly
+lib/python/cs/naysync.py: cs.naysync: async_iter: "aiter" is new in Python 3.10, use it.__aiter__() instead
+lib/python/cs/naysync.py: cs.naysync: New AnyIterable = Union[Iterable, AsyncIterable] type alias, allow both sync and async iterators
+lib/python/cs/naysync.py: cs.naysync: async_iter: new optional fast=False parameter, if true then iterate the iterator directly instead of via asyncio.to_thread
+lib/python/cs/naysync.py: cs.naysync: add missing import
+lib/python/cs/naysync.py: cs.naysync: async_iter: fix the test for an asynchronous iteratable
+lib/python/cs/naysync.py: cs.naysync: async_iter: make missing `fast=` be True for list/tuple/set and False otherwise
+lib/python/cs/naysync.py: cs.naysync: demo mode: exercise async_iter()
+lib/python/cs/naysync.py: cs.naysync: new AsyncPipeLine, an asynchronous iterable with a `put` method to provide input for processing
+lib/python/cs/naysync.py: cs.naysync: make the demo mode output more compact
+lib/python/cs/naysync.py: cs.naysync: demo mode: provide a leading debugging clause (disabled)
+lib/python/cs/naysync.py: cs.naysync: new StageMode class with a STREAM enum for streaming stages, implement in AsyncPipeLine.run_stage
+lib/python/cs/naysync.py: cs.naysync: @afunc: new optional fast=False parameter - if true then do not divert through asyncio.to_thread
+lib/python/cs/naysync.py: cs.naysync: update f-string
+lib/python/cs/naysync.py: cs.naysync: update module docstring
+lib/python/cs/naysync.py: cs.naysync: docstring tweaks
+lib/python/cs/naysync.py: cs.naysync: formatting
+lib/python/cs/naysync.py: cs.naysync: new aqget(q) and aqiter(q)
+lib/python/cs/naysync.py: cs.naysync: tweak demo output
+lib/python/cs/naysync.py: cs.naysync: demo uses pilfer but it is not part of the requirements, so hand an ImportError

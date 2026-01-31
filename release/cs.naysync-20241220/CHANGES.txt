@@ -1,0 +1,5 @@
+lib/python/cs/naysync.py: cs.naysync: new await_iter(Iterable) function returning an asynchronous generator yielding from an iterator
+lib/python/cs/naysync.py: cs.naysync: new amap(func,iterable) asynchronously mapping a function over an iterable
+lib/python/cs/naysync.py: cs.naysync: update imports, add exercise of amap() to the main mode
+lib/python/cs/naysync.py: cs.naysync: rename await_iter to async_iter
+lib/python/cs/naysync.py: merge async ==> default: new async_iter(iterator) and amap(func,iterable)

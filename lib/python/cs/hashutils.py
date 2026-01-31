@@ -1,6 +1,34 @@
 #!/usr/bin/python
 
 ''' Convenience hashing facilities.
+
+    This predefines classes for various hash algorithms:
+    `BLAKE3` (if we can import `blake3`), `MD5`, `SHA1`, `SHA224`,
+    `SHA256`, `SHA384`, `SHA512`, and a `BaseHashCode` base class
+    as a common ancestor with a `.hashclass()` factory method for
+    creating new subclasses for other algorithms.
+
+    All `BaseHashCode` classes have a variety of convenience factories for making instances:
+    * `from_hashbytes`: from an existing digest `bytes`
+    * `from_hashbytes_hex`: from a hex string of an existing digest
+    * `from_named_hashbytes_hex`: from a hashname (eg `'blake3'`) and a hex string
+    * `from_named_hashbytes_hex`: from a *hashname*`:`*hex* string
+    * `from_data`: from `bytes` content
+    * `from_buffer`: from a `CornuCopyBuffer` or anything which can be promoted to one
+    * `from_fspath`: from a filesystem path
+
+    Hashing some content returns instances of these classes, which
+    are subclasses of `bytes` i.e. the digest. All `BaseHashCode` classes various methods:
+    * `str(hashcode)`: returns a *hashname*`:`*hex* string
+    * `.hashname`: the hash function name
+    * `.hex()`: the digest as a hex string
+
+    The common example:
+
+        # obtain the contwnt hash from the file `fspath`
+        hashcode = hashclass.from_fspath(fspath)
+
+    where `hashclass` is whatever `BaseHashCode` subclass is in use.
 '''
 
 from binascii import hexlify, unhexlify
@@ -13,7 +41,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import promote
 from cs.lex import r
 
-__version__ = '20240412-post'
+__version__ = '20250414.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -47,13 +75,19 @@ class BaseHashCode(bytes):
     '''
     try:
       hashfunc = getattr(hashlib, hashname)
-    except AttributeError:
+    except AttributeError as hashlib_e:
       if hashname == 'blake3':
         # see if the blake3 module is around
         # pylint:disable=import-outside-toplevel
-        from blake3 import blake3 as hashfunc
+        try:
+          from blake3 import blake3 as hashfunc
+        except ImportError as import_e:
+          import sys
+          raise ValueError(
+              f'unknown {hashname=}: {import_e}; {sys.path=}'
+          ) from import_e
       else:
-        raise
+        raise ValueError(f'unknown {hashname=}: {hashlib_e}')
     return hashfunc
 
   @classmethod
@@ -155,7 +189,7 @@ class BaseHashCode(bytes):
 
   @classmethod
   def from_named_hashbytes_hex(cls, hashname, hashhex):
-    ''' Factory function to return a `HashCode` object
+    ''' Factory function to return a `BaseHashCode` object
         from the hash type name and the hash bytes hex text.
     '''
     hashclass = cls.hashclass(hashname)
@@ -244,3 +278,10 @@ SHA224 = BaseHashCode.hashclass('sha224')
 SHA256 = BaseHashCode.hashclass('sha256')
 SHA384 = BaseHashCode.hashclass('sha384')
 SHA512 = BaseHashCode.hashclass('sha512')
+# define BLAKE3 if available
+try:
+  from blake3 import blake3
+except ImportError:
+  pass
+else:
+  BLAKE3 = BaseHashCode.hashclass('blake3')

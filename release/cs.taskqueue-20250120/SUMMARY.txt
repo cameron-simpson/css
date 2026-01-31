@@ -1,0 +1,1 @@
+BaseTask.__init__: accept the state as positional or keyword.

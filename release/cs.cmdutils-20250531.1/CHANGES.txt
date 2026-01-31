@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.getopt_spec_map: fix precedence of subcommand and inherited options
+lib/python/cs/cmdutils.py: merge tagger ==> default: cs.cmdutils bugfix

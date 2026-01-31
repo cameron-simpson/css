@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmduutils: always offer the repl as a subcommand, improve its banner, only include public names in the locals
+lib/python/cs/cmdutils.py: cs.cmdutils: move BaseCommand.cmd_shell to preserve subcommand method lexical ordering
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: warn and skip unknown subcommands in show_subcmds

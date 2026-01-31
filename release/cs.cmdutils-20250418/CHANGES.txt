@@ -1,0 +1,9 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCOmmand.cmd_info: use cs.lex.printt() to print the fields table
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring fix, update reference to BaseCommand.Options in docstring example
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: if there is no identifierish subcommand name but there is self.SUBCOMMAND_ARGV_DEFAULT, prefix it to whatever argv there is
+lib/python/cs/cmdutils.py: cs.cmdutils: consistent testing for the presence of subcommands; make SubCommand.has_subcommands a method instead of a property
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring tweak
+lib/python/cs/cmdutils.py: cs.cmdutils: formatting tweaks
+lib/python/cs/cmdutils.py: cs.cmdutils: split_usage: take the first paragraph is Usage: missing, prepend the generic Usage: line
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: bugfix application of default argv, was setting self._argv too early; tweak some comments and a docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: clean some lint

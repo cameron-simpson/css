@@ -1,0 +1,2 @@
+lib/python/cs/tagset.py: cs.tagset: Tagset._Auto: act much more like a mapping
+lib/python/cs/tagset.py: merge ebooks ==> default

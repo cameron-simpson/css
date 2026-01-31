@@ -15,7 +15,7 @@ from cs.gimmicks import exception, warning
 from cs.py.func import funcname
 from cs.py3 import raise_from
 
-__version__ = '20240630-post'
+__version__ = '20250306-post'
 
 DISTINFO = {
     'description':
@@ -198,11 +198,6 @@ def unattributable(func):
   ''' Decorator to transmute `AttributeError` into a `RuntimeError`.
   '''
   return transmute(func, AttributeError, RuntimeError)
-
-def safe_property(func):
-  ''' Substitute for @property which lets AttributeErrors escape as RuntimeErrors.
-  '''
-  return property(unattributable(func))
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.

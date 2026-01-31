@@ -125,8 +125,12 @@ bsed '1i\
 Content-Type: text/plain; charset=utf-8; format=flowed' "$filename" || exit 1
 
 set -- \
+  set-x \
   rmafter "$filename" \
-    mutt -e "set editor=$editor" -e 'unset signature' -e 'set sidebar_visible=no' -H "$filename"
+    mutt -e "set editor=$editor" \
+         -e "unset signature" \
+         -e "set sidebar_visible=no" \
+         -H "$filename"
 
 if tmux start-server
 then  use_tmux=1

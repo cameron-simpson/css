@@ -19,31 +19,46 @@ sshopts=
 
 rtmp=/tmp
 rsetx=      # set -x
-ssh_exe=ssh
-rssh_exe=ssh
+ssh_exe=${SSH_EXE:-"sshto -E"}
+rssh_exe=${RSSH_EXE:-$ssh_exe}
 rssh_host=reverse-$HOST
-local_ssh_endpoint=127.0.0.1:22
+origin_ssh_endpoint=127.0.0.1:22
 rsetenv=
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [options...] remote [remote-command [args...]]
   Ssh to remote with a reverse ssh available back to the origin (here).
-  The basic reverse ssh command is:
-    ssh -F \"\$REVSSH_SSHCFG\" \"\$REVSSH_SRCHOST\"
   Without a remote-command this recites the remote envionment.
   Options:
+    -e ssh_exe      Ssh executable.
     -E envvar=value Set envvar=value in the remote environment.
     -x              Trace execution of the remote command.
   Note that _unlike_ ssh, the remote-command is passed to the far
   end as a correctly quoted command instead of being collapsed into
   a command string for the remote shell. The mechanism involved
-  assumes the remote shell uses Bourne shell quoting syntax."
+  assumes the remote shell uses Bourne shell quoting syntax.
+
+  The following environment variables are provided in the remote environment:
+
+    REVSSH_SRCHOST  The name of an ssh config clause which connects
+                    to the origin host.
+    REVSSH_SRCUSER  The origin username. This is informational, as
+                    it is wired into the ssh clause named by \$REVSSH_SRCHOST.
+    REVSSH_SSHCFG   The pathname of an ssh config file containing
+                    the clause named by \$REVSSH_SRCHOST, which
+                    will ssh back to the origin host.
+    REVSSH_SSHSOCK  The pathname of the socket presenting the origin ssh service.
+
+  The basic reverse ssh command from the remote is:
+
+    ssh -F \"\$REVSSH_SSHCFG\" \$REVSSH_SRCHOST\""
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case "$1" in
+    -e) ssh_exe=$2; shift ;;
     -E) renvvar=$(   expr "x$2" : 'x\([A-Za-z_][A-Za-z_0-9]*\)=.*' )
         renvvalue=$( expr "x$2" : 'x[A-Za-z_][A-Za-z_0-9]*=\(.*\)' || : )
         shift
@@ -82,15 +97,14 @@ else
                   sed "s/^/  /" "$REVSSH_SSHCFG"
                   echo "Forwarded agent:"
                   ssh-add -l | sed "s/^/  /"
-                  echo "Environment:"
-                  env | sort | sed "s/^/  /"
+                  ##echo "Environment:"
+                  ##env | sort | sed "s/^/  /"
                  '
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-local_ssh_endpoint=127.0.0.1:22
-localdir=$( pwd )
+origindir=$( pwd )
 
 reverse_host=reverse-$HOST
 reverse_cfg=$rtmp/revssh-$HOST-$$.cfg
@@ -111,7 +125,7 @@ $trace $ssh_exe $sshopts \
   -o ControlPath=none \
   -o ExitOnForwardFailure=yes \
   -o ForwardAgent=yes \
-  -R "$reverse_sock:$local_ssh_endpoint" \
+  -R "$reverse_sock:$origin_ssh_endpoint" \
   "$remote" \
   '
     umask 077

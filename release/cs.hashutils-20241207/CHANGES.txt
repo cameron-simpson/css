@@ -1,0 +1,1 @@
+lib/python/cs/hashutils.py: cs.hashutils: BaseHashCode.hashclass: raise ValueError from unknown hash function name with greater detail on the underlying failure

@@ -1,0 +1,1 @@
+tabulate: make the default separator two spaces instead of one, immediate return if no rows (avoids max() of empty list).

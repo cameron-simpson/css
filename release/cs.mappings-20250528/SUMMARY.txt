@@ -1,0 +1,1 @@
+New change_mapping(mapping,key,value[,mapping_name]) function which does mapping[key]=value with a warning on overwriting a value.

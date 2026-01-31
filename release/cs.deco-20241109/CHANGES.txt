@@ -1,0 +1,4 @@
+lib/python/cs/deco.py: cs.deco: add @uses_force to @uses_doit, @uses_quiet, @uses_verbose decorator set
+lib/python/cs/deco.py: cs.cmdutils,cs.deco: drop cs.cmdutils.uses_cmd_options, rename cs.deco.uses_cmd_option to uses_cmd_options, provide "options" if no option_defaults
+lib/python/cs/deco.py: cs.deco: @promote: accept optional keyword arguments, plumb to the from_typename factory method, improve docstring
+lib/python/cs/deco.py: merge default ==> vt

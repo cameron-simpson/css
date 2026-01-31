@@ -1,0 +1,6 @@
+lib/python/cs/psutils.py: cs.psutils: run(): accept new remote= and ssh_exe= parameters to support remote execution
+lib/python/cs/psutils.py: cs.psutils: clean some lint
+lib/python/cs/psutils.py: cs.psutils: docstring grammar fix
+lib/python/cs/psutils.py: cs.psutils: run: optional check= parameter defaults to True, inverse of subprocess.run's default
+lib/python/cs/psutils.py: cs.psutils: new remote= parameter to run command remotely, new optional ssh_exe= parameter to support the ssh invocation, default via @uses_cmd_options(ssh_exe)
+lib/python/cs/psutils.py: cs.psutils: remove debugging

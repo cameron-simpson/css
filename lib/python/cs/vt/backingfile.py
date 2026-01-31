@@ -173,8 +173,8 @@ class BackingFile(MutableMapping, MultiOpenMixin):
     '''
     return self.data_record_for(h).data
 
-class RawDataRecord(BinarySingleValue):
-  ''' A raw data record ha no encoding: the bytes are read and written directly.
+class RawDataRecord(BinarySingleValue, value_type=bytes):
+  ''' A raw data record has no encoding: the bytes are read and written directly.
       The index has the offset and length.
   '''
 

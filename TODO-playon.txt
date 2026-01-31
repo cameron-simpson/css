@@ -1,4 +1,6 @@
 SEI.from_Recording: also parse leading sSSeEE - from the playon.Name field
+if no series/season/episode, check the thumbnail path for "series | season N" p
+playon refresh: accept q ids to ping the API, mainly to expire zombie entries
 queue - what is the Status field? can I check for expired queue items
 "playon help" still logs in etc
 clean expired queued items somehow, same with pending

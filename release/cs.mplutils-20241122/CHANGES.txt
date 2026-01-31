@@ -1,0 +1,2 @@
+lib/python/cs/mplutils.py: cs.mplutils: FigureSize: fix field factories; print_figure: wire a .png extension for the temp image
+lib/python/cs/mplutils.py: cs.mplutils: saved_figure: clarify that the save file is removed on exit from the context

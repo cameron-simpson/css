@@ -1,0 +1,2 @@
+lib/python/cs/lex.py: cs.lex: tabulate: make the default separator two spaces instead of one
+lib/python/cs/lex.py: cs.lex: tabulate: immediate return if no rows

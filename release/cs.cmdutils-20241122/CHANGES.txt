@@ -1,0 +1,19 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: new usage_default, usage_commonopts_format, usage_format cached properties, rework get_usage_format to use them
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.popopts: infill with False instead of None for missing boolean options
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCOmmand: new usage_format_parts and usage_format_usage properties
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.get_usage_keywords: compute the elaborate ChainMap
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCOmmand.usage_text usage the new properties, make the subcommand listing a bit more skimmable
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec: replace arg_bool with field_default
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: new usage_format_desc1 property for the first line of the usage_format description
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: the short nonrecursive subcommand listing now uses tabulate() for 1 line per subcommand
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCOmmand.usage_text: remove the annoying ' (short form, long form with "help", "-h" or "--help")' verbiage
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_help: support -l (long) and -s (short) options, do some tidyups
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: revert SUBCOMMAND_ARGV_DEFAULT to None, make a missing subcommand run "help -s" when there's no SUBCOMMAND_ARGV_DEFAULT
+lib/python/cs/cmdutils.py: cs.cmdutils: remove default parameter in tabulate call
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCOmmand: new .has_subcommands property paralleling BaseCommand.has_subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: recursive short tabulated mode if recurse is true
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.{usage_text,subcommand_usage_text} are just thin shims to a SubCommand
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_help: add -r (recurse) option, plumb to self.usage_text()
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand: extract the short subusages into a method
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_text: big rework of the short/recurse behaviour and computation
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_help: mention -r (recurse) in the usage and hints

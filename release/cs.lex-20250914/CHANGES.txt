@@ -1,0 +1,29 @@
+lib/python/cs/lex.py: cs.lex: rename "o" to "obj", add a heap of type annoations
+lib/python/cs/lex.py: cs.lex: type annotation and docstring update
+lib/python/cs/lex.py: cs.lex: @has_format_attributes: traverse the inherited classes in reverse so that closer classes override further classes
+lib/python/cs/lex.py: cs.lex: fix type annotation
+lib/python/cs/lex.py: cs.lex: restore a couple of default offset=0 parameters, update some docstrings
+lib/python/cs/lex.py: cs.lex: new FormatMapping(obj,base_format_mapping) class presenting a mapping where some entries are callable, used by FormatableMixin.format_as
+lib/python/cs/lex.py: cs.lex: FormatableMixin.convert_via_method_or_attr: now just accepts the format_spec, works on self
+lib/python/cs/lex.py: cs.lex: import collections.abc.Mapping as MappingABC to avoid conflict with typing.Mapping
+lib/python/cs/lex.py: merge default ==> pilfer: ClonedIterator fix
+lib/python/cs/lex.py: cs.lex: get_nonwhite,get_decimal: supply default of 0 for offset
+lib/python/cs/lex.py: cs.lex: DISTINFO: drop python2
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.get_format_subspecs: we discard empty subspecs for now, drop else and outdent what follows
+lib/python/cs/lex.py: cs.lex: FormatableMixin: update docstring
+lib/python/cs/lex.py: cs.lex: FStr: rename lc to lc_ to reflect the use of the lc_() function
+lib/python/cs/lex.py: cs.lex: FormatAsError: annotate the error with .key, .format_s, .format_mapping, .error_sep, upgrade __str__ to use these
+lib/python/cs/lex.py: cs.lex: remove a bunch of pfx tracing around formats to get error messages more manageable
+lib/python/cs/lex.py: cs.lex: new single_space(s[,sep=]) function to split a string and rejoin, with a single space by default
+lib/python/cs/lex.py: cs.lex: BaseToken: less useful that I wish __post_init__ to set offset,end_offset if unspecified, except that they need to be specified (i.e. nonoptional) to allow the subclasses to add fields, so currently it handles specifiy-both-as-None
+lib/python/cs/lex.py: cs.lex: format_as, FormatableMixin.format_as: drop the strict parameter and the associated FormatableMixin.format_mode Thread local property
+lib/python/cs/lex.py: cs.lex: drop the _format_as alias, not needed
+lib/python/cs/lex.py: cs.lex: FormatMapping: add a {self} field by default; FormatableMixin.format_as: always wrap the mapping in FormatMapping to provide {self}
+lib/python/cs/lex.py: cs.lex: format_as: new optional `missing(mapping,key)` parameter to supply values for keys not in `format_mapping`; tweak an exception raise
+lib/python/cs/lex.py: cs.lex: obsolete @has_format_attributes, not done by FormatableMixin.__init_subclass__, rename ._format_attributes to .format_attributes
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: move some complexity into convert_via_method_or_attr(); FormatableMixin.convert_via_method_or_attr: improved logic
+lib/python/cs/lex.py: cs.lex: FormatMapping: also accept a missing=Callable(Mapping,key) parameter to supplied values for keys not in the mapping
+lib/python/cs/lex.py: cs.lex: minor tweaks
+lib/python/cs/lex.py: cs.lex: FormatMapping: provide .items and .keys proxying to self.mapping because the versions from collections.abc.Mapping somehow invoke incorrect behaviour via this class; remove some debug and shorten an exception message
+lib/python/cs/lex.py: cs.lex: format_as,FormatMapping,FormatableMixin.format_as: new strict=True optional parameter; if set to False then missing keys are replaced with {keyname} and no exception is raised
+lib/python/cs/lex.py: cs.lex: FormatMapping: revert missing= being keyword only

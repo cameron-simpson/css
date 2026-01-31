@@ -1,0 +1,12 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: rework the -h/-help/--help test a little
+lib/python/cs/cmdutils.py: cs.cmdutils: add "-e ssh-command"/.ssh_exe to the BaseCommand.Options
+lib/python/cs/cmdutils.py: cs.cmdutils: add .ssh_exe to default Options, get it from $SSH_EXE or "ssh"; fix a message typo
+lib/python/cs/cmdutils.py: cs.cmdutils: rename extract_usage_from_doc() to split_usage() and have it return s 3-tuple (preusage,usage,postusage)
+lib/python/cs/cmdutils.py: cs.cmdutils: update a docstring, add suggestions to @OBSOLETE marker
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.getopt_spec_map: new optional common_opt_specs parameter to override the inclusion of the common options
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions: new usage_options_format with the guts of usage_commonopts_format for reuse by @popopts
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.usage_commonopts_format: use usage_options_format
+lib/python/cs/cmdutils.py: cs.cmdutils: new @popopts decorator to run self.options.popopts and fill out the usage message
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: move @OBSOLETE(popopts) down the bottom to where it won't shadow the new @popopts decorator
+lib/python/cs/cmdutils.py: cs.cmdutils: dogfood the new @popopts on BaseCommand.cmd_help
+lib/python/cs/cmdutils.py: cs.cmdutils: fix variable spelling

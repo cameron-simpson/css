@@ -1,0 +1,2 @@
+lib/python/cs/djutils.py: cs.djutils: fix docstring typo
+lib/python/cs/djutils.py: cs.djutils: rename the published DjangoBaseCommand to just BaseCommand
