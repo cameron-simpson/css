@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from getopt import GetoptError
 import sys
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.logutils import error
 
 from .make import Maker
@@ -22,7 +22,6 @@ class MykeCommand(BaseCommand):
   ''' Command line mode for `cs.app.myke`.
   '''
 
-  GETOPT_SPEC = 'dD:eEf:ij:kmNnpqrRsS:tuvx'
   USAGE_FORMAT = "Usage: {cmd} [options...] [macro=value...] [targets...]"
 
   Options = Maker
@@ -80,25 +79,19 @@ class MykeCommand(BaseCommand):
     M.insert_namespace(cmd_ns)
     return argv
 
-  @contextmanager
-  def run_context(self):
-    with super().run_context():
-      M = self.options
-      M.makecmd = self.cmd
-      ok = M.loadMakefiles(M.makefiles)
-      ok = ok and M.loadMakefiles(M.appendfiles)
-      # prepend the command line namespace at the front again
-      if M.cmd_ns:
-        M.insert_namespace(M.cmd_ns)
-      if not ok:
-        raise GetoptError("errors loading Mykefiles")
-      with M:
-        yield
-
+  @popopts
   def main(self, argv):
     ''' Main body.
     '''
     M = self.options
+    M.makecmd = self.cmd
+    ok = M.loadMakefiles(M.makefiles)
+    ok = ok and M.loadMakefiles(M.appendfiles)
+    # prepend the command line namespace at the front again
+    if M.cmd_ns:
+      M.insert_namespace(M.cmd_ns)
+    if not ok:
+      raise GetoptError("errors loading Mykefiles")
     if argv:
       targets = argv
     else:

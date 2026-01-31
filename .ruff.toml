@@ -73,6 +73,7 @@ ignore = [
     "B904",
     "C408", # Unnecessary `dict()` call (rewrite as a literal)
     "COM812", # Trailing comma missing
+    "COM818", # Trailing comma on bare tuple prohibited
     "D105", # Missing docstring in magic method
     "D107", # Missing docstring in `__init__`
     "D200", # One-line docstring should fit on one line

@@ -28,7 +28,6 @@ from cs.lex import get_identifier, get_white
 from cs.logutils import debug, info, error, exception, D
 import cs.pfx
 from cs.pfx import pfx, Pfx, pfx_method
-from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.result import Result
 from cs.threads import (
@@ -83,7 +82,6 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   _makefiles: list = field(default_factory=list)
   appendfiles: list = field(default_factory=list)
   macros: dict = field(default_factory=dict)
-  targets: "TargetMap" = field(default_factory=lambda: TargetMap())
   rules: dict = field(default_factory=dict)
   precious: set = field(default_factory=set)
   active: set = field(default_factory=set)
@@ -92,6 +90,9 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   basic_namespaces: list = field(default_factory=list)
   cmd_ns: dict = field(default_factory=dict)
 
+  def __post_init__(self):
+    self.targets = TargetMap(self)
+
   def __str__(self):
     return (
         '%s:%s(parallel=%s,fail_fast=%s,no_action=%s,default_target=%s)' % (
@@ -99,6 +100,48 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
             self.no_action, self.default_target.name
         )
     )
+
+  # pylint: disable=use-dict-literal
+  COMMON_OPT_SPECS = dict(BaseCommandOptions.COMMON_OPT_SPECS)
+  COMMON_OPT_SPECS.update(
+      d=('debug', 'Debug mode.'),
+      D__=('debug_modes', 'Specific debug modes.'),
+      e=('exit_on_error', 'Run the shell with the -e (exit on error) option.'),
+      E=('env_macros', 'Import environment variables as macros.'),
+      f__=('_makefiles', 'Specify the Mykefile; accrues.'),
+      i=('ignore_errors', 'Ignore errors from commands.'),
+      j_=(
+          'parallel',
+          f'How many commands to run in parallel. Default from {DEFAULT_PARALLELISM=}.',
+          int, lambda jobs: jobs > 0
+      ),
+      k=('-fail_fast', 'Proceed with other targets if one fails.'),
+      m=('-strict_macros', 'Do not treat undefined macros as errors.'),
+      n=('no_action', 'No action: just recite planned actions.'),
+      N=(
+          'no_submakes',
+          'Really no execute mode; even lines containing the macro B<$(MAKE)> will be executed.'
+      ),
+      p=(
+          'print_macros',
+          'Print out the complete set of macro definitions and target descriptions.'
+      ),
+      q=(
+          'query_mode',
+          'Query mode; return a zero status if up to date, nonzero otherwise.'
+      ),
+      r=('no_builtin_rules', 'Ignore builtin rules.'),
+      R=('no_global_rules', 'Ignore global builtin rules.'),
+      s=('silent', 'Silent; do not print out command lines.'),
+      t=(
+          'touch_mode',
+          'Touch targets which must be remade in order to bring them up to date.'
+      ),
+      u=('unconditional', 'Unconditionally make targets.'),
+      x=(
+          'trace_commands', 'Print all actions taken, even ones silences by @.'
+      ),
+  )
 
   def __enter_exit__(self):
     ''' Run both the inherited context managers.
@@ -137,7 +180,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
       time.sleep(5)
       self.report()
 
-  @prop
+  @property
   def namespaces(self):
     ''' The namespaces for this Maker: the built namespaces plus the special macros.
     '''
@@ -150,7 +193,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
     '''
     self.basic_namespaces.insert(0, ns)
 
-  @prop
+  @property
   def makefiles(self):
     ''' The list of makefiles to consult, a tuple.
         It is not possible to add more makefiles after accessing this property.
@@ -192,7 +235,7 @@ class Maker(BaseCommandOptions, MultiOpenMixin, HasThreadState):
   def target_active(self, target):
     ''' Add this target to the set of "in progress" targets.
     '''
-    self.debug_make("note target \"%s\" as active", target.name)
+    self.debug_make('note target "%s" as active', target.name)
     with self.activity_lock:
       self.active.add(target)
 
@@ -484,18 +527,12 @@ class TargetMap(NS):
       Raise KeyError for missing Targets which are not inferrable.
   '''
 
-  def __init__(self):
+  def __init__(self, maker: Maker):
     ''' Initialise the `TargetMap`.
     '''
-    self._maker = None
+    self.maker = maker
     self.targets = {}
     self._lock = RLock()
-
-  @property
-  def maker(self):
-    ''' The `Maker` to use to make `Target`s.
-    '''
-    return self._maker or Maker.default()
 
   def __getitem__(self, name):
     ''' Return the Target for `name`.
@@ -579,8 +616,7 @@ class Target(Result):
         modify it the class; instead we extend .pending_actions
         when .require() is called the first time, just as we do for a
         :make directive.
-  '''
-
+    '''
     self._lock = RLock()
     Result.__init__(self, name=name, lock=self._lock)
     self.maker = maker
@@ -603,8 +639,7 @@ class Target(Result):
     #
 
   def __str__(self):
-    return "{}[{}]".format(self.name, self.fsm_state)
-    ##return "{}[{}]:{}:{}".format(self.name, self.fsm_state, self._prereqs, self._postprereqs)
+    return f'{self.name}[{self.fsm_state}]'
 
   def mdebug(self, msg, *a):
     ''' Emit a debug message.
@@ -639,7 +674,7 @@ class Target(Result):
     self.failed = True
     self.result = False
 
-  @prop
+  @property
   def namespaces(self):
     ''' The namespaces for this Target: the special per-Target macros,
         the Maker's namespaces, the Maker's macros and the special macros.
@@ -658,7 +693,7 @@ class Target(Result):
         ]
     )
 
-  @prop
+  @property
   def prereqs(self):
     ''' Return the prerequisite target names.
     '''
@@ -668,7 +703,7 @@ class Target(Result):
       self._prereqs = prereqs_mexpr(self.context, self.namespaces).split()
     return self._prereqs
 
-  @prop
+  @property
   def new_prereqs(self):
     ''' Return the new prerequisite target names.
     '''
@@ -772,7 +807,8 @@ class Target(Result):
       if self.was_missing or self.out_of_date:
         # proceed to normal make process
         self.Rs = []
-        return self._make_next()
+        self._make_next()
+        return
       # prereqs ok and up to date: make complete
       self.succeed()
 
@@ -859,7 +895,7 @@ class Action(NS):
 
   __repr__ = __str__
 
-  @prop
+  @property
   def prline(self):
     ''' Printable form of this Action.
     '''
@@ -871,10 +907,7 @@ class Action(NS):
         of the action.
     '''
     R = Result(name="%s.action(%s)" % (target, self))
-    target.maker.defer("%s:act[%s]" % (
-        self,
-        target,
-    ), self._act, R, target)
+    target.maker.defer(f'{self}:act[{target}]', self._act, R, target)
     return R
 
   def _act(self, R, target):
@@ -911,14 +944,14 @@ class Action(NS):
             mdebug = M.debug_make
             for T in subTs:
               if T.result:
-                mdebug("submake \"%s\" OK", T)
+                mdebug('submake "%s" OK', T)
               else:
                 ok = False
-                mdebug("submake \"%s\" FAIL", T)
+                mdebug('submake "%s" FAIL', T)
             R.put(ok)
 
           for T in subTs:
-            mdebug("submake \"%s\"", T)
+            mdebug('submake "%s"', T)
             T.require()
           M.after(subTs, _act_after_make)
           return

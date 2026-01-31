@@ -34,15 +34,44 @@ DISTINFO = {
 }
 
 # the known colour names and their colour codes
+# also a bunch of other things from:
+# https://en.wikipedia.org/wiki/ANSI_escape_code#Select_Graphic_Rendition_parameters
+# several are unimplemented by various terminals
 COLOUR_CODES = {
     'default': 0,
     'normal': 0,
+    'reset': 0,
     'bold': 1,
     'bright': 1,
+    'dim': 2,
+    'faint': 2,
+    'italic': 3,
     'underline': 4,
     'blink': 5,
     'flash': 5,
+    'fastblink': 6,
+    'fastflash': 6,
     'reverse': 7,
+    'conceal': 8,  # converse: reveal
+    'hide': 8,
+    'strike': 9,
+    'primary': 10,  # primary font
+    'font1': 11,
+    'font2': 12,
+    'font3': 13,
+    'font4': 14,
+    'font5': 15,
+    'font6': 16,
+    'font7': 17,
+    'font8': 18,
+    'font9': 19,
+    'gothic': 20,
+    'doubleunderline': 21,
+    'nounderline': 24,
+    'noblink': 25,
+    'reveal': 28,  # reverse of conceal
+    'nostrike': 29,
+    # foreground colours
     'black': 30,
     'red': 31,
     'green': 32,
@@ -52,6 +81,7 @@ COLOUR_CODES = {
     'purple': 35,
     'cyan': 36,
     'white': 37,
+    # background colours
     'blackbg': 40,
     'redbg': 41,
     'greenbg': 42,
@@ -61,6 +91,12 @@ COLOUR_CODES = {
     'purplebg': 45,
     'cyanbg': 46,
     'whitebg': 47,
+    'defaultbg': 49,
+    'framed': 51,
+    'encircled': 52,
+    'overline': 53,
+    'noframe': 54,  # neither framed nor encircled
+    'nooverline': 55,
 }
 
 def colour_escape(code):

@@ -9,7 +9,7 @@ set -ue
 
 # F401 unused import
 # UP004 class inherits from object
-ruff_fixes=${RUFF_FIXES:-'D207,F401,UP004'}
+ruff_fixes=${RUFF_FIXES:-'D207,F401,Q003,UP004'}
 ruff_pyver=${RUFF_PYTHON_VERSION:-'py38'}
 
 cmd=$0

@@ -108,7 +108,7 @@ def nsstr(namespaces):
                  for ns in namespaces
                )
 
-class Modifier(object):
+class Modifier:
   ''' Base class for modifiers.
   '''
 
@@ -240,7 +240,7 @@ class ModGlob(Modifier):
     '''
     globbed = []
     for ptn in self.words(text):
-      with Pfx("glob(\"%s\")", ptn):
+      with Pfx('glob("%s")', ptn):
         matches = glob.glob(ptn)
         if matches:
           if self.muststat:
@@ -384,10 +384,10 @@ class ModSetOp(Modifier):
     elif self.op == '*':
       words = words.intersection(subwords)
     else:
-      raise NotImplementedError("unimplemented set op \"%s\"" % (self.op,))
+      raise NotImplementedError('unimplemented set op "%s"' % (self.op,))
     return " ".join(words)
 
-class Macro(object):
+class Macro:
   ''' A macro definition.
   '''
 
@@ -548,7 +548,7 @@ def readMakefileLines(
               ifStack.append(newIfState)
               continue
             if word == "if":
-              raise ParseError(context, offset, "\":if\" not yet implemented")
+              raise ParseError(context, offset, '":if" not yet implemented')
               continue
             if word == "else":
               # extra text permitted
@@ -609,7 +609,7 @@ def readMakefileLines(
   if ifStack:
     raise SyntaxError("%s: EOF with open :if directives" % (filename,))
 
-class MacroExpression(object):
+class MacroExpression:
   ''' A MacroExpression represents a piece of text into which macro
       substitution is to occur.
   '''
@@ -925,7 +925,7 @@ def parseMacro(context, text=None, offset=0):
               modclass = ModSuffixLong
             else:
               raise NotImplementedError(
-                  "parse error: unhandled PpSs letter \"%s\"" % (mod0,)
+                  'parse error: unhandled PpSs letter "%s"' % (mod0,)
               )
           elif mod0 == '<':
             modclass = ModFromFiles
@@ -1023,7 +1023,7 @@ def parseMacro(context, text=None, offset=0):
         error("%s", e)
         offset += 1
 
-    assert ch == mmark2, "should be at \"%s\", but am at: %s" % (
+    assert ch == mmark2, 'should be at "%s", but am at: %s' % (
         mmark, text[offset:]
     )
     offset += 1
@@ -1054,7 +1054,7 @@ def parseMacro(context, text=None, offset=0):
       text[offset:]
   )
 
-class MacroTerm(object):
+class MacroTerm:
   ''' A macro reference such as $x or $(foo(a,b,c) xyz).
   '''
 
@@ -1120,7 +1120,7 @@ class MacroTerm(object):
         text = macro(context, namespaces, *param_values)
 
       for modifier in self.modifiers:
-        with Pfx("\"%s\" %s", text, modifier):
+        with Pfx('"%s" %s', text, modifier):
           text = modifier(text, namespaces)
 
       return text
