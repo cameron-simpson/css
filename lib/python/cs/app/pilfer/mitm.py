@@ -647,7 +647,7 @@ def grok_flow(hook_name, flow, *, P: Pilfer = None):
   '''
   flowstate = FlowState.from_Flow(flow)
   # ignore URLs for which there is no SiteMap
-  if not any(P.sitemaps_for(flowstate.url)):
+  if not any(P.sitemaps_for_url_host(flowstate.url)):
     return
 
   def grok_stream(bss: Iterable[bytes]):

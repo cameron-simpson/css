@@ -27,7 +27,7 @@ import shutil
 import sys
 from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Generator, Iterable, List, Mapping, Optional, Tuple
 from types import SimpleNamespace as NS
 
 import requests
@@ -713,18 +713,18 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return map_list
 
   @promote
-  def sitemaps_for(self, url: URL):
-    ''' Generator yielding sitemaps which match the `url`.
+  def sitemaps_for_url_host(self, url: URL) -> Generator[SiteMap]:
+    ''' Generator yielding sitemaps which match the `url` host part.
     '''
     hostname = url.hostname
     for pattern, sitemap in self.sitemaps:
       if fnmatch(hostname, pattern):
         yield sitemap
 
-  def sitemap_for(self, url: str | URL):
+  def sitemap_for(self, url: str | URL) -> SiteMap | None:
     ''' Return the first sitemap which matches the `url`, or `None`.
     '''
-    for sitemap in self.sitemaps_for(url):
+    for sitemap in self.sitemaps_for_url_host(url):
       return sitemap
     return None
 
@@ -737,11 +737,11 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       **run_match_kw,
   ) -> Iterable[Tuple[Callable, TagSet, Any]]:
     ''' A generator to call `SiteMap.run_matches(flowstate,*run_match_a,**run_match_kw)`
-        for each `SiteMap` from `self.sitemaps_for(flowstate.url)`.
+        for each `SiteMap` from `self.sitemaps_for_url_host(flowstate.url)`.
         Arguments are as for `SiteMap.run_matches`.
         Yield `(method,match_tags,result)` 3-tuples from each method called.
     '''
-    for sitemap in self.sitemaps_for(flowstate.url):
+    for sitemap in self.sitemaps_for_url_host(flowstate.url):
       yield from pfx_call(
           sitemap.run_matches, flowstate, *run_match_a, **run_match_kw
       )
@@ -765,22 +765,23 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
             f'{flowstate.url.short} {flowstate.response.status_code=} != 2xx, not grokking'
         )
         return
-      for sitemap in self.sitemaps_for(flowstate.url):
+      # for each SiteMap associated with the URL host, run its grok methods
+      for sitemap in self.sitemaps_for_url_host(flowstate.url):
         yield from sitemap.grok(flowstate, flowattr, **grok_kw)
 
   @promote
   def url_matches(self, url: URL, pattern_type: str, *, extra=None):
-    ''' Scan `self.sitemaps_for(url)` for patterns matching the URL.
+    ''' Scan `self.sitemaps_for_url_host(url)` for patterns matching the URL.
         Yield `SiteMapPatternMatch` instances for each match.
     '''
-    for sitemap in self.sitemaps_for(url):
+    for sitemap in self.sitemaps_for_url_host(url):
       patterns = getattr(sitemap, f'{pattern_type}_PATTERNS', None)
       if patterns:
         yield from sitemap.matches(url, patterns, extra=extra)
 
   @promote
   def url_entity(self, url: URL, *, methodglob='grok_*', **match_kw):
-    for sitemap in self.sitemaps_for(url):
+    for sitemap in self.sitemaps_for_url_host(url):
       entity = sitemap.url_entity(url)
       if entity is not None:
         return entity
@@ -893,7 +894,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     cache = self.content_cache
     cache_keys = set()
     with self:
-      for sitemap in self.sitemaps_for(url):
+      for sitemap in self.sitemaps_for_url_host(url):
         ##PR("sitemap", sitemap)
         for method, match_tags, site_cache_key in sitemap.run_matches(
             flowstate, None, 'cache_key_*'):
