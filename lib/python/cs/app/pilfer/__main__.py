@@ -883,7 +883,14 @@ class PilferCommand(BaseCommand):
         try:
           cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
         except AttributeError:
-          raise GetoptError("unknown sitemap command")
+          cmds = sorted(
+              name.removeprefix('cmd_')
+              for name in dir(sitemap)
+              if name.startswith('cmd_')
+          )
+          raise GetoptError(
+              f'unknown sitemap command, expected one of {", ".join(cmds)}'
+          )
         with stackattrs(sitemap, options=self.options):
           return cmdmethod(argv)
     # match URLs against the sitemap
