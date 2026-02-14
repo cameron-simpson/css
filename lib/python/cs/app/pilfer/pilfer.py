@@ -411,6 +411,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       session: Optional[PilferSession] = None,
       headers=None,
       method='GET',
+      verify=None,
       **rq_kw,
   ) -> requests.Response:
     ''' Fetch `url` using method (default `'GET'`), return a `requests.Response`.
@@ -419,17 +420,25 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         * `session`: an optional `requests.Session` instance, default `self.session`
         * `headers`: optional additional headers to use, updating those from `self.headers()`
         * `method`: the HTTP method to use, default `'GET'`
+        * `verify`: SSL certificate verification, passed to `session.request`,
+          default from `self.verify` (itself default `True`)
         Other keyword arguments are passed to the `session` request method.
     '''
     vprint(f'{self.__class__.__name__}: {method} {url}')
     if session is None:
       session = self.session
+    if verify is None:
+      verify = self.verify
     # a fresh headers mapping
     hdrs = self.headers()
     if headers is not None:
       hdrs.update(headers)
     return pfx_call(
-        getattr(session, method.lower()), str(url), headers=hdrs, **rq_kw
+        getattr(session, method.lower()),
+        str(url),
+        headers=hdrs,
+        verify=verify,
+        **rq_kw
     )
 
   def GET(self, url: str | URL, **rq_kw):

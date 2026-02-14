@@ -131,6 +131,7 @@ class PilferCommand(BaseCommand):
             lambda s: s.replace(',', ' ').split(),
         ),
         load_cookies='Load the browser cookie state into the Pilfer session.',
+        no_check_certificates='Do not verify SSL certificates.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
@@ -157,6 +158,7 @@ class PilferCommand(BaseCommand):
             later=later,
             rcpaths=options.configpaths,
             sqltags_db_url=options.db_url,
+            verify=not options.no_check_certificates,
         )
         with pilfer:
           pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
