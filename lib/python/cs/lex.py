@@ -7,7 +7,7 @@ for writing recursive descent parsers, of which I have several.
 There are also some transcription functions for producing text
 from various objects, such as `hexify` and `unctrl`.
 
-Generally the get_* functions accept a source string and an offset
+Generally the `get_*` functions accept a source string and an offset
 (usually optional, default `0`) and return a token and the new offset,
 raising `ValueError` on failed tokenisation.
 '''
