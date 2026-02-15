@@ -47,6 +47,7 @@ from . import (
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
+from .print import dump_soup
 from .rss import RSSChannelMixin
 from .sitemap import FlowState, SiteEntity, SiteMap
 
@@ -481,43 +482,7 @@ class PilferCommand(BaseCommand):
       print("Content:", flowstate.content_type)
       if flowstate.content_type in ('text/html',):
         soup = flowstate.soup
-        table = []
-        q = ListQueue([('', soup.head), ('', soup.body)])
-        for indent, tag in q:
-          subindent = indent + '  '
-          # TODO: looks like commants are also NavigableStrings, intercept here
-          if isinstance(tag, NavigableString):
-            text = str(tag).strip()
-            if text:
-              table.append(('', text))
-            continue
-          if tag.name == 'script':
-            continue
-          # sorted copy of the attributes
-          attrs = dict(sorted(tag.attrs.items()))
-          label = tag.name
-          # pop off the id attribute if present, include in the label
-          try:
-            id_attr = attrs.pop('id')
-          except KeyError:
-            pass
-          else:
-            label += f' #{id_attr}'
-          children = list(tag.children)
-          if not attrs and len(children) == 1 and isinstance(children[0],
-                                                             NavigableString):
-            desc = str(children[0].strip())
-          else:
-            desc = "\n".join(
-                f'{attr}={value!r}' for attr, value in attrs.items()
-            ) if attrs else ''
-            for index, subtag in enumerate(children):
-              q.insert(index, (subindent, subtag))
-          table.append((
-              f'{indent}{label}',
-              desc,
-          ))
-        printt(*table)
+        dump_soup(soup)
       elif flowstate.content_type in ('application/json',):
         jdata = flowstate.json
         if isinstance(jdata, dict):
