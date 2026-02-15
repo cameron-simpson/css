@@ -1492,8 +1492,29 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   from cs.fs import RemotePath
   return RemotePath.from_str(remotepath)
 
-def tabulate(*rows, sep='  ', ppcls=None):
-  r''' A generator yielding lines of values from `rows` aligned in columns.
+class TabulatePrettyPrinter(PrettyPrinter):
+  ''' A `PrettyPrinter` subclass which presents `date` and
+      `datetime` as ISO8601 strings.
+
+      This is used by `tabulate` and `printt`.
+  '''
+
+  def __init__(self, compact=True, sort_dicts=True, **ppkw):
+    ''' The default format settings use `compact=True` and `sort_dicts=True`.
+    '''
+    super().__init__(compact=compact, sort_dicts=sort_dicts, **ppkw)
+
+  def format(self, obj, *fmt_a) -> Tuple[str, bool, bool]:
+    ''' Use ISO8601 for `date` and `datetime` objects.
+    '''
+    if isinstance(obj, date):
+      return obj.isoformat(), True, False
+    if isinstance(obj, datetime):
+      return obj.isoformat(' '), True, False
+    return super().format(obj, *fmt_a)
+
+def tabulate(*rows, sep='  ', ppcls=TabulatePrettyPrinter) -> Iterable[str]:
+  r'''A generator yielding lines of values from `rows` aligned in columns.
 
       Each row in rows is a list of strings. Non-`str` objects are
       promoted to `str` via `pprint.pformat`. If the strings contain
@@ -1517,23 +1538,7 @@ def tabulate(*rows, sep='  ', ppcls=None):
           two      cols
           >>>
   '''
-  if ppcls is None:
-
-    class ppcls(PrettyPrinter):
-      ''' A `PrettyPrinter` subclass which presents `date` and
-          `datetime` as ISO8601 strings.
-      '''
-
-      def format(self, obj, *fmt_a):
-        ''' Use ISO8601 for `date` and `datetime` objects.
-        '''
-        if isinstance(obj, date):
-          return obj.isoformat(), True, False
-        if isinstance(obj, datetime):
-          return obj.isoformat(' '), True, False
-        return super().format(obj, *fmt_a)
-
-  ppr = ppcls(compact=True, sort_dicts=True)
+  ppr = ppcls()
   if not rows:
     # avoids max of empty list
     return
