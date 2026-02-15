@@ -1589,10 +1589,13 @@ def printt(
       Parameters:
       * `file`: optional output file, passed to `print_func`
       * `flush`: optional flush flag, passed to `print_func`
-      * `indent`: optional leading indent for the output lines
+      * `indent`: optional leading indent for the output lines;
+        if this is an `int` instead of a `str`, use that many spaces
       * `print_func`: optional `print()` function, default `builtins.print`
       Other keyword arguments are passed to `tabulate()`.
   '''
+  if isinstance(indent, int):
+    indent = ' ' * indent
   if print_func is None:
     from builtins import print as print_func
   for line in tabulate(*table, **tabulate_kw):
