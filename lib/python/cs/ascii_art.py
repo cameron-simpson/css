@@ -854,7 +854,7 @@ class RRMerge(RRStack):
   @property
   def width(self):
     ''' The width of the `RRMerge`, the width of the `RRStack` plus 1
-        for the left attachments.
+        for the right attachments.
     '''
     return super().width + 1
 
@@ -960,7 +960,7 @@ class RRSequence(_RailRoadMulti):
     return max(box.height for box in self.content)
 
   @render(sep_len=2)
-  def render_lines(self, *, sep_len, **_):
+  def render_lines(self, *, sep_len, middle='', **_):
     ''' Render the `RRSequence` as a list of one line strings.
     '''
     boxes = self.content
@@ -980,7 +980,7 @@ class RRSequence(_RailRoadMulti):
     lines = [[] for _ in range(total_lines)]
     attach = 0
     sep_spaces = " " * sep_len
-    sep_line = self.horiz(sep_len)
+    sep_line = self.horiz(sep_len, middle=middle)
     for bi, (box, box_top) in enumerate(zip(boxes, box_tops)):
       pad = " " * box.width
       row = 0
@@ -1010,13 +1010,13 @@ class RRSequence(_RailRoadMulti):
       assert row == len(lines), f'{row=} != {len(lines)=}'
     return ["".join(line_v) for line_v in lines]
 
-def rrprint(*seq):
+def rrprint(*seq, sep=''):
   ''' Promote the arguments to `RRBase` instances, make into an
       `RRSequence` and print it.
   '''
   assert isinstance(seq, tuple)
   seq = RRBase.promote(list(seq))
-  seq.print()
+  seq.print(middle=sep)
 
 def test_railroad():
   ''' Exercise various boxes.
