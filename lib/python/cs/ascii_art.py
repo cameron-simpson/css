@@ -45,7 +45,7 @@ from typing import Any, Optional, Union
 import unicodedata
 
 from cs.context import stackattrs
-from cs.deco import decorator
+from cs.deco import decorator, Promotable
 
 def box_char_name(
     heavy=False, arc=False, up=False, down=False, left=False, right=False
@@ -217,7 +217,7 @@ def render(render_func, **render_defaults):
   return render_wrapper
 
 @dataclass
-class RRBase(ABC):
+class RRBase(Promotable, ABC):
   ''' The abstract base class for various boxes.
   '''
 
@@ -251,6 +251,39 @@ class RRBase(ABC):
     if s and '\n' not in s:
       return Terminal(s)
     return RRTextBox(s)
+
+  @classmethod
+  def from_int(cls, i):
+    return cls.from_str(str(i))
+
+  @classmethod
+  def from_float(cls, f):
+    return cls.from_str(str(f))
+
+  @classmethod
+  def from_tuple(cls, t) -> "RRCHoice":
+    return RRChoice(content=map(cls.promote, t))
+
+  @classmethod
+  def from_list(cls, l) -> "RRSequence":
+    rrs = []
+    for i, item in enumerate(l):
+      if isinstance(item, tuple):
+        if i == 0:
+          rrcls = RRMerge
+        elif i == len(l) - 1:
+          rrcls = RRSplit
+        else:
+          rrcls = RRChoice
+        rr = rrcls(content=map(RRBase.promote, item))
+      else:
+        rr = cls.promote(item)
+      rrs.append(rr)
+    return RRSequence(content=rrs)
+
+  @classmethod
+  def from_set(cls, s) -> "RRSplit":
+    return RRSplit(content=map(cls.promote, s))
 
   @classmethod
   @render
@@ -976,6 +1009,14 @@ class RRSequence(_RailRoadMulti):
       attach += box.e - box.w
       assert row == len(lines), f'{row=} != {len(lines)=}'
     return ["".join(line_v) for line_v in lines]
+
+def rrprint(*seq):
+  ''' Promote the arguments to `RRBase` instances, make into an
+      `RRSequence` and print it.
+  '''
+  assert isinstance(seq, tuple)
+  seq = RRBase.promote(list(seq))
+  seq.print()
 
 def test_railroad():
   ''' Exercise various boxes.
