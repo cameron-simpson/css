@@ -741,7 +741,7 @@ class RRStack(_RailRoadMulti):
   def render_lines(self, *, align, heavy, attach_e, attach_w, **_):
     lines = []
     for box in self.content:
-      box_pad_length = self.width - box.width
+      box_pad_length = self.inner_width - box.width
       box_pad_left = (
           0 if align == 'left' else
           box_pad_length if align == 'right' else box_pad_length // 2
