@@ -765,7 +765,6 @@ class RRStack(_RailRoadMulti):
                 )
             )
         )
-    ##assert len(lines) == self.height
     return lines
 
 @dataclass
@@ -1014,8 +1013,7 @@ def rrprint(*seq, sep=''):
   ''' Promote the arguments to `RRBase` instances, make into an
       `RRSequence` and print it.
   '''
-  assert isinstance(seq, tuple)
-  seq = RRBase.promote(list(seq))
+  seq = RRBase.promote(list(seq))  # *seq gets a tuple
   seq.print(middle=sep)
 
 def test_railroad():
@@ -1041,6 +1039,47 @@ def test_railroad():
   merge.print(attach_w=True, attach_e=True)
   split = RRSplit((RR_START, RRSequence(("1", "2", "33")), "something"))
   split.print(attach_w=True, align='right')
+  rrprint(
+      (
+          "A",
+          "B",
+          "C",
+      ), 1, "2\nZ", 3, (
+          4,
+          5,
+          6,
+      ), (
+          7,
+          8,
+          [
+              9,
+              10,
+              (
+                  7,
+                  6,
+                  5,
+              ),
+              "x",
+              (
+                  5,
+                  4,
+                  3,
+              ),
+          ],
+          [7, (2, 3, 4)],
+      )
+  )  ## , 11)
+  rrprint(
+      1,
+      ## 1,
+      ##2,
+      (
+          4,
+          5,
+          [6, (6, 7, 6)],
+      ),
+      9,
+  )
 
 if __name__ == '__main__':
   test_railroad()
