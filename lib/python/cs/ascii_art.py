@@ -155,7 +155,7 @@ def box_char(
       if left or right:
         return "+"
       return "|"
-    elif left or right:
+    if left or right:
       return "-"
     raise RuntimeError(f'{ascii=} {up=} {down=} {left=} {right=}')
   return unicodedata.lookup(
