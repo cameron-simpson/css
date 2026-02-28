@@ -7,31 +7,39 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
 
     This is still pretty alpha.
 
-    This is the current test function:
+    The current demo mode runs:
 
-        def test_railroad():
-            box5 = RRTextBox("one\ntwo\nthree\nfour\nfive")
-            print(box5)
-            seq = RRSequence(
-                (
-                    RR_START, RRRepeat("repeat me"), "2 lines\naaaa",
-                    RRChoice(("one", "two", "three", box5)), RR_END
-                )
-            )
-            print(seq)
+        rrprint(
+            RR_START,
+            RRRepeat("repeat me"),
+            "2 lines\naaaa",
+            (
+                "one",
+                "two",
+                "three",
+                "one\n"
+                "two\n"
+                "three\n"
+                "four\n"
+                "five",
+                ["a", "sequence"],
+            ),
+            RR_END,
+        )
 
     which prints:
 
-                                      ╭┤one├──╮
-                                      ├┤two├──┤
-                                      ├┤three├┤
-                           ╭───────╮  │╭─────╮│
-                           │2 lines│  ││one  ││
-        ├┼──┬┤repeat me├┬──┤aaaa   ├──┤│two  │├──┼┤
-            ╰─────←─────╯  ╰───────╯  ╰┤three├╯
-                                       │four │
-                                       │five │
-                                       ╰─────╯
+                              ╭|one|──────────╮
+                              ├|two|──────────┤
+                              ├|three|────────┤
+                   ╭───────╮  │╭─────╮        │
+                   │2 lines│  ││one  │        │
+├┼──┬|repeat me|┬──┤aaaa   ├──┤│two  │        ├──┼┤
+    ╰─────←─────╯  ╰───────╯  ├┤three├────────┤
+                              ││four │        │
+                              ││five │        │
+                              │╰─────╯        │
+                              ╰|a|──|sequence|╯
 
 '''
 
@@ -1129,4 +1137,21 @@ def test_railroad():
     )
 
 if __name__ == '__main__':
-  test_railroad()
+  ##test_railroad()
+  rrprint(
+      RR_START,
+      RRRepeat("repeat me"),
+      "2 lines\naaaa",
+      (
+          "one",
+          "two",
+          "three",
+          "one\n"
+          "two\n"
+          "three\n"
+          "four\n"
+          "five",
+          ["a", "sequence"],
+      ),
+      RR_END,
+  )
