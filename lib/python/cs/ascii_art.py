@@ -328,8 +328,8 @@ class RRBase(Promotable, ABC):
   def horiz(
       cls,  # used by @render
       width: int,
-      middle='',
       *,
+      middle='',
       arc,
       heavy,
       ascii=False,
@@ -676,7 +676,9 @@ class _RailRoadAround(RRBase):
       )
     if not above:
       lines.append(
-          self.horiz(self.width, self.middle, left_up=True, right_up=True)
+          self.horiz(
+              self.width, middle=self.middle, left_up=True, right_up=True
+          )
       )
     return lines
 
