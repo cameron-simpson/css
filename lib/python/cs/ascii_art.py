@@ -227,20 +227,12 @@ def render(render_func, **render_defaults):
   '''
 
   def render_wrapper(self_or_cls, *a, ctx=None, **render_kw):
-    if False:
-      if ctx is None:
-        ctx = self_or_cls.render_context
-      apply_attrs = dict(render_defaults)
-      apply_attrs.update(render_kw)
-      with stackattrs(ctx, **apply_attrs):
-        return render_func(self_or_cls, *a, **ctx.__dict__)
-    else:
-      if ctx is None:
-        ctx = self_or_cls.render_context
-      apply_attrs = dict(render_defaults)
-      apply_attrs.update(render_kw)
-      with render_mode(ctx, **apply_attrs) as ctx:
-        return render_func(self_or_cls, *a, **ctx.__dict__)
+    if ctx is None:
+      ctx = self_or_cls.render_context
+    apply_attrs = dict(render_defaults)
+    apply_attrs.update(render_kw)
+    with render_mode(ctx, **apply_attrs) as ctx:
+      return render_func(self_or_cls, *a, **ctx.__dict__)
 
   return render_wrapper
 
