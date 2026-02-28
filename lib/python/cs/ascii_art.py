@@ -29,19 +29,28 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
 
     which prints:
 
-                              ╭|one|──────────╮
-                              ├|two|──────────┤
-                              ├|three|────────┤
-                   ╭───────╮  │╭─────╮        │
-                   │2 lines│  ││one  │        │
-├┼──┬|repeat me|┬──┤aaaa   ├──┤│two  │        ├──┼┤
-    ╰─────←─────╯  ╰───────╯  ├┤three├────────┤
-                              ││four │        │
-                              ││five │        │
-                              │╰─────╯        │
-                              ╰|a|──|sequence|╯
+                                      ╭|one|──────────╮
+                                      ├|two|──────────┤
+                                      ├|three|────────┤
+                           ╭───────╮  │╭─────╮        │
+                           │2 lines│  ││one  │        │
+        ├┼──┬|repeat me|┬──┤aaaa   ├──┤│two  │        ├──┼┤
+            ╰─────←─────╯  ╰───────╯  ├┤three├────────┤
+                                      ││four │        │
+                                      ││five │        │
+                                      │╰─────╯        │
+                                      ╰|a|──|sequence|╯
 
 '''
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.context', 'cs.deco'],
+}
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
