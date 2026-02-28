@@ -23,7 +23,7 @@ cs.app.portfwd pypi.release="20221228" ok_revision="3135549369d24a80fff3fad9c24e
 cs.app.ssh pypi.release=20161003 ok_revision="9ced6f54c76e3cde47b62721320820cab9082bc3"
 cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f3173d3c72"
 cs.app.ydl pypi.release="20220318" ok_revision="6c4e9e800dde94ed935a1b31a532f68cbe63adb8"
-cs.ascii_art ok_revision="1dce004546322ca4305b88480b3d96a3d3d665fa"
+cs.ascii_art ok_revision="1dce004546322ca4305b88480b3d96a3d3d665fa" pypi.release="20260228"
 cs.binary pypi.release="20250501" ok_revision=bf27ebd353dcdc58c68bf7e0d6309bb38e22faa7 features={"20230212":["BinaryMixin_load","BinaryMixin_save"],"20240630":["AbstractBinary__write","BinarySingleValue__value_from_bytes"],"20250501":["BinaryStruct","ListOfBinary","bs","is_single_value","struct_field_types"]}
 cs.buffer pypi.release="20250428" ok_revision=a554bd4b6973914b04d75e84055783dfffc1e16a features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"],"20240630":["CornuCopyBuffer__final_offset"],"20250428":["CornuCopyBuffer__from_cli_filespec"]}
 cs.cache pypi.release="20250111" ok_revision="707f72e21fdea1728fa5e45dae2eb7148fceb7b9" features={"20240412":["CachingMapping"],"20240422":["ConvCache","convof"],"20250103":["cachedmethod","file_based","file_property"]}
