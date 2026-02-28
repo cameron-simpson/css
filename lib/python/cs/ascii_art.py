@@ -112,13 +112,22 @@ def box_char_name(
   )
 
 def box_char(
-    heavy=False, arc=False, up=False, down=False, left=False, right=False
+    heavy=False,
+    *,
+    arc=None,
+    ascii=None,
+    up=False,
+    down=False,
+    left=False,
+    right=False,
+    render_mode=None,
 ):
   ''' Return the Unicode entity for a box drawing glyph with
       the specified line weight and lines.
 
       Parameters:
       * `arc`: return an arc character instead of a rectangluar box corner
+      * `ascii`: use ASCII characters rather than Unicode box drawing characters
       * `heavy`: the line wieght: `HEAVY` for `True`, `LIGHT` for `False`
       * `up`: with a line upward from the centre
       * `down`: with a line downward from the centre
@@ -127,6 +136,20 @@ def box_char(
   '''
   if not (up or down or left or right):
     return " "
+  if render_mode is None:
+    render_mode = DEFAULT_RENDER_CONTEXT
+  if arc is None:
+    arc = render_mode.arc
+  if ascii is None:
+    ascii = render_mode.ascii
+  if ascii:
+    if up or down:
+      if left or right:
+        return "+"
+      return "|"
+    elif left or right:
+      return "-"
+    raise RuntimeError(f'{ascii=} {up=} {down=} {left=} {right=}')
   return unicodedata.lookup(
       box_char_name(
           heavy=heavy, arc=arc, up=up, down=down, left=left, right=right
@@ -309,6 +332,7 @@ class RRBase(Promotable, ABC):
       *,
       arc,
       heavy,
+      ascii=False,
       left_up=False,
       left_down=False,
       right_up=False,
@@ -332,7 +356,8 @@ class RRBase(Promotable, ABC):
         )
     else:
       left_end = ''
-    horiz_c = HORIZ_ if heavy else HORIZ
+    horiz_c = ('='
+               if heavy else '-') if ascii else (HORIZ_ if heavy else HORIZ)
     if right_up or right_down:
       right_end = box_char(
           arc=arc, left=True, up=right_up, down=right_down, heavy=heavy
@@ -485,9 +510,11 @@ class Terminal(Symbol):
     return [
         "".join(
             (
-                box_char(heavy=heavy, left=attach_w, up=True,
-                         down=True), self.name,
-                box_char(heavy=heavy, right=attach_e, up=True, down=True)
+                "|" if ascii else
+                box_char(heavy=heavy, left=attach_w, up=True, down=True),
+                self.name,
+                "|" if ascii else
+                box_char(heavy=heavy, right=attach_e, up=True, down=True),
             )
         )
     ]
