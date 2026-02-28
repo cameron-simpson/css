@@ -1072,6 +1072,8 @@ def test_railroad():
   )
   print(seq)
   seq.print(heavy=True)
+  with render_mode(ascii=True):
+    seq.print()
   stack = RRStack(("st1", "2", "3\n4", "four five"))
   print(stack.render(attach_e=True, align='right'))
   merge = RRMerge((RR_START, RRSequence(("1", "2", "33")), "something"))
@@ -1111,17 +1113,18 @@ def test_railroad():
           [7, (2, 3, 4)],
       )
   )  ## , 11)
-  rrprint(
-      1,
-      ## 1,
-      ##2,
-      (
-          4,
-          5,
-          [6, (6, 7, 6)],
-      ),
-      9,
-  )
+  with render_mode(ascii=True):
+    rrprint(
+        1,
+        ## 1,
+        ##2,
+        (
+            4,
+            5,
+            [6, (6, 7, 6)],
+        ),
+        9,
+    )
 
 if __name__ == '__main__':
   test_railroad()
