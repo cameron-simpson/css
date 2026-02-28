@@ -36,6 +36,7 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
 '''
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cached_property
 from pprint import pprint
@@ -46,6 +47,14 @@ import unicodedata
 
 from cs.context import stackattrs
 from cs.deco import decorator, Promotable
+
+DEFAULT_RENDER_CONTEXT = NS(
+    arc=True,
+    ascii=False,
+    heavy=False,
+    attach_w=False,
+    attach_e=False,
+)
 
 def box_char_name(
     heavy=False, arc=False, up=False, down=False, left=False, right=False
@@ -168,6 +177,17 @@ class Cell:
       )
     return glyph
 
+@contextmanager
+def render_mode(ctx=None, **render_kw):
+  ''' A context manager to temporarily apply `render_kw` to the
+      rendering mode context `ctx` (default from `RRBase.render_context`).
+      Yields the render context.
+  '''
+  if ctx is None:
+    ctx = DEFAULT_RENDER_CONTEXT
+  with stackattrs(ctx, **render_kw):
+    yield ctx
+
 @decorator
 def render(render_func, **render_defaults):
   ''' A decorator to wrap rendering methods with the prevailing
@@ -207,12 +227,20 @@ def render(render_func, **render_defaults):
   '''
 
   def render_wrapper(self_or_cls, *a, ctx=None, **render_kw):
-    if ctx is None:
-      ctx = self_or_cls.render_context
-    apply_attrs = dict(render_defaults)
-    apply_attrs.update(render_kw)
-    with stackattrs(ctx, **apply_attrs):
-      return render_func(self_or_cls, *a, **ctx.__dict__)
+    if False:
+      if ctx is None:
+        ctx = self_or_cls.render_context
+      apply_attrs = dict(render_defaults)
+      apply_attrs.update(render_kw)
+      with stackattrs(ctx, **apply_attrs):
+        return render_func(self_or_cls, *a, **ctx.__dict__)
+    else:
+      if ctx is None:
+        ctx = self_or_cls.render_context
+      apply_attrs = dict(render_defaults)
+      apply_attrs.update(render_kw)
+      with render_mode(ctx, **apply_attrs) as ctx:
+        return render_func(self_or_cls, *a, **ctx.__dict__)
 
   return render_wrapper
 
@@ -222,12 +250,7 @@ class RRBase(Promotable, ABC):
   '''
 
   # the render context
-  render_context = NS(
-      arc=True,
-      heavy=False,
-      attach_w=False,
-      attach_e=False,
-  )
+  render_context = DEFAULT_RENDER_CONTEXT
 
   def __str__(self):
     ''' Return the default rendering of the text box.
