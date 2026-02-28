@@ -543,7 +543,7 @@ class RRTextBox(RRBase):
     return self is other
 
   def __repr__(self):
-    return f'{self.__class__.__name__}:{repr(self.text.splitlines()[:1])}...'
+    return f'{self.__class__.__name__}:{self.text.splitlines()[:1]!r}...'
 
   @render
   def render_lines(self, *, heavy, attach_w, attach_e, **_):
