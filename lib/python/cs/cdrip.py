@@ -177,7 +177,7 @@ def rip(
       disc_id = dev_info.id
     elif disc_id != dev_info.id:
       warning("disc_id:%r != dev_info.id:%r", disc_id, dev_info.id)
-    disc = mbdb.discs[disc_id]
+    disc = mbdb[MBDisc, disc_id]
     if disc_id == dev_info.id:
       disc.mb_toc = mb_toc
     recordings = disc.recordings
