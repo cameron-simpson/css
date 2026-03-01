@@ -193,6 +193,8 @@ def gvprint(
     T.join()
     bs, = captures
     return bs
+  if img2sixel_popen is not None:
+    print(file=file)
   return None
 
 ## Nothing renders this :-(
