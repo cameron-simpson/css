@@ -428,7 +428,6 @@ class MBArea(_MBEntity):
 class MBArtist(_MBEntity):
   ''' A Musicbrainz artist entry.
   '''
-
   TYPE_SUBNAME = 'artist'
 
 class MBDisc(_MBEntity):
@@ -1064,12 +1063,7 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
         v = dict(v)
         for k, subv in list(v.items()):
           type_name, _ = self.key_type_name(k)
-          v[k] = self._fold_value(
-              type_name,
-              subv,
-              q=q,
-              seen=seen
-          )
+          v[k] = self._fold_value(type_name, subv, q=q, seen=seen)
     elif isinstance(v, list):
       v = list(v)
       for i, subv in enumerate(v):
