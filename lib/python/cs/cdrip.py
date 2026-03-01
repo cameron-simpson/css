@@ -316,6 +316,12 @@ class _MBEntity(HasTags):
     return self.mbdb.refresh(self, **mbdb_refresh_kw)
 
   @property
+  def mbdb(self):
+    ''' Use the shared `SQLTags`.
+    '''
+    return self.tags_db
+
+  @property
   def mbkey(self):
     ''' The MusicBrainz id, typically a UUID or discid.
     '''
