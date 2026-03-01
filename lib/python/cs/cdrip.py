@@ -420,6 +420,11 @@ class _MBEntity(HasTags):
         sep = ', '
     return ''.join(strs)
 
+class MBArea(_MBEntity):
+  ''' A Musicbrainz area entry.
+  '''
+  TYPE_SUBNAME = 'area'
+
 class MBArtist(_MBEntity):
   ''' A Musicbrainz artist entry.
   '''
