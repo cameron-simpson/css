@@ -368,9 +368,10 @@ class _MBEntity(HasTags):
   @cached_property
   def artist_credit_v(self):
     ''' A list of `str|MBArtist` from `self.tags.artist_credit`.
+        This falls back to `self.tags.artist` if there are no `artist_credit`.
     '''
     artists = []
-    for ac in self.tags.artist_credit:
+    for ac in self.tags.get('artist_credit') or self.tags.get('artist', []):
       if isinstance(ac, str):
         artists.append(ac)
       else:
