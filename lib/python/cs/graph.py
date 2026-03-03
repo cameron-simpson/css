@@ -156,7 +156,8 @@ class Graph(Node):
 
   def add_edge(self, node1: str | Node, node2: str | Node, **edge_attrs):
     ''' Add an `Edge` to the `Graph`.
-  def __getitem__(self,node_name:str)->Node:
+  @typechecked
+  def __getitem__(self, node_name: str) -> Node:
     ''' Return the `Node` with `.name==node_name`.
     '''
     if node_name not in self._nodes_by_name:
