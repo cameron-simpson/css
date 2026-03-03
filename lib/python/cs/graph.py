@@ -9,9 +9,12 @@ from typing import Any, Iterable, Optional
 
 from cs.ascii_art import (
     RRBase,
+    RRChoice,
     RRMerge,
+    RROptional,
     RRSequence,
     RRSplit,
+    RRStack,
     RRTextBox,
     RR_START,
     RR_END,
@@ -19,6 +22,7 @@ from cs.ascii_art import (
 from cs.gvutils import Graph as GVGraph, Node as GVNode
 from cs.queues import ListQueue
 
+from typeguard import typechecked
 
 @dataclass
 class Node:
