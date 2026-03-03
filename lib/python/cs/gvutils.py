@@ -514,9 +514,6 @@ class Graph:
 
   def print(self, **gvprint_kw):
     dot_s = self.as_dot(fold=True)
-    print("GVGraph print:")
-    print(dot_s)
-    print("gvprint...")
     return gvprint(dot_s, **gvprint_kw)
 
 if __name__ == '__main__':
