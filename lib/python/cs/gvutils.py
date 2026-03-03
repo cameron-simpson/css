@@ -40,8 +40,11 @@ def quote(s):
   '''
   if isinstance(s, (int, float)):
     return str(s)
-  if ((s.isalnum() or s.replace('_', '').isalnum())
-      and s.lower() not in DOT_KEYWORDS):
+  if all((
+      not s[:1].isdigit(),
+      (s.isalnum() or s.replace('_', '').isalnum()),
+      s.lower() not in DOT_KEYWORDS,
+  )):
     return s
   return (
       '"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') +
@@ -510,7 +513,10 @@ class Graph:
     )
 
   def print(self, **gvprint_kw):
-    dot_s = self.as_dot()
+    dot_s = self.as_dot(fold=True)
+    print("GVGraph print:")
+    print(dot_s)
+    print("gvprint...")
     return gvprint(dot_s, **gvprint_kw)
 
 if __name__ == '__main__':
