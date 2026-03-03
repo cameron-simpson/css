@@ -33,11 +33,16 @@ class Node:
   def __str__(self):
     return f'{self.__class__.__name__}:{id(self) if self.name is None else repr(self.name)}'
 
+  __repr__ = __str__
+
   def __hash__(self):
     return id(self)
 
   def __eq__(self, other):
     return self is other
+
+  def __lt__(self, other):
+    return self.name < other.name
 
   @property
   def in_count(self):
@@ -84,7 +89,7 @@ class Node:
     return self.as_GVNode().as_dot(no_attrs=no_attrs)
 
   def as_railroad(self):
-    return RRTextBox(str(self))
+    return RRTextBox(self.name or str(self))
 
 @dataclass
 class Edge:
