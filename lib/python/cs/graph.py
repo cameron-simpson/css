@@ -154,8 +154,6 @@ class Graph(Node):
     self._nodes_by_name[node.name].add(node)
     return node
 
-  def add_edge(self, node1: str | Node, node2: str | Node, **edge_attrs):
-    ''' Add an `Edge` to the `Graph`.
   @typechecked
   def __getitem__(self, node_name: str) -> Node:
     ''' Return the `Node` with `.name==node_name`.
@@ -165,6 +163,10 @@ class Graph(Node):
     node,=self._nodes_by_name[node_name]
     return node
 
+  def add_edge(
+      self, node1: str | Node, node2: str | Node, **edge_attrs
+  ) -> Edge:
+    ''' Add an `Edge` to the `Graph`, return the new `Edge`.
     '''
     node1 = self.add_node(node1)  # may promote str to Node
     assert node1 is not None
@@ -174,6 +176,20 @@ class Graph(Node):
     self.edges.add(edge)
     node1.out_edges.append(edge)
     node2.in_edges.append(edge)
+    return edge
+
+  def add_chain(
+      self, node1: str | Node, *more_nodes: str | Node, **edge_attrs
+  ) -> list[Edge]:
+    ''' Add a chain of `Node`s `Graph`, return a list of the resulting `Edge`s.
+    '''
+    more_nodes = list(more_nodes)
+    edges = []
+    while more_nodes:
+      node2 = more_nodes.pop(0)
+      edges.append(self.add_edge(node1, node2, **edge_attrs))
+      node1 = node2
+    return edges
 
   def as_GVGraph(
       self,
