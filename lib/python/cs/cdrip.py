@@ -459,6 +459,7 @@ class MBDisc(_MBEntity):
     return self.query_result.get('release-list', [])
 
   @cached_property
+  @unattributable
   def releases(self):
     ''' A cached list of entries from `release_list` matching the `disc_id`. '''
     releases = []
@@ -475,6 +476,7 @@ class MBDisc(_MBEntity):
     return releases
 
   @cached_property
+  @unattributable
   def release(self):
     ''' The first release containing this disc found in the releases from Musicbrainz, or `None`.
     '''
