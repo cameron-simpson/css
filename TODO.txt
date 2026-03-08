@@ -1,3 +1,4 @@
+cs.upd: print seems to be printing from where the cursor is, not the withdrawn-then-print, or soemthign like that - playon dl writes the summary from the end of the progress bar
 cs.cmdutils: GETOPT_SPEC works badly with no subcmds
 printt: borders=True to use the box drawing chars? mechanism in cs.ascii_art?
 cs.graph: make a graph of arbitrary python data structures

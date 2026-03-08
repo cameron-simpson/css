@@ -9,9 +9,12 @@ from typing import Any, Iterable, Optional
 
 from cs.ascii_art import (
     RRBase,
+    RRChoice,
     RRMerge,
+    RROptional,
     RRSequence,
     RRSplit,
+    RRStack,
     RRTextBox,
     RR_START,
     RR_END,
@@ -19,6 +22,7 @@ from cs.ascii_art import (
 from cs.gvutils import Graph as GVGraph, Node as GVNode
 from cs.queues import ListQueue
 
+from typeguard import typechecked
 
 @dataclass
 class Node:
@@ -33,11 +37,16 @@ class Node:
   def __str__(self):
     return f'{self.__class__.__name__}:{id(self) if self.name is None else repr(self.name)}'
 
+  __repr__ = __str__
+
   def __hash__(self):
     return id(self)
 
   def __eq__(self, other):
     return self is other
+
+  def __lt__(self, other):
+    return self.name < other.name
 
   @property
   def in_count(self):
@@ -84,7 +93,7 @@ class Node:
     return self.as_GVNode().as_dot(no_attrs=no_attrs)
 
   def as_railroad(self):
-    return RRTextBox(str(self))
+    return RRTextBox(self.name or str(self))
 
 @dataclass
 class Edge:
@@ -149,9 +158,8 @@ class Graph(Node):
     self._nodes_by_name[node.name].add(node)
     return node
 
-  def add_edge(self, node1: str | Node, node2: str | Node, **edge_attrs):
-    ''' Add an `Edge` to the `Graph`.
-  def __getitem__(self,node_name:str)->Node:
+  @typechecked
+  def __getitem__(self, node_name: str) -> Node:
     ''' Return the `Node` with `.name==node_name`.
     '''
     if node_name not in self._nodes_by_name:
@@ -159,6 +167,10 @@ class Graph(Node):
     node,=self._nodes_by_name[node_name]
     return node
 
+  def add_edge(
+      self, node1: str | Node, node2: str | Node, **edge_attrs
+  ) -> Edge:
+    ''' Add an `Edge` to the `Graph`, return the new `Edge`.
     '''
     node1 = self.add_node(node1)  # may promote str to Node
     assert node1 is not None
@@ -168,6 +180,20 @@ class Graph(Node):
     self.edges.add(edge)
     node1.out_edges.append(edge)
     node2.in_edges.append(edge)
+    return edge
+
+  def add_chain(
+      self, node1: str | Node, *more_nodes: str | Node, **edge_attrs
+  ) -> list[Edge]:
+    ''' Add a chain of `Node`s `Graph`, return a list of the resulting `Edge`s.
+    '''
+    more_nodes = list(more_nodes)
+    edges = []
+    while more_nodes:
+      node2 = more_nodes.pop(0)
+      edges.append(self.add_edge(node1, node2, **edge_attrs))
+      node1 = node2
+    return edges
 
   def as_GVGraph(
       self,
@@ -384,32 +410,13 @@ class Graph(Node):
 
 if __name__ == '__main__':
   G = Graph("graph1")
-  G.add_node("a")
-  G.add_node("b")
-  G.add_edge("a", "b")
-  ##print("AB")
-  ##G.gvprint()
-  ##print(G.as_railroad())
-  ##breakpoint()
-  G.add_node("c")
-  G.add_edge("c", "b")
-  ##print("ABC")
-  ##G.gvprint()
-  ##print(G.as_railroad())
-  ##breakpoint()
-  G.add_edge("b", "d")
-  G.add_edge("00", "c")
-  ##print(G.as_dot(fold=True))
-  ##G.gvprint()
-  ##rr = G.as_railroad()
-  ##pprint(rr)
-  ##breakpoint()
-  ##rr.print()
-  G.add_edge("x", "a")
-  G.add_edge("x", "00")
+  G.add_chain("d", "mid", "e")
   G.add_edge("d", "e")
+  G.add_chain("x", "a", "y")
+  G.add_chain("x", "00", "c", "y")
+  G.add_edge("00", "00b")
   print(G.as_dot(fold=True))
-  G.gvprint(rank_dir='LR')
+  G.gvprint(rankdir='LR')
   rr = G.as_railroad()
   print(repr(rr))
   rr.print()

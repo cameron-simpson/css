@@ -177,7 +177,7 @@ def rip(
       disc_id = dev_info.id
     elif disc_id != dev_info.id:
       warning("disc_id:%r != dev_info.id:%r", disc_id, dev_info.id)
-    disc = mbdb.discs[disc_id]
+    disc = mbdb[MBDisc, disc_id]
     if disc_id == dev_info.id:
       disc.mb_toc = mb_toc
     recordings = disc.recordings
@@ -316,6 +316,12 @@ class _MBEntity(HasTags):
     return self.mbdb.refresh(self, **mbdb_refresh_kw)
 
   @property
+  def mbdb(self):
+    ''' Use the shared `SQLTags`.
+    '''
+    return self.tags_db
+
+  @property
   def mbkey(self):
     ''' The MusicBrainz id, typically a UUID or discid.
     '''
@@ -362,9 +368,10 @@ class _MBEntity(HasTags):
   @cached_property
   def artist_credit_v(self):
     ''' A list of `str|MBArtist` from `self.tags.artist_credit`.
+        This falls back to `self.tags.artist` if there are no `artist_credit`.
     '''
     artists = []
-    for ac in self.tags.artist_credit:
+    for ac in self.tags.get('artist_credit') or self.tags.get('artist', []):
       if isinstance(ac, str):
         artists.append(ac)
       else:
@@ -413,10 +420,14 @@ class _MBEntity(HasTags):
         sep = ', '
     return ''.join(strs)
 
+class MBArea(_MBEntity):
+  ''' A Musicbrainz area entry.
+  '''
+  TYPE_SUBNAME = 'area'
+
 class MBArtist(_MBEntity):
   ''' A Musicbrainz artist entry.
   '''
-
   TYPE_SUBNAME = 'artist'
 
 class MBDisc(_MBEntity):
@@ -448,6 +459,7 @@ class MBDisc(_MBEntity):
     return self.query_result.get('release-list', [])
 
   @cached_property
+  @unattributable
   def releases(self):
     ''' A cached list of entries from `release_list` matching the `disc_id`. '''
     releases = []
@@ -464,6 +476,7 @@ class MBDisc(_MBEntity):
     return releases
 
   @cached_property
+  @unattributable
   def release(self):
     ''' The first release containing this disc found in the releases from Musicbrainz, or `None`.
     '''
@@ -1052,12 +1065,7 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
         v = dict(v)
         for k, subv in list(v.items()):
           type_name, _ = self.key_type_name(k)
-          v[k] = self._fold_value(
-              type_name,
-              subv,
-              q=q,
-              seen=seen
-          )
+          v[k] = self._fold_value(type_name, subv, q=q, seen=seen)
     elif isinstance(v, list):
       v = list(v)
       for i, subv in enumerate(v):
