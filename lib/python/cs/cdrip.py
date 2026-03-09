@@ -30,7 +30,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, uses_cmd_options
 from cs.excutils import unattributable
 from cs.ffmpegutils import convert as ffconvert, MetaData as FFMetaData
 from cs.fileutils import atomic_filename
@@ -502,7 +502,8 @@ class MBDisc(_MBEntity):
 
   @cached_property
   @unattributable
-  def mb_info(self):
+  @uses_cmd_options(alt_discids=(), disc_fallback=False)
+  def mb_info(self, *, alt_discids, disc_fallback):
     ''' Salient data from the MusicbrainzNG API response.
     '''
     discid = self.mbkey
@@ -514,7 +515,7 @@ class MBDisc(_MBEntity):
     medium_count = len(media)
     for medium in media:
       for pos, disc_entry in enumerate(medium['disc-list'], 1):
-        if disc_entry['id'] == discid:
+        if disc_entry['id'] == discid or disc_entry['id'] in alt_discids:
           mb_info = AttrableMapping(
               disc_entry=disc_entry,
               disc_pos=pos,
@@ -522,6 +523,15 @@ class MBDisc(_MBEntity):
               medium_count=medium_count,
           )
           return mb_info
+    if disc_fallback:
+      for medium in media:
+        for pos, disc_entry in enumerate(medium['disc-list'], 1):
+          return AttrableMapping(
+              disc_entry=disc_entry,
+              disc_pos=pos,
+              medium=medium,
+              medium_count=medium_count,
+          )
     # gather discids for inclusion in the exception message
     discids = set()
     for medium in media:
@@ -1420,7 +1430,10 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     return 0
 
   # pylint: disable=too-many-locals
-  @popopts
+  @popopts(
+      alt_discids='Alternate discids to accept, comma separated.',
+      disc_fallback='Fall back to the first other disc id.',
+  )
   def cmd_rip(self, argv):
     ''' Usage: {cmd} [-F codecs] [-n] [disc_id]
           Pull the audio into a subdirectory of the current directory.
@@ -1428,6 +1441,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
           -n        No action; recite planned actions.
     '''
     options = self.options
+    options.alt_discids = (options.alt_discids or "").split(',')
     fstags = options.fstags
     dirpath = options.dirpath
     options.popopts(argv, F_='codecs_spec', n='dry_run')
