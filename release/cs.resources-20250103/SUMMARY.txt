@@ -1,0 +1,2 @@
+RunState: new raiseif() method to raise CancellationError if cancelled.
+Move ClosedError and @not_closed to cs.semantics.

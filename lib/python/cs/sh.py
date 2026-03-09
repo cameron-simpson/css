@@ -9,7 +9,7 @@ Somewhat like the inverse of the shlex stdlib module.
 
 As of Python 3.3 the function `shlex.quote()` does what `quotestr()` does.
 
-As of Python 3.8 the function `shlex.join()` does what `quotecmd()` does.
+As of Python 3.8 the function `shlex.join()` does what `quoteargv()` does.
 '''
 
 import string
@@ -116,7 +116,7 @@ def quotestr(s):
   flush()
   return ''.join(qparts)
 
-def quotecmd(argv):
+def quoteargv(argv):
   ''' Quote strings, assemble into command string.
   '''
   return ' '.join(quote(argv))
@@ -127,7 +127,7 @@ def main_shqstr(argv=None):
   if argv is None:
     argv = sys.argv
   argv.pop(0)
-  print(quotecmd(argv))
+  print(quoteargv(argv))
 
 if __name__ == '__main__':
   sys.exit(main_shqstr())

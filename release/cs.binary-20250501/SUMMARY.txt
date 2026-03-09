@@ -1,0 +1,10 @@
+@binclass: a dataclass-like way to specify binary structures.
+Rename BinaryByteses to BinaryBytes.
+Rename BinaryMultiStruct and BinarySingleStruct to BinaryStruct.
+New bs(bytes) subclass with a compact repr().
+BinarySingleValue classes now expect a type specification for the value.
+BinarySingleValue now subclasses cs.deco.Promotable.
+New struct_field_types(struct_format,field_names) to return a mapping of field names to struct.unpack-returned types.
+New is_single_value(obj) to test for single value binary objects.
+New ListOfBinary, a class holding a list of instances of some binary class.
+Many internal updates and improvements.

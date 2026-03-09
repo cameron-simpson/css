@@ -1,0 +1,2 @@
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: docstring improvements
+lib/python/cs/buffer.py: cs.buffer: DISTINFO: move python_version>=3.3 out to the "makers" section (presemly unused) because it was being used as a dependency, finding the python_version PyPI package

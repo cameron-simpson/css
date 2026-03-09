@@ -1,0 +1,1 @@
+Add some sanity checks on allowed state transitions, fix a check in add_callback.

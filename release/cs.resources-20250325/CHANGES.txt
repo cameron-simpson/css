@@ -1,0 +1,10 @@
+lib/python/cs/resources.py: cs.resources: RunState: new PAUSED state to support suspending activity
+lib/python/cs/resources.py: cs.resources: RunState: new ._unpause Event to allow block-until-unpaused, managed during fsm_event(); new pause() and pauseif() methods, new .paused property
+lib/python/cs/resources.py: cs.resources: RunState: remove duplicated .raiseif() method
+lib/python/cs/resources.py: cs.resources: RunState: update docstrings
+lib/python/cs/resources.py: cs.resources: RunSTate.running: include the PAUSED state
+lib/python/cs/resources.py: cs.resources: RunState.pauseif: there is always a self._unpause Event
+lib/python/cs/resources.py: cs.resources: RunState: the resume() method
+lib/python/cs/resources.py: cs.resources: RunState: PAUSED state: allow pause->PAUSED and send cancel->STOPPING
+lib/python/cs/resources.py: cs.resources: add missing import
+lib/python/cs/resources.py: cs.resources: RunState: drop ._running, no longer used

@@ -1,0 +1,1 @@
+lib/python/cs/app/osx/spaces.py: cs.app.osx.spaces: new current command to report the current space number

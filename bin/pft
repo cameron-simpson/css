@@ -1,12 +1,12 @@
 #!/bin/sh
 #
 # pft - convenience wrapper for "pfctl(8) -t".
-#       - Cameron Simpson <cs@cskk.id.au> 24may2014
+# - Cameron Simpson <cs@cskk.id.au> 24may2014
 #
 
 set -ue
 
-: ${PFT_EXPORT:=$HOME/var/pf/tables}
+: "${PFT_EXPORT:=$HOME/var/pf/tables}"
 
 trace=
 [ -t 2 ] && trace=set-x
@@ -14,11 +14,19 @@ trace=
 cmd=`basename "$0"`
 usage="Usage:
   $cmd [-a anchor] [op [args...]]
-Operations:
-  $cmd cat table...
-  $cmd export [-d export_base] [table...]
-  $cmd import [-d export_base] [-m {add|replace}] table...
-  $cmd [ls]     List tables."
+  The default op is \"ls\".
+  -a anchor Specify the pf anchor, default \"\" (the root).
+  Operations:
+    $cmd show table...
+      Show table contents.
+    $cmd export [-d export_base] [table...]
+      Export table contents to files in $PFT_EXPORT (from \$PFT_EXPORT).
+      -d export_base    Specify an alterantive export directory.
+    $cmd import [-d export_base] [-m {add|replace}] table...
+      Import table contents from files in $PFT_EXPORT (from \$PFT_EXPORT).
+      -d export_base    Specify an alterantive export directory.
+    $cmd [ls]
+      List tables."
 
 badopts=
 
@@ -48,7 +56,7 @@ _pft()
 }
 
 case "$op" in
-  cat)
+  show)
     for t
     do
       $trace pfctl -a "$anchor" -t "$t" -T show
@@ -74,7 +82,7 @@ case "$op" in
     for t
     do
       tfile=$export_dir/$t.txt
-      _pft cat "$t" >"$tfile"
+      _pft show "$t" >"$tfile"
     done
     ;;
   import)

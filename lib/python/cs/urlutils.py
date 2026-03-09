@@ -4,6 +4,51 @@
 # - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
+from collections import namedtuple
+from contextlib import contextmanager
+from functools import cached_property
+from heapq import heappush, heappop
+import os
+import os.path
+import re
+import sys
+from typing import Iterable, Union
+
+from netrc import netrc
+from string import whitespace
+from threading import RLock
+from urllib.request import (
+    HTTPError, URLError, HTTPPasswordMgrWithDefaultRealm
+)
+from urllib.parse import parse_qs, urlparse, urljoin as up_urljoin
+
+from bs4 import BeautifulSoup
+try:
+  try:
+    from lxml import etree
+  except ImportError:
+    import xml.etree.ElementTree as etree
+except ImportError:
+  try:
+    if sys.stderr.isatty():
+      print(
+          "%s: warning: cannot import lxml for use with bs4" % (__file__,),
+          file=sys.stderr
+      )
+  except AttributeError:
+    pass
+import requests
+from typeguard import typechecked
+
+from cs.deco import promote, Promotable
+from cs.excutils import unattributable
+from cs.lex import FormatableMixin, parseUC_sAttr, r
+from cs.logutils import debug, error, warning, exception
+from cs.pfx import Pfx, pfx_call
+from cs.rfc2616 import datetime_from_http_date
+from cs.seq import skip_map
+from cs.threads import locked, ThreadState, HasThreadState
+
 __version__ = '20231129-post'
 
 DISTINFO = {
@@ -26,54 +71,6 @@ DISTINFO = {
     ],
 }
 
-from collections import namedtuple
-from contextlib import contextmanager
-from heapq import heappush, heappop
-from itertools import chain
-import errno
-import os
-import os.path
-import sys
-import time
-from typing import Iterable
-
-from netrc import netrc
-import socket
-from string import whitespace
-from threading import RLock
-from urllib.request import Request, HTTPError, URLError, \
-            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
-            build_opener
-from urllib.parse import urlparse, urljoin as up_urljoin, quote as urlquote
-
-from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
-try:
-  try:
-    from lxml import etree
-  except ImportError:
-    import xml.etree.ElementTree as etree
-except ImportError:
-  try:
-    if sys.stderr.isatty():
-      print(
-          "%s: warning: cannot import lxml for use with bs4" % (__file__,),
-          file=sys.stderr
-      )
-  except AttributeError:
-    pass
-import requests
-from typeguard import typechecked
-
-from cs.deco import cachedmethod, promote, Promotable
-from cs.excutils import logexc, unattributable
-from cs.lex import parseUC_sAttr, r
-from cs.logutils import debug, error, warning, exception
-from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_iter
-from cs.rfc2616 import datetime_from_http_date
-from cs.seq import skip_map
-from cs.threads import locked, ThreadState, HasThreadState
-
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader
 ##def my_putheader(self, header, *values):
@@ -83,9 +80,11 @@ from cs.threads import locked, ThreadState, HasThreadState
 ##HTTPConnection.putheader = my_putheader
 
 def urljoin(url, other_url):
+  ''' This is `urllib.parse.urljoin` after coercing both arguments to `str`.
+  '''
   return up_urljoin(str(url), str(other_url))
 
-class URL(SingletonMixin, HasThreadState, Promotable):
+class URL(HasThreadState, FormatableMixin, Promotable):
   ''' Utility class to do simple stuff to URLs, subclasses `str`.
   '''
 
@@ -97,21 +96,13 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       retry_delay=3,
   )
 
-  @classmethod
-  def _singleton_key(cls, url_s: str, referer=None):
-    return url_s
-
   @typechecked
-  def __init__(self, url_s: str, referer=None):
+  def __init__(self, url_s: str, referer=None, soup=None, text=None):
     ''' Initialise the `URL` from the URL string `url_s`.
     '''
-    if hasattr(self, 'url_s'):
-      assert url_s == self.url_s
-      return
-    self.url_s = url_s
+    self.url_s = str(url_s)
     self._lock = RLock()
     self._parts = None
-    self._info = None
     self.flush()
 
   def __str__(self):
@@ -120,12 +111,29 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def __repr__(self):
     return f'{self.__class__.__name__}:{self.url_s!r}'
 
+  def isabs(self):
+    ''' Test whether this `URL` is absolute, having a hostname and
+        a path commencing with `'/'`.
+    '''
+    return bool(self.hostname) and self.path.startswith('/')
+
+  @property
+  def short(self):
+    ''' A shortened form of the URL for use in messages.
+    '''
+    path = self.path
+    if len(path) <= 32:
+      shortpath = path
+    else:
+      shortpath = f'{path[:15]}...{path[-14:]}'
+    return f'{self.hostname}{shortpath}'
+
   def flush(self):
     ''' Forget all cached content.
     '''
-    for val_attr in ['_' + attr for attr in 'GET HEAD parsed'.split()]:
+    for attr in 'GET_response', 'HEAD_response', 'parsed':
       try:
-        delattr(self, val_attr)
+        delattr(self, attr)
       except AttributeError:
         pass
 
@@ -138,14 +146,33 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      P = self.parsed
-      nodes = P.find_all(k.lower())
+      soup = self.soup
+      nodes = soup.find_all(k.lower())
       if plural:
         return nodes
       node, = nodes
       return node
     # look up method on equivalent Unicode string
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
+  def format_kwargs(self):
+    ''' Return a dict for use with `FormatableMixin.format_as()`.
+    '''
+    return dict(
+        basename=self.basename or 'index.html',
+        cleanpath=self.cleanpath,
+        cleanrpath=self.cleanrpath,
+        dirname=self.dirname,
+        domain=self.domain,
+        ext=self.ext,
+        hostname=self.hostname,
+        netloc=self.netloc,
+        path=self.path,
+        rpath=self.rpath,
+        scheme=self.scheme,
+        short=self.short,
+        url=self.url_s,
+    )
 
   @contextmanager
   def session(self, session=None):
@@ -159,27 +186,25 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       with self.context(session=session):
         yield session
 
+  @cached_property
   @locked
-  @cachedmethod
-  def GET(self):
-    ''' Return the `requests.Response` object from a `GET` of this URL.
-        This may be a cached response.
+  def GET_response(self):
+    ''' The `requests.Response` object from a `GET` of this URL.
     '''
     return requests.get(self.url_s)
 
+  @cached_property
   @locked
-  @cachedmethod
-  def HEAD(self):
-    ''' Return the `requests.Response` object from a `HEAD` of this URL.
-        This may be a cached response.
+  def HEAD_response(self):
+    ''' The `requests.Response` object from a `HEAD` of this URL.
     '''
-    return requests.get(self.url_s)
+    return requests.head(self.url_s)
 
   def exists(self) -> bool:
-    ''' Test if this URL exists.
+    ''' Test if this URL exists via a `HEAD` request.
     '''
     try:
-      self.HEAD()
+      self.HEAD_response
     except HTTPError as e:
       if e.code == 404:
         return False
@@ -188,33 +213,43 @@ class URL(SingletonMixin, HasThreadState, Promotable):
 
   @property
   @unattributable
-  def content(self):
-    ''' The URL content as a string.
+  def content(self) -> bytes:
+    ''' The decoded URL content as a `bytes`.
     '''
-    return self.GET().content
+    return self.GET_response.content
+
+  @cached_property
+  @unattributable
+  def text(self) -> str:
+    ''' The URL decoded content as a string.
+    '''
+    return self.GET_response.text
 
   @property
   @unattributable
-  def text(self):
-    ''' The URL content as a string.
-    '''
-    return self.GET().text
-
-  @property
-  @unattributable
-  @locked
   def headers(self):
     ''' A `requests.Response` headers mapping.
     '''
-    r = self.HEAD()
-    return r.headers
+    return self.HEAD_response.headers
 
-  @property
+  # TODO: use functions from cs.rfc2616? they do return an email.BaseHeader :-(
+  @cached_property
+  @unattributable
+  def content_type_full(self):
+    ''' The URL content MIME type from the `Content-Type` header.
+    '''
+    try:
+      return self.headers['content-type']
+    except KeyError as e:
+      warning("%s.content_type_full", self)
+
+  @cached_property
   @unattributable
   def content_type(self):
-    ''' The URL content MIME type.
+    ''' The base URL content MIME type from the `Content-Type` header.
+        Example: `'text/html'`
     '''
-    return self.headers['content-type']
+    return self.content_type_full.split(';')[0].strip().lower()
 
   @property
   @unattributable
@@ -232,9 +267,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   def last_modified(self):
     ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
     '''
-    if self._info is None:
-      self.HEAD()
-    value = self._info['Last-Modified']
+    value = self.headers.get('Last-Modified')
     if value is not None:
       # parse HTTP-date into datetime object
       dt_last_modified = datetime_from_http_date(value.strip())
@@ -243,13 +276,10 @@ class URL(SingletonMixin, HasThreadState, Promotable):
 
   @property
   @unattributable
-  @locked
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
     '''
-    if self._content is None:
-      self.HEAD()
-    return self._info.getencoding()
+    return self.headers.getencoding()
 
   @property
   @unattributable
@@ -262,32 +292,17 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       return ''
     return hostname.split('.', 1)[1]
 
-  @property
+  @cached_property
   @unattributable
-  @locked
-  @cachedmethod
-  def parsed(self):
+  def soup(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    try:
-      text = self.text
-      if self.content_type == 'text/html':
-        parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
-      else:
-        parser_names = ('lxml', 'xml')
-      try:
-        P = BeautifulSoup(text, 'html5lib')
-        ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
-      except Exception as e:
-        exception(
-            "%s: .parsed: BeautifulSoup(text,html5lib) fails: %s", self, e
-        )
-        with open("cs.urlutils-unparsed.html", "wb") as bs:
-          bs.write(self.content)
-        raise
-      return P
-    except:
-      raise
+    if self.content_type == 'text/html':
+      parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
+    else:
+      parser_names = ('lxml', 'xml')
+    soup = pfx_call(BeautifulSoup, self.text, 'lxml')  ## list(parser_names))
+    return soup
 
   def feedparsed(self):
     ''' A parse of the content via the feedparser module.
@@ -295,43 +310,68 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     import feedparser
     return feedparser.parse(self.content)
 
-  @property
+  @cached_property
   @unattributable
-  @locked
   def xml(self):
     ''' An `ElementTree` of the URL content.
     '''
     return etree.XML(self.content.decode('utf-8', 'replace'))
 
-  @property
-  @unattributable
-  def parts(self):
-    ''' The URL parsed into parts by urlparse.urlparse.
+  @cached_property
+  def url_parsed(self):
+    ''' The URL parsed by `urlparse.urlparse`.
+        This is a `(scheme,netloc,path,params,query,fragment)` namedtuple.
     '''
-    if self._parts is None:
-      self._parts = urlparse(self.url_s)
-    return self._parts
+    return urlparse(self.url_s)
 
   @property
   @unattributable
   def scheme(self):
-    ''' The URL scheme as returned by urlparse.urlparse.
+    ''' The URL scheme as returned by `urlparse.urlparse`.
     '''
-    return self.parts.scheme
+    return self.url_parsed.scheme
 
   @property
   @unattributable
   def netloc(self):
-    ''' The URL netloc as returned by urlparse.urlparse.
+    ''' The URL netloc as returned by `urlparse.urlparse`.
     '''
-    return self.parts.netloc
+    return self.url_parsed.netloc
 
   @property
   @unattributable
   def path(self):
-    ''' The URL path as returned by urlparse.urlparse.
+    ''' The URL path as returned by `urlparse.urlparse`.
     '''
-    return self.parts.path
+    return self.url_parsed.path
+
+  @property
+  @unattributable
+  def rpath(self):
+    ''' The URL path as returned by `urlparse.urlparse`, after any leading slashes.
+    '''
+    return self.path.lstrip('/')
+
+  @cached_property
+  @unattributable
+  def cleanpath(self):
+    ''' The URL path as returned by `urlparse.urlparse`,
+        with multiple slashes (`/`) reduced to a single slash.
+        Technically this can change the meaning of the URL path,
+        but usually these are an artifact of sloppy path construction.
+    '''
+    path = self.path
+    if '///' in path:
+      path = re.sub('//+', '/', path)  # the thorough thing
+    elif '//' in path:
+      path = path.replace('//', '/')  # the fast thing
+    return path
+
+  @property
+  def cleanrpath(self):
+    ''' The `cleanpath` with its leading slash stripped.
+    '''
+    return self.cleanpath.lstrip('/')
 
   @property
   @unattributable
@@ -343,55 +383,61 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   @property
   @unattributable
   def params(self):
-    ''' The URL params as returned by urlparse.urlparse.
+    ''' The URL params as returned by `urlparse.urlparse`.
     '''
-    return self.parts.params
+    return self.url_parsed.params
 
   @property
   @unattributable
   def query(self):
-    ''' The URL query as returned by urlparse.urlparse.
+    ''' The URL query as returned by `urlparse.urlparse`.
     '''
-    return self.parts.query
+    return self.url_parsed.query
+
+  @unattributable
+  def query_dict(self):
+    ''' Return a new `dict` containing the parsed param=value pairs from `self.query`.
+    '''
+    return parse_qs(self.query)
 
   @property
   @unattributable
   def fragment(self):
-    ''' The URL fragment as returned by urlparse.urlparse.
+    ''' The URL fragment as returned by `urlparse.urlparse`.
     '''
-    return self.parts.fragment
+    return self.url_parsed.fragment
 
   @property
   @unattributable
   def username(self):
-    ''' The URL username as returned by urlparse.urlparse.
+    ''' The URL username as returned by `urlparse.urlparse`.
     '''
-    return self.parts.username
+    return self.url_parsed.username
 
   @property
   @unattributable
   def password(self):
-    ''' The URL password as returned by urlparse.urlparse.
+    ''' The URL password as returned by `urlparse.urlparse`.
     '''
-    return self.parts.password
+    return self.url_parsed.password
 
   @property
   @unattributable
   def hostname(self):
-    ''' The URL hostname as returned by urlparse.urlparse.
+    ''' The URL hostname as returned by `urlparse.urlparse`.
     '''
-    return self.parts.hostname
+    return self.url_parsed.hostname
 
   @property
   @unattributable
   def port(self):
-    ''' The URL port as returned by urlparse.urlparse.
+    ''' The URL port as returned by `urlparse.urlparse`.
     '''
-    return self.parts.port
+    return self.url_parsed.port
 
   @property
   @unattributable
-  def dirname(self, absolute=False):
+  def dirname(self):
     return os.path.dirname(self.path)
 
   @property
@@ -402,7 +448,16 @@ class URL(SingletonMixin, HasThreadState, Promotable):
   @property
   @unattributable
   def basename(self):
+    ''' The URL basename.
+    '''
     return os.path.basename(self.path)
+
+  @property
+  @unattributable
+  def ext(self):
+    ''' The URL basename file extension, as from `os.path.splitext`.
+    '''
+    return os.path.splitext(self.basename)[1]
 
   def find_all(self, *a, **kw):
     ''' Convenience routine to call BeautifulSoup's .find_all() method.
@@ -443,6 +498,12 @@ class URL(SingletonMixin, HasThreadState, Promotable):
     ''' Resolve this URL with respect to a base URL.
     '''
     return URL(urljoin(base, self), referer=base)
+
+  def urlto(self, other: Union["URL", str]) -> "URL":
+    ''' Return `other` resolved against `self.baseurl`.
+        If `other` is an abolute URL it will not be changed.
+    '''
+    return URL(urljoin(self.baseurl, other), referer=self)
 
   def normalised(self):
     ''' Return a normalised URL where "." and ".." components have been processed.
@@ -485,9 +546,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       except KeyError:
         debug("no href, skip %r", A)
         continue
-      yield URL(
-          (urljoin(self.baseurl, href) if absolute else href), referer=self
-      )
+      yield self.urlto(href) if absolute else URL(href, referer=self)
 
   def srcs(self, *a, **kw):
     ''' All 'src=' values from the content HTML.
@@ -503,9 +562,7 @@ class URL(SingletonMixin, HasThreadState, Promotable):
       except KeyError:
         debug("no src, skip %r", A)
         continue
-      yield URL(
-          (urljoin(self.baseurl, src) if absolute else src), referer=self
-      )
+      yield self.urlto(src) if absolute else URL(src, referer=self)
 
   def savepath(self, rootdir):
     ''' Compute a local filesystem save pathname for this URL.
@@ -630,7 +687,8 @@ class URL(SingletonMixin, HasThreadState, Promotable):
         `str` is promoted directly to `cls(obj)`.
         `(url,referer)` is promoted to `cls(url,referer=referer)`.
     '''
-    if isinstance(obj, cls):
+    # TODO: can the None check comes from Promotable.promote?
+    if obj is None or isinstance(obj, cls):
       return obj
     if isinstance(obj, str):
       return cls(obj)

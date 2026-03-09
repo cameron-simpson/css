@@ -1,0 +1,2 @@
+lib/python/cs/seq.py: cs.seq: new ClonedIterator class to provide a reiterable clone of an iterator
+lib/python/cs/seq.py: cs.seq: ClonedIterator.__iter__: return instead of letting the inner StopIteration out

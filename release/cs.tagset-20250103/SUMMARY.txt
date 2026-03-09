@@ -1,0 +1,1 @@
+Replace TagSet.from_line with TagSet.from_str, leave @OBSOLETE hook behind.

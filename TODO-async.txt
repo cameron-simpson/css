@@ -1,2 +1,3 @@
 use await_iter in @agen?
-cs.naysync: nonpolling implementation for @agen
+dequeue: async generator yielding items from a sync queue
+bg: run distinct async event loop in its own thread

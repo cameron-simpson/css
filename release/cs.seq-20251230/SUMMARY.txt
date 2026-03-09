@@ -1,0 +1,2 @@
+New not_none(*iterables) generator yielding items which are not none, handy in * expansions.
+New range() class accepting ... for the stop.

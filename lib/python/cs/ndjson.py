@@ -14,7 +14,7 @@ from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 
-__version__ = '20211208-post'
+__version__ = '20250528-post'
 
 DISTINFO = {
     'description':
@@ -34,6 +34,17 @@ DISTINFO = {
         'cs.pfx',
     ],
 }
+
+def dump_ndjson(obj, f):
+  ''' Write `obj` as a single line of JSON, including the trailing newline.
+  '''
+  json.dump(obj, f, separators=(',', ':'))
+  f.write('\n')
+
+def dumps_ndjson(obj):
+  ''' Return `obj` as a single line of JSON, including the trailing newline.
+  '''
+  return json.dumps(obj, separators=(',', ':')) + '\n'
 
 @strable(open_func=lambda filename: gzifopen(filename, 'r', encoding='utf8'))
 def scan_ndjson(f, dictclass=dict, error_list=None):
@@ -64,8 +75,7 @@ def write_ndjson(f, objs):
   '''
   for lineno, o in enumerate(objs, 1):
     with Pfx("line %d", lineno):
-      f.write(json.dumps(o, separators=(',', ':')))
-      f.write('\n')
+      dump_ndjson(obj, f)
 
 # pylint: disable=consider-using-with
 @strable(open_func=lambda filename: gzifopen(filename, 'a', encoding='utf8'))

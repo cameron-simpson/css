@@ -236,7 +236,21 @@ def convert(
     extra_opts=None,
 ) -> List[str]:
   ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
+
+      Parameters:
+      * `srcs`: the positional parameters specify source files
+      * `doit`: optional flag (default `True`); do not procude the output if false
+      * `dstfmt`: optional destination format
+      * `ffmpeg_exe`: optional `ffmepg` executable
+      * `conversions`: optional format conversions
+      * `metadata`: an optional mapping of metadata values
+      * `timespans`: optional timespans to select form the sources
+      * `overwrite`: optional flag (default `False`); if true allow overwriting an existing destination file
+      * `acodec`: optional target audio codec
+      * `vcodec`: optional target video codec
+      * `extra_opts`: an optional mapping of additional ffmpeg output options
   '''
+  # TODO: append mode? original formats are kept with the desired formats added as additional streams
   if conversions is None:
     conversions = DEFAULT_CONVERSIONS
   if metadata is None:

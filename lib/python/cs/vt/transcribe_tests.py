@@ -15,7 +15,7 @@ from uuid import uuid4
 from .dir import Dir
 from .hash import Hash_SHA1
 from .meta import Meta
-from .transcribe import Transcriber
+from .transcribe import Transcribable
 
 class TestTranscribe(unittest.TestCase):
   ''' Test the text transcription facility.
@@ -42,9 +42,9 @@ class TestTranscribe(unittest.TestCase):
         Hash_SHA1.from_data(bytes(random.randint(0, 255) for _ in range(100))),
         Dir("some_dir", meta=Meta(dict(x=dict(a=1, b=2)))),
     ):
-      s = Transcriber.transcribe_obj(o, None)
+      s = Transcribable.str_obj(o, None)
       self.assertIsInstance(s, str)
-      o2, offset = Transcriber.parse(s)
+      o2, offset = Transcribable.parse(s)
       self.assertEqual(
           offset, len(s), "UNPARSED: len(s)=%d, offset=%d" % (len(s), offset)
       )

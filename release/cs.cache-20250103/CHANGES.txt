@@ -1,0 +1,5 @@
+lib/python/cs/cache.py: cs.cache: pull in @cachedmethod from cs.deco for dependency reasons
+lib/python/cs/cache.py: cs.cache,cs.fileutils: move file_based and @file_property from cs.fileutils to cs.cache
+lib/python/cs/cache.py: cs.cache: update imports
+lib/python/cs/cache.py: cs.cache: fix typo
+lib/python/cs/cache.py: cs.cache: get warning from cs.gimmicks instead of cs.logutils

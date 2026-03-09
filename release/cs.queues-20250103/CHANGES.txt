@@ -1,0 +1,6 @@
+lib/python/cs/queues.py: cs.queues: docstring and DISTINFO updates
+lib/python/cs/queues.py: cs.PushQueue: mix in RunStateMixin, automatic RunState parameter, honour runstate.cancelled
+lib/python/cs/queues.py: merge default -> pilfer
+lib/python/cs/queues.py: merge default -> pilfer
+lib/python/cs/queues.py: cs.queues: PushQueue: remove redundant @promote
+lib/python/cs/queues.py: cs.queues: update DISTINFO

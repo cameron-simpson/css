@@ -1,0 +1,1 @@
+BaseCommand.cmd_info: default skip_names is self.options.INFO_SKIP_NAMES.

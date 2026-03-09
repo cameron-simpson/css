@@ -1,0 +1,1 @@
+lib/python/cs/psutils.py: cs.psutils: print_argv: new as_str optional parameter to control conversion of arguments to strings, problem encountered by @HypnoticOcelot with pathlib.Path args

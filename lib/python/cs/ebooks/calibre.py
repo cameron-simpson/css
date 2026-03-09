@@ -1245,8 +1245,8 @@ class CalibreCommand(EBooksCommonBaseCommand):
   DEFAULT_LINKTO_DIRPATH_ENVVAR = 'MEDIA_BOOKSPATH'
   DEFAULT_LINKTO_FORMATS = ['CBZ', 'EPUB']
   DEFAULT_LINKTO_SELECTORS = ['CBZ', 'EPUB']
-  DEFAULT_LINKTO_SERIES_FORMAT = '{series.name:lc}--{series.index}--{title:lc}'
-  DEFAULT_LINKTO_NOSERIES_FORMAT = '{title:lc}'
+  DEFAULT_LINKTO_SERIES_FORMAT = '{series.name:lc_}--{series.index}--{title:lc_}'
+  DEFAULT_LINKTO_NOSERIES_FORMAT = '{title:lc_}'
 
   # mapping of target format key to source format and extra options
   CONVERT_MAP = {
@@ -1422,7 +1422,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
           Start an interactive database prompt.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     return self.options.calibre.dbshell()
 
   def cmd_decrypt(self, argv):
@@ -1510,8 +1510,8 @@ class CalibreCommand(EBooksCommonBaseCommand):
           if series_name:
             series_name = series_name.strip()
           name_format = link_format or (
-              '{series.name:lc}--{series.index}--{title:lc}'
-              if series_name else '{title:lc}'
+              '{series.name:lc_}--{series.index}--{title:lc_}'
+              if series_name else '{title:lc_}'
           )
           name = (
               cbook.format_as(name_format).replace('_', '-').replace('/', ':')
@@ -1667,7 +1667,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
           List the library preferences.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     xit = 0
     db = self.options.calibre.db
     with db.session() as session:
@@ -1860,7 +1860,7 @@ class CalibreCommand(EBooksCommonBaseCommand):
             options: self.options
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     interact(
         banner=f'{self.cmd}: {options.calibre}',

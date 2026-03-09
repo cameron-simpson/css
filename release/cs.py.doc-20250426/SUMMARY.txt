@@ -1,0 +1,3 @@
+module_doc: new doc_item inner function to format an item, now using a list instead of a heading - more compact and readable.
+module_doc: restore mangled command usage.
+module_doc: provide a short summary of every module top level name before the full docs.

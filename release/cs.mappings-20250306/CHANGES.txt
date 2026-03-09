@@ -1,0 +1,10 @@
+lib/python/cs/mappings.py: cs.mappings: new CachingMapping to present a mapping interface to a slower backend mapping
+lib/python/cs/mappings.py: cs.mappings: CachingMapping: fix MultiOpenMixin.startup_shutdown method
+lib/python/cs/mappings.py: cs.cache,cs.mappings: move CachingMapping to cs.cache
+lib/python/cs/mappings.py: cs.mappings: clean lint after moving CachingMapping
+lib/python/cs/mappings.py: cs.mappings: mark MappingChain as obsolete
+lib/python/cs/mappings.py: cs.mappings: new missingdict(factory:Callable[key]) type, like defaultdict but capable of key specific default values
+lib/python/cs/mappings.py: cs.mappings: new @mapped_property decorator to turn a key-based factory method into a mapping of key->value
+lib/python/cs/mappings.py: cs.mappings: @mapped_property: call the method with self.myself instead of self
+lib/python/cs/mappings.py: cs.mappings: missingdict.__Missing__: bugfix call to infill function
+lib/python/cs/mappings.py: cs.mapping: use a few more format strings and require Python>=3.6 (for the format strings, already in use)

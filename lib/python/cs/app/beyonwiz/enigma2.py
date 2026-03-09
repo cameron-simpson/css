@@ -15,7 +15,7 @@ from os.path import basename, isfile as isfilepath, splitext
 
 from icontract import require
 
-from cs.binary import BinaryMultiStruct
+from cs.binary import BinaryStruct
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -26,10 +26,10 @@ from cs.threads import locked_property
 from . import _Recording
 
 # an "access point" record from the .ap file
-Enigma2APInfo = BinaryMultiStruct('Enigma2APInfo', '>QQ', 'pts offset')
+Enigma2APInfo = BinaryStruct('Enigma2APInfo', '>QQ', 'pts offset')
 
 # a "cut" record from the .cuts file
-Enigma2Cut = BinaryMultiStruct('Enigma2Cut', '>QL', 'pts type')
+Enigma2Cut = BinaryStruct('Enigma2Cut', '>QL', 'pts type')
 
 class Enigma2(_Recording):
   ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
@@ -38,8 +38,8 @@ class Enigma2(_Recording):
   '''
 
   DEFAULT_FILENAME_BASIS = (
-      '{meta.title:lc}--{file.datetime:lc}--{file.channel:lc}'
-      '--beyonwiz--{meta.description:lc}'
+      '{meta.title:lc_}--{file.datetime:lc_}--{file.channel:lc_}'
+      '--beyonwiz--{meta.description:lc_}'
   )
 
   FFMPEG_METADATA_MAPPINGS = {

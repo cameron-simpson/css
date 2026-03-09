@@ -13,7 +13,7 @@ exec 3>&1 1>&2
 ffmpeg_exe_default=ffmpeg
 
 cmd=$0
-usage="Usage: $cmd [-n|--dry-run] [--replace] input [output [ffmpeg-options...]]
+usage="Usage: $cmd [-fflags flags] [-n|--dry-run] [--replace] input [output [ffmpeg-options...]]
   Write the output filename to standard output.
   Environment:
     \$FFMPEG_EXE the ffmpeg executable, default \"$ffmpeg_exe_default\""
@@ -23,12 +23,14 @@ badopts=
 doit=1
 do_replace=
 ffmpeg_exe=${FFMPEG_EXE:-"$ffmpeg_exe_default"}
+fflags=ignidx+fastseek+igndts+genpts
 input=
 output=
 
 while [ $# -gt 0 ]
 do
   case "$1" in
+    -fflags)        fflags=$2; shift ;;
     -n | --dry-run) doit= ;;
     --replace)      do_replace=1 ;;
     --)             shift; break ;;
@@ -122,7 +124,7 @@ do
 done
 set -- -map 0 "$@"
 
-set -- "$ffmpeg_exe" -i "$input" "$@" -fflags genpts "$output"
+set -- "$ffmpeg_exe" -i "$input" "$@" -fflags "$fflags" "$output"
 
 [ $doit ] || {
   echo "$*"

@@ -1,0 +1,2 @@
+model_batches_qs: new after=None parameter to indicate preiteration point.
+model_instances: new optional parameters prefetch_related and select_related to augument the querysets before iteration.

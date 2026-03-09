@@ -1,0 +1,2 @@
+atomic_filename: make all parameters after the filename keyword only.
+makelockfile: include the Thread name in the Pfx context, write the pid and Thread name into the lock file.

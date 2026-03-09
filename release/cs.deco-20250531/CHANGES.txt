@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: @decorator: optionally accept (decorated,attrs) to allow override of __doc__ etc

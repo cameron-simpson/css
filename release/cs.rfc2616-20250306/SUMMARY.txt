@@ -1,0 +1,1 @@
+New default_headerregistry(), header(headers,name), content_length(headers) and content_type(headers).

@@ -1,0 +1,3 @@
+lib/python/cs/seq.py: cs.seq: new infill() and infill_from_batches() generators for identifying missing records require an infill
+lib/python/cs/seq.py: cs.seq: clean some lint
+lib/python/cs/seq.py: cs.seq: infill_from_batches: new amend_batch(objs)->objs parameter for amending each batch

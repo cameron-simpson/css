@@ -1,0 +1,84 @@
+lib/python/cs/binary.py: cs.binary: new bs(bytes) class with a compact repr
+lib/python/cs/binary.py: cs.binary: add some examples to the module docstring
+lib/python/cs/binary.py: cs.binary: SimpleBinary.__str__: recognise single value MultiStructBinary-generated classes and crop repr(value.value) to avoid looking like a tuple, provide __str__ and __repr__ for single field MultiStructBinary-generated classes
+lib/python/cs/binary.py: cs.binary: pt_spec: better names for generated classes, provide __doc__ for the single value class
+lib/python/cs/binary.py: cs.binary: SimpleBinary.__str__: also use the short form for BinarySingleValue fields
+lib/python/cs/binary.py: cs.binary: new is_single_value(obj) to test for single value binary objects, use it in SimpleBinary.__str__
+lib/python/cs/binary.py: cs.binary: make AbstractBinary Promotable to support .from_typename methods
+lib/python/cs/binary.py: cs.binary: new @binclass class decorator, EXPERIMENTAL, for wrapping binary classes defined like data classes (UNTESTED)
+lib/python/cs/binary.py: cs.binary: tweak docstrings
+lib/python/cs/binary.py: cs.binary: @binclass: bugfixes, expand the example and make it a doctest
+lib/python/cs/binary.py: cs.binary: docstring updates, minor refactors
+lib/python/cs/binary.py: cs.binary: AbstractBinary: provide a __str__ like that from SimpleBinary, and a __repr__; SimpleBinary: just inherit __str__ from AbstractBinary
+lib/python/cs/binary.py: cs.binary: is_single_value: recognise BaseMultiValueBinary
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: provide a promote() method for single value structs
+lib/python/cs/binary.py: cs.binary: import collections.abc.Buffer (or define it as typing.ByteString)
+lib/python/cs/binary.py: cs.binary: AbstractBinary: new property _field_names being an iterable of the field names
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: define _field_names from the struct definition
+lib/python/cs/binary.py: cs.binary: AbstractBinary.__str__: accept attr_choose=True to include all attr_names
+lib/python/cs/binary.py: cs.binary: BinarySingleValue: require a type for the value in the class definition and check the value in __init__
+lib/python/cs/binary.py: cs.binary: some docstring tweaks
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: for single value structs, move __str__,__repr__ up, comment out the __repr__
+lib/python/cs/binary.py: cs.binary: new BinaryMultiStruct.promote() accepting an iterable of field values
+lib/python/cs/binary.py: cs.binary: BSString: set its type=str, missed earlier
+lib/python/cs/binary.py: cs.binary: new DSData.promote() accepting bytes
+lib/python/cs/binary.py: cs.binary: @binclass: completely rework the dataclass generation, support inheritance from super binclasses, various other fixes and improvements
+lib/python/cs/binary.py: cs.binary: pt_spec: accept optional type= parameter, infer type from parse function return annotation if None
+lib/python/cs/binary.py: cs.iso14496,cs.binary: move @parse_offsets from cs.iso14496 to cs.binary
+lib/python/cs/binary.py: cs.binary: @binclass: new .parse_field(fieldname,bfr) method to return an AbstractBinary instance from bfr of the type of fieldname
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: logic fix for promotion of field_names to a tuple of str
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: do not memoise class names, pointless restriction which may silently make bugs
+lib/python/cs/binary.py: cs.binary: new struct_field_types(struct_format,field_names) to return a mapping of field names to struct.unpack-returned types
+lib/python/cs/binary.py: cs.binary: BinaryMultiStruct: for single value structs, annotate the prase-value() function with the return type (also aids pt_spec())
+lib/python/cs/binary.py: cs.binary: format strings for exceptions, docstring tweaks, comments, TODOs
+lib/python/cs/binary.py: cs.binary: @binclass: provide a FIELD_MAPS mapping in the generates class for use by AbstractBinary.self_check()
+lib/python/cs/binary.py: cs.binary: fold BinaryMultiStruct and BinarySingleStruct into BinaryStruct, leave compatibility names behind
+lib/python/cs/binary.py: cs.binary: BinaryByteses: subclasses should receive a consume= class parameter indicating how many bytes to consume, default ... (all available bytes)
+lib/python/cs/binary.py: cs.binary: pt_spec: optional as_repr and as_str parameters to provide __repr__ and __str__ methods
+lib/python/cs/binary.py: cs.binary: pt_spec: rename type parameter to value_type
+lib/python/cs/binary.py: cs.binary: BinarySingleValue.__init_subclass__: rename type parameter to value_type
+lib/python/cs/binary.py: cs.binary: BinaryByteses: subclass BinarySingleValue, provide value_type class parameter
+lib/python/cs/binary.py: cs.binary: update class parameters from type to value_type
+lib/python/cs/binary.py: cs.binary: @binclass: rename a variable to avoid a builtin name, update the field type sanity check to accomodate variable fields and to upgrade ints or Ellipsis to BinaryByteses
+lib/python/cs/binary.py: cs.binary: @binclass: new parse_field and parse_fields class methods, modify parse() to init the class with the result of parse_fields
+lib/python/cs/binary.py: cs.binary: get Buffer from cs.gimmicks, remove some debug, adjust some formatting, add a type check
+lib/python/cs/binary.py: cs.binary: BinarySingleValue.__init_subclass__: construct a suitably annotated and typechecked __init__, avoid isinstance of subscripted generic
+lib/python/cs/binary.py: cs.binary: __init_subclass__: provide a default value_type (why duped with the class definition?) and plumb to super().__init_subclass__()
+lib/python/cs/binary.py: cs.binary: replace mentions of BinaryMultiStruct with BinaryStruct
+lib/python/cs/binary.py: cs.binary: BinaryStruct: include the struct format string in the repr() output
+lib/python/cs/binary.py: cs.binary: tweak docstest, comments, another docstring
+lib/python/cs/binary.py: cs.binary: @binclass: rename fieldmap to fieldtypemap; extract the code which promotes the annotations to classes as promote_fieldtypemap() for reuse
+lib/python/cs/binary.py: cs.binary: @binclass: parse_field,parse_fields: promote any supplied field type mapping
+lib/python/cs/binary.py: cs.binary: flatten: update docstr9ing with more detail, rename chunks var to transcription for clarity
+lib/python/cs/binary.py: cs.binary: docstring and comment updates, add simple test case when run as main
+lib/python/cs/binary.py: cs.binary: is_single_value: drop reference to abandonned BaseMultiValueBinary, seems to be covered by @binclass
+lib/python/cs/binary.py: cs.binary: BinarySingleValue: subclass Promotable, drop explicit .promote() class method since Promotable.promote() now covers this use case
+lib/python/cs/binary.py: cs.binary: rename BinaryByteses to BinaryBytes, add .promote() which will suck in an arbitrary AbstractBinary instance
+lib/python/cs/binary.py: cs.binary: renamed BinaryByteses to BinaryBytes
+lib/python/cs/binary.py: cs,binary: @binclass: new internal @bcmethod decorator for methods in BinClass which may be overridden by _direct_ methods in the wrapped class
+lib/python/cs/binary.py: cs.binary: @binclass: BinClass: record the template class as ._baseclass, make __repr__ robust when used early
+lib/python/cs/binary.py: cs.binary: @binclass: new BinClass.__setattr__: promote and set the dataclass instance attributes, otherwise set in self.__dict__
+lib/python/cs/binary.py: cs.binary: @binclass: new BinClass.__getattr__: unknown attributes must come from the dataclass instance, return obj.value for single value objects
+lib/python/cs/binary.py: cs.binary: @binclass: BinClass.parse_fields: the optional fieldtypes may be a mapping or an iterable or fieldnames or space separated list of field names whose types come from cls._datafieldtypes
+lib/python/cs/binary.py: cs.binary: @binclass: BinClass.promote_field_value: when the fieldtypemap contains a Union, try to promote to each union member type in turn; drop the vestigates of the old __getattr__ and __setattr__
+lib/python/cs/binary.py: cs.binary: @binclass: rename the template class, name the BinClass, add some assertions, minor tweak
+lib/python/cs/binary.py: cs.binary: update imports, remove debug, clean a little lint
+lib/python/cs/binary.py: cs.binary: replace a lot of percent formatting with f-strings
+lib/python/cs/binary.py: cs.binary: @binclass: add missing assignment to name0
+lib/python/cs/binary.py: cs.binary: AbstractBinary.self_check: accept optional field_types; BinClass.self_check: pass the dataclass instance and our FIELD_TYPES to AbstractClass.self_check
+lib/python/cs/binary.py: cs.binary: @binclass: BinaryClass.__str__: omit fields whose names end with an underscore
+lib/python/cs/binary.py: cs.binary: remove some debug
+lib/python/cs/binary.py: cs.binary: @binclass: BinClass.parse_field: accept optional fieldtypes
+lib/python/cs/binary.py: cs.binary: new ListOfBinary, a class holding a list of instances of some binary class
+lib/python/cs/binary.py: cs.binary: BinarySingleValue.__init__ now a conventional init calling typeguard.check_type() on the supplied value
+lib/python/cs/binary.py: cs.binary: ListOfBinary.transcribe: just return self, it's iterable
+lib/python/cs/binary.py: cs.binary: ListOfBinary.parse is a class method
+lib/python/cs/binary.py: cs.binary: @binclass: BinClass.parse: break out the access to cls.parse_fields for easier debugging
+lib/python/cs/binary.py: cs.binary: is_single_value: break out logic to aid debugging
+lib/python/cs/binary.py: cs.binary: ListOfBinary: not a BinarySingleValue, drop .value, break out logic in .parse() to aid debugging
+lib/python/cs/binary.py: cs.binary: @binclass: BinClass.__str__: obtain the field value from self._data
+lib/python/cs/binary.py: cs.binary: @binclass: BinCLass.__getattr__: fall back to the superclass __getattr__
+lib/python/cs/binary.py: cs.binary: remove debugging
+lib/python/cs/binary.py: cs.binary: small docstring clarification
+lib/python/cs/binary.py: cs.binary: try to make the module docstring more approachable
+lib/python/cs/binary.py: cs.binary: DISTINFO+typeguard

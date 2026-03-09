@@ -174,7 +174,7 @@ case "$op" in
     # variant for each of the following operations
     case "$op,$vcs_type" in
       # report current branch
-      branch,git)   git branch | sed -n 's/^\* //p' ;;
+      branch,git)   git branch --show-current ;; ##git branch | sed -n 's/^\* //p' ;;
       branch,hg)    hg branch ;;
       # report all branches
       branches,git) git branch ;;

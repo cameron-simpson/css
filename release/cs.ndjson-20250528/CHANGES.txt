@@ -1,0 +1,2 @@
+lib/python/cs/ndjson.py: cs.ndjson: tweak module docstring
+lib/python/cs/ndjson.py: cs.ndjson: new dump_ndjson and dumps_ndjson for transcribing obj as NDJSON (includes the trailing newline)

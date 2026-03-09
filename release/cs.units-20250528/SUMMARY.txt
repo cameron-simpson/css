@@ -1,0 +1,2 @@
+Big refactor so that we can just str() the result of a decompose.
+New Decomposed, UnitStep, UnitScale classes.

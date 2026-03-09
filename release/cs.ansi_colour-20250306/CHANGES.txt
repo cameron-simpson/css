@@ -1,0 +1,1 @@
+lib/python/cs/ansi_colour.py: cs.ansi_colour: colourise: do not colour the leading and trailing whitespace, provide colour_padding=False optional flag to disable
