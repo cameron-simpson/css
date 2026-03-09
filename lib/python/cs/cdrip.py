@@ -1462,7 +1462,7 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     except discid.disc.DiscError as e:
       error("disc error: %s", e)
       return 1
-    os.system("eject")
+    run(["eject"])
     return 0
 
   @popopts
