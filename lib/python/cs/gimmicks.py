@@ -6,7 +6,7 @@ Gimmicks and hacks to make some of my other modules more robust and
 less demanding of others.
 '''
 
-__version__ = '20250428-post'
+__version__ = '20260311'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
