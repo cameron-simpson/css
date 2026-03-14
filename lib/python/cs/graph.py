@@ -281,6 +281,22 @@ class Graph(Node):
     )
     gvgraph.print(**gvpkw)
 
+  def partition_nodes(self) -> tuple[list, list, list]:
+    ''' Partition `self.nodes` into a 3-tuple of `(roots,interior,tails)`.
+        Each is a list. An isolated `Node` will appear in both `roots` and `tails`.
+    '''
+    roots = []
+    tails = []
+    interior = []
+    for node in self.nodes:
+      if not node.in_edges:
+        roots.append(node)
+      if not node.out_edges:
+        tails.append(node)
+      if node.in_edges and node.out_edges:
+        interior.append(node)
+    return roots, interior, tails
+
   def as_railroad(self) -> RRBase:
     ''' Return a railroad node for this `Graph`.
     '''
