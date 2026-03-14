@@ -95,6 +95,36 @@ class Node:
   def as_railroad(self):
     return RRTextBox(self.name or str(self))
 
+  def reach_connectivity(
+      self,
+      reach=None,
+      path=None,
+      seen=None,
+  ) -> dict['Node', dict['Node', list[list['Node']]]]:
+    ''' Construct an adjacency graph for the entire network
+        with a mapping per-Node to a mapping of each reachable
+        destination Node to a list of the available routes as
+        lists of the intermediate `Node`s.
+    '''
+    # TODO: this duplicates tail routes reachable in multiple
+    # ways because they are traversed once for each prior route.
+    # Eg X => B -> E lists 2 B->E routes because the B to E tail
+    # route was traversed twice.
+    if reach is None:
+      reach = defaultdict(lambda: defaultdict(list))
+    if path is None:
+      path = []
+    if seen is None:
+      seen = set()
+    for i, ancestor_node in enumerate(path):
+      reach[ancestor_node][self].append(path[i + 1:])
+    path.append(self)
+    for out_node in self.out_nodes:
+      if out_node not in path:
+        out_node.reach_connectivity(reach, path, seen)
+    path.pop()
+    return reach
+
 @dataclass
 class Edge:
   ''' A directed edge between `Node`s in a `Graph`.
