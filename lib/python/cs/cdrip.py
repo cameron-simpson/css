@@ -1474,6 +1474,11 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
     try:
+      mb_info = disc.get_mb_info()
+    except ValueError as e:
+      warning("unrecognised disc: %s", e)
+      return 1
+    try:
       rip(
           self.device_id,
           options.mbdb,
