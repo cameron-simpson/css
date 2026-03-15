@@ -864,6 +864,9 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
                   report_print=True):
       try:
         mb_info = pfx_call(getter, db_id, includes=includes, **getter_kw)
+      except musicbrainzngs.musicbrainz.NetworkError as e:
+        warning(f'{getter=}: {e}')
+        raise
       except musicbrainzngs.musicbrainz.MusicBrainzError as e:
         if e.cause.code == 404:
           warning("not found: %s(%s): %s", getter_name, r(db_id), e)
