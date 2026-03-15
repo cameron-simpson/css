@@ -295,7 +295,9 @@ class _MBEntity(HasTags):
       try:
         mb_result = self[self.MB_QUERY_RESULT_TAG_NAME]
       except KeyError as e:
-        raise AttributeError(f'no {self.MB_QUERY_RESULT_TAG_NAME}: {e}') from e
+        raise AttributeError(
+            f'{self}.query_result: no {self.MB_QUERY_RESULT_TAG_NAME}: {e}'
+        ) from e
     typename, db_id = self.name.split('.', 1)
     self.mbdb.apply_dict(self, mb_result)
     return mb_result
@@ -430,6 +432,13 @@ class MBArtist(_MBEntity):
   '''
   TYPE_SUBNAME = 'artist'
 
+class MBDataTrack(_MBEntity):
+  ''' A Musicbrainz data track entry, a recording on a disc.
+      Is this any different to a track?
+  '''
+
+  TYPE_SUBNAME = 'data_track'
+
 class MBDisc(_MBEntity):
   ''' A Musicbrainz disc entry.
   '''
@@ -453,6 +462,7 @@ class MBDisc(_MBEntity):
     return self.medium_title or self.release['title']
 
   @property
+  @unattributable
   def release_list(self):
     ''' The query result `"release-list"` list.
     '''
