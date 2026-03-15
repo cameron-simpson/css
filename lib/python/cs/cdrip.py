@@ -588,6 +588,7 @@ class MBDisc(_MBEntity):
     return self.medium.get('title')
 
   @cached_property
+  @unattributable
   def recordings(self):
     ''' Return a list of `MBRecording` instances.
     '''
