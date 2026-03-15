@@ -511,10 +511,21 @@ class MBDisc(_MBEntity):
     return self.release.title
 
   @cached_property
-  @unattributable
+  def mb_info(self):
+    ''' The default result of `self.get_mb_info()`.
+    '''
+    try:
+      return self.get_mb_info()
+    except ValueError as e:
+      raise AttributeError(f'{self}.mb_info: {e}') from e
+
   @uses_cmd_options(alt_discids=(), disc_fallback=False)
-  def mb_info(self, *, alt_discids, disc_fallback):
-    ''' Salient data from the MusicbrainzNG API response.
+  def get_mb_info(self, *, alt_discids, disc_fallback):
+    ''' Obtain salient data from the MusicbrainzNG API response;
+        ideally from the first media containing this disc's discid
+        or one from `alt_discids` (default `()`),
+        but otherwise from the first medium if `disc_fallback`.
+        Raise a `ValueError` if no medium is matched.
     '''
     discid = self.mbkey
     release = self.release
@@ -547,7 +558,7 @@ class MBDisc(_MBEntity):
     for medium in media:
       for disc_entry in medium['disc-list']:
         discids.add(disc_entry['id'])
-    raise AttributeError(
+    raise ValueError(
         f'no medium+disc found for discid:{discid!r}: saw {sorted(discids)!r}'
     )
 
