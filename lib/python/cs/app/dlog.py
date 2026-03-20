@@ -180,7 +180,7 @@ class DLog:
     while (offset < len(line) - 1 and line.startswith('+', offset)
            and line[offset + 1].isalpha()):
       offset += 1
-      tag, offset = Tag.from_str2(line, offset)
+      tag, offset = Tag.parse(line, offset)
       tags.add(tag)
       offset = skipwhite(line, offset)
     return cls(
