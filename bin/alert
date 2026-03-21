@@ -175,7 +175,7 @@ fi
 
 [ $to_stderr ] && echo "ALERT: $title $subtitle $message" >&2
 [ $to_dlog ] && {
-  if [ -e "$DLOG_PIPEPATH" ]
+  if [ -p "$DLOG_PIPEPATH" ]
   then  echo "ALERT: $*" >>"$DLOG_PIPEPATH"
   else  dlog log ALERT: "$*" </dev/null &
   fi
