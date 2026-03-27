@@ -1,3 +1,4 @@
+pick-from-diff editor somewhat like hg-record, but agnostic so i can use it with git
 cs.psutils: some kind of Pipeline class which accepts Run objects - to be defined, basicly an argv plus flags, and extends with | of more runs and python callables
 re-subst: a mode to skip comment lines
 cs.upd: print seems to be printing from where the cursor is, not the withdrawn-then-print, or soemthign like that - playon dl writes the summary from the end of the progress bar
