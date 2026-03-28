@@ -1980,7 +1980,7 @@ class FormatMapping(MappingABC):
         except KeyError:
           if not self.strict:
             return f'{{{field_name}}}'
-      raise
+          raise
     else:
       if callable(value):
         value = value(self.obj)
