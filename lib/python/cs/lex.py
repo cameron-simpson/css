@@ -41,7 +41,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import fmtdoc, decorator, OBSOLETE, Promotable
+from cs.deco import attr, fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
@@ -1513,12 +1513,18 @@ class TabulatePrettyPrinter(PrettyPrinter):
       return obj.isoformat(' '), True, False
     return super().format(obj, *fmt_a)
 
-def tabulate(*rows, sep='  ', ppcls=TabulatePrettyPrinter) -> Iterable[str]:
+@attr(default_as_str=TabulatePrettyPrinter().pformat)
+def tabulate(*rows, sep='  ', as_str=None) -> Iterable[str]:
   r'''A generator yielding lines of values from `rows` aligned in columns.
 
       Each row in rows is a list of strings. Non-`str` objects are
-      promoted to `str` via `pprint.pformat`. If the strings contain
-      newlines they will be split into subrows.
+      promoted to `str` via the `as_str` function.
+      If the strings contains newlines they will be split into
+      subrows.
+
+      The default `as_str` function is `TabulatePrettyPrinter().pformat`;
+      the `TabulatePrettyPrinter` class is a subclass of `pprint.PrettyPrinter`
+      which also understands `datetime.date` and `datetime.datetime` objects.
 
       Example:
 
@@ -1538,13 +1544,14 @@ def tabulate(*rows, sep='  ', ppcls=TabulatePrettyPrinter) -> Iterable[str]:
           two      cols
           >>>
   '''
-  ppr = ppcls()
+  if as_str is None:
+    as_str = tabulate.default_as_str
   if not rows:
     # avoids max of empty list
     return
   # promote all table cells to str via pformat
   rows = [
-      [(cell if isinstance(cell, str) else ppr.pformat(cell))
+      [(cell if isinstance(cell, str) else as_str(cell))
        for cell in row]
       for row in rows
   ]
