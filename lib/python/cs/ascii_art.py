@@ -37,7 +37,7 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cache, cached_property
 from pprint import pprint
 import sys
 from types import SimpleNamespace as NS  # noqa: N814
@@ -102,6 +102,7 @@ def box_char_name(
       )
   )
 
+@cache
 def box_char(
     heavy=False, arc=False, up=False, down=False, left=False, right=False
 ):
