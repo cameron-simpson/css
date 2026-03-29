@@ -34,7 +34,7 @@ from string import (
 )
 import sys
 from textwrap import dedent
-from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
@@ -1513,6 +1513,30 @@ class TabulatePrettyPrinter(PrettyPrinter):
       return obj.isoformat(' '), True, False
     return super().format(obj, *fmt_a)
 
+def row_cells(row: Sequence[str]) -> List[List[str]]:
+  r'''Turn a row of strings into a grid by breaking each string into lines and 
+
+      Example:
+
+          >>> for cells in row_cells(['col1', 'multi\nline\ntext', 'goes\nhere', 'and\nhere']):
+          ...     print(cells)
+          ...
+          ['col1', 'multi', 'goes', 'and']
+          ['', 'line', 'here', 'here']
+          ['', 'text', '', '']
+  '''
+  if all("\n" not in cell for cell in row):
+    # no multiline row cells
+    return [row]
+  # split multiline cells into columns, pad columns to match
+  cols = [[subcell.rstrip() for subcell in cell.splitlines()] for cell in row]
+  max_height = max(map(len, cols))
+  return [
+      [(col[subrow] if subrow < len(col) else '')
+       for col in cols]
+      for subrow in range(max_height)
+  ]
+
 @attr(default_as_str=TabulatePrettyPrinter().pformat)
 def tabulate(*rows, sep='  ', as_str=None) -> Iterable[str]:
   r'''A generator yielding lines of values from `rows` aligned in columns.
@@ -1563,20 +1587,8 @@ def tabulate(*rows, sep='  ', as_str=None) -> Iterable[str]:
   # break rows on newlines
   srows = []
   for row in rows:
-    if all("\n" not in cell for cell in row):
-      # no multiline row cells
-      srows.append(row)
-    else:
-      # split multiline cells int columns, pad columns to match
-      cols = [
-          [subcell.rstrip() for subcell in cell.split("\n")] for cell in row
-      ]
-      max_height = max(map(len, cols))
-      for subrow in range(max_height):
-        srows.append(
-            [col[subrow] if subrow < len(col) else '' for col in cols]
-        )
-    rows = srows
+    srows.extend(row_cells(row))
+  rows = srows
   col_widths = [
       max(map(len, (row[c]
                     for row in rows)))
