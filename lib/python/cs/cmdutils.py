@@ -83,8 +83,6 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-from cs.debug import trace
-
 __version__ = '20250724-post'
 
 DISTINFO = {
