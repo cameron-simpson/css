@@ -83,6 +83,8 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
+from cs.debug import trace
+
 __version__ = '20250724-post'
 
 DISTINFO = {
@@ -1106,15 +1108,15 @@ class BaseCommandOptions(HasThreadState):
     return headline + "\n" + indent(
         "\n".join(
             tabulate(
-                *(
-                    (
+                *[
+                    [
                         opt_spec.option_terse(),
                         stripped_dedent(opt_spec.help_text)
-                    ) for _, opt_spec in sorted(
+                    ] for _, opt_spec in sorted(
                         getopt_spec_map.items(),
                         key=lambda kv: kv[0].lstrip('-').lower()
                     )
-                ),
+                ],
             )
         )
     )
