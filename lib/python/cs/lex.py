@@ -1513,8 +1513,18 @@ class TabulatePrettyPrinter(PrettyPrinter):
       return obj.isoformat(' '), True, False
     return super().format(obj, *fmt_a)
 
-def row_cells(row: Sequence[str]) -> List[List[str]]:
-  r'''Turn a row of strings into a grid by breaking each string into lines and 
+def row_cells(
+    row: str | Sequence[Any],
+    as_str: Callable[Any, str] | None = None,
+) -> List[List[str]]:
+  r'''Turn a row of items into a grid.
+
+      Process:
+      - convert each non-`str` item into a string using `as_str`
+      - break each string into lines
+      - make enough rows to cover the tallest column
+
+      The default `as_str` comes from `tabulate.as_str`.
 
       Example:
 
@@ -1525,6 +1535,13 @@ def row_cells(row: Sequence[str]) -> List[List[str]]:
           ['', 'line', 'here', 'here']
           ['', 'text', '', '']
   '''
+  if as_str is None:
+    as_str = tabulate.default_as_str
+  # promote a str to a single item list
+  if isinstance(row, str):
+    row = [row]
+  # turn non-str row items into strings
+  row = [(cell if isinstance(cell, str) else as_str(cell)) for cell in row]
   if all("\n" not in cell for cell in row):
     # no multiline row cells
     return [row]
