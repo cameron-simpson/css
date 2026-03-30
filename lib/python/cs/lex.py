@@ -19,6 +19,7 @@ from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import partial
+from itertools import zip_longest
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -40,6 +41,7 @@ from dateutil.tz import tzlocal
 from icontract import require
 from typeguard import typechecked
 
+from cs.ascii_art import box_char, HORIZ
 from cs.dateutils import unixtime2datetime, UTC
 from cs.deco import attr, fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
@@ -58,6 +60,7 @@ DISTINFO = {
         "Topic :: Text Processing",
     ],
     'install_requires': [
+        'cs.ascii_art',
         'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
@@ -1554,8 +1557,73 @@ def row_cells(
       for subrow in range(max_height)
   ]
 
+@typechecked
+def flatten_table_rows(
+    table_rows: list[str | list | tuple],
+    as_str: Callable[Any, str] | None = None,
+) -> tuple[list[list[str]], list[int]]:
+  ''' Flatten a list of table rows or tuples-of-table-rows into a
+      `(flat_rows,attach)` 2 -tuple where `flat_rows` is a list lof
+      list-of-str rows and attach is a list of indices into `flat_rows`
+      which are attachment points.
+      Nested subtables are connected with lines.
+
+      The default `as_str` comes from `tabulate.as_str`.
+  '''
+  if as_str is None:
+    as_str = tabulate.default_as_str
+  # promote rows to lists or AttachedLines
+  rows: list[list[str]] = []
+  attach: list[int] = []
+  for (trow, next_trow) in zip_longest(table_rows, table_rows[1:]):
+    attach_below = isinstance(next_trow, tuple)
+    if isinstance(trow, list):
+      cells = row_cells(trow)
+      attachable = bool(cells and cells[0] and cells[0][0].lstrip())
+      if attachable:
+        attach.append(len(rows))
+      # append the cell rows, possibly indents and attached
+      for ci, cell_row in enumerate(cells):
+        if ci > 0 and attach_below:
+          indent = box_char(
+              arc=True,
+              up=True,
+              down=attach_below,
+              right=attachable and ci == 0
+          )  ##+ ( HORIZ if attachable and ci == 0 else " ")
+          cell_row[0] = indent + cell_row[0]
+        rows.append(cell_row)
+    elif isinstance(trow, tuple):
+      # an indented subscetion
+      subrows, subattach = flatten_table_rows(
+          list(trow), as_str=as_str
+      )  # was True
+      # indent all the subrows
+      for subndx, subrow in enumerate(subrows):
+        do_attach = bool(subattach and subattach[0] == subndx)
+        if do_attach:
+          subattach.pop(0)
+        sub_attach_below = bool(subattach)  # more things to come
+        indent = box_char(
+            arc=True,
+            up=do_attach or sub_attach_below,
+            down=attach_below or sub_attach_below,
+            right=do_attach,
+        ) + (
+            HORIZ if do_attach else " "
+        )
+        subrow[0] = indent + subrow[0]
+        rows.append(subrow)
+    else:
+      raise TypeError(f'row type {type(trow)} is neither list nor tuple')
+  return rows, attach
+
 @attr(default_as_str=TabulatePrettyPrinter().pformat)
-def tabulate(*rows, sep='  ', as_str=None) -> Iterable[str]:
+def tabulate(
+    *rows,
+    sep='  ',
+    as_str: Callable[Any, str] | None = None,
+) -> Iterable[str]:
   r'''A generator yielding lines of values from `rows` aligned in columns.
 
       Each row in rows is a list of strings. Non-`str` objects are
@@ -1566,6 +1634,7 @@ def tabulate(*rows, sep='  ', as_str=None) -> Iterable[str]:
       The default `as_str` function is `TabulatePrettyPrinter().pformat`;
       the `TabulatePrettyPrinter` class is a subclass of `pprint.PrettyPrinter`
       which also understands `datetime.date` and `datetime.datetime` objects.
+      This is exposed as `tabulate.default_as_str`.
 
       Example:
 
@@ -1590,22 +1659,12 @@ def tabulate(*rows, sep='  ', as_str=None) -> Iterable[str]:
   if not rows:
     # avoids max of empty list
     return
-  # promote all table cells to str via pformat
-  rows = [
-      [(cell if isinstance(cell, str) else as_str(cell))
-       for cell in row]
-      for row in rows
-  ]
+  rows, _ = flatten_table_rows(list(rows), as_str=as_str)
   # pad short rows with empty columns
   max_cols = max(map(len, rows))
   for row in rows:
     if len(row) < max_cols:
       row += [''] * (max_cols - len(row))
-  # break rows on newlines
-  srows = []
-  for row in rows:
-    srows.extend(row_cells(row))
-  rows = srows
   col_widths = [
       max(map(len, (row[c]
                     for row in rows)))
