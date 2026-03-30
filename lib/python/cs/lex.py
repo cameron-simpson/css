@@ -23,7 +23,7 @@ from itertools import zip_longest
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from pprint import pformat, PrettyPrinter
+from pprint import PrettyPrinter
 import re
 from string import (
     ascii_letters,
