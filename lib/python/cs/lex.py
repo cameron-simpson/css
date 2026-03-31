@@ -1572,14 +1572,26 @@ def flatten_table_rows(
   '''
   if as_str is None:
     as_str = tabulate.default_as_str
+
+  def is_attachable_cell_grid(cells):
+    ''' Test if a cell row has nonwhitepace in column 0
+      '''
+    return bool(cells and cells[0] and cells[0][0].lstrip())
+
   # promote rows to lists or AttachedLines
   rows: list[list[str]] = []
   attach: list[int] = []
   for (trow, next_trow) in zip_longest(table_rows, table_rows[1:]):
-    attach_below = isinstance(next_trow, tuple)
+    # FIXME: this calls row_cells twice on each row
+    #        maybe call cell_rows on all lists?
+    #        in a prepass?
+    attach_below = bool(
+        isinstance(next_trow, tuple) and next_trow
+        and is_attachable_cell_grid(row_cells(next_trow[0]))
+    )
     if isinstance(trow, list):
       cells = row_cells(trow)
-      attachable = bool(cells and cells[0] and cells[0][0].lstrip())
+      attachable = is_attachable_cell_grid(cells)
       if attachable:
         attach.append(len(rows))
       # append the cell rows, possibly indents and attached
