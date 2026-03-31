@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import defaultdict
+import configparser
 from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
 import copy
@@ -507,7 +508,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       cfg = ConfigParser(allow_unnamed_section=True)
       try:
         pfx_call(cfg.read, rcpath)
-      except (FileNotFoundError, PermissionError) as e:
+      except (FileNotFoundError, PermissionError,
+              configparser.DuplicateOptionError) as e:
         warning("ConfigParser.read(%r): %s", rcpath, e)
         continue
       msection = mapping[None]
@@ -720,7 +722,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
             continue
           try:
             map_class = import_name(map_spec)
-          except (ImportError, SyntaxError) as e:
+          except (ImportError, NameError, SyntaxError) as e:
             warning(e._)
             continue
           sitemap = map_class(name=map_name)
