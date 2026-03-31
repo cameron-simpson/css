@@ -1638,10 +1638,14 @@ def tabulate(
 ) -> Iterable[str]:
   r'''A generator yielding lines of values from `rows` aligned in columns.
 
-      Each row in rows is a list of strings. Non-`str` objects are
+      Usually, each row in rows is a `list` of strings. Non-`str` objects are
       promoted to `str` via the `as_str` function.
       If the strings contains newlines they will be split into
       subrows.
+
+      A row may also be a `tuple`, indicating a subtable, which
+      will be embedded with its column 0 indented and joined up
+      with lines to indicate structure.
 
       The default `as_str` function is `TabulatePrettyPrinter().pformat`;
       the `TabulatePrettyPrinter` class is a subclass of `pprint.PrettyPrinter`
@@ -1655,15 +1659,30 @@ def tabulate(
           ...     ['three', 'column', 'row'],
           ...     ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
           ...     ['two', 'cols'],
+          ...     (
+          ...       ['subrow','description'],
+          ...       (
+          ...         ['inner','table'],
+          ...         ['','unattached'],
+          ...         ['inner\nbottom','last inner row'],
+          ...       ),
+          ...       ['subrow2'],
+          ...     ),
           ... ):
           ...     print(row)
           ...
           one col
-          three    column  row
-          row3     multi   goes  and
-                   line    here  here
-                   text
-          two      cols
+          three       column          row
+          row3        multi           goes  and
+                      line            here  here
+                      text
+          two         cols
+          ├─subrow    description
+          │ ├─inner   table
+          │ │         unattached
+          │ ╰─inner   last inner row
+          │   bottom
+          ╰─subrow2
           >>>
   '''
   if as_str is None:
