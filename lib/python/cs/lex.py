@@ -1601,8 +1601,8 @@ def flatten_table_rows(
               arc=True,
               up=True,
               down=attach_below,
-              right=attachable and ci == 0
-          )  ##+ ( HORIZ if attachable and ci == 0 else " ")
+              right=attachable and ci == 0,
+          )
           cell_row[0] = indent + cell_row[0]
         rows.append(cell_row)
     elif isinstance(trow, tuple):
