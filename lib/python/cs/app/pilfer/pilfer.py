@@ -77,7 +77,7 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
       * `fast`: optional flag, passed to `@agen` when wrapping the function
       * `with_P`: optional flag, default `False`: if true, pass
         `item,Pilfer` to the function instead of just `item`
-      * `new_P`: optional glag, default `False`; if true then the
+      * `new_P`: optional flag, default `False`; if true then the
         function yields `result,Pilfer` 2-tuples instead of just `result`
   '''
   if with_P:
@@ -265,6 +265,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   fspath: str = None
   sqltags_db_url: str = None
   user_agent: str = 'Pilfer'
+  # verify SSL certificates by default
+  verify: bool = True
   rcpaths: list[str] = field(default_factory=list)
   url_opener: Any = field(default_factory=build_opener)
   later: Later = field(default_factory=Later)
