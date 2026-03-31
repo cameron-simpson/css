@@ -38,12 +38,13 @@ from typeguard import typechecked
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
 from cs.context import contextif, stackattrs
-from cs.deco import decorator, default_params, promote
+from cs.deco import decorator, default_params, promote, uses_verbose
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, needdir, validate_rpath
 from cs.later import Later, uses_later
+from cs.lex import printt
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
@@ -406,10 +407,12 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return URL.promote(self._)
 
+  @uses_verbose
   def request(
       self,
       url: str | URL,
       *,
+      verbose: bool,
       session: Optional[PilferSession] = None,
       headers=None,
       method='GET',
@@ -435,6 +438,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     hdrs = self.headers()
     if headers is not None:
       hdrs.update(headers)
+    if verbose:
+      print(f'{method.upper()} request headers:')
+      printt(*[[hdr, body] for hdr, body in sorted(hdrs.items())], indent=2)
     return pfx_call(
         getattr(session, method.lower()),
         str(url),
