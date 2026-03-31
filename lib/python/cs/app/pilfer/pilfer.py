@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import defaultdict
+import configparser
 from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
 import copy
@@ -38,12 +39,13 @@ from typeguard import typechecked
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
 from cs.context import contextif, stackattrs
-from cs.deco import decorator, default_params, promote
+from cs.deco import decorator, default_params, promote, uses_verbose
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, needdir, validate_rpath
 from cs.later import Later, uses_later
+from cs.lex import printt
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
@@ -77,7 +79,7 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
       * `fast`: optional flag, passed to `@agen` when wrapping the function
       * `with_P`: optional flag, default `False`: if true, pass
         `item,Pilfer` to the function instead of just `item`
-      * `new_P`: optional glag, default `False`; if true then the
+      * `new_P`: optional flag, default `False`; if true then the
         function yields `result,Pilfer` 2-tuples instead of just `result`
   '''
   if with_P:
@@ -265,6 +267,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   fspath: str = None
   sqltags_db_url: str = None
   user_agent: str = 'Pilfer'
+  # verify SSL certificates by default
+  verify: bool = True
   rcpaths: list[str] = field(default_factory=list)
   url_opener: Any = field(default_factory=build_opener)
   later: Later = field(default_factory=Later)
@@ -404,10 +408,12 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return URL.promote(self._)
 
+  @uses_verbose
   def request(
       self,
       url: str | URL,
       *,
+      verbose: bool,
       session: Optional[PilferSession] = None,
       headers=None,
       method='GET',
@@ -433,6 +439,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     hdrs = self.headers()
     if headers is not None:
       hdrs.update(headers)
+    if verbose:
+      print(f'{method.upper()} request headers:')
+      printt(*[[hdr, body] for hdr, body in sorted(hdrs.items())], indent=2)
     return pfx_call(
         getattr(session, method.lower()),
         str(url),
@@ -499,7 +508,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       cfg = ConfigParser(allow_unnamed_section=True)
       try:
         pfx_call(cfg.read, rcpath)
-      except (FileNotFoundError, PermissionError) as e:
+      except (FileNotFoundError, PermissionError,
+              configparser.DuplicateOptionError) as e:
         warning("ConfigParser.read(%r): %s", rcpath, e)
         continue
       msection = mapping[None]
@@ -712,7 +722,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
             continue
           try:
             map_class = import_name(map_spec)
-          except (ImportError, SyntaxError) as e:
+          except (ImportError, NameError, SyntaxError) as e:
             warning(e._)
             continue
           sitemap = map_class(name=map_name)
@@ -802,7 +812,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       raise ValueError(f'unexpected kwargs {kw!r}')
     with self._print_lock:
       if file is None:
-        file = self._print_to if self._print_to else sys.stdout
+        file = self._print_to or sys.stdout
       print(*a, file=file)
       if self.flush_print:
         file.flush()
