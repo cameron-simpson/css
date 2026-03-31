@@ -57,7 +57,7 @@ DISTINFO = {
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cache, cached_property
 from pprint import pprint
 import sys
 from types import SimpleNamespace as NS  # noqa: N814
@@ -130,6 +130,7 @@ def box_char_name(
       )
   )
 
+@cache
 def box_char(
     heavy=False,
     *,
