@@ -1,3 +1,4 @@
+new pt: top-like mode as well
 rewrite pt in python, use printt for the listing
 pick-from-diff editor somewhat like hg-record, but agnostic so i can use it with git
 cs.psutils: some kind of Pipeline class which accepts Run objects - to be defined, basicly an argv plus flags, and extends with | of more runs and python callables
