@@ -812,7 +812,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       raise ValueError(f'unexpected kwargs {kw!r}')
     with self._print_lock:
       if file is None:
-        file = self._print_to if self._print_to else sys.stdout
+        file = self._print_to or sys.stdout
       print(*a, file=file)
       if self.flush_print:
         file.flush()
