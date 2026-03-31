@@ -469,14 +469,14 @@ class PilferCommand(BaseCommand):
       if i == 0:
         table.append(['Grokked:'])
       table.append(
-          (
+          [
               f'  {method.__qualname__}',
               "\n".join(map(str, sorted(match_tags)))
-          )
+          ]
       )
       if grokked is not None:
         for k, v in grokked.items():
-          table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
+          table.append([[f'    {k}', dict(v)] if isinstance(v, TagSet) else v])
     printt(*table)
     if self.options.dump_content:
       print("Content:", flowstate.content_type)
