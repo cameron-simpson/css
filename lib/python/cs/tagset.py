@@ -868,6 +868,7 @@ class TagSet(
       table.append(tuple([f'{key_indent}{k}', v] for k, v in kvs))
     return printt(*table, **printt_kw)
 
+  @OBSOLETE('TagSet.printt')
   def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
     ''' Dump a `TagSet` in multiline format.
 
