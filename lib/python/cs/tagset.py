@@ -866,8 +866,6 @@ class TagSet(
     kvs = sorted(self.as_dict().items())
     if kvs:
       table.append(tuple([f'{key_indent}{k}', v] for k, v in kvs))
-    from pprint import pprint
-    pprint(table)
     return printt(*table, **printt_kw)
 
   def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
