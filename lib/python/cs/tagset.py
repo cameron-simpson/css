@@ -861,12 +861,14 @@ class TagSet(
     '''
     return cls.from_str(s[offset:], **from_str_kw)
 
-  def printt(self, key_indent="  ", **printt_kw):
-    return printt(
-        [f'{self.__class__.__name__}:{id(self)}'],
-        *[[f'{key_indent}{k}', v] for k, v in sorted(self.as_dict().items())],
-        **printt_kw
-    )
+  def printt(self, key_indent="", **printt_kw):
+    table = [f'{self.__class__.__name__}:{id(self)}']
+    kvs = sorted(self.as_dict().items())
+    if kvs:
+      table.append(tuple([f'{key_indent}{k}', v] for k, v in kvs))
+    from pprint import pprint
+    pprint(table)
+    return printt(*table, **printt_kw)
 
   def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
     ''' Dump a `TagSet` in multiline format.
