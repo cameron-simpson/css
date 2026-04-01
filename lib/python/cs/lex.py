@@ -1589,7 +1589,7 @@ def flatten_table_rows(
         isinstance(next_trow, tuple) and next_trow
         and is_attachable_cell_grid(row_cells(next_trow[0]))
     )
-    if isinstance(trow, list):
+    if isinstance(trow, (list, str)):
       cells = row_cells(trow)
       attachable = is_attachable_cell_grid(cells)
       if attachable:
