@@ -419,7 +419,7 @@ class PilferCommand(BaseCommand):
       print("no soup for content_type", flowstate.content_type)
     else:
       table = []
-      title = soup.head.title
+      title = soup.head and soup.head.title
       if title:
         table.append(["Title:", title.string])
       meta = flowstate.meta
