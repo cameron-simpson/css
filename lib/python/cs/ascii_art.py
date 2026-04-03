@@ -191,6 +191,7 @@ HORIZ_DOWN = box_char(left=True, right=True, down=True)
 HORIZ_DOWN_ = box_char(left=True, right=True, down=True, heavy=True)
 CROSS = box_char(up=True, down=True, left=True, right=True)
 CROSS_ = box_char(up=True, down=True, left=True, right=True, heavy=True)
+LARGE_CIRCLE = '\N{LARGE CIRCLE}'
 LEFT_ARROW = '\N{LEFTWARDS ARROW}'
 RIGHT_ARROW = '\N{RIGHTWARDS ARROW}'
 
