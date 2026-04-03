@@ -19,7 +19,6 @@ from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import partial
-from itertools import zip_longest
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -41,14 +40,14 @@ from dateutil.tz import tzlocal
 from icontract import require
 from typeguard import typechecked
 
-from cs.ascii_art import box_char, HORIZ
+from cs.ascii_art import box_char, HORIZ, LARGE_CIRCLE
 from cs.dateutils import unixtime2datetime, UTC
 from cs.deco import attr, fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
-from cs.seq import common_prefix_length, common_suffix_length
+from cs.seq import common_prefix_length, common_suffix_length, with_neighbours
 
 __version__ = '20250914-post'
 
@@ -60,14 +59,14 @@ DISTINFO = {
         "Topic :: Text Processing",
     ],
     'install_requires': [
-        'cs.ascii_art',
+        'cs.ascii_art>=LARGE_CIRCLE',
         'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
         'cs.obj',
         'cs.pfx',
         'cs.py.func',
-        'cs.seq>=20200914',
+        'cs.seq>=with_neighbours',
         'python-dateutil',
         'icontract',
         'typeguard',
@@ -1581,15 +1580,15 @@ def flatten_table_rows(
   # promote rows to lists or AttachedLines
   rows: list[list[str]] = []
   attach: list[int] = []
-  for (trow, next_trow) in zip_longest(table_rows, table_rows[1:]):
+  for prev_trow, trow, next_trow in with_neighbours(table_rows):
     # FIXME: this calls row_cells twice on each row
     #        maybe call cell_rows on all lists?
     #        in a prepass?
-    attach_below = bool(
-        isinstance(next_trow, tuple) and next_trow
-        and is_attachable_cell_grid(row_cells(next_trow[0]))
-    )
     if isinstance(trow, (list, str)):
+      attach_below = bool(
+          isinstance(next_trow, tuple) and next_trow
+          and is_attachable_cell_grid(row_cells(next_trow[0]))
+      )
       cells = row_cells(trow)
       attachable = is_attachable_cell_grid(cells)
       if attachable:
@@ -1611,16 +1610,24 @@ def flatten_table_rows(
           list(trow), as_str=as_str
       )  # was True
       # indent all the subrows
+      n_subattach = len(subattach)
       for subndx, subrow in enumerate(subrows):
+        print(f'{subrow=}')
+        # NB: must be before the subattach.pop(0) below
+        attach_above = bool(
+            subattach
+            and (type(prev_trow) is list or len(subattach) < n_subattach)
+        )
         do_attach = bool(subattach and subattach[0] == subndx)
         if do_attach:
           subattach.pop(0)
         sub_attach_below = bool(subattach)  # more things to come
-        indent = box_char(
-            arc=True,
-            up=do_attach or sub_attach_below,
-            down=attach_below or sub_attach_below,
-            right=do_attach,
+        up = attach_above  ## do_attach or sub_attach_below,
+        down = sub_attach_below
+        right = do_attach
+        indent = (
+            LARGE_CIRCLE if right and not up and not down else
+            box_char(arc=True, up=up, down=down, right=right)
         ) + (
             HORIZ if do_attach else " "
         )
