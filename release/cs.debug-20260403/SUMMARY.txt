@@ -1,0 +1,4 @@
+@trace: include the return type when printing the return value.
+Drop trace_caller(), @trace does this already.
+@trace: new verbose=False and breakpoint=False optional parameters providing a fuller CALL recitation and a breakpoint respectively.
+New tabulate_obj() and print_obj() functions for nice printout of arbirary objects.

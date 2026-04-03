@@ -1,0 +1,10 @@
+lib/python/cs/debug.py: cs.debug: @trace: include the return type when printing the return value
+lib/python/cs/debug.py: merge default ==> pilfer: ClonedIterator fix
+lib/python/cs/debug.py: cs.debug: @trace: improve/fix the RAISE message
+lib/python/cs/debug.py: cs.debug: drop trace_caller, @trace does this already
+lib/python/cs/debug.py: cs.debug: @trace: update raise message from a generator to match the other one
+lib/python/cs/debug.py: cs.debug: @trace: new verbose=False and breakpoint=False optional parameters providing a fuller CALL recitation and a breakpoint respectively
+lib/python/cs/debug.py: cs.debug: @trace: EXCEPT: handle top level exception tracebacks with no `.tb_next`
+lib/python/cs/debug.py: cs.debug: @trace: accomodate exceptions with e.__traceback__.tb_next as None
+lib/python/cs/debug.py: merge default ==> pilfer
+lib/python/cs/debug.py: cs.debug: new tabulate_obj() and print_obj() functions for nice printout of arbirary objects
