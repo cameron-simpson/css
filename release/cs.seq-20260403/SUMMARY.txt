@@ -1,0 +1,1 @@
+New generator with_neighbours(iterable) to yield (prev,curr,next) 3-tuples.
