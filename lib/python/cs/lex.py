@@ -1612,7 +1612,6 @@ def flatten_table_rows(
       # indent all the subrows
       n_subattach = len(subattach)
       for subndx, subrow in enumerate(subrows):
-        print(f'{subrow=}')
         # NB: must be before the subattach.pop(0) below
         attach_above = bool(
             subattach
@@ -1662,19 +1661,34 @@ def tabulate(
       Example:
 
           >>> for row in tabulate(
+          ...    ['one col'],
+          ...    ['three', 'column', 'row'],
+          ...    ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
+          ...    ['two', 'cols'],
+          ...    (
+          ...        ['subrow', 'description'],
+          ...        (["0nd", "subtable"],),
+          ...        (
+          ...            ['inner', 'table'],
+          ...            ['', 'unattached'],
+          ...            ['inner\nbottom', 'last inner row'],
+          ...        ),
+          ...        (["2nd\nbbb", "subtable"],),
+          ...        ['subrow2'],
+          ...     ),
           ...     ['one col'],
           ...     ['three', 'column', 'row'],
           ...     ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
           ...     ['two', 'cols'],
           ...     (
-          ...       ['subrow','description'],
-          ...       (
-          ...         ['inner','table'],
-          ...         ['','unattached'],
-          ...         ['inner\nbottom','last inner row'],
-          ...       ),
-          ...       ['subrow2'],
+          ...        ['subrow','description'],
+          ...        (
+          ...           ['inner','table'],
+          ...           ['','unattached'],
+          ...           ['inner\nbottom','last inner row'],
+          ...        ),
           ...     ),
+          ...     ['subrow2'],
           ... ):
           ...     print(row)
           ...
@@ -1685,11 +1699,26 @@ def tabulate(
                       text
           two         cols
           ├─subrow    description
-          │ ├─inner   table
+          │ ╰─0nd     subtable
+          │ ╭─inner   table
           │ │         unattached
           │ ╰─inner   last inner row
           │   bottom
+          │ ◯─2nd     subtable
+          │   bbb
           ╰─subrow2
+          one col
+          three       column          row
+          row3        multi           goes  and
+                      line            here  here
+                      text
+          two         cols
+          ╰─subrow    description
+            ├─inner   table
+            │         unattached
+            ╰─inner   last inner row
+              bottom
+          subrow2
           >>>
   '''
   if as_str is None:
