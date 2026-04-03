@@ -849,20 +849,6 @@ def trace_DEBUG(debug_spec=None):
         if callable(F):
           setattr(M, func_name, trace(F))
 
-def selftest(module_name, defaultTest=None, argv=None):
-  ''' Called by my unit tests.
-  '''
-  # pylint: disable=import-outside-toplevel
-  if argv is None:
-    argv = sys.argv
-  import importlib
-  importlib.import_module(module_name)
-  import signal
-  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
-  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
-  import unittest
-  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
-
 builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
 if builtin_names_s:
   try:
@@ -895,6 +881,7 @@ if builtin_names_s:
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
 
+@ALL
 def tabulate_obj(obj, label=None):
   ''' Tabulate the contents of an object for display via `cs.lex.printt()`.
   '''
@@ -933,10 +920,25 @@ def tabulate_obj(obj, label=None):
     objattrs = {f'.{name}': value for name, value in kvs}
     yield from tabulate_obj(objattrs, label=label)
 
+@ALL
 def print_obj(obj, label=None):
   ''' Call `tabulate_obj(obj,label=label)` and pass to `cs.lex.printt()`.
   '''
   return printt(*tabulate_obj(obj, label=label))
+
+def selftest(module_name, defaultTest=None, argv=None):
+  ''' Called by my unit tests.
+  '''
+  # pylint: disable=import-outside-toplevel
+  if argv is None:
+    argv = sys.argv
+  import importlib
+  importlib.import_module(module_name)
+  import signal
+  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
+  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+  import unittest
+  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
 
 # honour the $DEBUG trace flags
 trace_DEBUG()
