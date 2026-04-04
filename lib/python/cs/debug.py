@@ -888,6 +888,8 @@ def tabulate_obj(obj, label=None, *, seen=None):
   if isinstance(obj, Mapping | Sequence):
   if seen is None:
     seen = set()
+  if label is None:
+    label = f'{obj.__class__.__name__}:{id(obj)}'
     yield [label or f'{obj.__class__.__name__}:{id(obj)}']
   if id(obj) in seen:
     yield [
