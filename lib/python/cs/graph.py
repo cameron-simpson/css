@@ -95,6 +95,36 @@ class Node:
   def as_railroad(self):
     return RRTextBox(self.name or str(self))
 
+  def reach_connectivity(
+      self,
+      reach=None,
+      path=None,
+      seen=None,
+  ) -> dict['Node', dict['Node', list[list['Node']]]]:
+    ''' Construct an adjacency graph for the entire network
+        with a mapping per-Node to a mapping of each reachable
+        destination Node to a list of the available routes as
+        lists of the intermediate `Node`s.
+    '''
+    # TODO: this duplicates tail routes reachable in multiple
+    # ways because they are traversed once for each prior route.
+    # Eg X => B -> E lists 2 B->E routes because the B to E tail
+    # route was traversed twice.
+    if reach is None:
+      reach = defaultdict(lambda: defaultdict(list))
+    if path is None:
+      path = []
+    if seen is None:
+      seen = set()
+    for i, ancestor_node in enumerate(path):
+      reach[ancestor_node][self].append(path[i + 1:])
+    path.append(self)
+    for out_node in self.out_nodes:
+      if out_node not in path:
+        out_node.reach_connectivity(reach, path, seen)
+    path.pop()
+    return reach
+
 @dataclass
 class Edge:
   ''' A directed edge between `Node`s in a `Graph`.
@@ -251,6 +281,22 @@ class Graph(Node):
     )
     gvgraph.print(**gvpkw)
 
+  def partition_nodes(self) -> tuple[list, list, list]:
+    ''' Partition `self.nodes` into a 3-tuple of `(roots,interior,tails)`.
+        Each is a list. An isolated `Node` will appear in both `roots` and `tails`.
+    '''
+    roots = []
+    tails = []
+    interior = []
+    for node in self.nodes:
+      if not node.in_edges:
+        roots.append(node)
+      if not node.out_edges:
+        tails.append(node)
+      if node.in_edges and node.out_edges:
+        interior.append(node)
+    return roots, interior, tails
+
   def as_railroad(self) -> RRBase:
     ''' Return a railroad node for this `Graph`.
     '''
@@ -400,12 +446,168 @@ class Graph(Node):
         ##rr = cont
       return rr
 
-    for root in root_nodes:
-      rr = trace(rr_from)(root)
-      pprint(rr)
-      breakpoint()
+    def rr_graph(self, root) -> RRBase:
+      ''' New plan:
+
+          Traverse the graph from a root, making a new graph where
+          each node is a branch point and each edge has a refobj as
+          an RR sequence or a nonbranching RR node.
+          - discard cycles with a warning, for some future fixup mode
+          - root nodes in the graph become an edge with a stub source node with refobj=None,
+            likewise for tails
+
+          Traverse the new simplified graph.
+          A node with multiple inputs gets a left merge:
+          - analyse the left graph for common ancestors?
+      '''
+
+      @typechecked
+      def rr_path(path: list[Node]) -> RRBase:
+        ''' Return an `RRBase` representing the `path`, a list of `Node`s.
+        '''
+        assert len(path) > 0
+        if len(path) == 1:
+          node = path[0]
+          rr_nodes.add(node)
+          return node.as_railroad()
+        rr_nodes.update(path)
+        return RRSequence([node.as_railroad() for node in path])
+
+      @typechecked
+      def rr_paths(paths: list[list[Node]]) -> RRBase:
+        ''' Return an `RRBase` representing `paths`, a list of paths.
+        '''
+        assert len(paths) > 0
+        if len(paths) == 1:
+          return rr_path(paths[0])
+        return RRChoice([rr_path(path) for path in paths])
+
+      # construct a list of `RRSequence`s one for each path from each root
+      rr_nodes = set()  # drawn nodes
+      rrs = []  # resulting RR instances
+      roots, interior, tails = self.partition_nodes()
+      print("ROOTS:", roots)
+      for root in roots:
+        print("root", root)
+        conns = root.reach_connectivity()
+        # print out the adjacency mapping
+        print("ORIGINAL ADJACENCY MAPPING for root", root.name)
+        for src, by_dst in sorted(
+            conns.items(),
+            key=lambda src__by_dst: -max(max(len(path)
+                                             for path in paths)
+                                         for paths in src__by_dst[1].values())
+        ):
+          print("  src", src)
+          if src in rr_nodes:
+            print("    skip src, already drawn")
+            continue
+          for dst, paths in sorted(
+              by_dst.items(),
+              key=lambda dst__paths: -max(len(path) for path in dst__paths[1]),
+          ):
+            for path in paths:
+              print(
+                  "    dst", dst.name, "<- src", src.name,
+                  [pnode.name for pnode in path]
+              )
+            if dst in rr_nodes:
+              print("      skip dst, already drawn")
+              continue
+            optional = False
+            if any(len(path) == 0 for path in paths):
+              optional = True
+              paths = list(filter(len, paths))
+              if paths:
+                rr = RRSequence(
+                    [src.name, RROptional(rr_paths(paths)), dst.name]
+                )
+              else:
+                rr = RRSequence([src.name, dst.name])
+            else:
+              if paths:
+                rr = RRSequence([src.name, rr_paths(paths), dst.name])
+              else:
+                rr = RRSequence([src.name, dst.name])
+            rrs.append(rr)
+        breakpoint()
+      print(len(rrs), "RR diagrams")
+      if len(rrs) == 1:
+        rr, = rrs
+      else:
+        rr = RRStack(rrs)
       print(rr)
-    breakpoint()
+      breakpoint()
+      return rr
+
+      # Prepare a connection graph where all the linear runs become
+      # RRSequences and attached to a single Edge between the start
+      # and end nodes.
+      cnode_by_node = {}
+
+      def cnode_for(node: Node):
+        try:
+          cnode = cnode_by_node[node]
+        except KeyError:
+          cnode = cnode_by_node[node] = Node(name=node.name, refobj=node)
+        return cnode
+
+      cgraph = Graph()
+      q = ListQueue([root], unique=True)
+      for node in q:
+        cnode = cnode_for(node)
+        for next_node in node.out_nodes:
+          # gather the linear run between node and the next branching node
+          seq = []
+          while next_node.in_count == 1 and next_node.out_count == 1:
+            seq.append(next_node)
+            next_node = next_node.out_node
+          next_cnode = cnode_for(next_node)
+          cedge = cgraph.add_edge(cnode, next_cnode)
+          cedge.objref = seq
+          q.append(next_node)
+      print("connection graph:")
+      cgraph.gvprint(rankdir="LR")
+
+      # there should be only 1 root node
+      croot, = cgraph.partition_nodes()[0]
+      cadj = connectivity(croot)
+      # print out the adjacency mapping
+      print("CGRAPH ADJACENCY MAPPING")
+      for src, by_dst in cadj.items():
+        for dst, paths in by_dst.items():
+          for path in paths:
+            print(src.name, dst.name, [pnode.name for pnode in path])
+
+      # process each mapping in reverse order of the mapping
+      # containing the longest path
+      for src, by_dst in sorted(
+          cadj.items(),
+          key=lambda src__by_dst: -max(map(len, src__by_dst[1].values()))):
+        print(src)
+        for dst, paths in by_dst.items():
+          print(" ", dst, list(map(len, paths)))
+
+      breakpoint()
+
+      # compose a stack of the possible paths
+      for src, by_dst in cadj.items():
+        assert len(by_dst) > 0
+        src_node = cgraph[src.name]
+        stack = []
+        for dst, paths in by_dst.items():
+          assert len(paths) > 0
+          if len(paths) == 1:
+            stack.append(paths[0])
+          else:
+            stack.append(paths)
+
+    for root in root_nodes:
+      rr = rr_graph(self, root)
+      ##rr = trace(rr_from, retval=True)(root)
+      ##pprint(rr)
+      ##breakpoint()
+      print(rr)
     return rr
 
 if __name__ == '__main__':

@@ -43,7 +43,7 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
 
 '''
 
-__version__ = '20260228-post'
+__version__ = '20260403-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -57,7 +57,7 @@ DISTINFO = {
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cache, cached_property
 from pprint import pprint
 import sys
 from types import SimpleNamespace as NS  # noqa: N814
@@ -130,6 +130,7 @@ def box_char_name(
       )
   )
 
+@cache
 def box_char(
     heavy=False,
     *,
@@ -190,6 +191,7 @@ HORIZ_DOWN = box_char(left=True, right=True, down=True)
 HORIZ_DOWN_ = box_char(left=True, right=True, down=True, heavy=True)
 CROSS = box_char(up=True, down=True, left=True, right=True)
 CROSS_ = box_char(up=True, down=True, left=True, right=True, heavy=True)
+LARGE_CIRCLE = '\N{LARGE CIRCLE}'
 LEFT_ARROW = '\N{LEFTWARDS ARROW}'
 RIGHT_ARROW = '\N{RIGHTWARDS ARROW}'
 

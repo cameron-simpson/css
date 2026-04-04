@@ -7,7 +7,7 @@ for writing recursive descent parsers, of which I have several.
 There are also some transcription functions for producing text
 from various objects, such as `hexify` and `unctrl`.
 
-Generally the get_* functions accept a source string and an offset
+Generally the `get_*` functions accept a source string and an offset
 (usually optional, default `0`) and return a token and the new offset,
 raising `ValueError` on failed tokenisation.
 '''
@@ -22,7 +22,7 @@ from functools import partial
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from pprint import pformat, PrettyPrinter
+from pprint import PrettyPrinter
 import re
 from string import (
     ascii_letters,
@@ -34,21 +34,22 @@ from string import (
 )
 import sys
 from textwrap import dedent
-from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
 from typeguard import typechecked
 
+from cs.ascii_art import box_char, HORIZ, LARGE_CIRCLE
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import fmtdoc, decorator, OBSOLETE, Promotable
+from cs.deco import attr, fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
-from cs.seq import common_prefix_length, common_suffix_length
+from cs.seq import common_prefix_length, common_suffix_length, with_neighbours
 
-__version__ = '20250914-post'
+__version__ = '20260403-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -58,13 +59,14 @@ DISTINFO = {
         "Topic :: Text Processing",
     ],
     'install_requires': [
+        'cs.ascii_art>=LARGE_CIRCLE',
         'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
         'cs.obj',
         'cs.pfx',
         'cs.py.func',
-        'cs.seq>=20200914',
+        'cs.seq>=with_neighbours',
         'python-dateutil',
         'icontract',
         'typeguard',
@@ -1492,79 +1494,244 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   from cs.fs import RemotePath
   return RemotePath.from_str(remotepath)
 
-def tabulate(*rows, sep='  ', ppcls=None):
-  r''' A generator yielding lines of values from `rows` aligned in columns.
+class TabulatePrettyPrinter(PrettyPrinter):
+  ''' A `PrettyPrinter` subclass which presents `date` and
+      `datetime` as ISO8601 strings.
 
-      Each row in rows is a list of strings. Non-`str` objects are
-      promoted to `str` via `pprint.pformat`. If the strings contain
-      newlines they will be split into subrows.
+      This is used by `tabulate` and `printt`.
+  '''
+
+  def __init__(self, compact=True, sort_dicts=True, **ppkw):
+    ''' The default format settings use `compact=True` and `sort_dicts=True`.
+    '''
+    super().__init__(compact=compact, sort_dicts=sort_dicts, **ppkw)
+
+  def format(self, obj, *fmt_a) -> Tuple[str, bool, bool]:
+    ''' Use ISO8601 for `date` and `datetime` objects.
+    '''
+    if isinstance(obj, date):
+      return obj.isoformat(), True, False
+    if isinstance(obj, datetime):
+      return obj.isoformat(' '), True, False
+    return super().format(obj, *fmt_a)
+
+def row_cells(
+    row: str | Sequence[Any],
+    as_str: Callable[Any, str] | None = None,
+) -> List[List[str]]:
+  r'''Turn a row of items into a grid.
+
+      Process:
+      - convert each non-`str` item into a string using `as_str`
+      - break each string into lines
+      - make enough rows to cover the tallest column
+
+      The default `as_str` comes from `tabulate.as_str`.
+
+      Example:
+
+          >>> for cells in row_cells(['col1', 'multi\nline\ntext', 'goes\nhere', 'and\nhere']):
+          ...     print(cells)
+          ...
+          ['col1', 'multi', 'goes', 'and']
+          ['', 'line', 'here', 'here']
+          ['', 'text', '', '']
+  '''
+  if as_str is None:
+    as_str = tabulate.default_as_str
+  # promote a str to a single item list
+  if isinstance(row, str):
+    row = [row]
+  # turn non-str row items into strings
+  row = [(cell if isinstance(cell, str) else as_str(cell)) for cell in row]
+  if all("\n" not in cell for cell in row):
+    # no multiline row cells
+    return [row]
+  # split multiline cells into columns, pad columns to match
+  cols = [[subcell.rstrip() for subcell in cell.splitlines()] for cell in row]
+  max_height = max(map(len, cols))
+  return [
+      [(col[subrow] if subrow < len(col) else '')
+       for col in cols]
+      for subrow in range(max_height)
+  ]
+
+@typechecked
+def flatten_table_rows(
+    table_rows: list[str | list | tuple],
+    as_str: Callable[Any, str] | None = None,
+) -> tuple[list[list[str]], list[int]]:
+  ''' Flatten a list of table rows or tuples-of-table-rows into a
+      `(flat_rows,attach)` 2 -tuple where `flat_rows` is a list lof
+      list-of-str rows and attach is a list of indices into `flat_rows`
+      which are attachment points.
+      Nested subtables are connected with lines.
+
+      The default `as_str` comes from `tabulate.as_str`.
+  '''
+  if as_str is None:
+    as_str = tabulate.default_as_str
+
+  def is_attachable_cell_grid(cells):
+    ''' Test if a cell row has nonwhitepace in column 0
+      '''
+    return bool(cells and cells[0] and cells[0][0].lstrip())
+
+  # promote rows to lists or AttachedLines
+  rows: list[list[str]] = []
+  attach: list[int] = []
+  for prev_trow, trow, next_trow in with_neighbours(table_rows):
+    # FIXME: this calls row_cells twice on each row
+    #        maybe call cell_rows on all lists?
+    #        in a prepass?
+    if isinstance(trow, (list, str)):
+      attach_below = bool(
+          isinstance(next_trow, tuple) and next_trow
+          and is_attachable_cell_grid(row_cells(next_trow[0]))
+      )
+      cells = row_cells(trow)
+      attachable = is_attachable_cell_grid(cells)
+      if attachable:
+        attach.append(len(rows))
+      # append the cell rows, possibly indents and attached
+      for ci, cell_row in enumerate(cells):
+        if ci > 0 and attach_below:
+          indent = box_char(
+              arc=True,
+              up=True,
+              down=attach_below,
+              right=attachable and ci == 0,
+          )
+          cell_row[0] = indent + cell_row[0]
+        rows.append(cell_row)
+    elif isinstance(trow, tuple):
+      # an indented subscetion
+      subrows, subattach = flatten_table_rows(
+          list(trow), as_str=as_str
+      )  # was True
+      # indent all the subrows
+      n_subattach = len(subattach)
+      for subndx, subrow in enumerate(subrows):
+        # NB: must be before the subattach.pop(0) below
+        attach_above = bool(
+            subattach
+            and (type(prev_trow) is list or len(subattach) < n_subattach)
+        )
+        do_attach = bool(subattach and subattach[0] == subndx)
+        if do_attach:
+          subattach.pop(0)
+        sub_attach_below = bool(subattach)  # more things to come
+        up = attach_above  ## do_attach or sub_attach_below,
+        down = sub_attach_below
+        right = do_attach
+        indent = (
+            LARGE_CIRCLE if right and not up and not down else
+            box_char(arc=True, up=up, down=down, right=right)
+        ) + (
+            HORIZ if do_attach else " "
+        )
+        subrow[0] = indent + subrow[0]
+        rows.append(subrow)
+    else:
+      raise TypeError(f'row type {type(trow)} is neither list nor tuple')
+  return rows, attach
+
+@attr(default_as_str=TabulatePrettyPrinter().pformat)
+def tabulate(
+    *rows,
+    sep='  ',
+    as_str: Callable[Any, str] | None = None,
+) -> Iterable[str]:
+  r'''A generator yielding lines of values from `rows` aligned in columns.
+
+      Usually, each row in rows is a `list` of strings. Non-`str` objects are
+      promoted to `str` via the `as_str` function.
+      If the strings contains newlines they will be split into
+      subrows.
+
+      A row may also be a `tuple`, indicating a subtable, which
+      will be embedded with its column 0 indented and joined up
+      with lines to indicate structure.
+
+      The default `as_str` function is `TabulatePrettyPrinter().pformat`;
+      the `TabulatePrettyPrinter` class is a subclass of `pprint.PrettyPrinter`
+      which also understands `datetime.date` and `datetime.datetime` objects.
+      This is exposed as `tabulate.default_as_str`.
 
       Example:
 
           >>> for row in tabulate(
+          ...    ['one col'],
+          ...    ['three', 'column', 'row'],
+          ...    ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
+          ...    ['two', 'cols'],
+          ...    (
+          ...        ['subrow', 'description'],
+          ...        (["0nd", "subtable"],),
+          ...        (
+          ...            ['inner', 'table'],
+          ...            ['', 'unattached'],
+          ...            ['inner\nbottom', 'last inner row'],
+          ...        ),
+          ...        (["2nd\nbbb", "subtable"],),
+          ...        ['subrow2'],
+          ...     ),
           ...     ['one col'],
           ...     ['three', 'column', 'row'],
           ...     ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
           ...     ['two', 'cols'],
+          ...     (
+          ...        ['subrow','description'],
+          ...        (
+          ...           ['inner','table'],
+          ...           ['','unattached'],
+          ...           ['inner\nbottom','last inner row'],
+          ...        ),
+          ...     ),
+          ...     ['subrow2'],
           ... ):
           ...     print(row)
           ...
           one col
-          three    column  row
-          row3     multi   goes  and
-                   line    here  here
-                   text
-          two      cols
+          three       column          row
+          row3        multi           goes  and
+                      line            here  here
+                      text
+          two         cols
+          ├─subrow    description
+          │ ╰─0nd     subtable
+          │ ╭─inner   table
+          │ │         unattached
+          │ ╰─inner   last inner row
+          │   bottom
+          │ ◯─2nd     subtable
+          │   bbb
+          ╰─subrow2
+          one col
+          three       column          row
+          row3        multi           goes  and
+                      line            here  here
+                      text
+          two         cols
+          ╰─subrow    description
+            ├─inner   table
+            │         unattached
+            ╰─inner   last inner row
+              bottom
+          subrow2
           >>>
   '''
-  if ppcls is None:
-
-    class ppcls(PrettyPrinter):
-      ''' A `PrettyPrinter` subclass which presents `date` and
-          `datetime` as ISO8601 strings.
-      '''
-
-      def format(self, obj, *fmt_a):
-        ''' Use ISO8601 for `date` and `datetime` objects.
-        '''
-        if isinstance(obj, date):
-          return obj.isoformat(), True, False
-        if isinstance(obj, datetime):
-          return obj.isoformat(' '), True, False
-        return super().format(obj, *fmt_a)
-
-  ppr = ppcls(compact=True, sort_dicts=True)
+  if as_str is None:
+    as_str = tabulate.default_as_str
   if not rows:
     # avoids max of empty list
     return
-  # promote all table cells to str via pformat
-  rows = [
-      [(cell if isinstance(cell, str) else ppr.pformat(cell))
-       for cell in row]
-      for row in rows
-  ]
+  rows, _ = flatten_table_rows(list(rows), as_str=as_str)
   # pad short rows with empty columns
   max_cols = max(map(len, rows))
   for row in rows:
     if len(row) < max_cols:
       row += [''] * (max_cols - len(row))
-  # break rows on newlines
-  srows = []
-  for row in rows:
-    if all("\n" not in cell for cell in row):
-      # no multiline row cells
-      srows.append(row)
-    else:
-      # split multiline cells int columns, pad columns to match
-      cols = [
-          [subcell.rstrip() for subcell in cell.split("\n")] for cell in row
-      ]
-      max_height = max(map(len, cols))
-      for subrow in range(max_height):
-        srows.append(
-            [col[subrow] if subrow < len(col) else '' for col in cols]
-        )
-    rows = srows
   col_widths = [
       max(map(len, (row[c]
                     for row in rows)))
@@ -1584,10 +1751,13 @@ def printt(
       Parameters:
       * `file`: optional output file, passed to `print_func`
       * `flush`: optional flush flag, passed to `print_func`
-      * `indent`: optional leading indent for the output lines
+      * `indent`: optional leading indent for the output lines;
+        if this is an `int` instead of a `str`, use that many spaces
       * `print_func`: optional `print()` function, default `builtins.print`
       Other keyword arguments are passed to `tabulate()`.
   '''
+  if isinstance(indent, int):
+    indent = ' ' * indent
   if print_func is None:
     from builtins import print as print_func
   for line in tabulate(*table, **tabulate_kw):
@@ -1972,7 +2142,7 @@ class FormatMapping(MappingABC):
         except KeyError:
           if not self.strict:
             return f'{{{field_name}}}'
-      raise
+          raise
     else:
       if callable(value):
         value = value(self.obj)

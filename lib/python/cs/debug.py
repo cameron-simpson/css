@@ -47,6 +47,7 @@ from threading import (
 import time
 import traceback
 from types import SimpleNamespace as NS
+from typing import Mapping, Sequence
 
 from cs.deco import ALL, decorator
 from cs.fs import shortpath
@@ -56,6 +57,7 @@ from cs.lex import (
     r,
     is_identifier,
     is_dotted_identifier,
+    printt,
 )  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
@@ -69,7 +71,7 @@ from cs.threads import ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20250728-post'
+__version__ = '20260403-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -847,20 +849,6 @@ def trace_DEBUG(debug_spec=None):
         if callable(F):
           setattr(M, func_name, trace(F))
 
-def selftest(module_name, defaultTest=None, argv=None):
-  ''' Called by my unit tests.
-  '''
-  # pylint: disable=import-outside-toplevel
-  if argv is None:
-    argv = sys.argv
-  import importlib
-  importlib.import_module(module_name)
-  import signal
-  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
-  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
-  import unittest
-  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
-
 builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
 if builtin_names_s:
   try:
@@ -892,6 +880,65 @@ if builtin_names_s:
         )
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
+
+@ALL
+def tabulate_obj(obj, label=None):
+  ''' Tabulate the contents of an object for display via `cs.lex.printt()`.
+  '''
+  if isinstance(obj, Mapping | Sequence):
+    yield [label or f'{obj.__class__.__name__}:{id(obj)}']
+    subrows = []
+    if isinstance(obj, Mapping):
+      try:
+        ivs = sorted(obj.items())
+      except TypeError:
+        ivs = list(obj.items())
+    elif isinstance(obj, Sequence):
+      ivs = enumerate(obj)
+    else:
+      raise RuntimeError('unhandled object {r(obj)}')
+    for i, v in ivs:
+      if isinstance(v, Mapping | Sequence):
+        subrows.extend(tabulate_obj(v, i))
+      else:
+        subrows.append([i, v])
+    if subrows:
+      yield tuple(subrows)
+  else:
+    try:
+      objdict = obj.__dict__
+    except AttributeError:
+      objcls = obj.__class__
+      try:
+        objslots = objcls.__slots__
+      except AttributeError:
+        yield [obj]
+      else:
+        kvs = [(f'{name}', getattr(obj, name)) for name in objslots]
+    else:
+      kvs = objdict.items()
+    objattrs = {f'.{name}': value for name, value in kvs}
+    yield from tabulate_obj(objattrs, label=label)
+
+@ALL
+def print_obj(obj, label=None):
+  ''' Call `tabulate_obj(obj,label=label)` and pass to `cs.lex.printt()`.
+  '''
+  return printt(*tabulate_obj(obj, label=label))
+
+def selftest(module_name, defaultTest=None, argv=None):
+  ''' Called by my unit tests.
+  '''
+  # pylint: disable=import-outside-toplevel
+  if argv is None:
+    argv = sys.argv
+  import importlib
+  importlib.import_module(module_name)
+  import signal
+  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
+  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+  import unittest
+  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
 
 # honour the $DEBUG trace flags
 trace_DEBUG()

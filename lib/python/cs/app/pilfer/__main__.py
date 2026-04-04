@@ -47,6 +47,7 @@ from . import (
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
+from .print import dump_soup
 from .rss import RSSChannelMixin
 from .sitemap import FlowState, SiteEntity, SiteMap
 
@@ -131,6 +132,7 @@ class PilferCommand(BaseCommand):
             lambda s: s.replace(',', ' ').split(),
         ),
         load_cookies='Load the browser cookie state into the Pilfer session.',
+        no_check_certificates='Do not verify SSL certificates.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
@@ -157,6 +159,7 @@ class PilferCommand(BaseCommand):
             later=later,
             rcpaths=options.configpaths,
             sqltags_db_url=options.db_url,
+            verify=not options.no_check_certificates,
         )
         with pilfer:
           pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
@@ -466,56 +469,20 @@ class PilferCommand(BaseCommand):
       if i == 0:
         table.append(['Grokked:'])
       table.append(
-          (
+          [
               f'  {method.__qualname__}',
               "\n".join(map(str, sorted(match_tags)))
-          )
+          ]
       )
       if grokked is not None:
         for k, v in grokked.items():
-          table.append([f'    {k}', dict(v) if isinstance(v, TagSet) else v])
+          table.append([[f'    {k}', dict(v)] if isinstance(v, TagSet) else v])
     printt(*table)
     if self.options.dump_content:
       print("Content:", flowstate.content_type)
       if flowstate.content_type in ('text/html',):
         soup = flowstate.soup
-        table = []
-        q = ListQueue([('', soup.head), ('', soup.body)])
-        for indent, tag in q:
-          subindent = indent + '  '
-          # TODO: looks like commants are also NavigableStrings, intercept here
-          if isinstance(tag, NavigableString):
-            text = str(tag).strip()
-            if text:
-              table.append(('', text))
-            continue
-          if tag.name == 'script':
-            continue
-          # sorted copy of the attributes
-          attrs = dict(sorted(tag.attrs.items()))
-          label = tag.name
-          # pop off the id attribute if present, include in the label
-          try:
-            id_attr = attrs.pop('id')
-          except KeyError:
-            pass
-          else:
-            label += f' #{id_attr}'
-          children = list(tag.children)
-          if not attrs and len(children) == 1 and isinstance(children[0],
-                                                             NavigableString):
-            desc = str(children[0].strip())
-          else:
-            desc = "\n".join(
-                f'{attr}={value!r}' for attr, value in attrs.items()
-            ) if attrs else ''
-            for index, subtag in enumerate(children):
-              q.insert(index, (subindent, subtag))
-          table.append((
-              f'{indent}{label}',
-              desc,
-          ))
-        printt(*table)
+        dump_soup(soup)
       elif flowstate.content_type in ('application/json',):
         jdata = flowstate.json
         if isinstance(jdata, dict):
@@ -721,6 +688,7 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError('missing actions')
     bad_actions = False
+    # make a MITMAddon and attach the CLI hooks
     mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
     while argv:
       try:
@@ -805,6 +773,16 @@ class PilferCommand(BaseCommand):
           file=T
       )
     print(output_fspath)
+    print("Reparse", output_fspath)
+    from rss_parser import RSSParser
+    with open(output_fspath) as rssf:
+      parsed = RSSParser.parse(rssf.read())
+    print("Language", parsed.channel.language)
+    print("RSS", parsed.version)
+    # Iteratively print feed items
+    for item in parsed.channel.items:
+      print(item.title)
+      print(item.description[:50])
 
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
@@ -872,7 +850,14 @@ class PilferCommand(BaseCommand):
         try:
           cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
         except AttributeError:
-          raise GetoptError("unknown sitemap command")
+          cmds = sorted(
+              name.removeprefix('cmd_')
+              for name in dir(sitemap)
+              if name.startswith('cmd_')
+          )
+          raise GetoptError(
+              f'unknown sitemap command, expected one of {", ".join(cmds)}'
+          )
         with stackattrs(sitemap, options=self.options):
           return cmdmethod(argv)
     # match URLs against the sitemap

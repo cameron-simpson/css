@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import defaultdict
+import configparser
 from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
 import copy
@@ -27,7 +28,7 @@ import shutil
 import sys
 from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Generator, Iterable, List, Mapping, Optional, Tuple
 from types import SimpleNamespace as NS
 
 import requests
@@ -38,12 +39,13 @@ from typeguard import typechecked
 from cs.app.flag import PolledFlags
 from cs.cmdutils import vprint
 from cs.context import contextif, stackattrs
-from cs.deco import decorator, default_params, promote
+from cs.deco import decorator, default_params, promote, uses_verbose
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, needdir, validate_rpath
 from cs.later import Later, uses_later
+from cs.lex import printt
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
@@ -77,7 +79,7 @@ def one_to_many(func, fast=None, with_P=False, new_P=False):
       * `fast`: optional flag, passed to `@agen` when wrapping the function
       * `with_P`: optional flag, default `False`: if true, pass
         `item,Pilfer` to the function instead of just `item`
-      * `new_P`: optional glag, default `False`; if true then the
+      * `new_P`: optional flag, default `False`; if true then the
         function yields `result,Pilfer` 2-tuples instead of just `result`
   '''
   if with_P:
@@ -265,6 +267,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   fspath: str = None
   sqltags_db_url: str = None
   user_agent: str = 'Pilfer'
+  # verify SSL certificates by default
+  verify: bool = True
   rcpaths: list[str] = field(default_factory=list)
   url_opener: Any = field(default_factory=build_opener)
   later: Later = field(default_factory=Later)
@@ -404,13 +408,16 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return URL.promote(self._)
 
+  @uses_verbose
   def request(
       self,
       url: str | URL,
       *,
+      verbose: bool,
       session: Optional[PilferSession] = None,
       headers=None,
       method='GET',
+      verify=None,
       **rq_kw,
   ) -> requests.Response:
     ''' Fetch `url` using method (default `'GET'`), return a `requests.Response`.
@@ -419,17 +426,28 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         * `session`: an optional `requests.Session` instance, default `self.session`
         * `headers`: optional additional headers to use, updating those from `self.headers()`
         * `method`: the HTTP method to use, default `'GET'`
+        * `verify`: SSL certificate verification, passed to `session.request`,
+          default from `self.verify` (itself default `True`)
         Other keyword arguments are passed to the `session` request method.
     '''
     vprint(f'{self.__class__.__name__}: {method} {url}')
     if session is None:
       session = self.session
+    if verify is None:
+      verify = self.verify
     # a fresh headers mapping
     hdrs = self.headers()
     if headers is not None:
       hdrs.update(headers)
+    if verbose:
+      print(f'{method.upper()} request headers:')
+      printt(*[[hdr, body] for hdr, body in sorted(hdrs.items())], indent=2)
     return pfx_call(
-        getattr(session, method.lower()), str(url), headers=hdrs, **rq_kw
+        getattr(session, method.lower()),
+        str(url),
+        headers=hdrs,
+        verify=verify,
+        **rq_kw
     )
 
   def GET(self, url: str | URL, **rq_kw):
@@ -490,7 +508,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       cfg = ConfigParser(allow_unnamed_section=True)
       try:
         pfx_call(cfg.read, rcpath)
-      except (FileNotFoundError, PermissionError) as e:
+      except (FileNotFoundError, PermissionError,
+              configparser.DuplicateOptionError) as e:
         warning("ConfigParser.read(%r): %s", rcpath, e)
         continue
       msection = mapping[None]
@@ -703,7 +722,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
             continue
           try:
             map_class = import_name(map_spec)
-          except (ImportError, SyntaxError) as e:
+          except (ImportError, NameError, SyntaxError) as e:
             warning(e._)
             continue
           sitemap = map_class(name=map_name)
@@ -713,18 +732,18 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return map_list
 
   @promote
-  def sitemaps_for(self, url: URL):
-    ''' Generator yielding sitemaps which match the `url`.
+  def sitemaps_for_url_host(self, url: URL) -> Generator[SiteMap]:
+    ''' Generator yielding sitemaps which match the `url` host part.
     '''
     hostname = url.hostname
     for pattern, sitemap in self.sitemaps:
       if fnmatch(hostname, pattern):
         yield sitemap
 
-  def sitemap_for(self, url: str | URL):
+  def sitemap_for(self, url: str | URL) -> SiteMap | None:
     ''' Return the first sitemap which matches the `url`, or `None`.
     '''
-    for sitemap in self.sitemaps_for(url):
+    for sitemap in self.sitemaps_for_url_host(url):
       return sitemap
     return None
 
@@ -737,11 +756,11 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       **run_match_kw,
   ) -> Iterable[Tuple[Callable, TagSet, Any]]:
     ''' A generator to call `SiteMap.run_matches(flowstate,*run_match_a,**run_match_kw)`
-        for each `SiteMap` from `self.sitemaps_for(flowstate.url)`.
+        for each `SiteMap` from `self.sitemaps_for_url_host(flowstate.url)`.
         Arguments are as for `SiteMap.run_matches`.
         Yield `(method,match_tags,result)` 3-tuples from each method called.
     '''
-    for sitemap in self.sitemaps_for(flowstate.url):
+    for sitemap in self.sitemaps_for_url_host(flowstate.url):
       yield from pfx_call(
           sitemap.run_matches, flowstate, *run_match_a, **run_match_kw
       )
@@ -765,22 +784,23 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
             f'{flowstate.url.short} {flowstate.response.status_code=} != 2xx, not grokking'
         )
         return
-      for sitemap in self.sitemaps_for(flowstate.url):
+      # for each SiteMap associated with the URL host, run its grok methods
+      for sitemap in self.sitemaps_for_url_host(flowstate.url):
         yield from sitemap.grok(flowstate, flowattr, **grok_kw)
 
   @promote
   def url_matches(self, url: URL, pattern_type: str, *, extra=None):
-    ''' Scan `self.sitemaps_for(url)` for patterns matching the URL.
+    ''' Scan `self.sitemaps_for_url_host(url)` for patterns matching the URL.
         Yield `SiteMapPatternMatch` instances for each match.
     '''
-    for sitemap in self.sitemaps_for(url):
+    for sitemap in self.sitemaps_for_url_host(url):
       patterns = getattr(sitemap, f'{pattern_type}_PATTERNS', None)
       if patterns:
         yield from sitemap.matches(url, patterns, extra=extra)
 
   @promote
   def url_entity(self, url: URL, *, methodglob='grok_*', **match_kw):
-    for sitemap in self.sitemaps_for(url):
+    for sitemap in self.sitemaps_for_url_host(url):
       entity = sitemap.url_entity(url)
       if entity is not None:
         return entity
@@ -792,7 +812,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       raise ValueError(f'unexpected kwargs {kw!r}')
     with self._print_lock:
       if file is None:
-        file = self._print_to if self._print_to else sys.stdout
+        file = self._print_to or sys.stdout
       print(*a, file=file)
       if self.flush_print:
         file.flush()
@@ -893,7 +913,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     cache = self.content_cache
     cache_keys = set()
     with self:
-      for sitemap in self.sitemaps_for(url):
+      for sitemap in self.sitemaps_for_url_host(url):
         ##PR("sitemap", sitemap)
         for method, match_tags, site_cache_key in sitemap.run_matches(
             flowstate, None, 'cache_key_*'):
