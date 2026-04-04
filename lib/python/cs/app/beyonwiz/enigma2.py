@@ -39,7 +39,7 @@ class Enigma2(_Recording):
 
   DEFAULT_FILENAME_BASIS = (
       '{meta.title:lc_}--{file.datetime:lc_}--{file.channel:lc_}'
-      '--beyonwiz--{meta.description:lc_}'
+      '--beyonwiz--{meta.description_sentence1:lc_}'
   )
 
   FFMPEG_METADATA_MAPPINGS = {
@@ -127,6 +127,9 @@ class Enigma2(_Recording):
           warning("cannot open: %s", e)
         else:
           raise
+      desc = data.get('description', '')
+      sentence1 = desc.split('. ', 1)[0]
+      data['description_sentence1'] = sentence1 or desc
     return data
 
   @locked_property

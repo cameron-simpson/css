@@ -57,7 +57,7 @@ class BWizCmd(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals
   @popopts(
-      a_=('acodec', 'Specify output audio  format.'),
+      a_=('acodec', 'Specify output audio format.'),
       v_=('vcodec', 'Specify output video format.'),
       d_=(
           'outputdir',
