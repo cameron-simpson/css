@@ -62,7 +62,7 @@ from cs.logutils import warning, debug
 from cs.pfx import Pfx, pfx_call, pfx_method, XP
 from cs.tagset import TagSet, Tag
 from cs.threads import locked_property, ThreadState
-from cs.units import geek_bytes, human_time
+from cs.units import geek, geek_bytes, human_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
 __version__ = '20241122-post'
@@ -286,6 +286,7 @@ class MP4Command(BaseCommand):
                     recurse=True,
                     dump_fields=options.with_fields,
                     dump_offsets=options.with_offsets,
+                    with_offsets=True,
                 )
             )
           else:
@@ -1160,10 +1161,13 @@ class Box(SimpleBinary):
       dump_fields=False,
       dump_offsets=False,
       recurse=False,
+      with_offsets=False,
   ) -> List[Tuple[str, str]]:
     ''' Dump this `Box` as a table of descriptions.
         Return a list of `(title,description)` 2-tuples
         suitable for use with `cs.lex.printt()`.
+
+        If 'with_offsets' is true, include a third column with the box offset and size.
     '''
     if table is None:
       table = []
@@ -1174,9 +1178,16 @@ class Box(SimpleBinary):
         box_desc = ''
       else:
         box_desc = body.__class__.__doc__.strip().split("\n")[0]
+      box_offset = geek(box.end_offset - box.offset).__str__(
+          no_pad=True, sep=','
+      )
       if dump_fields:
         table.append(
             (
+                f'{row_indent}{box.box_type_s}:{body.__class__.__name__}',
+                f'{box_offset} @ 0x{box.offset:06x}',
+                box_desc,
+            ) if with_offsets else (
                 f'{row_indent}{box.box_type_s}:{body.__class__.__name__}',
                 box_desc,
             )
@@ -1190,10 +1201,13 @@ class Box(SimpleBinary):
             box_content = f'{box_content__}: {box_desc}'
           else:
             box_content = box_content__
-        table.append((
-            f'{row_indent}{box.box_type_s}',
-            box_content,
-        ))
+        table.append(
+            (
+                f'{row_indent}{box.box_type_s}',
+                f'{box_offset} @ 0x{box.offset:06x}',
+                box_content,
+            )
+        )
       if dump_fields:
         # indent the subrows
         field_indent = row_indent + subindent
@@ -1206,7 +1220,9 @@ class Box(SimpleBinary):
             body.__dict__.keys(),
         )):
           field = getattr(body, field_name)
-          table.append((f'{field_indent}.{field_name}', cropped_repr(field)))
+          table.append(
+              (f'{field_indent}.{field_name}', '', cropped_repr(field))
+          )
     return table
 
   def dump(self, file=None, **dump_table_kw):
