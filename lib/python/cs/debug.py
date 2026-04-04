@@ -924,6 +924,7 @@ def tabulate_obj(obj, label=None, *, seen=None):
     if subrows:
       yield tuple(subrows)
   else:
+    kvs = None
     try:
       objdict = obj.__dict__
     except AttributeError:
@@ -931,12 +932,14 @@ def tabulate_obj(obj, label=None, *, seen=None):
       try:
         objslots = objcls.__slots__
       except AttributeError:
-        yield [obj]
+        yield [label, obj]
+        return
       else:
         kvs = [(f'{name}', getattr(obj, name)) for name in objslots]
     else:
       kvs = objdict.items()
-    objattrs = {f'.{name}': value for name, value in kvs}
+    if kvs is not None:
+      objattrs = {f'.{name}': value for name, value in kvs}
       yield from tabulate_obj(objattrs, label=label, seen=seen)
 
 @ALL
