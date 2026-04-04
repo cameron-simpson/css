@@ -885,7 +885,6 @@ if builtin_names_s:
 def tabulate_obj(obj, label=None, *, seen=None):
   ''' Tabulate the contents of an object for display via `cs.lex.printt()`.
   '''
-  if isinstance(obj, Mapping | Sequence):
   if seen is None:
     seen = set()
   if label is None:
@@ -899,6 +898,14 @@ def tabulate_obj(obj, label=None, *, seen=None):
     ]
     return
   seen.add(id(obj))
+  try:
+    is_container = isinstance(obj, Mapping | Sequence)
+  except RecursionError as e:
+    ##warning(f'isinstance(obj:{type(obj)}, Mapping | Sequence): {e}')
+    yield [label, '(isinstance failure)']
+    return
+  if is_container:
+    yield [label]
     subrows = []
     if isinstance(obj, Mapping):
       try:
