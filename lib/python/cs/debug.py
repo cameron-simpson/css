@@ -890,7 +890,9 @@ def tabulate_obj(obj, label=None, *, seen=None):
     seen = set()
   if label is None:
     label = f'{obj.__class__.__name__}:{id(obj)}'
-    yield [label or f'{obj.__class__.__name__}:{id(obj)}']
+  if isinstance(obj, type):
+    yield [label]
+    return
   if id(obj) in seen:
     yield [
         label, "" if isinstance(obj, (int, float, str)) else "(already seen)"
