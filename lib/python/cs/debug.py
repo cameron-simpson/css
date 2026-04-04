@@ -882,11 +882,19 @@ if builtin_names_s:
       setattr(builtins, builtin_name, vs[builtin_name])
 
 @ALL
-def tabulate_obj(obj, label=None):
+def tabulate_obj(obj, label=None, *, seen=None):
   ''' Tabulate the contents of an object for display via `cs.lex.printt()`.
   '''
   if isinstance(obj, Mapping | Sequence):
+  if seen is None:
+    seen = set()
     yield [label or f'{obj.__class__.__name__}:{id(obj)}']
+  if id(obj) in seen:
+    yield [
+        label, "" if isinstance(obj, (int, float, str)) else "(already seen)"
+    ]
+    return
+  seen.add(id(obj))
     subrows = []
     if isinstance(obj, Mapping):
       try:
@@ -899,7 +907,7 @@ def tabulate_obj(obj, label=None):
       raise RuntimeError('unhandled object {r(obj)}')
     for i, v in ivs:
       if isinstance(v, Mapping | Sequence):
-        subrows.extend(tabulate_obj(v, i))
+        subrows.extend(tabulate_obj(v, str(i), seen=seen))
       else:
         subrows.append([i, v])
     if subrows:
@@ -918,7 +926,7 @@ def tabulate_obj(obj, label=None):
     else:
       kvs = objdict.items()
     objattrs = {f'.{name}': value for name, value in kvs}
-    yield from tabulate_obj(objattrs, label=label)
+      yield from tabulate_obj(objattrs, label=label, seen=seen)
 
 @ALL
 def print_obj(obj, label=None):
