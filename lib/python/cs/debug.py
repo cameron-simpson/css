@@ -882,11 +882,30 @@ if builtin_names_s:
       setattr(builtins, builtin_name, vs[builtin_name])
 
 @ALL
-def tabulate_obj(obj, label=None):
+def tabulate_obj(obj, label=None, *, seen=None):
   ''' Tabulate the contents of an object for display via `cs.lex.printt()`.
   '''
-  if isinstance(obj, Mapping | Sequence):
-    yield [label or f'{obj.__class__.__name__}:{id(obj)}']
+  if seen is None:
+    seen = set()
+  if label is None:
+    label = f'{obj.__class__.__name__}:{id(obj)}'
+  if isinstance(obj, type):
+    yield [label]
+    return
+  if id(obj) in seen:
+    yield [
+        label, "" if isinstance(obj, (int, float, str)) else "(already seen)"
+    ]
+    return
+  seen.add(id(obj))
+  try:
+    is_container = isinstance(obj, Mapping | Sequence)
+  except RecursionError as e:
+    ##warning(f'isinstance(obj:{type(obj)}, Mapping | Sequence): {e}')
+    yield [label, '(isinstance failure)']
+    return
+  if is_container:
+    yield [label]
     subrows = []
     if isinstance(obj, Mapping):
       try:
@@ -899,12 +918,13 @@ def tabulate_obj(obj, label=None):
       raise RuntimeError('unhandled object {r(obj)}')
     for i, v in ivs:
       if isinstance(v, Mapping | Sequence):
-        subrows.extend(tabulate_obj(v, i))
+        subrows.extend(tabulate_obj(v, str(i), seen=seen))
       else:
         subrows.append([i, v])
     if subrows:
       yield tuple(subrows)
   else:
+    kvs = None
     try:
       objdict = obj.__dict__
     except AttributeError:
@@ -912,13 +932,15 @@ def tabulate_obj(obj, label=None):
       try:
         objslots = objcls.__slots__
       except AttributeError:
-        yield [obj]
+        yield [label, obj]
+        return
       else:
         kvs = [(f'{name}', getattr(obj, name)) for name in objslots]
     else:
       kvs = objdict.items()
-    objattrs = {f'.{name}': value for name, value in kvs}
-    yield from tabulate_obj(objattrs, label=label)
+    if kvs is not None:
+      objattrs = {f'.{name}': value for name, value in kvs}
+      yield from tabulate_obj(objattrs, label=label, seen=seen)
 
 @ALL
 def print_obj(obj, label=None):
