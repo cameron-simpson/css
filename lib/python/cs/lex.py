@@ -142,7 +142,7 @@ def lc_(value: str) -> str:
 
 def titleify_lc(value_lc: str) -> str:
   ''' Translate `'-'` into `' '` and `'_'` translated into `'-'`,
-      then titlecased.
+      then titlecase.
 
       See also `lc_()`, which this reverses imperfectly.
   '''
@@ -2132,20 +2132,23 @@ class FormatMapping(MappingABC):
       value = self.mapping[field_name]
     except KeyError:
       if field_name == 'self':
-        return self.obj
-      if self.missing is None:
-        if not self.strict:
-          return f'{{{field_name}}}'
+        value = self.obj
+      elif self.missing is None:
+        if self.strict:
+          raise
+        value = f'{{{field_name}}}'
       else:
         try:
           value = self.missing(self.mapping, field_name)
         except KeyError:
-          if not self.strict:
-            return f'{{{field_name}}}'
-          raise
+          if self.strict:
+            raise
+          value = f'{{{field_name}}}'
     else:
       if callable(value):
         value = value(self.obj)
+    if not isinstance(value, FormatableMixin):
+      value = FStr(value)
     return value
 
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
