@@ -1646,7 +1646,7 @@ def tabulate(
 
       Usually, each row in rows is a `list` of strings. Non-`str` objects are
       promoted to `str` via the `as_str` function.
-      If the strings contains newlines they will be split into
+      If the strings contain newlines they will be split into
       subrows.
 
       A row may also be a `tuple`, indicating a subtable, which
@@ -2147,7 +2147,7 @@ class FormatMapping(MappingABC):
     else:
       if callable(value):
         value = value(self.obj)
-    if not isinstance(value, FormatableMixin):
+    if not isinstance(value, FStr):
       value = FStr(value)
     return value
 
