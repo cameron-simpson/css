@@ -1992,7 +1992,7 @@ class BaseCommand:
       )
     printt(
         *(
-            (f'{field_name}:', getattr(options, field_name))
+            [f'{field_name}:', getattr(options, field_name)]
             for field_name in field_names
         )
     )
