@@ -1,3 +1,4 @@
+print_obj: does not print excpetion info
 new pt: top-like mode as well
 rewrite pt in python, use printt for the listing
 pick-from-diff editor somewhat like hg-record, but agnostic so i can use it with git
