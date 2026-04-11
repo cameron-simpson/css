@@ -1,3 +1,4 @@
+does the wizpnp protocol allow control or query of the recording stuff eg epg etc?
 proper getwizpnp impl in the tvwiz module
 convert: write result to different directory
 tvwiz: use cs.binary
