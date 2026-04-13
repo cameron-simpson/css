@@ -194,14 +194,23 @@ async def async_iter(it: AnyIterable, *, fast=None):
     async for item in dund_aiter():
       yield item
 
-async def aqget(q: Queue):
+async def aqget(q: Queue, tpe: ThreadPoolExecutor = None):
   ''' An asynchronous function to get an item from a `queue.Queue`like object `q`.
-      It must support the `.get()` and `.get_nowait()` methods.
+      It must support the `.get()` and `.get_nowait()` methods; if
+      requires the `.get()` is dispatched using `to_thread()`.
+
+      The optional `tpe` parameter may specify a
+      `concurrent.futures.ThreadPoolExecutor` to use instead of
+      `to_thread`. For example, the `Lock` class uses a thread pool
+      to avoid deadlocking with the general purpose thread pool
+      used by `to_thread`.
   '''
   try:
     return q.get_nowait()
   except Empty:
-    return await to_thread(q.get)
+    if tpe is None:
+      return await to_thread(q.get)
+    return await to_threadpool(tpe, q.get)
 
 _aqiter_NO_SENTINEL = object()
 
