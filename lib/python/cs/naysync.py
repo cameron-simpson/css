@@ -382,6 +382,58 @@ async def amap(
     # this should have cleared the heap
     assert len(results) == 0
 
+class Lock:
+  ''' A lock object which can be used in synchronous and asynchonous contexts.
+
+      The async enter step is built on the `aqget()` function.
+
+      Example use:
+
+          shared_lock =- Lock("my shared lock")
+
+      Synchronous use from some thread:
+
+          with shared_lock:
+              critical section
+
+      Asynchronous use from some event loop:
+
+          async with shared_lock:
+              critical section
+  '''
+
+  def __init__(self, name=None, *, max_workers=64):
+    ''' Initialise the `Lock`.
+
+        Parameters:
+        * `name`: optional name for the lock
+        * `mac_workers`: optional number of threads in the per-lock thread pool,
+          arbitrarily set to 64 since the defaults for `ThreadPoolExecutor`
+          seems insanely low and `run_in_executor` is synchronous!
+    '''
+    if name is None:
+      name = f'{self.__class__.__name__}:{id(self)}'
+    self.name = name
+    self.token = None
+    self.q = Queue()
+    self.q.put(self.token)
+    self.tpe = ThreadPoolExecutor(max_workers, f'{name}-')
+
+  def __str__(self):
+    return self.name
+
+  def __enter__(self):
+    return self.q.get()
+
+  def __exit__(self, _):
+    self.q.put(self.token)
+
+  async def __aenter__(self):
+    return await aqget(self.q, tpe=self.tpe)
+
+  async def __aexit__(self, _):
+    self.q.put(self.token)
+
 class IterableAsyncQueue(AQueue):
   ''' An iterable subclass of `asyncio.Queue`.
 
