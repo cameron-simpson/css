@@ -25,11 +25,13 @@
 from asyncio import (
     CancelledError,
     create_task,
+    get_running_loop,
     run,
     to_thread,
     Queue as AQueue,
     Task,
 )
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import auto, StrEnum
 from functools import partial
@@ -69,6 +71,16 @@ DISTINFO = {
 }
 
 AnyIterable = Union[Iterable, AsyncIterable]
+
+async def to_threadpool(tpe: ThreadPoolExecutor, func, *a, **kw):
+  ''' A variant on `asyncio.to_thread` which dispatches the thread
+      via a `concurrent.futures.ThreadPoolExecutor`.
+
+      You can just use the `run_in_executor` event loop method
+      directly but this is handy if you've already got a thread
+      pool for a specific purpose and code which fits `to_thread`.
+  '''
+  return get_running_loop().run_in_exector(tpe, partial(func, *a, **kw))
 
 @decorator
 def agen(genfunc, *, fast=None):
