@@ -389,7 +389,7 @@ class Lock:
 
       Example use:
 
-          shared_lock =- Lock("my shared lock")
+          shared_lock = Lock("my shared lock")
 
       Synchronous use from some thread:
 
