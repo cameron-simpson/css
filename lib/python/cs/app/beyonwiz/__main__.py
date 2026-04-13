@@ -17,7 +17,7 @@ from pprint import pformat
 import shutil
 import sys
 
-from cs.cmdutils import BaseCommand
+from cs.cmdutils import BaseCommand, popopts
 from cs.ffmpegutils import ffprobe
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
@@ -56,49 +56,33 @@ class BWizCmd(BaseCommand):
     return 0
 
   # pylint: disable=too-many-branches,too-many-locals
+  @popopts(
+      a_=('acodec', 'Specify output audio format.'),
+      v_=('vcodec', 'Specify output video format.'),
+      d_=(
+          'outputdir',
+          'The derived output file should be written in outputdir.'
+      ),
+      rm=(
+          'remove_source', 'Remove the source file if the conversion succeeds.'
+      ),
+  )
   def cmd_convert(self, argv):
     ''' Convert a recording to MP4.
 
-        Usage: {cmd} [-n] [-a:afmt] [-v:vfmt] [--rm] [-d outputdir] [start..end]... recording [output.mp4]
+        Usage: {cmd} [start..end]... recording [output.mp4]
           Convert the video content of the named recording, usually to an MP4.
           Most metadata are preserved.
-          Options:
-            -n          No action, dry run.
-            -a:afmt     Specify output audio format.
-            -v:vfmt     Specify output video format.
-            -d outputdir The derived output file should be written in outputdir.
-            --rm        Remove the source file if the conversion succeeds.
             start..end  Optional start and end offsets in seconds, used
               to crop the recording output.
     '''
+    options = self.options
+    doit = options.doit
+    acodec = options.acodec
+    vcodec = options.vcodec
+    outputdir = options.outputdir or '.'
+    remove_source = options.remove_source
     badopts = False
-    doit = True
-    acodec = None
-    vcodec = None
-    outputdir = '.'
-    remove_source = False
-    # parse options
-    while argv:
-      arg0 = argv.pop(0)
-      with Pfx(arg0):
-        if arg0 == '--':
-          break
-        if not arg0.startswith('-') or len(arg0) == 1:
-          argv.insert(0, arg0)
-          break
-        if arg0 == '-n':
-          doit = False
-        elif arg0.startswith('-a:'):
-          acodec = arg0[3:]
-        elif arg0.startswith('-v:'):
-          vcodec = arg0[3:]
-        elif arg0 == '--rm':
-          remove_source = True
-        elif arg0 == '-d':
-          outputdir = argv.pop(0)
-        else:
-          warning('unexpected option')
-          badopts = True
     if not isdirpath(outputdir):
       warning("outputdir is not a directory: %r", outputdir)
       badopts = True

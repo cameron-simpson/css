@@ -1,0 +1,1 @@
+lib/python/cs/semantics.py: cs.semantics: new module holding ClosedError and @not_closed, pulled from cs.resources

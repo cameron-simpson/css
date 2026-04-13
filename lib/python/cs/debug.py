@@ -14,7 +14,7 @@ anywhere in the code provided this module has been imported somewhere.
 
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
-* `abrk`: a decorator to call `breakpoint(0` in an `AssertionError`
+* `abrk`: a decorator to call `breakpoint()` on an `AssertionError`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`
@@ -29,12 +29,15 @@ The allowed names are the list `cs.debug.__all__` and include:
 '''
 
 from __future__ import print_function
+import builtins
 from cmd import Cmd
+from collections import defaultdict
 from contextlib import redirect_stdout
 import inspect
 import logging
 import os
 from pprint import pformat, pprint  # pylint: disable=unused-import
+import re
 from subprocess import Popen, PIPE
 import sys
 from threading import (
@@ -46,23 +49,31 @@ from threading import (
 import time
 import traceback
 from types import SimpleNamespace as NS
+from typing import Mapping, Sequence
 
-from cs.deco import ALL, decorator
+from cs.deco import ALL, attr, decorator
 from cs.fs import shortpath
-from cs.lex import s, r, is_identifier, is_dotted_identifier  # pylint: disable=unused-import
+from cs.lex import (
+    cropped_repr,
+    s,
+    r,
+    is_identifier,
+    is_dotted_identifier,
+    printt,
+)  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
 from cs.py.func import funccite, funcname, func_a_kw_fmt
-from cs.py.stack import caller
+from cs.py.stack import caller, frames
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.threads import ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20241005-post'
+__version__ = '20260403-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -82,6 +93,7 @@ DISTINFO = {
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
+        'cs.threads',
         'cs.upd',
         'cs.x',
     ],
@@ -189,6 +201,8 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
       Parameters:
       * `stack`: a stack list as returned by `traceback.extract_stack`.
         If missing or `None`, use the result of `traceback.extract_stack()`.
+        If `stack` has a `.tb_frame` or `.__traceback__` attribute,
+        extract the stack from that (this covers traceback objects and exceptions).
       * `limit`: a limit to the number of stack entries to dump.
         If missing or `None`, dump all entries.
       * `logger`: a `logger.Logger` ducktype or the name of a logger.
@@ -196,10 +210,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
       * `log_level`: the logging level for the dump.
         If missing or `None`, use `cs.logutils.loginfo.level`.
   '''
-  if stack is None:
-    stack = traceback.extract_stack()
-  if limit is not None:
-    stack = stack[:limit]
+  stack = frames(stack, limit=limit)
   if logger is None:
     logger = logging.getLogger()
   elif isinstance(logger, str):
@@ -480,26 +491,6 @@ class DebuggingThread(threading_Thread, DebugWrapper):
     _debug_threads.discard(self)
     return retval
 
-def trace_caller(func):
-  ''' Decorator to report the caller of a function when called.
-  '''
-
-  def subfunc(*a, **kw):
-    frame = caller()
-    D(
-        "CALL %s()<%s:%d> FROM %s()<%s:%d>",
-        func.__name__,
-        func.__code__.co_filename,
-        func.__code__.co_firstlineno,
-        frame.name,
-        frame.filename,
-        frame.lineno,
-    )
-    return func(*a, **kw)
-
-  subfunc.__name__ = "trace_caller/subfunc/" + func.__name__
-  return subfunc
-
 class TracingObject(Proxy):
 
   def __init__(self, other):
@@ -654,9 +645,11 @@ def trace(
     retval=False,
     exception=True,
     use_pformat=False,
-    with_caller=False,
+    with_caller=True,
     with_pfx=False,
     xlog=None,
+    verbose=False,
+    breakpoint=False,
 ):
   ''' Decorator to report the call and return of a function.
 
@@ -666,11 +659,11 @@ def trace(
       * `exception`: trace raised exceptions, default `True`
       * `use_pformat`: present the return value using
         `pformat` instead of `repr`, default `False`
-      * `with_caller`: include the caller if this function, default `False`
+      * `with_caller`: include the caller if this function, default `True`
       * `with_pfx`: include the current `Pfx` prefix, default `False`
   '''
-
   citation = funcname(func)  ## funccite(func)
+  fmtv = pformat if use_pformat else cropped_repr
 
   def traced_function_wrapper(*a, **kw):
     ''' Wrapper for `func` to trace call and return.
@@ -686,13 +679,24 @@ def trace(
     else:
       xlog = X
     log_cite = citation
-    if with_caller:
-      log_cite = log_cite + "from[%s]" % (caller(),)
-    if call:
-      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
-      xlog("%sCALL " + fmt, _trace_state.indent, *av)
     old_indent = _trace_state.indent
     _trace_state.indent += '  '
+    indent = _trace_state.indent
+    if call:
+      fmt, av = func_a_kw_fmt(log_cite, *a, **kw)
+      if verbose and (a or kw):
+        xlog("%sCALL   %s(", old_indent, log_cite)
+        for arg in a:
+          xlog("%s         %s,", old_indent, r(arg, None))
+        for kwname, kwarg in kw.items():
+          xlog("%s         %s=%s,", old_indent, kwname, r(kwarg, None))
+        xlog("%s       )", old_indent)
+      else:
+        xlog("%sCALL   " + fmt, old_indent, *av)
+      if with_caller:
+        xlog("%sFROM %s", indent, caller(-4))
+      if breakpoint:
+        breakpoint() if callable(breakpoint) else builtins.breakpoint()
     start_time = time.time()
     try:
       result = func(*a, **kw)
@@ -701,91 +705,97 @@ def trace(
       if exception:
         xlog_kw = {}
         if xlog is X:
-          xlog_kw['colour'] = 'red'
+          xlog_kw['colour'] = 'white'  ## 'red'
         xlog(
-            "%sCALL %s %gs RAISE %r",
-            _trace_state.indent,
+            "%sRAISE  %s => %s:%s\n"
+            "%s  at %s\n"
+            "%s  elapsed %gs",
+            indent,
             log_cite,
-            end_time - start_time,
+            e.__class__.__name__,
             e,
+            indent,
+            (
+                "no-frame" if e.__traceback__.tb_next is None else
+                e.__traceback__.tb_next.tb_frame
+            ),
+            indent,
+            end_time - start_time,
             **xlog_kw,
         )
       _trace_state.indent = old_indent
       raise
+    end_time = time.time()
+    if inspect.isgeneratorfunction(func):
+      iterator = result
+
+      def traced_generator():
+        while True:
+          next_time = time.time()
+          if call:
+            xlog(
+                "%sNEXT   %s at %gs",
+                old_indent,
+                log_cite,
+                next_time - start_time,
+            )
+          try:
+            item = next(iterator)
+          except StopIteration:
+            yield_time = time.time()
+            xlog(
+                "%sDONE   %s in %gs",
+                indent,
+                log_cite,
+                yield_time - next_time,
+            )
+            break
+          except Exception as e:
+            end_time = time.time()
+            if exception:
+              xlog_kw = {}
+              if xlog is X:
+                xlog_kw['colour'] = 'red'
+              xlog(
+                  "%sRAISE  %s => %s:%s\n"
+                  "%s  at %s\n"
+                  "%s  elapsed %gs\n",
+                  indent,
+                  log_cite,
+                  e.__class__.__name__,
+                  e,
+                  indent,
+                  e.__traceback__.tb_next.tb_frame,
+                  indent,
+                  end_time - start_time,
+                  **xlog_kw,
+              )
+            _trace_state.indent = old_indent
+            raise
+          else:
+            yield_time = time.time()
+            xlog(
+                "%sYIELD  %s => %s at %gs",
+                old_indent,
+                log_cite,
+                fmtv(item),
+                yield_time - next_time,
+            )
+            yield item
+
+      result = traced_generator()
     else:
-      end_time = time.time()
       if retval:
         xlog(
-            "%sCALL %s %gs RETURN %s",
-            _trace_state.indent,
+            "%sRETURN %s => %s:%s in %gs",
+            indent,  ##_trace_state.indent,
             log_cite,
+            result.__class__.__name__,
+            fmtv(result),
             end_time - start_time,
-            (pformat if use_pformat else repr)(result),
         )
-      if inspect.isgeneratorfunction(func):
-        iterator = result
-
-        def traced_generator():
-          while True:
-            next_time = time.time()
-            if call:
-              xlog(
-                  "%sNEXT %s %gs ...",
-                  _trace_state.indent,
-                  log_cite,
-                  next_time - start_time,
-              )
-            try:
-              item = next(iterator)
-            except StopIteration:
-              yield_time = time.time()
-              xlog(
-                  "%sDONE %s %gs ...",
-                  _trace_state.indent,
-                  log_cite,
-                  yield_time - next_time,
-              )
-              break
-            except Exception as e:
-              end_time = time.time()
-              if exception:
-                xlog_kw = {}
-                if xlog is X:
-                  xlog_kw['colour'] = 'red'
-                xlog(
-                    "%sCALL %s %gs RAISE %r",
-                    _trace_state.indent,
-                    log_cite,
-                    end_time - start_time,
-                    e,
-                    **xlog_kw,
-                )
-              _trace_state.indent = old_indent
-              raise
-            else:
-              yield_time = time.time()
-              xlog(
-                  "%sYIELD %gs %s <= %s",
-                  _trace_state.indent,
-                  yield_time - next_time,
-                  s(item),
-                  log_cite,
-              )
-              yield item
-
-        result = traced_generator()
-      else:
-        ##xlog("%sRETURN %s <= %s", _trace_state.indent, type(result), log_cite)
-        if retval:
-          xlog(
-              "%sRETURN %gs %s <= %s",
-              _trace_state.indent,
-              end_time - start_time,
-              s(result),
-              log_cite,
-          )
-      _trace_state.indent = old_indent
-      return result
+    _trace_state.indent = old_indent
+    return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
   traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
@@ -841,20 +851,6 @@ def trace_DEBUG(debug_spec=None):
         if callable(F):
           setattr(M, func_name, trace(F))
 
-def selftest(module_name, defaultTest=None, argv=None):
-  ''' Called by my unit tests.
-  '''
-  # pylint: disable=import-outside-toplevel
-  if argv is None:
-    argv = sys.argv
-  import importlib
-  importlib.import_module(module_name)
-  import signal
-  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
-  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
-  import unittest
-  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
-
 builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
 if builtin_names_s:
   try:
@@ -886,6 +882,147 @@ if builtin_names_s:
         )
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
+
+@ALL
+@attr(
+    # types whose values we check by value not id()
+    BASIC_TYPES=(int, float, str),
+    # a regexp to match name(x=1,y=2,...) repr()s
+    REPR_re=re.compile(r'[._\w]+\((([\w_]+=\S+, ?)*[\w_]+=\S+)\)$')
+)
+def tabulate_obj(obj, label=None, *, seen=None):
+  ''' Tabulate the contents of an object for display via `cs.lex.printt()`.
+  '''
+  BASIC_TYPES = tabulate_obj.BASIC_TYPES
+  ##print(type(obj), repr(obj))
+  if label is None:
+    label = f'{obj.__class__.__name__}:{id(obj)}'
+  if seen is None:
+    seen = set()
+  if id(obj) in seen:
+    ##print("SEEN")
+    yield [label, "" if isinstance(obj, BASIC_TYPES) else "(already seen)"]
+    return
+  seen.add(id(obj))
+  objcls = obj.__class__
+
+  # dotted attributes
+  attrmap = None
+  if not isinstance(obj, BASIC_TYPES):
+    try:
+      attrmap = obj.__dict__
+    except AttributeError:
+      # TODO: unpack descriptors from dir(type(obj))?
+      try:
+        clsslots = objcls.__slots__
+      except AttributeError:
+        pass
+      else:
+        if clsslots:
+          attrmap = {name: getattr(obj, name) for name in clsslots}
+    else:
+      attrmap = {
+          attr: value
+          for attr, value in attrmap.items()
+          if not attr.startswith('_')
+      }
+    if not attrmap:
+      # recognised namedtuples and their ilk via repr()
+      m = tabulate_obj.REPR_re.match(repr(obj))
+      if m:
+        attrmap = {}
+        for fv in re.split(', ?', m.group(1)):
+          f, v = fv.split('=', 1)
+          try:
+            v = int(v)
+          except ValueError:
+            try:
+              v = float(v)
+            except ValueError:
+              pass
+          attrmap[f] = v
+  assert attrmap is None or isinstance(attrmap, Mapping), (
+      f'attrmap should be a Mapping but is {type(attrmap)} {attrmap!r}'
+  )
+
+  # collection members
+  items = None
+  if isinstance(obj, Mapping):
+    try:
+      items = sorted(obj.items())
+    except TypeError:
+      items = list(obj.items())
+  # sequences, excluding strings which just make more strings
+  elif not isinstance(obj, str) and isinstance(obj, Sequence):
+    items = list(enumerate(obj))
+  assert items is None or isinstance(items, Sequence)
+
+  if not attrmap and not items:
+    yield [label, obj]
+  else:
+    yield [label, f'{obj.__class__.__name__}:{id(obj)}']
+
+    attrs_by_value_id = defaultdict(list)  # indexed rows to subsume
+    attrs_by_value = defaultdict(list)  # indexed rows to subsume
+    attr_indices = defaultdict(list)  # attrs for values
+    if attrmap is None:
+      attrmap = {}
+    else:
+      for attr, value in sorted(attrmap.items()):
+        if not attr.startswith('_'):
+          if isinstance(value, BASIC_TYPES):
+            attrs_by_value[value].append(attr)
+          else:
+            attrs_by_value_id[id(value)].append(attr)
+    if items is None:
+      items = ()
+    else:
+      # figure out which values have been seen
+      for index, value in items:
+        if isinstance(value, BASIC_TYPES):
+          attr_names = attrs_by_value.get(value, ())
+        else:
+          attr_names = attrs_by_value_id.get(id(value), ())
+        for attr in attr_names:
+          attr_indices[attr].append(index)
+    # generate the listing
+    subrows = []
+    # list the attributes
+    used_indices = set()
+    for attr, indices in sorted(attrmap.items()):
+      label = f'.{attr}'
+      indices = attr_indices.get(attr, ())
+      if indices:
+        label += f', also [{",".join(map(repr, indices))}]'
+        used_indices.update(indices)
+      subrows.extend(tabulate_obj(attrmap[attr], label, seen=seen))
+    # list the unmentioned indices
+    for index, value in items:
+      if index not in used_indices:
+        subrows.extend(tabulate_obj(value, f'[{index!r}]', seen=seen))
+    yield tuple(subrows)
+
+@ALL
+def print_obj(obj, label=None):
+  ''' Call `tabulate_obj(obj,label=label)` and pass to `cs.lex.printt()`.
+  '''
+  table = list(tabulate_obj(obj, label=label))
+  ##pprint(table, indent=2)
+  return printt(*table)
+
+def selftest(module_name, defaultTest=None, argv=None):
+  ''' Called by my unit tests.
+  '''
+  # pylint: disable=import-outside-toplevel
+  if argv is None:
+    argv = sys.argv
+  import importlib
+  importlib.import_module(module_name)
+  import signal
+  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
+  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+  import unittest
+  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
 
 # honour the $DEBUG trace flags
 trace_DEBUG()

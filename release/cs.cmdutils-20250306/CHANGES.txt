@@ -1,0 +1,1 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: if a subcommand raises GetoptError, only show the usage for that subcommand

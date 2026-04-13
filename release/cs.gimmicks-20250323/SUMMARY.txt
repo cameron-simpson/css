@@ -1,0 +1,1 @@
+Provide direct r() and s() instead of circular cs.lex import.

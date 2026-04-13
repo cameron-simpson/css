@@ -1,0 +1,3 @@
+lib/python/cs/context.py: cs.context: ContextManagerMixin: improve the docstring
+lib/python/cs/context.py: cs.context: with_self: fix reference to the get_context_from_self parameter
+lib/python/cs/context.py: cs.context: with_all: BREAKING: receive the objects as *objs, not objs, easier to use and read

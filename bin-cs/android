@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Hook into the Android SDK then run a command.
+# - Cameron Simpson <cs@cskk.id.au> 15jan2026
+#
+
+set -ue
+[ -t 2 ] && set -x
+
+android_sdk=/usr/local/var/homebrew/share/android-commandlinetools
+PATH=$android_sdk/platform-tools:$android_sdk/emulator:$PATH
+export PATH
+
+[ $# -gt 0 ] || set emulator -list-avds
+exec "$@"

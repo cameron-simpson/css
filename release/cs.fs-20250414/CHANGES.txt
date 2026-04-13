@@ -1,0 +1,6 @@
+lib/python/cs/fs.py: cs.fs: HasFSPath: provide an __lt__ method which compares the .fspath attributes
+lib/python/cs/fs.py: merge default ==> tagger
+lib/python/cs/fs.py: merge default => tagger
+lib/python/cs/fs.py: merge default -> tagger
+lib/python/cs/fs.py: cs.fs: new RemotePath(host,fspath) namedtuple subclass for [host:]fspath path specifications
+lib/python/cs/fs.py: cs.fs: RemotePath: expose __str__ composition as the new str(host,fspath) method

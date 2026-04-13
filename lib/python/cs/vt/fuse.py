@@ -329,7 +329,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     # this is used to support '..' at the top of the tree
     fs.mnt_path = abspath(mnt)
 
-    @trace
+    ##@trace
     def _vt_runfuse__mainloop():
       ''' Worker main loop to run the filesystem then tidy up.
       '''

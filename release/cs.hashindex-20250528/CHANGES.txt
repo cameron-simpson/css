@@ -1,0 +1,42 @@
+lib/python/cs/hashindex.py: cs.hashindex: fix definition of HashIndexCommand.Options.COMMON_OPT_SPECS
+lib/python/cs/hashindex.py: cs.hashindex: replace the match statement with some if statements to work on older pythons
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: drop USAGE_FORMAT, add SUBCOMMAND_ARGV_DEFAULT=ls
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: new popdirspec(argv) method to pop a RemotePath from argv
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_comm: use popdirspec and RemotePath instances
+lib/python/cs/hashindex.py: cs.hashindex: hashindex: also accept a RemotePath, soon to be the common case
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: better docstring
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.popdirspec: rename to poppathspec and add optional check_isdir=False parameter
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: renamed popdirspec to poppathspec
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: update to use poppathspec()
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: fix -s help and option name, rename target to src, use poppathspec()
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: minor and cosmetic tweaks
+lib/python/cs/hashindex.py: cs.hashindex: make more things interruptable
+lib/python/cs/hashindex.py: cs.hashindex: new hashindex_map(dirpath) function exposing the code to make a hashcode->[fspath,...] mapping
+lib/python/cs/hashindex.py: cs.hashindex: new remote_rearrange(rhost,dstdir,fspaths_by_hashcode) function to rearrange a remote directory
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: new cmd_rsync() to rearrange a target then rsync to it
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: use hashindex_map() and remote_rearrange()
+lib/python/cs/hashindex.py: cs.hashindex: update imports, add a type check and a TODO
+lib/python/cs/hashindex.py: cs.hashindex: update imports, plumb parameter
+lib/python/cs/hashindex.py: cs.hashindex: fix attribute access, update module doc to mention "hashindex rsync"
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rsync: honour ssh_exe in rsync invocation
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rsync: shuffle the rsync CLI options for better apprehension
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand: do not put stdout into line buffered mode, instead just flush vprint() in rearrange()
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rsync: add --partial option
+lib/python/cs/hashindex.py: cs.hashindex: minor shuffles
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rsync: new --bwlimit
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_ls: add task display, print nothing in quiet mode; "hashindex ls -q" now just updates the hash records
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: add an assertion that srcdir.host==dstdir.host, which we have arranged but is required for the rearrange calls; update a usage message
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: honour "-" as the refdir to read the hash index from standard input
+lib/python/cs/hashindex.py: cs.hashindex: remote_rearrange: require both srcdir and dstdir
+lib/python/cs/hashindex.py: cs.hashindex: dir_filepaths: test that dirpath is an existing directory, would have made previous bugs evident
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: add missed variable assignment
+lib/python/cs/hashindex.py: cs.hashindex: change default verbosity for rearrange/merge
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rearrange: default to move mode, change the CLI options to have --ln instead of --mv
+lib/python/cs/hashindex.py: cs.hashindex: remote_rearrange: pass --ln for link mode instead of --mv for move mode
+lib/python/cs/hashindex.py: cs.hashindex: rearrange: if there is only one possible rearrange target, do a move instead of a link and a remove later
+lib/python/cs/hashindex.py: cs.hashindex: make the merge code safer; new "hashindex rearrange -1 (once) option; disable symlink mode; redo almost the entire merge() function for clearer logic
+lib/python/cs/hashindex.py: cs.hashindex: second half of the previous commit
+lib/python/cs/hashindex.py: cs.hashindex: clean a little lint
+lib/python/cs/hashindex.py: cs.hashindex: use -q/quiet and qprint instead of -v/verbose and vprint for the rearrange/merge stuff i.e. print unless quiet
+lib/python/cs/hashindex.py: cs.hashindex: clean some lint
+lib/python/cs/hashindex.py: cs.hashindex: plumb the quiet param a bit, use qprint in another place

@@ -12,14 +12,16 @@ will consume some or all of the derived iterator
 in the course of its function.
 '''
 
+from builtins import range as builtin_range
 import heapq
 import itertools
 from threading import Lock, Condition, Thread
+from typing import Callable, GenericAlias, Hashable, Iterable, Optional, Tuple, TypeVar
 
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20221118-post'
+__version__ = '20260403-post'
 
 DISTINFO = {
     'description':
@@ -27,16 +29,17 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
     ],
+    'python_requires':
+    '>=3',
 }
 
-class Seq(object):
+class Seq:
   ''' A numeric sequence implemented as a thread safe wrapper for
       `itertools.count()`.
 
@@ -93,8 +96,8 @@ def the(iterable, context=None):
 def first(iterable):
   ''' Return the first item from an iterable; raise `IndexError` on empty iterables.
   '''
-  for item in iterable:
-    return item
+  for first in iterable:
+    return first
   raise IndexError("empty iterable %r" % (iterable,))
 
 def last(iterable):
@@ -103,9 +106,10 @@ def last(iterable):
   nothing = True
   for item in iterable:
     nothing = False
+    last = item
   if nothing:
     raise IndexError("no items in iterable: %r" % (iterable,))
-  return item  # pylint: disable=undefined-loop-variable
+  return last  # pylint: disable=undefined-loop-variable
 
 def get0(iterable, default=None):
   ''' Return first element of an iterable, or the default.
@@ -165,8 +169,8 @@ def imerge(*iters, **kw):
 
   # prime the list of head elements with (value, iter)
   heap = []
-  for it in iters:
-    it = iter(it)
+  for iterable in iters:
+    it = iter(iterable)
     try:
       head = next(it)
     except StopIteration:
@@ -267,7 +271,7 @@ def common_suffix_length(*seqs):
   '''
   return common_prefix_length(list(map(lambda s: list(reversed(s)), *seqs)))
 
-class TrackingCounter(object):
+class TrackingCounter:
   ''' A wrapper for a counter which can be incremented and decremented.
 
       A facility is provided to wait for the counter to reach a specific value.
@@ -366,7 +370,7 @@ class TrackingCounter(object):
       watcher.acquire()
     watcher.wait()
 
-class StatefulIterator(object):
+class StatefulIterator:
   ''' A trivial iterator which wraps another iterator to expose some tracking state.
 
       This has 2 attributes:
@@ -374,13 +378,13 @@ class StatefulIterator(object):
       * `.state`: the last state value from the internal iterator
 
       The originating use case is resuse of an iterator by independent
-      calls that are typically sequential, specificly the .read
+      calls that are typically sequential, specificly the `.read`
       method of file like objects. Naive sequential reads require
       the underlying storage to locate the data on every call, even
       though the previous call has just performed this task for the
       previous read. Saving the iterator used from the preceeding
       call allows the iterator to pick up directly if the file
-      offset hasn't been fiddled in the meantime.
+      offset hasn't been modified in the meantime.
   '''
 
   def __init__(self, it):
@@ -394,6 +398,53 @@ class StatefulIterator(object):
     item, new_state = next(self.it)
     self.state = new_state
     return item
+
+class ClonedIterator(Iterable):
+  ''' A thread safe clone of some orginal iterator.
+
+      `next()` of this yields the next item from the supplied iterator.
+      `iter()` of this returns a generator yielding from the
+      historic items and then from the original iterator.
+
+      Note that this accrues all of the items from the original
+      iterator in memory.
+  '''
+
+  def __init__(self, it: Iterable):
+    ''' Initialise the clone with the iterable `it`.
+    '''
+    self._iterator = iter(it)
+    self._cloned = []
+    self._lock = Lock()
+
+  def __next__(self):
+    ''' Return the next item from the original iterator.
+    '''
+    with self._lock:
+      item = next(self._iterator)
+      self._cloned.append(item)
+    return item
+
+  def __iter__(self):
+    ''' Iterate over the clone, returning a new iterator.
+
+        In mild violation of the iterator protocol, instead of
+        returning `self`, `iter(self)` returns a generator yielding
+        the historic and then current contents of the original iterator.
+    '''
+    i = 0
+    while True:
+      with self._lock:
+        try:
+          item = self._cloned[i]
+        except IndexError:
+          try:
+            item = next(self._iterator)
+          except StopIteration:
+            return
+          self._cloned.append(item)
+      yield item
+      i += 1
 
 def splitoff(sq, *sizes):
   ''' Split a sequence into (usually short) prefixes and a tail,
@@ -647,6 +698,243 @@ def skip_map(func, *iterables, except_types, quiet=False):
         quiet or warning(
             "skip_map(func=%s): item=%s: skip exception: %s", func, item, e
         )
+
+# infill object generic type
+_infill_T = TypeVar('_infill_T')
+# infill object key generic type
+_infill_K = TypeVar('_infill_K', bound=Hashable)
+
+def infill(
+    objs: Iterable[_infill_T],
+    *,
+    obj_keys: Callable[[_infill_T], _infill_K],
+    existing_keys: Callable[[_infill_T], _infill_K],
+    all: Optional[bool] = False,
+) -> Iterable[Tuple[_infill_T, _infill_K]]:
+  ''' A generator accepting an iterable of objects
+      which yields `(obj,missing_keys)` 2-tuples
+      indicating missing records requiring infill for each object.
+
+      Parameters:
+      * `objs`: an iterable of objects
+      * `obj_keys`: a callable accepting an object and returning
+        an iterable of the expected keys
+      * `existsing_keys`: a callable accepting an object and returning
+        an iterable of the existing keys
+      * `all`: optional flag, default `False`: if true then yield
+        `(obj,())` for objects with no missing records
+
+      Example:
+
+          for obj, missing_key in infill(objs,...):
+            ... infill a record for missing_key ...
+  '''
+  for obj in objs:
+    required = set(obj_keys(obj))
+    if not required:
+      if all:
+        yield obj, ()
+      continue
+    existing = set(existing_keys(obj))
+    missing = required - existing
+    if all or missing:
+      yield obj, missing
+
+def infill_from_batches(
+    objss: Iterable[Iterable[_infill_T]],
+    *,
+    obj_keys: Callable[[_infill_T], _infill_K],
+    existing_keys: Callable[[_infill_T], _infill_K],
+    all: Optional[bool] = False,
+    amend_batch: Optional[Callable[
+        [Iterable[_infill_T]],
+        Iterable[_infill_T],
+    ]] = lambda obj_batch: obj_batch,
+):
+  ''' A batched version of `infill(objs)` accepting an iterable of
+      batches of objects which yields `(obj,obj_key)` 2-tuples
+      indicating missing records requiring infill for each object.
+
+      This is aimed at processing batches of objects where it is
+      more efficient to prepare each batch as a whole, such as a
+      Django `QuerySet` which lets the caller make single database
+      queries for a batch of `Model` instances.
+      Thus this function can be used with `cs.djutils.model_batches_qs`
+      for more efficient infill processing.
+
+      Parameters:
+      * `objss`: an iterable of iterables of objects
+      * `obj_keys`: a callable accepting an object and returning
+        an iterable of the expected keys
+      * `existsing_keys`: a callable accepting an object and returning
+        an iterable of the existing keys
+      * `all`: optional flag, default `False`: if true then yield
+        `(obj,())` for objects with no missing records
+      * `amend_batch`: optional callable to amend the batch of objects,
+        for example to amend a `QuerySet` with `.select_related()` or similar
+  '''
+  for objs in map(amend_batch, objss):
+    yield from infill(
+        objs, obj_keys=obj_keys, existing_keys=existing_keys, all=all
+    )
+
+def not_none(*iterables):
+  ''' Filter the iterables for items which are not `None`.
+  '''
+  for iterable in iterables:
+    yield from filter(lambda item: item is not None, iterable)
+
+class range:
+  ''' A class like the builtin `range` exceppt that it will
+      accept `...` as the stop value, indicating an unbound range.
+      Note that if initialised like a normal range it returns a
+      builtin `range` instance.
+
+      Examples:
+
+      Normal instantiation returns a builin `range`:
+
+          >>> r = range(9)
+          >>> type(r)
+          <class 'range'>
+          >>> r
+          range(0, 9)
+
+      The basic unbound range:
+
+          >>> r0 = range(...)
+          >>> type(r0)
+          <class 'cs.seq.range'>
+          >>> r0
+          range(0:...:1)
+          >>> str(r0)
+          '0...'
+          >>> list(r0[:10])
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+          >>> 99999999999999999 in r0
+          True
+          >>> -10 in r0
+          False
+
+      An unbound instantiation starting at 9:
+
+          >>> r = range(9,...)
+          >>> type(r)
+          <class 'cs.seq.range'>
+          >>> r
+          range(9:...:1)
+          >>> r[:10]
+          range(9, 19)
+          >>> r2 = r[:10]
+          >>> type(r2)
+          <class 'range'>
+          >>> r2
+          range(9, 19)
+
+  '''
+
+  def __new__(cls, start, stop=None, step=1):
+    if stop is None:
+      stop = start
+      start = 0
+    if stop is not ...:
+      return builtin_range(start, stop, step)
+    return super().__new__(cls)
+
+  def __init__(self, start, stop=None, step=1):
+    if stop is None:
+      stop = start
+      start = 0
+    assert stop is ...
+    self.start = start
+    self.step = step
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}({self.start}:...:{self.step})'
+
+  def __str__(self):
+    if self.step == 1:
+      return f'{self.start}...'
+    return f'{self.start}:...:{self.step}'
+
+  def __contains__(self, index):
+    if index < self.start:
+      return False
+    return (index - self.start) % self.step == 0
+
+  def __getitem__(self, index):
+    if isinstance(index, int):
+      return range(0, index + 1)[index]
+    if isinstance(index, slice):
+      start, stop, step = index.start, index.stop, index.step
+      if start is None:
+        start = 0
+      elif start < 0:
+        raise ValueError(f'{start=} may not be negative')
+      if stop is ...:
+        stop = None
+      elif stop is not None and stop < 0:
+        raise ValueError(f'{stop=} may not be negative')
+      if step is None:
+        step = 1
+      if stop is not None:
+        return builtin_range(
+            self.start + start, self.start + stop, self.step * step
+        )
+      return self.__class__(self.start + start, ..., self.step * step)
+    raise TypeError(repr(type(index)))
+
+  @classmethod
+  def __class_getitem__(cls, index):
+    if isinstance(index, slice):
+      return range(...)[index]
+    if isinstance(index, type):
+      return GenericAlias(cls, (index,))
+    raise TypeError(f'{type(index)}:{index!r} is not a slice')
+
+  def __iter__(self):
+    i = self.start
+    while True:
+      yield i
+      i += self.step
+
+def with_neighbours(it: Iterable, no_neighbour=None):
+  ''' Return 3-tuples of `(prev,curr,next)` from the iterable `it`
+      where `curr` is each item from `it` and `prev` and `next` are
+      the preceeding and following items respectively.
+
+      The first item will have a `prev` of `no_neighbour`
+      and the last item will have a `next` of `no_neighbour`.
+
+      `no_neighbour` defaults to `None`, but may be specified as
+      another sentinel if `None` is anticipated in the iterable.
+
+      Examples:
+
+          >>> list(with_neighbours((1,2,3)))
+          [(None, 1, 2), (1, 2, 3), (2, 3, None)]
+          >>> list(with_neighbours(()))
+          []
+          >>> list(with_neighbours((1,)))
+          [(None, 1, None)]
+          >>> list(with_neighbours((1,2)))
+          [(None, 1, 2), (1, 2, None)]
+          >>> list(with_neighbours((1,None,3),"END"))
+          [('END', 1, None), (1, None, 3), (None, 3, 'END')]
+
+  '''
+  it = iter(it)
+  prev_item = no_neighbour
+  try:
+    curr_item = next(it)
+  except StopIteration:
+    return
+  for next_item in it:
+    yield prev_item, curr_item, next_item
+    prev_item = curr_item
+    curr_item = next_item
+  # we're already set up for the next iteration
+  yield prev_item, curr_item, no_neighbour
 
 if __name__ == '__main__':
   import sys

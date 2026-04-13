@@ -1,0 +1,11 @@
+@afunc now accepts an async function and returns it unchanged.
+@agen now accepts an async generator and returns it unchanged.
+async_iter: now accepts an async iterable, return aiter(it) of it directly.
+New AnyIterable = Union[Iterable, AsyncIterable] type alias, to allow both sync and async iterators.
+async_iter: new optional fast=False parameter, if true then iterate the iterator directly instead of via asyncio.to_thread.
+async_iter: make missing `fast=` be True for list/tuple/set and False otherwise.
+@afunc: new optional fast=False parameter - if true then do not divert through asyncio.to_thread.
+New AsyncPipeLine, an asynchronous iterable with a `put` method to provide input for processing.
+New StageMode class with a STREAM enum for streaming stages, implement in AsyncPipeLine.run_stage.
+New aqget(Queue), an async interface to queue.Queue.get.
+New aqiter(Queue[,sentinel]), an async generator yielding from a queue.Queue.

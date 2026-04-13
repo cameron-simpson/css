@@ -208,7 +208,7 @@ class TestStreamPipes(_TestStream, unittest.TestCase):
         ok = False
       if not ok:
         thread_dump()
-        breakpoint()
+        ##breakpoint()
       for fd in (
           upstream_rd,
           upstream_wr,

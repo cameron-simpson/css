@@ -1,0 +1,1 @@
+lib/python/cs/py/func.py: cs.py.func: funcname: accomodate functions with no .__module__ attribute

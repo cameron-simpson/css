@@ -1,0 +1,1 @@
+ClonedIterator: it may be an Iterable, not just an Iterator.

@@ -1,0 +1,2 @@
+lib/python/cs/djutils.py: cs.djutils: model_instances: docstring tweak to make the doc summary better
+lib/python/cs/djutils.py: cs.djutils: model_batches_qs (and therefore also model_instances): after may also be a Model instance

@@ -298,7 +298,7 @@ class EnhancedTagFrame(SimpleBinary):
     assert len(end_text) == 6
     yield end_text
 
-class ID3V2Size(BinarySingleValue):
+class ID3V2Size(BinarySingleValue, value_type=int):
   ''' An ID3v2 size field,
       a big endian 4 byte field of 7-bit values, high bit 0.
   '''
@@ -336,7 +336,7 @@ class ID3V2Size(BinarySingleValue):
     cls.check_size_bytes(size_bs)
     return size_bs
 
-class ISO8859_1NULString(BinarySingleValue):
+class ISO8859_1NULString(BinarySingleValue, value_type=str):
   ''' A NUL terminated string encoded with ISO8859-1.
   '''
   ENCODING_BYTE = bytes([0])
@@ -359,7 +359,7 @@ class ISO8859_1NULString(BinarySingleValue):
     yield s.encode(cls.ENCODING)
     yield b'\0'
 
-class UCS2NULString(BinarySingleValue):
+class UCS2NULString(BinarySingleValue, value_type=str):
   ''' A NUL terminated string encoded with UCS-2.
 
       We're cheating and using UTF16 for this.
@@ -401,7 +401,7 @@ class UCS2NULString(BinarySingleValue):
     yield s.encode(cls.DEFAULT_ENCODING)
     yield bytes([0, 0])
 
-class TextEncodingClass(BinarySingleValue):
+class TextEncodingClass(BinarySingleValue, value_type=int):
   ''' A trite class to parse the single byte text encoding field.
   '''
 

@@ -1,0 +1,1 @@
+lib/python/cs/djutils.py: cs.djutils: model_batches_qs: bugfix second and following QuerySet construction

@@ -1,0 +1,6 @@
+Replace a bundle of percent formats with format strings.
+Spaces: extract the filesystem path Sonoma fix into new static method spaces_pathfor(fspath).
+New DEFAULT_BACKGROUND_RGB = 0, 0, 0 (black) default background colour.
+Space.set_wp_dirpath: rename to set_wp_fspath, accomodate single image or dir of images.
+Spaces.set_wp_fspath: for directories, add back ChangeDuration, comment out NewImageFilePath and LastName.
+Some minor improvements.

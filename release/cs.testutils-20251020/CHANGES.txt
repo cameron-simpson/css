@@ -1,0 +1,3 @@
+lib/python/cs/testutils.py: cs.testutils: remove the dependency on cs.debug, use cs.debug.thread_dump opportunisticly if available
+lib/python/cs/testutils.py: cs.testutils: import missed in previous commit
+lib/python/cs/testutils.py: cs.testutils: add a default base SetupTeardownMixin.setupTeardown() context manager - this should now play nicely with test cases unaware of SetupTeardownMixin

@@ -22,7 +22,14 @@
     - `AsyncPipeLine`: a pipeline of functions connected together with `IterableAsyncQueue`s
 '''
 
-from asyncio import create_task, run, to_thread, Queue as AQueue, Task
+from asyncio import (
+    CancelledError,
+    create_task,
+    run,
+    to_thread,
+    Queue as AQueue,
+    Task,
+)
 from dataclasses import dataclass
 from enum import auto, StrEnum
 from functools import partial
@@ -47,7 +54,7 @@ from typing import (
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
 
-__version__ = '20241221.1-post'
+__version__ = '20251119-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -64,12 +71,14 @@ DISTINFO = {
 AnyIterable = Union[Iterable, AsyncIterable]
 
 @decorator
-def agen(genfunc):
+def agen(genfunc, *, fast=None):
   ''' A decorator for a synchronous generator which turns it into
       an asynchronous generator.
       If `genfunc` already an asynchronous generator it is returned unchanged.
       Exceptions in the synchronous generator are reraised in the asynchronous
       generator.
+
+      The optional parameter `fast` is passed through to `async_iter`.
 
       Example:
 
@@ -86,15 +95,15 @@ def agen(genfunc):
   if isasyncgenfunction(genfunc):
     return genfunc
 
-  def agen(*a, **kw):
+  def agenerator(*a, **kw):
     ''' Return an async iterator yielding items from `genfunc`.
     '''
-    return async_iter(genfunc(*a, **kw))
+    return async_iter(genfunc(*a, **kw), fast=fast)
 
-  return agen
+  return agenerator
 
 @decorator
-def afunc(func, fast=False):
+def afunc(func, *, fast=False):
   ''' A decorator for a synchronous function which turns it into
       an asynchronous function.
       If `func` is already an asynchronous function it is returned unchanged.
@@ -117,15 +126,17 @@ def afunc(func, fast=False):
   '''
   if iscoroutinefunction(func):
     return func
+
   if fast:
 
     async def fast_func(*a, **kw):
       return func(*a, **kw)
 
     return fast_func
+
   return partial(to_thread, func)
 
-async def async_iter(it: AnyIterable, fast=None):
+async def async_iter(it: AnyIterable, *, fast=None):
   ''' Return an asynchronous iterator yielding items from the iterable `it`.
       An asynchronous iterable returns `aiter(it)` directly.
 
@@ -182,7 +193,7 @@ async def aqget(q: Queue):
 
 _aqiter_NO_SENTINEL = object()
 
-async def aqiter(q: Queue, sentinel=_aqiter_NO_SENTINEL):
+async def aqiter(q: Queue, *, sentinel=_aqiter_NO_SENTINEL):
   ''' An asynchronous generator to yield items from a `queue.Queue`like object `q`.
       It must support the `.get()` and `.get_nowait()` methods.
 
@@ -203,9 +214,11 @@ async def aqiter(q: Queue, sentinel=_aqiter_NO_SENTINEL):
 async def amap(
     func: Callable[[Any], Any],
     it: AnyIterable,
+    *,
     concurrent=False,
     unordered=False,
     indexed=False,
+    fast=False,
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
       for each `item` in the iterable `it`.
@@ -216,9 +229,9 @@ async def amap(
 
       If `concurrent` is `False` (the default), run each `func(item)`
       call in series.
-
       If `concurrent` is true run the function calls as `asyncio`
       tasks concurrently.
+
       If `unordered` is true (default `False`) yield results as
       they arrive, otherwise yield results in the order of the items
       in `it`, but as they arrive - tasks still evaluate concurrently
@@ -227,6 +240,9 @@ async def amap(
       If `indexed` is true (default `False`) yield 2-tuples of
       `(i,result)` instead of just `result`, where `i` is the index
       if each item from `it` counting from `0`.
+
+      If `fast` is true (default `False`) assume that `func` does
+      not block or otherwise take a long time.
 
       Example of an async function to fetch URLs in parallel.
 
@@ -241,7 +257,7 @@ async def amap(
                   yield urls[i], response
   '''
   # promote a synchronous function to an asynchronous function
-  func = afunc(func)
+  func = afunc(func, fast=fast)
   # promote the iterable to an asynchronous iterator
   ait = async_iter(it)
   if not concurrent:
@@ -257,35 +273,89 @@ async def amap(
   # dispatch calls to func() as tasks
   # yield results from an asyncio.Queue
 
-  # a queue of (index, result)
-  Q = AQueue()
-
-  # run func(item) and yield its sequence number and result
-  # this allows us to yield in order from a heap
-  async def qfunc(i, item):
-    await Q.put((i, await func(item)))
-
-  # queue all the tasks with their sequence numbers
+  # flag indicating that all input items have been dispatched
+  consumed = False
+  # flag indicating that a queued function raised, terminating further dispatch or calls
+  terminated = False
+  # counter of dispatched tasks for each input item
   queued = 0
+  # counter of completed functions, used to measure end of results if consumed
+  completed = 0
+  # a queue of (result,exc), fulfilled by the consume_ait task below
+  resultQ = IterableAsyncQueue()
+
+  # Run func(item) and put (i,result,exc) onto resultQ being (i,result,None)
+  # if func completed or (i,None,exc) if func raised an exception.
+  # This allows us to dispatch funcs concurrently and yield results
+  # in the desired order.
+  async def qfunc(i, item):
+    nonlocal consumed, terminated, queued, completed
+    if terminated:
+      completed += 1
+      await resultQ.put(
+          (
+              i,
+              None,
+              CancelledError(f'amap({i}:{item}): processing terminated'),
+          )
+      )
+    try:
+      result = await func(item)
+    except Exception as exc:
+      completed += 1
+      await resultQ.put((i, None, exc))
+    else:
+      completed += 1
+      await resultQ.put((i, result, None))
+    if consumed and completed == queued:
+      # close the queue on the last function completion
+      await resultQ.close()
+
+  # Queue all the tasks with their sequence numbers.
   # Does this also need to be an async function in case there's
   # some capacity limitation on the event loop? I hope not.
-  async for item in ait:
-    create_task(qfunc(queued, item))
-    queued += 1
+  # Keep a mapping of queue number to task so that tasks are not
+  # prematurely garbage collected.
+  tasks = {}
+
+  async def consume_ait():
+    nonlocal ait, queued, consumed, terminated
+    try:
+      async for item in ait:
+        if terminated:
+          break
+        # Keep a reference to the task so that it is not garbage
+        # collected before completion.
+        tasks[queued] = create_task(qfunc(queued, item))
+        queued += 1
+    finally:
+      consumed = True
+      if queued <= completed:
+        # no functions outstanding, so we must close the resultQ ourselves
+        await resultQ.close()
+
+  # keep a reference to the consumer also
+  consumer = create_task(consume_ait())
   if unordered:
-    # yield results as they come in
-    for _ in range(queued):
-      i, result = await Q.get()
+    async for i, result, exc in resultQ:
+      del tasks[i]  # release the task reference
+      if exc is not None:
+        terminated = True
+        raise exc
       yield (i, result) if indexed else result
   else:
     # gather results in a heap
     # yield results as their number arrives
     results = []
     unqueued = 0
-    for _ in range(queued):
-      heappush(results, await Q.get())
+    async for i_result_exc in resultQ:
+      heappush(results, i_result_exc)
       while results and results[0][0] == unqueued:
-        i, result = heappop(results)
+        i, result, exc = heappop(results)
+        del tasks[i]  # release the task reference
+        if exc is not None:
+          terminated = True
+          raise exc
         yield (i, result) if indexed else result
         unqueued += 1
     # this should have cleared the heap
@@ -439,23 +509,21 @@ class AsyncPipeLine:
         are the same queue.
 
         Each stage specification is either:
-        - an stage function suitable for `run_stage`
+        - a stage function, implying a `batchsize` of `None`
         - a 2-tuple of `(stage_func,batchsize)`
-        In the latter case:
-        - `stage_func` is an stage function suitable for `run_stage`
-        - `batchsize` is an `int`, where `0` means to gather all the
-          items from `inq` and supply them as a single batch to
-          `stage_func` and where a value `>0` collects items up to a limit
-          of `batchsize` and supplies each batch to `stage_func`
-        If the `batchsize` is `0` the `stage_func` is called exactly
-        once with all the input items, even if there are no input
-        items.
+        The `stage_func` and `batchsize` are as for the `run_stage` method.
+        In particular the `batchsize` should be:
+        - `None`, for a `stage_func` accepting a single item
+        - an `int` >=0, for a `stage_func` accepting a list of items
+        - `StageMode.STREAM`, for a `stage_func` accepting an `AsyncIterableQueue`
     '''
     inq = IterableAsyncQueue(maxsize)
     inq0, outq = inq, inq
     tasks = []
     for stage_spec in stage_specs:
       new_outq = IterableAsyncQueue(maxsize)
+      # TODO: a fast setting and honour it
+      fast = None  # indicator for synchronous stage functions, as yet unimplementd
       try:
         stage_func, batchsize = stage_spec
       except (
@@ -494,6 +562,11 @@ class AsyncPipeLine:
         If `batchsize` is `None`, the default, each input item is
         passed to `stage_func(item)`, which yields the results from the
         single item.
+
+        If `batchsize is StageMode.STREAM` then `stage_func`
+        should be a synchronous or asynchronous generator function
+        which receives `inq` as its sole parameter and yields
+        results.
 
         If `batchsize` is an `int`, items from `inq` are collected
         into batches up to a limit of `batchsize` (no limit if
@@ -568,11 +641,15 @@ if __name__ == '__main__':
   if True:  # debugging
 
     async def demo_pipeline2(it: AnyIterable):
-      print("pipeline(hrefs)www.smh.com.au...")
-      from cs.app.pilfer.urls import hrefs
-      pipeline = AsyncPipeLine.from_stages(hrefs)
-      async for result in pipeline(it):
-        print(result)
+      print("pipeline(hrefs)...")
+      try:
+        from cs.app.pilfer.urls import hrefs
+      except ImportError as e:
+        print("no cs.app.pilfer.urls, skipping pipeline demo:", e)
+      else:
+        pipeline = AsyncPipeLine.from_stages(hrefs)
+        async for result in pipeline(it):
+          print(result)
 
     run(demo_pipeline2(['https://www.smh.com.au/']))
 
@@ -631,22 +708,24 @@ if __name__ == '__main__':
       for concurrent in False, True:
         for unordered in False, True:
           for indexed in False, True:
-            print_(
-                'amap',
-                f'{concurrent=}',
-                f'{unordered=}',
-                f'{indexed=}',
-            )
-            start_time = time.time()
-            async for result in amap(
-                sync_sleep,
-                [random.randint(1, 10) / 10 for _ in range(5)],
-                concurrent=concurrent,
-                unordered=unordered,
-                indexed=indexed,
-            ):
-              print_("", result)
-            print(f': elapsed {round(time.time()-start_time, 2)}')
+            for nitems in 0, 5:
+              print_(
+                  'amap',
+                  f'{concurrent=}',
+                  f'{unordered=}',
+                  f'{indexed=}',
+                  f'{nitems=}',
+              )
+              start_time = time.time()
+              async for result in amap(
+                  sync_sleep,
+                  [random.randint(1, 10) / 10 for _ in range(nitems)],
+                  concurrent=concurrent,
+                  unordered=unordered,
+                  indexed=indexed,
+              ):
+                print_("", result)
+              print(f': elapsed {round(time.time()-start_time, 2)}')
 
     run(test_amap())
 

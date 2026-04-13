@@ -194,7 +194,7 @@ class DeDRMCommand(EBooksCommonBaseCommand):
               print(" ", k, v)
       elif op == 'import':
         if argv:
-          raise GetoptError("extra arguments: %r" % (argv,))
+          raise GetoptError(f'extra arguments: {argv!r}')
         if sys.stdin.isatty():
           print("Reading JSON keys from standard input.")
         new_kks = json.loads(sys.stdin.read())
@@ -202,13 +202,13 @@ class DeDRMCommand(EBooksCommonBaseCommand):
         dedrm.update_kindlekeys_from_keys(new_kks)
       elif op == 'json':
         if argv:
-          raise GetoptError("extra arguments: %r" % (argv,))
+          raise GetoptError(f'extra arguments: {argv!r}')
         with redirect_stdout(sys.stderr):
           kks = dedrm.kindlekeys
         print(json.dumps(kks, indent=2))
       elif op == 'print':
         if argv:
-          raise GetoptError("extra arguments: %r" % (argv,))
+          raise GetoptError(f'extra arguments: {argv!r}')
         with redirect_stdout(sys.stderr):
           kks = dedrm.kindlekeys
         for kk in kks:

@@ -3,29 +3,79 @@
 ''' Utlity functions for working with tmux(1).
 '''
 
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
+from functools import cached_property
+from getopt import GetoptError
 import os
-from os import O_RDWR
 from os.path import join as joinpath
+import re
 from shlex import join as shq
-from socket import socket, AF_UNIX, SHUT_RD, SHUT_WR, SOCK_STREAM
 from subprocess import CompletedProcess, PIPE, Popen
+import sys
 from threading import Lock
 from typing import List
 
 from icontract import require
 from typeguard import typechecked
 
+from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.fs import HasFSPath
+from cs.lex import cutprefix
 from cs.logutils import info, warning
-from cs.pfx import Pfx, pfx, pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.psutils import run
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
+from cs.result import Result
+from cs.threads import bg
 
-from cs.debug import trace, X, s, r
+def main(argv=None):
+  ''' The CLI mode for `cs.tmuxutils`.
+  '''
+  return TMuxUtilsCommand(argv).run()
+
+class TMuxUtilsCommand(BaseCommand):
+  ''' CLI to access various cs.tmuxutils facilities.
+  '''
+
+  SUBCOMMAND_ARGV_DEFAULT = ['ls', '-n']
+
+  @contextmanager
+  def run_context(self):
+    ''' Establish a tmux(1) control connection during the command run.
+    '''
+    with super().run_context():
+      with TmuxControl() as tmux:
+        with stackattrs(self.options, tmux=tmux):
+          yield
+
+  @trace
+  @popopts(a='all_sessions', n=('number_list', 'Number the listing.'))
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [-n]
+          List sessions.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    options = self.options
+    all_sessions = options.all_sessions
+    number_list = options.number_list
+    tmux = options.tmux
+    n = 0
+    for session_id, annotations, parsed in tmux.sessions():
+      if not all_sessions and not isinstance(session_id, str):
+        continue
+      n += 1
+      if number_list:
+        print(
+            f'{n:3d}', session_id, "created",
+            parsed['created_dt'].isoformat(sep=' ')
+        )
+      else:
+        print(session_id, "created", parsed['created_dt'].isoformat(sep=' '))
 
 @dataclass
 class TmuxCommandResponse:
@@ -77,7 +127,7 @@ class TmuxCommandResponse:
     while True:
       bs = rf.readline()
       if not bs:
-        raise EOFError()
+        raise EOFError
       if bs.startswith((b'%end ', b'%error ')):
         break
       output.append(bs)
@@ -96,6 +146,66 @@ class TmuxCommandResponse:
         notifications=notifications,
     )
 
+  @cached_property
+  def lines(self):
+    ''' A tuple of `str` from the response output, including the trailing newline.
+    '''
+    return tuple(
+        line_bs.decode('utf-8', errors='replace') for line_bs in self.output
+    )
+
+  @staticmethod
+  def parse_session_line(line):
+    ''' Parse a tmux(1) `list-sessions` response line
+        into a `(id,annotations,parsed)` 3-tuple where:
+        - `id` is the session id, and `int` if unnamed, a `str` if named
+        - `annotations` a list of text parts of the "(text)" suffixes
+        - `parsed` is a dict containing parsed values
+
+        The `parsed` dict always contains:
+        - `nwindows`, the number of windows in the session
+        - `created`, the UNIX timestamp of when the session was created
+        - `attached`, whether the session is currently attached
+    '''
+    id_s, etc = line.rstrip().split(': ', 1)
+    try:
+      session_id = int(id_s)
+    except ValueError:
+      session_id = id_s
+    with Pfx("session %s", session_id):
+      annotations = []
+      parsed = dict(
+          attached=False,
+          created=None,
+          nwindows=None,
+          session_id=session_id,
+      )
+      if m := re.match(r'^(\d+) windows', etc):
+        parsed['nwindows'] = int(m.group(1))
+        etc = etc[m.end():]
+      while etc:
+        if m := re.match(r'^\s*\(([^()]+)\)', etc):
+          annotation = m.group(1)
+          annotations.append(annotation)
+          etc = etc[m.end():]
+          created_date = cutprefix(annotation, 'created ')
+          if annotation == 'attached':
+            parsed['attached'] = True
+          elif created_date != annotation:
+            try:
+              dt = datetime.strptime(created_date, '%a %b %d %H:%M:%S %Y')
+            except ValueError as e:
+              warning("cannot parse created date %r: %s", created_date, e)
+            else:
+              parsed['created'] = dt.timestamp()
+              parsed['created_dt'] = dt
+          else:
+            warning("unhandled annotation %r", annotation)
+        else:
+          warning("unparsed session information: %r", etc)
+          break
+    return session_id, annotations, parsed
+
 class TmuxControl(HasFSPath, MultiOpenMixin):
   ''' A class to control tmux(1) via its control socket.
 
@@ -112,13 +222,16 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
 
   TMUX = 'tmux'
 
-  def __init__(self, socketpath=None, notify=None):
+  def __init__(self, socketpath=None, notify=None, tmux_exe=None):
     if socketpath is None:
       socketpath = self.get_socketpath()
     if notify is None:
       notify = self.default_notify
+    if tmux_exe is None:
+      tmux_exe = self.TMUX
     self.fspath = socketpath
     self.notify = notify
+    self.tmux_exe = tmux_exe
     self._lock = Lock()
 
   @staticmethod
@@ -143,16 +256,20 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
   def startup_shutdown(self):
     ''' Open/close the control socket.
     '''
-    with Popen([self.TMUX, '-S', self.fspath, '-C'], stdin=PIPE,
-               stdout=PIPE) as P:
+    with Popen(
+        [self.tmux_exe, '-S', self.fspath, '-C'],
+        stdin=PIPE,
+        stdout=PIPE,
+    ) as P:
       try:
         pending = []  # queue of pending Results
         with stackattrs(self, rf=P.stdout, wf=P.stdin, pending=pending):
-          workerT = bg(self._worker)
+          workerT = bg(self._worker, name='tmux response parser')
           with stackattrs(self, workerT=workerT):
             yield
       finally:
         P.stdin.close()
+        workerT.join()
         P.wait()
 
   def default_notify(self, bs: bytes):
@@ -170,6 +287,8 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
     pending = self.pending
     notify = self.notify
     lock = self._lock
+    # consume the initial greeting response
+    rsp0 = TmuxCommandResponse.read_response(rf, notify=notify)
     while True:
       rsp = TmuxCommandResponse.read_response(rf, notify=notify)
       if rsp is None:
@@ -197,14 +316,29 @@ class TmuxControl(HasFSPath, MultiOpenMixin):
       wf.flush()
     return R
 
-  # TODO: worker thread to consume the control data and complete Results
-
   @pfx_method
   @typechecked
   def __call__(self, tmux_command: str) -> TmuxCommandResponse:
+    ''' Call us with a `tmux_command`, return the `TmuxCommandResponse`.
+    '''
     with self:
       R = self.submit(tmux_command)
       return R()
+
+  def sessions(self):
+    ''' Return a list of `(session_id,annotations,parsed)` 3-tuples
+        as from `parse_session_line` for the current sessions.
+    '''
+    rsp = self('list-session')
+    return [rsp.parse_session_line(line) for line in rsp.lines]
+
+  def session_names(self):
+    ''' Return a list of the session names.
+    '''
+    return [
+        session_id for session_id, annotations, parsed in self.sessions()
+        if isinstance(session_id, str)
+    ]
 
 def tmux(tmux_command, *tmux_args) -> CompletedProcess:
   ''' Execute the tmux(1) command `tmux_command`.
@@ -236,6 +370,4 @@ def run_pane(*argv) -> IterableQueue:
   shcmd = shq(argv)
 
 if __name__ == '__main__':
-  with TmuxControl() as tm:
-    print(tm('list-sessions'))
-    print(tm('list-panes'))
+  sys.exit(main(sys.argv))

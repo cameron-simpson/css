@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Run a command with a real-time timeout.
-#	- Cameron Simpson <cs@cskk.id.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 sigopt=
@@ -19,11 +19,11 @@ timeout=$1
 shift
 
 case "$timeout" in
-	[1-9]*)	;;	# dodgy bros syntax check since [!0-9] fails
-	*)	echo "$0: timeout must be a positive integer" >&2
-		echo "$usage" >&2
-		exit 2
-		;;
+    [1-9]*) ;;  # dodgy bros syntax check since [!0-9] fails
+    *)  echo "$0: timeout must be a positive integer" >&2
+        echo "$usage" >&2
+        exit 2
+        ;;
 esac
 
 cmdpid=$$
@@ -34,7 +34,7 @@ cmdpid=$$
     left=$timeout
     while [ $left -ge 1 ]
     do  kill -0 "$cmdpid" 2>/dev/null || exit 0
-	sleep 1
+    sleep 1
         left=`expr $left - 1` || :
     done
     [ $left -gt 0 ] \
@@ -42,8 +42,8 @@ cmdpid=$$
 
     if kill -0 "$cmdpid" 2>/dev/null
     then
-	echo "$0: timed out after $timeout seconds: $*" >&2
-	if ( set -x; kill $sigopt "$cmdpid" )
+    echo "$0: timed out after $timeout seconds: $*" >&2
+    if ( set -x; kill $sigopt "$cmdpid" )
         then
             sleep 2
             kill -0 "$cmdpid" 2>/dev/null && ( set -x; kill -9 "$cmdpid" )

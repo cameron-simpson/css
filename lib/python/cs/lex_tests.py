@@ -10,11 +10,21 @@
 import sys
 from functools import partial
 import unittest
-from cs.lex import texthexify, untexthexify, \
-                   get_envvar, \
-                   get_sloshed_text, SLOSH_CHARMAP, \
-                   get_qstr, \
-                   get_identifier, get_dotted_identifier
+
+from .lex import (
+    FormatAsError,
+    FormatableMixin,
+    SLOSH_CHARMAP,
+    get_dotted_identifier,
+    get_envvar,
+    get_identifier,
+    get_qstr,
+    get_sloshed_text,
+    s,
+    texthexify,
+    untexthexify,
+)
+
 from cs.py3 import bytes
 
 ##from cs.logutils import X
@@ -154,7 +164,7 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_identifier('1a', 1), ('a', 2))
 
   def test05get_dotted_identifier(self):
-    ''' test get_gotted_identifier.
+    ''' Test get_gotted_identifier.
     '''
     self.assertEqual(get_dotted_identifier(''), ('', 0))
     self.assertEqual(get_dotted_identifier('a'), ('a', 1))
@@ -166,6 +176,62 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_dotted_identifier('a1..b'), ('a1', 2))
     self.assertEqual(get_dotted_identifier('a1.b.c'), ('a1.b.c', 6))
     self.assertEqual(get_dotted_identifier('a1.b.c+'), ('a1.b.c', 6))
+
+class TestFormattable(unittest.TestCase):
+  ''' Unit tests for `FormattableFormatter` and `FormatableMixin`.
+  '''
+
+  def _test_format_as(self, obj, *extra_formats, **format_as_kwargs):
+    for format_s, expected in (
+        ('', ''),
+        ('{self}', str(obj)),
+        *extra_formats,
+    ):
+      with self.subTest(
+          f'{s(obj)}.format_as',
+          format_s=format_s,
+          expected=expected,
+      ):
+        if isinstance(expected, type) and issubclass(expected, Exception):
+          self.assertRaises(
+              expected, obj.format_as, format_s, **format_as_kwargs
+          )
+        else:
+          self.assertEqual(
+              obj.format_as(format_s, **format_as_kwargs), expected
+          )
+
+  def test_formatable_dict(self):
+
+    class fdict(dict, FormatableMixin):
+      pass
+
+    def missing(mapping, key):
+      if key == 'miskey':
+        return f'MISSING_KEY({key=})'
+      raise KeyError(key)
+
+    fd = fdict(a=1, b=2, c='foo', d='BAR', path='a/b/C.def')
+    self._test_format_as(
+        fd,
+        # simple interpolation
+        ('c={c}', 'c=foo'),
+        # unknown key
+        ('c2={c2}', FormatAsError),
+        # simple conversions
+        ('d={d}', 'd=BAR'),
+        ('d={d:title}', 'd=Bar'),
+        ('d={d:lc_}', 'd=bar'),
+        # compound conversions using Fstr methods and str methods
+        ('path={path}', 'path=a/b/C.def'),
+        ('path={path:basename}', 'path=C.def'),
+        ('path={path:basename:lc_}', 'path=c.def'),
+        ('path={path:basename:upper}', 'path=C.DEF'),
+        # fill in missing key via the missing() function
+        ('missing={miskey}', "missing=MISSING_KEY(key='miskey')"),
+        ('missing={badkey}', FormatAsError),
+        missing=missing,
+    )
 
 def selftest(argv):
   ''' Run selftests.

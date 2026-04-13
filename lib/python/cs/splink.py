@@ -42,7 +42,7 @@ from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.csvutils import csv_import
-from cs.deco import cachedmethod
+from cs.cache import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import s
@@ -786,7 +786,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         f'dataset should be one of {SPLinkData.TIMESERIES_DATASETS}',
     )
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     now = time.time()
     start = now - 3 * 24 * 3600
     spd.to_csv(dataset, start, now, sys.stdout)
@@ -997,7 +997,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
           Report information about the time series stored at tspath.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     spd = options.spd
     print(spd)
