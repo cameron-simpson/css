@@ -25,11 +25,13 @@
 from asyncio import (
     CancelledError,
     create_task,
+    get_running_loop,
     run,
     to_thread,
     Queue as AQueue,
     Task,
 )
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import auto, StrEnum
 from functools import partial
@@ -70,6 +72,16 @@ DISTINFO = {
 
 AnyIterable = Union[Iterable, AsyncIterable]
 
+async def to_threadpool(tpe: ThreadPoolExecutor, func, *a, **kw):
+  ''' A variant on `asyncio.to_thread` which dispatches the thread
+      via a `concurrent.futures.ThreadPoolExecutor`.
+
+      You can just use the `run_in_executor` event loop method
+      directly but this is handy if you've already got a thread
+      pool for a specific purpose and code which fits `to_thread`.
+  '''
+  return await get_running_loop().run_in_executor(tpe, partial(func, *a, **kw))
+
 @decorator
 def agen(genfunc, *, fast=None):
   ''' A decorator for a synchronous generator which turns it into
@@ -91,7 +103,6 @@ def agen(genfunc, *, fast=None):
           async for item in gen(5):
               print(item)
   '''
-
   if isasyncgenfunction(genfunc):
     return genfunc
 
@@ -182,14 +193,23 @@ async def async_iter(it: AnyIterable, *, fast=None):
     async for item in dund_aiter():
       yield item
 
-async def aqget(q: Queue):
+async def aqget(q: Queue, tpe: ThreadPoolExecutor = None):
   ''' An asynchronous function to get an item from a `queue.Queue`like object `q`.
-      It must support the `.get()` and `.get_nowait()` methods.
+      It must support the `.get()` and `.get_nowait()` methods; if
+      requires the `.get()` is dispatched using `to_thread()`.
+
+      The optional `tpe` parameter may specify a
+      `concurrent.futures.ThreadPoolExecutor` to use instead of
+      `to_thread`. For example, the `Lock` class uses a thread pool
+      to avoid deadlocking with the general purpose thread pool
+      used by `to_thread`.
   '''
   try:
     return q.get_nowait()
   except Empty:
-    return await to_thread(q.get)
+    if tpe is None:
+      return await to_thread(q.get)
+    return await to_threadpool(tpe, q.get)
 
 _aqiter_NO_SENTINEL = object()
 
@@ -361,6 +381,70 @@ async def amap(
     # this should have cleared the heap
     assert len(results) == 0
 
+class Lock:
+  ''' A lock object which can be used in synchronous and asynchonous contexts.
+
+      The async enter step is built on the `aqget()` function.
+
+      Example use:
+
+          shared_lock = Lock("my shared lock")
+
+      Synchronous use from some thread:
+
+          with shared_lock:
+              critical section
+
+      Asynchronous use from some event loop:
+
+          async with shared_lock:
+              critical section
+  '''
+
+  def __init__(self, name=None, *, max_workers=64):
+    ''' Initialise the `Lock`.
+
+        Parameters:
+        * `name`: optional name for the lock
+        * `mac_workers`: optional number of threads in the per-lock thread pool,
+          arbitrarily set to 64 since the defaults for `ThreadPoolExecutor`
+          seems insanely low and `run_in_executor` is synchronous!
+    '''
+    if name is None:
+      name = f'{self.__class__.__name__}:{id(self)}'
+    self.name = name
+    self.token = object()  # unique token for sanity checks
+    self.q = Queue()
+    self.q.put(self.token)
+    self.tpe = ThreadPoolExecutor(max_workers, f'{name}-')
+
+  def __str__(self):
+    return self.name
+
+  def __enter__(self):
+    assert self.q.qsize() < 2
+    token = self.q.get()
+    assert self.q.qsize() == 0  # we have the token
+    assert token is self.token
+    return token
+
+  def __exit__(self, *_):
+    assert self.q.qsize() == 0
+    self.q.put(self.token)
+    assert self.q.qsize() < 2
+
+  async def __aenter__(self):
+    assert self.q.qsize() < 2
+    token = await aqget(self.q, tpe=self.tpe)
+    assert self.q.qsize() == 0  # we have the token
+    assert token is self.token, f'aqget gave {token=}, which is not {self.token=}'
+    return token
+
+  async def __aexit__(self, *_):
+    assert self.q.qsize() == 0
+    self.q.put(self.token)
+    assert self.q.qsize() < 2
+
 class IterableAsyncQueue(AQueue):
   ''' An iterable subclass of `asyncio.Queue`.
 
@@ -450,7 +534,7 @@ class AsyncPipeLine:
           )
           async for result in pipeline([1,2,3,4]):
               print(result)
- '''
+  '''
 
   inq: IterableAsyncQueue
   tasks: List[Task]
@@ -633,8 +717,10 @@ class AsyncPipeLine:
 
 if __name__ == '__main__':
 
+  import asyncio
   import time
   import random
+  from threading import Thread
 
   print_ = partial(print, end='', flush=True)
 
@@ -786,7 +872,7 @@ if __name__ == '__main__':
     print()
 
     async def aqiter_sent(q, sent):
-      async for item in aqiter(q, sent):
+      async for item in aqiter(q, sentinel=sent):
         print_(" ->", item)
 
     print_("aqiter_sent")
@@ -797,3 +883,130 @@ if __name__ == '__main__':
     myq.put(qsent)
     run(aqiter_sent(myq, qsent))
     print()
+
+    print_("trite Lock ")
+    start = time.time()
+    with Lock():
+      print('got lock, sleep1')
+      time.sleep(1)
+      print('slept')
+    print('released_lock')
+    elapsed = time.time() - start
+    print(f'{elapsed=}')
+    assert elapsed >= 1.0
+
+    # async function to sleep holding a Lock
+    async def alocksleep(lock, delay):
+      print_('async lock sleep', delay, end=' ')
+      async with lock:
+        print_('locked, sleep... ')
+        await asyncio.sleep(delay)
+        print_('slept ')
+      print('async asleep done')
+
+    print('single alocksleep')
+    start = time.time()
+    run(alocksleep(Lock(), 1))
+    elapsed = time.time() - start
+    print(f'alocksleep {elapsed=}')
+    assert elapsed >= 1.0
+
+    # sync function to sleep holding a Lock, for a thread
+    def tlocksleep(lock, delay):
+      print_('sync lock sleep', delay, end=' ')
+      with lock:
+        print_('locked, sleep... ')
+        time.sleep(delay)
+        print_('slept ')
+      print('sync asleep done')
+
+    print('single tlocksleep')
+    t1 = Thread(target=tlocksleep, args=(Lock(), 1))
+    start = time.time()
+    t1.start()
+    t1.join()
+    elapsed = time.time() - start
+    print(f'tlocksleep {elapsed=}')
+    assert elapsed >= 1.0
+
+    print('double tlocksleep')
+    shared_lock = Lock()
+    t1 = Thread(target=tlocksleep, args=(shared_lock, 1))
+    t2 = Thread(target=tlocksleep, args=(shared_lock, 1))
+    start = time.time()
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    elapsed = time.time() - start
+    assert elapsed >= 2.0
+
+    # sync function to run alocksleep, for an event loop in another thread
+    def talocksleep(lock, delay):
+      print('async lock use in distinct thread...')
+      run(alocksleep(lock, delay))
+
+    print('single talocksleep')
+    t1 = Thread(target=talocksleep, args=(Lock(), 1))
+    start = time.time()
+    t1.start()
+    t1.join()
+    elapsed = time.time() - start
+    print(f'talocksleep {elapsed=}')
+    assert elapsed >= 1.0
+
+    print('double talocksleep')
+    shared_lock = Lock()
+    t1 = Thread(target=talocksleep, args=(shared_lock, 1))
+    t2 = Thread(target=talocksleep, args=(shared_lock, 1))
+    start = time.time()
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    elapsed = time.time() - start
+    assert elapsed >= 2.0
+
+    # async function to run 2 alocksleeps concurrently
+    async def concalocksleep(lock, delay):
+      t1 = create_task(alocksleep(lock, delay))
+      t2 = create_task(alocksleep(lock, delay))
+      await t1
+      await t2
+
+    print("concalocksleep...")
+    start = time.time()
+    run(concalocksleep(Lock(), 1))
+    elapsed = time.time() - start
+    print(f'concalocksleep {elapsed=}')
+    assert elapsed >= 2.0 and elapsed < 2.1
+
+    async def mixed_lock(lock, delay):
+      start = time.time()
+      # kick off threads using the lock in sync mode
+      t1 = Thread(target=tlocksleep, args=(lock, 1))
+      t1.start()
+      t2 = Thread(target=tlocksleep, args=(lock, 1))
+      t2.start()
+      # kick off threads using the lock in an async event loop
+      t3 = Thread(target=talocksleep, args=(lock, 1))
+      t3.start()
+      t4 = Thread(target=talocksleep, args=(lock, 1))
+      t4.start()
+      t5 = create_task(concalocksleep(lock, delay))
+      await t5
+      t1.join()
+      t2.join()
+      t3.join()
+      t4.join()
+      end = time.time()
+      elapsed = end - start
+      print(f'2 sync threads, 2 async threads, 1x2 concurrent: {elapsed=}s')
+
+    print("mixed_lock...")
+    shared_lock = Lock()
+    start = time.time()
+    run(mixed_lock(shared_lock, 1))
+    elapsed = time.time() - start
+    print(f'mixed_lock {elapsed=}')
+    assert elapsed > 6.0 and elapsed < 6.5
