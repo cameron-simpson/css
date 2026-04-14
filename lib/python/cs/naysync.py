@@ -859,7 +859,7 @@ if __name__ == '__main__':
     print()
 
     async def aqiter_sent(q, sent):
-      async for item in aqiter(q, sent):
+      async for item in aqiter(q, sentinel=sent):
         print_(" ->", item)
 
     print_("aqiter_sent")
