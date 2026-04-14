@@ -80,7 +80,7 @@ async def to_threadpool(tpe: ThreadPoolExecutor, func, *a, **kw):
       directly but this is handy if you've already got a thread
       pool for a specific purpose and code which fits `to_thread`.
   '''
-  return get_running_loop().run_in_exector(tpe, partial(func, *a, **kw))
+  return await get_running_loop().run_in_executor(tpe, partial(func, *a, **kw))
 
 @decorator
 def agen(genfunc, *, fast=None):
