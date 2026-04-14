@@ -1,0 +1,9 @@
+lib/python/cs/naysync.py: cs.naysync: new to_threadpool() function like to_thread(0 but utilitiing a ThreadPoolExecutor
+lib/python/cs/naysync.py: cs.naysync: aqget: new optional tpe:ThreadPoolExecutor parameter to use a thread pool for the to_thread call, if used
+lib/python/cs/naysync.py: cs.naysync: new Lock context manager class which can be used from sync and async contexts
+lib/python/cs/naysync.py: cs.naysync: fix docstring typo
+lib/python/cs/naysync.py: cs.naysync: update call to aqiter in the selftests
+lib/python/cs/naysync.py: cs.naysync: to_threadpool: fix call to run_in_executor
+lib/python/cs/naysync.py: cs.naysync: Lock: put sanity checks in the enter/exit methods
+lib/python/cs/naysync.py: cs.naysync: clean some lint
+lib/python/cs/naysync.py: cs.naysync: selftests for the Lock class
