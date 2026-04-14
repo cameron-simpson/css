@@ -717,8 +717,10 @@ class AsyncPipeLine:
 
 if __name__ == '__main__':
 
+  import asyncio
   import time
   import random
+  from threading import Thread
 
   print_ = partial(print, end='', flush=True)
 
@@ -881,3 +883,130 @@ if __name__ == '__main__':
     myq.put(qsent)
     run(aqiter_sent(myq, qsent))
     print()
+
+    print_("trite Lock ")
+    start = time.time()
+    with Lock():
+      print('got lock, sleep1')
+      time.sleep(1)
+      print('slept')
+    print('released_lock')
+    elapsed = time.time() - start
+    print(f'{elapsed=}')
+    assert elapsed >= 1.0
+
+    # async function to sleep holding a Lock
+    async def alocksleep(lock, delay):
+      print_('async lock sleep', delay, end=' ')
+      async with lock:
+        print_('locked, sleep... ')
+        await asyncio.sleep(delay)
+        print_('slept ')
+      print('async asleep done')
+
+    print('single alocksleep')
+    start = time.time()
+    run(alocksleep(Lock(), 1))
+    elapsed = time.time() - start
+    print(f'alocksleep {elapsed=}')
+    assert elapsed >= 1.0
+
+    # sync function to sleep holding a Lock, for a thread
+    def tlocksleep(lock, delay):
+      print_('sync lock sleep', delay, end=' ')
+      with lock:
+        print_('locked, sleep... ')
+        time.sleep(delay)
+        print_('slept ')
+      print('sync asleep done')
+
+    print('single tlocksleep')
+    t1 = Thread(target=tlocksleep, args=(Lock(), 1))
+    start = time.time()
+    t1.start()
+    t1.join()
+    elapsed = time.time() - start
+    print(f'tlocksleep {elapsed=}')
+    assert elapsed >= 1.0
+
+    print('double tlocksleep')
+    shared_lock = Lock()
+    t1 = Thread(target=tlocksleep, args=(shared_lock, 1))
+    t2 = Thread(target=tlocksleep, args=(shared_lock, 1))
+    start = time.time()
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    elapsed = time.time() - start
+    assert elapsed >= 2.0
+
+    # sync function to run alocksleep, for an event loop in another thread
+    def talocksleep(lock, delay):
+      print('async lock use in distinct thread...')
+      run(alocksleep(lock, delay))
+
+    print('single talocksleep')
+    t1 = Thread(target=talocksleep, args=(Lock(), 1))
+    start = time.time()
+    t1.start()
+    t1.join()
+    elapsed = time.time() - start
+    print(f'talocksleep {elapsed=}')
+    assert elapsed >= 1.0
+
+    print('double talocksleep')
+    shared_lock = Lock()
+    t1 = Thread(target=talocksleep, args=(shared_lock, 1))
+    t2 = Thread(target=talocksleep, args=(shared_lock, 1))
+    start = time.time()
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    elapsed = time.time() - start
+    assert elapsed >= 2.0
+
+    # async function to run 2 alocksleeps concurrently
+    async def concalocksleep(lock, delay):
+      t1 = create_task(alocksleep(lock, delay))
+      t2 = create_task(alocksleep(lock, delay))
+      await t1
+      await t2
+
+    print("concalocksleep...")
+    start = time.time()
+    run(concalocksleep(Lock(), 1))
+    elapsed = time.time() - start
+    print(f'concalocksleep {elapsed=}')
+    assert elapsed >= 2.0 and elapsed < 2.1
+
+    async def mixed_lock(lock, delay):
+      start = time.time()
+      # kick off threads using the lock in sync mode
+      t1 = Thread(target=tlocksleep, args=(lock, 1))
+      t1.start()
+      t2 = Thread(target=tlocksleep, args=(lock, 1))
+      t2.start()
+      # kick off threads using the lock in an async event loop
+      t3 = Thread(target=talocksleep, args=(lock, 1))
+      t3.start()
+      t4 = Thread(target=talocksleep, args=(lock, 1))
+      t4.start()
+      t5 = create_task(concalocksleep(lock, delay))
+      await t5
+      t1.join()
+      t2.join()
+      t3.join()
+      t4.join()
+      end = time.time()
+      elapsed = end - start
+      print(f'2 sync threads, 2 async threads, 1x2 concurrent: {elapsed=}s')
+
+    print("mixed_lock...")
+    shared_lock = Lock()
+    start = time.time()
+    run(mixed_lock(shared_lock, 1))
+    elapsed = time.time() - start
+    print(f'mixed_lock {elapsed=}')
+    assert elapsed > 6.0 and elapsed < 6.5
