@@ -414,7 +414,7 @@ class Lock:
     if name is None:
       name = f'{self.__class__.__name__}:{id(self)}'
     self.name = name
-    self.token = None
+    self.token = object()  # unique token for sanity checks
     self.q = Queue()
     self.q.put(self.token)
     self.tpe = ThreadPoolExecutor(max_workers, f'{name}-')
@@ -423,16 +423,28 @@ class Lock:
     return self.name
 
   def __enter__(self):
-    return self.q.get()
+    assert self.q.qsize() < 2
+    token = self.q.get()
+    assert self.q.qsize() == 0  # we have the token
+    assert token is self.token
+    return token
 
-  def __exit__(self, _):
+  def __exit__(self, *_):
+    assert self.q.qsize() == 0
     self.q.put(self.token)
+    assert self.q.qsize() < 2
 
   async def __aenter__(self):
-    return await aqget(self.q, tpe=self.tpe)
+    assert self.q.qsize() < 2
+    token = await aqget(self.q, tpe=self.tpe)
+    assert self.q.qsize() == 0  # we have the token
+    assert token is self.token, f'aqget gave {token=}, which is not {self.token=}'
+    return token
 
-  async def __aexit__(self, _):
+  async def __aexit__(self, *_):
+    assert self.q.qsize() == 0
     self.q.put(self.token)
+    assert self.q.qsize() < 2
 
 class IterableAsyncQueue(AQueue):
   ''' An iterable subclass of `asyncio.Queue`.
