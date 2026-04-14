@@ -103,7 +103,6 @@ def agen(genfunc, *, fast=None):
           async for item in gen(5):
               print(item)
   '''
-
   if isasyncgenfunction(genfunc):
     return genfunc
 
@@ -535,7 +534,7 @@ class AsyncPipeLine:
           )
           async for result in pipeline([1,2,3,4]):
               print(result)
- '''
+  '''
 
   inq: IterableAsyncQueue
   tasks: List[Task]
