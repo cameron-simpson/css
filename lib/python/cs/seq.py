@@ -21,7 +21,7 @@ from typing import Callable, GenericAlias, Hashable, Iterable, Optional, Tuple, 
 from cs.deco import decorator
 from cs.gimmicks import warning
 
-__version__ = '20251231.1-post'
+__version__ = '20260403-post'
 
 DISTINFO = {
     'description':
@@ -897,6 +897,44 @@ class range:
     while True:
       yield i
       i += self.step
+
+def with_neighbours(it: Iterable, no_neighbour=None):
+  ''' Return 3-tuples of `(prev,curr,next)` from the iterable `it`
+      where `curr` is each item from `it` and `prev` and `next` are
+      the preceeding and following items respectively.
+
+      The first item will have a `prev` of `no_neighbour`
+      and the last item will have a `next` of `no_neighbour`.
+
+      `no_neighbour` defaults to `None`, but may be specified as
+      another sentinel if `None` is anticipated in the iterable.
+
+      Examples:
+
+          >>> list(with_neighbours((1,2,3)))
+          [(None, 1, 2), (1, 2, 3), (2, 3, None)]
+          >>> list(with_neighbours(()))
+          []
+          >>> list(with_neighbours((1,)))
+          [(None, 1, None)]
+          >>> list(with_neighbours((1,2)))
+          [(None, 1, 2), (1, 2, None)]
+          >>> list(with_neighbours((1,None,3),"END"))
+          [('END', 1, None), (1, None, 3), (None, 3, 'END')]
+
+  '''
+  it = iter(it)
+  prev_item = no_neighbour
+  try:
+    curr_item = next(it)
+  except StopIteration:
+    return
+  for next_item in it:
+    yield prev_item, curr_item, next_item
+    prev_item = curr_item
+    curr_item = next_item
+  # we're already set up for the next iteration
+  yield prev_item, curr_item, no_neighbour
 
 if __name__ == '__main__':
   import sys

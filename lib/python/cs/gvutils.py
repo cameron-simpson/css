@@ -40,8 +40,11 @@ def quote(s):
   '''
   if isinstance(s, (int, float)):
     return str(s)
-  if ((s.isalnum() or s.replace('_', '').isalnum())
-      and s.lower() not in DOT_KEYWORDS):
+  if all((
+      not s[:1].isdigit(),
+      (s.isalnum() or s.replace('_', '').isalnum()),
+      s.lower() not in DOT_KEYWORDS,
+  )):
     return s
   return (
       '"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') +
@@ -193,6 +196,8 @@ def gvprint(
     T.join()
     bs, = captures
     return bs
+  if img2sixel_popen is not None:
+    print(file=file)
   return None
 
 ## Nothing renders this :-(
@@ -508,7 +513,7 @@ class Graph:
     )
 
   def print(self, **gvprint_kw):
-    dot_s = self.as_dot()
+    dot_s = self.as_dot(fold=True)
     return gvprint(dot_s, **gvprint_kw)
 
 if __name__ == '__main__':

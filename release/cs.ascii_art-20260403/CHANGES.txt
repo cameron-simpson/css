@@ -1,0 +1,3 @@
+lib/python/cs/ascii_art.py: cs.ascii_art: box_char: cache the results
+lib/python/cs/ascii_art.py: merge pilfer ==> default: assorted pilfer things, but also subtable support for printt/tabulate
+lib/python/cs/ascii_art.py: cs.ascii_art: add LARGE_CIRCLE, slightly pointless but used by cs.lex like HORIZ

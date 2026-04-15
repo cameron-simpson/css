@@ -31,11 +31,13 @@ The allowed names are the list `cs.debug.__all__` and include:
 from __future__ import print_function
 import builtins
 from cmd import Cmd
+from collections import defaultdict
 from contextlib import redirect_stdout
 import inspect
 import logging
 import os
 from pprint import pformat, pprint  # pylint: disable=unused-import
+import re
 from subprocess import Popen, PIPE
 import sys
 from threading import (
@@ -47,8 +49,9 @@ from threading import (
 import time
 import traceback
 from types import SimpleNamespace as NS
+from typing import Mapping, Sequence
 
-from cs.deco import ALL, decorator
+from cs.deco import ALL, attr, decorator
 from cs.fs import shortpath
 from cs.lex import (
     cropped_repr,
@@ -56,6 +59,7 @@ from cs.lex import (
     r,
     is_identifier,
     is_dotted_identifier,
+    printt,
 )  # pylint: disable=unused-import
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
@@ -69,7 +73,7 @@ from cs.threads import ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20250728-post'
+__version__ = '20260403-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -847,20 +851,6 @@ def trace_DEBUG(debug_spec=None):
         if callable(F):
           setattr(M, func_name, trace(F))
 
-def selftest(module_name, defaultTest=None, argv=None):
-  ''' Called by my unit tests.
-  '''
-  # pylint: disable=import-outside-toplevel
-  if argv is None:
-    argv = sys.argv
-  import importlib
-  importlib.import_module(module_name)
-  import signal
-  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
-  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
-  import unittest
-  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
-
 builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
 if builtin_names_s:
   try:
@@ -892,6 +882,147 @@ if builtin_names_s:
         )
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
+
+@ALL
+@attr(
+    # types whose values we check by value not id()
+    BASIC_TYPES=(int, float, str),
+    # a regexp to match name(x=1,y=2,...) repr()s
+    REPR_re=re.compile(r'[._\w]+\((([\w_]+=\S+, ?)*[\w_]+=\S+)\)$')
+)
+def tabulate_obj(obj, label=None, *, seen=None):
+  ''' Tabulate the contents of an object for display via `cs.lex.printt()`.
+  '''
+  BASIC_TYPES = tabulate_obj.BASIC_TYPES
+  ##print(type(obj), repr(obj))
+  if label is None:
+    label = f'{obj.__class__.__name__}:{id(obj)}'
+  if seen is None:
+    seen = set()
+  if id(obj) in seen:
+    ##print("SEEN")
+    yield [label, "" if isinstance(obj, BASIC_TYPES) else "(already seen)"]
+    return
+  seen.add(id(obj))
+  objcls = obj.__class__
+
+  # dotted attributes
+  attrmap = None
+  if not isinstance(obj, BASIC_TYPES):
+    try:
+      attrmap = obj.__dict__
+    except AttributeError:
+      # TODO: unpack descriptors from dir(type(obj))?
+      try:
+        clsslots = objcls.__slots__
+      except AttributeError:
+        pass
+      else:
+        if clsslots:
+          attrmap = {name: getattr(obj, name) for name in clsslots}
+    else:
+      attrmap = {
+          attr: value
+          for attr, value in attrmap.items()
+          if not attr.startswith('_')
+      }
+    if not attrmap:
+      # recognised namedtuples and their ilk via repr()
+      m = tabulate_obj.REPR_re.match(repr(obj))
+      if m:
+        attrmap = {}
+        for fv in re.split(', ?', m.group(1)):
+          f, v = fv.split('=', 1)
+          try:
+            v = int(v)
+          except ValueError:
+            try:
+              v = float(v)
+            except ValueError:
+              pass
+          attrmap[f] = v
+  assert attrmap is None or isinstance(attrmap, Mapping), (
+      f'attrmap should be a Mapping but is {type(attrmap)} {attrmap!r}'
+  )
+
+  # collection members
+  items = None
+  if isinstance(obj, Mapping):
+    try:
+      items = sorted(obj.items())
+    except TypeError:
+      items = list(obj.items())
+  # sequences, excluding strings which just make more strings
+  elif not isinstance(obj, str) and isinstance(obj, Sequence):
+    items = list(enumerate(obj))
+  assert items is None or isinstance(items, Sequence)
+
+  if not attrmap and not items:
+    yield [label, obj]
+  else:
+    yield [label, f'{obj.__class__.__name__}:{id(obj)}']
+
+    attrs_by_value_id = defaultdict(list)  # indexed rows to subsume
+    attrs_by_value = defaultdict(list)  # indexed rows to subsume
+    attr_indices = defaultdict(list)  # attrs for values
+    if attrmap is None:
+      attrmap = {}
+    else:
+      for attr, value in sorted(attrmap.items()):
+        if not attr.startswith('_'):
+          if isinstance(value, BASIC_TYPES):
+            attrs_by_value[value].append(attr)
+          else:
+            attrs_by_value_id[id(value)].append(attr)
+    if items is None:
+      items = ()
+    else:
+      # figure out which values have been seen
+      for index, value in items:
+        if isinstance(value, BASIC_TYPES):
+          attr_names = attrs_by_value.get(value, ())
+        else:
+          attr_names = attrs_by_value_id.get(id(value), ())
+        for attr in attr_names:
+          attr_indices[attr].append(index)
+    # generate the listing
+    subrows = []
+    # list the attributes
+    used_indices = set()
+    for attr, indices in sorted(attrmap.items()):
+      label = f'.{attr}'
+      indices = attr_indices.get(attr, ())
+      if indices:
+        label += f', also [{",".join(map(repr, indices))}]'
+        used_indices.update(indices)
+      subrows.extend(tabulate_obj(attrmap[attr], label, seen=seen))
+    # list the unmentioned indices
+    for index, value in items:
+      if index not in used_indices:
+        subrows.extend(tabulate_obj(value, f'[{index!r}]', seen=seen))
+    yield tuple(subrows)
+
+@ALL
+def print_obj(obj, label=None):
+  ''' Call `tabulate_obj(obj,label=label)` and pass to `cs.lex.printt()`.
+  '''
+  table = list(tabulate_obj(obj, label=label))
+  ##pprint(table, indent=2)
+  return printt(*table)
+
+def selftest(module_name, defaultTest=None, argv=None):
+  ''' Called by my unit tests.
+  '''
+  # pylint: disable=import-outside-toplevel
+  if argv is None:
+    argv = sys.argv
+  import importlib
+  importlib.import_module(module_name)
+  import signal
+  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
+  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+  import unittest
+  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
 
 # honour the $DEBUG trace flags
 trace_DEBUG()
