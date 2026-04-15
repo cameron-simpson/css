@@ -1,3 +1,4 @@
+cs.cmdutils: usage: some way to embed a table of envvars like we do for options, then generalise for other tables
 xfer-drive tool: prep-xfer, do-xfer, purge-xfer modes - too much manual stuff in my hacking around by hand
 print_obj: does not print excpetion info
 new pt: top-like mode as well
