@@ -5,6 +5,7 @@
 '''
 
 from collections import namedtuple
+from contextlib import contextmanager
 import errno
 from fnmatch import filter as fnfilter
 from functools import partial
@@ -35,7 +36,7 @@ from tempfile import mkstemp, TemporaryDirectory
 from threading import Lock
 from typing import Any, Callable, Iterable, Optional, Union
 
-from cs.deco import decorator, fmtdoc, Promotable
+from cs.deco import fmtdoc, Promotable
 from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call, Pfx
@@ -88,25 +89,51 @@ def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None) -> bool:
     pfx_mkdir(dirpath, mode)
   return True
 
-@decorator
-def atomic_directory(infill_func, make_placeholder=False):
-  ''' Decorator for a function which fills in a directory
-      which calls the function against a temporary directory
-      then renames the temporary to the target name on completion.
+def atomic_directory(
+    dirpath_or_func: str | callable, *, make_placeholder=False
+):
+  ''' RUn code in a temporary directory, which will be renamed to
+      the target directory if no exception occurs.
 
       Parameters:
-      * `infill_func`: the function to fill in the target directory
       * `make_placeholder`: optional flag, default `False`:
         if true an empty directory will be make at the target name
         and after completion it will be removed and the completed
         directory renamed to the target name
-  '''
 
-  def atomic_directory_wrapper(dirpath, *a, **kw):
-    assert isinstance(
-        dirpath,
-        str,
-    ), f'dirpath not a str: {r(dirpath)}'
+      This may be used as a context manager or as a decorator.
+
+      As a contextmanager:
+
+          with atimoc_directory(target_directory) as tmpdirpath:
+              do work inside tmpdirpath
+
+      This will rename the `tmpdirpath` to `target_directory` on exit.
+
+      As a decorator:
+
+          @atomic_directory
+          def produce_dir_content(tmpdirpath,.....):
+
+      This produces a function which will accept a target directory
+      path as its first argument and calls `produce_dir_content`
+      with the temporary directory.
+      On return the temporary directory will be renamed to the target directory.
+  '''
+  if callable(dirpath_or_func):
+    func = dirpath_or_func
+
+    def atomic_directory_wrapper(dirpath: str, *a, **kw):
+      with atomic_directory(dirpath,
+                            make_placeholder=make_placeholder) as tmpdirpath:
+        return func(tmpdirpath, *a, **kw)
+
+    return atomic_directory_wrapper
+  assert isinstance(dirpath_or_func, str)
+  dirpath = dirpath_or_func
+
+  @contextmanager
+  def atomic_directory_cm(dirpath: str, *, make_placeholder=False):
     remove_placeholder = False
     if make_placeholder:
       # prevent other users from using this directory
@@ -121,7 +148,7 @@ def atomic_directory(infill_func, make_placeholder=False):
           prefix='.tmp--atomic_directory--',
           suffix='--' + basename(dirpath),
       ) as tmpdirpath:
-        result = infill_func(tmpdirpath, *a, **kw)
+        yield tmpdirpath
         if remove_placeholder:
           pfx_rmdir(dirpath)
           remove_placeholder = False
@@ -133,9 +160,8 @@ def atomic_directory(infill_func, make_placeholder=False):
       if remove_placeholder and isdirpath(dirpath):
         pfx_rmdir(dirpath)
       raise
-    return result
 
-  return atomic_directory_wrapper
+  return atomic_directory_cm(dirpath, make_placeholder=make_placeholder)
 
 @pfx
 def scandirtree(
