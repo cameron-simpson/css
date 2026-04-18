@@ -91,19 +91,6 @@ class Enigma2(_Recording):
         self.scpath,
     )
 
-  @pfx_method
-  def remove(self, *, doit=False):
-    ''' Remove all the files associated with this recording.
-    '''
-    for fspath in self.fspaths:
-      with Pfx(fspath):
-        print("remove", fspath)
-        if doit:
-          pfx_call(os.remove, fspath)
-        else:
-          if not isfilepath(fspath):
-            warning("not a file")
-
   def read_meta(self):
     ''' Read the .meta file and return the contents as a dict.
     '''
