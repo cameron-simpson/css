@@ -90,7 +90,7 @@ def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None) -> bool:
   return True
 
 def atomic_directory(
-    dirpath_or_func: str | callable, *, make_placeholder=False
+    dirpath_or_func: Union[str, Callable], *, make_placeholder=False
 ):
   ''' RUn code in a temporary directory, which will be renamed to
       the target directory if no exception occurs.
