@@ -1240,6 +1240,12 @@ class SiteEntity(HasTags):
       page_url = self.urlto(page_url)
     return page_url
 
+  @property
+  def refresh_resource(self):
+    ''' The default refresh resource is `self.sitepage_url`, supporting `Refreshable`.
+    '''
+    return self.sitepage_url
+
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
 
@@ -1349,23 +1355,21 @@ class SiteEntity(HasTags):
       return datetime_from_http_date(http_date).timestamp()
     return 0
 
-  def is_stale(
-      self, lifespan=STALE_LIFESPAN, *, page="sitepage", method="GET"
-  ):
-    ''' Test if the sitepage response timestamp is more than `lifespan` seconds older than `time.time()`.
+  @property
+  def refresh_lifespan(self):
+    ''' The refresh lifespan, from `self['refresh_lifespan']` or `self.STALE_LIFEPSAN`.
+        Supports the `Refreshable` mixin.
     '''
-    is_stale = time.time() - self.rq_timestamp(
-        page=page, method=method
-    ) > lifespan
-    return is_stale
+    return self.get('refresh_lifespan', self.STALE_LIFEPSAN)
 
-  def refresh(self, *, force=False, lifespan=STALE_LIFESPAN):
+  def _refresh(self, resource):
+    ''' Try to refresh this entity from the sitepage, supporting `Refreshable`.
+    '''
     ''' Refetch and reparse `self.sitepage_url` via `self.grok_sitepage()`
         if the page is stale (or if `force` is true).
     '''
-    if not force and not self.is_stale(lifespan):
-      return
-    self.grok_sitepage(self.sitepage_url)
+    self.grok_sitepage(resource)
+    return True
 
   def update_from_meta(self, flowstate: FlowState, **update_kw):
     ''' Update this entity from the `flowstate.meta`.
