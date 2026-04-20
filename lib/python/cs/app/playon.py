@@ -368,14 +368,17 @@ class PlayOnCommand(BaseCommand):
     return xit
 
   @uses_runstate
-  def _refresh_sqltags_data(self, api, runstate: RunState, max_age=None):
+  def _refresh_sqltags_data(self, api, runstate: RunState, lifespan=None):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
     recordings = set(api.fetch_recordings())
     need_refresh = (
         # any current recordings whose state is stale
-        any(recording.is_stale(max_age=max_age) for recording in recordings) or
+        any(
+            recording.refresh_needed(lifespan=lifespan)
+            for recording in recordings
+        ) or
         # no recording is current
         all(recording.is_expired() for recording in recordings)
     )
@@ -536,6 +539,9 @@ class _PlayOnEntity(HasTags):
       This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
   '''
 
+  def _refresh(self, recourse):
+    warning("no individual {self.__class__.__name__}._refresh method")
+
 class LoginState(_PlayOnEntity):
 
   TYPE_SUBNAME = 'login.state'
@@ -671,19 +677,14 @@ class Recording(_PlayOnEntity):
       return True
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
-  @format_attribute
-  def is_stale(self, max_age=None):
-    ''' Override for `TagSet.is_stale()` which considers expired
-        records not stale because they can never be refrehed from the
-        service.
+  def refresh_needed(self, **kw):
+    ''' Override for `Refreshable.refresh_needed` which always
+        returns `False` for expired recordings.
     '''
     if self.is_expired():
       # an expired recording will never become stale
       return False
-    last_updated = self.get('last_updated')
-    if last_updated is None:
-      return True
-    return last_updated + (max_age or self.STALE_AGE) < time.time()
+    return super().refresh_needed(**kw)
 
   @fmtdoc
   def filename(self, filename_format=None) -> str:
@@ -1105,7 +1106,7 @@ class PlayOnAPI(HTTPServiceAPI):
                     entry[e_field] = value2
         entity = self[entity_type, entry_id]
         entity.tags.update(entry, prefix='playon')
-        entity.tags.update(dict(last_updated=now))
+        entity.refreshed(now)
         entities.add(entity)
     return entities
 
