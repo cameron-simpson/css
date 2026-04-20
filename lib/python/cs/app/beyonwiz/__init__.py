@@ -13,6 +13,7 @@ from datetime import datetime
 import json
 import os
 from os.path import (
+    basename,
     dirname,
     exists as existspath,
     isabs as isabspath,
@@ -33,9 +34,9 @@ from cs.ffmpegutils import (
 from cs.fileutils import atomic_filename, crop_name
 from cs.fs import HasFSPath
 from cs.fstags import HasFSTagsMixin
-from cs.logutils import error
+from cs.logutils import error, warning
 from cs.mediainfo import EpisodeInfo
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py.func import prop
 from cs.tagset import Tag
 
@@ -217,12 +218,12 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
           if not isfilepath(fspath):
             warning("not a file")
 
-  def move_info(self, dstdirpath:str,*,doit=False):
+  def move_info(self, dstdirpath: str, *, doit=False):
     ''' Move all the files associated with this recording into `dstdirpath`.
     '''
     for fspath in self.fspaths:
       with Pfx(fspath):
-        dstpath=joinpath(dstdirpath,basename(fspath))
+        dstpath = joinpath(dstdirpath, basename(fspath))
         print("move", fspath, "->", dstpath)
         if doit:
           if existspath(dstpath):
