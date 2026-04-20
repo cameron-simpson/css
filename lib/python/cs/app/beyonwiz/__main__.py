@@ -63,8 +63,10 @@ class BWizCmd(BaseCommand):
           'outputdir',
           'The derived output file should be written in outputdir.'
       ),
-      F_=('faileddir',
-          'The source files for failed conversions should be moved into this directory.'),
+      F_=(
+          'faileddir',
+          'The source files for failed conversions should be moved into this directory.'
+      ),
       rm=(
           'remove_source', 'Remove the source file if the conversion succeeds.'
       ),
@@ -86,7 +88,7 @@ class BWizCmd(BaseCommand):
     outputdir = options.outputdir or '.'
     remove_source = options.remove_source
     badopts = False
-    if failedir and not isdirpath(faileddir):
+    if faileddir and not isdirpath(faileddir):
       warning("faileddir is not a directory: %r", faileddir)
       badopts = True
     if not isdirpath(outputdir):
@@ -133,8 +135,8 @@ class BWizCmd(BaseCommand):
       if remove_source:
         R.remove(doit=doit)
     else:
-      if faildirpath:
-        R.moveinto(faileddir,doit=doit)
+      if faileddir:
+        R.moveinto(faileddir, doit=doit)
       return 1
 
   def cmd_ffprobe(self, argv):
