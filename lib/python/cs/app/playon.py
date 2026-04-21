@@ -560,7 +560,7 @@ class Recording(_PlayOnEntity):
   TYPE_SUBNAME = 'recording'
 
   # recording data are considered stale after 10 minutes
-  STALE_AGE = 600
+  refresh_lifespan = 600
 
   RECORDING_QUALITY = {
       1: '720p',
