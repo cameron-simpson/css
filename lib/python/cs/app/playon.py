@@ -923,7 +923,8 @@ class PlayOnAPI(HTTPServiceAPI):
       headers = dict(Authorization=self.jwt)
     return super().suburl(suburl, _base_url=_base_url, headers=headers, **kw)
 
-  def suburl_data(self, suburl, *, raw=False, **kw):
+  @uses_verbose
+  def suburl_data(self, suburl, *, raw=False, verbose=False, **kw):
     ''' Call `suburl` and return the `'data'` component on success.
 
         Parameters:
@@ -933,13 +934,15 @@ class PlayOnAPI(HTTPServiceAPI):
           result keys and returning `result['data']`
         Other keyword arguments are passed to the `HTTPServiceAPI.json` method.
     '''
-    result = self.json(suburl, **kw)
-    if raw:
-      return result
-    ok = result.get('success')
-    if not ok:
-      raise ValueError("failed: %r" % (result,))
-    return result['data']
+    with run_task(f'{self.__class__.__name__}.suburl_data({suburl})',
+                  report_print=verbose):
+      result = self.json(suburl, **kw)
+      if raw:
+        return result
+      ok = result.get('success')
+      if not ok:
+        raise ValueError("failed: %r" % (result,))
+      return result['data']
 
   @pfx_method
   def account(self):
@@ -980,19 +983,24 @@ class PlayOnAPI(HTTPServiceAPI):
     )
 
   @pfx_method
-  def fetch_recordings(self) -> set[Recording]:
+  @uses_verbose
+  def fetch_recordings(self, *, verbose=False) -> set[Recording]:
     ''' Return a set of the `Recording` instances for the available recordings.
         This makes an API request.
     '''
     data = self.suburl_data('library/all')
     entries = data['entries']
-    return self._entry_entities(
+    entities = self._entry_entities(
         entries, Recording, dict(
             Episode=int,
             ReleaseYear=int,
             Season=int,
         )
     )
+    if verbose:
+      for ent in entities:
+        ent.printt()
+    return entities
 
   def recordings(self):
     ''' Yield the `Recording`s.
