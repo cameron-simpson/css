@@ -920,18 +920,6 @@ class TagSet(
   #################################################################
   # Properties supporting Refreshable.
   @property
-  def refresh_last_poll(self):
-    ''' The last time a refresh poll was attempted.
-    '''
-    return self.get('refresh_last_poll', 0.0)
-
-  @refresh_last_poll.setter
-  def refresh_last_poll(self, when: float):
-    ''' Save the last refresh poll attempt time.
-    '''
-    self['refresh_last_poll'] = when
-
-  @property
   def refresh_last_update(self):
     ''' The last time a refresh update time.
     '''
@@ -3213,28 +3201,16 @@ class HasTags(TagSetTyping, FormatableMixin, Refreshable):
   #################################################################
   # Properties supporting Refreshable.
   @property
-  def refresh_last_poll(self):
-    ''' The last time a refresh poll was attempted.
-    '''
-    return self.get('refresh_last_poll', 0.0)
-
-  @refresh_last_poll.setter
-  def refresh_last_poll(self, when: float):
-    ''' Save the last refresh poll attempt time.
-    '''
-    self['refresh_last_poll'] = when
-
-  @property
   def refresh_last_update(self):
     ''' The last time a refresh update time.
     '''
-    return self.get('refresh_last_update', 0.0)
+    return self.tags.refresh_last_update
 
   @refresh_last_update.setter
   def refresh_last_update(self, when: float):
     ''' Save the last refresh update time.
     '''
-    self['refresh_last_update'] = when
+    self.tags.refresh_last_update = when
 
 class UsesTagSets:
   ''' A mixin to support classes which use a `BaseTagSets` to store their data.
