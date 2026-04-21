@@ -608,7 +608,7 @@ class Refreshable(ABC):
         return False
     # the object is stale (or force is true)
     if resource is None:
-      resource = self.refresh_resource
+      resource = getattr(self, 'refresh_resource', None)
     self.refresh_last_poll = now
     refreshed = self._refresh(resource)
     if refreshed:
