@@ -967,18 +967,11 @@ class SiteEntity(HasTags):
       attribute to enable a `.sitepage_url` attribute which returns the
       primary web page for the entity.
 
-      Entity update: support for `SiteMap.updated_entities(Iterabe[SiteEntity])`:
-      - if the entity has a `.update_entity()` method, this will be
-        called to update the entity
-      - otherwise if the entity has a `.sitepage_url` then
-        `entity.grok_sitepage(FlowState)` will be called to update
-        the entity; often the `.sitepage_url` is derived from the `SITEPAGE_URL_FORMAT`
-        format string
-
-      Design note: there is no default `.update_entity()` based on
-      eg `.sitepage_url` because that would prevent use of the concurrent
-      prefetching queue in `SiteMap.updated_entities()`.
+      Entity update: entities support individual update viathe
+      Refreshable.refresh() mixin method and bulk update via
+      `SiteMap.refreshed_entities(Iterabe[SiteEntity])`.
   '''
+
 
   # default staleness is 1 day
   STALE_LIFESPAN = 86400
@@ -1231,13 +1224,17 @@ class SiteEntity(HasTags):
   @property
   def sitepage_url(self):
     ''' Allow `self["sitepage"]` to override `self.SITEPAGE_URL_FORMAT`.
+        This may return `None` for entities with no primary site URL.
     '''
     try:
       page_url = self.tags["sitepage"]
     except KeyError:
       page_url = self.__getattr__('sitepage_url')
-    if page_url.startswith('/'):
-      page_url = self.urlto(page_url)
+    if page_url is None:
+      warning("%s.site-age_url: no site page, returning None")
+    else:
+      if page_url.startswith('/'):
+        page_url = self.urlto(page_url)
     return page_url
 
   @property
@@ -1268,23 +1265,8 @@ class SiteEntity(HasTags):
     '''
     return self.tags_db
 
-  def update_from_sitemap(self):
-    ''' Run this entity through `self.updated_entities()`.
-    '''
-    for _ in self.sitemap.updated_entities((self,)):
-      pass
 
-  def updated(self):
-    ''' Return this entity after updating via `self.update_from_sitemap()`.
 
-        This supports idioms like:
-
-            entity = sitemap[EntityType, 'entity_key'].update()
-
-        for working with a known up to date entity.
-    '''
-    self.update_from_sitemap()
-    return self
 
   @cached_property
   def url_root(self):
@@ -1362,12 +1344,14 @@ class SiteEntity(HasTags):
     '''
     return self.get('refresh_lifespan', self.STALE_LIFEPSAN)
 
-  def _refresh(self, resource):
+  def _refresh(self, resource=None):
     ''' Try to refresh this entity from the sitepage, supporting `Refreshable`.
     '''
     ''' Refetch and reparse `self.sitepage_url` via `self.grok_sitepage()`
         if the page is stale (or if `force` is true).
     '''
+    if resource is None:
+      resource = self.sitepage_url
     self.grok_sitepage(resource)
     return True
 
@@ -1718,13 +1702,14 @@ class SiteMap(UsesTagSets, Promotable):
   # TODO: some notion of staleness
   @classmethod
   @uses_pilfer
-  def updated_entities(
+  @typechecked
+  def refreshed_entities(
       cls,
       entities: Iterable["SiteEntity"],
       *,
       P: "Pilfer",  # noqa: F821
       force=False,
-  ):
+  ) -> Generator[SiteEntity]:
     ''' A generator yielding updated `SiteEntity` instances
         from an iterable of `SiteEntity` instances.
 
@@ -1779,35 +1764,21 @@ class SiteMap(UsesTagSets, Promotable):
       '''
       try:
         for entity in entities:
+          if not isinstance(entity, SiteEntity):
+            warning("not a SiteEntity: %s", r(entity))
+            continue
           # TODO: a better staleness criterion
-          if not force and "sitepage.last_update_unixtime" in entity:
+          if not force and not entitiy.refresh_needed():
             # do not update
             ent_fsQ.put((entity, None))
             continue
-          # TODO: maybe a .prefetch_update_url property allowing use of
-          # the prefetch queue in conjunction with .update_entity()?
-          # That would (a) allow prefetch for this and (b) allow a
-          # default .sitepage_url based .update_entity() method.
-          update_entity = getattr(entity, 'update_entity', None)
-          if callable(update_entity):
-            # the entity has a custom update method
-            ent_fsQ.put((entity, update_entity))
-            continue
-          # Why isn't there a default .update_entity() which uses
-          # the .sitepage_url? Because it would prevent this prefetching
-          # queue.
-          # TODO: skip entities with no .grok_sitepage method
-          sitepage = getattr(entity, "sitepage", None)
-          if sitepage is None:
+          sitepage_url = entity.sitepage_url
+          if sitepage_url is None:
             # no sitepage, do not update
             ent_fsQ.put((entity, None))
             continue
-          if not hasattr(entity, 'grok_sitepage'):
-            # sitepage but no grok-sitepage, do not update
-            ent_fsQ.put((entity, None))
-            continue
           # send the entity and sitepage to the prefetcher
-          ent_spQ.put((entity, sitepage))
+          ent_spQ.put((entity, sitepage_url))
       finally:
         # close the (entity,sitepage) processor
         ent_spQ.close()
@@ -1864,25 +1835,10 @@ class SiteMap(UsesTagSets, Promotable):
         pass
       else:
         try:
-          with Pfx("update %s", entity):
-            if isinstance(update_from, FlowState):
-              # update from a ready FlowState
-              flowstate = update_from
-              # process the flowstate
-              with Pfx("%s.grok_sitepage(FlowState:%s", entity,
-                       flowstate.url.short):
-                entity.grok_sitepage(flowstate)
-            elif callable(update_from):
-              # update from a callable, usually entity.update_entity()
-              update_entity = update_from
-              pfx_call(update_entity)
-            else:
-              raise ValueError(f'cannot honour update_from={r(update_from)}')
+          entity.refresh(update_from)
         except Exception as e:
           warning("exception for update_from=%s: %s", r(update_from), s(e))
-        else:
-          # mark the entity as up to date as of start_time
-          entity["sitepage.last_update_unixtime"] = start_time
+          raise  # debug
       yield entity
 
   @staticmethod
