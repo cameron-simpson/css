@@ -12,9 +12,15 @@ separated list of names then the `builtins` module will be monkey
 patched with those names, enabling trite debug use of those names
 anywhere in the code provided this module has been imported somewhere.
 
+Particularly, when debugging programmes which read data from the
+standard input (`sys.stdin`) it is helpful to monkey patch `breakpoint`
+with the function from this module, which attaches to `/dev/tty`
+for the duration of the breakpoint call.
+
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
-* `abrk`: a decorator to call `breakpoint()` on an `AssertionError`
+* `abrk`: a decorator to call `breakpoint()` on logic errors such as `AssertionError`
+* `breakpoint`: a wrapper for the builtin `breakpoint` which attaches to `/dev/tty`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`
@@ -30,6 +36,7 @@ The allowed names are the list `cs.debug.__all__` and include:
 
 from __future__ import print_function
 import builtins
+from builtins import breakpoint as _breakpoint
 from cmd import Cmd
 from collections import defaultdict
 from contextlib import redirect_stdout
@@ -51,6 +58,7 @@ import traceback
 from types import SimpleNamespace as NS
 from typing import Mapping, Sequence
 
+from cs.context import stackattrs
 from cs.deco import ALL, attr, decorator
 from cs.fs import shortpath
 from cs.lex import (
@@ -83,6 +91,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.context',
         'cs.deco',
         'cs.fs',
         'cs.lex',
@@ -607,6 +616,20 @@ def log_via_print(msg, *a, file=None):
   if file is None:
     file = sys.stdout
   print(msg, file=file, flush=True)
+
+@ALL
+def breakpoint(*a, **kw):
+  ''' Wrapper for buildins.breakpoint()` which attaches `/dev/tty`
+      as `sys.stdin` if `sys.stdin` is not a tty.
+  '''
+  if sys.stdin.isatty():
+    return _breakpoint(*a, **kw)
+  with open('/dev/tty', 'r') as ttyf:
+    with stackattrs(sys, stdin=ttyf):
+      print(
+          'breakpoint wrapper using /dev/tty, type "up" to go to the normal stack frame'
+      )
+      return _breakpoint(*a, **kw)
 
 @ALL
 @decorator
