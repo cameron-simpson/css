@@ -883,38 +883,6 @@ def trace_DEBUG(debug_spec=None):
         if callable(F):
           setattr(M, func_name, trace(F))
 
-builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
-if builtin_names_s:
-  try:
-    import builtins  # pylint: disable=unused-import
-  except ImportError:
-    warning(
-        "$%s=%r but connot import builtins for monkey patching",
-        CS_DEBUG_BUILTINS_ENVVAR, builtin_names_s
-    )
-  else:
-    vs = vars()
-    for builtin_name in (__all__ if builtin_names_s == "1" else
-                         builtin_names_s.split(',')):
-      if not builtin_name:
-        continue
-      if builtin_name not in __all__:
-        warning(
-            "$%s: ignoring %r, not in cs.debug.__all__:%r",
-            CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
-        )
-        continue
-      if builtin_name in ('breakpoint',):
-        # breakpoint doesn't work right if wrapped, gets the wrong frame
-        continue
-      if not is_identifier(builtin_name):
-        warning(
-            "$%s: ignoring %r, not an identifier", CS_DEBUG_BUILTINS_ENVVAR,
-            builtin_name
-        )
-        continue
-      setattr(builtins, builtin_name, vs[builtin_name])
-
 @ALL
 @attr(
     # types whose values we check by value not id()
@@ -1058,3 +1026,26 @@ def selftest(module_name, defaultTest=None, argv=None):
 
 # honour the $DEBUG trace flags
 trace_DEBUG()
+
+# insert names into builtins
+builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
+print('$CS_DEBUG_BUILTINS ->', repr(builtin_names_s))
+if builtin_names_s:
+  vs = vars()
+  for builtin_name in (__all__ if builtin_names_s == "1" else
+                       builtin_names_s.split(',')):
+    if not builtin_name:
+      continue
+    if builtin_name not in __all__:
+      warning(
+          "$%s: ignoring %r, not in cs.debug.__all__:%r",
+          CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
+      )
+      continue
+    if not is_identifier(builtin_name):
+      warning(
+          "$%s: ignoring %r, not an identifier", CS_DEBUG_BUILTINS_ENVVAR,
+          builtin_name
+      )
+      continue
+    setattr(builtins, builtin_name, vs[builtin_name])
