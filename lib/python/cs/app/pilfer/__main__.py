@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import cached_property
 import logging
 import os
 from os.path import expanduser, join as joinpath
@@ -116,6 +117,23 @@ class PilferCommand(BaseCommand):
       '''
       return [fspath for fspath in self.configpath.split(':') if fspath]
 
+    @cached_property
+    def later(self) -> Later:
+      ''' The `Later` instance derived from the options.
+      '''
+      return Later(self.jobs)
+
+    @cached_property
+    def pilfer(self) -> Pilfer:
+      ''' The `Pilfer` instance derived from the options.
+      '''
+      return Pilfer(
+          later=self.later,
+          rcpaths=self.configpaths,
+          sqltags_db_url=self.db_url,
+          verify=not self.no_check_certificates,
+      )
+
     COMMON_OPT_SPECS = dict(
         **BaseCommand.Options.COMMON_OPT_SPECS,
         c_=('configpath', 'Colon separated list of config paths.'),
@@ -152,21 +170,15 @@ class PilferCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError(f'invalid flags: {options.flagnames!r}')
-    with super().run_context():
-      later = Later(self.options.jobs)
+    pilfer = options.pilfer
+    with super().run_context(pilfer=pilfer) as options:
+      later = options.later
       with later:
-        pilfer = Pilfer(
-            later=later,
-            rcpaths=options.configpaths,
-            sqltags_db_url=options.db_url,
-            verify=not options.no_check_certificates,
-        )
+        pilfer = options.pilfer
         with pilfer:
           pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
-              later=later,
-              pilfer=pilfer,
               sqltags=pilfer.sqltags,
               # TODO: this feels clumsy
               db_url=pilfer.sqltags and pilfer.sqltags.db_url,
