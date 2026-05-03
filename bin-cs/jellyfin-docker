@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Run jellyfin in a ocker container.
+# - Cameron Simpson <cs@cskk.id.au> 02may2026
+#
+
+set -ue
+
+image=${JELLYFIN_DOCKER_IMAGE:-ghcr.io/jellyfin/jellyfin:latest}
+config=${JELLYFIN_CONFIG:-$HOME/var/jellyfin}
+media=${JELLYFIN_MEDIA:-$HOME/media}
+cache=${JELLYFIN_CACHE:-~/var/cache/jellyfin}
+
+set -x
+exec run-docker "rw:config:$config" "rw:cache:$cache" "ro:media:$media" "$image"
