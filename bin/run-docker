@@ -1,0 +1,138 @@
+#!/bin/sh
+#
+# Run a command from a relevant docker image.
+# - Cameron Simpson <cs@cskk.id.au> 02may2026
+#
+
+set -ue
+
+name=
+image=
+use_tmux=
+session_name=
+doit=1
+trace=
+[ -t 2 ] && trace=set-x
+run_pull_mode=missing
+uid=$( id -u )
+gid=$( id -g )
+tz=${TZ:-$( cat /etc/timezone )}
+no_dri=
+dri_path=/dev/dri
+[ -e "$dri_path" ] || no_dri=1
+
+# ports to expose
+# see https://support.plex.tv/articles/201543147-what-network-ports-do-i-need-to-allow-through-my-firewall/
+ports=
+# bonjour/avahi discovery
+ports_bonjour="5353:5353/udp"
+# G'Day Mate discovery
+ports_gday="32410:32410/udp 3241232412/udp 3241332413/udp 32414:32414/udp"
+ports_dlna="1900:1900/udp 32469:32469"
+# controlling Plex for Roku via Plex Companion
+ports_roku="8324:8324"
+
+cmd=$0
+usage="Usage: $cmd [options...] [{ro|rw}:subpath:hostpath...] image [/exec/path] [cmdargs...]
+  Run a docker container with various host directories attached.
+
+  Leading options:
+  --bonjour Expose ports for Bonjour/Avahi discovery.
+  --dlna    Expose ports to support DLNA.
+  --gdm     Expose ports to support GDM discovery.
+  -n        No action, dry run. Print the resulting docker command.
+  --no-dri  Do not mount $dri_path inside the container.
+  --roku    Expose ports for controlling Plex for Roku via Plex Companion.
+  -S session_name
+            Session name for tmux; implies --tm.
+  --tm      Run the \"docker run ...\" in a tmux(1) session via the tm(1cs) command.
+            This is handy when dispatching on a remote machine.
+  -U        Update the docker image using \"docker run --pull always\".
+            The default is \"--pull $run_pull_mode\".
+  -x        Trace execution."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --bonjour)  ports="$ports $ports_bonjour" ;;
+    --dlna)     ports="$ports $ports_dlna" ;;
+    --gday)     ports="$ports $ports_gday" ;;
+    --no-dri)   no_dri= ;;
+    --ports)    ports="$ports $2"; shift ;;
+    --roku)     ports="$ports $ports_roku" ;;
+    --tm)       use_tmux=1 ;;
+    --name)     name=$2; shift ;;
+    -S)         use_tmux=1 session_name=$2; shift ;;
+    -U)         run_pull_mode=always ;;
+    -n)         doit= trace=echo ;;
+    -x)         trace=set-x ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
+  esac
+  shift
+done
+
+# the magic argv shuffle
+first=1
+in_opts=1
+for arg
+do
+  if [ $first ]
+  then
+    first=
+    # set initial args
+    # --restart unless-stopped
+    set -- \
+      docker run \
+        --rm \
+        --net=host \
+        --pull "$run_pull_mode" \
+        -e "PUID=$uid" \
+        -e "PGID=$gid" \
+        -e "TZ=$tz"
+    for port in $ports
+    do  set -- "$@" -p "$port"
+    done
+    [ -n "$name" ] || name=run-docker-$$
+    [ $no_dri ] || set -- "$@" --device=/dev/dri:/dev/dri
+    if [ -n "$name" ]
+    then
+      docker_name=$( echo "$name" | tr -s "/' .:+" "______" )
+      set -- "$@" --name "$docker_name"
+    fi
+  fi
+  if [ $in_opts ]
+  then
+    # probe for inage
+    case "$arg" in
+      ro:* | rw:* )
+        m_mode=$( expr "$arg" : '\([^:][^:]*\):.*' )
+        m_subpath=$( expr "$arg" : '[^:][^:]*:\([^/,:][^,:]*\):.*' )
+        m_hostpath=$( expr "$arg" : '[^:][^:]*:[^/,:][^,:]*:\(/[^,]*\)' )
+        mountopts=type=bind
+        [ "$m_mode" = ro ] && mountopts=$mountopts,readonly
+        mountopts=$mountopts,src=$m_hostpath,dst=/$m_subpath
+        set -- "$@" --mount "$mountopts"
+        continue
+        ;;
+    esac
+    in_opts=
+  fi
+  set -- "$@" "$arg"
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $use_tmux ]
+then
+  session_name=$( echo "${session_name:-${name:-$image}}" | tr -s '/ .:+' '_____' )
+  set -- tm -x "$session_name" "$@"
+fi
+
+[ $doit ] && set -x
+exec $trace "$@"
