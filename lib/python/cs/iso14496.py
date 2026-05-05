@@ -248,11 +248,11 @@ class MP4Command(BaseCommand):
             box.report_table(table)
             for subbox, tags in box.gather_metadata():
               if not tags:
-                table.append((f'  {box.box_type_s}', 'No metadata.'))
+                table.append([f'  {box.box_type_s}', 'No metadata.'])
               else:
-                table.append((f'  {box.box_type_s}',))
+                table.append(['  {box.box_type_s}'])
                 for tag_name, tag_value in tags.items():
-                  table.append((f'    {tag_name}', tag_value))
+                  table.append([f'    {tag_name}', tag_value])
         printt(*table)
     return xit
 
@@ -1235,21 +1235,22 @@ class Box(SimpleBinary):
     box_type = self.box_type_s
     if box_type == 'ftyp':
       table.append(
-          (
+          [
               f'{indent}File type',
               f'File type: {self.major_brand}, brands={self.brands_bs}'
-          )
+          ]
       )
     elif box_type == 'free':
-      table.append((f'{indent}Free space', str(geek_bytes(len(self))[-2:])))
+      table.append([f'{indent}Free space', str(geek_bytes(len(self))[-2:])])
     elif box_type == 'mdat':
       table.append(
-          (f'{indent}Media data', str(geek_bytes(len(self.body))[-2:]))
+          [f'{indent}Media data',
+           str(geek_bytes(len(self.body))[-2:])]
       )
     elif box_type == 'moov':
       mvhd = self.MVHD
       table.append(
-          (
+          [
               f'{indent}Movie',
               ", ".join(
                   (
@@ -1258,7 +1259,7 @@ class Box(SimpleBinary):
                       f'next_track_id={mvhd.next_track_id}',
                   )
               ),
-          )
+          ]
       )
       for moov_box in self:
         box_type = moov_box.box_type_s
@@ -1271,14 +1272,14 @@ class Box(SimpleBinary):
       mdia = trak.MDIA
       mdhd = mdia.MDHD
       tkhd = trak.TKHD
-      table.append((f'{indent}Track', f'duration={tkhd.duration}'))
-      table.append((f'{indent2}EDTS', ('No EDTS' if edts is None else edts)))
+      table.append([f'{indent}Track', f'duration={tkhd.duration}'])
+      table.append([f'{indent2}EDTS', ('No EDTS' if edts is None else edts)])
       duration_s = human_time(mdhd.duration.value / mdhd.timescale.value)
       table.append(
-          (
+          [
               f'{indent2}Media',
               f'duration={duration_s} language={mdhd.language}'
-          )
+          ]
       )
       for tbox in trak:
         tbox_type = tbox.box_type_s
@@ -1289,7 +1290,7 @@ class Box(SimpleBinary):
       box_s = str(self)
       if len(box_s) > 58:
         box_s = box_s[:55] + '...'
-      table.append((f'{indent}{box_type}', box_s))
+      table.append([f'{indent}{box_type}', box_s])
     return table
 
   def report(self, file=None, **report_table_kw):
