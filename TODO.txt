@@ -1,3 +1,4 @@
+jellyfin: make NFO files from fstags
 cs.cmdutils: rework the usgae text stuff, have a HasUsage mixin etc
 aalib as fallback for no sixel? maybe just roll my own greyscale to char mapping? python-aalib has... problems
 cs.cmdutils: usage: some way to embed a table of envvars like we do for options, then generalise for other tables
