@@ -610,7 +610,7 @@ def shortpath(
         except OSError:
           i += 1
     parts = [
-        (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
+        (path_as[1] or (str(path_as[0]) if i == 0 else path_as[0].name))
         for i, path_as in enumerate(keep_as)
     ]
     parts.append(paths_as[-1][1] or leaf.name)
