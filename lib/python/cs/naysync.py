@@ -389,6 +389,10 @@ class Lock:
 
           async with shared_lock:
               critical section
+
+      If you're using just async code in a single thread, use `asyncio.Lock`.
+      If you're using just sync code in multiple threads, use `threading.Lock`.
+      If you need to control access in various sync and async contexts use this `Lock`.
   '''
 
   def __init__(self, name=None, *, max_workers=64):
