@@ -1906,7 +1906,6 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath, Promotable):
     '''
     return CachedValue(self, prefix, name, state_func=state_func)
 
-  @uses_verbose
   def infer_from_basename(self, rules=None):
     ''' Apply `rules` to the basename of this `TaggedPath`,
         return a `TagSet` of inferred `Tag`s.
