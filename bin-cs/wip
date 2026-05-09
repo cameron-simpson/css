@@ -45,7 +45,7 @@ wip_branch=WIP-$branch-noci
 
 if $trace git stash
 then
-  $trace git co -b "$wip_branch"
+  $trace git co -B "$wip_branch"
   $trace patch -p1 <"$diff"
   $trace git add $for_wip
   $trace git commit -m "WIP for $branch as of `date`"
