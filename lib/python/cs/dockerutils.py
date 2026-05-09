@@ -361,6 +361,7 @@ class DockerRun:
       quiet = True
     argv = list(argv)  # work with a mutable copy
     is_podman = basename(self.docker_exe).startswith("podman")
+    is_docker = not is_podman
     if self.image is None:
       raise ValueError("self.image is still None")
     with Pfx("input_root:%r", self.input_root):
@@ -382,9 +383,15 @@ class DockerRun:
     docker_argv = [
         self.docker_exe,
         'run',
+        quiet and '--quiet',
         '--rm',
         ('--network', self.network),
         ('--workdir', self.output_root),
+        ('--cap-drop', 'all'),
+        is_podman and self.user and ('--user', self.user),
+        ##is_podman and not self.user and ('--userns','keep-id'),
+        ##is_podman and not self.user and ('--user','f'{os.geteuid()}:{os.getegid()}',
+        is_docker and
         ('--user', self.user or f'{os.geteuid()}:{os.getegid()}'),
         *self.options,
     ]
