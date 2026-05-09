@@ -111,7 +111,7 @@ class JellfyfinCommand(BaseCommand):
       print(filename)
       print(jf.pathto_series_episode(filename))
 
-  @popopts
+  @popopts(f=('force', 'Force: overwrite existing .nfo files.'))
   @uses_fstags
   def cmd_nfo(self, argv, fstags: FSTags):
     ''' Usage: {cmd} mediapaths...
@@ -125,7 +125,9 @@ class JellfyfinCommand(BaseCommand):
       vprint(fspath)
       with Pfx(fspath):
         try:
-          nfopath = make_nfo(fspath, fstags=fstags)
+          nfopath = make_nfo(
+              fspath, fstags=fstags, exists_ok=self.options.force
+          )
         except OSError as e:
           warning("%s", e)
           xit = 1
@@ -142,7 +144,9 @@ def nfopath(mediapath):
 @pfx
 @uses_fstags
 @uses_verbose
-def make_nfo(mediapath, *, fstags: FSTags, verbose: bool) -> str:
+def make_nfo(
+    mediapath, *, fstags: FSTags, verbose: bool, exists_ok=False
+) -> str:
   ''' Create the `.nfo` file for `mediapath` if missing.
       Return the path of the NFO file.
   '''
@@ -155,7 +159,7 @@ def make_nfo(mediapath, *, fstags: FSTags, verbose: bool) -> str:
     print("  fstags:")
     ftags.printt(indent=4)
   nfpath = nfopath(mediapath)
-  if existspath(nfpath):
+  if not exists_ok and existspath(nfpath):
     vprint(nfpath, "already exists")
     return nfpath
   itags = ftags.infer_tags()
@@ -168,7 +172,7 @@ def make_nfo(mediapath, *, fstags: FSTags, verbose: bool) -> str:
     xml = nfo_tv(itags)
   else:
     xml = nfo_movie(itags)
-  with atomic_filename(nfpath, mode="w") as f:
+  with atomic_filename(nfpath, mode="w", exists_ok=exists_ok) as f:
     print('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', file=f)
     print(xml_tostring(xml, encoding='unicode', pretty_print=True), file=f)
   return nfpath
@@ -190,7 +194,7 @@ def nfo_movie(tags: TagSet):
               # displayseason - season the special aired in
               # trailer - YouTube URL in the Kodi format
               # rating
-              # year
+              year=tags.get('year'),
               # sorttitle
               # mpaa
               # aspectratio
@@ -220,7 +224,7 @@ def nfo_tv(tags: TagSet):
   return E.tvshow(
       *[
           getattr(E, tag)(str(value)) for tag, value in dict(
-              plot=tags.get('.synopsis'),
+              plot=tags.get('synopsis'),
               seasonnumber=tags.get('tv.season'),
               showtitle=tags.get('tv.episode_title'),
               episode=tags.get('tv.episode'),
