@@ -323,7 +323,8 @@ from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatMapping,
-    FormatableMixin, format_attribute, FStr, printt, r, s, without_suffix
+    FormatableMixin, format_attribute, FStr, printt, r, s, without_prefix,
+    without_suffix
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
@@ -711,7 +712,7 @@ class TagSetTyping:
         is `('id.tvdb.series','1234')`.
     '''
     ##return f'{cls.type_zone_of(name)}.zone_key', cls.type_zone_key_of(name)
-    return f'id.{self.type_name}', self.type_key
+    return f'id.{cls.type_name_of(name)}', cls.type_key_of(name)
 
   @property
   def type_reference(self):
