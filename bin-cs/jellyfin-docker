@@ -12,4 +12,4 @@ media=${JELLYFIN_MEDIA:-$HOME/media}
 cache=${JELLYFIN_CACHE:-~/var/cache/jellyfin}
 
 set -x
-exec run-docker "rw:config:$config" "rw:cache:$cache" "ro:media:$media" "$image"
+exec run-docker --restart unless-stopped "rw:config:$config" "rw:cache:$cache" "ro:media:$media" "$image"
