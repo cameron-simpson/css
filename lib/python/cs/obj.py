@@ -602,7 +602,7 @@ class Refreshable(ABC):
         return False
       last_poll = getattr(self, 'refresh_last_poll', 0.0)
       if ratelimit is None:
-        ratelimit = getattr(self, 'refresh_reatelimit', 1.0)
+        ratelimit = getattr(self, 'refresh_ratelimit', 1.0)
       if now - last_poll < ratelimit:
         # too early to repoll
         return False
