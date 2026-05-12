@@ -2562,9 +2562,10 @@ class BaseToken(Promotable):
     '''
     while True:
       try:
-        token, offset = cls.parse(text, offset, skip=skip)
+        token = cls.parse(text, offset, skip=skip)
       except EOFError:
         break
+      offset = token.end_offset
       yield token
 
 class CoreTokens(BaseToken):
