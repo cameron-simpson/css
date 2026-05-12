@@ -7,12 +7,15 @@ r'''
 Convenience facilities for objects.
 '''
 
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from copy import copy as copy0
 import sys
 from threading import Lock
+import time
 import traceback
 from types import SimpleNamespace
+from typing import Optional
 from weakref import WeakValueDictionary
 
 from cs.deco import OBSOLETE
@@ -520,6 +523,97 @@ class Sentinel:
 
   def __eq__(self, other):
     return self is other
+
+class Refreshable(ABC):
+  ''' A mixin for refreshable objects.
+      The object must provide a `_refresh(resource)` method
+      which tries to refresh from `resource`.
+
+      This mixin provides a `.refresh()` method which implements the refresh policy.
+  '''
+
+  @abstractmethod
+  def _refresh(self, resource) -> bool:
+    ''' Refresh the object from `resource`, typically an URL.
+        Return `True` if the object was updated, `False` otherwise.
+    '''
+    raise NotImplementedError
+
+  def refreshed(self, now: float = None):
+    ''' Mark `self` as refreshed as of `now`, default `time.time()`.
+    '''
+    if now is None:
+      now = time.time()
+    self.refresh_last_update = now
+
+  def refresh_needed(
+      self,
+      *,
+      lifespan: float = None,
+      now: float = None,
+  ) -> bool:
+    ''' Test whether `self` is considered stale.
+
+        Parameters:
+        * `lifespan`: how many seconds before updated information
+          is considered no stale, default from `self.refresh_lifespan`,
+          or 1.0s
+         * `now`: optional reference time, default from `time.time()`
+    '''
+    if now is None:
+      now = time.time()
+    if lifespan is None:
+      lifespan = getattr(self, 'refresh_lifespan', 1.0)
+    last_update = getattr(self, 'refresh_last_update', 0.0)
+    return last_update + lifespan < now
+
+  def refresh(
+      self,
+      resource: Optional = None,
+      *,
+      force=False,
+      lifespan: float = None,
+      ratelimit: float = None,
+  ) -> bool:
+    ''' Refresh this object; if it is stale attempt to refresh via `self._refresh()`.
+        Return `True` if the object was updated, `False` otherwise.
+
+        The refresh policy is: if `force` or (the object's information
+        is stale and the rate limit does not preclude a refresh),
+        call `self._refresh(resource)`.
+        This is measured by `self.refresh_needed()`.
+
+        State about the refresh poll times is kept in
+        `self.refresh_last_poll` and `self.refresh_last_update`.
+
+        Parameters:
+        * `resource`: the reference resource, default from `self.refresh_resource`
+        * `force`: optional flag, default `False`; if true attempt
+          a refresh regardless of staleness or the rate limit
+        * `lifespan`: how many seconds before updated information
+          is considered no stale, default from `self.refresh_lifespan`,
+          or 1.0s
+        * `ratelimit`: how many seconds should elapsed before
+          attempting a refresh, default from `self.refresh_ratelimit` or 1.0s
+    '''
+    now = time.time()
+    if not force:
+      if not self.refresh_needed(lifespan=lifespan, now=now):
+        return False
+      last_poll = getattr(self, 'refresh_last_poll', 0.0)
+      if ratelimit is None:
+        ratelimit = getattr(self, 'refresh_reatelimit', 1.0)
+      if now - last_poll < ratelimit:
+        # too early to repoll
+        return False
+    # the object is stale (or force is true)
+    if resource is None:
+      resource = getattr(self, 'refresh_resource', None)
+    self.refresh_last_poll = now
+    refreshed = self._refresh(resource)
+    if refreshed:
+      self.refresh_last_update = now
+    return refreshed
 
 def public_subclasses(cls, extras=()):
   ''' Return a set of the subclasses of `cls` which have public names.

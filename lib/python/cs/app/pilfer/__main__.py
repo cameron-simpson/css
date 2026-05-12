@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import cached_property
 import logging
 import os
 from os.path import expanduser, join as joinpath
@@ -12,7 +13,7 @@ import re
 import sys
 from typing import Iterable
 
-from bs4 import NavigableString
+from bs4 import BeautifulSoup, NavigableString
 from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
@@ -49,7 +50,7 @@ from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 from .print import dump_soup
 from .rss import RSSChannelMixin
-from .sitemap import FlowState, SiteEntity, SiteMap
+from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -116,6 +117,23 @@ class PilferCommand(BaseCommand):
       '''
       return [fspath for fspath in self.configpath.split(':') if fspath]
 
+    @cached_property
+    def later(self) -> Later:
+      ''' The `Later` instance derived from the options.
+      '''
+      return Later(self.jobs)
+
+    @cached_property
+    def pilfer(self) -> Pilfer:
+      ''' The `Pilfer` instance derived from the options.
+      '''
+      return Pilfer(
+          later=self.later,
+          rcpaths=self.configpaths,
+          sqltags_db_url=self.db_url,
+          verify=not self.no_check_certificates,
+      )
+
     COMMON_OPT_SPECS = dict(
         **BaseCommand.Options.COMMON_OPT_SPECS,
         c_=('configpath', 'Colon separated list of config paths.'),
@@ -152,21 +170,15 @@ class PilferCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError(f'invalid flags: {options.flagnames!r}')
-    with super().run_context():
-      later = Later(self.options.jobs)
+    pilfer = options.pilfer
+    with super().run_context(pilfer=pilfer) as options:
+      later = options.later
       with later:
-        pilfer = Pilfer(
-            later=later,
-            rcpaths=options.configpaths,
-            sqltags_db_url=options.db_url,
-            verify=not options.no_check_certificates,
-        )
+        pilfer = options.pilfer
         with pilfer:
           pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
-              later=later,
-              pilfer=pilfer,
               sqltags=pilfer.sqltags,
               # TODO: this feels clumsy
               db_url=pilfer.sqltags and pilfer.sqltags.db_url,
@@ -350,44 +362,56 @@ class PilferCommand(BaseCommand):
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [METHOD] url [header:value...] [param=value...]
           Fetch url and dump information from it.
+          The word "-" may be supplied instead of a URL to dump the
+          stdandard input, parsing it as HTML.
     '''
     options = self.options
     P = options.pilfer
-    # optional leading METHOD
-    if argv and argv[0].isupper():
-      method = argv.pop(0)
+    if argv and argv[0] == '-':
+      # "-" means dump the content of stdin
+      url = argv.pop(0)
     else:
-      method = 'GET'
-    # url
-    if not argv:
-      raise GetoptError("missing URL")
-    url = argv.pop(0)
-    # optional header:value
-    rqhdrs = {}
-    while argv:
-      name, offset = get_identifier(argv[0], extra='_-')
-      if not name or not name.startswith(':'):
-        # not a header
-        break
-      rqhdrs[name] = name[offset + 1:]
-      argv.pop(0)
-    # optional param=value
-    params = {}
-    while argv:
-      name, offset = get_identifier(argv[0], extra='_-')
-      if not name or not name.startswith('='):
-        # not a parameter
-        break
-      params[name] = name[offset + 1:]
-      argv.pop(0)
+      # optional leading METHOD
+      if argv and argv[0].isupper():
+        method = argv.pop(0)
+      else:
+        method = 'GET'
+      # url
+      if not argv:
+        raise GetoptError("missing URL")
+      url = argv.pop(0)
+      # optional header:value
+      rqhdrs = {}
+      while argv:
+        name, offset = get_identifier(argv[0], extra='_-')
+        if not name or not name.startswith(':'):
+          # not a header
+          break
+        rqhdrs[name] = name[offset + 1:]
+        argv.pop(0)
+      # optional param=value
+      params = {}
+      while argv:
+        name, offset = get_identifier(argv[0], extra='_-')
+        if not name or not name.startswith('='):
+          # not a parameter
+          break
+        params[name] = name[offset + 1:]
+        argv.pop(0)
     if argv:
       raise GetoptError(f'extra arguments after URL/headers/params: {argv!r}')
+    if url == '-':
+      text = sys.stdin.read()
+      soup = BeautifulSoup(text, BS4_PARSER_DEFAULT)
+      dump_soup(soup)
+      return 0
     print(
         method,
         url,
         *(f'{name}:{value}' for name, value in rqhdrs.items()),
         *(f'{param}={value}' for param, value in params.items()),
     )
+    # a normal URL: fetch it and dump
     rsp = P.request(
         url,
         method=method,
@@ -419,7 +443,7 @@ class PilferCommand(BaseCommand):
       print("no soup for content_type", flowstate.content_type)
     else:
       table = []
-      title = soup.head.title
+      title = soup.head and soup.head.title
       if title:
         table.append(["Title:", title.string])
       meta = flowstate.meta

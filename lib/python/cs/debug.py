@@ -12,9 +12,15 @@ separated list of names then the `builtins` module will be monkey
 patched with those names, enabling trite debug use of those names
 anywhere in the code provided this module has been imported somewhere.
 
+Particularly, when debugging programmes which read data from the
+standard input (`sys.stdin`) it is helpful to monkey patch `breakpoint`
+with the function from this module, which attaches to `/dev/tty`
+for the duration of the breakpoint call.
+
 The allowed names are the list `cs.debug.__all__` and include:
 * `X`: `cs.x.X`
-* `abrk`: a decorator to call `breakpoint()` on an `AssertionError`
+* `abrk`: a decorator to call `breakpoint()` on logic errors such as `AssertionError`
+* `breakpoint`: a wrapper for the builtin `breakpoint` which attaches to `/dev/tty`
 * `pformat`: `pprint.pformat`
 * `pprint`: `pprint.pprint`
 * `print`: `cs.upd.print`
@@ -30,6 +36,7 @@ The allowed names are the list `cs.debug.__all__` and include:
 
 from __future__ import print_function
 import builtins
+from builtins import breakpoint as _breakpoint
 from cmd import Cmd
 from collections import defaultdict
 from contextlib import redirect_stdout
@@ -51,6 +58,7 @@ import traceback
 from types import SimpleNamespace as NS
 from typing import Mapping, Sequence
 
+from cs.context import stackattrs
 from cs.deco import ALL, attr, decorator
 from cs.fs import shortpath
 from cs.lex import (
@@ -83,6 +91,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.context',
         'cs.deco',
         'cs.fs',
         'cs.lex',
@@ -609,14 +618,37 @@ def log_via_print(msg, *a, file=None):
   print(msg, file=file, flush=True)
 
 @ALL
+def breakpoint(*a, **kw):
+  ''' Wrapper for buildins.breakpoint()` which attaches `/dev/tty`
+      as `sys.stdin` if `sys.stdin` is not a tty.
+  '''
+  if sys.stdin.isatty():
+    return _breakpoint(*a, **kw)
+  with open('/dev/tty', 'r') as ttyf:
+    with stackattrs(sys, stdin=ttyf):
+      print(
+          'breakpoint wrapper using /dev/tty, type "up" to go to the normal stack frame'
+      )
+      return _breakpoint(*a, **kw)
+
+@ALL
 @decorator
 def abrk(func, exceptions=(AssertionError, NameError, RuntimeError)):
-  ''' A decorator to intercept certain exceptions
+  ''' A decorator to intercept the specified `exceptions`
       (by default `AssertionError`, `NameError`, `RuntimeError`)
       and call `breakpoint()`.
       The breakpoint frame contains:
       - `func`: the wrapper function
       - `func_a`, `func_kw`: the function positional and keyword arguments
+
+      Examples:
+
+          @abrk
+          def broken_function(......):
+
+          @property
+          @abrk(exceptions=AttributeError)
+          def broken_property(......):
   '''
 
   def cs_debug_abrk_wrapper(*func_a, **func_kw):
@@ -851,38 +883,6 @@ def trace_DEBUG(debug_spec=None):
         if callable(F):
           setattr(M, func_name, trace(F))
 
-builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
-if builtin_names_s:
-  try:
-    import builtins  # pylint: disable=unused-import
-  except ImportError:
-    warning(
-        "$%s=%r but connot import builtins for monkey patching",
-        CS_DEBUG_BUILTINS_ENVVAR, builtin_names_s
-    )
-  else:
-    vs = vars()
-    for builtin_name in (__all__ if builtin_names_s == "1" else
-                         builtin_names_s.split(',')):
-      if not builtin_name:
-        continue
-      if builtin_name not in __all__:
-        warning(
-            "$%s: ignoring %r, not in cs.debug.__all__:%r",
-            CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
-        )
-        continue
-      if builtin_name in ('breakpoint',):
-        # breakpoint doesn't work right if wrapped, gets the wrong frame
-        continue
-      if not is_identifier(builtin_name):
-        warning(
-            "$%s: ignoring %r, not an identifier", CS_DEBUG_BUILTINS_ENVVAR,
-            builtin_name
-        )
-        continue
-      setattr(builtins, builtin_name, vs[builtin_name])
-
 @ALL
 @attr(
     # types whose values we check by value not id()
@@ -1026,3 +1026,26 @@ def selftest(module_name, defaultTest=None, argv=None):
 
 # honour the $DEBUG trace flags
 trace_DEBUG()
+
+# insert names into builtins
+builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
+print('$CS_DEBUG_BUILTINS ->', repr(builtin_names_s))
+if builtin_names_s:
+  vs = vars()
+  for builtin_name in (__all__ if builtin_names_s == "1" else
+                       builtin_names_s.split(',')):
+    if not builtin_name:
+      continue
+    if builtin_name not in __all__:
+      warning(
+          "$%s: ignoring %r, not in cs.debug.__all__:%r",
+          CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
+      )
+      continue
+    if not is_identifier(builtin_name):
+      warning(
+          "$%s: ignoring %r, not an identifier", CS_DEBUG_BUILTINS_ENVVAR,
+          builtin_name
+      )
+      continue
+    setattr(builtins, builtin_name, vs[builtin_name])

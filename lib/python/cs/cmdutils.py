@@ -558,7 +558,7 @@ class SubCommand:
   def usage_format_parts(
       self
   ) -> Tuple[str, Union[str, None], Union[str, None]]:
-    ''' The usage description format string brokoen into:
+    ''' The usage description format string broken into:
         - the usage line (or lines if slosh extended)
         - the first line of the description, or `None`
         - the trailing lines of the description, or `None`
@@ -1789,10 +1789,7 @@ class BaseCommand:
     options = self.options
     try:
       try:
-        with self.run_context(**kw_options) as xit:
-          if xit is not None:
-            error("exit status from run_context: %s", xit)
-            return xit
+        with self.run_context(**kw_options):
           return self._run(self._argv)
       except CancellationError:
         error("cancelled")
@@ -1866,19 +1863,21 @@ class BaseCommand:
   @uses_upd
   def run_context(self, *, runstate: RunState, upd: Upd, **options_kw):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
-        Normally this will have a bare `yield`, but you can yield
-        a not `None` value to exit before the command, for example
-        if the run setup fails.
+
+        A new `self.options` object is prepared as a copy of the
+        current `self.options` so that subcommands are free to
+        modify its values; this is yielded from the context manager.
 
         This default does several things, and subclasses should
         override it like this:
 
             @contextmanager
             def run_context(self):
-              with super().run_context():
+              with super().run_context() as options:
                 try:
                   ... subclass context setup ...
-                  yield
+                  ... possibly modifying the new options ...
+                  yield options
                 finally:
                   ... any unconditional cleanup ...
 
@@ -1896,20 +1895,24 @@ class BaseCommand:
     runstate = self.options.runstate or runstate
     # redundant try/finally to remind subclassers of correct structure
     try:
-      run_options = self.options.copy(runstate=runstate, **options_kw)
-      with run_options:  # make the default ThreadState
-        with stackattrs(
-            self,
-            options=run_options,
-        ):
-          with upd:
-            with runstate:
-              with runstate.catch_signal(
-                  run_options.runstate_signals,
-                  call_previous=False,
-                  handle_signal=self.handle_signal,
-              ):
-                yield
+      run_options = self.options.copy()
+      infill = self.options.__dict__.copy()
+      infill.update(runstate=runstate)
+      infill.update(**options_kw)
+      with trace(stackattrs)(run_options, **infill):
+        with run_options:  # make the default ThreadState
+          with stackattrs(
+              self,
+              options=run_options,
+          ):
+            with upd:
+              with runstate:
+                with runstate.catch_signal(
+                    run_options.runstate_signals,
+                    call_previous=False,
+                    handle_signal=self.handle_signal,
+                ):
+                  yield run_options
 
     finally:
       pass

@@ -368,14 +368,17 @@ class PlayOnCommand(BaseCommand):
     return xit
 
   @uses_runstate
-  def _refresh_sqltags_data(self, api, runstate: RunState, max_age=None):
+  def _refresh_sqltags_data(self, api, runstate: RunState, lifespan=None):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
     recordings = set(api.fetch_recordings())
     need_refresh = (
         # any current recordings whose state is stale
-        any(recording.is_stale(max_age=max_age) for recording in recordings) or
+        any(
+            recording.refresh_needed(lifespan=lifespan)
+            for recording in recordings
+        ) or
         # no recording is current
         all(recording.is_expired() for recording in recordings)
     )
@@ -536,6 +539,9 @@ class _PlayOnEntity(HasTags):
       This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
   '''
 
+  def _refresh(self, recourse):
+    warning("no individual {self.__class__.__name__}._refresh method")
+
 class LoginState(_PlayOnEntity):
 
   TYPE_SUBNAME = 'login.state'
@@ -554,7 +560,7 @@ class Recording(_PlayOnEntity):
   TYPE_SUBNAME = 'recording'
 
   # recording data are considered stale after 10 minutes
-  STALE_AGE = 600
+  refresh_lifespan = 600
 
   RECORDING_QUALITY = {
       1: '720p',
@@ -671,19 +677,14 @@ class Recording(_PlayOnEntity):
       return True
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
-  @format_attribute
-  def is_stale(self, max_age=None):
-    ''' Override for `TagSet.is_stale()` which considers expired
-        records not stale because they can never be refrehed from the
-        service.
+  def refresh_needed(self, **kw):
+    ''' Override for `Refreshable.refresh_needed` which always
+        returns `False` for expired recordings.
     '''
     if self.is_expired():
       # an expired recording will never become stale
       return False
-    last_updated = self.get('last_updated')
-    if last_updated is None:
-      return True
-    return last_updated + (max_age or self.STALE_AGE) < time.time()
+    return super().refresh_needed(**kw)
 
   @fmtdoc
   def filename(self, filename_format=None) -> str:
@@ -922,7 +923,8 @@ class PlayOnAPI(HTTPServiceAPI):
       headers = dict(Authorization=self.jwt)
     return super().suburl(suburl, _base_url=_base_url, headers=headers, **kw)
 
-  def suburl_data(self, suburl, *, raw=False, **kw):
+  @uses_verbose
+  def suburl_data(self, suburl, *, raw=False, verbose=False, **kw):
     ''' Call `suburl` and return the `'data'` component on success.
 
         Parameters:
@@ -932,13 +934,15 @@ class PlayOnAPI(HTTPServiceAPI):
           result keys and returning `result['data']`
         Other keyword arguments are passed to the `HTTPServiceAPI.json` method.
     '''
-    result = self.json(suburl, **kw)
-    if raw:
-      return result
-    ok = result.get('success')
-    if not ok:
-      raise ValueError("failed: %r" % (result,))
-    return result['data']
+    with run_task(f'{self.__class__.__name__}.suburl_data({suburl})',
+                  report_print=verbose):
+      result = self.json(suburl, **kw)
+      if raw:
+        return result
+      ok = result.get('success')
+      if not ok:
+        raise ValueError("failed: %r" % (result,))
+      return result['data']
 
   @pfx_method
   def account(self):
@@ -979,19 +983,24 @@ class PlayOnAPI(HTTPServiceAPI):
     )
 
   @pfx_method
-  def fetch_recordings(self) -> set[Recording]:
+  @uses_verbose
+  def fetch_recordings(self, *, verbose=False) -> set[Recording]:
     ''' Return a set of the `Recording` instances for the available recordings.
         This makes an API request.
     '''
     data = self.suburl_data('library/all')
     entries = data['entries']
-    return self._entry_entities(
+    entities = self._entry_entities(
         entries, Recording, dict(
             Episode=int,
             ReleaseYear=int,
             Season=int,
         )
     )
+    if verbose:
+      for ent in entities:
+        ent.printt()
+    return entities
 
   def recordings(self):
     ''' Yield the `Recording`s.
@@ -1105,7 +1114,7 @@ class PlayOnAPI(HTTPServiceAPI):
                     entry[e_field] = value2
         entity = self[entity_type, entry_id]
         entity.tags.update(entry, prefix='playon')
-        entity.tags.update(dict(last_updated=now))
+        entity.refreshed(now)
         entities.add(entity)
     return entities
 

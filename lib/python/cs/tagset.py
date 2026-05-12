@@ -331,7 +331,7 @@ from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
 )
-from cs.obj import public_subclasses, SingletonMixin
+from cs.obj import public_subclasses, Refreshable, SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin, openif
@@ -759,6 +759,7 @@ class TagSet(
     FormatableMixin,
     AttrableMappingMixin,
     Promotable,
+    Refreshable,
 ):
   ''' A setlike class collection of `Tag`s.
 
@@ -913,6 +914,20 @@ class TagSet(
     ''' Make a `TagSet` from an iterable of `Tag`s.
     '''
     return cls(_ontology=_ontology, **{tag.name: tag.value for tag in tags})
+
+  #################################################################
+  # Properties supporting Refreshable.
+  @property
+  def refresh_last_update(self):
+    ''' The last time a refresh update time.
+    '''
+    return self.get('refresh_last_update', 0.0)
+
+  @refresh_last_update.setter
+  def refresh_last_update(self, when: float):
+    ''' Save the last refresh update time.
+    '''
+    self['refresh_last_update'] = when
 
   #################################################################
   # Methods supporting FormattableMixin.
@@ -1316,21 +1331,6 @@ class TagSet(
       return None
     else:
       return UUID(uuid_s) if uuid_s else None
-
-  @format_attribute
-  def is_stale(self, max_age=None):
-    ''' Test whether this `TagSet` is stale
-        i.e. the time since `self.last_updated` UNIX time exceeds `max_age` seconds
-        (default from `self.STALE_AGE`).
-
-        This is a convenience function for `TagSet`s which cache external data.
-    '''
-    if max_age is None:
-      max_age = self.STALE_AGE
-    last_updated = self.get('last_updated', None)
-    if not last_updated:
-      return True
-    return time.time() >= last_updated + max_age
 
   #############################################################################
   # The '.auto' attribute space.
@@ -2998,7 +2998,7 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class HasTags(TagSetTyping, FormatableMixin):
+class HasTags(TagSetTyping, FormatableMixin, Refreshable):
   ''' A mixin for classes which have a `.tags:TagSet` attribute.
 
       The subclass may itself define its `.tags` instance attribute
@@ -3195,6 +3195,20 @@ class HasTags(TagSetTyping, FormatableMixin):
       return method
 
     return FormatMapping(self, kwargs, missing)
+
+  #################################################################
+  # Properties supporting Refreshable.
+  @property
+  def refresh_last_update(self):
+    ''' The last time a refresh update time.
+    '''
+    return self.tags.refresh_last_update
+
+  @refresh_last_update.setter
+  def refresh_last_update(self, when: float):
+    ''' Save the last refresh update time.
+    '''
+    self.tags.refresh_last_update = when
 
 class UsesTagSets:
   ''' A mixin to support classes which use a `BaseTagSets` to store their data.
