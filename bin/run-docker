@@ -10,6 +10,8 @@ name=
 image=
 use_tmux=
 session_name=
+rmopt=--rm
+restart=no
 doit=1
 trace=
 [ -t 2 ] && trace=set-x
@@ -43,6 +45,8 @@ usage="Usage: $cmd [options...] [{ro|rw}:subpath:hostpath...] image [/exec/path]
   -n        No action, dry run. Print the resulting docker command.
   --no-dri  Do not mount $dri_path inside the container.
   --roku    Expose ports for controlling Plex for Roku via Plex Companion.
+  --restart mode
+            Passed to docker, default $restart.
   -S session_name
             Session name for tmux; implies --tm.
   --tm      Run the \"docker run ...\" in a tmux(1) session via the tm(1cs) command.
@@ -64,6 +68,7 @@ do
     --roku)     ports="$ports $ports_roku" ;;
     --tm)       use_tmux=1 ;;
     --name)     name=$2; shift ;;
+    --restart)  restart=$2 rmopt= ; shift ;;
     -S)         use_tmux=1 session_name=$2; shift ;;
     -U)         run_pull_mode=always ;;
     -n)         doit= trace=echo ;;
@@ -89,9 +94,10 @@ do
     # --restart unless-stopped
     set -- \
       docker run \
-        --rm \
+        $rmopt \
         --net=host \
         --pull "$run_pull_mode" \
+        --restart "$restart" \
         -e "PUID=$uid" \
         -e "PGID=$gid" \
         -e "TZ=$tz"
