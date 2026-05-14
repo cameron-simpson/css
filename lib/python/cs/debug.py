@@ -1031,21 +1031,60 @@ trace_DEBUG()
 builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
 print('$CS_DEBUG_BUILTINS ->', repr(builtin_names_s))
 if builtin_names_s:
-  vs = vars()
-  for builtin_name in (__all__ if builtin_names_s == "1" else
-                       builtin_names_s.split(',')):
-    if not builtin_name:
-      continue
-    if builtin_name not in __all__:
-      warning(
-          "$%s: ignoring %r, not in cs.debug.__all__:%r",
-          CS_DEBUG_BUILTINS_ENVVAR, builtin_name, __all__
-      )
-      continue
-    if not is_identifier(builtin_name):
-      warning(
-          "$%s: ignoring %r, not an identifier", CS_DEBUG_BUILTINS_ENVVAR,
-          builtin_name
-      )
-      continue
-    setattr(builtins, builtin_name, vs[builtin_name])
+  try:
+    import builtins  # pylint: disable=unused-import
+  except ImportError:
+    warning(
+        "$%s=%r but connot import builtins for monkey patching",
+        CS_DEBUG_BUILTINS_ENVVAR,
+        builtin_names_s,
+    )
+  else:
+    vs = vars()
+    for builtin_name in (__all__ if builtin_names_s == "1" else
+                         builtin_names_s.split(",")):
+      if not builtin_name:
+        continue
+      if builtin_name not in __all__:
+        warning(
+            "$%s: ignoring %r, not in cs.debug.__all__:%r",
+            CS_DEBUG_BUILTINS_ENVVAR,
+            builtin_name,
+            __all__,
+        )
+        continue
+      if builtin_name in ("breakpoint",):
+        # breakpoint doesn't work right if wrapped, gets the wrong frame
+        continue
+      if not is_identifier(builtin_name):
+        warning(
+            "$%s: ignoring %r, not an identifier",
+            CS_DEBUG_BUILTINS_ENVVAR,
+            builtin_name,
+        )
+        continue
+      setattr(builtins, builtin_name, vs[builtin_name])
+
+if __name__ == "__main__":
+  import os
+  from collections import namedtuple
+  import sys
+
+  ##print_obj(sys)
+  ##breakpoint()
+  S = os.stat(".")
+  N = namedtuple("ab", "a b")(a=1, b=2)
+  print_obj(SyntaxError("foo"))
+  False and print_obj(
+      {
+          ##'S': S,
+          ##'N': N,
+          ##'L': [1, 2, 3, {
+          ##4: 5
+          ##}],
+          ##'stat': type(S),
+          ##'namedtuple ab': type(N),
+          "exc": SyntaxError("foo"),
+      }
+  )
+  ##breakpoint()
