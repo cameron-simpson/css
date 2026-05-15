@@ -55,12 +55,9 @@ case "$target" in
         dirpath=$( expr "x$target" : 'x[^:]*:\(.*\)' )
         target=$(  expr "x$target" : 'x\([^:]*\):.*' )
         case "$dirpath" in
-          /* )  ;;
-          ./* | ../*)
-                dirpath=$( cd "$dirpath"; pwd )
-                ;;
-          *:*)  rhost=$( expr "x$dirpath" : 'x\([^:]*\):.*' )
-                ;;
+          /* )          ;;
+          ./* | ../*)   dirpath=$( cd "$dirpath"; pwd ) ;;
+          *:*)          rhost=$( expr "x$dirpath" : 'x\([^:]*\):.*' ) ;;
         esac
         [ -n "$rhost" ] || [ -d "$dirpath" ] || {
           echo "$cmd $target: not a directory: $dirpath" >&2
@@ -73,9 +70,14 @@ case "$target" in
           echo "$cmd: no dirpath defined fortarget: $target" >&2
           exit 1
         }
+        case "$dirpath" in
+          /* | ./* | ../* ) ;;
+          *:*)  rhost=$( expr "x$dirpath" : 'x\([^:]*\):.*' ) ;;
+        esac
         ;;
 esac
 
+set -x
 [ -n "$rhost" ] || {
   if [ $# = 0 ]
   then
