@@ -1,0 +1,89 @@
+#!/bin/sh
+#
+# Open a shell in a well known place, wrapper for incd.
+# - Cameron Simpson <cs@cskk.id.au> 16may2026
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+tagpath=${IN_TAGPATH:-$HOME}
+
+cmd=$0
+usage="Usage: $cmd [-t tagpath] [-x] [--] target[:[[user@]host:]dirpath] [command]
+  Enter the target directory.
+  With a [remote:]dirpath, assign the path for the target, then enter it.
+  Options:
+  -t tagpath    Specify the directory storing the tags.
+                Default from \$IN_TAGPATH or \$HOME: $tagpath
+  -x            trace execution."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -t) tagpath=$2; shift ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unreognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target" >&2
+  badopts=1
+else
+  target=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+rhost=
+case "$target" in
+  /* | ./* | ../*)
+        # no target name, fall through to plain incd
+        dirpath=$target
+        ;;
+  *:*)  # update the target definition
+        dirpath=$( expr "x$target" : 'x[^:]*:\(.*\)' )
+        target=$(  expr "x$target" : 'x\([^:]*\):.*' )
+        case "$dirpath" in
+          /* )  ;;
+          ./* | ../*)
+                dirpath=$( cd "$dirpath"; pwd )
+                ;;
+          *:*)  rhost=$( expr "x$dirpath" : 'x\([^:]*\):.*' )
+                ;;
+        esac
+        [ -n "$rhost" ] || [ -d "$dirpath" ] || {
+          echo "$cmd $target: not a directory: $dirpath" >&2
+          exit 1
+        }
+        $trace fstags tag "$tagpath" "in.dirpath.$target=$dirpath"
+        ;;
+    *)  dirpath=$( fstags ls -d -o "{in.dirpath.$target}" -- "$tagpath" )
+        [ -n "$dirpath" ] || {
+          echo "$cmd: no dirpath defined fortarget: $target" >&2
+          exit 1
+        }
+        ;;
+esac
+
+[ -n "$rhost" ] || {
+  if [ $# = 0 ]
+  then
+    if [ -t 1 -a -t 2 ]
+    then  set -- "$SHELL"
+    else  set -- pwd
+    fi
+  fi
+}
+
+exec $trace incd "$dirpath" ${1+"$@"}
