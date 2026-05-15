@@ -4451,6 +4451,34 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     return ' '.join(fields)
 
   @classmethod
+  def write_tagsets(
+      cls,
+      f,
+      tagsets,
+      unparsed,
+      extra_types=None,
+      prune=False,
+  ):
+    ''' Save `tagsets` and `unparsed` to the file `f`.
+
+        This method *does not* clear the `.modified` attribute of the `TagSet`s
+        because it does not know it is saving to the `Tagset`'s primary location.
+    '''
+    for _, line in unparsed:
+      if not line.startswith('#'):
+        f.write('##  ')
+      f.write(line)
+      f.write('\n')
+    for name, tags in sorted(tagsets.items()):
+      with Pfx(name):
+        if not tags:
+          continue
+        f.write(
+            cls.tags_line(name, tags, extra_types=extra_types, prune=prune)
+        )
+        f.write('\n')
+
+  @classmethod
   def save_tagsets(
       cls,
       filepath,
@@ -4479,23 +4507,17 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
         return
       try:
         with atomic_filename(filepath, mode="w", exists_ok=True) as f:
-          for _, line in unparsed:
-            if not line.startswith('#'):
-              f.write('##  ')
-            f.write(line)
-            f.write('\n')
-          for name, tags in name_tags:
-            with Pfx(name):
-              if not tags:
-                continue
-              f.write(
-                  cls.tags_line(
-                      name, tags, extra_types=extra_types, prune=prune
-                  )
-              )
-              f.write('\n')
-      except PermissionError as e:
-        warning("save_tagsets(%r) fails: %s", filepath, e)
+          cls.write_tagsets(
+              f, tagsets, unparsed, extra_types=extra_types, prune=prune
+          )
+      except PermissionError:
+        try:
+          with open(filepath, mode="w") as f:
+            cls.write_tagsets(
+                f, tagsets, unparsed, extra_types=extra_types, prune=prune
+            )
+        except PermissionError as e:
+          warning("save_tagsets(%r) fails: %s", filepath, e)
 
   def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.
