@@ -11,13 +11,13 @@ trace=
 tagpath=${IN_TAGPATH:-$HOME}
 
 cmd=$0
-usage="Usage: $cmd [-t tagpath] [-x] [--] target[:[[user@]host:]dirpath] [command]
+usage="Usage: $cmd [-t tagpath] [-x] [--] target[:[[user@]host:]dirpath] [command...]
   Enter the target directory.
   With a [remote:]dirpath, assign the path for the target, then enter it.
   Options:
   -t tagpath    Specify the directory storing the tags.
                 Default from \$IN_TAGPATH or \$HOME: $tagpath
-  -x            trace execution."
+  -x            Trace execution."
 
 badopts=
 
@@ -65,7 +65,7 @@ case "$target" in
         }
         $trace fstags tag "$tagpath" "in.dirpath.$target=$dirpath"
         ;;
-    *)  dirpath=$( fstags ls -d -o "{in.dirpath.$target}" -- "$tagpath" )
+  *)    dirpath=$( fstags ls -d -o "{in.dirpath.$target}" -- "$tagpath" )
         [ -n "$dirpath" ] || {
           echo "$cmd: no dirpath defined fortarget: $target" >&2
           exit 1
@@ -88,4 +88,4 @@ set -x
   fi
 }
 
-exec $trace incd "$dirpath" ${1+"$@"}
+exec $trace incd --no-save "$dirpath" ${1+"$@"}
