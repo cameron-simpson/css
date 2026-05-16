@@ -10,7 +10,7 @@ cmd=$0
 usage="Usage: $cmd [-L] [-P] [--no-save] [--] [[user@]host:]dir [command [args...]]
   -L         After cd and before exec, set \$PWD to \$( pwd -L ).
   -P         After cd and before exec, set \$PWD to \$( pwd -P ).
-  --no-save  Do not record the target with fstags.
+  --no-save  Do not record the target with fstags."
 
 trace= do_trace=
 [ -t 2 ] && trace=set-x do_trace=1
