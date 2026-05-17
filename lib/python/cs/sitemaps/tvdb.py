@@ -4,6 +4,7 @@
 '''
 
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import cached_property
@@ -11,12 +12,16 @@ from itertools import batched
 import os
 from os.path import basename
 import re
+import sys
+from textwrap import wrap
 from typing import Generator
 
 from cs.app.pilfer.pilfer import Pilfer, uses_pilfer
 from cs.app.pilfer.sitemap import SiteEntity, SiteMap, on
 from cs.bs4utils import child_tags
-from cs.deco import default_params
+from cs.cmdutils import BaseCommand, GetoptError, popopts
+from cs.context import stackattrs
+from cs.deco import default_params, Promotable
 from cs.lex import printt, r, s
 from cs.logutils import warning
 from cs.mappings import change_mapping
