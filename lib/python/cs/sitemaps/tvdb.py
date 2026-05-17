@@ -494,30 +494,57 @@ class TheTVDBSite(SiteMap):
             pprint(actor_map, width=60)
     return tve
 
-if __name__ == '__main__':
-  import sys
-  cmd = sys.argv.pop(0)
-  force = False
-  if sys.argv and sys.argv[0] == '-f':
-    force = True
-    sys.argv.pop(0)
-  api = TheTVDBAPI()
-  ##pprint(api.artwork_types)
-  patience = api[Series, 451584]
-  patience.refresh(force=force, recurse=True)
-  if sys.argv:
-    print("SEARCH", *sys.argv)
-    query = sys.argv.pop(0)
-    qkw = {qk: qv for qk, qv in map(lambda kv: kv.split('=', 1), sys.argv)}
+class TheTVDBCommand(BaseCommand):
+  ''' Command line interface to accessing the TVDB API.
+  '''
+
+  @contextmanager
+  def run_context(self):
+    with super().run_context() as options:
+      with stackattrs(options, tvdb_api=TheTVDBAPI()):
+        yield options
+
+  @popopts(
+      f=('force', 'Force refresh even if not stale.'),
+      r=('recurse', 'Recursively refresh the related entities also.'),
+  )
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} entities...
+    '''
+    force = self.options.force
+    recurse = self.options.recurse
+    if not argv:
+      raise GetoptError("missing entities")
+    for arg in argv:
+      ent = TVDBEntity.promote(arg)
+      print(type(ent), ent.name)
+      ent.refresh(force=force, recurse=recurse)
+      ent.print()
+
+  def cmd_search(self, argv):
+    ''' Usage: {cmd} [type:]query [param=value...]
+          Search the API for query with optional constraints.
+          Documentation for the search endpoint:
+          https://thetvdb.github.io/v4-api/#/Search
+          The optional type: prefix sets the type parameter, which
+          may be one of movie, series, person, or company.
+    '''
+    api = self.options.tvdb_api
+    runstate = self.options.runstate
+    if not argv:
+      raise GetoptError("missing query")
+    query = argv.pop(0)
+    # collect the remaining arguments as parameters
+    qkw = {qk: qv for qk, qv in map(lambda kv: kv.split('=', 1), argv)}
+    # split off the type from query if present
     if m := re.match('^([a-z]+):', query):
       qkw['type'] = m.group(1)
       query = query[m.end():]
     results = api.search(query, **qkw)
     for i, (result, ent) in enumerate(results):
-      printt(
-          [f'Result {i}:', ent.name],
-          *([k, v] for k, v in sorted(result.items())),
-      )
+      runstate.raiseif()
       ent.refresh()
-      ent.printt()
-    breakpoint()
+      ent.print()
+
+if __name__ == '__main__':
+  sys.exit(TheTVDBCommand().run())
