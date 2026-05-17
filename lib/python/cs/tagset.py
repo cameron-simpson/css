@@ -3075,6 +3075,12 @@ class HasTags(TagSetTyping, FormatableMixin, Refreshable):
         **printt_kw
     )
 
+  def print(self):
+    ''' The default `print()` runs `self.printt()`.
+        This is intended to be a nice print of important stuff.
+    '''
+    return self.printt()
+
   @cached_property
   def tags_entity_key(self):
     ''' Our tagged entity key, `self.tags.name`.
