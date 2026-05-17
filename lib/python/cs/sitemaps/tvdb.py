@@ -36,7 +36,7 @@ class TVDBEntity(SiteEntity, Promotable):
   '''
 
   TVDB_API_ENTITY_SUBPATH_FORMAT = '{type_subname}/{type_key}'
-  TVDB_SUBENTITY_FIELDS = ()
+  TVDB_SUBENTITY_FIELDS = ()  # list of (fieldname,entity-type)
   TVDB_LINKENTITY_FIELDS = ()
   TVDB_ENTITYTYPE_BY_TVDB_TYPENAME = {}
 
@@ -56,6 +56,14 @@ class TVDBEntity(SiteEntity, Promotable):
     if entity_spec.startswith(f'{tvdb_api.TYPE_ZONE}.'):
       return tvdb_api[cls.type_zone_key_of(entity_spec)]
     raise ValueError(f'cannot convert {entity_spec=} to {cls.__name__}')
+
+  def field_entity_type(cls, field_name):
+    for ref_field, ref_type in cls.TVDB_SUBENTITY_FIELDS:
+      if ref_field == field_name:
+        return ref_type
+    raise ValueError(
+        f'no entity type for {field_name=} in {cls}.TVDB_SUBENTITY_FIELDS={cls.TVDB_SUBENTITY_FIELDS}'
+    )
 
   @property
   def refresh_resource(self):
@@ -104,6 +112,19 @@ class TVDBEntity(SiteEntity, Promotable):
         ref_id = ref_data["id"]
         ent = self.tags_db[ref_type, ref_id]
         yield ent
+
+  def related(self, ref_field: str) -> Generator["TVDBEntity"]:
+    ''' Yield entities specified by the records in `self[ref_field]`.
+    '''
+    ref_type = self.field_entity_type(ref_field)
+    ref = self.get(ref_field)
+    if ref is None:
+      warning(f'{self.__class__.__name__}:{self.name}: no [{ref_field=}]')
+      return
+    for ref_data in ref:
+      ref_id = ref_data["id"]
+      ent = self.tags_db[ref_type, ref_id]
+      yield ent
 
 class Character(TVDBEntity):
   TYPE_SUBNAME = 'character'
