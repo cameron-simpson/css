@@ -3198,6 +3198,11 @@ class HasTags(TagSetTyping, FormatableMixin, Refreshable):
 
   #################################################################
   # Properties supporting Refreshable.
+  def refresh_key(self):
+    ''' The unique key identifying this object for use in recursive refreshes.
+    '''
+    return self.name
+
   @property
   def refresh_last_update(self):
     ''' The last time a refresh update time.
