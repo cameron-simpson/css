@@ -25,6 +25,7 @@ usage="Usage: $0 [-n] srcdir dstdir [{-|xferdir}]
       $0 local-media-dir remotehost:remote-media-dir /mnt/xfer_drive/media"
 
 doit=1
+quiet=
 rsopts=
 [ -t 2 ] && rsopts="$rsopts -P"
 trace=
@@ -39,7 +40,7 @@ do
     -D) do_purge=1 ;;
     -n) doit= rsopts="$rsopts -n" ;;
     -P) rsopts="$rsopts $1" ;;
-    -q) trace= ;;
+    -q) quiet=1 trace= ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -101,7 +102,9 @@ then
   | if [ $doit ]
     then
       ( set -ue
+        [ -z "$trace" ] || set -x
         cd "$xferdir"
+        [ $quiet ] || pwd >&2
         xxargs $trace rm --
       )
     else
