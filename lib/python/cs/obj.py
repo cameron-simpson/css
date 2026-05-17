@@ -572,6 +572,18 @@ class Refreshable(ABC):
     last_update = getattr(self, 'refresh_last_update', 0.0)
     return last_update + lifespan < now
 
+  def refresh_related(self):
+    ''' Return the related objects which should also be refreshed in recursive refreshes.
+    '''
+    return ()
+
+  def refresh_key(self):
+    ''' Return the key value for the `seen` set used in a recursive refresh.
+        This default returns `id(self)`; classes like `HasTags`
+        would use a characteristic value like `self.name`.
+    '''
+    return id(self)
+
   def refresh(
       self,
       resource: Optional = None,
@@ -579,6 +591,9 @@ class Refreshable(ABC):
       force=False,
       lifespan: float = None,
       ratelimit: float = None,
+      recurse=False,
+      seen=None,
+      **_refresh_kw,  # passed to self._refresh()
   ) -> bool:
     ''' Refresh this object; if it is stale attempt to refresh via `self._refresh()`.
         Return `True` if the object was updated, `False` otherwise.
@@ -601,9 +616,20 @@ class Refreshable(ABC):
         * `ratelimit`: how many seconds should elapsed before
           attempting a refresh, default from `self.refresh_ratelimit`
           or `type(self).REFRESH_RATELIMIT`
+        * `recurse`: optional flag, default `False`; if true the
+          recursively refresh the objects from `self.refresh_related()`
+        * `seen`: optional set of keys to prevent unbound recursion
+        Other keyword parameters are passed to `self._refresh()` if it is called.
     '''
     lifespan0 = lifespan
     ratelimit0 = ratelimit
+    key = self.refresh_key()
+    if seen is None:
+      seen = set()
+    else:
+      if key in seen:
+        return
+    seen.add(key)
     now = time.time()
     if not force:
       if not self.refresh_needed(lifespan=lifespan, now=now):
@@ -622,9 +648,19 @@ class Refreshable(ABC):
     if resource is None:
       resource = getattr(self, 'refresh_resource', None)
     self.refresh_last_poll = now
-    refreshed = self._refresh(resource)
+    refreshed = self._refresh(resource, **_refresh_kw)
     if refreshed:
       self.refresh_last_update = now
+    if recurse:
+      for obj in self.refresh_related():
+        obj.refresh(
+            recurse=True,
+            force=force,
+            lifespan=lifespan0,
+            ratelimit=ratelimit0,
+            seen=seen,
+            **_refresh_kw
+        )
     return refreshed
 
 def public_subclasses(cls, extras=()):
