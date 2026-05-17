@@ -31,7 +31,7 @@ from cs.debug import trace, X, r, s, pprint, printt
 
 uses_tvdb = default_params(tvdb_api=lambda: TheTVDBAPI())
 
-class TVDBEntity(SiteEntity):
+class TVDBEntity(SiteEntity, Promotable):
   ''' The base class for TheTVDB entities.
   '''
 
@@ -44,6 +44,18 @@ class TVDBEntity(SiteEntity):
     super().__init_subclass__()
     api_typename = getattr(cls, 'TVDB_API_TYPENAME', cls.__name__.lower())
     cls.TVDB_ENTITYTYPE_BY_TVDB_TYPENAME[api_typename] = cls
+
+  @classmethod
+  @uses_tvdb
+  def from_str(cls, entity_spec, *, tvdb_api: "TheTVDBAPI") -> "TVDBEntity":
+    ''' Recognise a TVDB object id such as `"series-1234"` and
+        return the corresponding `TVDBEntity` instance.
+    '''
+    if '.' not in entity_spec and '-' in entity_spec:
+      return tvdb_api.parse_object_id(entity_spec)
+    if entity_spec.startswith(f'{tvdb_api.TYPE_ZONE}.'):
+      return tvdb_api[cls.type_zone_key_of(entity_spec)]
+    raise ValueError(f'cannot convert {entity_spec=} to {cls.__name__}')
 
   @property
   def refresh_resource(self):
