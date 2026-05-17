@@ -164,6 +164,49 @@ class Series(TVDBEntity):
   SITEPAGE_URL_FORMAT = '/{type_subname}/{fullname:lc_}'
   TVDB_API_ENTITY_SUBPATH_FORMAT = 'series/{type_key}/extended'
 
+  def print(self):
+    print("ent print", type(self))
+    table = [['Series', self['tvdb.name']]]
+    rel = self.related('tvdb.characters')
+    characters = list(self.related('tvdb.characters'))
+    if characters:
+      table.append(['Characters', len(characters)])
+      table.append(
+          tuple(
+              [character['tvdb.name'], character['tvdb.personName']]
+              for character in characters
+          )
+      )
+    seasons = list(self.related('tvdb.seasons'))
+    if seasons:
+      table.append(['Seasons', len(seasons)])
+      seatable = []
+      for season in sorted(seasons, key=lambda season: season['tvdb.number']):
+        season.refresh()
+        episodes = list(season.related('tvdb.episodes'))
+        seatable.append(
+            [
+                f'Season {season["tvdb.number"]} {season.name}',
+                'No episodes.' if len(episodes) == 0 else '1 episode.'
+                if len(episodes) == 1 else f'{len(episodes)} episodes.'
+            ]
+        )
+        if episodes:
+          epitable = []
+          for episode in episodes:
+            episode.refresh()
+            epitable.append(
+                [
+                    episode['tvdb.number'],
+                    f'{episode["tvdb.name"]}\n{"\\n".join(wrap(episode["tvdb.overview"],60))}'
+                ]
+            )
+          seatable.append(tuple(epitable))
+      table.append(tuple(seatable))
+    else:
+      table.append(['Seasons', 'None'])
+    printt(*table)
+
 # cross references for refresh recursion
 Character.TVDB_LINKENTITY_FIELDS = (
     ('tvdb.peopleId', Person),
