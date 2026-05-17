@@ -532,6 +532,11 @@ class Refreshable(ABC):
       This mixin provides a `.refresh()` method which implements the refresh policy.
   '''
 
+  # default refresh lifespan is, arbitrarily,  1 week
+  REFRESH_LIFESPAN = 3600 * 24 * 7
+  # rate limit - refresh no more often than once per second
+  REFRESH_RATELIMIT = 1.0
+
   @abstractmethod
   def _refresh(self, resource) -> bool:
     ''' Refresh the object from `resource`, typically an URL.
@@ -557,13 +562,13 @@ class Refreshable(ABC):
         Parameters:
         * `lifespan`: how many seconds before updated information
           is considered no stale, default from `self.refresh_lifespan`,
-          or 1.0s
+          or `type(self).REFRESH_LIFESPAN`
          * `now`: optional reference time, default from `time.time()`
     '''
     if now is None:
       now = time.time()
     if lifespan is None:
-      lifespan = getattr(self, 'refresh_lifespan', 1.0)
+      lifespan = getattr(self, 'refresh_lifespan', type(self).REFRESH_LIFESPAN)
     last_update = getattr(self, 'refresh_last_update', 0.0)
     return last_update + lifespan < now
 
@@ -592,17 +597,24 @@ class Refreshable(ABC):
           a refresh regardless of staleness or the rate limit
         * `lifespan`: how many seconds before updated information
           is considered no stale, default from `self.refresh_lifespan`,
-          or 1.0s
+          or `type(self).REFRESH_RATELIMIT`
         * `ratelimit`: how many seconds should elapsed before
-          attempting a refresh, default from `self.refresh_ratelimit` or 1.0s
+          attempting a refresh, default from `self.refresh_ratelimit`
+          or `type(self).REFRESH_RATELIMIT`
     '''
+    lifespan0 = lifespan
+    ratelimit0 = ratelimit
     now = time.time()
     if not force:
       if not self.refresh_needed(lifespan=lifespan, now=now):
         return False
       last_poll = getattr(self, 'refresh_last_poll', 0.0)
       if ratelimit is None:
-        ratelimit = getattr(self, 'refresh_ratelimit', 1.0)
+        # optional instance attribute
+        ratelimit = getattr(
+            self, 'refresh_ratelimit',
+            type(self).REFRESH_RATELIMIT
+        )
       if now - last_poll < ratelimit:
         # too early to repoll
         return False
