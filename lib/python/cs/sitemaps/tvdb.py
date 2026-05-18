@@ -1,6 +1,6 @@
 #!/usr/bin/env pyuthon3
 
-''' Pilfer SiteMap for thetvb.com.
+''' API and Pilfer SiteMap for thetvdb.com.
 '''
 
 from collections import defaultdict
@@ -26,6 +26,7 @@ from cs.lex import printt, r, s
 from cs.logutils import warning
 from cs.mappings import change_mapping
 from cs.pfx import Pfx, pfx_call
+from cs.resources import RunState, uses_runstate
 from cs.service_api import HTTPServiceAPI
 from cs.tagset import HasTags, TagSet, UsesTagSets
 
@@ -169,24 +170,30 @@ class Series(TVDBEntity):
   SITEPAGE_URL_FORMAT = '/{type_subname}/{fullname:lc_}'
   TVDB_API_ENTITY_SUBPATH_FORMAT = 'series/{type_key}/extended'
 
-  def print(self):
-    print("ent print", type(self))
+  @uses_runstate
+  def print(self, *, runstate: RunState):
     table = [['Series', self['tvdb.name']]]
-    rel = self.related('tvdb.characters')
     characters = list(self.related('tvdb.characters'))
     if characters:
       table.append(['Characters', len(characters)])
-      table.append(
-          tuple(
-              [character['tvdb.name'], character['tvdb.personName']]
-              for character in characters
-          )
-      )
+      chartable = []
+      for character in characters:
+        runstate.raiseif()
+        character.refresh()
+        chartable.append(
+            [
+                character['tvdb.name'],
+                character['tvdb.personName'],
+            ]
+        )
+      table.append(tuple(chartable))
     seasons = list(self.related('tvdb.seasons'))
     if seasons:
       table.append(['Seasons', len(seasons)])
       seatable = []
-      for season in sorted(seasons, key=lambda season: season['tvdb.number']):
+      for season in sorted(seasons,
+                           key=lambda season: season.get('tvdb.number', -1)):
+        runstate.raiseif()
         season.refresh()
         episodes = list(season.related('tvdb.episodes'))
         seatable.append(
@@ -199,11 +206,12 @@ class Series(TVDBEntity):
         if episodes:
           epitable = []
           for episode in episodes:
+            runstate.raiseif()
             episode.refresh()
             epitable.append(
                 [
                     episode['tvdb.number'],
-                    f'{episode["tvdb.name"]}\n{"\\n".join(wrap(episode["tvdb.overview"],60))}'
+                    f'{episode["tvdb.name"]}\n{"\n".join(wrap(episode["tvdb.overview"],60))}'
                 ]
             )
           seatable.append(tuple(epitable))
