@@ -140,6 +140,7 @@ class Character(TVDBEntity):
 class Company(TVDBEntity):
   TYPE_SUBNAME = 'company'
   SITEPAGE_URL_FORMAT = '/companies/{type_key}'
+  TVDB_API_ENTITY_SUBPATH_FORMAT = 'companies/{type_key}'
 
 class Episode(TVDBEntity):
   TYPE_SUBNAME = 'episode'
