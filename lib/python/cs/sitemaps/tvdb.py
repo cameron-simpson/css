@@ -172,7 +172,7 @@ class Series(TVDBEntity):
 
   @uses_runstate
   def print(self, *, runstate: RunState):
-    table = [['Series', self['tvdb.name']]]
+    table = [[self.name, self['tvdb.name']]]
     characters = list(self.related('tvdb.characters'))
     if characters:
       table.append(['Characters', len(characters)])
@@ -191,10 +191,12 @@ class Series(TVDBEntity):
     if seasons:
       table.append(['Seasons', len(seasons)])
       seatable = []
-      for season in sorted(seasons,
-                           key=lambda season: season.get('tvdb.number', -1)):
+      # refresh the seasons because we sort on tvdb.number
+      for season in seasons:
         runstate.raiseif()
         season.refresh()
+      for season in sorted(seasons, key=lambda season: season['tvdb.number']):
+        runstate.raiseif()
         episodes = list(season.related('tvdb.episodes'))
         seatable.append(
             [
@@ -211,7 +213,7 @@ class Series(TVDBEntity):
             epitable.append(
                 [
                     episode['tvdb.number'],
-                    f'{episode["tvdb.name"]}\n{"\n".join(wrap(episode["tvdb.overview"],60))}'
+                    f'{episode["tvdb.name"]}\n{"\n".join(wrap(episode.get("tvdb.overview","No overview."),60))}'
                 ]
             )
           seatable.append(tuple(epitable))
