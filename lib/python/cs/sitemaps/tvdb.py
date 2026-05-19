@@ -522,6 +522,7 @@ class TheTVDBCommand(BaseCommand):
   @popopts(
       f=('force', 'Force refresh even if not stale.'),
       r=('recurse', 'Recursively refresh the related entities also.'),
+      t=('printt', 'Use ent.printt() instead of ent.print().'),
   )
   def cmd_refresh(self, argv):
     ''' Usage: {cmd} entities...
@@ -534,7 +535,10 @@ class TheTVDBCommand(BaseCommand):
       ent = TVDBEntity.promote(arg)
       print(type(ent), ent.name)
       ent.refresh(force=force, recurse=recurse)
-      ent.print()
+      if self.options.printt:
+        ent.printt()
+      else:
+        ent.print()
 
   def cmd_search(self, argv):
     ''' Usage: {cmd} [type:]query [param=value...]
