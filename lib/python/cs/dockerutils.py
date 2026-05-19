@@ -387,12 +387,13 @@ class DockerRun:
         '--rm',
         ('--network', self.network),
         ('--workdir', self.output_root),
-        ('--cap-drop', 'all'),
+        # ('--cap-drop', 'all'),
+        is_podman and not self.user and ('--userns', 'keep-id'),
+        # this requires the "crun" container runtime to be installed
+        is_podman and not self.user and ('--group-add', 'keep-groups'),
         is_podman and self.user and ('--user', self.user),
-        ##is_podman and not self.user and ('--userns','keep-id'),
-        ##is_podman and not self.user and ('--user','f'{os.geteuid()}:{os.getegid()}',
-        is_docker and
-        ('--user', self.user or f'{os.geteuid()}:{os.getegid()}'),
+        is_docker
+        and ('--user', self.user or f'{os.geteuid()}:{os.getegid()}'),
         *self.options,
     ]
     # input readonly mounts
