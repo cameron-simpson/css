@@ -89,7 +89,7 @@ class TVDBEntity(SiteEntity, Promotable):
       breakpoint()
       subpath = self.refresh_resource
     api_id = int(self.type_key)
-    data = tvdb_api.data(subpath)
+    data = tvdb_api / subpath
     assert data["id"] == api_id, (
         f'TVDB API {data["id"]=} != {api_id=} (from {self.type_key=})'
     )
@@ -256,15 +256,14 @@ class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
       api_key = os.environ[cls.TVDB_API_KEY_ENVVAR]
     return api_key
 
-  def __init__(self, api_key: str = None):
+  def __init__(self, api_key: str = None, **httpapi_kw):
     if hasattr(self, 'api_key'):
       return
-    super().__init__()
+    super().__init__(mode="data", **httpapi_kw)
     if api_key is None:
       api_key = os.environ[self.TVDB_API_KEY_ENVVAR]
-    if token := os.environ.get(self.TVDB_API_TOKEN_ENVVAR):
-      self.token = token
     self.api_key = api_key
+    self.token = os.environ.get(self.TVDB_API_TOKEN_ENVVAR)
 
   def parse_object_id(self, type_id: str) -> TVDBEntity:
     ''' Resolve a TVDB entity spec such as `"series-1234"` into the `TVDBEntity` instance.
@@ -273,41 +272,30 @@ class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
     ent_type = TVDBEntity.TVDB_ENTITYTYPE_BY_TVDB_TYPENAME[api_typename]
     return self[ent_type, id_s]
 
-  def login(self):
-    ''' POST to /login, return the `Response`.
+  def login(self) -> dict:
+    ''' POST to /login, return the login response data.
+        This sets `self.token` and `self.default_headers['Authorization']`
+        as a side effect.
     '''
-    rsp = self.suburl("login", _method='POST', json={"apikey": self.api_key})
-    rsp.raise_for_status()
-    return rsp
+    data = self.suburl("login", method='POST', json={"apikey": self.api_key})
+    self.token = data["token"]
+    return data
 
-  @cached_property
-  @trace
+  @property
   def token(self) -> str:
     ''' Obtain the token.
     '''
-    rsp = self.login()
-    token = rsp.json()["data"]["token"]
-    self.token = token
-    return token
+    if self._token is None:
+      self.login()
+    return self._token
 
-  def GET(self, subpath, *, headers=None, **rqkw) -> dict:
-    if headers is None:
-      headers = {}
-    if 'Authorization' not in headers:
-      token = self.token
-      headers['Authorization'] = token
-    rsp = self.suburl(
-        subpath,
-        headers=headers,
-        **rqkw,
-    )
-    rsp.raise_for_status()
-    return rsp.json()
-
-  def data(self, subpath, **rqkw):
-    rsp_json = self.GET(subpath, **rqkw)
-    ##print(f'GET {subpath=} -> status {rsp_json["status"]=}')
-    return rsp_json["data"]
+  @token.setter
+  def token(self, new_token: str):
+    self._token = new_token
+    if new_token is None:
+      self.default_headers.pop('Authorization', None)
+    else:
+      self.default_headers['Authorization'] = new_token
 
   @cached_property
   def artwork_types(self):
@@ -324,7 +312,7 @@ class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
         query=query,
         **search_params,
     )
-    results = self.data('search', params=params, **_rqkw)
+    results = self.suburl('search', params=params, **_rqkw)
     for result in results:
       yield result, self.parse_object_id(result["id"])
 
