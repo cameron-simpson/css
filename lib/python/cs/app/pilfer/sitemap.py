@@ -2669,41 +2669,6 @@ class DocSite(SiteMap):
     return match['cache_key']
 
 @dataclass
-class Wikipedia(SiteMap):
-  ''' The SiteMap for `wikipedia.org'.
-  '''
-
-  TYPE_ZONE = 'wikipedia'
-
-  URL_KEY_PATTERNS = [
-      # https://en.wikipedia.org/wiki/Braille
-      (
-          (
-              '*.wikipedia.org',
-              r'/wiki/(?P<title>[^:/]+)$',
-          ),
-          'wiki/{title}',
-      ),
-      # https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Carbonate-outcrops_world.jpg/620px-Carbonate-outcrops_world.jpg
-      (
-          (
-              'upload.wikipedia.org',
-              r'/wikipedia/commons/(?<subpath>.*\.(jpg|gif|png))$',
-          ),
-          'wiki/commons/{subpath}',
-      ),
-  ]
-
-  @promote
-  def url_key(self, url: URL, extra: Mapping | None = None) -> str | None:
-    ''' Include the domain name language in the URL key.
-    '''
-    key = super().url_key(url, extra=extra)
-    if key is not None:
-      key = f'{cutsuffix(url.hostname, ".wikipedia.org")}/{key}'
-    return key
-
-@dataclass
 class DockerIO(SiteMap):
 
   TYPE_ZONE = 'dockerio'
