@@ -1899,7 +1899,7 @@ class BaseCommand:
       infill = self.options.__dict__.copy()
       infill.update(runstate=runstate)
       infill.update(**options_kw)
-      with trace(stackattrs)(run_options, **infill):
+      with stackattrs(run_options, **infill):
         with run_options:  # make the default ThreadState
           with stackattrs(
               self,

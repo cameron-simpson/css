@@ -202,8 +202,7 @@ class PlayOnCommand(BaseCommand):
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
-    for k, v in sorted(api.account().items()):
-      print(k, pformat(v))
+    printt(*([k, v] for k, v in sorted(api.account().items())))
 
   @popopts
   def cmd_api(self, argv):
@@ -802,7 +801,7 @@ class PlayOnAPI(HTTPServiceAPI):
   CDS_BASE_LOCAL = f'https://{CDS_HOSTNAME_LOCAL}/api/v6/'
 
   def __init__(self, login=None, password=None, **kw):
-    super().__init__(**kw)
+    super().__init__(mode="data", check_json={"success": True}, **kw)
     if login:
       self.login_userid = login
     self._password = password
@@ -854,9 +853,8 @@ class PlayOnAPI(HTTPServiceAPI):
             "netrc: supplied login:%r != netrc login:%r" % (login, n_login)
         )
       password = n_password
-    return self.suburl_data(
+    return self.post(
         'login',
-        _method='POST',
         headers={'x-mmt-app': 'web'},
         params=dict(email=login, password=password)
     )
@@ -884,9 +882,7 @@ class PlayOnAPI(HTTPServiceAPI):
   # UNUSED
   def renew_jwt(self):
     at = self.auth_token
-    data = self.suburl_data(
-        'login/at', _method='POST', params=dict(auth_token=at)
-    )
+    data = self.post('login/at', params=dict(auth_token=at))
     self._jwt = data['token']
 
   @staticmethod
@@ -912,57 +908,36 @@ class PlayOnAPI(HTTPServiceAPI):
     return super().__getitem__(index)
 
   def suburl(
-      self, suburl, *, api_version=None, headers=None, _base_url=None, **kw
+      self, suburl, *, api_version=None, headers=None, base_url=None, **kw
   ):
     ''' Override `HTTPServiceAPI.suburl` with default
         `headers={'Authorization':self.jwt}`.
     '''
-    if _base_url is None:
-      _base_url = None if api_version is None else f'api/v{api_version}'
+    if base_url is None:
+      base_url = None if api_version is None else f'api/v{api_version}'
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    return super().suburl(suburl, _base_url=_base_url, headers=headers, **kw)
-
-  @uses_verbose
-  def suburl_data(self, suburl, *, raw=False, verbose=False, **kw):
-    ''' Call `suburl` and return the `'data'` component on success.
-
-        Parameters:
-        * `suburl`: the API subURL designating the endpoint.
-        * `raw`: if true, return the whole decoded JSON result;
-          the default is `False`, returning `'success'` in the
-          result keys and returning `result['data']`
-        Other keyword arguments are passed to the `HTTPServiceAPI.json` method.
-    '''
-    with run_task(f'{self.__class__.__name__}.suburl_data({suburl})',
-                  report_print=verbose):
-      result = self.json(suburl, **kw)
-      if raw:
-        return result
-      ok = result.get('success')
-      if not ok:
-        raise ValueError("failed: %r" % (result,))
-      return result['data']
+    return super().suburl(suburl, base_url=base_url, headers=headers, **kw)
 
   @pfx_method
   def account(self):
     ''' Return account information.
     '''
-    return self.suburl_data('account')
+    return self / 'account'
 
   @pfx_method
   def notifications(self):
     ''' Return the notifications.
     '''
-    return self.suburl_data('notification')
+    return self / 'notification'
 
-  def cdsurl_data(self, suburl, _method='GET', headers=None, **kw):
+  def cdsurl_data(self, suburl, method='GET', headers=None, **kw):
     ''' Wrapper for `suburl_data` using `CDS_BASE` as the base URL.
     '''
-    return self.suburl_data(
+    return self.suburl(
         suburl,
-        _base_url=self.CDS_BASE,
-        _method=_method,
+        base_url=self.CDS_BASE,
+        method=method,
         headers=headers,
         raw=True,
         **kw
@@ -972,7 +947,7 @@ class PlayOnAPI(HTTPServiceAPI):
   def queue(self):
     ''' Return the `TagSet` instances for the queued recordings.
     '''
-    data = self.suburl_data('queue')
+    data = self / 'queue'
     entries = data['entries']
     return self._entry_entities(
         entries, Recording, dict(
@@ -988,7 +963,7 @@ class PlayOnAPI(HTTPServiceAPI):
     ''' Return a set of the `Recording` instances for the available recordings.
         This makes an API request.
     '''
-    data = self.suburl_data('library/all')
+    data = self / 'library/all'
     entries = data['entries']
     entities = self._entry_entities(
         entries, Recording, dict(
@@ -1158,7 +1133,7 @@ class PlayOnAPI(HTTPServiceAPI):
     return self.suburl(
         self,
         f'content/{service_id}/image?size={"large" if large else "small"}',
-        _base_url=self.CDS_HOSTNAME,
+        base_url=self.CDS_HOSTNAME,
         api_version=9,
     )
 
@@ -1200,7 +1175,7 @@ class PlayOnAPI(HTTPServiceAPI):
         then the file extension will be taken from the filename
         of the download URL.
     '''
-    dl_data = self.suburl_data(f'library/{download_id}/download')
+    dl_data = self / f'library/{download_id}/download'
     dl_url = dl_data['url']
     dl_basename = unpercent(basename(dl_url))
     if filename is None:

@@ -6,7 +6,7 @@
 
 set -ue
 
-default_image=linuxserver/ffmpeg
+default_image=docker.io/linuxserver/ffmpeg
 
 use_tmux=
 [ -n "${FFMPEG_DOCKER_TMUX:-}" ] && use_tmux=1

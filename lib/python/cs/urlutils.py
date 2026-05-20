@@ -155,6 +155,12 @@ class URL(HasThreadState, FormatableMixin, Promotable):
     # look up method on equivalent Unicode string
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
+  # TODO: resolve .. and . in the subpath? or not bother?
+  def __truediv__(self, subpath):
+    ''' Return a new `URL` with `subpath` appended.
+    '''
+    return self.__class__(f'{self}/{subpath}')
+
   def format_kwargs(self):
     ''' Return a dict for use with `FormatableMixin.format_as()`.
     '''

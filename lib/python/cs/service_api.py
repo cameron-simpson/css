@@ -15,10 +15,11 @@ from functools import cached_property
 from json import JSONDecodeError
 from threading import RLock
 import time
-from typing import Mapping, Set
+from typing import Mapping, Set, Union
 
 from icontract import require
 import requests
+from requests import Request, Response
 try:
   from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
 except ImportError:
@@ -135,7 +136,13 @@ class HTTPServiceAPI(ServiceAPI):
   '''
 
   def __init__(
-      self, api_hostname=None, *, default_headers=None, **service_api_kw
+      self,
+      api_hostname=None,
+      *,
+      default_headers=None,
+      mode='response',
+      check_json=None,
+      **service_api_kw
   ):
     if api_hostname is None:
       api_hostname = type(self).API_HOSTNAME
@@ -154,9 +161,29 @@ class HTTPServiceAPI(ServiceAPI):
     }
     self.cookies = session.cookies
     self.default_headers = default_headers
+    self.mode = mode
+    self.check_json = check_json
 
-  def __div__(self, suburl) -> URL:
-    return self.suburl(suburl)
+  def response_as_json(self, rsp: Response) -> dict:
+    ''' Return `rsp.json()`.
+    '''
+    try:
+      js = rsp.json()
+    except (JSONDecodeError, RequestsJSONDecodeError) as e:
+      warning("response is not JSON: %s\n%r", e, rsp)
+      raise
+    if self.check_json:
+      for field, value in self.check_json.items():
+        js_value = js.get(field)
+        if js_value != value:
+          warning(f'expected {field}={value!r}, got {js_value!r} from {js!r}')
+    return js
+
+  def response_as_json_data(self, rsp: Response) -> dict:
+    ''' Return the `"data"` element from a JSON response.
+    '''
+    js = self.response_as_json(rsp)
+    return js["data"]
 
   @uses_runstate
   @uses_verbose
@@ -165,41 +192,57 @@ class HTTPServiceAPI(ServiceAPI):
       self,
       suburl,
       *,
-      _base_url=None,
-      _method='GET',
-      _no_raise_for_status=False,
+      base_url=None,
+      method='GET',
+      mode=None,
+      check=True,
       cookies=None,
       headers=None,
       runstate: RunState,
       verbose: bool,
       **rqkw,
-  ) -> URL:
+  ) -> Union[Response, dict]:
     ''' Request `suburl` from the service, by default using a `GET`.
         The `suburl` must be a URL subpath not commencing with `'/'`.
 
+        Return:
+        - `mode(Response)` if `mode` is callable
+        - the `Response` if `mode=="response"`
+        - the `Response.json()` if `mode=="json"`
+        - the `Response.json()["data"]` if `mode=="data"`
+
         Keyword parameters:
-        * `_base_url`: the base request domain, default from `self.API_BASE`
-        * `_method`: the request method, default `'GET'`
-        * `_no_raise_for_status`: do not raise an HTTP error if the
-          response status is not 200, default `False` (raise if not 200)
+        * `base_url`: the base request domain, default from `self.API_BASE`
+        * `method`: optional request method, default `'GET'`
+        * `check`: if true, raise an HTTP error if the response
+          status is not 200; default `True`
         * `cookies`: optional cookie jar, default from `self.cookies`
+        * `mode`: optional result mode, default from `self.mode`
         Other keyword parameters are passed to the requests method.
     '''
-    rqm = self.REQUESTS_METHOD_CALLS[_method]
-    if _base_url is None:
-      _base_url = self.API_BASE
+    rqm = self.REQUESTS_METHOD_CALLS[method]
+    if base_url is None:
+      base_url = self.API_BASE
     if cookies is None:
       cookies = self.cookies
-    url = _base_url + suburl
+    if mode is None:
+      mode = self.mode
+    url = base_url + suburl
     rq_headers = {}
     rq_headers.update(self.default_headers)
     if headers is not None:
       rq_headers.update(headers)
-    with run_task(f'{_method} {url}', report_print=verbose):
+    with run_task(f'{method} {url}', report_print=verbose):
       for retry in range(self.API_RETRY_COUNT, 0, -1):
         runstate.raiseif()
         try:
-          rsp = pfx_call(rqm, url, cookies=cookies, headers=rq_headers, **rqkw)
+          rsp = pfx_call(
+              rqm,
+              url,
+              cookies=cookies,
+              headers=rq_headers,
+              **rqkw,
+          )
           break
         except requests.ConnectionError as e:
           if retry <= 1:
@@ -207,24 +250,32 @@ class HTTPServiceAPI(ServiceAPI):
             raise
           warning("%s: %s, retrying in %ds", url, e, self.API_RETRY_DELAY)
           runstate.sleep(self.API_RETRY_DELAY)
-    if not _no_raise_for_status:
+    if check:
       rsp.raise_for_status()
-    return rsp
+    if callable(mode):
+      return mode(rsp)
+    if mode == 'response':
+      return rsp
+    if mode == 'json':
+      return self.response_as_json(rsp)
+    if mode == 'data':
+      return self.response_as_json_data(rsp)
+    raise ValueError(
+        f'unsupported {mode=}, expected "data", "json", "response" or a callable'
+    )
 
-  def json(self, suburl, _response_encoding=None, **kw):
-    ''' Request `suburl` from the service, by default using a `GET`.
-        Return the result decoded as JSON.
-
-        Parameters are as for `HTTPServiceAPI.suburl`.
+  def get(self, suburl, **kw) -> Response:
+    ''' Call `slef.suburl` with `method="GET"`.
     '''
-    rsp = self.suburl(suburl, **kw)
-    if _response_encoding is not None:
-      rsp.encoding = _response_encoding
-    try:
-      return rsp.json()
-    except (JSONDecodeError, RequestsJSONDecodeError) as e:
-      warning("response is not JSON: %s\n%r", e, rsp)
-      raise
+    return self, suburl(suburl, method='GET', **kw)
+
+  def post(self, suburl, **kw) -> Response:
+    ''' Call `slef.suburl` with `method="POST"`.
+    '''
+    return self.suburl(suburl, method='POST', **kw)
+
+  def __truediv__(self, suburl):
+    return self.suburl(suburl)
 
 # pylint: disable=too-few-public-methods
 class RequestsNoAuth(requests.auth.AuthBase):

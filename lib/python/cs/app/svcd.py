@@ -643,7 +643,7 @@ class SvcD(FlaggedMixin, object):
             if stop:
               self._kill_subproc()
               sleep(self.restart_delay)
-          sleep(1)
+          sleep(5)
         if self.subp is not None:
           self._kill_subproc()
 
