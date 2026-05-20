@@ -972,9 +972,8 @@ class SiteEntity(HasTags):
       `SiteMap.refreshed_entities(Iterabe[SiteEntity])`.
   '''
 
-
   # default staleness is 1 day
-  STALE_LIFESPAN = 86400
+  REFRESH_LIFESPAN = 86400
 
   # keys which can be obtained by grokking a web page
   # a mapping of tag_name to page name eg "sitepage"
@@ -1265,9 +1264,6 @@ class SiteEntity(HasTags):
     '''
     return self.tags_db
 
-
-
-
   @cached_property
   def url_root(self):
     ''' Proxy to `self.sitemap.url_root`.
@@ -1336,13 +1332,6 @@ class SiteEntity(HasTags):
     if http_date:
       return datetime_from_http_date(http_date).timestamp()
     return 0
-
-  @property
-  def refresh_lifespan(self):
-    ''' The refresh lifespan, from `self['refresh_lifespan']` or `self.STALE_LIFEPSAN`.
-        Supports the `Refreshable` mixin.
-    '''
-    return self.get('refresh_lifespan', self.STALE_LIFEPSAN)
 
   def _refresh(self, resource=None):
     ''' Try to refresh this entity from the sitepage, supporting `Refreshable`.
