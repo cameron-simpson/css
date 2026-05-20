@@ -141,6 +141,7 @@ class HTTPServiceAPI(ServiceAPI):
       *,
       default_headers=None,
       mode='response',
+      check_json=None,
       **service_api_kw
   ):
     if api_hostname is None:
@@ -161,23 +162,27 @@ class HTTPServiceAPI(ServiceAPI):
     self.cookies = session.cookies
     self.default_headers = default_headers
     self.mode = mode
+    self.check_json = check_json
 
   def response_as_json(self, rsp: Response) -> dict:
     ''' Return `rsp.json()`.
     '''
     try:
-      return rsp.json()
+      js = rsp.json()
     except (JSONDecodeError, RequestsJSONDecodeError) as e:
       warning("response is not JSON: %s\n%r", e, rsp)
       raise
+    if self.check_json:
+      for field, value in self.check_json.items():
+        js_value = js.get(field)
+        if js_value != value:
+          warning(f'expected {field}={value!r}, got {js_value!r} from {js!r}')
+    return js
 
   def response_as_json_data(self, rsp: Response) -> dict:
     ''' Return the `"data"` element from a JSON response.
     '''
     js = self.response_as_json(rsp)
-    data_status = js.get("status")
-    if data_status != "success":
-      warning(f'expected status="success", got {data_status!r} from {js!r}')
     return js["data"]
 
   @uses_runstate
@@ -267,7 +272,7 @@ class HTTPServiceAPI(ServiceAPI):
   def post(self, suburl, **kw) -> Response:
     ''' Call `slef.suburl` with `method="POST"`.
     '''
-    return self, suburl(suburl, method='POST', **kw)
+    return self.suburl(suburl, method='POST', **kw)
 
   def __truediv__(self, suburl):
     return self.suburl(suburl)
