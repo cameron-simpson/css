@@ -202,8 +202,7 @@ class PlayOnCommand(BaseCommand):
     if argv:
       raise GetoptError(f'extra arguments: {argv!r}')
     api = self.options.api
-    for k, v in sorted(api.account().items()):
-      print(k, pformat(v))
+    printt(*([k, v] for k, v in sorted(api.account().items())))
 
   @popopts
   def cmd_api(self, argv):
