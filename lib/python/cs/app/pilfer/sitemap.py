@@ -1494,10 +1494,12 @@ class SiteWidget(ABC):
   sitemap: "SiteMap"
   tag: BS4Tag
 
-  def __init_subclass__(cls, **kw):
+  def __init_subclass__(cls, *, sitemap_class, **kw):
     ''' Record this widget class against its entity type.
     '''
     super().__init_subclass__(**kw)
+    cls.SITEMAP_CLASS = sitemap_class
+    sitemap_class.WIDGET_CLASSES.append(cls)
     cls.ENTITY_CLASS.WIDGET_CLASSES.append(cls)
 
   # most site widgets are DIVs
@@ -1522,12 +1524,22 @@ class SiteWidget(ABC):
     '''
     raise NotImplementedError
 
+  def check_tag(cls, tag: BS4Tag) -> bool:
+    ''' Test whether this tag is in fact an instance of the widget.
+
+        The default sweep by `scan_soup` uses `cls.TAG_NAME` and
+        `cls.FIND_ALL_CRITERIA`, then further winnows matched tags
+        using this method.
+    '''
+    return True
+
   @classmethod
   def scan_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
     ''' Scan some soup for this kind of widget, yield instances of `cls`.
     '''
     for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
-      yield cls(sitemap=sitemap, tag=tag)
+      if cls.check_tag(tag):
+        yield cls(sitemap=sitemap, tag=tag)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
