@@ -405,11 +405,10 @@ class PilferCommand(BaseCommand):
       soup = BeautifulSoup(text, BS4_PARSER_DEFAULT)
       dump_soup(soup)
       return 0
-    print(
-        method,
-        url,
-        *(f'{name}:{value}' for name, value in rqhdrs.items()),
-        *(f'{param}={value}' for param, value in params.items()),
+    printt(
+        [method, url],
+        tuple([name, value] for name, value in rqhdrs.items()),
+        *([param, value] for param, value in params.items()),
     )
     # a normal URL: fetch it and dump
     rsp = P.request(
@@ -860,9 +859,9 @@ class PilferCommand(BaseCommand):
       for pattern in sitemap.URL_KEY_PATTERNS:
         (domain_glob, path_re_s), format_s = pattern
         printt(
-            ('Domain:', '*' if domain_glob is None else domain_glob),
-            ('  Path RE:', path_re_s),
-            ('  Format:', format_s),
+            ['Domain:', '*' if domain_glob is None else domain_glob],
+            ['  Path RE:', path_re_s],
+            ['  Format:', format_s],
         )
       return 0
     # a subcommand?
@@ -890,8 +889,8 @@ class PilferCommand(BaseCommand):
       with Pfx(url):
         U = URL(url)
         table.extend((
-            ("URL:", url),
-            ("  key:", sitemap.url_key(url)),
+            ["URL:", url],
+            ["  key:", sitemap.url_key(url)],
         ))
     printt(*table)
 
