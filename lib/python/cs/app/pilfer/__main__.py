@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup, NavigableString
 from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
+from cs.bs4utils import printt_soup
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.fileutils import atomic_filename
@@ -48,7 +49,6 @@ from . import (
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .print import dump_soup
 from .rss import RSSChannelMixin
 from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
 
@@ -505,7 +505,7 @@ class PilferCommand(BaseCommand):
       print("Content:", flowstate.content_type)
       if flowstate.content_type in ('text/html',):
         soup = flowstate.soup
-        dump_soup(soup)
+        printt_soup(soup)
       elif flowstate.content_type in ('application/json',):
         jdata = flowstate.json
         if isinstance(jdata, dict):
