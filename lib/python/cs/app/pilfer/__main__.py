@@ -170,13 +170,12 @@ class PilferCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError(f'invalid flags: {options.flagnames!r}')
-    pilfer = options.pilfer
-    with super().run_context(pilfer=pilfer) as options:
-      later = options.later
-      with later:
+    options.pilfer  # make the original Pilfer if not yet done
+    with super().run_context() as options:
+      with options.later:
         pilfer = options.pilfer
         with pilfer:
-          pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
+          pilfer.sitemaps  # preloads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
               sqltags=pilfer.sqltags,
@@ -185,7 +184,7 @@ class PilferCommand(BaseCommand):
           ):
             if self.options.load_cookies:
               pilfer.load_browser_cookies(pilfer.session.cookies)
-            yield
+            yield options
 
   # TODO: accept a URL and look it up?
   def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
