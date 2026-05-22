@@ -597,22 +597,22 @@ class PilferCommand(BaseCommand):
     table = []
     for method, match_tags, grokked in P.grok(url):
       table.append(
-          (
+          [
               f'  {method.__qualname__}',
               "\n".join(map(str, sorted(match_tags)))
-          )
+          ]
       )
       if grokked is None:
-        table.append(('    grokked =>', 'None'))
+        table.append(['    grokked =>', 'None'])
       else:
         if isinstance(grokked, SQLTagSet):
           table.append(
-              ('    grokked =>', f'{grokked.sqltags}[{grokked.name}]')
+              ['    grokked =>', f'{grokked.sqltags}[{grokked.name}]']
           )
         else:
-          table.append(('    grokked =>', s(grokked)))
+          table.append(['    grokked =>', s(grokked)])
         for k, v in grokked.items():
-          table.append((f'      {k}', v))
+          table.append([f'      {k}', v])
     printt(*table)
 
   @popopts
