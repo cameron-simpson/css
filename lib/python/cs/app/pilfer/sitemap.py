@@ -1290,11 +1290,18 @@ class SiteEntity(HasTags):
 
   @pagemethod
   def grok_sitepage(self, flowstate: FlowState, match=None):
-    ''' The basic sitepage grok: record the metadta.
+    ''' The basic sitepage grok:
+        - update the entity cache of the request
+        - record the metadata
+        - record the opengraph tags
+        - call `self.grok_soup`, which scans the page soup for the
+          known widgets
     '''
     self._request_update(flowstate, page="sitepage")
     self.update_from_meta(flowstate)
     self.update(flowstate.opengraph_tags)
+    # scan the soup for known widgets
+    1 in self.grok_soup(flowstate.soup, self.sitemap)
 
   def _request(self, *, page="sitepage", method="GET"):
     ''' Return the dict which caches the HTTP Response from the last request for `page`.
