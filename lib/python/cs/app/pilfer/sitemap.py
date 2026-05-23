@@ -825,10 +825,13 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
   @cached_property
   def text(self) -> str:
     ''' The text content of the URL.
+        Note that this assumes UTF-8 if there is no specified
+        charset, and decodes with `errors="replace"`; this means
+        it will always return text - it may be mojibake.
     '''
     # assume UTF-8 if not specified
     charset = self.content_charset or 'utf-8'
-    text = self.content.decode(charset)
+    text = self.content.decode(charset, errors='replace')
     self.url.text = text
     return text
 
