@@ -1349,12 +1349,13 @@ class SiteEntity(HasTags):
 
   def _request(self, *, page="sitepage", method="GET"):
     ''' Return the dict which caches the HTTP Response from the last request for `page`.
-
         Note that just updating this dict does not reflect in the database.
         Instead the `._request_update(flowstate)` method should be called.
     '''
-    return self.setdefault("_request",
-                           {}).setdefault(page, {}).setdefault(method, {})
+    _request = self.tags.get('_request') or {}
+    _request.setdefault(page, {}).setdefault(method, {})
+    self.tags['_request'] = _request
+    return _request
 
   def _request_update(
       self, flowstate: FlowState, *, page="sitepage", method="GET"
@@ -1362,7 +1363,7 @@ class SiteEntity(HasTags):
     ''' Update the cached HTTP response information for `page` from `flowstate`.
     '''
     _request = self._request(page="sitepage", method=flowstate.method)
-    _request.update(
+    _request[page][method].update(
         url=flowstate.url.url_s,
         request={
             hdr.lower(): value
@@ -1375,7 +1376,7 @@ class SiteEntity(HasTags):
         },
     )
     # update the database
-    self.tags.set('_request', self['_request'])
+    self.tags.set('_request', _request, force=True)
 
   def rq_timestamp(self, *, page="sitepage", method="GET"):
     ''' Return the cached HTTP Response `Date` field for `page` as a UNIX timestamp.
