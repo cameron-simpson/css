@@ -179,6 +179,8 @@ class URLPattern(Promotable):
       ),
       'wordpath':
       Converter(r'\w+(/\w+)*', str, str),
+      'ANY':
+      Converter(r'.*', str, str),
   }
 
   class ParsedPattern(namedtuple('ParsedPattern',
@@ -186,7 +188,7 @@ class URLPattern(Promotable):
 
     # a <converter:name> placeholder
     PLACEHOLDER_re = re.compile(
-        r'<((?P<converter>[a-z][a-z0-9_]*):)?(?P<name>[a-z][a-z0-9_]*)>'
+        r'<((?P<converter>[a-zA-Z][a-zA-Z0-9_]*):)?(?P<name>[a-z_][a-z0-9_]*)>'
     )
 
     @classmethod
@@ -315,7 +317,8 @@ class URLPattern(Promotable):
       return None
     if m.end() < len(url.path):
       return None
-    return m.groupdict()
+    # return the public named matches (excludes _* names)
+    return {k: v for k, v in m.groupdict().items() if not k.startswith('_')}
 
   @classmethod
   def promote(cls, obj):
