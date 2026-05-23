@@ -1031,11 +1031,12 @@ class SiteEntity(HasTags):
     if sitemap is None:
       sitemap = cls.default_sitemap()
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
-      match = cls.match_url(url, pattern_name=pattern_name)
-      if match is None:
+      m = cls.match_url(url, pattern_name=pattern_name)
+      if m is None:
         raise ValueError(
             f'no match from {cls.__name__}.match_url({url},{pattern_name=})'
         )
+      pattern_name, match = m
       try:
         type_key = match["type_key"]
       except KeyError as e:
