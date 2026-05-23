@@ -1092,7 +1092,7 @@ class SiteEntity(HasTags):
       cls,
       pattern_name="sitepage_url",
       *,
-      sitemap: "SiteMap" = None
+      sitemap: "SiteMap" = None,
   ) -> URLPattern | None:
     ''' Return a `URLPattern` for the specified page name, default `"sitepage_url"`.
     '''
@@ -1105,7 +1105,36 @@ class SiteEntity(HasTags):
     return URLPattern(pattern_s, sitemap.URL_DOMAIN)
 
   @classmethod
-  def match_url(cls, url: URL, *, pattern_name="sitepage_url"):
+  def url_pattern_mapping(
+      cls,
+      *,
+      sitemap: "SiteMap" = None,
+  ) -> dict[str, URLPattern]:
+    ''' Return a mapping of `pattern_name`->`URLPattern` derived
+        from the `*_URL_PATTERN` attributes of this class and its
+        superclasses.
+    '''
+    if sitemap is None:
+      sitemap = cls.default_sitemap()
+    pattern_map = {}
+    for supercls in reversed(cls.__mro__):
+      for clsattr, pattern_s in supercls.__dict__.items():
+        if clsattr.endswith('_URL_PATTERN'):
+          if pattern_s is None:  # a cleared pattern name
+            if clsattr in pattern_map:
+              del pattern_map[clsattr]
+          else:
+            pattern_map[clsattr] = pattern_s
+    return {
+        pattern_name: URLPattern(pattern_s, sitemap.URL_DOMAIN)
+        for pattern_name, pattern_s in pattern_map.items()
+    }
+
+  @classmethod
+  def match_url(cls,
+                url: URL,
+                *,
+                pattern_name="sitepage_url") -> tuple[str, dict] | None:
     ''' Test whether this `SiteEntity` subclass matches `url`.
         Return `None` if there is no pattern for `pattern_name`
         (default `"sitepage_url"`), otherwise the result of the
@@ -1115,10 +1144,21 @@ class SiteEntity(HasTags):
         be a mapping, and will be updated by the mapping from a
         successful match.
     '''
-    ptn = cls.pattern(pattern_name=pattern_name)
-    if ptn is None:
-      return None
-    return ptn.match(url)
+    try:
+      pattern_mapping = cls.url_pattern_mapping()
+    except Exception as e:
+      warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
+      return
+    for pattern_name, pattern in pattern_mapping.items():
+      try:
+        m = pattern.match(url)
+      except Exception as e:
+        warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
+        continue
+      if m is not None:
+        return pattern_name, m
+
+    return None
 
   @mapped_property
   def patterns(self, pattern_name: str):
