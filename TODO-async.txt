@@ -1,3 +1,4 @@
+amap: mode to terminate other tasks on exception or not, currently inferred from with_exceptions
 cs.naysync: amap: can I enumerate() an async iter?
 amap: flip concurrent default to True, accept int or async Semaphore
 amap: yield same shape as pmap
