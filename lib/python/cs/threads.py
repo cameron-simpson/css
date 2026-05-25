@@ -847,7 +847,7 @@ def pmap(
     indexed=False,
     with_exceptions=False,
 ) -> Generator:
-  ''' A generator yielding the results of `func(item)`
+  ''' A generator yielding the result of `func(item)`
       for each `item` in the iterable `it`.
 
       See `cs.naysync.amap` for a version of this for asynchronous code.
@@ -874,7 +874,6 @@ def pmap(
 
       Example concurrent in call order:
 
-          >>> from random import random
           >>> import time
           >>> sleep_times = [0.1, 0.4, 0.2]
           >>>
@@ -894,6 +893,7 @@ def pmap(
 
       Example concurrent in completion order:
 
+          >>> import time
           >>> start = time.time()
           >>> for index, result in pmap(
           ...   lambda delay: (time.sleep(delay),delay)[-1],
