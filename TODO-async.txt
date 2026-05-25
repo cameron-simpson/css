@@ -1,3 +1,4 @@
+amap: with_exceptions
 use await_iter in @agen?
 dequeue: async generator yielding items from a sync queue
 bg: run distinct async event loop in its own thread
