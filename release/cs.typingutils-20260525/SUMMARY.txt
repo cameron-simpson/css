@@ -1,0 +1,1 @@
+Sortable and EQSortable Protocols which support __lt__ and both __eq__ and __lt__ respectively.

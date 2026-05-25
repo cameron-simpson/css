@@ -25,7 +25,7 @@ from cs.deco import decorator
 from cs.gimmicks import warning
 from cs.typingutils import Sortable
 
-__version__ = '20260403-post'
+__version__ = '20260525.1-post'
 
 DISTINFO = {
     'description':
@@ -952,6 +952,29 @@ class Ordered:
     '''
     while self.heap:
       yield heappop(self.heap)
+
+def order(
+    indexed_items: Iterable[Tuple[Sortable, Any]],
+    indices: Iterable[Sortable] = None
+) -> Generator[Tuple[Sortable, Any]]:
+  ''' A convenience wrapper for an `Ordered` instance to order the `indexed_items`.
+
+      Example:
+
+          >>> # an iterator yielding unordered results, just because
+          >>> unordered_results = iter( ((2, "third"), (0, "first"), (1, "second")) )
+          >>> for i, result in order(unordered_results):
+          ...   print(i, result)
+          ...
+          0 first
+          1 second
+          2 third
+
+  '''
+  ordered = Ordered(indices)
+  for i, item in indexed_items:
+    yield from ordered.push(i, item)
+  yield from ordered.drain()
 
 def with_neighbours(it: Iterable, no_neighbour=None):
   ''' Return 3-tuples of `(prev,curr,next)` from the iterable `it`
