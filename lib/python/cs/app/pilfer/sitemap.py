@@ -179,6 +179,8 @@ class URLPattern(Promotable):
       ),
       'wordpath':
       Converter(r'\w+(/\w+)*', str, str),
+      'ANY':
+      Converter(r'.*', str, str),
   }
 
   class ParsedPattern(namedtuple('ParsedPattern',
@@ -186,7 +188,7 @@ class URLPattern(Promotable):
 
     # a <converter:name> placeholder
     PLACEHOLDER_re = re.compile(
-        r'<((?P<converter>[a-z][a-z0-9_]*):)?(?P<name>[a-z][a-z0-9_]*)>'
+        r'<((?P<converter>[a-zA-Z][a-zA-Z0-9_]*):)?(?P<name>[a-z_][a-z0-9_]*)>'
     )
 
     @classmethod
@@ -315,7 +317,8 @@ class URLPattern(Promotable):
       return None
     if m.end() < len(url.path):
       return None
-    return m.groupdict()
+    # return the public named matches (excludes _* names)
+    return {k: v for k, v in m.groupdict().items() if not k.startswith('_')}
 
   @classmethod
   def promote(cls, obj):
@@ -822,10 +825,13 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
   @cached_property
   def text(self) -> str:
     ''' The text content of the URL.
+        Note that this assumes UTF-8 if there is no specified
+        charset, and decodes with `errors="replace"`; this means
+        it will always return text - it may be mojibake.
     '''
     # assume UTF-8 if not specified
     charset = self.content_charset or 'utf-8'
-    text = self.content.decode(charset)
+    text = self.content.decode(charset, errors='replace')
     self.url.text = text
     return text
 
@@ -1025,11 +1031,12 @@ class SiteEntity(HasTags):
     if sitemap is None:
       sitemap = cls.default_sitemap()
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
-      match = cls.match_url(url, pattern_name=pattern_name)
-      if match is None:
+      m = cls.match_url(url, pattern_name=pattern_name)
+      if m is None:
         raise ValueError(
             f'no match from {cls.__name__}.match_url({url},{pattern_name=})'
         )
+      pattern_name, match = m
       try:
         type_key = match["type_key"]
       except KeyError as e:
@@ -1089,7 +1096,7 @@ class SiteEntity(HasTags):
       cls,
       pattern_name="sitepage_url",
       *,
-      sitemap: "SiteMap" = None
+      sitemap: "SiteMap" = None,
   ) -> URLPattern | None:
     ''' Return a `URLPattern` for the specified page name, default `"sitepage_url"`.
     '''
@@ -1102,7 +1109,36 @@ class SiteEntity(HasTags):
     return URLPattern(pattern_s, sitemap.URL_DOMAIN)
 
   @classmethod
-  def match_url(cls, url: URL, *, pattern_name="sitepage_url"):
+  def url_pattern_mapping(
+      cls,
+      *,
+      sitemap: "SiteMap" = None,
+  ) -> dict[str, URLPattern]:
+    ''' Return a mapping of `pattern_name`->`URLPattern` derived
+        from the `*_URL_PATTERN` attributes of this class and its
+        superclasses.
+    '''
+    if sitemap is None:
+      sitemap = cls.default_sitemap()
+    pattern_map = {}
+    for supercls in reversed(cls.__mro__):
+      for clsattr, pattern_s in supercls.__dict__.items():
+        if clsattr.endswith('_URL_PATTERN'):
+          if pattern_s is None:  # a cleared pattern name
+            if clsattr in pattern_map:
+              del pattern_map[clsattr]
+          else:
+            pattern_map[clsattr] = pattern_s
+    return {
+        pattern_name: URLPattern(pattern_s, sitemap.URL_DOMAIN)
+        for pattern_name, pattern_s in pattern_map.items()
+    }
+
+  @classmethod
+  def match_url(cls,
+                url: URL,
+                *,
+                pattern_name="sitepage_url") -> tuple[str, dict] | None:
     ''' Test whether this `SiteEntity` subclass matches `url`.
         Return `None` if there is no pattern for `pattern_name`
         (default `"sitepage_url"`), otherwise the result of the
@@ -1112,10 +1148,21 @@ class SiteEntity(HasTags):
         be a mapping, and will be updated by the mapping from a
         successful match.
     '''
-    ptn = cls.pattern(pattern_name=pattern_name)
-    if ptn is None:
-      return None
-    return ptn.match(url)
+    try:
+      pattern_mapping = cls.url_pattern_mapping()
+    except Exception as e:
+      warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
+      return
+    for pattern_name, pattern in pattern_mapping.items():
+      try:
+        m = pattern.match(url)
+      except Exception as e:
+        warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
+        continue
+      if m is not None:
+        return pattern_name, m
+
+    return None
 
   @mapped_property
   def patterns(self, pattern_name: str):
@@ -1287,20 +1334,28 @@ class SiteEntity(HasTags):
 
   @pagemethod
   def grok_sitepage(self, flowstate: FlowState, match=None):
-    ''' The basic sitepage grok: record the metadta.
+    ''' The basic sitepage grok:
+        - update the entity cache of the request
+        - record the metadata
+        - record the opengraph tags
+        - call `self.grok_soup`, which scans the page soup for the
+          known widgets
     '''
     self._request_update(flowstate, page="sitepage")
     self.update_from_meta(flowstate)
     self.update(flowstate.opengraph_tags)
+    # scan the soup for known widgets
+    1 in self.grok_soup(flowstate.soup, self.sitemap)
 
   def _request(self, *, page="sitepage", method="GET"):
     ''' Return the dict which caches the HTTP Response from the last request for `page`.
-
         Note that just updating this dict does not reflect in the database.
         Instead the `._request_update(flowstate)` method should be called.
     '''
-    return self.setdefault("_request",
-                           {}).setdefault(page, {}).setdefault(method, {})
+    _request = self.tags.get('_request') or {}
+    _request.setdefault(page, {}).setdefault(method, {})
+    self.tags['_request'] = _request
+    return _request
 
   def _request_update(
       self, flowstate: FlowState, *, page="sitepage", method="GET"
@@ -1308,7 +1363,7 @@ class SiteEntity(HasTags):
     ''' Update the cached HTTP response information for `page` from `flowstate`.
     '''
     _request = self._request(page="sitepage", method=flowstate.method)
-    _request.update(
+    _request[page][method].update(
         url=flowstate.url.url_s,
         request={
             hdr.lower(): value
@@ -1321,7 +1376,7 @@ class SiteEntity(HasTags):
         },
     )
     # update the database
-    self.tags.set('_request', self['_request'])
+    self.tags.set('_request', _request, force=True)
 
   def rq_timestamp(self, *, page="sitepage", method="GET"):
     ''' Return the cached HTTP Response `Date` field for `page` as a UNIX timestamp.
@@ -1494,10 +1549,12 @@ class SiteWidget(ABC):
   sitemap: "SiteMap"
   tag: BS4Tag
 
-  def __init_subclass__(cls, **kw):
+  def __init_subclass__(cls, *, sitemap_class, **kw):
     ''' Record this widget class against its entity type.
     '''
     super().__init_subclass__(**kw)
+    cls.SITEMAP_CLASS = sitemap_class
+    sitemap_class.WIDGET_CLASSES.append(cls)
     cls.ENTITY_CLASS.WIDGET_CLASSES.append(cls)
 
   # most site widgets are DIVs
@@ -1522,12 +1579,22 @@ class SiteWidget(ABC):
     '''
     raise NotImplementedError
 
+  def check_tag(cls, tag: BS4Tag) -> bool:
+    ''' Test whether this tag is in fact an instance of the widget.
+
+        The default sweep by `scan_soup` uses `cls.TAG_NAME` and
+        `cls.FIND_ALL_CRITERIA`, then further winnows matched tags
+        using this method.
+    '''
+    return True
+
   @classmethod
   def scan_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
     ''' Scan some soup for this kind of widget, yield instances of `cls`.
     '''
     for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
-      yield cls(sitemap=sitemap, tag=tag)
+      if cls.check_tag(tag):
+        yield cls(sitemap=sitemap, tag=tag)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
@@ -2667,41 +2734,6 @@ class DocSite(SiteMap):
   )
   def cache_key_docsite(self, flowstate: FlowState, match: TagSet) -> str:
     return match['cache_key']
-
-@dataclass
-class Wikipedia(SiteMap):
-  ''' The SiteMap for `wikipedia.org'.
-  '''
-
-  TYPE_ZONE = 'wikipedia'
-
-  URL_KEY_PATTERNS = [
-      # https://en.wikipedia.org/wiki/Braille
-      (
-          (
-              '*.wikipedia.org',
-              r'/wiki/(?P<title>[^:/]+)$',
-          ),
-          'wiki/{title}',
-      ),
-      # https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Carbonate-outcrops_world.jpg/620px-Carbonate-outcrops_world.jpg
-      (
-          (
-              'upload.wikipedia.org',
-              r'/wikipedia/commons/(?<subpath>.*\.(jpg|gif|png))$',
-          ),
-          'wiki/commons/{subpath}',
-      ),
-  ]
-
-  @promote
-  def url_key(self, url: URL, extra: Mapping | None = None) -> str | None:
-    ''' Include the domain name language in the URL key.
-    '''
-    key = super().url_key(url, extra=extra)
-    if key is not None:
-      key = f'{cutsuffix(url.hostname, ".wikipedia.org")}/{key}'
-    return key
 
 @dataclass
 class DockerIO(SiteMap):

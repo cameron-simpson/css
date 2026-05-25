@@ -89,7 +89,7 @@ def fmtdoc(func):
   func.__doc__ = func.__doc__.format_map(fmtmap)
   return func
 
-def decorator(deco):
+def decorator(deco=None, *, decorable=callable):
   ''' A decorator for decorator functions to support optional arguments
       and also to allow specifying additional attributes to apply
       to the decorated function.
@@ -111,6 +111,18 @@ def decorator(deco):
 
       allowing `da` and `dkw` to affect the behaviour of the decorator `mydeco`.
 
+      `@decorator` itself accepts an optional `decorable=` keyword
+      parameter; this is used as the test of the first positional
+      argument to the subdecorator to see if it is the function it
+      decorates.
+      This defaults to `callable`, but may be specified; I have a
+      decorator which can accept classes as positional arguments
+      and classes are callable so I decorate it like this:
+
+          @decorator(decorable=lambda f: callable(f) and not isinstance(f, type))
+
+      so as not to mistake a class as the function being decoration.
+
       Examples:
 
           # define your decorator as if always called with func and args
@@ -131,6 +143,9 @@ def decorator(deco):
       The `@mydeco` decorator itself is then written as though the
       arguments were always supplied.
   '''
+
+  if deco is None:
+    return lambda func, **kw: decorator(func, decorable=decorable, **kw)
 
   def decorate(func, *dargs, **dkwargs):
     ''' Final decoration when we have the function and the decorator arguments.
@@ -187,7 +202,7 @@ def decorator(deco):
         Otherwise return a decorator using the provided arguments,
         ready for the subsequent function.
     '''
-    if len(da) > 0 and callable(da[0]):
+    if len(da) > 0 and decorable(da[0]):
       # `func` is already supplied, pop it off and decorate it now.
       func = da[0]
       da = tuple(da[1:])

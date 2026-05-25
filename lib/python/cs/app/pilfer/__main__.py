@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup, NavigableString
 from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
+from cs.bs4utils import printt_soup
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.fileutils import atomic_filename
@@ -48,7 +49,6 @@ from . import (
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .print import dump_soup
 from .rss import RSSChannelMixin
 from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
 
@@ -170,13 +170,12 @@ class PilferCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError(f'invalid flags: {options.flagnames!r}')
-    pilfer = options.pilfer
-    with super().run_context(pilfer=pilfer) as options:
-      later = options.later
-      with later:
+    options.pilfer  # make the original Pilfer if not yet done
+    with super().run_context() as options:
+      with options.later:
         pilfer = options.pilfer
         with pilfer:
-          pilfer.sitemaps  # loads SiteMaps from the pilferrc files as side effect
+          pilfer.sitemaps  # preloads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
               sqltags=pilfer.sqltags,
@@ -185,7 +184,7 @@ class PilferCommand(BaseCommand):
           ):
             if self.options.load_cookies:
               pilfer.load_browser_cookies(pilfer.session.cookies)
-            yield
+            yield options
 
   # TODO: accept a URL and look it up?
   def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
@@ -405,11 +404,10 @@ class PilferCommand(BaseCommand):
       soup = BeautifulSoup(text, BS4_PARSER_DEFAULT)
       dump_soup(soup)
       return 0
-    print(
-        method,
-        url,
-        *(f'{name}:{value}' for name, value in rqhdrs.items()),
-        *(f'{param}={value}' for param, value in params.items()),
+    printt(
+        [method, url],
+        tuple([name, value] for name, value in rqhdrs.items()),
+        *([param, value] for param, value in params.items()),
     )
     # a normal URL: fetch it and dump
     rsp = P.request(
@@ -506,7 +504,7 @@ class PilferCommand(BaseCommand):
       print("Content:", flowstate.content_type)
       if flowstate.content_type in ('text/html',):
         soup = flowstate.soup
-        dump_soup(soup)
+        printt_soup(soup)
       elif flowstate.content_type in ('application/json',):
         jdata = flowstate.json
         if isinstance(jdata, dict):
@@ -599,22 +597,22 @@ class PilferCommand(BaseCommand):
     table = []
     for method, match_tags, grokked in P.grok(url):
       table.append(
-          (
+          [
               f'  {method.__qualname__}',
               "\n".join(map(str, sorted(match_tags)))
-          )
+          ]
       )
       if grokked is None:
-        table.append(('    grokked =>', 'None'))
+        table.append(['    grokked =>', 'None'])
       else:
         if isinstance(grokked, SQLTagSet):
           table.append(
-              ('    grokked =>', f'{grokked.sqltags}[{grokked.name}]')
+              ['    grokked =>', f'{grokked.sqltags}[{grokked.name}]']
           )
         else:
-          table.append(('    grokked =>', s(grokked)))
+          table.append(['    grokked =>', s(grokked)])
         for k, v in grokked.items():
-          table.append((f'      {k}', v))
+          table.append([f'      {k}', v])
     printt(*table)
 
   @popopts
@@ -860,9 +858,9 @@ class PilferCommand(BaseCommand):
       for pattern in sitemap.URL_KEY_PATTERNS:
         (domain_glob, path_re_s), format_s = pattern
         printt(
-            ('Domain:', '*' if domain_glob is None else domain_glob),
-            ('  Path RE:', path_re_s),
-            ('  Format:', format_s),
+            ['Domain:', '*' if domain_glob is None else domain_glob],
+            ['  Path RE:', path_re_s],
+            ['  Format:', format_s],
         )
       return 0
     # a subcommand?
@@ -890,8 +888,8 @@ class PilferCommand(BaseCommand):
       with Pfx(url):
         U = URL(url)
         table.extend((
-            ("URL:", url),
-            ("  key:", sitemap.url_key(url)),
+            ["URL:", url],
+            ["  key:", sitemap.url_key(url)],
         ))
     printt(*table)
 
