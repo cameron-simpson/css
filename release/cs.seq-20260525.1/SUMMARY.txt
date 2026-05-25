@@ -1,0 +1,1 @@
+order: yield sorted indexed item, convenience wrapper for Ordered.
