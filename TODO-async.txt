@@ -1,3 +1,4 @@
+amap: use cs.seq.Ordered
 amap: with_exceptions
 use await_iter in @agen?
 dequeue: async generator yielding items from a sync queue
