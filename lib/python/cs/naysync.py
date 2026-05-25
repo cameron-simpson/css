@@ -45,6 +45,7 @@ from typing import (
 
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
+from cs.seq import Ordered
 
 __version__ = '20260415-post'
 
@@ -57,6 +58,7 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.semantics',
+        'cs.seq',
     ],
 }
 
@@ -228,6 +230,7 @@ async def amap(
     concurrent=False,
     unordered=False,
     indexed=False,
+    with_exceptions=False,
     fast=False,
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
@@ -251,6 +254,10 @@ async def amap(
       `(i,result)` instead of just `result`, where `i` is the index
       if each item from `it` counting from `0`.
 
+      If `with_exceptions` is true (default `False`) then an exception
+      `exc` in a call to `func(item)` are reraised, otherwise the
+      yield value is `(result,exc)`.
+
       If `fast` is true (default `False`) assume that `func` does
       not block or otherwise take a long time.
 
@@ -266,6 +273,38 @@ async def amap(
               ):
                   yield urls[i], response
   '''
+
+  async def result_exc(
+      func, item
+  ) -> Union[Tuple[Any, None] | Tuple[None, Exception]]:
+    ''' Await `func(oitem)` and return a `(result,None)` 2-tuple on
+        completion or a `(None,Exception)` 2-tuple on an exception.
+    '''
+    try:
+      result = await func(item)
+    except Exception as exc:
+      return None, exc
+    return result, None
+
+  def yield_value(index, result, exc):
+    ''' Return the appropriate *value* for the yield of `index`, `result`, `exc`.
+        If `with_exceptions` set *value* to `(result,exc)`, otherwise
+        `raise exc` if `exc` is not `None`, otherwise set *value*
+        to `result`.
+        If `indexed`, set *value* to `(index,`*value*`)`.
+    '''
+    # out until cs.pfx does not need cs.py3
+    ##with Pfx('amap(func=%s)[%s]->(%r,%r)', func, index, result, exc):
+    if with_exceptions:
+      y = result, exc
+    elif exc is not None:
+      raise exc
+    else:
+      y = result
+    if indexed:
+      y = index, y
+    return y
+
   # promote a synchronous function to an asynchronous function
   func = afunc(func, fast=fast)
   # promote the iterable to an asynchronous iterator
@@ -274,8 +313,8 @@ async def amap(
     # serial operation
     i = 0
     async for item in ait:
-      result = await func(item)
-      yield (i, result) if indexed else result
+      result, exc = await result_exc(func, item)
+      yield yield_value(i, result, exc)
       i += 1
     return
 
@@ -309,14 +348,9 @@ async def amap(
               CancelledError(f'amap({i}:{item}): processing terminated'),
           )
       )
-    try:
-      result = await func(item)
-    except Exception as exc:
-      completed += 1
-      await resultQ.put((i, None, exc))
-    else:
-      completed += 1
-      await resultQ.put((i, result, None))
+    result, exc = await result_exc(func, item)
+    completed += 1
+    await resultQ.put((i, result, exc))
     if consumed and completed == queued:
       # close the queue on the last function completion
       await resultQ.close()
@@ -350,26 +384,22 @@ async def amap(
     async for i, result, exc in resultQ:
       del tasks[i]  # release the task reference
       if exc is not None:
-        terminated = True
-        raise exc
-      yield (i, result) if indexed else result
+        terminated = not with_exceptions
+      yield yield_value(i, result, exc)
   else:
     # gather results in a heap
     # yield results as their number arrives
-    results = []
     unqueued = 0
-    async for i_result_exc in resultQ:
-      heappush(results, i_result_exc)
-      while results and results[0][0] == unqueued:
-        i, result, exc = heappop(results)
-        del tasks[i]  # release the task reference
-        if exc is not None:
-          terminated = True
-          raise exc
-        yield (i, result) if indexed else result
-        unqueued += 1
-    # this should have cleared the heap
-    assert len(results) == 0
+    ordered = None if unordered else Ordered()
+    async for i, result, exc in resultQ:
+      if unordered:
+        yield yield_value(i, result, exc)
+      else:
+        for oi, (oresult, oexc) in ordered.push(i, (result, exc)):
+          if exc is not None:
+            terminated = not with_exceptions
+          yield yield_value(oi, oresult, oexc)
+          unqueued += 1
 
 class Lock:
   ''' A lock object which can be used in synchronous and asynchonous contexts.
