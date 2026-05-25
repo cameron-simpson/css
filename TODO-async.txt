@@ -1,3 +1,4 @@
+amap: flip concurrent default to True, accept int or async Semaphore
 amap: yield same shape as pmap
 amap: use cs.seq.Ordered
 amap: with_exceptions
