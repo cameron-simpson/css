@@ -37,7 +37,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Ordered, Seq
 
-__version__ = '20250528-post'
+__version__ = '20260526'
 
 DISTINFO = {
     'description':
