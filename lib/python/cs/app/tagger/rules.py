@@ -368,7 +368,7 @@ class MoveAction(_Action):
       raise ValueError(f'zero length file (placeholder?): {fspath!r}')
     target_dirpath = dirname(target_fspath)
     if doit and not isdirpath(target_dirpath):
-      needdir(target_dirpath, use_makedirs=False, verbose=not quiet)
+      needdir(target_dirpath, use_makedirs=False)
     merge(
         fspath,
         target_fspath,

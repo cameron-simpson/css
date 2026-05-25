@@ -248,11 +248,11 @@ class MP4Command(BaseCommand):
             box.report_table(table)
             for subbox, tags in box.gather_metadata():
               if not tags:
-                table.append((f'  {box.box_type_s}', 'No metadata.'))
+                table.append([f'  {box.box_type_s}', 'No metadata.'])
               else:
-                table.append((f'  {box.box_type_s}',))
+                table.append(['  {box.box_type_s}'])
                 for tag_name, tag_value in tags.items():
-                  table.append((f'    {tag_name}', tag_value))
+                  table.append([f'    {tag_name}', tag_value])
         printt(*table)
     return xit
 
@@ -272,6 +272,11 @@ class MP4Command(BaseCommand):
     filespec, bfr = self.pop_buffer(argv)
     if bfr is None:
       return 1
+    columns = (
+        ('box_type', 'offset', 'size',
+         'description') if options.with_offsets else
+        ('box_type', 'size', 'description')
+    )
     type_paths = list(argv)
     with Pfx("%r", filespec):
       print(filespec)
@@ -283,10 +288,10 @@ class MP4Command(BaseCommand):
           if not type_paths:
             scan_table.extend(
                 topbox.dump_table(
+                    columns=columns,
                     recurse=True,
                     dump_fields=options.with_fields,
                     dump_offsets=options.with_offsets,
-                    with_offsets=True,
                 )
             )
           else:
@@ -301,10 +306,10 @@ class MP4Command(BaseCommand):
                     seen_paths[type_path] = True
                   scan_table.extend(
                       topbox.dump_table(
+                          columns=columns,
                           recurse=True,
                           dump_fields=options.with_fields,
                           dump_offsets=options.with_offsets,
-                          indent='  '
                       )
                   )
                 else:
@@ -315,10 +320,9 @@ class MP4Command(BaseCommand):
                       seen_paths[type_path] = True
                     scan_table.extend(
                         subbox.dump_table(
+                            columns=columns,
                             recurse=True,
                             dump_fields=options.with_fields,
-                            dump_offsets=options.with_offsets,
-                            indent='  '
                         )
                     )
     printt(*scan_table)
@@ -1156,73 +1160,56 @@ class Box(SimpleBinary):
   def dump_table(
       self,
       table=None,
-      indent='',
-      subindent='  ',
+      columns=('box_type', 'size', 'description'),
       dump_fields=False,
       dump_offsets=False,
       recurse=False,
-      with_offsets=False,
   ) -> List[Tuple[str, str]]:
     ''' Dump this `Box` as a table of descriptions.
-        Return a list of `(title,description)` 2-tuples
+        Return a list of `(title,description)` 2-lists
+        with fields and subboxes in tuples
         suitable for use with `cs.lex.printt()`.
-
-        If 'with_offsets' is true, include a third column with the box offset and size.
     '''
     if table is None:
       table = []
-    for level, box, subboxes in self.walk(limit=(None if recurse else 0)):
-      row_indent = indent + subindent * level
-      body = box.body
-      if body.__class__ is BoxBody:
-        box_desc = ''
-      else:
-        box_desc = body.__class__.__doc__.strip().split("\n")[0]
-      box_offset = geek(box.end_offset - box.offset).__str__(
-          no_pad=True, sep=','
-      )
-      if dump_fields:
-        table.append(
-            (
-                f'{row_indent}{box.box_type_s}:{body.__class__.__name__}',
-                f'{box_offset} @ 0x{box.offset:06x}',
-                box_desc,
-            ) if with_offsets else (
-                f'{row_indent}{box.box_type_s}:{body.__class__.__name__}',
-                box_desc,
+    body = self.body
+    if body.__class__ is BoxBody:
+      box_desc = ''
+    else:
+      box_desc = body.__class__.__doc__.strip().split("\n")[0]
+    box_row_d = {
+        'box_type': f'{self.box_type_s}:{body.__class__.__name__}',
+        'offset': f'0x{self.offset:08x}',
+        'size':
+        geek(self.end_offset - self.offset).__str__(no_pad=True, sep=','),
+        'description': box_desc,
+    }
+    table.append([box_row_d[col] for col in columns])
+    subrows = []
+    if dump_fields:
+      for field_name in sorted(filter(
+          lambda name: all((
+              not name.startswith('_'),
+              (name not in ('parent',) and (dump_offsets or name not in
+                                            ('offset', 'end_offset'))),
+              (not recurse or name not in ('boxes',)),
+          )),
+          body.__dict__.keys(),
+      )):
+        field = getattr(body, field_name)
+        subrows.append([f'.{field_name}', '', cropped_repr(field)])
+    if recurse:
+      for subbox in self.boxes:
+        subrows.extend(
+            subbox.dump_table(
+                columns=columns,
+                dump_fields=dump_fields,
+                dump_offsets=dump_offsets,
+                recurse=recurse,
             )
         )
-      else:
-        box_content = str(body)
-        box_content__ = cutsuffix(box_content, '()')
-        if box_content__ is not box_content:
-          # there are fields in the brackets
-          if box_desc:
-            box_content = f'{box_content__}: {box_desc}'
-          else:
-            box_content = box_content__
-        table.append(
-            (
-                f'{row_indent}{box.box_type_s}',
-                f'{box_offset} @ 0x{box.offset:06x}',
-                box_content,
-            )
-        )
-      if dump_fields:
-        # indent the subrows
-        field_indent = row_indent + subindent
-        for field_name in sorted(filter(
-            lambda name: all((
-                not name.startswith('_'),
-                (dump_offsets or name not in ('offset', 'end_offset')),
-                (not recurse or name not in ('boxes',)),
-            )),
-            body.__dict__.keys(),
-        )):
-          field = getattr(body, field_name)
-          table.append(
-              (f'{field_indent}.{field_name}', '', cropped_repr(field))
-          )
+    if subrows:
+      table.append(tuple(subrows))
     return table
 
   def dump(self, file=None, **dump_table_kw):
@@ -1248,21 +1235,22 @@ class Box(SimpleBinary):
     box_type = self.box_type_s
     if box_type == 'ftyp':
       table.append(
-          (
+          [
               f'{indent}File type',
               f'File type: {self.major_brand}, brands={self.brands_bs}'
-          )
+          ]
       )
     elif box_type == 'free':
-      table.append((f'{indent}Free space', str(geek_bytes(len(self))[-2:])))
+      table.append([f'{indent}Free space', str(geek_bytes(len(self))[-2:])])
     elif box_type == 'mdat':
       table.append(
-          (f'{indent}Media data', str(geek_bytes(len(self.body))[-2:]))
+          [f'{indent}Media data',
+           str(geek_bytes(len(self.body))[-2:])]
       )
     elif box_type == 'moov':
       mvhd = self.MVHD
       table.append(
-          (
+          [
               f'{indent}Movie',
               ", ".join(
                   (
@@ -1271,7 +1259,7 @@ class Box(SimpleBinary):
                       f'next_track_id={mvhd.next_track_id}',
                   )
               ),
-          )
+          ]
       )
       for moov_box in self:
         box_type = moov_box.box_type_s
@@ -1284,14 +1272,14 @@ class Box(SimpleBinary):
       mdia = trak.MDIA
       mdhd = mdia.MDHD
       tkhd = trak.TKHD
-      table.append((f'{indent}Track', f'duration={tkhd.duration}'))
-      table.append((f'{indent2}EDTS', ('No EDTS' if edts is None else edts)))
+      table.append([f'{indent}Track', f'duration={tkhd.duration}'])
+      table.append([f'{indent2}EDTS', ('No EDTS' if edts is None else edts)])
       duration_s = human_time(mdhd.duration.value / mdhd.timescale.value)
       table.append(
-          (
+          [
               f'{indent2}Media',
               f'duration={duration_s} language={mdhd.language}'
-          )
+          ]
       )
       for tbox in trak:
         tbox_type = tbox.box_type_s
@@ -1302,7 +1290,7 @@ class Box(SimpleBinary):
       box_s = str(self)
       if len(box_s) > 58:
         box_s = box_s[:55] + '...'
-      table.append((f'{indent}{box_type}', box_s))
+      table.append([f'{indent}{box_type}', box_s])
     return table
 
   def report(self, file=None, **report_table_kw):

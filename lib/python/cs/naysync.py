@@ -10,16 +10,6 @@
     an async world is that anything asynchronous needs to be turtles
     all the way down: a single blocking synchronous call anywhere
     in the call stack blocks the async event loop.
-
-    This module presently provides:
-    - `@afunc`: a decorator to make a synchronous function asynchronous
-    - `@agen`: a decorator to make a synchronous generator asynchronous
-    - `amap(func,iterable)`: asynchronous mapping of `func` over an iterable
-    - `aqget(q)`: asynchronous function to get an item from a `queue.Queue` or similar
-    - `aqiter(q)`: asynchronous generator to yield items from a `queue.Queue` or similar
-    - `async_iter(iterable)`: return an asynchronous iterator of an iterable
-    - `IterableAsyncQueue`: an iterable flavour of `asyncio.Queue` with no `get` methods
-    - `AsyncPipeLine`: a pipeline of functions connected together with `IterableAsyncQueue`s
 '''
 
 from asyncio import (
@@ -56,7 +46,7 @@ from typing import (
 from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
 
-__version__ = '20251119-post'
+__version__ = '20260415-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -399,6 +389,10 @@ class Lock:
 
           async with shared_lock:
               critical section
+
+      If you're using just async code in a single thread, use `asyncio.Lock`.
+      If you're using just sync code in multiple threads, use `threading.Lock`.
+      If you need to control access in various sync and async contexts use this `Lock`.
   '''
 
   def __init__(self, name=None, *, max_workers=64):

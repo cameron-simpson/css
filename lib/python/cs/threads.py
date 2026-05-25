@@ -11,6 +11,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
 from inspect import ismethod
+from queue import Queue
 import sys
 from threading import (
     current_thread,
@@ -19,7 +20,9 @@ from threading import (
     Thread as builtin_Thread,
     local as thread_local,
 )
+from typing import Any, Generator, Iterable, Tuple, Union
 
+from icontract import require
 from cs.context import (
     ContextManagerMixin,
     stackattrs,
@@ -32,9 +35,9 @@ from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx  # prefix
 from cs.py.func import funcname, prop
 from cs.py.stack import caller
-from cs.seq import Seq
+from cs.seq import Ordered, Seq
 
-__version__ = '20250528-post'
+__version__ = '20260526-post'
 
 DISTINFO = {
     'description':
@@ -45,6 +48,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'icontract',
         'cs.context',
         'cs.deco',
         'cs.excutils',
@@ -825,6 +829,182 @@ class NRLock:
 
   def __exit__(self, *_):
     self.release()
+
+# TODO: runstate
+# TODO: tagfunc to return a tag, even the item, instead of the index
+#       callable indexed=
+# TODO: optional thread pool or Thread() constructor
+# TODO: future-like executor?
+@require(
+    lambda concurrent: concurrent is None or isinstance(concurrent, Semaphore)
+    or concurrent > 0
+)
+def pmap(
+    func,
+    it: Iterable,
+    *,
+    concurrent: Union[int | Semaphore | None] = None,
+    unordered=False,
+    indexed=False,
+    with_exceptions=False,
+) -> Generator:
+  ''' A generator yielding the result of `func(item)`
+      for each `item` in the iterable `it`.
+
+      See `cs.naysync.amap` for a version of this for asynchronous code.
+
+      Parameters:
+      * `func`: the callable to accept items from `it`
+      * `it`: an iterable of items to apply to `func`
+      * `concurrent`: a optional constraint on the number of parallel
+        calls to `func`; if `None` then no constraint, if an `int` then
+        a maximum of that many calls, if a `Semaphore` use that as
+        the constraint
+      * `unordered`: optional flase, default `False`;
+        if true then yield results as calls complete, otherwise
+        yield results in the same order as `it` though still as
+        soon as available
+      * `indexed`: if true, yield `(index,result)` instead of `result`
+        where `index` is the ordinal from `enumerate(it)`
+      * `with_exceptions`: yield `(result,exc)` as the result value
+        instead of `result`; in this mode exceptions from calls to
+        `func` are not reraised, as they come back in the yield values
+
+      Note that `indexed=True` and `with_exceptions=True` produce
+      `(index,(result,exc))` tuples.
+
+      Example concurrent in call order:
+
+          >>> import time
+          >>> sleep_times = [0.1, 0.4, 0.2]
+          >>>
+          >>> start = time.time()
+          >>> for index, result in pmap(
+          ...   lambda delay: (time.sleep(delay),delay)[-1],
+          ...   sleep_times,
+          ...   unordered=False,
+          ...   indexed=True):
+          ...     print(index, result)
+          ...
+          0 0.1
+          1 0.4
+          2 0.2
+          >>> # concurrent delays
+          >>> assert 0.4 < time.time() - start < 0.5
+
+      Example concurrent in completion order:
+
+          >>> import time
+          >>> start = time.time()
+          >>> for index, result in pmap(
+          ...   lambda delay: (time.sleep(delay),delay)[-1],
+          ...   sleep_times,
+          ...   unordered=True,
+          ...   indexed=True):
+          ...     print(index, result)
+          ...
+          0 0.1
+          2 0.2
+          1 0.4
+          >>> # concurrent delays
+          >>> assert 0.4 < time.time() - start < 0.5
+  '''
+
+  def result_exc(func,
+                 item) -> Union[Tuple[Any, None] | Tuple[None, Exception]]:
+    ''' Run `func(oitem)` and return a `(result,None)` 2-tuple on
+        completion or a `(None,Exception)` 2-tuple on an exception.
+    '''
+    try:
+      result = func(item)
+    except Exception as exc:
+      return None, exc
+    return result, None
+
+  def yield_value(index, result, exc):
+    ''' Return the appropriate *value* for the yield of `index`, `result`, `exc`.
+        If `with_exceptions` set *value* to `(result,exc)`, otherwise
+        `raise exc` if `exc` is not `None`, otherwise set *value*
+        to `result`.
+        If `indexed`, turn set *value* to `(index,`*value*`)`.
+    '''
+    with Pfx('pmap(func=%s)[%s]->(%r,%r)', func, index, result, exc):
+      if with_exceptions:
+        y = result, exc
+      elif exc is not None:
+        raise exc
+      else:
+        y = result
+      if indexed:
+        y = index, y
+      return y
+
+  if concurrent is None:
+    # no bound on the number on concurrent Threads
+    sem = None
+  elif isinstance(concurrent, Semaphore):
+    sem = concurrent
+  elif concurrent == 1:
+    # trivial case, just use map()
+    for i, (result, exc) in enumerate(map(lambda item: result_exc(func, item),
+                                          it)):
+      yield yield_value(i, result, exc)
+    return
+  else:
+    sem = Semaphore(concurrent)
+  resultQ = Queue()
+
+  def run_func(sem, func, i, item):
+    with Pfx('pmap(func=%s)[%s]:func(%r)', func, i, item):
+      try:
+        result = func(item)
+      except Exception as exc:
+        if sem is not None: sem.release()
+        resultQ.put((i, (None, exc)))
+      else:
+        if sem is not None: sem.release()
+        resultQ.put((i, (result, None)))
+
+  ndispatched = 0  # number of worker threads dispatched
+
+  def dispatcher():
+    nonlocal ndispatched
+    for i, item in enumerate(it):
+      if sem is None:
+        name = f'pmap[{i}]:{func=},{item=}'
+        T = builtin_Thread(
+            name=name, target=run_func, args=(sem, func, i, item)
+        )
+        if sem is None:
+          T.start()
+          ndispatched += 1
+        else:
+          if sem is not None: sem.acquire()
+          try:
+            T.start()
+            ndispatched += 1
+          except Exception as e:
+            if sem is not None: sem.release()
+            warning(
+                f'pmap: Thread({name}).start(): {e}', exc_info=sys.exc_info()
+            )
+
+  name = f'pmap dispatcher:{func=}'
+  DT = builtin_Thread(name=name, target=dispatcher)
+  DT.start()
+  consumed = 0
+  if unordered:
+    ordered = None
+  else:
+    ordered = Ordered()
+  while DT.is_alive() or consumed < ndispatched:
+    i, (result, exc) = resultQ.get()
+    consumed += 1
+    if unordered:
+      yield yield_value(i, result, exc)
+    else:
+      for oi, (oresult, oexc) in ordered.push(i, (result, exc)):
+        yield yield_value(oi, oresult, oexc)
 
 if __name__ == '__main__':
   import cs.threads_tests

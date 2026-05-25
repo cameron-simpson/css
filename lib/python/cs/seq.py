@@ -13,15 +13,19 @@ in the course of its function.
 '''
 
 from builtins import range as builtin_range
-import heapq
+from heapq import heappop, heappush
 import itertools
 from threading import Lock, Condition, Thread
-from typing import Callable, GenericAlias, Hashable, Iterable, Optional, Tuple, TypeVar
+from typing import (
+    Any, Callable, GenericAlias, Generator, Hashable, Iterable, Optional,
+    Tuple, TypeVar
+)
 
 from cs.deco import decorator
 from cs.gimmicks import warning
+from cs.typingutils import Sortable
 
-__version__ = '20260403-post'
+__version__ = '20260525.1-post'
 
 DISTINFO = {
     'description':
@@ -176,16 +180,16 @@ def imerge(*iters, **kw):
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, _MergeHeapItem((head, it)))
+      heappush(heap, _MergeHeapItem((head, it)))
   while heap:
-    head, it = heapq.heappop(heap)
+    head, it = heappop(heap)
     yield head
     try:
       head = next(it)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, _MergeHeapItem((head, it)))
+      heappush(heap, _MergeHeapItem((head, it)))
 
 def onetoone(func):
   ''' A decorator for a method of a sequence to merge the results of
@@ -897,6 +901,80 @@ class range:
     while True:
       yield i
       i += self.step
+
+class Ordered:
+  ''' A class to yield indexed but out of order values in index
+      order such as you may receive from completion of concurrent actions
+      which you want to process in submission order but otherwise as
+      soon as possible.
+
+      Example:
+
+          >>> ordered = Ordered()
+          >>> for i, result in (2, "third"), (0, "first"), (1, "second"):
+          ...   for oi, oresult in ordered.push(i, result):
+          ...     print(oi, oresult)
+          ...
+          0 first
+          1 second
+          2 third
+
+      The class may be initialised with an arbitrary iterable of
+      expected indices; these must still be `Sortable` and in fact
+      in order.
+      The default expected indices start at 0 and count up by 1.
+  '''
+
+  def __init__(self, indices: Iterable[Sortable] = None):
+    if indices is None:
+      indices = range(...)
+    self.heap = []
+    self.indices = iter(indices)
+    self.next_index = next(self.indices)
+
+  def push(self, index, value) -> Generator[Tuple[Sortable, Any]]:
+    ''' A generator to push an (index,value) 2-tuple onto the heap
+        and then yield (index,value) 2-tuples from the heap while it
+        is not empty and the top element equals the expected next index
+        from `self.indices`.
+    '''
+    heappush(self.heap, (index, value))
+    # This contortion is to infer == by excluding < and >
+    # thus requiring only < support in the indices.
+    while self.heap and (not self.heap[0][0] < self.next_index
+                         and not self.next_index < self.heap[0][0]):
+      index, value = heappop(self.heap)
+      self.next_index = next(self.indices)
+      yield index, value
+
+  def drain(self) -> Generator[Tuple[Sortable, Any]]:
+    ''' A generator yielding (index,value) 2-tuples from the heap until it is empty.
+    '''
+    while self.heap:
+      yield heappop(self.heap)
+
+def order(
+    indexed_items: Iterable[Tuple[Sortable, Any]],
+    indices: Iterable[Sortable] = None
+) -> Generator[Tuple[Sortable, Any]]:
+  ''' A convenience wrapper for an `Ordered` instance to order the `indexed_items`.
+
+      Example:
+
+          >>> # an iterator yielding unordered results, just because
+          >>> unordered_results = iter( ((2, "third"), (0, "first"), (1, "second")) )
+          >>> for i, result in order(unordered_results):
+          ...   print(i, result)
+          ...
+          0 first
+          1 second
+          2 third
+
+  '''
+  ordered = Ordered(indices)
+  for i, item in indexed_items:
+    yield from ordered.push(i, item)
+  yield from ordered.drain()
 
 def with_neighbours(it: Iterable, no_neighbour=None):
   ''' Return 3-tuples of `(prev,curr,next)` from the iterable `it`

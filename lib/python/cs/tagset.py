@@ -323,14 +323,15 @@ from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatMapping,
-    FormatableMixin, format_attribute, FStr, printt, r, s, without_suffix
+    FormatableMixin, format_attribute, FStr, printt, r, s, without_prefix,
+    without_suffix
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
 )
-from cs.obj import public_subclasses, SingletonMixin
+from cs.obj import public_subclasses, Refreshable, SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin, openif
@@ -703,24 +704,25 @@ class TagSetTyping:
 
   @classmethod
   def type_reference_of(cls, name: str):
-    ''' Return a 2-tuple of `(`*type_zone*`.zone_key,`*zone_key*`)`
+    ''' Return a 2-tuple of `(`id.`*type_name*, *type_key*`)`
         to be used as a tag name and value to annotate a `TagSet`
         to refer to an entity `name`.
 
         For example, the type reference to an entity named `tvdb.series.1234`
-        is `('tvdb.zone_key`,'series.1234')`.
+        is `('id.tvdb.series','1234')`.
     '''
-    return f'{cls.type_zone_of(name)}.zone_key', cls.type_zone_key_of(name)
+    ##return f'{cls.type_zone_of(name)}.zone_key', cls.type_zone_key_of(name)
+    return f'id.{cls.type_name_of(name)}', cls.type_key_of(name)
 
   @property
   def type_reference(self):
     ''' The foreign reference to this `TagSet` as a `(tag_name,reference)` 2-tuple.
-        The `tag_name` is *zone*`.zone_key` and the reference is the zone key.
+        This is `self.type_reference_of(self.name)`.
 
         For example, the type reference to an entity named `tvdb.series.1234`
-        is `('tvdb.zone_key`,'series.1234')`.
+        is `('id.tvdb.series','1234')`.
     '''
-    return f'{self.type_zone}.zone_key', self.type_zone_key
+    return self.type_reference_of(self.name)
 
   def type_reference_apply_to(self, other):
     ''' Apply a reference to `self` to `other`.
@@ -732,26 +734,22 @@ class TagSetTyping:
     ref, key = self.type_reference
     other[ref] = key
 
-  def type_references(self,
-                      tags_db: "UsesTagSets",
-                      zones=None) -> Mapping[str, "HasTags"]:
-    ''' Return a `dict` mapping ` `type_zone` to the entity from that zone
+  def type_references(self, tags_db: "UsesTagSets") -> Mapping[str, "HasTags"]:
+    ''' Return a `dict` mapping `type_zone` to the entity from that zone
         in `tags_db` for all tags whose tag name has the form *zone*`.zone_key`.
 
         Parameters:
         * `tags_db`: the `HasTags` from which to obtain the entities
-        * `zones`: an optional list or tuple of zone names of interest
 
         For example, `tags.type_references(sitemap,('tvdb',))`
-        where `tags` had a `tvdb.zone_key='series.1234'` tag
-        would return a `dict` with a key of `'tvdb'` and a corresponding
+        where `tags` had a `id.tvdb.series='1234'` tag
+        would return a `dict` with a key of `'tvdb.series'` and a corresponding
         `TVDBSeries` instance for series 1234.
     '''
     entities = {}
-    for tag_name, zone_key in self.items():
-      if (zone := without_suffix(tag_name, '.zone_key')) is not None:
-        if zones is None or zone in zones:
-          entities[zone] = tags_db[zone, zone_key]
+    for tag_name, type_key in self.items():
+      if (type_name := without_prefix(tag_name, 'id.')) is not None:
+        entities[type_name] = tags_db[type_name, type_key]
     return entities
 
 class TagSet(
@@ -761,6 +759,7 @@ class TagSet(
     FormatableMixin,
     AttrableMappingMixin,
     Promotable,
+    Refreshable,
 ):
   ''' A setlike class collection of `Tag`s.
 
@@ -862,7 +861,7 @@ class TagSet(
     return cls.from_str(s[offset:], **from_str_kw)
 
   def printt(self, key_indent="", **printt_kw):
-    table = [f'{self.__class__.__name__}:{id(self)}']
+    table = [[f'{self.__class__.__name__}:{id(self)}']]
     kvs = sorted(self.as_dict().items())
     if kvs:
       table.append(tuple([f'{key_indent}{k}', v] for k, v in kvs))
@@ -915,6 +914,20 @@ class TagSet(
     ''' Make a `TagSet` from an iterable of `Tag`s.
     '''
     return cls(_ontology=_ontology, **{tag.name: tag.value for tag in tags})
+
+  #################################################################
+  # Properties supporting Refreshable.
+  @property
+  def refresh_last_update(self):
+    ''' The last time a refresh update time.
+    '''
+    return self.get('refresh_last_update', 0.0)
+
+  @refresh_last_update.setter
+  def refresh_last_update(self, when: float):
+    ''' Save the last refresh update time.
+    '''
+    self['refresh_last_update'] = when
 
   #################################################################
   # Methods supporting FormattableMixin.
@@ -1318,21 +1331,6 @@ class TagSet(
       return None
     else:
       return UUID(uuid_s) if uuid_s else None
-
-  @format_attribute
-  def is_stale(self, max_age=None):
-    ''' Test whether this `TagSet` is stale
-        i.e. the time since `self.last_updated` UNIX time exceeds `max_age` seconds
-        (default from `self.STALE_AGE`).
-
-        This is a convenience function for `TagSet`s which cache external data.
-    '''
-    if max_age is None:
-      max_age = self.STALE_AGE
-    last_updated = self.get('last_updated', None)
-    if not last_updated:
-      return True
-    return time.time() >= last_updated + max_age
 
   #############################################################################
   # The '.auto' attribute space.
@@ -3000,7 +2998,7 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class HasTags(TagSetTyping, FormatableMixin):
+class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
   ''' A mixin for classes which have a `.tags:TagSet` attribute.
 
       The subclass may itself define its `.tags` instance attribute
@@ -3076,6 +3074,12 @@ class HasTags(TagSetTyping, FormatableMixin):
         *[[f'{key_indent}{k}', v] for k, v in sorted(self.as_dict().items())],
         **printt_kw
     )
+
+  def print(self):
+    ''' The default `print()` runs `self.printt()`.
+        This is intended to be a nice print of important stuff.
+    '''
+    return self.printt()
 
   @cached_property
   def tags_entity_key(self):
@@ -3197,6 +3201,25 @@ class HasTags(TagSetTyping, FormatableMixin):
       return method
 
     return FormatMapping(self, kwargs, missing)
+
+  #################################################################
+  # Properties supporting Refreshable.
+  def refresh_key(self):
+    ''' The unique key identifying this object for use in recursive refreshes.
+    '''
+    return self.name
+
+  @property
+  def refresh_last_update(self):
+    ''' The last time a refresh update time.
+    '''
+    return self.tags.refresh_last_update
+
+  @refresh_last_update.setter
+  def refresh_last_update(self, when: float):
+    ''' Save the last refresh update time.
+    '''
+    self.tags.refresh_last_update = when
 
 class UsesTagSets:
   ''' A mixin to support classes which use a `BaseTagSets` to store their data.
@@ -4439,6 +4462,34 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     return ' '.join(fields)
 
   @classmethod
+  def write_tagsets(
+      cls,
+      f,
+      tagsets,
+      unparsed,
+      extra_types=None,
+      prune=False,
+  ):
+    ''' Save `tagsets` and `unparsed` to the file `f`.
+
+        This method *does not* clear the `.modified` attribute of the `TagSet`s
+        because it does not know it is saving to the `Tagset`'s primary location.
+    '''
+    for _, line in unparsed:
+      if not line.startswith('#'):
+        f.write('##  ')
+      f.write(line)
+      f.write('\n')
+    for name, tags in sorted(tagsets.items()):
+      with Pfx(name):
+        if not tags:
+          continue
+        f.write(
+            cls.tags_line(name, tags, extra_types=extra_types, prune=prune)
+        )
+        f.write('\n')
+
+  @classmethod
   def save_tagsets(
       cls,
       filepath,
@@ -4467,23 +4518,17 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
         return
       try:
         with atomic_filename(filepath, mode="w", exists_ok=True) as f:
-          for _, line in unparsed:
-            if not line.startswith('#'):
-              f.write('##  ')
-            f.write(line)
-            f.write('\n')
-          for name, tags in name_tags:
-            with Pfx(name):
-              if not tags:
-                continue
-              f.write(
-                  cls.tags_line(
-                      name, tags, extra_types=extra_types, prune=prune
-                  )
-              )
-              f.write('\n')
-      except PermissionError as e:
-        warning("save_tagsets(%r) fails: %s", filepath, e)
+          cls.write_tagsets(
+              f, tagsets, unparsed, extra_types=extra_types, prune=prune
+          )
+      except PermissionError:
+        try:
+          with open(filepath, mode="w") as f:
+            cls.write_tagsets(
+                f, tagsets, unparsed, extra_types=extra_types, prune=prune
+            )
+        except PermissionError as e:
+          warning("save_tagsets(%r) fails: %s", filepath, e)
 
   def save(self, extra_types=None, prune=False):
     ''' Save the tag map to the tag file if modified.

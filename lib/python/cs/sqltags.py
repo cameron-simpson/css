@@ -1735,7 +1735,6 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
       *,
       unixtime=None,
       tags=None,
-      skip_refresh=False,
   ):
     ''' Fetch or create an `SQLTagSet` for `name`.
         Return the `SQLTagSet`.
@@ -1757,11 +1756,6 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         assert te is not None
         if tags:
           entity.add_new_tags(tags, session=session)
-      # refresh entry from some source if there is a .refresh() method
-      if not skip_refresh:
-        refresh = getattr(type(te), 'refresh', None)
-        if refresh is not None and callable(refresh):
-          refresh(te)
     else:
       # update the existing SQLTagSet
       if unixtime is not None:

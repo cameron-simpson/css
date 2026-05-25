@@ -67,7 +67,7 @@ FFMPEG_EXE_ENVVAR = 'FFMPEG_EXE'
 
 # executable and image for use with docker
 FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
-FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
+FFMPEG_DOCKER_IMAGE_DEFAULT = 'docker.io/linuxserver/ffmpeg'
 FFMPEG_DOCKER_IMAGE_ENVVAR = 'FFMPEG_DOCKER_IMAGE'
 
 def main_ffmpeg_docker(argv=None):
@@ -362,7 +362,6 @@ def ffmpeg_docker(
     doit: Optional[bool] = None,
     quiet: Optional[bool] = None,
     ffmpeg_exe: Optional[str] = None,
-    docker_exe: Optional[str] = None,
     image: Optional[str] = None,
     output_hostdir: Optional[str] = None,
 ) -> Optional[CompletedProcess]:
@@ -450,4 +449,4 @@ def ffmpeg_docker(
         else:
           ffmpeg_argv.extend([arg, ffmpeg_args.pop(0)])
   DR.output_hostdir = output_hostdir
-  return DR.run(*ffmpeg_argv, docker_exe=docker_exe, doit=doit, quiet=quiet)
+  return DR.run(*ffmpeg_argv, doit=doit, quiet=quiet)

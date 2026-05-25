@@ -179,6 +179,8 @@ class URLPattern(Promotable):
       ),
       'wordpath':
       Converter(r'\w+(/\w+)*', str, str),
+      'ANY':
+      Converter(r'.*', str, str),
   }
 
   class ParsedPattern(namedtuple('ParsedPattern',
@@ -186,7 +188,7 @@ class URLPattern(Promotable):
 
     # a <converter:name> placeholder
     PLACEHOLDER_re = re.compile(
-        r'<((?P<converter>[a-z][a-z0-9_]*):)?(?P<name>[a-z][a-z0-9_]*)>'
+        r'<((?P<converter>[a-zA-Z][a-zA-Z0-9_]*):)?(?P<name>[a-z_][a-z0-9_]*)>'
     )
 
     @classmethod
@@ -315,7 +317,8 @@ class URLPattern(Promotable):
       return None
     if m.end() < len(url.path):
       return None
-    return m.groupdict()
+    # return the public named matches (excludes _* names)
+    return {k: v for k, v in m.groupdict().items() if not k.startswith('_')}
 
   @classmethod
   def promote(cls, obj):
@@ -822,10 +825,13 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
   @cached_property
   def text(self) -> str:
     ''' The text content of the URL.
+        Note that this assumes UTF-8 if there is no specified
+        charset, and decodes with `errors="replace"`; this means
+        it will always return text - it may be mojibake.
     '''
     # assume UTF-8 if not specified
     charset = self.content_charset or 'utf-8'
-    text = self.content.decode(charset)
+    text = self.content.decode(charset, errors='replace')
     self.url.text = text
     return text
 
@@ -967,21 +973,13 @@ class SiteEntity(HasTags):
       attribute to enable a `.sitepage_url` attribute which returns the
       primary web page for the entity.
 
-      Entity update: support for `SiteMap.updated_entities(Iterabe[SiteEntity])`:
-      - if the entity has a `.update_entity()` method, this will be
-        called to update the entity
-      - otherwise if the entity has a `.sitepage_url` then
-        `entity.grok_sitepage(FlowState)` will be called to update
-        the entity; often the `.sitepage_url` is derived from the `SITEPAGE_URL_FORMAT`
-        format string
-
-      Design note: there is no default `.update_entity()` based on
-      eg `.sitepage_url` because that would prevent use of the concurrent
-      prefetching queue in `SiteMap.updated_entities()`.
+      Entity update: entities support individual update viathe
+      Refreshable.refresh() mixin method and bulk update via
+      `SiteMap.refreshed_entities(Iterabe[SiteEntity])`.
   '''
 
   # default staleness is 1 day
-  STALE_LIFESPAN = 86400
+  REFRESH_LIFESPAN = 86400
 
   # keys which can be obtained by grokking a web page
   # a mapping of tag_name to page name eg "sitepage"
@@ -1033,11 +1031,12 @@ class SiteEntity(HasTags):
     if sitemap is None:
       sitemap = cls.default_sitemap()
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
-      match = cls.match_url(url, pattern_name=pattern_name)
-      if match is None:
+      m = cls.match_url(url, pattern_name=pattern_name)
+      if m is None:
         raise ValueError(
             f'no match from {cls.__name__}.match_url({url},{pattern_name=})'
         )
+      pattern_name, match = m
       try:
         type_key = match["type_key"]
       except KeyError as e:
@@ -1097,7 +1096,7 @@ class SiteEntity(HasTags):
       cls,
       pattern_name="sitepage_url",
       *,
-      sitemap: "SiteMap" = None
+      sitemap: "SiteMap" = None,
   ) -> URLPattern | None:
     ''' Return a `URLPattern` for the specified page name, default `"sitepage_url"`.
     '''
@@ -1110,7 +1109,36 @@ class SiteEntity(HasTags):
     return URLPattern(pattern_s, sitemap.URL_DOMAIN)
 
   @classmethod
-  def match_url(cls, url: URL, *, pattern_name="sitepage_url"):
+  def url_pattern_mapping(
+      cls,
+      *,
+      sitemap: "SiteMap" = None,
+  ) -> dict[str, URLPattern]:
+    ''' Return a mapping of `pattern_name`->`URLPattern` derived
+        from the `*_URL_PATTERN` attributes of this class and its
+        superclasses.
+    '''
+    if sitemap is None:
+      sitemap = cls.default_sitemap()
+    pattern_map = {}
+    for supercls in reversed(cls.__mro__):
+      for clsattr, pattern_s in supercls.__dict__.items():
+        if clsattr.endswith('_URL_PATTERN'):
+          if pattern_s is None:  # a cleared pattern name
+            if clsattr in pattern_map:
+              del pattern_map[clsattr]
+          else:
+            pattern_map[clsattr] = pattern_s
+    return {
+        pattern_name: URLPattern(pattern_s, sitemap.URL_DOMAIN)
+        for pattern_name, pattern_s in pattern_map.items()
+    }
+
+  @classmethod
+  def match_url(cls,
+                url: URL,
+                *,
+                pattern_name="sitepage_url") -> tuple[str, dict] | None:
     ''' Test whether this `SiteEntity` subclass matches `url`.
         Return `None` if there is no pattern for `pattern_name`
         (default `"sitepage_url"`), otherwise the result of the
@@ -1120,10 +1148,21 @@ class SiteEntity(HasTags):
         be a mapping, and will be updated by the mapping from a
         successful match.
     '''
-    ptn = cls.pattern(pattern_name=pattern_name)
-    if ptn is None:
-      return None
-    return ptn.match(url)
+    try:
+      pattern_mapping = cls.url_pattern_mapping()
+    except Exception as e:
+      warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
+      return
+    for pattern_name, pattern in pattern_mapping.items():
+      try:
+        m = pattern.match(url)
+      except Exception as e:
+        warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
+        continue
+      if m is not None:
+        return pattern_name, m
+
+    return None
 
   @mapped_property
   def patterns(self, pattern_name: str):
@@ -1231,14 +1270,24 @@ class SiteEntity(HasTags):
   @property
   def sitepage_url(self):
     ''' Allow `self["sitepage"]` to override `self.SITEPAGE_URL_FORMAT`.
+        This may return `None` for entities with no primary site URL.
     '''
     try:
       page_url = self.tags["sitepage"]
     except KeyError:
       page_url = self.__getattr__('sitepage_url')
-    if page_url.startswith('/'):
-      page_url = self.urlto(page_url)
+    if page_url is None:
+      warning("%s.site-age_url: no site page, returning None")
+    else:
+      if page_url.startswith('/'):
+        page_url = self.urlto(page_url)
     return page_url
+
+  @property
+  def refresh_resource(self):
+    ''' The default refresh resource is `self.sitepage_url`, supporting `Refreshable`.
+    '''
+    return self.sitepage_url
 
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
@@ -1261,24 +1310,6 @@ class SiteEntity(HasTags):
     ''' The `SiteMap` is the `tags_db`.
     '''
     return self.tags_db
-
-  def update_from_sitemap(self):
-    ''' Run this entity through `self.updated_entities()`.
-    '''
-    for _ in self.sitemap.updated_entities((self,)):
-      pass
-
-  def updated(self):
-    ''' Return this entity after updating via `self.update_from_sitemap()`.
-
-        This supports idioms like:
-
-            entity = sitemap[EntityType, 'entity_key'].update()
-
-        for working with a known up to date entity.
-    '''
-    self.update_from_sitemap()
-    return self
 
   @cached_property
   def url_root(self):
@@ -1303,20 +1334,28 @@ class SiteEntity(HasTags):
 
   @pagemethod
   def grok_sitepage(self, flowstate: FlowState, match=None):
-    ''' The basic sitepage grok: record the metadta.
+    ''' The basic sitepage grok:
+        - update the entity cache of the request
+        - record the metadata
+        - record the opengraph tags
+        - call `self.grok_soup`, which scans the page soup for the
+          known widgets
     '''
     self._request_update(flowstate, page="sitepage")
     self.update_from_meta(flowstate)
     self.update(flowstate.opengraph_tags)
+    # scan the soup for known widgets
+    1 in self.grok_soup(flowstate.soup, self.sitemap)
 
   def _request(self, *, page="sitepage", method="GET"):
     ''' Return the dict which caches the HTTP Response from the last request for `page`.
-
         Note that just updating this dict does not reflect in the database.
         Instead the `._request_update(flowstate)` method should be called.
     '''
-    return self.setdefault("_request",
-                           {}).setdefault(page, {}).setdefault(method, {})
+    _request = self.tags.get('_request') or {}
+    _request.setdefault(page, {}).setdefault(method, {})
+    self.tags['_request'] = _request
+    return _request
 
   def _request_update(
       self, flowstate: FlowState, *, page="sitepage", method="GET"
@@ -1324,7 +1363,7 @@ class SiteEntity(HasTags):
     ''' Update the cached HTTP response information for `page` from `flowstate`.
     '''
     _request = self._request(page="sitepage", method=flowstate.method)
-    _request.update(
+    _request[page][method].update(
         url=flowstate.url.url_s,
         request={
             hdr.lower(): value
@@ -1337,7 +1376,7 @@ class SiteEntity(HasTags):
         },
     )
     # update the database
-    self.tags.set('_request', self['_request'])
+    self.tags.set('_request', _request, force=True)
 
   def rq_timestamp(self, *, page="sitepage", method="GET"):
     ''' Return the cached HTTP Response `Date` field for `page` as a UNIX timestamp.
@@ -1349,23 +1388,16 @@ class SiteEntity(HasTags):
       return datetime_from_http_date(http_date).timestamp()
     return 0
 
-  def is_stale(
-      self, lifespan=STALE_LIFESPAN, *, page="sitepage", method="GET"
-  ):
-    ''' Test if the sitepage response timestamp is more than `lifespan` seconds older than `time.time()`.
+  def _refresh(self, resource=None):
+    ''' Try to refresh this entity from the sitepage, supporting `Refreshable`.
     '''
-    is_stale = time.time() - self.rq_timestamp(
-        page=page, method=method
-    ) > lifespan
-    return is_stale
-
-  def refresh(self, *, force=False, lifespan=STALE_LIFESPAN):
     ''' Refetch and reparse `self.sitepage_url` via `self.grok_sitepage()`
         if the page is stale (or if `force` is true).
     '''
-    if not force and not self.is_stale(lifespan):
-      return
-    self.grok_sitepage(self.sitepage_url)
+    if resource is None:
+      resource = self.sitepage_url
+    self.grok_sitepage(resource)
+    return True
 
   def update_from_meta(self, flowstate: FlowState, **update_kw):
     ''' Update this entity from the `flowstate.meta`.
@@ -1517,10 +1549,12 @@ class SiteWidget(ABC):
   sitemap: "SiteMap"
   tag: BS4Tag
 
-  def __init_subclass__(cls, **kw):
+  def __init_subclass__(cls, *, sitemap_class, **kw):
     ''' Record this widget class against its entity type.
     '''
     super().__init_subclass__(**kw)
+    cls.SITEMAP_CLASS = sitemap_class
+    sitemap_class.WIDGET_CLASSES.append(cls)
     cls.ENTITY_CLASS.WIDGET_CLASSES.append(cls)
 
   # most site widgets are DIVs
@@ -1545,12 +1579,22 @@ class SiteWidget(ABC):
     '''
     raise NotImplementedError
 
+  def check_tag(cls, tag: BS4Tag) -> bool:
+    ''' Test whether this tag is in fact an instance of the widget.
+
+        The default sweep by `scan_soup` uses `cls.TAG_NAME` and
+        `cls.FIND_ALL_CRITERIA`, then further winnows matched tags
+        using this method.
+    '''
+    return True
+
   @classmethod
   def scan_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
     ''' Scan some soup for this kind of widget, yield instances of `cls`.
     '''
     for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
-      yield cls(sitemap=sitemap, tag=tag)
+      if cls.check_tag(tag):
+        yield cls(sitemap=sitemap, tag=tag)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
@@ -1714,13 +1758,14 @@ class SiteMap(UsesTagSets, Promotable):
   # TODO: some notion of staleness
   @classmethod
   @uses_pilfer
-  def updated_entities(
+  @typechecked
+  def refreshed_entities(
       cls,
       entities: Iterable["SiteEntity"],
       *,
       P: "Pilfer",  # noqa: F821
       force=False,
-  ):
+  ) -> Generator[SiteEntity]:
     ''' A generator yielding updated `SiteEntity` instances
         from an iterable of `SiteEntity` instances.
 
@@ -1775,35 +1820,21 @@ class SiteMap(UsesTagSets, Promotable):
       '''
       try:
         for entity in entities:
+          if not isinstance(entity, SiteEntity):
+            warning("not a SiteEntity: %s", r(entity))
+            continue
           # TODO: a better staleness criterion
-          if not force and "sitepage.last_update_unixtime" in entity:
+          if not force and not entitiy.refresh_needed():
             # do not update
             ent_fsQ.put((entity, None))
             continue
-          # TODO: maybe a .prefetch_update_url property allowing use of
-          # the prefetch queue in conjunction with .update_entity()?
-          # That would (a) allow prefetch for this and (b) allow a
-          # default .sitepage_url based .update_entity() method.
-          update_entity = getattr(entity, 'update_entity', None)
-          if callable(update_entity):
-            # the entity has a custom update method
-            ent_fsQ.put((entity, update_entity))
-            continue
-          # Why isn't there a default .update_entity() which uses
-          # the .sitepage_url? Because it would prevent this prefetching
-          # queue.
-          # TODO: skip entities with no .grok_sitepage method
-          sitepage = getattr(entity, "sitepage", None)
-          if sitepage is None:
+          sitepage_url = entity.sitepage_url
+          if sitepage_url is None:
             # no sitepage, do not update
             ent_fsQ.put((entity, None))
             continue
-          if not hasattr(entity, 'grok_sitepage'):
-            # sitepage but no grok-sitepage, do not update
-            ent_fsQ.put((entity, None))
-            continue
           # send the entity and sitepage to the prefetcher
-          ent_spQ.put((entity, sitepage))
+          ent_spQ.put((entity, sitepage_url))
       finally:
         # close the (entity,sitepage) processor
         ent_spQ.close()
@@ -1860,25 +1891,10 @@ class SiteMap(UsesTagSets, Promotable):
         pass
       else:
         try:
-          with Pfx("update %s", entity):
-            if isinstance(update_from, FlowState):
-              # update from a ready FlowState
-              flowstate = update_from
-              # process the flowstate
-              with Pfx("%s.grok_sitepage(FlowState:%s", entity,
-                       flowstate.url.short):
-                entity.grok_sitepage(flowstate)
-            elif callable(update_from):
-              # update from a callable, usually entity.update_entity()
-              update_entity = update_from
-              pfx_call(update_entity)
-            else:
-              raise ValueError(f'cannot honour update_from={r(update_from)}')
+          entity.refresh(update_from)
         except Exception as e:
           warning("exception for update_from=%s: %s", r(update_from), s(e))
-        else:
-          # mark the entity as up to date as of start_time
-          entity["sitepage.last_update_unixtime"] = start_time
+          raise  # debug
       yield entity
 
   @staticmethod
@@ -2718,41 +2734,6 @@ class DocSite(SiteMap):
   )
   def cache_key_docsite(self, flowstate: FlowState, match: TagSet) -> str:
     return match['cache_key']
-
-@dataclass
-class Wikipedia(SiteMap):
-  ''' The SiteMap for `wikipedia.org'.
-  '''
-
-  TYPE_ZONE = 'wikipedia'
-
-  URL_KEY_PATTERNS = [
-      # https://en.wikipedia.org/wiki/Braille
-      (
-          (
-              '*.wikipedia.org',
-              r'/wiki/(?P<title>[^:/]+)$',
-          ),
-          'wiki/{title}',
-      ),
-      # https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Carbonate-outcrops_world.jpg/620px-Carbonate-outcrops_world.jpg
-      (
-          (
-              'upload.wikipedia.org',
-              r'/wikipedia/commons/(?<subpath>.*\.(jpg|gif|png))$',
-          ),
-          'wiki/commons/{subpath}',
-      ),
-  ]
-
-  @promote
-  def url_key(self, url: URL, extra: Mapping | None = None) -> str | None:
-    ''' Include the domain name language in the URL key.
-    '''
-    key = super().url_key(url, extra=extra)
-    if key is not None:
-      key = f'{cutsuffix(url.hostname, ".wikipedia.org")}/{key}'
-    return key
 
 @dataclass
 class DockerIO(SiteMap):

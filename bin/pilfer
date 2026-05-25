@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.13
 import sys
 sys.path[:] = [ path for path in sys.path if path ]
 from cs.app.pilfer.__main__ import main

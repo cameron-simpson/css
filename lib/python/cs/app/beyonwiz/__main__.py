@@ -63,6 +63,10 @@ class BWizCmd(BaseCommand):
           'outputdir',
           'The derived output file should be written in outputdir.'
       ),
+      F_=(
+          'faileddir',
+          'The source files for failed conversions should be moved into this directory.'
+      ),
       rm=(
           'remove_source', 'Remove the source file if the conversion succeeds.'
       ),
@@ -80,9 +84,13 @@ class BWizCmd(BaseCommand):
     doit = options.doit
     acodec = options.acodec
     vcodec = options.vcodec
+    faileddir = options.faileddir
     outputdir = options.outputdir or '.'
     remove_source = options.remove_source
     badopts = False
+    if faileddir and not isdirpath(faileddir):
+      warning("faileddir is not a directory: %r", faileddir)
+      badopts = True
     if not isdirpath(outputdir):
       warning("outputdir is not a directory: %r", outputdir)
       badopts = True
@@ -116,7 +124,7 @@ class BWizCmd(BaseCommand):
     if badopts:
       raise GetoptError("bad invocation")
     R = Recording(srcpath)
-    if not R.convert(
+    if R.convert(
         dstpath,
         doit=doit,
         acodec=acodec,
@@ -124,9 +132,12 @@ class BWizCmd(BaseCommand):
         max_n=TRY_N,
         timespans=timespans,
     ):
+      if remove_source:
+        R.remove(doit=doit)
+    else:
+      if faileddir:
+        R.moveinto(faileddir, doit=doit)
       return 1
-    if remove_source:
-      R.remove(doit=doit)
 
   def cmd_ffprobe(self, argv):
     ''' Run `ffprobe` against a file.
