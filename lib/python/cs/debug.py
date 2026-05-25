@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Assorted debugging facilities.
-#       - Cameron Simpson <cs@cskk.id.au> 20apr2013
+# - Cameron Simpson <cs@cskk.id.au> 20apr2013
 #
 
 r'''
