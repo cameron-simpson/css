@@ -48,6 +48,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'icontract',
         'cs.context',
         'cs.deco',
         'cs.excutils',
