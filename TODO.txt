@@ -1,3 +1,4 @@
+pmap: mode to terminate other tasks on exception or not, currently inferred from with_exceptions
 cs.dockerutils: drop caps and add, default no caps
 jellyfin: make NFO files from fstags
 cs.cmdutils: rework the usgae text stuff, have a HasUsage mixin etc
