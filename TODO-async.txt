@@ -1,3 +1,4 @@
+cs.naysync: amap: can I enumerate() an async iter?
 amap: flip concurrent default to True, accept int or async Semaphore
 amap: yield same shape as pmap
 amap: use cs.seq.Ordered
