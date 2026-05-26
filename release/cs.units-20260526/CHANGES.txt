@@ -1,0 +1,1 @@
+lib/python/cs/units.py: cs.units: Decomposed: new __getitem__ returning a new Decomposed if the index is a slice
