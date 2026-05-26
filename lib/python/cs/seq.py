@@ -932,7 +932,7 @@ class Ordered:
     self.indices = iter(indices)
     self.next_index = next(self.indices)
 
-  def push(self, index, value) -> Generator[Tuple[Sortable, Any]]:
+  def push(self, index, value) -> Generator[Tuple[Sortable, Any], None, None]:
     ''' A generator to push an (index,value) 2-tuple onto the heap
         and then yield (index,value) 2-tuples from the heap while it
         is not empty and the top element equals the expected next index
@@ -947,7 +947,7 @@ class Ordered:
       self.next_index = next(self.indices)
       yield index, value
 
-  def drain(self) -> Generator[Tuple[Sortable, Any]]:
+  def drain(self) -> Generator[Tuple[Sortable, Any], None, None]:
     ''' A generator yielding (index,value) 2-tuples from the heap until it is empty.
     '''
     while self.heap:
@@ -956,7 +956,7 @@ class Ordered:
 def order(
     indexed_items: Iterable[Tuple[Sortable, Any]],
     indices: Iterable[Sortable] = None
-) -> Generator[Tuple[Sortable, Any]]:
+) -> Generator[Tuple[Sortable, Any], None, None]:
   ''' A convenience wrapper for an `Ordered` instance to order the `indexed_items`.
 
       Example:
