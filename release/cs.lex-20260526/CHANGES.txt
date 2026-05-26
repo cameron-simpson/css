@@ -1,0 +1,3 @@
+lib/python/cs/lex.py: cs.lex: FormatMapping.__getitem__: ensure we always return a FormatableMixin, converting via FStr is necessary; string.Formatter.vformat sees to quietly ingnore non-strs - may need to make this check for str instead of FormatableMixin in the future
+lib/python/cs/lex.py: cs.lex: FormatMapping.__getitem__: task against FStr, promote to FStr - arranges str for the stlib and FormatableMixin for the futher modifiers
+lib/python/cs/lex.py: cs.lex: BaseToken.scan: bugfix parse offset for .end_offset
