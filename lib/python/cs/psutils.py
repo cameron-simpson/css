@@ -19,6 +19,7 @@ import shlex
 from signal import SIGTERM, SIGKILL, signal
 from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subprocess_run
 import sys
+from threading import Lock
 import time
 
 from cs.deco import fmtdoc, uses_cmd_options
@@ -45,6 +46,8 @@ DISTINFO = {
 # halved because even allowing for the size of the environment this
 # can be too big. Unsure why.
 MAX_ARGV = 262144 // 2
+
+_trace_lock = Lock()
 
 def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   ''' Stop the process specified by `pid`, optionally await its demise.
@@ -257,11 +260,13 @@ def run(
     return None
   if not quiet:
     if logger:
-      trace("+ %s", shlex.join(argv))
+      with _trace_lock:
+        trace("+ %s", shlex.join(argv))
     else:
       if fold is None:
         fold = False
-      print_argv(
+      with _trace_lock:
+        print_argv(
           *argv,
           indent0="+ ",
           indent="  ",
@@ -322,7 +327,8 @@ def pipefrom(
   '''
   argv = prep_argv(*argv, remote=remote, ssh_exe=ssh_exe)
   if not quiet:
-    print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
+    with _trace_lock:
+      print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
 # TODO: text= parameter?
@@ -348,7 +354,8 @@ def pipeto(argv, *, quiet: bool, remote=None, ssh_exe, **kw):
   '''
   argv = prep_argv(*argv)
   if not quiet:
-    print_argv(*argv, indent="| ", file=sys.stderr)
+    with _trace_lock:
+      print_argv(*argv, indent="| ", file=sys.stderr)
   P = Popen(argv, stdin=PIPE)  # pylint: disable=consider-using-with
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
