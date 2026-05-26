@@ -1,0 +1,3 @@
+lib/python/cs/fs.py: cs.fs: atomic_directory: should now be usable as a decorator and also as a contextmanager
+lib/python/cs/fs.py: cs.fs: atomic_directory: older type attribute form
+lib/python/cs/fs.py: cs.fs: shortpath: make precedence overt

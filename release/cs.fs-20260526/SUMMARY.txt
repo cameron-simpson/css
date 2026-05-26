@@ -1,0 +1,1 @@
+atomic_directory: should now be usable as a decorator and also as a contextmanager.
