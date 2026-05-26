@@ -1,0 +1,5 @@
+lib/python/cs/obj.py: cs.obj: new Refreshable mixin class embodying refresh logic
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: default self.refresh_resource to None
+lib/python/cs/obj.py: cs.obj: Refreshable: fix spelling of refresh_ratelimit
+lib/python/cs/obj.py: cs.obj: Refreshable: new default REFRESH_LIFESPAN and REFRESH_RATELIMIT class attributes
+lib/python/cs/obj.py: cs.obj: Refreshable: recursion support via .refresh_related() and .refresh_key()
