@@ -38,6 +38,7 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
+        'cs.typingutils',
     ],
     'python_requires':
     '>=3',
