@@ -955,39 +955,29 @@ def pmap(
   resultQ = Queue()
 
   def run_func(sem, func, i, item):
-    with Pfx('pmap(func=%s)[%s]:func(%r)', func, i, item):
-      try:
-        result = func(item)
-      except Exception as exc:
-        if sem is not None: sem.release()
-        resultQ.put((i, (None, exc)))
-      else:
-        if sem is not None: sem.release()
-        resultQ.put((i, (result, None)))
+    try:
+      with Pfx('pmap(func=%s)[%s]:func(%r)', func, i, item):
+        result, exc = result_exc(func, item)
+        resultQ.put((i, (result, exc)))
+    finally:
+      if sem is not None: sem.release()
 
   ndispatched = 0  # number of worker threads dispatched
 
   def dispatcher():
+    ''' Dispatch `Thread`s to run `func` against each item.
+    '''
     nonlocal ndispatched
     for i, item in enumerate(it):
-      if sem is None:
-        name = f'pmap[{i}]:{func=},{item=}'
-        T = builtin_Thread(
-            name=name, target=run_func, args=(sem, func, i, item)
-        )
-        if sem is None:
-          T.start()
-          ndispatched += 1
-        else:
-          if sem is not None: sem.acquire()
-          try:
-            T.start()
-            ndispatched += 1
-          except Exception as e:
-            if sem is not None: sem.release()
-            warning(
-                f'pmap: Thread({name}).start(): {e}', exc_info=sys.exc_info()
-            )
+      name = f'pmap[{i}]:{func=},{item=}'
+      T = builtin_Thread(name=name, target=run_func, args=(sem, func, i, item))
+      if sem is not None: sem.acquire()
+      try:
+        T.start()
+        ndispatched += 1
+      except Exception as e:
+        if sem is not None: sem.release()
+        warning(f'pmap: Thread({name}).start(): {e}', exc_info=sys.exc_info())
 
   name = f'pmap dispatcher:{func=}'
   DT = builtin_Thread(name=name, target=dispatcher)
