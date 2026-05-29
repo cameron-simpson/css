@@ -10,9 +10,12 @@
 from __future__ import print_function
 import sys
 from functools import partial
+import os
+from threading import Semaphore
 import time
 import unittest
-from .threads import bg, PriorityLock, PriorityLockSubLock
+
+from .threads import bg, pmap, PriorityLock, PriorityLockSubLock
 
 class TestPriorityLock(unittest.TestCase):
   ''' Unit tests for `PriorityLock`.
@@ -75,6 +78,80 @@ class TestPriorityLock(unittest.TestCase):
     for T in Ts:
       T.join()
     self.assertEqual(pri_list, sorted(pri_list))
+
+class TestPMap(unittest.TestCase):
+
+  @staticmethod
+  def gen(n):
+    for i in range(n, 0, -1):
+      yield i
+
+  @staticmethod
+  def sleep_n(n):
+    delay = 0.1 * n
+    time.sleep(delay)
+    return f'slept {delay}s'
+
+  def test_variations(self):
+    ''' All the flag combinations.
+
+        Note the setting of `FAST_MODES` below to `True`.
+        Running all the combinations takes a long time in series.
+        For typical use we use pmap() itself to run them in parallel.
+        Provided pmap's working, that's great.
+        When being thorough or looking for problems in pmap, choose `False`
+        to use map() to run each combination in series.
+    '''
+    # True runs the combinations in parallel _using pmap() itself_,
+    # good for when things are working. False runs the combinations
+    # using map(). Good for expected regressions.
+    FAST_MODES = (
+        os.environ.get("FAST"),
+    )  # or (False,) or of course (False, True)
+
+    def genmodes(**fixed_modes):
+      for n in 0, 1, 5, 17:
+        for concurrent in 1, 3, 20, None, Semaphore(4):
+          for unordered in False, True:
+            for indexed in False, True:
+              for with_exceptions in False, True:
+                modes = dict(
+                    n=n,
+                    concurrent=concurrent,
+                    unordered=unordered,
+                    indexed=indexed,
+                    with_exceptions=with_exceptions,
+                )
+                for fixed, value in fixed_modes.items():
+                  if modes[fixed] != value:
+                    print("skip", modes)
+                    break
+                else:
+                  n = modes.pop('n')
+                  yield n, modes
+
+    def test_pmap(n_modes):
+      n, modes = n_modes
+      with self.subTest(n=n, **modes):
+        results = list(pmap(self.sleep_n, self.gen(n), **modes))
+        self.assertEqual(len(results), n)
+      return n, modes
+
+    for fast in (False,):  ##(True,):  ## FAST_MODES:
+      test_modes = genmodes(
+          ## n=5,
+          ## concurrent=None,
+          ## indexed=False,
+          ## with_exceptions=False,
+          ## unordered=True,
+      )
+      if fast:
+        tested = pmap(test_pmap, test_modes)
+      else:
+        tested = map(test_pmap, test_modes)
+      ##for n, modes in tested:
+      for n, modes in tested:
+        pass
 
 def selftest(argv):
   ''' Run unit tests.
