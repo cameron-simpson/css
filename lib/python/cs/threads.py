@@ -850,7 +850,7 @@ def pmap(
 ) -> Generator:
   ''' A generator yielding the result of `func(item)`
       for each `item` in the iterable `it`,
-      evaluated in parallel.
+      evaluated in parallel, kin to `cs.nayasync.amap`.
 
       See `cs.naysync.amap` for a version of this for asynchronous code.
 
@@ -861,7 +861,7 @@ def pmap(
         calls to `func`; if `None` then no constraint, if an `int` then
         a maximum of that many calls, if a `Semaphore` use that as
         the constraint
-      * `unordered`: optional flase, default `False`;
+      * `unordered`: optional flag, default `False`;
         if true then yield results as calls complete, otherwise
         yield results in the same order as `it` though still as
         soon as available
