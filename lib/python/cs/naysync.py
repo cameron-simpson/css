@@ -234,7 +234,8 @@ async def amap(
     fast=False,
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
-      for each `item` in the iterable `it`.
+      for each `item` in the iterable `it`,
+      evaluated concurrently.
 
       `it` may be a synchronous or asynchronous iterable.
 
