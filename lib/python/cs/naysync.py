@@ -235,7 +235,9 @@ async def amap(
 ):
   ''' An asynchronous generator yielding the results of `func(item)`
       for each `item` in the iterable `it`,
-      evaluated concurrently.
+      evaluated concurrently, kin to `cs.threads.pmap`.
+
+      See `cs.threads.pmap` for a version of this for synchronous code.
 
       `it` may be a synchronous or asynchronous iterable.
 
