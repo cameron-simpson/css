@@ -47,7 +47,7 @@ from cs.deco import decorator
 from cs.semantics import ClosedError, not_closed
 from cs.seq import Ordered
 
-__version__ = '20260415-post'
+__version__ = '20260530'
 
 DISTINFO = {
     'keywords': ["python3"],

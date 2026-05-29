@@ -1,0 +1,5 @@
+lib/python/cs/naysync.py: cs.naysync: drop summary from module docstring, now provided by cs.distinfo at release time
+lib/python/cs/naysync.py: cs.naysync: Lock: clarify the use case in the docstring
+lib/python/cs/naysync.py: cs.nayasync: amap: add with_exceptions like cs.threads.pmap, use cs.seq.Ordered for the in-order yields
+lib/python/cs/naysync.py: cs.naysync: amap: docstring tweak
+lib/python/cs/naysync.py: cs.naysync: amap: another docstring tweak
