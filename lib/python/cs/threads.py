@@ -849,7 +849,8 @@ def pmap(
     with_exceptions=False,
 ) -> Generator:
   ''' A generator yielding the result of `func(item)`
-      for each `item` in the iterable `it`.
+      for each `item` in the iterable `it`,
+      evaluated in parallel.
 
       See `cs.naysync.amap` for a version of this for asynchronous code.
 
