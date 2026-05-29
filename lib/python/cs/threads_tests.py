@@ -81,17 +81,6 @@ class TestPriorityLock(unittest.TestCase):
 
 class TestPMap(unittest.TestCase):
 
-  @staticmethod
-  def gen(n):
-    for i in range(n, 0, -1):
-      yield i
-
-  @staticmethod
-  def sleep_n(n):
-    delay = 0.1 * n
-    time.sleep(delay)
-    return f'slept {delay}s'
-
   def test_variations(self):
     ''' All the flag combinations.
 
@@ -105,9 +94,7 @@ class TestPMap(unittest.TestCase):
     # True runs the combinations in parallel _using pmap() itself_,
     # good for when things are working. False runs the combinations
     # using map(). Good for expected regressions.
-    FAST_MODES = (
-        os.environ.get("FAST"),
-    )  # or (False,) or of course (False, True)
+    FAST_MODES = (os.environ.get("FAST", ""),)
 
     def genmodes(**fixed_modes):
       for n in 0, 1, 5, 17:
@@ -131,13 +118,44 @@ class TestPMap(unittest.TestCase):
                   yield n, modes
 
     def test_pmap(n_modes):
+
+      def sleep_n(n):
+        delay = 0.1 * n
+        time.sleep(delay)
+        return n
+
       n, modes = n_modes
       with self.subTest(n=n, **modes):
-        results = list(pmap(self.sleep_n, self.gen(n), **modes))
+        count_down = range(n, 0, -1)
+        start = time.time()
+        results = list(pmap(sleep_n, iter(count_down), **modes))
+        elapsed = time.time() - start
         self.assertEqual(len(results), n)
+        concurrent = modes['concurrent']
+        indexed = modes['indexed']
+        unordered = modes['unordered']
+        with_exceptions = modes['with_exceptions']
+        if (concurrent is None
+            or (isinstance(concurrent, int) and concurrent >= n)
+            or (isinstance(concurrent, Semaphore) and concurrent._value >= n)):
+          # all the sleeps should run concurrently
+          self.assertLess(elapsed, (n + 1) * 0.15)
+          if not fast: print("  elapsed OK")
+        if concurrent == 1 or not unordered:
+          # all the results should arrive in count_down order
+          expected_results = [
+              (
+                  ((i, (n, None)) if indexed else
+                   (n, None)) if with_exceptions else
+                  ((i, n) if indexed else n)
+              ) for i, n in enumerate(count_down)
+          ]
+          self.assertEqual(results, expected_results)
+          if not fast: print("  order ok")
+      if not fast: print("tested", n, modes)
       return n, modes
 
-    for fast in (False,):  ##(True,):  ## FAST_MODES:
+    for fast in FAST_MODES:
       test_modes = genmodes(
           ## n=5,
           ## concurrent=None,
