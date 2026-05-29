@@ -107,7 +107,7 @@ cs.tagset ok_revision="83c4e893a68556f28b9757221d24f905df373927" features={"2022
 cs.tarutils ok_revision=b5ed41d868eba32d0098c9d651a36df8eb52c7ff pypi.release="20240318"
 cs.taskqueue ok_revision="879d12f2e8d786307b2bee942c38f08ff73d8633" features={"20221207":["BaseTask"]} pypi.release="20250120"
 cs.testutils ok_revision="0972084494fc61d065c4a0864224eff7c0c94781" features={"20230109":["SetupTeardownMixin","product_test"],"20240623":["assertSingleThread"]} pypi.release="20251020"
-cs.threads ok_revision="31104c27702c9fac2b7fe27ab2a0b54155c0066f" pypi.release="20260526" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"],"20260526":["pmap"]}
+cs.threads ok_revision="31104c27702c9fac2b7fe27ab2a0b54155c0066f" pypi.release="20260530" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"],"20260526":["pmap"]}
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.tty
