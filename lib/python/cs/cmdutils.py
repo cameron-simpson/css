@@ -92,6 +92,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.buffer',
         'cs.context',
         'cs.deco>=decorator__attrs',
         'cs.lex',
