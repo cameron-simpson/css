@@ -17,7 +17,7 @@ from urllib.parse import quote as urlquote
 
 from cs.lex import cutprefix, cutsuffix, indent as indent_text, r
 
-__version__ = '20260531'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python3"],
