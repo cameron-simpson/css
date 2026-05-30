@@ -10,7 +10,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from functools import cached_property
+from functools import cached_property, partial
 from getopt import GetoptError
 from netrc import netrc
 import os
@@ -50,10 +50,11 @@ from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
 from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.rfc2616 import content_length
+from cs.seq import unrepeated
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags
 from cs.tagset import HasTags
-from cs.threads import monitor, bg as bg_thread
+from cs.threads import monitor, bg as bg_thread, pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
@@ -296,74 +297,67 @@ class PlayOnCommand(BaseCommand):
     api = options.api
     filename_format = options.filename_format
     runstate = options.runstate
-    sem = Semaphore(dl_jobs)
+
+    def recordings_from_argv(argv):
+      for arg in argv:
+        with Pfx(arg):
+          recording_ids = trace(api.recording_ids_from_str)(arg)
+          if not recording_ids:
+            if sys.stderr.isatty():
+              warning("no recording ids")
+            continue
+          for dl_id in recording_ids:
+            print(f'recordings_from_argv: {dl_id=}')
+            recording = api[dl_id]
+            with Pfx(recording.name):
+              citation = recording.nice_name()
+              if recording.is_expired():
+                warning("expired, skipping %r", citation)
+                continue
+              if not recording.is_available():
+                warning("not yet available, skipping %r", citation)
+                continue
+              if recording.is_downloaded():
+                warning(
+                    "already downloaded %r to %r", citation,
+                    recording.download_path
+                )
+              print(f'recordings_from_argv: yield {recording=}')
+              yield recording
+
+    recordings = list(unrepeated(recordings_from_argv(argv)))
+    if no_download:
+      for recording in recordings:
+        recording.ls(format=filename_format)
+      return 0
 
     @typechecked
-    def _dl(dl_id: int, sem):
-      try:
-        with api:
-          filename = api[dl_id].filename(filename_format)
-          try:
-            api.download(dl_id, filename=filename, runstate=runstate)
-          except ValueError as e:
-            warning("download fails: %s", e)
-            return None
-          return filename
-      finally:
-        sem.release()
+    def _dl(recording, *, runstate: RunState):
+      dl_id = recording.recording_id()
+      with api:
+        filename = api[dl_id].filename(filename_format)
+        try:
+          api.download(dl_id, filename=filename, runstate=runstate)
+        except ValueError as e:
+          warning("download fails: %s", e)
+          return None
+        return filename
 
     xit = 0
-    Rs = []
-    for arg in argv:
-      with Pfx(arg):
-        recording_ids = api.recording_ids_from_str(arg)
-        if not recording_ids:
-          if sys.stderr.isatty():
-            warning("no recording ids")
-          continue
-        for dl_id in recording_ids:
-          recording = api[dl_id]
-          with Pfx(recording.name):
-            citation = recording.nice_name()
-            if recording.is_expired():
-              warning("expired, skipping %r", citation)
-              continue
-            if not recording.is_available():
-              warning("not yet available, skipping %r", citation)
-              continue
-            if recording.is_downloaded():
-              warning(
-                  "already downloaded %r to %r", citation,
-                  recording.download_path
-              )
-            if no_download:
-              recording.ls()
-            else:
-              sem.acquire()  # pylint: disable=consider-using-with
-              Rs.append(
-                  bg_result(
-                      _dl,
-                      dl_id,
-                      sem,
-                      _extra=dict(dl_id=dl_id),
-                      _name=f'playon dl {dl_id} {recording.name}',
-                  )
-              )
-
-    if Rs:
-      for R in report_results(Rs):
-        dl_id = R.extra['dl_id']
-        recording = api[dl_id]
-        try:
-          dl = R()
-        except CancellationError as e:
-          warning("%s: download interrupted: %s", recording.nice_name(), e)
-          xit = 1
-        else:
-          if not dl:
-            warning("FAILED download of %d", dl_id)
-            xit = 1
-
+    for i, (filename, dl_exc) in pmap(
+        partial(_dl, runstate=runstate),
+        recordings,
+        concurrent=dl_jobs,
+        indexed=True,
+        unordered=True,
+        with_exceptions=True,
+    ):
+      recording = recordings[i]
+      print(f'{recording=}')
+      if dl_exc is not None:
+        warning("%s -> %s: %s", recording.nice_name(), filename, dl_exc)
+        xit = 1
+        raise dl_exc
     return xit
 
   @uses_runstate
@@ -704,7 +698,7 @@ class Recording(_PlayOnEntity):
     ''' List a recording.
     '''
     if format is None:
-      format = PlayOnCommand.LS_FORMAT
+      format = LS_FORMAT
     if print_func is None:
       print_func = print
     print_func(self.format_as(format))
