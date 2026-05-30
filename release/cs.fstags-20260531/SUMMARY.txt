@@ -1,0 +1,5 @@
+TaggedPath: provide __hash__ so that we can put these in sets or mapping keys.
+TaggedPathSet: preserve insertion order, add a .find() to return the index of a path, make promotable from a list of filesystem paths, len() support, new .fspaths property with a list of the filesystem paths.
+FSTags: subclass UsesTagSets.
+FSTagsCommand.cmd_as_envvars: export tags values as shell compatible assignments.
+tagset,fstags,sqltags: make _id only special to SQLTagSet (the db row id), drop all mentions elsewhere.
