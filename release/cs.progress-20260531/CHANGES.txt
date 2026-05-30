@@ -1,0 +1,1 @@
+lib/python/cs/progress.py: cs.progress: BaseProgress.iterbar: use @fmtdoc to present DEFAULT_UPDATE_PERIOD
