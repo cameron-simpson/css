@@ -301,7 +301,7 @@ class PlayOnCommand(BaseCommand):
     def recordings_from_argv(argv):
       for arg in argv:
         with Pfx(arg):
-          recording_ids = trace(api.recording_ids_from_str)(arg)
+          recording_ids = api.recording_ids_from_str(arg)
           if not recording_ids:
             if sys.stderr.isatty():
               warning("no recording ids")
