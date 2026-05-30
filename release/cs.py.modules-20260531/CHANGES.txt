@@ -1,0 +1,2 @@
+lib/python/cs/py/modules.py: cs.py.modules: import_module_name: less misleading exception message text
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: new include_indented=False to include indented import statements - it was getting far too confused by condition and late imports, and even examples
