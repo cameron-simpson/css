@@ -68,9 +68,7 @@ from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import shortpath
-from cs.lex import (
-    FormatAsError, get_decimal_value, printt, r
-)
+from cs.lex import FormatAsError, get_decimal_value, printt, r
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
