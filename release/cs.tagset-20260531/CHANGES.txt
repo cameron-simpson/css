@@ -1,0 +1,94 @@
+lib/python/cs/tagset.py: cs.tagset: Tag.from_str: there is no offset variable any more
+lib/python/cs/tagset.py: cs.tagset: Tag.from_arg: fix call to Tag.from_str, no longer accepts an offset
+lib/python/cs/tagset.py: cs.tagset: docstring and message updates, some type annotations
+lib/python/cs/tagset.py: cs.tagset: Tag.transcribe_value: clarify the check that the stringised version does not contain whitespace
+lib/python/cs/tagset.py: merge default ==> pilfer
+lib/python/cs/tagset.py: cs.tagset: TagSet.set: skip change message is not verbose, use repr(tag) if str(tag) fails
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion.promote: rename the o param to obj, fallback to super().promote(obj)
+lib/python/cs/tagset.py: cs.tagset: TagsCommandMixin.parse_tagset_criteria: superceded by more conventional pop_tagset_criteria
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion.promote: rework the name,value inference logic
+lib/python/cs/tagset.py: cs.tagset: remove debugging
+lib/python/cs/tagset.py: cs.tagset: TagSet.update: rename the other_kw for clarity, update docstring
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion.from_str2: change idiom for trying parsers
+lib/python/cs/tagset.py: cs.tagset: TagSetCriterion.promote: check for str earlier (can be mistaken for (name,value) pair; remove some debug
+lib/python/cs/tagset.py: cs.tagset: remove some debug
+lib/python/cs/tagset.py: merge default ==> pilfer: sqltags stuff
+lib/python/cs/tagset.py: cs.tagset: new TagSetTyping mixin for TagSets providing .type_name, .type_key, .type_zone and .type_subname properties based on partitioning .name into zone.type_subname.key; inherited by TagSet
+lib/python/cs/tagset.py: cs.tagset: new HasTags mixin for classes whose instances have a .tags attribute which is a TagSet, proxying several mapping methods, .deref, and __getattr__ to the .tags
+lib/python/cs/tagset.py: cs.tagset: HasTags: add __contains__ and __iter__; comment out some debug
+lib/python/cs/tagset.py: cs.tagset: HasTags: new _new__ method which returns a suitable subclass instance based on the subclass' .TYPE_SUBNAME attribute
+lib/python/cs/tagset.py: cs.tagset: HasTags.tags: add a note about the use of self.tags_entity_key by subclasses
+lib/python/cs/tagset.py: cs.tagset: HasTags.__new__: rename unused parameters
+lib/python/cs/tagset.py: cs.tagset: TagSet.edit_tagset: verbose is now a keyword only parameter
+lib/python/cs/tagset.py: cs.tagset: HasTags: now subclasses FormatableMixin
+lib/python/cs/tagset.py: cs.tagset: HasTags.__getattr__: better AttributeError exception
+lib/python/cs/tagset.py: cs.tagset: TagSetTyping: new .type_zone_key property, the per-zone part of .name
+lib/python/cs/tagset.py: cs.tagset: BaseTagSets: accept keyword arguments to default_factory() and __missing__()
+lib/python/cs/tagset.py: cs.tagset: BaseTagSets: new deref(TagSet) method to dereference values in a TagSet's tags to their corresponding TagSets
+lib/python/cs/tagset.py: cs.tagset: HasTags: provide __init__(TagSet,UsesTagSets), __str__, __repr__
+lib/python/cs/tagset.py: cs.tagset: HasTags: move the FormatableMixin methods down the bottom
+lib/python/cs/tagset.py: cs.tagset: HasTags: docstirng updates; deref just a shim to UsesTagSets.deref
+lib/python/cs/tagset.py: cs.tagset: new UsesTagSets, the bulk of UsesSQLTags, deref which promotes the result of BaseTagSets.deref and relies on subclasses to provide a .find(), such as SQLTags.find
+lib/python/cs/tagset.py: cs.tagset: update imports, fix docstring typo, replace a percent format with an f-=string
+lib/python/cs/tagset.py: cs.tagset: update the module docstring with persistence and domain knowledge sections
+lib/python/cs/tagset.py: cs.tagset: fix docstring typo, autoformat an expression
+lib/python/cs/tagset.py: cs.tagset: various docstring typo fixes
+lib/python/cs/tagset.py: cs.tagset: HasTags: plumb .update through to .tags; UsesTagSets.__getitem__: accept an int as the key
+lib/python/cs/tagset.py: cs.tagset: fix some type annotations
+lib/python/cs/tagset.py: cs.tagset: update a docstring
+lib/python/cs/tagset.py: cs.tagset: HasTags: subclass TagSetTyping for the .type_* properties
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets.deref: pass the tag_name through to BaseTagSets.deref
+lib/python/cs/tagset.py: cs.tagset: HasTags.format_kwargs: add the type_* values from TagSetTyping
+lib/python/cs/tagset.py: cs.tagset: TagSetTyping: expose the logic of the various type_* properties as type_*_of(name) static methods
+lib/python/cs/tagset.py: cs.tagset: new UsesTagSets.keys() method returning (subname,type_key) 2-tuples from self.tagsets.keys()
+lib/python/cs/tagset.py: cs.tagset: new TagSetTyping.type_parts_of() class method in .type_parts property, refactor the other .type_* methods and properties to use these
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets.__getitem__: also accept a subname.key string as index; UsesTagSets.keys: yield tuples, not lists, for use with __getitem__
+lib/python/cs/tagset.py: cs.tagset: improve assertion message, type check .deref() calls
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets: keep a class attribute by_type_zone:WeakValueDictionary mapping type zones to their implementing UsesTagSets instance, new by_entity_id(entity_id) returning the right entity type via this mapping
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets.__getitem__: also accept a (zone,subname,key) 3-tuple now that we can map zones to their UsesTagSets instance
+lib/python/cs/tagset.py: cs.tagset: fix exception message
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets: .zone_entity(zone) method from TaggedPath, belongs here; remove some debugging
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets.__getitem__( (subname,key) ): let subname be a subclass of self.HasTagsClass to avoid hardwiring the subname strings
+lib/python/cs/tagset.py: cs.tagset: BaseTagSets.deref: subtype inference: strip trailing "_id" instead of English specific and dodgy "s", for less ambiguity
+lib/python/cs/tagset.py: cs.tagset: update imports
+lib/python/cs/tagset.py: cs.tagset: simplify some verbose tracing
+lib/python/cs/tagset.py: cs.tagset: HasTags: proxy .as_dict() and .__delitem__() to self.tags
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets.__getitem__: bugfix turning a HasTags subclass into use TYPE_SUBNAME; some other minor tweaks
+lib/python/cs/tagset.py: cs.tagset: TagSet: drop get_value() and get_format_attribute(); minor tweaks
+lib/python/cs/tagset.py: cs.tagset: jsonable: make the "already seen" `convertered` parameter optional
+lib/python/cs/tagset.py: cs.tagset: drop obsolete @has_format_attributes decorator use
+lib/python/cs/tagset.py: cs.tagset: new TagSet.json() and HasTags.json() methods, usable as format conversions
+lib/python/cs/tagset.py: cs.tagset: new HasTags.printt() method calling cs.lex.printt()
+lib/python/cs/tagset.py: cs.tagset: HasTags.format_kwargs: return a FormatMapping() which can look up missing keys via the .tags formattable attributes
+lib/python/cs/tagset.py: cs.tagset: HasTags.format_kwargs: prise out the .tags for use in the missing() function, missed in previous commit
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets.__getitem__: also accept a UUID key, clean up the logic a bit, improve a Pfx, extend the docstring with examples and a reference to TagSetTyping
+lib/python/cs/tagset.py: cs.tagset: update imports
+lib/python/cs/tagset.py: cs.tagset: remove some debugging
+lib/python/cs/tagset.py: cs.tagsets: docstring tweaks
+lib/python/cs/tagset.py: cs.tagset: TagSetTyping: add type_reference_of, type_reference, type_reference_apply_to, type_references for managing references to zone entities
+lib/python/cs/tagset.py: cs.tagset: update imports
+lib/python/cs/tagset.py: cs.tagset: jsonable: rework for better type tolerance
+lib/python/cs/tagset.py: cs.tagset: BaseTagSets.deref: do not mistake a str for an iterable of values to deref
+lib/python/cs/tagset.py: cs.tagset: TagSet: new printt() method
+lib/python/cs/tagset.py: cs.tagset: HasTags: new setdefault() method
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets.find: plumb the keyword arguments through to self.tagsets.find()
+lib/python/cs/tagset.py: merge default ==> pilfer
+lib/python/cs/tagset.py: cs.tagset: update imports
+lib/python/cs/tagset.py: cs.tagset: jsonable: support transcribe datetime.date
+lib/python/cs/tagset.py: cs.tagset: BaseTagSets.deref: an explicit value of None derefs to None, pull the common subtype computation up
+lib/python/cs/tagset.py: cs.tagset: HasTags.__new__: if the class has STRICT_SUBTYPES=True, raise ValueError instead of returning an instance of the root class
+lib/python/cs/tagset.py: cs.tagset,fstags,sqltags: make _id only special to SQLTagSet (the db row id), drop all mentions elsewhere
+lib/python/cs/tagset.py: cs.tagset: remove some debug, fix a docstring typo
+lib/python/cs/tagset.py: TagSet.printt: use the new subtable support
+lib/python/cs/tagset.py: cs.tagset: remove debugging
+lib/python/cs/tagset.py: cs.tagset: TagSet.dump: make as obsolete, prefer tagSet.printt
+lib/python/cs/tagset.py: cs/tagset: TagSetTyping: change the entity reference tag name to id.zone.entity_type=key
+lib/python/cs/tagset.py: cs.tagset: TagSet.printt: update for new list/tuple distinction in printt
+lib/python/cs/tagset.py: cs.tagset: bugfix TagSetTyping.type_reference_of; add missed import
+lib/python/cs/tagset.py: cs.tagset: TagSet and HasTags:: make Refreshable, drop the .is_stale() method, superceded by .refresh_needed()
+lib/python/cs/tagset.py: cs.tagset: TagSet: drop .refresh.last_poll, this is a runtime thing not a persistent thing; HasTags: drop .refresh_last_poll, proxy .refresh_last_update to self.tags
+lib/python/cs/tagset.py: merge pilfer ==> default: Refreshable
+lib/python/cs/tagset.py: cs.tagset: TagFile.save_tagset: have atomic_filename fall back to overwrite on PermissionError, uses new write_tagsets class method
+lib/python/cs/tagset.py: cs.tagset: HasTags: use self.name as the refresh_key() for recursive refreshes
+lib/python/cs/tagset.py: cs.tagset: HasTags: new .print() method for a nice summary, default calls .printt()
+lib/python/cs/tagset.py: cs.tagset: HasTags: subclass Promotable
