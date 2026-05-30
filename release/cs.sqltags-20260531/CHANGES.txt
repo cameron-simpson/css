@@ -1,0 +1,55 @@
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand: modernise usage spec and common options, make .sqltags a cached property of BaseSQLTagsCommand (uses self.TAGSETS_CLASS, hence not in the Options)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: provide __lt__ to order entities
+lib/python/cs/sqltags.py: cs.sqltags: clean some lint
+lib/python/cs/sqltags.py: cs.sqltags: clean some more lint
+lib/python/cs/sqltags.py: cs.sqltags: clean lots of lint
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand.Options: fix definition of COMMON_OPT_SPECS
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags now subclasses SingletonMixin, keying on the normalised db URL for filesystem paths
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommandsMixin: the /sqltags is a property of the BaseSQLTagsCommand
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_list: modernise the l=long_mode option
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.jsonable: turn datetimes into ISO8601 strings
+lib/python/cs/sqltags.py: cs.sqltags: docstring grammar fix
+lib/python/cs/sqltags.py: cs.sqltags: update import for @cached_property
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.from_str: move up the top next to __str__
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommandsMixin,BaseSQLTagsCommand: modernise option parsing and usage
+lib/python/cs/sqltags.py: cs.sqltags: docstring tweaks, some comments
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: initial support for a (tag_name,value) 2-tuple as an index
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommandsMixin.cmd_find: use the new pop_tagset_criteria(argv) method to obtain the search criteria
+lib/python/cs/sqltags.py: cs.sqltags: parse_tagset_criterion: rename arg to crit_s for clarity
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: if the (missing) index is a (name,value) 2-tuple create the entity with name=None and set the tag
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: for a (tag_name,tag_value) 2-tuple, if the tag_name is "name" create it with that name
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommandsMixin.cmd_find: use printt() for a better listing
+lib/python/cs/sqltags.py: cs.sqltags: update imports, fix a docstring
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommandsMixin.cmd_find: adjust reference to the sqltags
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.TYPE_JS_MAPPING: add UUID to the supported types
+lib/python/cs/sqltags.py: cs.sqltags: SQTCriterion: raise bare NotImplementedError
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.sql_parameters: support name=None
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.set: adjust the printing
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.__str__: return a line as for a .fstags file; add type annotation, clarify docstring
+lib/python/cs/sqltags.py: merge default ==> pilfer: sqltags stuff
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: new .deref() method to dereference tags whose values refer to other SQLTagSets
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.get: catch matches to more than one SQLTagSet, emit a warning, and return the first one
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: pull DBURL_ENVVAR and DBURL_DEFAULT into the class for overiding by subclasses
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommandsMixin: rename cmd_init to cmd_dbinit
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand.Options.db_url: default to None so that infer_db_url() can do its thing after the option parse
+lib/python/cs/sqltags.py: cs.sqltags: new HasSQLTags(HasTags) mixin providing a .tags_db proptery from self.tags.sqltags; new UsesSQLTags mixin providing .__getitem__(type_subname,key)
+lib/python/cs/sqltags.py: cs.sqltags: remove debug, mistakenly committed
+lib/python/cs/sqltags.py: cs.sqltags: HasSQLTags: provide a default .tags_entity_key cached property, but note that it is usually not used and that "on demand" flavoured subclasses should provide a replacement not relying on self.tags
+lib/python/cs/sqltags.py: cs.sqltags,cs.cdrip: move the MBDB.find method into UsesSQLTags
+lib/python/cs/sqltags.py: cs.sqltags: remove debug, fix type annotation
+lib/python/cs/sqltags.py: cs.sqltags: docstring tweaks
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: drop .deref(), now in BaseTagSets
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.import_tagged_entity: rename e to dbe for clarity
+lib/python/cs/sqltags.py: cs.sqltags: drop HasSQLTags (HasTags does it all now), make UsesSQLTags subclass UsesTagSets and just set TagSetsClass=SQLTags
+lib/python/cs/sqltags.py: cs.sqltags: update imports
+lib/python/cs/sqltags.py: cs.sqltags: new SQLTags.dbshell() method to run an interactive db prompt
+lib/python/cs/sqltags.py: cs.sqltags: brush off a little lint
+lib/python/cs/sqltags.py: cs.sqltags: simplify some tracing
+lib/python/cs/sqltags.py: cs.app.playon,cs.sqltags: drop obsolete @has_format_attributes
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: new setdefault() method
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new .preload(*criteria) method to preload and return TagSets
+lib/python/cs/sqltags.py: cs.tagset,fstags,sqltags: make _id only special to SQLTagSet (the db row id), drop all mentions elsewhere
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.set: new optional force=False parameter, skips db update if false and value unchanged
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_factory: drp skip_refresh support, will be covered by the Refreshable stuff
+lib/python/cs/sqltags.py: cs.sqltags: tidy imports
+lib/python/cs/sqltags.py: cs.sqltags: autoformat
