@@ -32,6 +32,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.fsm',
+        'cs.gvutils',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -214,7 +216,7 @@ def module_doc(
         warning("UNHANDLED %r, neither function nor class", Mname)
   return ''.join(full_docs)
 
-# TODO: use inspect.getdoc() initially
+# TODO: use inspect.getdoc() initially, or maybe cleandoc() ?
 def obj_docstring(obj):
   ''' Return a docstring for `obj` which has been passed through `stripped_dedent`.
 
