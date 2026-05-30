@@ -134,13 +134,12 @@ from cs.lex import (
     r,
     titleify_lc,
 )
-from cs.logutils import error, warning, ifverbose
+from cs.logutils import error, warning
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.seq import unrepeated
 from cs.tagset import (
     BaseTagSets,
-    HasTags,
     RegexpTagRule,
     Tag,
     TagBasedTest,
@@ -152,8 +151,8 @@ from cs.tagset import (
     UsesTagSets,
     tag_or_tag_value,
 )
-from cs.threads import locked, locked_property, State
-from cs.upd import Upd, UpdProxy, uses_upd, print  # pylint: disable=redefined-builtin
+from cs.threads import locked, locked_property
+from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 
 __version__ = '20250528-post'
 
@@ -178,6 +177,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.resources',
+        'cs.seq',
         'cs.tagset>=20211212',
         'cs.threads',
         'cs.upd',
