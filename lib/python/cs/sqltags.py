@@ -69,7 +69,7 @@ from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc, Promotable
 from cs.fileutils import shortpath
 from cs.lex import (
-    FormatAsError, has_format_attributes, get_decimal_value, printt, r
+    FormatAsError, get_decimal_value, printt, r
 )
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
@@ -81,7 +81,6 @@ from cs.sqlalchemy_utils import (
 )
 from cs.tagset import (
     BaseTagSets,
-    HasTags,
     Tag,
     TagBasedTest,
     TagFile,
