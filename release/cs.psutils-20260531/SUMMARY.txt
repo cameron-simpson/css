@@ -1,0 +1,1 @@
+Serialise command traces, avoids interleaving things like pipelines.
