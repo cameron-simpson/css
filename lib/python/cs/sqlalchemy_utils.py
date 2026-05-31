@@ -43,7 +43,7 @@ from cs.threads import NRLock, ThreadState
 ##  from cs.py.stack import caller
 ##  X("CHECK from %r", caller())
 
-__version__ = '20260531'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'description':
