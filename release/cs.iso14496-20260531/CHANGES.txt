@@ -1,0 +1,128 @@
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: provide a default boxes=() class attribute; drop HasBoxesMixin, already covered by BoxBody.__getattr__
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command: modernise the option handling
+lib/python/cs/iso14496.py: cs.iso14496: Box.parse: simplify the attachment of subboxes now that there's always a .boxes
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_tags: finish updating the --tag-prefix option
+lib/python/cs/iso14496.py: cs.iso14496: format strings in exceptions
+lib/python/cs/iso14496.py: cs.iso14496: replace @prop with @property, it confused linters for little gain
+lib/python/cs/iso14496.py: cs.iso14496: Box.BOX_TYPE: simplfy call to Box.boxbody_type_from_class
+lib/python/cs/iso14496.py: cs.iso14496: Box.ancestor: raise ValueError if no matching ancestor is found
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.parse_boxes: rename parameter for clarity
+lib/python/cs/iso14496.py: cs.iso14496: Box.BOX_TYPE: raise AttributeError if we cannot derive the type from the class name
+lib/python/cs/iso14496.py: cs.iso14496: Box.walk: yield (level,box,subboxes) 3-tuples to allow the called to track depth - maybe better to yield the ancestor box types?
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command: rename cmd_parse to cmd_scan, change impementation
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_scan: fix table output
+lib/python/cs/iso14496.py: cs.iso14496: tweak warnings
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__iter__: iterate self.boxes, not (), now that we always have a self.boxes
+lib/python/cs/iso14496.py: cs.iso14496: Box,BoxHeader: support for boxes with a UUID as the type
+lib/python/cs/iso14496.py: cs.iso14496: ILSTTextSchema.__repr__ is just the repr of the text
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__init_subclass__: apply some default docstrings to known methods
+lib/python/cs/iso14496.py: cs.iso14496: drop dump_box() in favour of new Box.dump_table and box.dump methods, add a recursion limit to Box.walk, update MP4COmmand.cmd_scan to use Box.dump
+lib/python/cs/iso14496.py: cs.iso14496: brush off a little lint
+lib/python/cs/iso14496.py: cs.iso14496: drop OverBox.dump()
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__str__: omit .boxes by default
+lib/python/cs/iso14496.py: cs.iso14496: Box: new .descendants() method to scan a Box hierarchy for boxes of specified types
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_scan: accept just one filename, following arguments are box types of interest
+lib/python/cs/iso14496.py: cs.iso14496: new @parse_offsets decorator to annotate the parsed object with .offset and .end_offset, and to report .offset if report=True
+lib/python/cs/iso14496.py: cs.iso14496,cs.binary: move @parse_offsets from cs.iso14496 to cs.binary
+lib/python/cs/iso14496.py: cs.iso14496: some f-strings and docstring tweaks
+lib/python/cs/iso14496.py: cs.iso14496: add types to various BinarySingleValue subclass definitions
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_scan: use CornuCopyBuffer.from_cli_filespec() to pop the filespec
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_extract: use CornuCopyBuffer.from_filename() instead of explicitly opening the file
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.parse_field: accept ... in addition to an int to parse raw bytes
+lib/python/cs/iso14496.py: cs.iso14496: drop OverBox, I'll be getting rid of it
+lib/python/cs/iso14496.py: cs.iso14496: update imports, tweak Box.dump_table() contents
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__init_subclass__: call super().__init_subclass__()
+lib/python/cs/iso14496.py: cs.iso14496: rename BinaryMultiStruct to BinaryStruct
+lib/python/cs/iso14496.py: cs.iso14496: update imports, remove a little debug
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__init_subclass__: handle readonly __doc__ attribute, do not register the @binclass BinClass, we will register it later in @boxbodyclass, handle reregistering a known class
+lib/python/cs/iso14496.py: cs.iso14496: @boxbodyclass: decorator wrapping @binclass which reregisters the new class as the body handler for its box type
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.boxbody_type_from_class: handle the BoxBody2 suffix of the new experimental @boxbodyclass/@binclass classes during the transition
+lib/python/cs/iso14496.py: cs.iso14496: Box.parse: drop obsolete .post_offset attribute, @parse_offsets sets .offset and .end_offset
+lib/python/cs/iso14496.py: cs.iso14496: new FulBoxBody2 @binclass based class, hopefully will replace FullBoxBody in the fullness of time
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.FIELD_TYPES: end_offset instead of post_offset
+lib/python/cs/iso14496.py: cs.iso14496: MVHDBoxBody: reimpleent subclassing FullBoxBody2
+lib/python/cs/iso14496.py: cs.iso14496: PDINBoxBody: reimplement subclassing FullBoxBody with a .pdinfo:PDInfoList field
+lib/python/cs/iso14496.py: cs.iso14496: drop parse_fields(), obsoleted by Box.scan()
+lib/python/cs/iso14496.py: cs.iso14496: fix format string
+lib/python/cs/iso14496.py: cs.iso14496: refactor the ILST box schemas as namedtuples
+lib/python/cs/iso14496.py: cs.*: replace BinaryMultiStruct with BinaryStruct
+lib/python/cs/iso14496.py: cs.iso14496: new ListOfBoxes(ListOfBinary,item_type=Box) class
+lib/python/cs/iso14496.py: cs.iso14496: PDINBoxBody: drop obsolete parse_fileds method
+lib/python/cs/iso14496.py: cs.iso14496: ContainerBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: HDLRBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: ELNGBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496 new EntryCountListOfBoxes(FullBoxBody2) being a generic list of boxes with preceeding entry_count
+lib/python/cs/iso14496.py: cs.iso14496: _SampleTableContainerBoxBody now subclasses EntryCountListOfBoxes
+lib/python/cs/iso14496.py: cs.iso14496: _SampleEntry now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: BTRTBoxBody now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: STSDBoxBody - SampleDescriptionBoxBody - ISO14496 section 8.5.2.2
+lib/python/cs/iso14496.py: cs.iso14496: DREFBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: CPRTBoxBody now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: VMHDBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: SMHDBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: Box.dump_table: new dump_offsets=False mode parameter, includes .offset and .end_offset if true; MP4Command.cmd_scan: new --with-offsets plumbed to Box.dump_table()
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.boxes: present default boxes=() via __getattr__ instead of as a class attribute (which preempts __getattr__, TIL)
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__getattr__: fall back to super().__getattr__
+lib/python/cs/iso14496.py: cs.iso14496: Box.box_type_s: ensure an ASCII box type is entirely printable (no control characters)
+lib/python/cs/iso14496.py: cs.iso14496: Box.dump_table: include the box type description if we have a bare box class name with no values
+lib/python/cs/iso14496.py: cs.iso14496: ListOfBoxes: new __str__ being the class name, the number of boxes, and a summary of the box types
+lib/python/cs/iso14496.py: cs.iso14496: parse() - include offsets (this will probably be going awy anyway); remove debug, tweak Pfx, fix comment typo
+lib/python/cs/iso14496.py: cs.iso14496: MDHDBoxBody: rename .pre_defined to .pre_defined_ to omit from default listing (for later, when this becomes a @binclass)
+lib/python/cs/iso14496.py: cs.iso14496: TimeStampMixin.datetime: use datetime.fromtimestamp(..,UTC) instead of datetime.utcfromtimestamp(..)
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_scan: use a single table for the output for a consistent indentation
+lib/python/cs/iso14496.py: cs.iso14496: FTYPBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: STDPBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: MOOVBoxBody is a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: move the STBLBoxBody class definition down
+lib/python/cs/iso14496.py: cs.iso14496: restore explanatory comment
+lib/python/cs/iso14496.py: cs.iso14496: MVHDBoxBody.parse_fields: just pass a list of the outstanding field names for the trailing field parse
+lib/python/cs/iso14496.py: cs.iso14496: TKHDBoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: METABoxBody is now a @binclass
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody: make a SUBBOX_SCHEMA_BY_LONG_ATTRIBUTE to avoid a linear search in __getattr__
+lib/python/cs/iso14496.py: merge media ==> default
+lib/python/cs/iso14496.py: cs.iso14496: Box.parse: new body_type_for=None parameter for providing a custom box_type->BoxBody-class function, intended for the ILST subboxes
+lib/python/cs/iso14496.py: cs.usi14496: some docstring tweaks
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__init__: pass an empty _parsed_field_names through to SimpleBinary.__init__
+lib/python/cs/iso14496.py: cs.iso14496: Box.reparse_buffer: reliably restore the .unparsed data
+lib/python/cs/iso14496.py: cs.iso14496: ListOfBoxes.__str__: fix the collation of enclosed box types
+lib/python/cs/iso14496.py: cs.iso14496: drop the top level parse() function, improve a docstring
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody: turn the (ignored) __init__ method into a parse_fields_method, use .parse_field on the subboxes instead of parse_field_value
+lib/python/cs/iso14496.py: cs.iso14496: ELSTBoxBody: update parse of entry_count
+lib/python/cs/iso14496.py: cs.iso14496: STSZBoxBody: tweak parse
+lib/python/cs/iso14496.py: cs.iso14496: clean some lint, remove some debug
+lib/python/cs/iso14496.py: cs.iso14496: datetime.UTC only appears in 3.11
+lib/python/cs/iso14496.py: merge default ==> vt
+lib/python/cs/iso14496.py: cs.iso14496: ELSTBoxBody.parse_fields: entry_count is a property, do not try to store it
+lib/python/cs/iso14496.py: cs/iso14496: ILSTBoxBody: decode value.value, not value
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_fields: clarify some logic, fix up some decoding
+lib/python/cs/iso14496.py: cs.iso14496: restore a warning, update some comments
+lib/python/cs/iso14496.py: cs.iso14496: _attr_schema: docstring
+lib/python/cs/iso14496.py: cs.iso14496: replace _ILSTAofBSchema with an ILSTAofB @binclass
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_fields: small fix
+lib/python/cs/iso14496.py: cs.iso14496: minor tweaks
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.parse_boxes: new options field_name parameter, default "boxes"
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_fields: complete refactor to place the derived values directly on each sub Box
+lib/python/cs/iso14496.py: cs.iso14496: Box: new .report_table() and .report() analogues for .dump_table() and .dump() but with human friendly summary information
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_scan: use BaseCommand.pop_buffer() instead of CornuCopyBuffer.from_cli_filespec()
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_info: redo use .pop_buffers() and the new report_table() method
+lib/python/cs/iso14496.py: cs.iso14496: drop top level report() function, supplanted by Box.report_table() and Box.report()
+lib/python/cs/iso14496.py: cs.iso14496: Box: new __len__ returning the parsed length from .offset and .end_offset; new __bool__ returning True to avoid implied call of len() for truthiness
+lib/python/cs/iso14496.py: cs.iso14496: Box.walk(): fix return type annotation and docstring
+lib/python/cs/iso14496.py: cs.iso14496: Box: redo .metatags() and .gather_metadata(), add .merged_metadaa()
+lib/python/cs/iso14496.py: cs.iso14496: MDATBox.transcribe: warning instead of assert? would make empty transcriptions from a "no data" parse
+lib/python/cs/iso14496.py: cs.iso14496: MDHDBoxBody.language: fix access to the language_short value
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_fields: drop tag collection, now retrieved later by .gather_metadata() et al
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_fields: move the check that the data boxes are all of type b'data' to the non-"----" subboxes
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_fields: on each subbox, record the long attribute name as .attribute_name and the value as .{attribute_name}
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.metatags: assemble this directly from the subboxes
+lib/python/cs/iso14496.py: merge default ==> media
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody: comment out old code from the media branch in case I've missed something with the new code
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command: rename cmd_info to cmd_probe
+lib/python/cs/iso14496.py: cs.iso14496: Box.report_table: fix call to .append
+lib/python/cs/iso14496.py: cs.iso14496: update use of cs.units, remove a little debug
+lib/python/cs/iso14496.py: cs.iso14496: update imports
+lib/python/cs/iso14496.py: cs.iso14496: drop unused parameter, fix uninitialised variable
+lib/python/cs/iso14496.py: cs.iso14496: Box.dump_table: new optional with_offsets=False parameter, includes Box size and offset if true
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_scan, Box.dump_table: use new printt nesting mode, move to named columns instead of flags for box offsets
+lib/python/cs/iso14496.py: MP$Command.cmd_probe,Box.report_table: replace tuples with lists for new printt nested stuff

@@ -1,0 +1,26 @@
+BoxBody: provide a default boxes=() class attribute; drop HasBoxesMixin, already covered by BoxBody.__getattr__.
+Box.ancestor: raise ValueError if no matching ancestor is found.
+Box.BOX_TYPE: raise AttributeError if we cannot derive the type from the class name.
+Box.walk: yield (level,box,subboxes) 3-tuples to allow the called to track depth.
+MP4Command: rename cmd_parse to cmd_scan.
+BoxBody.__iter__: iterate self.boxes, not (), now that we always have a self.boxes.
+Box,BoxHeader: support for boxes with a UUID as the type.
+drop dump_box() in favour of new Box.dump_table and box.dump methods, add a recursion limit to Box.walk.
+Box: new .descendants() method to scan a Box hierarchy for boxes of specified types.
+MP4Command.cmd_scan: accept just one filename, following arguments are box types of interest.
+BoxBody.parse_field: accept ... in addition to an int to parse raw bytes.
+Drop OverBox.
+@boxbodyclass: decorator wrapping @binclass which reregisters the new class as the body handler for its box type.
+New FulBoxBody2 @binclass based class, hopefully will replace FullBoxBody in the fullness of time.
+Drop parse_fields(), obsoleted by Box.scan().
+Refactor the ILST box schemas as namedtuples.
+New ListOfBoxes(ListOfBinary,item_type=Box) class.
+Reimplement several box classes using @binclass.
+Box.box_type_s: ensure an ASCII box type is entirely printable (no control characters).
+ILSTBoxBody: make a SUBBOX_SCHEMA_BY_LONG_ATTRIBUTE to avoid a linear search in __getattr__.
+Box.parse: new body_type_for=None parameter for providing a custom box_type->BoxBody-class function, intended for the ILST subboxes.
+Drop the top level parse() function.
+Box: new .report_table() and .report() analogues for .dump_table() and .dump() but with human friendly summary information.
+Drop top level report() function, supplanted by Box.report_table() and Box.report().
+Box: new __len__ returning the parsed length from .offset and .end_offset; new __bool__ returning True to avoid implied call of len() for truthiness.
+Assorted other changes.
