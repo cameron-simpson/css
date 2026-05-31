@@ -1898,10 +1898,10 @@ class SiteMap(UsesTagSets, Promotable):
       yield entity
 
   @staticmethod
-  @decorator
+  @decorator(decorable=lambda f: callable(f) and not isinstance(f, type))
   @typechecked
   def on(method, *patterns, **tags_kw):
-    ''' A decorator for handler methods which specifies conditions
+    r'''A decorator for handler methods which specifies conditions
         which must match for this handler to be called.
         This decorator may be applied multiple times
         if the handler method should match various flows.
@@ -1920,9 +1920,14 @@ class SiteMap(UsesTagSets, Promotable):
         - a string containing no slash character (`'/'`):
           a filename glob to match against the URL hostname
         - a string containing a slash:
-          a regular expression to apply against the URL path;
-          a leading slash anchors the regexp against the start of the path
-          otherwise it may match anywhere in the path
+          if the string contains a `'<'` character consider it a
+          string for a `URLPattern.path_pattern`, otherwise consider
+          it a regular expression. to apply against the URL path.
+          If a regular expression containing a `'<'` is desired it
+          should be inserted as a _regexp_ `\N{LESS-THAN SIGN}`
+          escape (_not_ a Python string escape.
+          A leading slash anchors a regexp against the start of the path
+          otherwise it may match anywhere in the path.
         - a regular expression object to apply against the URL path
         - subclass of `SiteEntity`: use its `.match_url()` class method
         - a `URLPattern`: use its `.match()` method
@@ -1930,6 +1935,7 @@ class SiteMap(UsesTagSets, Promotable):
           current match `TagSet`;
           it may return `None` or `False` for no match,
           or `True` or a `Mapping[str,str]` for a match
+
         Note that to avoid confusing the decorator the first condition
         cannot be a callable. However, it's usually a domain glob anyway.
 
@@ -1973,8 +1979,10 @@ class SiteMap(UsesTagSets, Promotable):
             def test(flowstate, match):
               vprint(f'@on: {test_name}')
               m = entity_class.match_url(flowstate.url)
-              if m is not None and match is not None:
-                match.update(m)
+              if m is not None:
+                _, m = m
+                if m is not None:
+                  match.update(m)
               return m
 
             test.__name__ = test_name
@@ -1987,8 +1995,10 @@ class SiteMap(UsesTagSets, Promotable):
             def test(flowstate, match):
               vprint(f'@on: {test_name}')
               m = pattern.match(flowstate.url)
-              if m is not None and match is not None:
-                match.update(m)
+              if m is not None:
+                _, m = m
+                if m is not None:
+                  match.update(m)
               return m
 
             test.__name__ = test_name
@@ -2009,27 +2019,42 @@ class SiteMap(UsesTagSets, Promotable):
 
           elif '/' in pattern:
             # a path match
-            def maketest(regexp_s):
-              regexp = pfx_call(re.compile, regexp_s)
-              if pattern.startswith('/'):
-                # match at the start of the path
-                test_name = f'flowstate.url.path ~ ^{regexp}'
+            def maketest(pattern_s):
+              if '<' in pattern_s:
+                # a URLPatthern.path_pattern
+                pattern = URLPattern(pattern_s)
+                test_name = str(pattern)
 
                 def test(flowstate, match):
-                  vprint(f'@on: {flowstate.url.path=} ~ ^{regexp}')
-                  m = pfx_call(regexp.match, flowstate.url.path)
-                  if m is None:
-                    return None
-                  return m.groupdict()
+                  vprint(f'@on: {test_name}')
+                  m = pattern.match(flowstate.url)
+                  if m is not None:
+                    _, m = m
+                    if m is not None:
+                      match.update(m)
+                  return m
               else:
-                test_name = f'flowstate.url.path ~ {regexp}'
+                # a regexp for the URL path
+                regexp = pfx_call(re.compile, pattern_s)
+                if pattern_s.startswith('/'):
+                  # match at the start of the path
+                  test_name = f'flowstate.url.path ~ ^{regexp}'
 
-                def test(flowstate, match):
-                  vprint(f'@on: {flowstate.url.path=} ~ {regexp}')
-                  m = pfx_call(regexp.search, flowstate.url.path)
-                  if m is None:
-                    return None
-                  return m.groupdict()
+                  def test(flowstate, match):
+                    vprint(f'@on: {flowstate.url.path=} ~ ^{regexp}')
+                    m = pfx_call(regexp.match, flowstate.url.path)
+                    if m is None:
+                      return None
+                    return m.groupdict()
+                else:
+                  test_name = f'flowstate.url.path ~ {regexp}'
+
+                  def test(flowstate, match):
+                    vprint(f'@on: {flowstate.url.path=} ~ {regexp}')
+                    m = pfx_call(regexp.search, flowstate.url.path)
+                    if m is None:
+                      return None
+                    return m.groupdict()
 
               test.__name__ = test_name
               return test
