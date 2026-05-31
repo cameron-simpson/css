@@ -1,0 +1,3 @@
+lib/python/cs/cache.py: cs.cache: @cachedmethod: rewrite the internal logic to support use on methods acception arguments
+lib/python/cs/cache.py: cs.cache: remove a little lint
+lib/python/cs/cache.py: cs.cache: ConvCache.convof: if verbose, print a message when writing a cache entry
