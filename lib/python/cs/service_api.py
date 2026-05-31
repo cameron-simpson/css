@@ -34,7 +34,7 @@ from cs.tagset import HasTags, UsesTagSets
 from cs.sqltags import SQLTagSet, UsesSQLTags
 from cs.upd import run_task
 
-__version__ = '20241007-post'
+__version__ = '20260531'
 
 DISTINFO = {
     'keywords': ["python3"],

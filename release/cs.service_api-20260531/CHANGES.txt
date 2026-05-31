@@ -1,0 +1,13 @@
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI: add __div__(suburl); add a type annotation
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI: default .API_HOSTNAME comes from the class
+lib/python/cs/service_api.py: merge default -> pilfer
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI.json: catch RequestsJSONDecodeError also
+lib/python/cs/service_api.py: cs.service_api: ServiceAPI now subclasses UsesSQLTags; many minor tweaks
+lib/python/cs/service_api.py: cs.service_api: ServiceAPI.get_login_state: now a HasSQLTags
+lib/python/cs/service_api.py: cs.service_api: update to use a UsesTagSets instead of an SQLTags
+lib/python/cs/service_api.py: cs.service_api: update imports
+lib/python/cs/service_api.py: cs.service_api: backport for requests.exceptions.JSONDecodeError, assume we get an json.JSONDecodeError in the past
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI: new mode ("response", "json", "data", callable) parameter, assorted small changes
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI: new check_json optional dict of expected fields and values in JSON responses; fix a typo
+lib/python/cs/service_api.py: cs.service_api: DISTINFO + cs.tagset, cs.urlutils
+lib/python/cs/service_api.py: cs.service_api: tidy imports
