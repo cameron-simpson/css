@@ -58,7 +58,7 @@ cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280
 cs.id3 pypi.release="20260531" ok_revision=f5dd86f885b6363b8d26416ab1c7a47b84aafb13
 cs.imageutils ok_revision="4192f7323931a73405a1752b34be32a935f36399" features={"20240422":["ThumbnailCache","sixel"]} pypi.release="20260531"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
-cs.iso14496 pypi.release="20241122" ok_revision=d119731d38eed9058fcf6dd4e344b78244965f1f
+cs.iso14496 pypi.release="20241122" ok_revision="391216eb6f50b71feb4c76c7160cd7960b85dc0f"
 cs.later pypi.release="20240630" ok_revision="819a6782e492719c8ec508be77bebd84117e8cfc" features={"20240305":["Later__thread_states"]}
 cs.lex pypi.release="20260526" ok_revision="7539ecb871d1588e6dcff914ed14c864f3d1f36e" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"],"20241109":["tabulate"],"20241119":["stripped_dedent__sub_indent"],"20241207":["tabulate__newlines"],"20250103":["BaseToken__token_classes","Identifier","NumericValue","QuotedString"],"20250323":["printt"],"20250914":["FormatMapping","single_space"],"20260403":["TabulatePrettyPrinter","flatten_table_rows","row_cells","without_prefix"]}
 cs.logutils pypi.release="20250323" ok_revision=a3b20bbeb0e556fdbe18407a812abddf5c818380 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"],"20240630":["LoggingState"]}
