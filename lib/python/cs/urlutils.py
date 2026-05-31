@@ -49,7 +49,7 @@ from cs.rfc2616 import datetime_from_http_date
 from cs.seq import skip_map
 from cs.threads import locked, ThreadState, HasThreadState
 
-__version__ = '20260531'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'description':
