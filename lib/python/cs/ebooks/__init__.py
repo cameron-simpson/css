@@ -99,6 +99,9 @@ DISTINFO = {
         'sqlalchemy',
         'typeguard',
     ],
+    'extras_requires': {
+        'dedrm': ['pycryptodomex'],
+    },
     'entry_points': {
         'console_scripts': {
             'ebooks': 'cs.ebooks.__main__:main'
