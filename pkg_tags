@@ -56,7 +56,7 @@ cs.hashindex ok_revision="03c9a6c06ec749b3d501eb6c11f1659988599a8e" pypi.release
 cs.hashutils ok_revision="2030d99fdf99da2d111ecdf71841b9fbc55bbfac" pypi.release="20250414.1" features={"20240412":["BaseHashCode__get_hashfunc","blake3"],"20250414":["BLAKE3"]}
 cs.html pypi.release=20160828 ok_revision="23989d64974a81c6521174d3fe496bcfdd280d3f"
 cs.id3 pypi.release="20260531" ok_revision=f5dd86f885b6363b8d26416ab1c7a47b84aafb13
-cs.imageutils ok_revision="4192f7323931a73405a1752b34be32a935f36399" features={"20240422":["ThumbnailCache","sixel"]} pypi.release="20240422.1"
+cs.imageutils ok_revision="4192f7323931a73405a1752b34be32a935f36399" features={"20240422":["ThumbnailCache","sixel"]} pypi.release="20260531"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.iso14496 pypi.release="20241122" ok_revision=d119731d38eed9058fcf6dd4e344b78244965f1f
 cs.later pypi.release="20240630" ok_revision="819a6782e492719c8ec508be77bebd84117e8cfc" features={"20240305":["Later__thread_states"]}
