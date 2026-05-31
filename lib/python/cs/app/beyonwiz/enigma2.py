@@ -74,7 +74,7 @@ class Enigma2(_Recording):
     tsbase = splitext(basename(tspath))[0]
     self.appath = tspath + '.ap'
     self.cutpath = tspath + '.cuts'
-    self.eitpath = tsbase + '.eit'
+    self.eitpath = tspath + '.eit'
     self.metapath = tspath + '.meta'
     self.scpath = tspath + '.sc'
 
