@@ -213,7 +213,10 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
       with Pfx(fspath):
         print("remove", fspath)
         if doit:
-          pfx_call(os.remove, fspath)
+          try:
+            pfx_call(os.remove, fspath)
+          except FileNotFoundError as e:
+            warning(str(e))
         else:
           if not isfilepath(fspath):
             warning("not a file")
