@@ -70,12 +70,10 @@ DISTINFO = {
         'cs.buffer',
         'cs.cmdutils',
         'cs.context',
-        'cs.debug',
         'cs.deco',
         'cs.fileutils',
         'cs.fs',
         'cs.fstags',
-        'cs.gimmicks',
         'cs.lex',
         'cs.logutils',
         'cs.numeric',
@@ -100,7 +98,7 @@ DISTINFO = {
         'typeguard',
     ],
     'extras_requires': {
-        'dedrm': ['pycryptodomex'],
+        'dedrm': ['cs.gimmicks', 'pycryptodomex'],
     },
     'entry_points': {
         'console_scripts': {
