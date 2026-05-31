@@ -1,0 +1,3 @@
+class bs.promote: check against a Buffer, not just bytes.
+struct_field_types: update decoding to recognise numeric prefixes, pop multiple field names.
+Assorted small changes.
