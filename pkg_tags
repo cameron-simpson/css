@@ -96,7 +96,7 @@ cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release="20250306" ok_revision="74bf122de126cda4642d6030ed3cd6e992b971db" features={"20250306":["content_length","content_type","default_headerregistry","header"]}
 cs.semantics ok_revision=efc3bbb8a0e9059323f57e8b97c7d8b51093c6b7 features={"20250103":["ClosedError","not_closed"]} pypi.release="20250103"
 cs.seq pypi.release="20260526" ok_revision="25563db7fe0de740fcb433a810f4047e9d390c21" featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"],"20250724":["ClonedIterator"],"20251230":["not_none","unbound_range"],"20251231":["range__class_getitem"],"20251231.1":["range__genericalias"],"20260403":["with_neighbours"],"20260525":["Ordered"],"20260525.1":["order"]}
-cs.service_api ok_revision="7ad64b8a036b26f1f93471f296ee262214a73aee" pypi.release="20241007"
+cs.service_api ok_revision="7ad64b8a036b26f1f93471f296ee262214a73aee" pypi.release="20260531"
 cs.sh ok_revision="3af3cf2c5da8cc18eafa8a65437eaf1e7b7f1db3"
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.splink ok_revision=d931f30ab0db0d1e1aef4df8295a1b20e364a4be pypi.release="20240316"
