@@ -1,0 +1,1 @@
+FFMPEG_DOCKER_IMAGE_DEFAULT=docker.io/linuxserver/ffmpeg, adjust for cs.dockerutils changes.
