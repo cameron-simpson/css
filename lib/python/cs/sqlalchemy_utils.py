@@ -27,7 +27,6 @@ from cs.lex import cutprefix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.psutils import run
-from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import NRLock, ThreadState
 
@@ -56,18 +55,18 @@ DISTINFO = {
         "Topic :: Database",
     ],
     'install_requires': [
-        'icontract',
-        'sqlalchemy>=2.0',
-        'typeguard',
         'cs.context',
         'cs.deco',
         'cs.fileutils',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
-        'cs.py.func',
+        'cs.psutils',
         'cs.resources',
         'cs.threads',
+        'icontract',
+        'sqlalchemy>=2.0',
+        'typeguard',
     ],
 }
 
