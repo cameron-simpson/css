@@ -1,0 +1,3 @@
+DockerUtilCommand.cmd_run: give a more informative name to the temporary directory for mounts.
+DockerRun: build the docker command more nicely, call run(...,fold=True) for more readable tracing.
+DockerRun: add .docker_exe as a field, run as the current user by default, drop .as_root and replace with .user, honour $DK_COMMAND as the default docker command name, adjust option usage on that basis.

@@ -1,0 +1,5 @@
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerUtilCommand.cmd_run: give a more informative name to the temporary directory for mounts
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun: build the docker command more nicely, call run(...,fold=True) for more readable tracing
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun: add .docker_exe as a field, run as the current user by default, drop .as_root and replace with .user
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun.run: --quiet, --user, --userns --cap-drop options
+lib/python/cs/dockerutils.py: cs.dockerutils: DockerRun.run: user --userns=keep-id an --group-add=keep-groups by default for podman
