@@ -1,0 +1,1 @@
+lib/python/cs/tarutils.py: cs.tarutils: an IterableQueue no longer has a .open() method
