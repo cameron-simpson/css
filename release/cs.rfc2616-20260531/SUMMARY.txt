@@ -1,0 +1,3 @@
+header(): new default=None optional parameter.
+content_length,content_type: plumb keyword arguments through to header().
+New content_encodings(headers) returning a list of the content encodings from headers.
