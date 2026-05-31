@@ -1,0 +1,13 @@
+DOwnloads: use cs.rfc2616.content_length to get the download content-length, open the download file with 'xb'.
+PlayOnAPI is now the source of the sqltags, do not expect to access it outside.
+New _PlayOnEntity(HasSQLTags) base class for Recording and LoginState.
+PlayOnAPI: new .login_userid property for external use.
+PlayOnAPI.__getitem__: an int index is promoted to ('recording,str(index)) for lookup.
+PlayOnAPI: new .recordings() finding playon.recording.*; use it for __iter__.
+PlayOnAPI: new .recording_ids_from_str() method for use by the CLI.
+PlayOnAPI: use the new UsesTagSets stuff.
+The PlayOn API has started reciting times with a microsecond field.
+PlayOnAPI.from_playon_date: accomodate time formats with and without microseconds.
+Recording.STALE_AGE -> Recording.refresh_lifespan for Refreshable.
+PlayOnCommand.cmd_dl: use pmap() to run the downloads in parallel.
+Assorted other internal changes.
