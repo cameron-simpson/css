@@ -1,0 +1,10 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: expose the db URL normalisation stuff as methods
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM.__init__: clean up the init logic a little; improve some docstrings and a warning message
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM._serial_sessions_lock: use an NRLock instead of a Lock, aids deadlock detection but will be asyncio unfriendly later
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM.startup_shutdown: do not obtain the db lock, we will now do this per orchestrated_session(); put a try/finally around the outer session creation to clean up reliably
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: new ORM.dbshell() method to run an interactive db prompt
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: update imports, clean a little lint
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: use @decorator on the decorators
+lib/python/cs/sqlalchemy_utils.py: cs.*: add missing imports, remove some debug
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utls: ORM.__init__: shuffle the sqlite/serial_sessions logic for clarity
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: update imports and DISTINFO
