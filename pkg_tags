@@ -104,7 +104,7 @@ cs.sqlalchemy_utils ok_revision="511ca32658122179b40f257594ad68885af61ee8" pypi.
 cs.sqlalchemyutils
 cs.sqltags ok_revision=ab0819255ce37f72b0285bcc4f1357c7aa10e0e5 pypi.release="20260531"
 cs.tagset ok_revision="688af4502ee071488834a94e61866132d5e78299" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"],"20240422":["fix_Tag__str__bad_TypeError","jsonable"],"20240422.2":["jsonable__for_json"],"20250528":["Tag__parse"],"20260531":["HasTags","TagSetTyping","UsesTagSets"]} pypi.release="20260531"
-cs.tarutils ok_revision=f9f22335cc4694b6778b813dac31792fe508d95a pypi.release="20240318"
+cs.tarutils ok_revision=f9f22335cc4694b6778b813dac31792fe508d95a pypi.release="20260531"
 cs.taskqueue ok_revision="879d12f2e8d786307b2bee942c38f08ff73d8633" features={"20221207":["BaseTask"]} pypi.release="20250120"
 cs.testutils ok_revision="0972084494fc61d065c4a0864224eff7c0c94781" features={"20230109":["SetupTeardownMixin","product_test"],"20240623":["assertSingleThread"]} pypi.release="20251020"
 cs.threads ok_revision="93c1227738801a06a44534eba792f21197c50b04" pypi.release="20260531" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"],"20260526":["pmap"]}
