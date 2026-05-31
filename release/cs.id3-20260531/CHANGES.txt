@@ -1,0 +1,1 @@
+lib/python/cs/id3.py: cs.id3: provide value_type for the BinarySingleValue subclasses
