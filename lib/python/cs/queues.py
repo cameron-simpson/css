@@ -48,6 +48,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.resources',
         'cs.result',
+        'cs.semantics',
         'cs.seq',
         'typeguard',
     ],
@@ -216,7 +217,7 @@ def WorkerQueue(worker, capacity=0, name=None, args=(), kwargs=None):
     raise
   return q, T
 
-class Channel(object):
+class Channel:
   ''' A zero-storage data passage.
       Unlike a `Queue`, `put(item)` blocks waiting for the matching `get()`.
   '''
@@ -335,6 +336,7 @@ class PushQueue(MultiOpenMixin, RunStateMixin):
           received.
         * `outQ` is a `MultiOpenMixin` which accepts via its `.put()` method.
     '''
+    RunStateMixin.__init__(runstate=runstate)
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
@@ -433,7 +435,7 @@ class NullQueue(MultiOpenMixin):
 
 NullQ = NullQueue(name='NullQ')
 
-class TimerQueue(object):
+class TimerQueue:
   ''' Class to run a lot of "in the future" jobs without using a bazillion
       Timer threads.
   '''
