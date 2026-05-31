@@ -19,7 +19,7 @@ from typing import Mapping, Set, Union
 
 from icontract import require
 import requests
-from requests import Request, Response
+from requests import Response
 try:
   from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
 except ImportError:
@@ -33,7 +33,6 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.tagset import HasTags, UsesTagSets
 from cs.sqltags import SQLTagSet, UsesSQLTags
 from cs.upd import run_task
-from cs.urlutils import URL
 
 __version__ = '20241007-post'
 
@@ -53,7 +52,6 @@ DISTINFO = {
         'cs.tagset',
         'cs.sqltags',
         'cs.upd',
-        'cs.urlutils',
         'icontract',
         'requests',
     ],
