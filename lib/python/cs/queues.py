@@ -33,7 +33,7 @@ from cs.result import CancellationError
 from cs.semantics import not_closed
 from cs.seq import seq, unrepeated
 
-__version__ = '20260531'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
