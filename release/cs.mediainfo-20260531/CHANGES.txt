@@ -1,0 +1,2 @@
+lib/python/cs/mediainfo.py: cs.mediainfo: docstring updates
+lib/python/cs/mediainfo.py: cs.mediainfo: doc tweaks, fix parse return value
