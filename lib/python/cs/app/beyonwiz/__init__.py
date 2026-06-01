@@ -8,7 +8,6 @@ structures and to access Beyonwiz devices via the net.
 '''
 
 from abc import ABC, abstractmethod
-from contextlib import nullcontext
 from datetime import datetime
 import json
 import os
@@ -22,6 +21,7 @@ from os.path import (
     join as joinpath,
     splitext,
 )
+from subprocess import CalledProcessError
 from threading import Lock
 from types import SimpleNamespace as NS
 
@@ -289,9 +289,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
       path2 = "%s--%d%s" % (basis, i + 1, ext)
       if not existspath(path2):
         return path2
-    raise ValueError(
-        "no available --0..--%d variations: %r" % (max_n - 1, path)
-    )
+    raise ValueError(f'no available --0..--{max_n-1} variations: {path!r}')
 
   # pylint: disable=too-many-branches,too-many-locals
   def convert(
@@ -317,9 +315,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     if use_data:
       assert srcpath is None
       if timespans:
-        raise ValueError(
-            "%d timespans but do_copyto is true" % (len(timespans,))
-        )
+        raise ValueError(f'{len(timespans)} timespans but do_copyto is true')
     else:
       if srcpath is None:
         srcpath = self.fspath
@@ -379,18 +375,23 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     ) as T:
       if doit:
         os.remove(T.name)
-      ffconvert(
-          srcpath,
-          dstpath=dstpath if T is None else T.name,
-          doit=doit,
-          conversions=None,
-          metadata=self.ffmetadata(dstfmt),
-          timespans=timespans,
-          overwrite=False,
-          acodec=acodec,
-          vcodec=vcodec,
-          extra_opts=extra_opts,
-      )
+      try:
+        pfx_call(
+            ffconvert,
+            srcpath,
+            dstpath=dstpath if T is None else T.name,
+            doit=doit,
+            conversions=None,
+            metadata=self.ffmetadata(dstfmt),
+            timespans=timespans,
+            overwrite=False,
+            acodec=acodec,
+            vcodec=vcodec,
+            extra_opts=extra_opts,
+        )
+      except CalledProcessError as e:
+        warning("conversion fails: %s", e)
+        return False
     return True
 
   def ffmpeg_metadata(self, dstfmt=None):
