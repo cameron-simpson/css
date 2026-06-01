@@ -1,0 +1,1 @@
+progressbar: also run the progress bar if report_print is true in order to get the report (was optimised out when the Upd was disabled).

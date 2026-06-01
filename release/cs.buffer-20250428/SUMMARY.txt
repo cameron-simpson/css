@@ -1,0 +1,2 @@
+New CornuCopyBuffer.from_cli_filespec() factory method accepting "-" or a filename for use by CLIs.
+Some minor internal things.

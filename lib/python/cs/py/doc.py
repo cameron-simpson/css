@@ -23,7 +23,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.py.modules import module_attributes
 
-__version__ = '20250426-post'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -32,6 +32,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.fsm',
+        'cs.gvutils',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -85,7 +87,7 @@ def module_doc(
       if obj_module is not module:
         # name imported from another module
         continue
-      docstring = getattr(obj, '__doc__', '').strip()
+      docstring = (getattr(obj, '__doc__', None) or '').strip()
       if not docstring:
         continue
       line1 = " ".join(
@@ -158,7 +160,7 @@ def module_doc(
                   indent("Usage: " + usage_text, "    "),
               )
           )
-        full_docs.append(doc_item(Mname, f'Class `{classname_etc}', obj_doc))
+        full_docs.append(doc_item(Mname, f'class {classname_etc}', obj_doc))
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
         # iterate over specified names or default names in order
@@ -214,7 +216,7 @@ def module_doc(
         warning("UNHANDLED %r, neither function nor class", Mname)
   return ''.join(full_docs)
 
-# TODO: use inspect.getdoc() initially
+# TODO: use inspect.getdoc() initially, or maybe cleandoc() ?
 def obj_docstring(obj):
   ''' Return a docstring for `obj` which has been passed through `stripped_dedent`.
 

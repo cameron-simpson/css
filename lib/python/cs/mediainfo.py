@@ -5,10 +5,10 @@
 #
 
 '''
-Simple minded facilities for media information.
-This contains mostly lexical functions
-for extracting information from strings
-or constructing media filenames from metadata.
+Simple minded facilities for media information inferred from filenames.
+This contains mostly lexical functions for extracting information from strings
+or constructing media filenames from metadata and a few classes
+like `EpisodeInfo` and `SeriesEpisodeInfo` for common descriptions.
 
 The default filename parsing rules are based on my personal convention,
 which is to name media files as:
@@ -19,13 +19,13 @@ where the components are:
 * `series_name`:
   the programme series name downcased and with whitespace replaced by dashes;
   in the case of standalone items like movies this is often the studio.
-* `episode_info`: a structures field with episode information:
+* `episode_info`: a structured field with episode information:
   `s`_n_ is a series/season,
   `e`_n_` is an episode number within the season,
   `x`_n_` is a "extra" - addition material supplied with the season,
   etc.
-* `title`: the episode title downcased and with whitespace replaced by dashes
-* `source`: the source of the media
+* `title`: the episode title downcased and with whitespace replaced by dashes.
+* `source`: the source of the media.
 * `ext`: filename extension such as `mp4`.
 
 As you may imagine,
@@ -49,7 +49,7 @@ from cs.lex import cutsuffix, get_prefix_n, get_suffix_part
 from cs.pfx import Pfx, pfx
 from cs.tagset import Tag
 
-__version__ = '20240519-post'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -109,10 +109,11 @@ def part_to_title(part):
   '''
   return part.strip('- \t\r\n').replace('-', ' ').title()
 
-_EpisodeDatumDefn = namedtuple('EpisodeDatumDefn', 'name prefix re')
-
-class EpisodeDatumDefn(_EpisodeDatumDefn):
-  ''' An `EpisodeInfo` marker definition.
+class EpisodeDatumDefn(namedtuple('EpisodeDatumDefn', 'name prefix re')):
+  ''' An `EpisodeInfo` marker definition with the following components:
+      - `name`: the marker name, such as `"series"` or `"episode"`
+      - `prefix`: the stub used in a filename, such as `"s"` or `"e"`
+      - `re`: a regular expression to match the `prefix` an some digits
   '''
 
   def __new__(cls, name, prefix):
@@ -127,9 +128,9 @@ class EpisodeDatumDefn(_EpisodeDatumDefn):
         * `s`: the string
         * `offset`: parse offset, default 0
     '''
-    m = self.re.match(s[offset:])
+    m = self.re.match(s, offset)
     if m:
-      return int(m.group(1)), offset + m.end()
+      return int(m.group(1)), m.end()
     raise ValueError(
         '%s: unparsed episode datum: %r' % (type(self).__name__, s[offset:])
     )
@@ -384,6 +385,7 @@ class SeriesEpisodeInfo(Promotable):
 
   def as_dict(self):
     ''' Return the non-`None` values as a `dict`.
+        Note that this uses `dataclasses.asdict()` and as such is a deep copy.
     '''
     return {k: v for k, v in asdict(self).items() if v is not None}
 

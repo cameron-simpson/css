@@ -38,8 +38,8 @@ class Enigma2(_Recording):
   '''
 
   DEFAULT_FILENAME_BASIS = (
-      '{meta.title:lc}--{file.datetime:lc}--{file.channel:lc}'
-      '--beyonwiz--{meta.description:lc}'
+      '{meta.title:lc_}--{file.datetime:lc_}--{file.channel:lc_}'
+      '--beyonwiz--{meta.description_sentence1:lc_}'
   )
 
   FFMPEG_METADATA_MAPPINGS = {
@@ -74,7 +74,7 @@ class Enigma2(_Recording):
     tsbase = splitext(basename(tspath))[0]
     self.appath = tspath + '.ap'
     self.cutpath = tspath + '.cuts'
-    self.eitpath = tsbase + '.eit'
+    self.eitpath = tspath + '.eit'
     self.metapath = tspath + '.meta'
     self.scpath = tspath + '.sc'
 
@@ -90,19 +90,6 @@ class Enigma2(_Recording):
         self.metapath,
         self.scpath,
     )
-
-  @pfx_method
-  def remove(self, *, doit=False):
-    ''' Remove all the files associated with this recording.
-    '''
-    for fspath in self.fspaths:
-      with Pfx(fspath):
-        print("remove", fspath)
-        if doit:
-          pfx_call(os.remove, fspath)
-        else:
-          if not isfilepath(fspath):
-            warning("not a file")
 
   def read_meta(self):
     ''' Read the .meta file and return the contents as a dict.
@@ -127,6 +114,9 @@ class Enigma2(_Recording):
           warning("cannot open: %s", e)
         else:
           raise
+      desc = data.get('description', '')
+      sentence1 = desc.split('. ', 1)[0]
+      data['description_sentence1'] = sentence1 or desc
     return data
 
   @locked_property

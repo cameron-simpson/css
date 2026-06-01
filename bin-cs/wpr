@@ -17,15 +17,16 @@ from os.path import (
 import random
 import re
 import sys
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, Tuple
 
 from icontract import require
 from typeguard import typechecked
 
 from cs.app.osx.spaces import Spaces
+from cs.desktop import Desktop
 from cs.fs import needdir, scandirtree, shortpath, update_linkdir
 from cs.lastvalue import LastValue
-from cs.lex import cutprefix
+from cs.lex import cutprefix, printt
 from cs.mappings import missingdict
 from cs.pfx import pfx_call
 
@@ -33,7 +34,7 @@ from cs.pfx import pfx_call
 word_re_map = missingdict(partial(re.compile, flags=re.I))
 
 def main(argv=None):
-  USAGE_FORMAT = '''Usage: {cmd} [-nwp] [-N] [-P wppath] [--] [spaces] [ RENEW | words...]
+  USAGE_FORMAT = '''Usage: {cmd} [-nwp] [-N] [-P wppath] [-v] [--] [spaces] [ RENEW | words...]
       Select wallpapers from the directories in $WPPATH
       at random matching the sed-regexps "words".
       Construct a scratch directoy in $WPLINKDIR: $WPLINKDIR
@@ -41,8 +42,9 @@ def main(argv=None):
       as the wallpaper directory for the current (or specified) space.
       -nwp        Limit the number of wallpapers to nwp (${nwp}).
       -N          Do not update the OSX Spaces wallpaper settings.
-      -W wppath   Use the supplied wallpaper path, default from
-                  $WPPATH, which defaults to $WPDIR:$SSV_DIR: {":".join(wppath)}'''
+      -P wppath   Use the supplied wallpaper path, default from
+                  $WPPATH, which defaults to $WPDIR:$SSV_DIR: {":".join(wppath)}
+      -v          Verbose.'''
   if argv is None:
     argv = list(sys.argv)
   cmd = argv.pop(0)
@@ -51,10 +53,8 @@ def main(argv=None):
   do_renew = False
   nwp = 16
   update_spaces = True
-  ssvdirpath = os.environ.get('SSV_DIR', expanduser('~/im/screencaps'))
-  wpdirpath = os.environ.get('WPDIR', expanduser('~/im/wp'))
-  wplinkdirpath = os.environ.get('WPLINKDIR', expanduser('~/var/im/wp'))
-  wppath = (os.environ.get('WPPATH') or f'{wpdirpath}:{ssvdirpath}').split(':')
+  verbose = False
+  desktop = Desktop()
   space_list = [spaces.current_index + 1]
   badopts = False
   while argv and argv[0].startswith('-'):
@@ -70,6 +70,8 @@ def main(argv=None):
       update_spaces = False
     elif opt == 'P':
       wppath = argv.pop(0).split(':')
+    elif opt == 'v':
+      verbose = True
     else:
       print(f'{cmd}: unrecognised option: -{opt}', file=sys.stderr)
       badopts = True
@@ -99,14 +101,24 @@ def main(argv=None):
     return 2
   if do_renew:
     seen_word_tuples = set()
+    wpn_words = sorted(
+        (wpn, tuple(word_list))
+        for wpn, word_list in last_wp_values(lv).items()
+    )
+    if verbose:
+      printt(*([wpn, " ".join(words)] for wpn, words in wpn_words))
     for wpn, word_list in sorted(last_wp_values(lv).items()):
       word_tuple = tuple(word_list)
       if word_tuple not in seen_word_tuples:
-        wpdir, _ = update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
+        wpdir, _ = update_random_wpdir(
+            desktop.wplinkdirpath, word_tuple, desktop.wppath, nwp
+        )
         seen_word_tuples.add(word_tuple)
       spaces.set_wp_fspath(wpn - 1, wpdir)
   else:
-    wpdir, _ = update_random_wpdir(wplinkdirpath, word_tuple, wppath, nwp)
+    wpdir, _ = update_random_wpdir(
+        desktop.wplinkdirpath, word_tuple, desktop.wppath, nwp
+    )
     for wpn in space_list:
       spaces.set_wp_fspath(wpn - 1, wpdir)
 
@@ -125,9 +137,9 @@ def last_wp_values(lv) -> dict[int, list[str]]:
 def update_random_wpdir(
     wplinkdirpath: str,
     words: Sequence[str],
-    wppath: list[str],
+    wppath: Iterable[str],
     count: int,
-    exts=('.jpg', '.png'),
+    exts: Tuple = ('.jpg', '.png'),
 ) -> tuple[str, dict[str, str]]:
   ''' Randomly choose `count` image paths found in `wppath` matching `words`.
       Choose a subdirectory of `wplinkdirpath` based on `words`, making it at need.

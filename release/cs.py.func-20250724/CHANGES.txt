@@ -1,0 +1,7 @@
+lib/python/cs/py/func.py: cs.py.func: callif: use func_a_kw() instead of hopping through func_a_kw_fmt()
+lib/python/cs/py/func.py: cs.py.func: callif: do not potentially modify the optional modes dict
+lib/python/cs/py/func.py: cs.py.func: callmethod_if: rename `o` to `obj`
+lib/python/cs/py/func.py: cs.py.func: func_a_kw_fmt: truncate %r at 20 chars, things were particularly bad for big strings and bytes
+lib/python/cs/py/func.py: cs.py.func: func_a_kw_fmt: bump %.02r to %.40r, it was too short
+lib/python/cs/py/func.py: cs.py.func: remove unused imports, update DISTINFO to match
+lib/python/cs/py/func.py: cs.py.func: python 3 only

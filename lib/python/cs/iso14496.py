@@ -12,16 +12,12 @@ ISO make the standard available here:
 * [zip file download](http://standards.iso.org/ittf/PubliclyAvailableStandards/c068960_ISO_IEC_14496-12_2015.zip)
 '''
 
-from base64 import b64encode, b64decode
+from base64 import b64decode
 from collections import namedtuple
-try:
-  from collections.abc import Buffer
-except ImportError:
-  from typing import ByteString as Buffer
 from contextlib import closing, contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import cached_property
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import os
 import sys
 from typing import Iterable, List, Mapping, Tuple, Union
@@ -42,7 +38,6 @@ from cs.binary import (
     BinaryUTF8NUL,
     BinaryUTF16NUL,
     SimpleBinary,
-    BinaryListValues,
     BinaryStruct,
     BinaryMultiValue,
     BinarySingleValue,
@@ -56,23 +51,21 @@ from cs.cmdutils import BaseCommand, popopts
 from cs.deco import decorator
 from cs.fs import scandirpaths
 from cs.fstags import FSTags, uses_fstags
-from cs.imageutils import sixel_from_image_bytes
 from cs.lex import (
     cropped_repr,
     cutsuffix,
     get_identifier,
     get_decimal_value,
     printt,
-    tabulate,
 )
 from cs.logutils import warning, debug
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx_call, pfx_method, XP
 from cs.tagset import TagSet, Tag
 from cs.threads import locked_property, ThreadState
-from cs.units import transcribe_bytes_geek as geek, transcribe_time
+from cs.units import geek, geek_bytes, human_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
-__version__ = '20241122-post'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -232,49 +225,41 @@ class MP4Command(BaseCommand):
             ofp.write(chunk)
             need -= len(chunk)
 
-  def cmd_info(self, argv):
+  def cmd_probe(self, argv):
     ''' Usage: {cmd} [{{-|filename}}]...]
           Print informative report about each source.
     '''
     if not argv:
       argv = ['-']
     xit = 0
-    for spec in argv:
-      with Pfx(spec):
-        if spec == '-':
-          parsee = sys.stdin.fileno()
+    first = True
+    for filespec, bfr in self.pop_buffers(argv):
+      if bfr is None:
+        continue
+      with Pfx(filespec):
+        if first:
+          first = False
         else:
-          parsee = spec
+          print()
+        print(filespec)
+        table = []
         with PARSE_MODE(discard_data=True):
-          over_box = parse(parsee)
-        print(spec + ":")
-        for top_box in over_box:
-          for box, tags in top_box.gather_metadata():
-            if tags:
-              print(' ', box.box_type_path, str(len(tags)) + ':')
-              for tag in tags:
-                with Pfx(tag.name):
-                  if tag.name == 'moov.udta.meta.ilst.cover':
-                    image_bs = b64decode(tag.value)
-                    if sys.stdout.isatty():
-                      print(f'    {tag.name}:')
-                      with open(sixel_from_image_bytes(image_bs),
-                                'rb') as sixelf:
-                        print(sixelf.read().decode('ascii'))
-                    else:
-                      print(f'    {tag.name}: {image_bs[:32]!r}...')
-                  else:
-                    try:
-                      print('   ', tag)
-                    except TypeError as e:
-                      warning("cannot print: %s", e)
-                      xit = 1
-                      print('   ', tag.name, '=', repr(tag.value))
+          for box in Box.scan(bfr):
+            box.report_table(table)
+            for subbox, tags in box.gather_metadata():
+              if not tags:
+                table.append([f'  {box.box_type_s}', 'No metadata.'])
+              else:
+                table.append(['  {box.box_type_s}'])
+                for tag_name, tag_value in tags.items():
+                  table.append([f'    {tag_name}', tag_value])
+        printt(*table)
     return xit
 
   @popopts(
       with_data='Include the data components of boxes.',
       with_fields='Include a line for each box field.',
+      with_offsets='Include Box and Box body offsets in the dump.',
   )
   def cmd_scan(self, argv):
     ''' Usage: {cmd} [--with-data] [--with-fields] [{{-|filename}} [type_paths...]]
@@ -283,22 +268,32 @@ class MP4Command(BaseCommand):
     options = self.options
     if not argv:
       argv = ['-']
-    filespec = argv.pop(0)
-    type_paths = list(argv)
     xit = 0
+    filespec, bfr = self.pop_buffer(argv)
+    if bfr is None:
+      return 1
+    columns = (
+        ('box_type', 'offset', 'size',
+         'description') if options.with_offsets else
+        ('box_type', 'size', 'description')
+    )
+    type_paths = list(argv)
     with Pfx("%r", filespec):
       print(filespec)
-      try:
-        bfr = CornuCopyBuffer.from_cli_filespec(filespec)
-      except FileNotFoundError as e:
-        warning("scannot scan: %s", e)
-        return 1
       with PARSE_MODE(discard_data=not options.with_data):
         rows = []
-        seen_paths = {path: False for path in type_paths}
+        seen_paths = dict.fromkeys(type_paths, False)
+        scan_table = []
         for topbox in Box.scan(bfr):
           if not type_paths:
-            topbox.dump(recurse=True, dump_fields=options.with_fields)
+            scan_table.extend(
+                topbox.dump_table(
+                    columns=columns,
+                    recurse=True,
+                    dump_fields=options.with_fields,
+                    dump_offsets=options.with_offsets,
+                )
+            )
           else:
             for type_path in type_paths:
               first_match = True
@@ -309,10 +304,13 @@ class MP4Command(BaseCommand):
                     print(type_path)
                     first_match = False
                     seen_paths[type_path] = True
-                  topbox.dump(
-                      recurse=True,
-                      dump_fields=options.with_fields,
-                      indent='  '
+                  scan_table.extend(
+                      topbox.dump_table(
+                          columns=columns,
+                          recurse=True,
+                          dump_fields=options.with_fields,
+                          dump_offsets=options.with_offsets,
+                      )
                   )
                 else:
                   for subbox in topbox.descendants(tail_types):
@@ -320,16 +318,19 @@ class MP4Command(BaseCommand):
                       print(type_path)
                       first_match = False
                       seen_paths[type_path] = True
-                    subbox.dump(
-                        recurse=True,
-                        dump_fields=options.with_fields,
-                        indent='  '
+                    scan_table.extend(
+                        subbox.dump_table(
+                            columns=columns,
+                            recurse=True,
+                            dump_fields=options.with_fields,
+                        )
                     )
-      if type_paths:
-        for type_path in type_paths:
-          if not seen_paths[type_path]:
-            warning("no match for %r", type_path)
-            xit = 1
+    printt(*scan_table)
+    if type_paths:
+      for type_path in type_paths:
+        if not seen_paths[type_path]:
+          warning("no match for %r", type_path)
+          xit = 1
     return xit
 
   @popopts(tag_prefix_='Specify the tag prefix, default {TAG_PREFIX!r}.')
@@ -511,12 +512,9 @@ class TimeStampMixin:
                       0xfffffffffffffffe, 0xffffffffffffffff):
       return None
     try:
-      dt = datetime.utcfromtimestamp(self.value)
+      dt = pfx_call(datetime.fromtimestamp, self.value, timezone.utc)
     except (OverflowError, OSError) as e:
-      warning(
-          "%s.datetime: datetime.utcfromtimestamp(%s): %s, returning None",
-          type(self).__name__, self.value, e
-      )
+      warning("%s.datetime: returning None", type(self).__name__, e)
       return None
     return dt.replace(year=dt.year - 66)
 
@@ -603,14 +601,12 @@ class BoxHeader(BinaryMultiValue('BoxHeader', {
     return UUID(bytes=self.user_type)
 
 class BoxBody(SimpleBinary):
-  ''' Abstract basis for all `Box` bodies.
+  ''' The basis for all `Box` bodies.
+      This base class does not parse any of the body content.
   '''
 
   FIELD_TYPES = dict(offset=int, end_offset=int)
   SUBCLASSES_BY_BOXTYPE = {}
-
-  # class based default for .boxes for bodies with no subboxes
-  boxes = ()
 
   @classmethod
   def __init_subclass__(cls, bodyclass_name=None, doc=None):
@@ -635,11 +631,14 @@ class BoxBody(SimpleBinary):
     if cls.__name__ == 'BinClass':
       # This came from the BinClass inside the @binclass decorator.
       # Because this subclasses BoxBody (because it subclasses cls, a BoxBody)
-      # we get it when made, before  it gets its __name__.
+      # we get it when made, before it gets its __name__.
       # Skip the registration here.
       pass
     else:
       BoxBody._register_subclass_boxtypes(cls)
+
+  def __init__(self, *ns_a, **ns_kw):
+    super().__init__(*ns_a, _parsed_field_names=[], **ns_kw)
 
   @staticmethod
   def _register_subclass_boxtypes(cls, prior_cls=None):
@@ -704,6 +703,9 @@ class BoxBody(SimpleBinary):
           If there are zero matches, return `None`.
           Otherwise return the matching box.
     '''
+    # .boxes - pretend we have an empty .boxes if missing
+    if attr == 'boxes':
+      return ()
     # .TYPE - the sole item in self.boxes matching b'type'
     if len(attr) == 4 and attr.isupper():
       box, = getattr(self, f'{attr}s')
@@ -722,7 +724,11 @@ class BoxBody(SimpleBinary):
             return None
           box, = boxes
           return box
-    raise AttributeError(f'{self.__class__.__name__}.{attr}')
+    gsa = super().__getattr__
+    try:
+      return gsa(attr)
+    except AttributeError as e:
+      raise AttributeError(f'{self.__class__.__name__}.{attr}') from e
 
   def __str__(self, attr_names=None):
     if attr_names is None:
@@ -731,6 +737,9 @@ class BoxBody(SimpleBinary):
           if not attr_name.startswith('_') and attr_name != 'boxes'
       )
     return super().__str__(attr_names)
+
+  def __len__(self):
+    return self.end_offset - self.offset
 
   def __iter__(self):
     yield from self.boxes
@@ -743,7 +752,6 @@ class BoxBody(SimpleBinary):
         Subclasses implement a `parse_fields` method to parse additional fields.
     '''
     self = cls()
-    self._parsed_field_names = []
     self.parse_fields(bfr)
     return self
 
@@ -761,7 +769,7 @@ class BoxBody(SimpleBinary):
         from what gets transcribed.
     '''
     instance = binary_cls.parse(bfr)
-    self.add_field('_' + field_name + '__Binary', instance)
+    self.add_field(f'_{field_name}__Binary', instance)
     setattr(self, field_name, instance.value)
 
   def parse_field(self, field_name, bfr: CornuCopyBuffer, binary_cls):
@@ -803,12 +811,15 @@ class BoxBody(SimpleBinary):
         self._parsed_field_names,
     )
 
-  def parse_boxes(self, bfr: CornuCopyBuffer, **box_scan_kw):
+  def parse_boxes(
+      self, bfr: CornuCopyBuffer, field_name='boxes', **box_scan_kw
+  ):
     ''' Utility method to parse the remainder of the buffer as a
-        sequence of `Box`es.
+        sequence of `Box`es and to save them as the attribute named by `field_name`<
+        default `".boxes"`.
     '''
-    self.boxes = list(Box.scan(bfr, **box_scan_kw))
-    self._parsed_field_names.append('boxes')
+    setattr(self, field_name, list(Box.scan(bfr, **box_scan_kw)))
+    self._parsed_field_names.append(field_name)
 
   @classmethod
   def boxbody_type_from_class(cls):
@@ -872,6 +883,11 @@ class Box(SimpleBinary):
 
   __repr__ = __str__
 
+  def __bool__(self):
+    ''' A `Box` is always true, prevents implied call of `len()` for truthiness.
+    '''
+    return True
+
   def __getattr__(self, attr):
     ''' If there is no direct attribute from `SimpleBinary.__getattr__`,
         have a look in the `.header` and `.body`.
@@ -903,12 +919,14 @@ class Box(SimpleBinary):
 
   @classmethod
   @parse_offsets(report=True)
-  def parse(cls, bfr: CornuCopyBuffer):
+  def parse(cls, bfr: CornuCopyBuffer, body_type_for=None):
     ''' Decode a `Box` from `bfr` and return it.
     '''
+    if body_type_for is None:
+      body_type_for = BoxBody.for_box_type
     self = cls()
     header = self.header = BoxHeader.parse(bfr)
-    with Pfx("%s.parse", header.box_type):
+    with Pfx("%s[%s].parse", cls.__name__, header.box_type):
       length = header.box_size
       if length is Ellipsis:
         end_offset = Ellipsis
@@ -917,7 +935,7 @@ class Box(SimpleBinary):
       else:
         end_offset = self.offset + length
         bfr_tail = bfr.bounded(end_offset)
-      body_class = BoxBody.for_box_type(header.type)
+      body_class = body_type_for(header.type)
       body_offset = bfr_tail.offset
       self.body = body_class.parse(bfr_tail)
       # attach subBoxen to self
@@ -1026,18 +1044,21 @@ class Box(SimpleBinary):
 
   @contextmanager
   def reparse_buffer(self):
-    ''' Context manager for continuing a parse from the `unparsed` field.
+    ''' A context manager for continuing a `Box` parse from the `unparsed` field.
 
         Pops the final `unparsed` field from the `Box`,
-        yields a `CornuCopyBuffer` make from it,
+        yields a `CornuCopyBuffer` made from it,
         then pushes the `unparsed` field again
-        with the remaining contents of the buffer.
+        with the remaining contents of the buffer
+        after the reparse is done.
     '''
     unparsed = self.unparsed
     self.unparsed = []
     bfr = CornuCopyBuffer(unparsed)
-    yield bfr
-    self.unparsed = list(bfr)
+    try:
+      yield bfr
+    finally:
+      self.unparsed = list(bfr)
 
   @property
   def box_type(self):
@@ -1060,6 +1081,9 @@ class Box(SimpleBinary):
       box_type_name = box_type_b.decode('ascii')
     except UnicodeDecodeError:
       box_type_name = repr(box_type_b)
+    else:
+      if not all(c.isprintable() for c in box_type_name):
+        box_type_name = repr(box_type_b)
     return box_type_name
 
   @property
@@ -1136,41 +1160,56 @@ class Box(SimpleBinary):
   def dump_table(
       self,
       table=None,
-      indent='',
-      subindent='  ',
+      columns=('box_type', 'size', 'description'),
       dump_fields=False,
+      dump_offsets=False,
       recurse=False,
-      file=None
   ) -> List[Tuple[str, str]]:
-    ''' Dump this `Box` 
+    ''' Dump this `Box` as a table of descriptions.
+        Return a list of `(title,description)` 2-lists
+        with fields and subboxes in tuples
+        suitable for use with `cs.lex.printt()`.
     '''
     if table is None:
       table = []
-    for level, box, subboxes in self.walk(limit=(None if recurse else 0)):
-      row_indent = indent + subindent * level
-      body = box.body
-      table.append(
-          (
-              (
-                  f'{row_indent}{box.box_type_s}:{body.__class__.__name__}',
-                  body.__class__.__doc__.strip().split("\n")[0],
-              ) if dump_fields else (
-                  f'{row_indent}{box.box_type_s}',
-                  cutsuffix(str(body), '()'),
-              )
-          )
-      )
-      # indent the subrows
-      if dump_fields:
-        field_indent = row_indent + subindent
-        for field_name in sorted(filter(lambda name: not name.startswith('_'),
-                                        body.__dict__.keys())):
-          if field_name.startswith('_'):
-            continue
-          if field_name == 'boxes' and recurse:
-            continue
-          field = getattr(body, field_name)
-          table.append((f'{field_indent}.{field_name}', cropped_repr(field)))
+    body = self.body
+    if body.__class__ is BoxBody:
+      box_desc = ''
+    else:
+      box_desc = body.__class__.__doc__.strip().split("\n")[0]
+    box_row_d = {
+        'box_type': f'{self.box_type_s}:{body.__class__.__name__}',
+        'offset': f'0x{self.offset:08x}',
+        'size':
+        geek(self.end_offset - self.offset).__str__(no_pad=True, sep=','),
+        'description': box_desc,
+    }
+    table.append([box_row_d[col] for col in columns])
+    subrows = []
+    if dump_fields:
+      for field_name in sorted(filter(
+          lambda name: all((
+              not name.startswith('_'),
+              (name not in ('parent',) and (dump_offsets or name not in
+                                            ('offset', 'end_offset'))),
+              (not recurse or name not in ('boxes',)),
+          )),
+          body.__dict__.keys(),
+      )):
+        field = getattr(body, field_name)
+        subrows.append([f'.{field_name}', '', cropped_repr(field)])
+    if recurse:
+      for subbox in self.boxes:
+        subrows.extend(
+            subbox.dump_table(
+                columns=columns,
+                dump_fields=dump_fields,
+                dump_offsets=dump_offsets,
+                recurse=recurse,
+            )
+        )
+    if subrows:
+      table.append(tuple(subrows))
     return table
 
   def dump(self, file=None, **dump_table_kw):
@@ -1179,15 +1218,95 @@ class Box(SimpleBinary):
     '''
     printt(*self.dump_table(**dump_table_kw), file=file)
 
+  # pylint: disable=too-many-locals,too-many-branches
+  def report_table(
+      self,
+      table=None,
+      indent='',
+      subindent='  ',
+  ):
+    ''' Report some human friendly information as a table.
+        Return a list of `(title,description)` 2-tuples
+        suitable for use with `cs.lex.printt()`.
+    '''
+    if table is None:
+      table = []
+    indent2 = indent + subindent
+    box_type = self.box_type_s
+    if box_type == 'ftyp':
+      table.append(
+          [
+              f'{indent}File type',
+              f'File type: {self.major_brand}, brands={self.brands_bs}'
+          ]
+      )
+    elif box_type == 'free':
+      table.append([f'{indent}Free space', str(geek_bytes(len(self))[-2:])])
+    elif box_type == 'mdat':
+      table.append(
+          [f'{indent}Media data',
+           str(geek_bytes(len(self.body))[-2:])]
+      )
+    elif box_type == 'moov':
+      mvhd = self.MVHD
+      table.append(
+          [
+              f'{indent}Movie',
+              ", ".join(
+                  (
+                      f'timescale={mvhd.timescale}',
+                      f'duration={mvhd.duration}',
+                      f'next_track_id={mvhd.next_track_id}',
+                  )
+              ),
+          ]
+      )
+      for moov_box in self:
+        box_type = moov_box.box_type_s
+        if box_type == 'mvhd':
+          continue
+        moov_box.report_table(table, indent=indent2, subindent=subindent)
+    elif box_type == 'trak':
+      trak = self
+      edts = trak.EDTS0
+      mdia = trak.MDIA
+      mdhd = mdia.MDHD
+      tkhd = trak.TKHD
+      table.append([f'{indent}Track', f'duration={tkhd.duration}'])
+      table.append([f'{indent2}EDTS', ('No EDTS' if edts is None else edts)])
+      duration_s = human_time(mdhd.duration.value / mdhd.timescale.value)
+      table.append(
+          [
+              f'{indent2}Media',
+              f'duration={duration_s} language={mdhd.language}'
+          ]
+      )
+      for tbox in trak:
+        tbox_type = tbox.box_type_s
+        if tbox_type in ('edts', 'mdia', 'tkhd'):
+          continue
+        tbox.report_table(table, indent=indent2, subindent=subindent)
+    else:
+      box_s = str(self)
+      if len(box_s) > 58:
+        box_s = box_s[:55] + '...'
+      table.append([f'{indent}{box_type}', box_s])
+    return table
+
+  def report(self, file=None, **report_table_kw):
+    ''' Report on this `Box` to `file` (default `sys.stdout` per `cs.lex.printt`.
+        Other keyword paramaters are passed to `Box.report_table`.
+    '''
+    printt(*self.report_table(**report_table_kw), file=file)
+
   def walk(self,
            *,
            level=0,
-           limit=None) -> Iterable[Tuple["Box", List["Box"]]]:
+           limit=None) -> Iterable[Tuple[int, "Box", List["Box"]]]:
     ''' Walk this `Box` hierarchy.
 
-        Yields the starting box and its children as `(level,self,subboxes)`
-        and then yields `(level+1,subbox,subsubboxes)` for each child in turn,
-        recursing into the subboxes.
+        Yield `(level,self,subboxes)` 3-tuples starting with the top box (`self`)
+        and recursing into its subboxes.
 
         As with `os.walk`, the returned `subboxes` list
         may be modified in place to prune or reorder the subsequent walk.
@@ -1205,39 +1324,63 @@ class Box(SimpleBinary):
             level=level + 1, limit=(None if limit is None else limit - 1)
         )
 
-  def metatags(self):
-    ''' Return a `TagSet` containing metadata for this box.
+  def metatags(self) -> TagSet:
+    ''' Return a `TagSet` containing direct metadata for this box.
+        This default implementation returns an empty `TagSet`.
     '''
-    with Pfx("metatags(%r)", self.box_type):
-      box_prefix = self.box_type_s
-      tags = TagSet()
-      meta_box = self.META0
-      if meta_box:
-        tags.update(meta_box.tagset(), prefix=box_prefix + '.meta')
-      udta_box = self.UDTA0
-      if udta_box:
-        pass  # X("UDTA?")
-        udta_meta_box = udta_box.META0
-        if udta_meta_box:
-          ilst_box = udta_meta_box.ILST0
-          if ilst_box:
-            tags.update(ilst_box.tags, prefix=box_prefix + '.udta.meta.ilst')
-      else:
-        pass  # X("NO UDTA")
-      ##dump_box(self, crop_length=None)
-      return tags
+    return TagSet()
 
-  def gather_metadata(self):
+  def gather_metadata(self, prepath='') -> Iterable[Tuple[str, "Box", TagSet]]:
     ''' Walk the `Box` hierarchy looking for metadata.
-        Yield `(Box,TagSet)` for each `b'moov'` or `b'trak'` `Box`.
+        Yield `(box_path,Box,TagSet)` 3-tuples for each `Box`
+        with a nonempty `.metatags`.
     '''
-    for _, box, _ in self.walk():
-      if box.box_type in (b'moov', b'trak'):
-        yield box, box.metatags()
+    path = f'{prepath}.{self.box_type_s}' if prepath else self.box_type_s
+    tags = self.metatags()
+    if tags:
+      yield path, self, tags
+    for subbox in self.boxes:
+      yield from subbox.gather_metadata(path)
+
+  def merged_metadata(self) -> TagSet:
+    ''' Return a `TagSet` containing the merged metadata from this `Box` down.
+    '''
+    tags = TagSet()
+    for path, box, tags in self.gather_metadata():
+      for tag_name, tag_value in tags.items():
+        merged_name = f'{path}.{tag_name}'
+        assert merged_name not in tags
+        tags[merged_name] = tag_value
+    return tags
 
 # patch us in
 Box.FIELD_TYPES['parent'] = (False, (type(None), Box))
 BoxBody.FIELD_TYPES['parent'] = Box
+
+class ListOfBoxes(ListOfBinary, item_type=Box):
+  ''' A `ListOfBinary` containing `Box`es.
+  '''
+
+  def __str__(self):
+    last_box_type = None
+    last_count = None
+    boxgroups = []
+    for box in self:
+      box_type = box.box_type_s
+      if last_box_type is None or last_box_type != box_type:
+        if last_box_type is not None:
+          boxgroups.append((last_box_type, last_count))
+        last_box_type = box_type
+        last_count = 1
+      else:
+        last_count += 1
+    if last_box_type is not None:
+      boxgroups.append((last_box_type, last_count))
+    type_listing = ",".join(
+        box_type_s if count == 1 else f'{box_type_s}[{count}]'
+        for box_type_s, count in boxgroups
+    )
+    return f'{self.__class__.__name__}:{len(self)}:{type_listing}'
 
 def add_body_subclass(superclass, box_type, section, desc):
   ''' Create and register a new `BoxBody` class that is simply a subclass of
@@ -1331,7 +1474,8 @@ class MDATBoxBody(BoxBody):
     ''' Transcribe the data.
         Raise an `AssertionError` if we skipped the data during the parse.
     '''
-    assert self.data is not None
+    if self.data is None:
+      warning("self.data is None, self=%s", self)
     return self.data
 
 class FREEBoxBody(BoxBody):
@@ -1362,31 +1506,14 @@ class FREEBoxBody(BoxBody):
     if free_size > 0:
       yield bytes(free_size)
 
+@boxbodyclass
 class FTYPBoxBody(BoxBody):
   ''' An 'ftyp' File Type box - ISO14496 section 4.3.
       Decode the major_brand, minor_version and compatible_brands.
   '''
-
-  FIELD_TYPES = dict(
-      BoxBody.FIELD_TYPES,
-      major_brand=bytes,
-      minor_version=int,
-      brands_bs=bytes,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer, **kw):
-    ''' Gather the `major_brand`, `minor_version` and `brand_bs` fields.
-    '''
-    super().parse_fields(bfr, **kw)
-    self.major_brand = bfr.take(4)
-    self.minor_version = UInt32BE.parse_value(bfr)
-    self.brands_bs = b''.join(bfr)
-
-  @pfx_method
-  def transcribe(self):
-    yield self.major_brand
-    yield UInt32BE.transcribe_value(self.minor_version)
-    yield self.brands_bs
+  major_brand: 4
+  minor_version: UInt32BE
+  brands_bs: ...
 
   @property
   def compatible_brands(self):
@@ -1401,7 +1528,6 @@ class PDINBoxBody(FullBoxBody2):
   ''' A 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
   '''
 
-
   # field names for the tuples in a PDINBoxBody
   PDInfo = BinaryStruct('PDInfo', '>LL', 'rate initial_delay')
 
@@ -1410,24 +1536,13 @@ class PDINBoxBody(FullBoxBody2):
 
   pdinfo: PDInfoList
 
-  def parse_fields(self, bfr: CornuCopyBuffer, **kw):
-    ''' Gather the normal version information
-        and then the `(rate,initial_delay)` pairs of the data section
-        as the `pdinfo` field.
-    '''
-    super().parse_fields(bfr, **kw)
-
+@boxbodyclass
 class ContainerBoxBody(BoxBody):
   ''' Common superclass of several things with `.boxes`.
   '''
+  boxes: ListOfBoxes
 
-  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=list)
-
-  @pfx_method
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    super().parse_fields(bfr)
-    self.parse_boxes(bfr)
-
+@boxbodyclass
 class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
       Decode the contained boxes.
@@ -1453,8 +1568,8 @@ class MVHDBoxBody(FullBoxBody2):
     # parse the fixed fields from the superclass, FullBoxBody2
     parse_fields = super().parse_fields
     superfields = super()._datafieldtypes
-    ##parse_fields = FullBoxBody2.parse_fields
     field_values = parse_fields(bfr, superfields)
+    ##field_values = super().parse_fields(bfr)
     version = field_values['version'].value
     # obtain box data after version and flags decode
     if version == 0:
@@ -1486,15 +1601,10 @@ class MVHDBoxBody(FullBoxBody2):
     field_values.update(
         super().parse_fields(
             bfr,
-            # TODO: just pass a list of field names here
-            dict(
-                rate_long=Int32BE,
-                volume_short=Int16BE,
-                reserved1_=10,
-                matrix=Matrix9Long,
-                predefined1_=24,
-                next_track_id=UInt32BE,
-            )
+            [
+                'rate_long', 'volume_short', 'reserved1_', 'matrix',
+                'predefined1_', 'next_track_id'
+            ],
         )
     )
     return field_values
@@ -1515,7 +1625,8 @@ class MVHDBoxBody(FullBoxBody2):
 
 add_body_subclass(ContainerBoxBody, 'trak', '8.3.1', 'Track')
 
-class TKHDBoxBody(FullBoxBody):
+@boxbodyclass
+class TKHDBoxBody(FullBoxBody2):
   ''' A 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
 
@@ -1523,67 +1634,68 @@ class TKHDBoxBody(FullBoxBody):
       'TKHDMatrix', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
   )
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      creation_time=(True, (TimeStamp32, TimeStamp64)),
-      modification_time=(True, (TimeStamp32, TimeStamp64)),
-      track_id=UInt32BE,
-      reserved1=UInt32BE,
-      duration=(True, (UInt32BE, UInt64BE)),
-      reserved2=UInt32BE,
-      reserved3=UInt32BE,
-      layer=Int16BE,
-      alternate_group=Int16BE,
-      volume=Int16BE,
-      reserved4=UInt16BE,
-      matrix=TKHDMatrix,
-      width=UInt32BE,
-      height=UInt32BE,
-  )
+  creation_time: Union[TimeStamp32, TimeStamp64]
+  modification_time: Union[TimeStamp32, TimeStamp64]
+  track_id: UInt32BE
+  reserved1_: UInt32BE
+  duration: Union[UInt32BE, UInt64BE]
+  reserved2_: UInt32BE
+  reserved3_: UInt32BE
+  layer: Int16BE
+  alternate_group: Int16BE
+  volume: Int16BE
+  reserved4_: UInt16BE
+  matrix: TKHDMatrix
+  width: UInt32BE
+  height: UInt32BE
 
-  def parse_fields(self, bfr: CornuCopyBuffer, **kw):
-    super().parse_fields(bfr, **kw)
+  @classmethod
+  def parse_fields(cls, bfr: CornuCopyBuffer) -> Mapping[str, AbstractBinary]:
+    # parse the fixed fields from the superclass, FullBoxBody2
+    parse_fields = super().parse_fields
+    superfields = super()._datafieldtypes
+    field_values = parse_fields(bfr, superfields)
+    ##field_values = super().parse_fields(bfr)
+    version = field_values['version'].value
     # obtain box data after version and flags decode
-    if self.version == 0:
-      self.parse_field('creation_time', bfr, TimeStamp32)
-      self.parse_field('modification_time', bfr, TimeStamp32)
-      self.parse_field('track_id', bfr, UInt32BE)
-      self.parse_field('reserved1', bfr, UInt32BE)
-      self.parse_field('duration', bfr, UInt32BE)
-    elif self.version == 1:
-      self.parse_field('creation_time', bfr, TimeStamp64)
-      self.parse_field('modification_time', bfr, TimeStamp64)
-      self.parse_field('track_id', bfr, UInt32BE)
-      self.parse_field('reserved1', bfr, UInt32BE)
-      self.parse_field('duration', bfr, UInt64BE)
+    if version == 0:
+      field_values.update(
+          super().parse_fields(
+              bfr,
+              dict(
+                  creation_time=TimeStamp32,
+                  modification_time=TimeStamp32,
+                  track_id=UInt32BE,
+                  reserved1_=UInt32BE,
+                  duration=UInt32BE,
+              )
+          )
+      )
+    elif version == 1:
+      field_values.update(
+          super().parse_fields(
+              bfr,
+              dict(
+                  creation_time=TimeStamp64,
+                  modification_time=TimeStamp64,
+                  track_id=UInt32BE,
+                  reserved1_=UInt32BE,
+                  duration=UInt64BE,
+              )
+          )
+      )
     else:
-      raise ValueError(f'TRHD: unsupported {self.version=}')
-    self.parse_field('reserved2', bfr, UInt32BE)
-    self.parse_field('reserved3', bfr, UInt32BE)
-    self.parse_field('layer', bfr, Int16BE)
-    self.parse_field('alternate_group', bfr, Int16BE)
-    self.parse_field('volume', bfr, Int16BE)
-    self.parse_field('reserved4', bfr, UInt16BE)
-    self.parse_field('matrix', bfr, TKHDBoxBody.TKHDMatrix)
-    self.parse_field('width', bfr, UInt32BE)
-    self.parse_field('height', bfr, UInt32BE)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.creation_time
-    yield self.modification_time
-    yield self.track_id
-    yield self.reserved1
-    yield self.duration
-    yield self.reserved2
-    yield self.reserved3
-    yield self.layer
-    yield self.alternate_group
-    yield self.volume
-    yield self.reserved4
-    yield self.matrix
-    yield self.width
-    yield self.height
+      raise ValueError(f'{cls.__name__}: unsupported {version=}')
+    field_values.update(
+        super().parse_fields(
+            bfr,
+            [
+                'reserved2_', 'reserved3_', 'layer', 'alternate_group',
+                'volume', 'reserved4_', 'matrix', 'width', 'height'
+            ],
+        )
+    )
+    return field_values
 
   @property
   def track_enabled(self):
@@ -1665,6 +1777,7 @@ add_body_subclass(
 )
 add_body_subclass(ContainerBoxBody, 'mdia', '8.4.1', 'Media')
 
+# TODO: as for MVHD
 class MDHDBoxBody(FullBoxBody):
   ''' A MDHDBoxBody is a Media Header box - ISO14496 section 8.4.2.
   '''
@@ -1676,7 +1789,7 @@ class MDHDBoxBody(FullBoxBody):
       timescale=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
       language_short=UInt16BE,
-      pre_defined=UInt16BE,
+      pre_defined_=UInt16BE,
   )
 
   def parse_fields(self, bfr: CornuCopyBuffer):
@@ -1698,7 +1811,7 @@ class MDHDBoxBody(FullBoxBody):
     else:
       raise NotImplementedError(f'unsupported {self.version=}')
     self.parse_field('language_short', bfr, UInt16BE)
-    self.parse_field('pre_defined', bfr, UInt16BE)
+    self.parse_field('pre_defined_', bfr, UInt16BE)
 
   def transcribe(self):
     yield super().transcribe()
@@ -1707,13 +1820,13 @@ class MDHDBoxBody(FullBoxBody):
     yield self.timescale
     yield self.duration
     yield self.language_short
-    yield self.pre_defined
+    yield self.pre_defined_
 
   @property
   def language(self):
     ''' The ISO 639‐2/T language code as decoded from the packed form.
     '''
-    language_short = self.language_short
+    language_short = self.language_short.value
     return bytes(
         [
             x + 0x60 for x in (
@@ -1723,130 +1836,111 @@ class MDHDBoxBody(FullBoxBody):
         ]
     ).decode('ascii')
 
-class HDLRBoxBody(FullBoxBody):
+@boxbodyclass
+class HDLRBoxBody(FullBoxBody2):
   ''' A HDLRBoxBody is a Handler Reference box - ISO14496 section 8.4.3.
   '''
-
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      pre_defined=UInt32BE,
-      handler_type_long=UInt32BE,
-      reserved1=UInt32BE,
-      reserved2=UInt32BE,
-      reserved3=UInt32BE,
-      name=BinaryUTF8NUL,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `handler_type_long` and `name` fields.
-    '''
-    super().parse_fields(bfr)
-    # NB: handler_type is supposed to be an unsigned long, but in
-    # practice seems to be 4 ASCII bytes, so we present it as a string
-    # for readability
-    self.parse_field('pre_defined', bfr, UInt32BE)
-    self.parse_field('handler_type_long', bfr, UInt32BE)
-    self.parse_field('reserved1', bfr, UInt32BE)
-    self.parse_field('reserved2', bfr, UInt32BE)
-    self.parse_field('reserved3', bfr, UInt32BE)
-    self.parse_field('name', bfr, BinaryUTF8NUL)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.pre_defined
-    yield self.handler_type_long
-    yield self.reserved1
-    yield self.reserved2
-    yield self.reserved3
-    yield self.name
+  pre_defined_: UInt32BE
+  handler_type_long: UInt32BE
+  reserved1_: UInt32BE
+  reserved2_: UInt32BE
+  reserved3_: UInt32BE
+  name: BinaryUTF8NUL
 
   @property
   def handler_type(self):
     ''' The handler_type as an ASCII string, its usual form.
     '''
-    return bytes(self.handler_type_long).decode('ascii')
+    return bytes(self._data.handler_type_long).decode('ascii')
 
 add_body_subclass(ContainerBoxBody, b'minf', '8.4.4', 'Media Information')
 add_body_subclass(FullBoxBody, 'nmhd', '8.4.5.2', 'Null Media Header')
 
-class ELNGBoxBody(FullBoxBody):
-  ''' A ELNGBoxBody is a Extended Language Tag box - ISO14496 section 8.4.6.
+@boxbodyclass
+class ELNGBoxBody(FullBoxBody2):
+  ''' A `ELNGBoxBody` is a Extended Language Tag box - ISO14496 section 8.4.6.
   '''
+  # extended language based on RFC4646
+  extended_language: BinaryUTF8NUL
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      extended_language=BinaryUTF8NUL,
-  )
+class EntryCountListOfBoxes(FullBoxBody2):
+  ''' An intermediate `FullBoxBody` subclass which contains more boxes
+      whose number if specified with a leading `entry_count`
+      whose defaut type is `UInt32BE`.
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `extended_language` field.
-    '''
-    super().parse_fields(bfr)
-    # extended language based on RFC4646
-    self.parse_field('extended_language', bfr, BinaryUTF8NUL)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.extended_language
-
-add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
-
-class _SampleTableContainerBoxBody(FullBoxBody):
-  ''' An intermediate FullBoxBody subclass which contains more boxes.
+      This is a common superclass of `_SampleTableContainerBoxBody` and 
   '''
+  boxes: ListOfBoxes
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      entry_count=UInt32BE,
-      boxes=list,
-  )
+  ENTRY_COUNT_TYPE = None
+
+  def __init_subclass__(cls, count_type=UInt32BE, **ickw):
+    super().__init_subclass__(**ickw)
+    cls.ENTRY_COUNT_TYPE = count_type
 
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
+  @property
+  def entry_count(self):
+    ''' The `entry_count` is the number of `Box`es.
+    '''
+    return len(self.boxes)
+
+  @classmethod
+  def parse_fields(cls, bfr: CornuCopyBuffer):
     ''' Gather the `entry_count` and `boxes`.
     '''
-    super().parse_fields(bfr)
-    # obtain box data after version and flags decode
-    self.entry_count = UInt32BE.parse(bfr)
-    self.parse_boxes(bfr, count=int(self.entry_count.value))
+    # parse the fixed fields from the superclass, FullBoxBody2
+    parse_fields = super().parse_fields
+    superfields = super()._datafieldtypes
+    field_values = parse_fields(bfr, superfields)
+    entry_count = cls.ENTRY_COUNT_TYPE.parse_value(bfr)
+    field_values.update(boxes=ListOfBoxes.parse(bfr, count=entry_count))
+    self = cls(**field_values)
+    return self
 
   def transcribe(self):
     yield super().transcribe()
-    yield self.entry_count
+    yield self.ENTRY_COUNT_TYPE(self.entry_count)
     yield self.boxes
 
-add_body_subclass(
-    _SampleTableContainerBoxBody, b'stsd', '8.5.2', 'Sample Description'
-)
+class _SampleTableContainerBoxBody(EntryCountListOfBoxes):
+  pass
 
+@boxbodyclass
 class _SampleEntry(BoxBody):
   ''' Superclass of Sample Entry boxes.
   '''
+  reserved_: 6
+  data_reference_index: UInt16BE
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `data_reference_inde` field.
-    '''
-    super().parse_fields(bfr)
-    self.add_field('reserved', bfr.take(6))
-    self.parse_field('data_reference_index', bfr, UInt16BE)
-
+@boxbodyclass
 class BTRTBoxBody(BoxBody):
   ''' BitRateBoxBody - section 8.5.2.2.
   '''
+  bufferSizeDB: UInt32BE
+  maxBitrate: UInt32BE
+  avgBitRate: UInt32BE
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `bufferSizeDB`, `maxBitrate` and `avgBitrate` fields.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('bufferSizeDB', bfr, UInt32BE)
-    self.parse_field('maxBitrate', bfr, UInt32BE)
-    self.parse_field('avgBitRate', bfr, UInt32BE)
+@boxbodyclass
+class STDPBoxBody(FullBoxBody2):
+  ''' A `STDPBoxBody` is a DegradationPriorityBox - ISO14496 section 8.5.3.2.
+  '''
 
-add_body_subclass(
-    _SampleTableContainerBoxBody, b'stdp', '8.5.3', 'Degradation Priority'
-)
+  class PriorityList(ListOfBinary, item_type=UInt16BE):
+    pass
+
+  priority: PriorityList
+
+@boxbodyclass
+class STSDBoxBody(BoxBody):
+  ''' A `STSDBoxBody` is a SampleDescriptionBoxBody - ISO14496 section 8.5.2.2.
+  '''
+  reserved_: 6  # 6 8-bit integers
+  data_reference_index: UInt16BE
+
+add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
 
 TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
 
@@ -2055,7 +2149,7 @@ class ELSTBoxBody(FullBoxBody):
     ''' Transcribe an `ELSTBoxBody`.
     '''
     yield super().transcribe()
-    yield UInt32BE.transcribe_value(self.entry_count)
+    yield self.entry_count
     yield map(self.entry_class.transcribe, self.entries)
 
 add_body_subclass(ContainerBoxBody, b'dinf', '8.7.1', 'Data Information')
@@ -2103,9 +2197,9 @@ class STSZBoxBody(FullBoxBody):
     ''' Gather the `sample_size`, `sample_count`, and `entry_sizes` fields.
     '''
     super().parse_fields(bfr)
-    self.sample_size = UInt32BE.parse(bfr)
+    self.parse_field('sample_size', bfr, UInt32BE)
     sample_size = self.sample_size.value
-    self.sample_count = UInt32BE.parse(bfr)
+    self.parse_field('sample_count', bfr, UInt32BE)
     sample_count = self.sample_count.value
     if sample_size == 0:
       # a zero sample size means that each sample's individual size
@@ -2173,7 +2267,7 @@ class STZ2BoxBody(FullBoxBody):
     self.entry_sizes = entry_sizes
 
   def transcribe(self):
-    ''' transcribe the STZ2BoxBody.
+    ''' Transcribe the STZ2BoxBody.
     '''
     yield super().transcribe()
     yield self.reserved
@@ -2326,35 +2420,18 @@ class CO64BoxBody(FullBoxBody):
   ##    offsets.append(UInt64BE.from_buffer(bfr))
   ##  return offsets
 
-class DREFBoxBody(FullBoxBody):
+@boxbodyclass
+class DREFBoxBody(EntryCountListOfBoxes):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
   '''
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      entry_count=UInt32BE,
-      boxes=list,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `entry_count` and `boxes` fields.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('entry_count', bfr, UInt32BE)
-    self.parse_boxes(bfr, count=int(self.entry_count.value))
-
 add_body_subclass(ContainerBoxBody, b'udta', '8.10.1', 'User Data')
 
-class CPRTBoxBody(FullBoxBody):
+class CPRTBoxBody(FullBoxBody2):
   ''' A 'cprt' Copyright box - section 8.10.2.
   '''
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `language` and `notice` fields.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('language_packed', bfr, UInt16BE)
-    self.parse_field('notice', bfr, UTF8or16Field)
+  language_packed: UInt16BE
+  notice: UTF8or16Field
 
   @property
   def language(self):
@@ -2375,49 +2452,40 @@ class CPRTBoxBody(FullBoxBody):
         (ord(ch1) - 0x60) & 0x1f, ((ord(ch2) - 0x60) & 0x1f) << 5,
         ((ord(ch3) - 0x60) & 0x1f) << 10
     )
-    self.language_packed.value = packed
+    self.language_packed = packed
 
-class METABoxBody(FullBoxBody):
+@boxbodyclass
+class METABoxBody(FullBoxBody2):
   ''' A 'meta' Meta BoxBody - section 8.11.1.
   '''
-
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      theHandler=Box,
-      boxes=list,
-  )
+  theHandler: Box
+  boxes: ListOfBoxes
 
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `theHandler` `Box` and gather the following Boxes as `boxes`.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('theHandler', bfr, Box)
-    ## we don't have a .parent yet - does this break the handler path?
-    ## self.theHandler.parent = self.parent
-    self.parse_boxes(bfr)
-
   @pfx_method
   def __getattr__(self, attr):
-    ''' Present the `ilst` attributes if present.
+    ''' Attributes not found on `self` in the normal way
+        are also looked up on the `.ILST` subbox
+        if there is one.
     '''
-    if attr != 'boxes':
-      try:
-        # direct attribute access
-        return super().__getattr__(attr)
-      except AttributeError as e:
-        # otherwise dereference through the .ilst subbox if present
-        ilst = super().__getattr__('ILST0')
-        if ilst is not None:
-          value = getattr(ilst, attr, None)
-          if value is not None:
-            return value
+    try:
+      # direct attribute access
+      return super().__getattr__(attr)
+    except AttributeError:
+      # otherwise dereference through the .ilst subbox if present
+      ilst = super().__getattr__('ILST0')
+      if ilst is not None:
+        value = getattr(ilst, attr, None)
+        if value is not None:
+          return value
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
-class _attr_schema(namedtuple('attributed_schema',
-                              'attribute_name schema_class')):
+class _attr_schema(namedtuple('_attr_schema', 'attribute_name schema_class')):
+  ''' A `(attribute_name,schema_class)` 2-tuple
+      associating a long `attribute_name` with an `AbstractBinary`.
+  '''
 
   def __repr__(self):
     return f'schema({self.attribute_name}={self.schema_class.__name__})'
@@ -2447,7 +2515,6 @@ class _ILSTTextSchema(
 ):
   pass
 
-
 def ILSTTextSchema(attribute_name):
   ''' Attribute name and type for ILST text schema.
   '''
@@ -2464,14 +2531,22 @@ def ILSTUInt8Schema(attribute_name):
   return _attr_schema(attribute_name, UInt8)
 
 # class to decode n/total as a pair of UInt32BE values
-_ILSTAofBSchema = BinaryMultiValue(
-    'ILSTAofBSchema', dict(n=UInt32BE, total=UInt32BE)
-)
+@binclass
+class ILSTAofB:
+  n: UInt32BE
+  total: UInt32BE
+
+  def __str__(self):
+    total_s = "..." if self.total == 0 else str(self.total)
+    return f'{self.n}/{total_s}'
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self}'
 
 def ILSTAofBSchema(attribute_name):
   ''' Attribute name and type for ILST "A of B" schema.
   '''
-  return _attr_schema(attribute_name, _ILSTAofBSchema)
+  return _attr_schema(attribute_name, ILSTAofB)
 
 # class to decode bytes as UTF-8 of ISO8601 datetime string
 _ILSTISOFormatSchema = pt_spec(
@@ -2481,6 +2556,8 @@ _ILSTISOFormatSchema = pt_spec(
     ),
     name='ILSTISOFormatSchema',
     value_type=datetime,
+    ##as_str=lambda self: self.value.isoformat(sep='T', timespec='seconds'),
+    ##as_repr=lambda self: self.value.isoformat(sep='T', timespec='seconds'),
 )
 
 def ILSTISOFormatSchema(attribute_name):
@@ -2529,6 +2606,7 @@ class _ILSTUTF8Text(BinarySingleValue, value_type=str):
     '''
     return value.encode('utf-8')
 
+@boxbodyclass
 class ILSTBoxBody(ContainerBoxBody):
   ''' Apple iTunes Information List, container for iTunes metadata fields.
 
@@ -2541,12 +2619,6 @@ class ILSTBoxBody(ContainerBoxBody):
 
           https://github.com/sergiomb2/libmp4v2/wiki/iTunesMetadata
   '''
-
-  FIELD_TYPES = dict(
-      ContainerBoxBody.FIELD_TYPES,
-      tags=TagSet,
-  )
-  FIELD_TRANSCRIBERS = dict(tags=lambda _: None,)
 
   # the schema names are available as attributes
   SUBBOX_SCHEMA = {
@@ -2661,144 +2733,162 @@ class ILSTBoxBody(ContainerBoxBody):
       }
   }
 
-  # pylint: disable=attribute-defined-outside-init,too-many-locals
-  # pylint: disable=too-many-statements,too-many-branches
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    super().parse_fields(bfr)
-    self.tags = TagSet()
-    for subbox in self.boxes:
+  # make a mapping of schema long attribute names to (schema_code,schema)
+  SUBBOX_SCHEMA_BY_LONG_ATTRIBUTE = {
+      schema.attribute_name: (schema_code, schema)
+      for schema_code, schema in reversed(SUBBOX_SCHEMA.items())
+  }
+
+  @classmethod
+  def parse_fields(cls, bfr: CornuCopyBuffer):
+    ''' An ILST body is a list of `Box`es containering "data" `Box`es.
+        The ILST member `Box`es' types are not related to the ISO14496 types.
+        The meaning of the "data" subboxes depends on the ILST box type field.
+
+        Therefore we always scan the subboxes as plain `BoxBody` boxes,
+        then parse their meaning once loaded.
+    '''
+    # scan in the member Boxes, ignoring their box type fields
+    subboxes = list(Box.scan(bfr, body_type_for=lambda _: BoxBody))
+    # process each member by looking up its `box_type` in SUBSUBBOX_SCHEMA
+    for subbox in subboxes:
       subbox_type = bytes(subbox.box_type)
       with Pfx("subbox %r", subbox_type):
+        # first, parse the contained "data" subboxes
         with subbox.reparse_buffer() as subbfr:
-          subbox.parse_boxes(subbfr)
-        inner_boxes = list(subbox.boxes)
+          data_boxes = list(Box.scan(subbfr, body_type_for=lambda _: BoxBody))
         if subbox_type == b'----':
           # 3 boxes: mean, name, value
-          mean_box, name_box, data_box = inner_boxes
+          #
+          # The mean Box.
+          mean_box = data_boxes.pop(0)
           assert mean_box.box_type == b'mean'
-          assert name_box.box_type == b'name'
+          subbox.add_field('mean', mean_box)
           with mean_box.reparse_buffer() as meanbfr:
-            mean_box.parse_field_value('n1', meanbfr, UInt32BE)
-            mean_box.parse_field_value('text', meanbfr, _ILSTUTF8Text)
-          with Pfx("mean %r", mean_box.text):
-            with name_box.reparse_buffer() as namebfr:
-              name_box.parse_field_value('n1', namebfr, UInt32BE)
-              name_box.parse_field_value('text', namebfr, _ILSTUTF8Text)
-            with Pfx("name %r", name_box.text):
-              with data_box.reparse_buffer() as databfr:
-                data_box.parse_field_value('n1', databfr, UInt32BE)
-                data_box.parse_field_value('n2', databfr, UInt32BE)
-                data_box.parse_field_value('text', databfr, _ILSTUTF8Text)
-              value = data_box.text
-              subsubbox_schema = self.SUBSUBBOX_SCHEMA.get(mean_box.text, {})
-              decoder = subsubbox_schema.get(name_box.text)
+            mean_box.parse_field('_n1', meanbfr, UInt32BE)
+            mean_box.parse_field('text', meanbfr, _ILSTUTF8Text)
+          mean_value = mean_box.text.value
+          subsubbox_schema = cls.SUBSUBBOX_SCHEMA.get(mean_value, {})
+          #
+          # The name Box.
+          name_box = data_boxes.pop(0)
+          assert name_box.box_type == b'name'
+          subbox.add_field('name', name_box)
+          with name_box.reparse_buffer() as namebfr:
+            name_box.parse_field('_n1', namebfr, UInt32BE)
+            name_box.parse_field('text', namebfr, _ILSTUTF8Text)
+          name_value = name_box.text.value
+          #
+          # The data Box.
+          data_box = data_boxes.pop(0)
+          assert data_box.box_type == b'data'
+          subbox.add_field('data', data_box)
+          with data_box.reparse_buffer() as databfr:
+            data_box.parse_field('_n1', databfr, UInt32BE)
+            data_box.parse_field('_n2', databfr, UInt32BE)
+            data_box.parse_field('text', databfr, _ILSTUTF8Text)
+          # decode the data value
+          data_value = data_box.text.value
+          decoder = subsubbox_schema.get(name_value)
+          if decoder is not None:
+            data_value = pfx_call(decoder, data_value)
+          # annotate the subbox and the ilst
+          attribute_name = f'{mean_box.text}.{name_box.text}'
+          setattr(subbox, 'attribute_name', attribute_name)
+          setattr(subbox, attribute_name, data_value)
+        else:
+          # Other boxes have a single data subbox.
+          for i, data_box in enumerate(data_boxes):
+            if data_box.box_type != b'data':
+              warning(
+                  "data_boxes[%d].box_type is not b'data': got %r", i,
+                  data_box.box_type
+              )
+              value = value.value
+              decoder = subsubbox_schema.get(name_box.text.value)
               if decoder is not None:
                 value = decoder(value)
               # annotate the subbox and the ilst
               attribute_name = f'{mean_box.text}.{name_box.text}'
               setattr(subbox, attribute_name, value)
-              self.tags.add(attribute_name, value)
-        else:
-          # single data box
-          if not inner_boxes:
-            warning("no inner boxes, expected 1 data box")
-          else:
-            data_box, = inner_boxes
-            with data_box.reparse_buffer() as databfr:
-              data_box.parse_field_value('n1', databfr, UInt32BE)
-              data_box.parse_field_value('n2', databfr, UInt32BE)
-              subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
-              if subbox_schema is None:
-                bs = databfr.take(...)
-                ##warning("%r: no schema, stashing bytes %r", subbox_type, bs)
-                data_box.add_field(
-                    'subbox__' + subbox_type.decode('ascii'), bs
-                )
-              else:
-                attribute_name, binary_cls = subbox_schema
-                with Pfx("%s=%s", attribute_name, binary_cls):
-                  try:
-                    data_box.parse_field(attribute_name, databfr, binary_cls)
-                  except (ValueError, TypeError) as e:
-                    warning("decode fails: %s", e)
-                  else:
-                    # also annotate the subbox and the tags
-                    value = getattr(data_box, attribute_name)
-                    setattr(subbox, attribute_name, value)
-                    if isinstance(value, BinarySingleValue):
-                      tag_value = value.value
-                    elif isinstance(value, tuple) and len(value) == 1:
-                      tag_value, = value
-                    else:
-                      tag_value = value
-                    if isinstance(tag_value, bytes):
-                      self.tags.add(
-                          attribute_name,
-                          b64encode(tag_value).decode('ascii')
-                      )
-                    else:
-                      self.tags.add(attribute_name, tag_value)
+              tags.add(attribute_name, value)
+        ### single data box
+        ##elif not inner_boxes:
+        ##  warning("no inner boxes, expected 1 data box")
+        ##else:
+        ##  data_box, = inner_boxes
+        ##  with data_box.reparse_buffer() as databfr:
+        ##    data_box.parse_field('_n1', databfr, UInt32BE)
+        ##    data_box.parse_field('_n2', databfr, UInt32BE)
+        ##    subbox_schema = cls.SUBBOX_SCHEMA.get(subbox_type)
+        ##    if subbox_schema is None:
+        ##      # no specific schema, just stash the bytes
+        ##      bs = databfr.take(...)
+        ##      warning("no schema, stashing bytes %s", cropped_repr(bs))
+        ##      subbox.add_field(f'subbox__{subbox_type.decode("ascii")}', bs)
+        ##    else:
+        ##      attribute_name, binary_cls = subbox_schema
+        ##      with Pfx("%s:%s", attribute_name, binary_cls):
+        ##        try:
+        ##          subbox.parse_field(attribute_name, databfr, binary_cls)
+        ##        except (ValueError, TypeError) as e:
+        ##          warning("decode fails: %s", e)
+        ##        else:
+        ##          data_attr = getattr(subbox, attribute_name)
+        ##          tag_value = data_attr.value if is_single_value(
+        ##              data_attr
+        ##          ) else data_attr
+        ##        if isinstance(tag_value, bytes):
+        ##          # record bytes in base64 in the Tag
+        ##          tag_value = b64encode(tag_value).decode('ascii')
+        ##        setattr(subbox, 'attribute_name', attribute_name)
+        ##        setattr(subbox, attribute_name, tag_value)
+        ### Any trailing Boxes.
+        ##if data_boxes:
+        ##  subbox.add_field('extra_boxes', data_boxes)
+        ##  warning("%d unexpected extra boxes: %r", len(data_boxes), data_boxes)
+    return dict(boxes=subboxes)
 
   def __getattr__(self, attr):
     # see if this is a schema long name
-    for schema_code, schema in self.SUBBOX_SCHEMA.items():
-      if schema.attribute_name == attr:
-        subbox_attr = schema_code.decode('iso8859-1').upper()
-        with Pfx(
-            "%s.%s: schema:%r: self.%s",
-            self.__class__.__name__,
-            attr,
-            schema_code,
-            subbox_attr,
-        ):
-          return getattr(self, subbox_attr)
-    return super().__getattr__(attr)
+    try:
+      schema_code, schema = self.SUBBOX_SCHEMA_BY_LONG_ATTRIBUTE[attr]
+    except KeyError:
+      # not a long attribute name
+      return super().__getattr__(attr)
+    subbox_attr = schema_code.decode('iso8859-1').upper()
+    with Pfx(
+        "%s.%s: schema:%r: self.%s",
+        self.__class__.__name__,
+        attr,
+        schema_code,
+        subbox_attr,
+    ):
+      return getattr(self, subbox_attr)
 
-class VMHDBoxBody(FullBoxBody):
+  def metatags(self):
+    for subbox in self.boxes:
+      return TagSet(
+          **{subbox.attribute_name: getattr(subbox, subbox.attribute_name)}
+      )
+
+OpColor = BinaryStruct('OpColor', '>HHH', 'red green blue')
+
+@boxbodyclass
+class VMHDBoxBody(FullBoxBody2):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
-
   OpColor = BinaryStruct('OpColor', '>HHH', 'red green blue')
 
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      graphicsmode=UInt16BE,
-      opcolor=OpColor,
-  )
+  graphicsmode: UInt16BE
+  opcolor: OpColor
 
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `graphicsmode` and `opcolor` fields.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('graphicsmode', bfr, UInt16BE)
-    self.parse_field('opcolor', bfr, VMHDBoxBody.OpColor)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.graphicsmode
-    yield self.opcolor
-
-class SMHDBoxBody(FullBoxBody):
+@boxbodyclass
+class SMHDBoxBody(FullBoxBody2):
   ''' A 'smhd' Sound Media Headerbox - section 12.2.2.
   '''
-
-  FIELD_TYPES = dict(
-      FullBoxBody.FIELD_TYPES,
-      balance=Int16BE,
-      reserved=UInt16BE,
-  )
-
-  def parse_fields(self, bfr: CornuCopyBuffer):
-    ''' Gather the `balance` field.
-    '''
-    super().parse_fields(bfr)
-    self.parse_field('balance', bfr, Int16BE)
-    self.parse_field('reserved', bfr, UInt16BE)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.balance
-    yield self.reserved
+  balance: Int16BE
+  reserved: UInt16BE
 
 def parse_tags(path, tag_prefix=None):
   ''' Parse the tags from `path`.
@@ -2819,107 +2909,6 @@ def parse_tags(path, tag_prefix=None):
             new_tags.update(Tag(tag, prefix=tag_prefix) for tag in tags)
             tags = new_tags
           yield box, tags
-
-def parse(o):
-  ''' Return the `OverBox` from a source (str, int, bytes, file).
-
-      The leading `o` parameter may be one of:
-      * `str`: a filesystem file pathname
-      * `int`: a OS file descriptor
-      * `bytes`: a `bytes` object
-      * `file`: if not `int` or `str` the presumption
-        is that this is a file-like object
-
-      Keyword arguments are as for `OverBox.from_buffer`.
-  '''
-  fd = None
-  if isinstance(o, str):
-    fd = os.open(o, os.O_RDONLY)
-    bfr = CornuCopyBuffer.from_fd(fd)
-  elif isinstance(o, int):
-    bfr = CornuCopyBuffer.from_fd(o)
-  elif isinstance(o, bytes):
-    bfr = CornuCopyBuffer.from_bytes([o])
-  else:
-    bfr = CornuCopyBuffer.from_file(o)
-  over_box = OverBox.parse(bfr)
-  if bfr.bufs:
-    warning("unparsed data in bfr: %r", list(map(len, bfr.bufs)))
-  if fd is not None:
-    os.close(fd)
-  return over_box
-
-# pylint: disable=too-many-locals,too-many-branches
-def report(box, indent='', fp=None, indent_incr=None):
-  ''' Report some human friendly information about a box.
-  '''
-  if fp is None:
-    fp = sys.stdout
-  if indent_incr is None:
-    indent_incr = '  '
-
-  def p(*a):
-    a0 = a[0]
-    return print(indent + a0, *a[1:], file=fp)
-
-  def p1(*a):
-    a0 = a[0]
-    return print(indent + indent_incr + a0, *a[1:], file=fp)
-
-  def subreport(box):
-    return report(
-        box, indent=indent + indent_incr, indent_incr=indent_incr, fp=fp
-    )
-
-  if isinstance(box, OverBox):
-    ftyp = box.FTYP
-    p("File type: %r, brands=%r" % (ftyp.major_brand, ftyp.brands_bs))
-    for subbox in box:
-      btype = subbox.box_type_s
-      if btype in ('ftyp',):
-        continue
-      subreport(subbox)
-  else:
-    # normal Boxes
-    btype = box.box_type_s
-    if btype == 'free':
-      p(geek(len(box)), "of free space")
-    elif btype == 'mdat':
-      p(geek(len(box.body)), "of media data")
-    elif btype == 'moov':
-      mvhd = box.MVHD
-      p(
-          "Movie:", f"timescale={mvhd.timescale}", f"duration={mvhd.duration}",
-          f"next_track_id={mvhd.next_track_id}"
-      )
-      for moov_box in box:
-        btype = moov_box.box_type_s
-        if btype == 'mvhd':
-          continue
-        subreport(moov_box)
-    elif btype == 'trak':
-      trak = box
-      edts = trak.EDTS0
-      mdia = trak.MDIA
-      mdhd = mdia.MDHD
-      tkhd = trak.TKHD
-      p(f"Track #{tkhd.track_id}:", f"duration={tkhd.duration}")
-      if edts is None:
-        p1("No EDTS.")
-      else:
-        p1("EDTS:", edts)
-      duration_s = transcribe_time(mdhd.duration / mdhd.timescale)
-      p1(f"MDIA: duration={duration_s} language={mdhd.language}")
-      for tbox in trak:
-        btype = tbox.box_type_s
-        if btype in ('edts', 'mdia', 'tkhd'):
-          continue
-        subreport(tbox)
-    else:
-      box_s = str(box)
-      if len(box_s) > 58:
-        box_s = box_s[:55] + '...'
-      p(box_s)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

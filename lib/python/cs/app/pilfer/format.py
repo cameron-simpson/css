@@ -16,7 +16,7 @@ class FormatArgument(str):
   def as_int(self):
     return int(self)
 
-class FormatMapping(object):
+class FormatMapping:
   ''' A mapping object to set or fetch user variables or URL attributes.
       Various URL attributes are known, and may not be assigned to.
       This mapping is used with str.format to fill in {value}s.

@@ -1,0 +1,13 @@
+lib/python/cs/debug.py: cs.debug: show tabulate_obj and print_obj via @ALL, move selftest() back down the bottom
+lib/python/cs/debug.py: cs.dbug: tabulate_obj: recursion checks
+lib/python/cs/debug.py: cs.debug: tabulate_obj: proper label default
+lib/python/cs/debug.py: cs.debug: tabulate_obj: drop spurious yeild, short return for classes (TODO: class attributes?)
+lib/python/cs/debug.py: cs.debug: tabulate_obj: shuffle around the container handling
+lib/python/cs/debug.py: cs.debug: tabulate_obj: small fixes
+lib/python/cs/debug.py: cs.debug: tabulate_obj: big cleanup of how objects are decomposed
+lib/python/cs/debug.py: cs.debug: @abrk: update docstring with some examples
+lib/python/cs/debug.py: cs.debug: new breakpoint wrapper to use /dev/tty if stdin is not a tty
+lib/python/cs/debug.py: cs.debug: move the builtins monkey patching to the bottom, drop the exclusion of breakpoint
+lib/python/cs/debug.py: cs.debug:  handle no builtins module, add __main__ tests for current tuff
+lib/python/cs/debug.py: cs.debug: trite comment tweak
+lib/python/cs/debug.py: merge default ==> async

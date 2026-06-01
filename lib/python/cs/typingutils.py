@@ -3,9 +3,9 @@
 ''' Trite hacks for use with typing.
 '''
 
-from typing import get_args, get_origin, TypeVar, Union
+from typing import get_args, get_origin, Protocol, TypeVar, Union
 
-__version__ = '20250428-post'
+__version__ = '20260525-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -28,7 +28,7 @@ def is_optional(annotation):
   except ValueError:
     # an Optional is [type,None]
     return None
-  if none is not None:
+  if none is not None and none is not type(None):
     # [type1,type2] is not an Optional
     return None
   return t
@@ -44,3 +44,21 @@ def subtype(t, name=None):
   if name is None:
     name = t.__name__ + 'SubType'
   return TypeVar(name, bound=t)
+
+class Sortable(Protocol):
+  ''' A type whose instances can be sorted i.e. support the `<` operator.
+  '''
+
+  def __lt__(self, other) -> bool:
+    ...
+
+class EQSortable(Protocol):
+  ''' A type whose instances can be sorted and also tested for
+      equality i.e. support the `<` and `==` operators.
+  '''
+
+  def __lt__(self, other) -> bool:
+    ...
+
+  def __eq__(self, other) -> bool:
+    ...

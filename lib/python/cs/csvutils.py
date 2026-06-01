@@ -16,7 +16,10 @@
 
 from __future__ import absolute_import, print_function
 import csv
+from getopt import GetoptError
 import sys
+
+from cs.cmdutils import BaseCommand, popopts
 from cs.deco import strable
 from cs.logutils import warning
 from cs.mappings import named_column_tuples
@@ -35,6 +38,11 @@ DISTINFO = {
     ],
     'install_requires': ['cs.deco', 'cs.logutils', 'cs.mappings', 'cs.pfx'],
 }
+
+def main(argv=None):
+  ''' Run the `CSVToolCommand` command line tool.
+  '''
+  return CSVToolCommand(argv).run()
 
 if sys.hexversion >= 0x03000000:
   # python 3 onwards
@@ -182,27 +190,46 @@ def xl_import(workbook, sheet_name=None, skip_rows=0, **kw):
       ), **kw
   )
 
-if __name__ == '__main__':
-  args = sys.argv[1:]
-  if not args:
-    raise ValueError("missing filename")
-  for filename in args:
-    print(filename)
-    with Pfx(filename):
-      if filename.endswith('.csv'):
-        with open(filename, 'r') as csvfp:
-          cls, rows = csv_import(csvfp)
-          for rownum, row in enumerate(rows, 1):
-            print(filename, rownum, row)
-      elif filename.endswith('.xlsx'):
-        from openpyxl import load_workbook
-        workbook = load_workbook(filename=filename, read_only=True)
-        for wb_sheet_name in workbook.get_sheet_names():
-          with Pfx(wb_sheet_name):
-            # presume row 1 in some kind of title and column names are row 2
-            cls, rows = xl_import(workbook, wb_sheet_name, skip_rows=1)
+class CSVToolCommand(BaseCommand):
+  ''' CSV utility tool.
+  '''
+
+  @popopts(
+      o_=('output_format', 'Output format string using the column names.')
+  )
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd} csv-or-xlxs-filenames...
+          Dump the contents of the named files.
+    '''
+    if not argv:
+      raise GetoptError('missing files')
+    output_format = self.options.output_format
+    for filename in argv:
+      print(filename)
+      with Pfx(filename):
+        if filename.endswith('.csv'):
+          with open(filename, 'r') as csvfp:
+            cls, rows = csv_import(csvfp)
             for rownum, row in enumerate(rows, 1):
-              print(filename, wb_sheet_name, rownum, row)
-      else:
-        raise ValueError('not a .csv or .xlsx file')
-    print()
+              if output_format:
+                print(output_format.format_map(row))
+              else:
+                print(filename, rownum, row)
+        elif filename.endswith('.xlsx'):
+          from openpyxl import load_workbook
+          workbook = load_workbook(filename=filename, read_only=True)
+          for wb_sheet_name in workbook.get_sheet_names():
+            with Pfx(wb_sheet_name):
+              # presume row 1 in some kind of title and column names are row 2
+              cls, rows = xl_import(workbook, wb_sheet_name, skip_rows=1)
+              for rownum, row in enumerate(rows, 1):
+                if output_format:
+                  print(output_format.format_map(row))
+                else:
+                  print(filename, wb_sheet_name, rownum, row)
+        else:
+          raise ValueError('not a .csv or .xlsx file')
+      print()
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

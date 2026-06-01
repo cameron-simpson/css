@@ -1,0 +1,6 @@
+lib/python/cs/queues.py: cs.queues: QueueIterator no longer subclasses MultiiOpenMixin, a bad fit and now simpler
+lib/python/cs/queues.py: cs.queues: QueueIterator: repr() returns str()
+lib/python/cs/queues.py: cs.queues: new WorkerQueue(worker) factory returning (q,T) being an IterableQueue and a Thread running the worker
+lib/python/cs/queues.py: cs.queues: remove debug
+lib/python/cs/queues.py: cs.queues: get not_closed from cs.semantics
+lib/python/cs/queues.py: cs.qeueus: DISTINFO + cs.semantics; Channel: fix init; brush off a little lint

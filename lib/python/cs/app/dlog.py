@@ -180,7 +180,7 @@ class DLog:
     while (offset < len(line) - 1 and line.startswith('+', offset)
            and line[offset + 1].isalpha()):
       offset += 1
-      tag, offset = Tag.from_str2(line, offset)
+      tag, offset = Tag.parse(line, offset)
       tags.add(tag)
       offset = skipwhite(line, offset)
     return cls(
@@ -404,12 +404,14 @@ class DLogCommand(BaseCommand):
     ''' Usage: {cmd} [{{CATEGORIES:|tag=value}}...] {{-|headline}}
           Log headline to the dlog.
           Options:
-          -c categories   Alternate categories specification.
+          -c categories   Alternate categories specification, default from $CS_DLOG_CATEGORIES.
           -d datetime     Timestamp for the log entry instead of "now".
           -t tags         Tags.
     '''
     options = self.options
-    options.categories = set()  # pylint: disable=attribute-defined-outside-init
+    options.categories = set(
+        os.environ.get('CS_DLOG_CATEGORIES', '').upper().split()
+    )  # pylint: disable=attribute-defined-outside-init
     options.tags = TagSet()  # pylint: disable=attribute-defined-outside-init
     options.tags.when = None  # pylint: disable=attribute-defined-outside-init
     options.popopts(

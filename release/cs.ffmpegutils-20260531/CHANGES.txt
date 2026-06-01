@@ -1,0 +1,2 @@
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: convert: document the parameters
+lib/python/cs/ffmpegutils.py: cs.ffmpegutils: FFMPEG_DOCKER_IMAGE_DEFAULT=docker.io/linuxserver/ffmpeg, adjust for cs.dockerutils changes

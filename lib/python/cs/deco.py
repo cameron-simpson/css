@@ -18,7 +18,7 @@ import typing
 from cs.gimmicks import warning
 from cs.typingutils import is_optional
 
-__version__ = '20250428-post'
+__version__ = '20260525-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -26,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks', 'cs.typeutils'],
+    'install_requires': ['cs.gimmicks', 'cs.typingutils'],
 }
 
 def ALL(func):
@@ -49,37 +49,79 @@ def ALL(func):
   return func
 
 def fmtdoc(func):
-  ''' Decorator to replace a function's docstring with that string
-      formatted against the function's module `__dict__`.
+  ''' A decorator to format a function's docstring.
+      This replaces the docstring with that string
+      formatted against the function's module `__dict__`
+      using `str.format_map`.
 
-      This supports simple formatted docstrings:
+      A quirk of `format_map` allows us to also support:
+      * `{`*name*`=}`: the f-string `{`*name*`=}` notation
+      * `{`*name*`==}`: the f-string `{`*name*`=}` notation
+        with the function module name prefixed
 
-          ENVVAR_NAME = 'FUNC_DEFAULT'
+      This supports simple formatted docstrings. Example:
+
+          FUNC_ENVVAR = 'FUNC_SETTING
+          FUNC_DEFAUlT = 12
 
           @fmtdoc
           def func():
-              """Do something with os.environ[{ENVVAR_NAME}]."""
-              print(os.environ[ENVVAR_NAME])
+              """
+              Do something with the environment variable `${FUNC_ENVVAR}`.
+              The default if no `${FUNC_ENVVAR}` comes from `{FUNC_DEFAUlT==}`.
+              """
+              print(os.environ.get(FUNC_ENVVAR, FUNC_DEFAUlT))
 
       This gives `func` this docstring:
 
-          Do something with os.environ[FUNC_DEFAULT].
+          Do something with the environment variable `$FUNC_SETTING`.
+          The default if no `$FUNC_SETTING` comes from `module.func.FUNC_DEFAUlT=12`.
 
       *Warning*: this decorator is intended for wiring "constants"
       into docstrings, not for dynamic values. Use for other types
       of values should be considered with trepidation.
   '''
-  func.__doc__ = func.__doc__.format(**sys.modules[func.__module__].__dict__)
+  fmtmap = dict(**sys.modules[func.__module__].__dict__)
+  # bodge in support for {name=}
+  for name, value in list(fmtmap.items()):
+    fmtmap[f'{name}='] = f'{name}={value!r}'
+    fmtmap[f'{name}=='] = f'{func.__module__}.{name}={value!r}'
+  func.__doc__ = func.__doc__.format_map(fmtmap)
   return func
 
-def decorator(deco):
-  ''' Wrapper for decorator functions to support optional arguments.
+def decorator(deco=None, *, decorable=callable):
+  ''' A decorator for decorator functions to support optional arguments
+      and also to allow specifying additional attributes to apply
+      to the decorated function.
 
-      The actual decorator function ends up being called as:
+      The decorated function is updated by `functools.update_wrapper`
+      and also has its `__name__` and `__doc__` set to those from
+      before the decoration.
+
+      The return of such a decorator is _usually_ the conventional
+      decorated function, but may alternatively be a `(decorated,attrs)`
+      2-tuple where `attrs` is a mapping of additional attributes
+      to apply to `decorated`.
+      This allows overriding the restored `__name__` and `__doc__`
+      from above, and potentially other useful attributes.
+
+      The actual decorator function (eg `mydeco`) ends up being called as:
 
           mydeco(func, *da, **dkw)
 
       allowing `da` and `dkw` to affect the behaviour of the decorator `mydeco`.
+
+      `@decorator` itself accepts an optional `decorable=` keyword
+      parameter; this is used as the test of the first positional
+      argument to the subdecorator to see if it is the function it
+      decorates.
+      This defaults to `callable`, but may be specified; I have a
+      decorator which can accept classes as positional arguments
+      and classes are callable so I decorate it like this:
+
+          @decorator(decorable=lambda f: callable(f) and not isinstance(f, type))
+
+      so as not to mistake a class as the function being decoration.
 
       Examples:
 
@@ -88,16 +130,22 @@ def decorator(deco):
           def mydeco(func, *da, arg2=None):
             ... decorate func subject to the values of da and arg2
 
-          # mydeco called with defaults
+          # @mydeco called with defaults
           @mydeco
           def func1(...):
             ...
 
-          @ mydeco called with nondefault arguments
+          # @mydeco called with nondefault arguments
           @mydeco('foo', arg2='bah')
           def func2(...):
             ...
+
+      The `@mydeco` decorator itself is then written as though the
+      arguments were always supplied.
   '''
+
+  if deco is None:
+    return lambda func, **kw: decorator(func, decorable=decorable, **kw)
 
   def decorate(func, *dargs, **dkwargs):
     ''' Final decoration when we have the function and the decorator arguments.
@@ -108,10 +156,13 @@ def decorator(deco):
     func_name = getattr(func, '__name__', str(func))
     # Now decorate func.
     decorated = deco(func, *dargs, **dkwargs)
+    # accept either the a function or a (function,attrmap) 2-tuple
+    try:
+      decorated, func_attrs = decorated
+    except TypeError:
+      func_attrs = {}
     # Catch mucked decorators which forget to return the new function.
-    assert decorated is not None, (
-        "deco:%r(func:%r,...) -> None" % (deco, func)
-    )
+    assert decorated is not None, f'@decorator @{deco=} of {func=} returned None'
     if decorated is not func:
       # We got a wrapper function back, pretty up the returned wrapper.
       try:
@@ -135,6 +186,9 @@ def decorator(deco):
         decorated.__module__ = func_module
       except AttributeError:
         pass
+    # apply any func_attrs
+    for attr, value in func_attrs.items():
+      setattr(decorated, attr, value)
     return decorated
 
   def metadeco(*da, **dkw):
@@ -148,7 +202,7 @@ def decorator(deco):
         Otherwise return a decorator using the provided arguments,
         ready for the subsequent function.
     '''
-    if len(da) > 0 and callable(da[0]):
+    if len(da) > 0 and decorable(da[0]):
       # `func` is already supplied, pop it off and decorate it now.
       func = da[0]
       da = tuple(da[1:])
@@ -405,7 +459,6 @@ def OBSOLETE(func, suggestion=None):
       This emits a warning log message before calling the decorated function.
       Only one warning is emitted per calling location.
   '''
-
   callers = set()
 
   def OBSOLETE_func_wrapper(*args, **kwargs):
@@ -429,12 +482,13 @@ def OBSOLETE(func, suggestion=None):
 
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
-  doc = "OBSOLETE " + funcname
-  func.__doc__ = doc + '\n\n' + funcdoc
+  doc = "OBSOLETE version of " + funcname
   if suggestion:
-    doc += ' suggestion: ' + suggestion
-  OBSOLETE_func_wrapper.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  return OBSOLETE_func_wrapper
+    doc += ', suggestion: ' + suggestion
+  return OBSOLETE_func_wrapper, dict(
+      __name__=f'@OBSOLETE({funcname})',
+      __doc__=f'{doc}\n\n{funcdoc}',
+  )
 
 @OBSOLETE(suggestion='cs.cache.cachedmethod')
 def cached(*a, **kw):
@@ -537,6 +591,20 @@ def strable(func, open_func=None):
 
   return accepts_str
 
+def with_(func, obj):
+  ''' A decorator to run `func` inside a `with obj:`.
+
+      Example:
+
+          T = Thread(target=with_(some_context, target_func))
+  '''
+
+  def with_obj(*a, **kw):
+    with obj:
+      return func(*a, **kw)
+
+  return with_obj
+
 def observable_class(property_names, only_unequal=False):
   ''' Class decorator to make various instance attributes observable.
 
@@ -551,7 +619,6 @@ def observable_class(property_names, only_unequal=False):
         values to be comparable for inequality.
         Default: `False`, meaning that all updates will be reported.
   '''
-
   if isinstance(property_names, str):
     property_names = (property_names,)
 
@@ -559,7 +626,6 @@ def observable_class(property_names, only_unequal=False):
   def make_observable_class(cls):
     ''' Annotate the class `cls` with observable properties.
     '''
-
     # push the per instance initialisation
     old_init = cls.__init__
 
@@ -641,20 +707,14 @@ def observable_class(property_names, only_unequal=False):
 
 @decorator
 def default_params(func, _strict=False, **param_defaults):
-  ''' Decorator to provide factory functions for default parameters.
+  ''' A decorator to provide factory functions for default parameters.
 
-      This decorator accepts the following keyword parameters:
+      This decorator accepts the following special keyword parameters:
       * `_strict`: default `False`; if true only replace genuinely
         missing parameters; if false also replace the traditional
         `None` placeholder value
       The remaining keyword parameters are factory functions
       providing the respective default values.
-
-      Atypical one off direct use:
-
-          @default_params(dbconn=open_default_dbconn,debug=lambda:settings.DB_DEBUG_MODE)
-          def dbquery(query, *, dbconn):
-              dbconn.query(query)
 
       Typical use as a decorator factory:
 
@@ -673,6 +733,30 @@ def default_params(func, _strict=False, **param_defaults):
               if ds3client is None:
                   ds3client = get_ds3client()
               ... make queries using ds3client ...
+
+      It's quite common for me to associate one of these with a
+      class.  I have a `HasThreadState` mixin class which maintains
+      a thread-local state object which I use to store a per-thread
+      "ambient" instance of the class so that it does not need to
+      be plumbed through every call (including all the intermediate
+      calls which have no interest in the object, the horror!)
+      So I'll often do this:
+
+          class Thing(..., HasThreadState):
+              ....
+          uses_thing = default_params(thing=Thing.default)
+
+      This can be used to provide the ambient instance of `Thing`
+      to functions while allowing the caller to omit any mention
+      of a `Thing` or to pass a specific instance if sensible.
+      (In this examplke, `Thing.default` is a method provided by the mixin.)
+
+      And then there's the atypical one off direct use,
+      which is not really a big win over the conventional way:
+
+          @default_params(dbconn=open_default_dbconn,debug=lambda:settings.DB_DEBUG_MODE)
+          def dbquery(query, *, dbconn):
+              dbconn.query(query)
   '''
   if not param_defaults:
     raise ValueError("@default_params(%s): no defaults?" % (func,))
@@ -777,6 +861,7 @@ def uses_cmd_options(
                  ... do the thing ...
               ... etc ...
   '''
+  from cs.context import stackattrs
 
   def uses_cmd_wrapper(*func_a, **func_kw):
     # fill in the func_kw from the defaults
@@ -784,7 +869,6 @@ def uses_cmd_options(
     # run with the prevailing BaseCommand suitably updated
     try:
       from cs.cmdutils import BaseCommand
-      from cs.context import stackattrs
     except ImportError:
       # missing cs.cmdutils or cs.context,
       # make an options with no attributes
@@ -823,6 +907,7 @@ uses_force = uses_cmd_options(force=False)
 uses_quiet = uses_cmd_options(quiet=False)
 uses_verbose = uses_cmd_options(verbose=False)
 
+# TODO: handle async functions
 # pylint: disable=too-many-statements
 @decorator
 def promote(func, params=None, types=None):
@@ -950,6 +1035,22 @@ def promote(func, params=None, types=None):
     annotation = param.annotation
     if annotation is Parameter.empty:
       continue
+    if isinstance(annotation, str):
+      resolved = sys.modules[func.__module__].__dict__.get(annotation)
+      if resolved is None:
+        warning(
+            "@promote(%s): skip param %s:%r: cannot be resolved from sys.modules[%r]",
+            func,
+            param_name,
+            annotation,
+            func.__module__,
+        )
+        continue
+      ##warning(
+      ##    "@promote(%s): param %s: str:%r -> %r", func, param_name, annotation,
+      ##    resolved
+      ##)
+      annotation = resolved
     # recognise optional parameters and use their primary type
     optional = False
     if param.default is not Parameter.empty:
@@ -971,7 +1072,7 @@ def promote(func, params=None, types=None):
     return func
 
   def promote_args(a, kw):
-    ''' Promote the position and keyword arguments.
+    ''' Promote the positional and keyword arguments.
     '''
     bound_args = sig.bind(*a, **kw)
     arg_mapping = bound_args.arguments
@@ -1020,7 +1121,7 @@ def promote(func, params=None, types=None):
             else:
               # assuming a property or even a plain attribute
               as_value = as_annotation
-            arg_value = as_value
+            promoted_value = as_value
       except TypeError:
         # promotion fails
         if (optional and arg_value is param.default
@@ -1049,7 +1150,8 @@ def promote(func, params=None, types=None):
 
 # pylint: disable=too-few-public-methods
 class Promotable:
-  ''' A mixin class which supports the `@promote` decorator.
+  ''' A mixin class which supports the `@promote` decorator
+      by providing a default `.promote(cls,obj)` class method.
   '''
 
   @classmethod
@@ -1106,4 +1208,11 @@ class Promotable:
     else:
       return from_type(obj, **from_t_kw)
     # try instantiating the class with obj as its sole argument
-    return cls(obj)
+    try:
+      return cls(obj)
+    except TypeError as e:
+      raise TypeError(
+          f'cannot promote object of class {obj.__class__!r} to class {cls!r}'
+          f', last attempt of {cls.__name__}({obj.__class__.__name__}:{obj!r})'
+          f' raised {e.__class__.__name__}: {e}'
+      )

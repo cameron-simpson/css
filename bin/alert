@@ -11,6 +11,7 @@ alert_to_default='log stderr'
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert-local}
+: ${DLOG_PIPEPATH:=$HOME/var/dlog.pipe}
 
 cmd=$0
 usage="Usage: $cmd [options...] [--] {-|echo-args...}
@@ -173,7 +174,12 @@ then
 fi
 
 [ $to_stderr ] && echo "ALERT: $title $subtitle $message" >&2
-[ $to_dlog ] && dlog log ALERT: "$*" </dev/null &
+[ $to_dlog ] && {
+  if [ -p "$DLOG_PIPEPATH" ]
+  then  echo "ALERT: $*" >>"$DLOG_PIPEPATH"
+  else  dlog log ALERT: "$*" </dev/null &
+  fi
+}
 
 if [ $to_desktop ]
 then

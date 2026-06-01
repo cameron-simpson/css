@@ -1,0 +1,1 @@
+model_batches_qs (and therefore also model_instances): after may also be a Model instance.

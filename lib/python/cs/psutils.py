@@ -19,13 +19,14 @@ import shlex
 from signal import SIGTERM, SIGKILL, signal
 from subprocess import DEVNULL as subprocess_DEVNULL, PIPE, Popen, run as subprocess_run
 import sys
+from threading import Lock
 import time
 
 from cs.deco import fmtdoc, uses_cmd_options
 from cs.gimmicks import trace, warning, DEVNULL
 from cs.pfx import pfx_call
 
-__version__ = '20250108.1-post'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -45,6 +46,8 @@ DISTINFO = {
 # halved because even allowing for the size of the environment this
 # can be too big. Unsure why.
 MAX_ARGV = 262144 // 2
+
+_trace_lock = Lock()
 
 def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   ''' Stop the process specified by `pid`, optionally await its demise.
@@ -257,11 +260,13 @@ def run(
     return None
   if not quiet:
     if logger:
-      trace("+ %s", shlex.join(argv))
+      with _trace_lock:
+        trace("+ %s", shlex.join(argv))
     else:
       if fold is None:
         fold = False
-      print_argv(
+      with _trace_lock:
+        print_argv(
           *argv,
           indent0="+ ",
           indent="  ",
@@ -322,7 +327,8 @@ def pipefrom(
   '''
   argv = prep_argv(*argv, remote=remote, ssh_exe=ssh_exe)
   if not quiet:
-    print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
+    with _trace_lock:
+      print_argv(*argv, indent="+ ", end=" |\n", file=sys.stderr)
   return Popen(argv, stdout=PIPE, text=text, stdin=stdin, **popen_kw)
 
 # TODO: text= parameter?
@@ -348,7 +354,8 @@ def pipeto(argv, *, quiet: bool, remote=None, ssh_exe, **kw):
   '''
   argv = prep_argv(*argv)
   if not quiet:
-    print_argv(*argv, indent="| ", file=sys.stderr)
+    with _trace_lock:
+      print_argv(*argv, indent="| ", file=sys.stderr)
   P = Popen(argv, stdin=PIPE)  # pylint: disable=consider-using-with
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
@@ -364,7 +371,7 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
       * `argv`: the sequence of arguments to distribute; this may not be empty
       * `post_argv`: optional, the sequence of trailing arguments
       * `max_argv`: optional, the maximum length of each distributed
-        argument list, default from `MAX_ARGV`: `{MAX_ARGV}`
+        argument list, default from `{MAX_ARGV==}`
       * `encode`: default `False`.
         If true, encode the argv sequences into bytes for accurate tallying.
         If `encode` is a Boolean,
@@ -483,8 +490,23 @@ def print_argv(
     file=None,
     fold=False,
     print=None,
+    as_str=str,
 ):
-  ''' Print an indented possibly folded command line.
+  r'''Print an indented possibly folded command line.
+
+      Parameters:
+      * `argv`: the arguments to print
+      * `indent0`: optional indent for the first argument
+      * `indent`: optional per line indent if `fold` is true
+      * `subindent`: optional additional indent for the second and
+        following lines, default `"  "`
+      * `end`: optional line ending, default `"\n"`
+      * `file`: optional output file, default `sys.stdout`
+      * `fold`: optional fold mode, default `False`;
+        if true then arguments are laid out over multiple lines
+      * `print`: optional `print` callable, default `builtins.print`
+      * `as_str`: optional callable to convert arguments to strings, default `str`;
+        this can be `None` to avoid conversion
   '''
   if indent0 is None:
     indent0 = indent
@@ -495,6 +517,8 @@ def print_argv(
   pr_argv = []
   was_opt = False
   for i, arg in enumerate(argv):
+    if as_str is not None:
+      arg = as_str(arg)
     if i == 0:
       pr_argv.append(indent0)
       was_opt = False

@@ -8,11 +8,11 @@ structures and to access Beyonwiz devices via the net.
 '''
 
 from abc import ABC, abstractmethod
-from contextlib import nullcontext
 from datetime import datetime
 import json
 import os
 from os.path import (
+    basename,
     dirname,
     exists as existspath,
     isabs as isabspath,
@@ -21,6 +21,7 @@ from os.path import (
     join as joinpath,
     splitext,
 )
+from subprocess import CalledProcessError
 from threading import Lock
 from types import SimpleNamespace as NS
 
@@ -33,9 +34,9 @@ from cs.ffmpegutils import (
 from cs.fileutils import atomic_filename, crop_name
 from cs.fs import HasFSPath
 from cs.fstags import HasFSTagsMixin
-from cs.logutils import error
+from cs.logutils import error, warning
 from cs.mediainfo import EpisodeInfo
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py.func import prop
 from cs.tagset import Tag
 
@@ -174,10 +175,9 @@ def Recording(path):
     # see if we were given a prefix from command line filename completion
     if path.endswith('.'):
       tspath = path + 'ts'
-      if existspath(tspath):
-        return Recording(tspath)
     else:
       tspath = path + '.ts'
+    if existspath(tspath):
       return Recording(tspath)
   raise ValueError("don't know how to open recording %r" % (path,))
 
@@ -204,6 +204,37 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     ):
       return getattr(self.metadata, attr)
     raise AttributeError(attr)
+
+  @pfx_method
+  def remove(self, *, doit=False):
+    ''' Remove all the files associated with this recording.
+    '''
+    for fspath in self.fspaths:
+      with Pfx(fspath):
+        print("remove", fspath)
+        if doit:
+          try:
+            pfx_call(os.remove, fspath)
+          except FileNotFoundError as e:
+            warning(str(e))
+        else:
+          if not isfilepath(fspath):
+            warning("not a file")
+
+  def move_info(self, dstdirpath: str, *, doit=False):
+    ''' Move all the files associated with this recording into `dstdirpath`.
+    '''
+    for fspath in self.fspaths:
+      with Pfx(fspath):
+        dstpath = joinpath(dstdirpath, basename(fspath))
+        print("move", fspath, "->", dstpath)
+        if doit:
+          if existspath(dstpath):
+            raise FileExistsError(dstpath)
+          pfx_call(os.rename, fspath, dstpath)
+        else:
+          if not isfilepath(fspath):
+            warning("not a file")
 
   # pylint: disable=redefined-builtin
   def filename(self, format=None, *, ext):
@@ -258,9 +289,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
       path2 = "%s--%d%s" % (basis, i + 1, ext)
       if not existspath(path2):
         return path2
-    raise ValueError(
-        "no available --0..--%d variations: %r" % (max_n - 1, path)
-    )
+    raise ValueError(f'no available --0..--{max_n-1} variations: {path!r}')
 
   # pylint: disable=too-many-branches,too-many-locals
   def convert(
@@ -286,9 +315,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     if use_data:
       assert srcpath is None
       if timespans:
-        raise ValueError(
-            "%d timespans but do_copyto is true" % (len(timespans,))
-        )
+        raise ValueError(f'{len(timespans)} timespans but do_copyto is true')
     else:
       if srcpath is None:
         srcpath = self.fspath
@@ -348,18 +375,23 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
     ) as T:
       if doit:
         os.remove(T.name)
-      ffconvert(
-          srcpath,
-          dstpath=dstpath if T is None else T.name,
-          doit=doit,
-          conversions=None,
-          metadata=self.ffmetadata(dstfmt),
-          timespans=timespans,
-          overwrite=False,
-          acodec=acodec,
-          vcodec=vcodec,
-          extra_opts=extra_opts,
-      )
+      try:
+        pfx_call(
+            ffconvert,
+            srcpath,
+            dstpath=dstpath if T is None else T.name,
+            doit=doit,
+            conversions=None,
+            metadata=self.ffmetadata(dstfmt),
+            timespans=timespans,
+            overwrite=False,
+            acodec=acodec,
+            vcodec=vcodec,
+            extra_opts=extra_opts,
+        )
+      except CalledProcessError as e:
+        warning("conversion fails: %s", e)
+        return False
     return True
 
   def ffmpeg_metadata(self, dstfmt=None):

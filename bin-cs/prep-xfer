@@ -1,34 +1,47 @@
 #!/bin/sh
 #
-# Prepare data in a transfer directory such a removable hard drive
+# Prepare data in a transfer directory such a removable hard drive,
 # with files from a source not present at a destination.
 # - Cameron Simpson <cs@cskk.id.au> 17mar2024
 #
-#
-#set -ue
+
+set -ue
 
 cmd=$0
 usage="Usage: $0 [-n] srcdir dstdir [{-|xferdir}]
   Copy files from srcdir to xferdir if they are not present (by content) in dstdir.
   This is useful for preparing a transfer disc to hold files to be
   taken to the remote location holding dstdir.
+
   Options:
+  -D  Delete: remove files in xferdir which already existin in dstdir.
   -n  No action: recite planned actions.
+  -P  Rsync progress reporting, passed to rsync.
+  -q  Quiet - no tracing.
+  -x  Trace execution.
+
   If xferdir is omitted or is \"-\" just emit the filenames to stdout.
   Example:
       $0 local-media-dir remotehost:remote-media-dir /mnt/xfer_drive/media"
 
+doit=1
+quiet=
 rsopts=
 [ -t 2 ] && rsopts="$rsopts -P"
 trace=
 [ -t 2 ] && trace=set-x
+do_purge=
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
-    -n) rsopts="$rsopts -n" ;;
+    -D) do_purge=1 ;;
+    -n) doit= rsopts="$rsopts -n" ;;
+    -P) rsopts="$rsopts $1" ;;
+    -q) quiet=1 trace= ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -82,6 +95,24 @@ fi
 }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $do_purge ]
+then
+  $trace hashindex comm -3 -o '{fspath}' -r -- "$xferdir" "$dstdir" \
+  | if [ $doit ]
+    then
+      ( set -ue
+        [ -z "$trace" ] || set -x
+        cd "$xferdir"
+        [ $quiet ] || pwd >&2
+        xxargs $trace rm --
+      )
+    else
+      echo "( cd $xferdir"
+      xxargs echo "  rm --"
+      echo ")"
+    fi
+fi
 
 $trace hashindex comm -1 -o '{fspath}' -r -- "$srcdir" "$dstdir" \
 | case "$xferdir" in

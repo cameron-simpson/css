@@ -386,7 +386,7 @@ class Result(FSM):
         `(None,exc_info)` is returned
         where `exc_info` is a tuple of `(exc_type,exc_value,exc_traceback)`.
         If the function was cancelled the sequence `(None,None)`
-        is returned.
+        is returned; the `.fsm_state` will be `'CANCELLED'`.
     '''
     self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()

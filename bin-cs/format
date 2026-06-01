@@ -11,6 +11,7 @@ trace=
 
 flagfile=
 pymode=3
+black_opts=${BLACK_OPTS-"-S"}
 
 cmd=$0
 usage="Usage: $cmd [-2] [-3] [-n] [-q] [-t flagfile] [-x] filenames...
@@ -139,7 +140,8 @@ do
         case $pyformat in
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
-          black)  $trace black -q -t py38 -S "$srcfile" ;;
+          black)  $trace black -q -t py38 $black_opts "$srcfile" ;;
+          ruff)   $trace ruff format -q "$srcfile" ;;
           *)      echo "$cmd: unsupported Python formatter: $pyformat" >&2
                   exit 1
                   ;;

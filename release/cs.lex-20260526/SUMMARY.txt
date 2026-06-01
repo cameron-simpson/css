@@ -1,0 +1,2 @@
+FormatMapping.__getitem__: ensure we always return a FormatableMixin, converting via FStr is necessary (string.Formatter.vformat sees to quietly ingnore non-strs).
+BaseToken.scan: bugfix parse offset for .end_offset.

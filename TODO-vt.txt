@@ -1,3 +1,13 @@
+actual async support?
+adler32 can be had from the zlib stdlib module
+cs.vt.DEFAULT_BASEDIR: base off the xdg stuff
+we can mmap a bloom filter as a bitmap in a file
+bloom filter in front of the dbm stores? um, it would need to persist, and rescale as the store grew
+support os.copy_byte_range in VTFuse
+maybe make the Transcriber class not conflict with AbstractBinary by using encode/decode instead of transcribe/parse, so that we do not need distinct classes
+Dockerfile then fly.toml
+man pages in ronn format
+a vt package via pyoxidizer T v
 replace run_modes with @uses_verbose etc
 Dir and File objects to subclass importlib.resources.abc.Traversable
 rename Store.connected to Store.active

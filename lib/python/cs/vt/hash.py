@@ -19,7 +19,7 @@ from cs.lex import get_identifier
 from cs.resources import MultiOpenMixin
 
 from .pushpull import missing_hashcodes
-from .transcribe import Transcriber
+from .transcribe import Transcribable
 
 HASHNAME_DEFAULT = 'blake3'
 HASHNAME_ENVVAR = 'VT_HASHNAME'
@@ -57,44 +57,9 @@ class HasDotHashclassMixin:
     '''
     return self.hashclass.hashname
 
-class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
-  ''' Binary transcription of hashcodes.
-  '''
-
-  @property
-  def hashcode(self):
-    ''' The value named `.hashcode`.
-    '''
-    return self.value
-
-  @property
-  def hashclass(self):
-    ''' The hash class comes from the hash code.
-    '''
-    return self.value.hashclass
-
-  @staticmethod
-  def parse_value(bfr):
-    ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
-    '''
-    hashenum = BSUInt.parse_value(bfr)
-    hashcls = HashCode.by_hashenum[hashenum]
-    return hashcls.from_hashbytes(bfr.take(hashcls.hashlen))
-
-  # pylint: disable=arguments-renamed
-  @staticmethod
-  def transcribe_value(hashcode):
-    ''' Serialise a hashcode.
-    '''
-    yield BSUInt.transcribe_value(hashcode.hashenum)
-    yield hashcode
-
-decode_buffer = HashCodeField.parse_value
-decode = HashCodeField.parse_value_from_bytes
-
 class HashCode(
     BaseHashCode,
-    Transcriber,
+    Transcribable,
     hashname=None,
     hashfunc=None,
     prefix='H',
@@ -138,7 +103,7 @@ class HashCode(
     )
 
   def __str__(self):
-    return type(self).transcribe_obj(self)
+    return type(self).str_obj(self)
 
   def __repr__(self):
     return f'{self.hashname}:{self.hex()}'
@@ -204,7 +169,7 @@ class HashCode(
     return f'{self.hex()}.{self.hashname}'
 
   @classmethod
-  def from_filename(cls, filename):
+  def from_hash_based_filename(cls, filename):
     ''' Take a *hashcodehex*`.`*hashname* string
         and return a `HashCode` subclass instance.
 
@@ -223,7 +188,7 @@ class HashCode(
     hashbytes = bytes.fromhex(hexpart)
     return hashclass.from_hashbytes(hashbytes)
 
-  def transcribe_inner(self) -> str:
+  def str_inner(self) -> str:
     return f'{self.hashname}:{self.hex()}'
 
   @classmethod
@@ -308,6 +273,42 @@ class HashCodeType(type, Promotable):
     if isclass(obj) and issubclass(obj, HashCode):
       return obj
     return super().promote(obj)
+
+class HashCodeField(BinarySingleValue, HasDotHashclassMixin,
+                    value_type=HashCode):
+  ''' Binary transcription of hashcodes.
+  '''
+
+  @property
+  def hashcode(self):
+    ''' The value named `.hashcode`.
+    '''
+    return self.value
+
+  @property
+  def hashclass(self):
+    ''' The hash class comes from the hash code.
+    '''
+    return self.value.hashclass
+
+  @staticmethod
+  def parse_value(bfr):
+    ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
+    '''
+    hashenum = BSUInt.parse_value(bfr)
+    hashcls = HashCode.by_hashenum[hashenum]
+    return hashcls.from_hashbytes(bfr.take(hashcls.hashlen))
+
+  # pylint: disable=arguments-renamed
+  @staticmethod
+  def transcribe_value(hashcode):
+    ''' Serialise a hashcode.
+    '''
+    yield BSUInt.transcribe_value(hashcode.hashenum)
+    yield hashcode
+
+decode_buffer = HashCodeField.parse_value
+decode = HashCodeField.parse_value_from_bytes
 
 class HashCodeUtilsMixin:
   ''' Utility methods for classes which use `HashCode`s as keys.

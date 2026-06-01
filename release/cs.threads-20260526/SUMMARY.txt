@@ -1,0 +1,1 @@
+New pmap(func,items) function, a parallel version of map(), like cs.nayasync.amap().

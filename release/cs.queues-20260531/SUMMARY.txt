@@ -1,0 +1,2 @@
+QueueIterator no longer subclasses MultiiOpenMixin, a bad fit and now simpler.
+New WorkerQueue(worker) factory returning (q,T) being an IterableQueue and a Thread running the worker.

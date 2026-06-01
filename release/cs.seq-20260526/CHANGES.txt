@@ -1,0 +1,2 @@
+lib/python/cs/seq.py: cs.seq: provide the default Generator arguments, required prior to python 3.13
+lib/python/cs/seq.py: c.seq: DISTINFO: ad cs.typingutils

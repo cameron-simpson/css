@@ -1,0 +1,2 @@
+lib/python/cs/threads.py: cs.threads: pmap: docstring tweak
+lib/python/cs/threads.py: cs.threas: pmap: anther docstring tweak

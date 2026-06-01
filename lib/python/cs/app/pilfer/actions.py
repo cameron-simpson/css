@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import re
 import shlex
 from subprocess import Popen, PIPE
-from typing import Any, Callable, List, Tuple, Union
+from typing import Any, Callable, List, Mapping, Tuple, Union
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -16,26 +16,68 @@ except ImportError:
 
 from typeguard import typechecked
 
-from cs.lex import BaseToken
+from cs.lex import BaseToken, cutprefix
 from cs.logutils import (warning)
 from cs.naysync import agen, afunc, async_iter, AnyIterable, StageMode
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import pfx_call
 from cs.urlutils import URL
 
 from .parse import get_name_and_args, import_name
 from .pilfer import Pilfer, uses_pilfer
 
 @dataclass
-class Action(BaseToken):
+class ActionSpecification:
+  r'''An action specification parsed from the `[actions]` section of a `pilferrc` file.
 
-  pilfer: Pilfer
+      Such a section contains fields of the form:
+
+          action_name = action_argv
+          action_name.mode = mode_value
+
+      where:
+      * `action_name` is a name containing no dots, specifying the
+        argument list for an action
+      * `action_argv` is a shell compatible argument list parsed by `shlex.split`
+      * `action_name.mode` specifies a value for the mode of `action_name` named `mode`;
+        there may be several of these
+      The `action_name=action_argv` line may be omitted, or have
+      an empty `action_argv`; this configuration is expected to be
+      for a builtin action such as `dump`.
+
+      Example:
+
+          [actions]
+          untrack = s/\?.*//
+          dump.ignore_hosts = analytics.example.com beacon.example.com
+  '''
+  name: str
+  argv: list[str]
+  modes: Mapping[str, str]
+
+  def from_actions_section(cls, name: str, section: Mapping[str, str]):
+    ''' Make a new `_Action` from the action name and an `[actions]` pilferrc section mapping.
+    '''
+    argv = shlex.split(section.get(name, '').strip())
+    mode_prefix = f'{name}.'
+    modes = {
+        cutprefix(mode_field, mode_prefix): mode_value.strip()
+        for mode_field, mode_value in section.items()
+        if mode_field.startswith(mode_prefix)
+    }
+    return cls(name=name, argv=argv, modes=modes)
+
+@dataclass
+class _Action(BaseToken):
+
+  pilfer: Pilfer = None
+  modes: Mapping[str, Any] = field(default_factory=dict)
   batchsize: Union[int, None] = None
 
   @classmethod
   @uses_pilfer
   @typechecked
-  def from_str(cls, text, *, P: Pilfer) -> "Action":
-    ''' Convert an action specification into an `Action`.
+  def from_str(cls, text, *, P: Pilfer) -> "_Action":
+    ''' Convert an action specification into an `_Action`.
 
         The following specifications are recognised:
         - *name*: filter the input via the named stage function
@@ -45,124 +87,51 @@ class Action(BaseToken):
         - "-/regexp": filter items to those not matching regexp
         - "..": treat items as URLs and produce their parent URL
 
-        Named stage functions are converted to `Action`s which keep
+        Named stage functions are converted to `_Action`s which keep
         a reference to the supplied `Pilfer` instance, and the
         `Pilfer` is used when converting the actions into pipeline
         stage functions.
     '''
-    with Pfx("%s.from_str(%r)", cls.__name__, text):
-      # dotted_name[:param=,...]
-      name, args, kwargs, offset = get_name_and_args(text)
-      if name:
-        if offset < len(text):
-          raise ValueError(f'unparsed text after params: {text[offset:]!r}')
-        return ActionByName(
-            pilfer=P,
-            offset=0,
-            source_text=text,
-            end_offset=len(text),
-            name=name,
-            args=args,
-            kwargs=kwargs,
-        )
-
-      # "! shcmd" or "| shlex-split"
-      if text.startswith(('!', '|')):
-        # pipe through shell command or shlex-argv
-        cmdtext = text[1:].strip()
-        if not cmdtext:
-          raise SyntaxError("empty command")
-        if text.startswith('!'):
-          # shell command
-          argv = ['/bin/sh', '-c', cmdtext]
-        elif text.startswith('!'):
-          # shlex.split()
-          argv = shlex.split(cmdtext)
-        else:
-          raise RuntimeError('unhandled shcmd/shlex subprocess')
-        return ActionSubProcess(
-            pilfer=P,
-            offset=0,
-            source_text=text,
-            end_offset=len(text),
-            argv=argv,
-        )
-
-      # /regexp or -/regexp
-      if text.startswith(('/', '-/')):
-        if text.startswith('/'):
-          offset = 1
-          invert = False
-        else:
-          assert text.startswith('-/', offset)
-          offset = 2
-          invert = True
-        if text.endswith('/'):
-          regexp_s = text[offset:-1]
-        else:
-          regexp_s = text[offset:]
-        regexp = pfx_call(re.compile, regexp_s)
-        if regexp.groupindex:
-          # a regexp with named groups
-          @uses_pilfer
-          def re_match(item, *, P: Pilfer):
-            ''' Match `item` against `regexp`, update the `Pilfer` vars if matched.
-            '''
-            m = regexp.search(str(item))
-            if not m:
-              return False
-            varmap = m.groupdict()
-            if varmap:
-              P = P.copy_with_vars(**varmap)
-            yield m
-        else:
-
-          def re_match(item):
-            ''' Just test `item` against `regexp`.
-            '''
-            return regexp.search(str(item))
-
-        return ActionSelect(
-            pilfer=P,
-            offset=0,
-            source_text=text,
-            end_offset=len(text),
-            select_func=re_match,
-            invert=invert,
-        )
-
-      if text == '..':
-        return ActionModify(
-            pilfer=P,
-            offset=0,
-            source_text=text,
-            end_offset=len(text),
-            modify_func=lambda item, P: (URL.promote(item).parent, P),
-            fast=True,
-        )
-
-      raise SyntaxError('no action recognised')
+    action = super().from_str(text)
+    action.pilfer = P
+    return action
 
 @dataclass(kw_only=True)
-class ActionByName(Action):
+class ActionByName(_Action):
 
   name: str
   args: list = field(default_factory=list)
   kwargs: dict = field(default_factory=dict)
+
+  @classmethod
+  def parse(cls, text: str, offset=0) -> Tuple[_Action, int]:
+    # dotted_name[:param=,...]
+    name, args, kwargs, offset1 = get_name_and_args(text)
+    if not name:
+      raise SyntaxError(f'no name at {offset=} in {text=}')
+    return cls(
+        source_text=text,
+        offset=offset,
+        end_offset=offset1,
+        name=name,
+        args=args,
+        kwargs=kwargs,
+    ), offset1
 
   @property
   def stage_spec(self):
     ''' Produce the stage specification for this action.
     '''
     P = self.pilfer
+    action_map = P.action_map
     try:
-      return P.action_map[self.name]
+      return action_map[self.name]
     except KeyError:
       return import_name(self.name)
 
 # TODO: this gathers it all, need to open pipe and stream, how?
 @dataclass(kw_only=True)
-class ActionSubProcess(Action):
+class ActionSubProcess(_Action):
   ''' A action which passes items through a subprocess
       with `str(item)` on each input line
       and yielding the subprocess output lines
@@ -170,6 +139,31 @@ class ActionSubProcess(Action):
   '''
 
   argv: List[str]
+
+  @classmethod
+  def parse(cls, text, offset=0):
+    if not text.startswith(('!', '|'), offset):
+      raise SyntaxError(
+          f'expected ! or | at {offset=}, found {text[offset:offset+1]!r}'
+      )
+    # pipe through shell command or shlex-argv
+    cmdtext = text[offset + 1:].strip()
+    if not cmdtext:
+      raise SyntaxError("empty command")
+    if text.startswith('!'):
+      # shell command
+      argv = ['/bin/sh', '-c', cmdtext]
+    elif text.startswith('!'):
+      # shlex.split()
+      argv = shlex.split(cmdtext)
+    else:
+      raise RuntimeError('unhandled shcmd/shlex subprocess')
+    return cls(
+        source_text=text,
+        offset=offset,
+        end_offset=len(text),
+        argv=argv,
+    ), len(text)
 
   @property
   def stage_spec(self):
@@ -231,7 +225,7 @@ class ActionSubProcess(Action):
 
 # TODO: this gathers it all, need to open pipe and stream, how?
 @dataclass(kw_only=True)
-class ActionSelect(Action):
+class ActionSelect(_Action):
   ''' This action's `stage_func` yields the input item or not
       depending on the truthiness of `select_func`.
 
@@ -277,6 +271,55 @@ class ActionSelect(Action):
 
     self.stage_func = stage_func
 
+  @classmethod
+  def parse(cls, text, offset=0):
+    text0 = text
+    text = text[offset:]
+    regexp = cutprefix(text, ('/', '-/'))
+    if regexp is text:
+      raise SyntaxError(f'expected leading / or -/ at {offset=} of {text0!r}')
+    if text.startswith('/'):
+      offset = 1
+      invert = False
+    else:
+      assert text.startswith('-/')
+      offset = 2
+      invert = True
+    # optional trailing /
+    if text.endswith('/'):
+      regexp_s = text[:-1]
+    try:
+      regexp = pfx_call(re.compile, regexp_s)
+    except re.PatternError as re_e:
+      raise SyntaxError(f'invalid regexp {regexp_s}: {re_e}') from re_e
+    if regexp.groupindex:
+      # a regexp with named groups
+      @uses_pilfer
+      def re_match(item, *, P: Pilfer):
+        ''' Match `item` against `regexp`, update the `Pilfer` vars if matched.
+        '''
+        m = regexp.search(str(item))
+        if not m:
+          return False
+        varmap = m.groupdict()
+        if varmap:
+          P = P.copy_with_vars(**varmap)
+        yield m
+    else:
+
+      def re_match(item):
+        ''' Just test `item` against `regexp`.
+        '''
+        return regexp.search(str(item))
+
+    return cls(
+        source_text=text0,
+        offset=offset,
+        end_offset=len(text0),
+        select_func=re_match,
+        invert=invert,
+    ), len(text0)
+
   @property
   def stage_spec(self):
     ''' Our stage function uses the usual process one item style.
@@ -284,7 +327,7 @@ class ActionSelect(Action):
     return self.stage_func
 
 @dataclass(kw_only=True)
-class ActionModify(Action):
+class ActionModify(_Action):
 
   modify_func: Callable[Tuple[Any, Pilfer], Tuple[Any, Pilfer]]
   fast: bool = False
@@ -298,6 +341,18 @@ class ActionModify(Action):
       yield await af(item, P)
 
     self.stage_func = stage_func
+
+  @classmethod
+  def parse(cls, text: str, offset: int = 0):
+    if text[offset:] == '..':
+      return cls(
+          source_text=text,
+          offset=offset,
+          end_offset=len(text),
+          modify_func=lambda item, P: (URL.promote(item).parent, P),
+          fast=True,
+      ), len(text)
+    raise SyntaxError('unrecognised {cls.__name__} at {offset=} of {text!r}')
 
   @property
   def stage_spec(self):

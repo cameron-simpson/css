@@ -1,0 +1,1 @@
+lib/python/cs/mappings.py: cs.mappings: new change_mapping(mapping,key,value[,mapping_name]) functions, does mapping[key]=value with a warning

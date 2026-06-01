@@ -1,0 +1,2 @@
+Add a default base SetupTeardownMixin.setupTeardown() context manager; this should now play nicely with test cases unaware of SetupTeardownMixin.
+Remove the dependency on cs.debug.

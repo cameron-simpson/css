@@ -1,0 +1,16 @@
+Require html5lib and lxml and python 3 urllib modules.
+URL.flush: clean out defined cached attributes.
+URL: new session() context manager to make a requests.Session.
+URL: hrefs, srcs: return a URLs collection.
+URL: Promotable and Formatable.
+URL: replace caching methods .GET() and .HEAD() with @cached_property .GET_response and .HEAD_response.
+URL: new .url_parsed property being the namedtuple from urlparse, drop .parts.
+URL: new .query_dict() method, returning the query parameters as a dict.
+UR: new .cleanpath and .cleanrpath properties.
+URL: new .urlto(other_url) to resolve other_url against self, use it in hrefs() and srcs().
+URL: rename content_type to content_type_full, make content_type the plain text/html value.
+URL: make .text a cached_property, get the soup using just lxml (the list-=of-parsers approach seems unsupported).
+URL: new .short attrubute being a shortend URL for messages.
+URL: new .ext property for the URL file extension.
+URL: new isabs() method to test is a URL has a hostname and a path commencing with /
+URL: support extending a URL with /

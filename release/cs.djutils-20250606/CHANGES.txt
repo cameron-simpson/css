@@ -1,0 +1,4 @@
+lib/python/cs/djutils.py: cs.djutils: model_batches_qs: new after=None parameter to indicate preiteration point
+lib/python/cs/djutils.py: cs.djutils: clean some lint, small reformatting
+lib/python/cs/djutils.py: cs.djutils: model_instances: drop only=None parameter, passed through via mbqs_kw
+lib/python/cs/djutils.py: cs.djutils: model_instances: new optional parameters prefetch_related and select_related to augument the uqerysets before iteration

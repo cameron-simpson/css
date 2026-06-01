@@ -38,7 +38,7 @@ from cs.queues import IterableQueue, QueueIterator
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, uses_upd  # pylint: disable=redefined-builtin
 
-__version__ = '20240318-post'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -230,7 +230,6 @@ def traced_untar(
   ##  with open(P.stderr, 'r', buffering=1) as ferr:
   with upd.insert(0) as filename_proxy:
     filenames_q = IterableQueue()
-    filenames_q.open()  # secondary open for the stderr processor
     # consumer of tar stdout
     # expects bare filenames
     Thread(

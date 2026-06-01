@@ -1,0 +1,1 @@
+progressbar, Progress.iterbar, Progress.bar: default report_print to the ambient verbose setting instead of not the ambient quiet setting.

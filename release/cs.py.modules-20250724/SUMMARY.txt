@@ -1,0 +1,2 @@
+Improve resolution of relative imports. (Fix seems to be an overly strong word here, unfortunately.)
+Drop pretence at Python 2 support.

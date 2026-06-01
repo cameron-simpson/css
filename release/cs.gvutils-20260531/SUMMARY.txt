@@ -1,0 +1,3 @@
+New DOT_KEYWORDS, update quote() to quote keywords.
+New Node and Graph classes for constructing a graphviz style node graph.
+gvprint: print a final newline after the sixel output.

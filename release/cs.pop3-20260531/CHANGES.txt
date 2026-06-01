@@ -1,0 +1,2 @@
+lib/python/cs/pop3.py: cs.pop3: POP3Command.cmd_dl: modernise, add -1 (once) option for testing, notice SIGINT (though the RETRs get queued so fast it hardly helps)
+lib/python/cs/pop3.py: cs.pop3: POP3Command.cmd_dl: new --limit=n option to limit the number of messages fetched

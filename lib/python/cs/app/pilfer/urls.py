@@ -3,7 +3,6 @@
 from cs.deco import promote
 from cs.urlutils import URL
 
-from cs.debug import trace, X, r, s
 
 @promote
 def hrefs(U: URL):

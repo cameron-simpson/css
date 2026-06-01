@@ -1,0 +1,9 @@
+lib/python/cs/gvutils.py: cs.gvutils: autoformat, rename a parameter for clarity
+lib/python/cs/gvutils.py: cs.gvutils: gvprint: use xb mode to prevent overwrites
+lib/python/cs/gvutils.py: cs.gvutils: new DOT_KEYWORDS, update quote() to quote keywords
+lib/python/cs/gvutils.py: cs.gvutils: some docstring updates
+lib/python/cs/gvutils.py: cs.gvutils: new Node and Graph classes for constructing a graphviz style node graph
+lib/python/cs/gvutils.py: cs.gvutils: brush off some lint
+lib/python/cs/gvutils.py: cs.gvutils: gvprint: print a final newline after the sixel output
+lib/python/cs/gvutils.py: cs.gvutils: quote: bugfix check for valid bareword (ID)
+lib/python/cs/gvutils.py: cs.gvutils: graph.print(): remove debugging accidentally included in the previous commit

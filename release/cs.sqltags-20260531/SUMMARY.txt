@@ -1,0 +1,20 @@
+BaseSQLTagsCommand: modernise usage spec and common options, make .sqltags a cached property of BaseSQLTagsCommand (uses self.TAGSETS_CLASS, hence not in the Options).
+SQLTagSet: provide __lt__ to order entities.
+SQLTags now subclasses SingletonMixin, keying on the normalised db URL for filesystem paths.
+SQLTagSet.jsonable: turn datetimes into ISO8601 strings.
+SQLTags.__getitem__: initial support for a (tag_name,value) 2-tuple as an index.
+SQLTags.__getitem__: if the (missing) index is a (name,value) 2-tuple create the entity with name=None and set the tag.
+SQLTags.__getitem__: for a (tag_name,tag_value) 2-tuple, if the tag_name is "name" create it with that name.
+SQLTagSet.TYPE_JS_MAPPING: add UUID to the supported types.
+SQLTagBasedTest.sql_parameters: support name=None.
+SQLTagSet: new .deref() method to dereference tags whose values refer to other SQLTagSets.
+SQLTagsCommandsMixin: rename cmd_init to cmd_dbinit.
+New HasSQLTags(HasTags) mixin providing a .tags_db proptery from self.tags.sqltags.
+New UsesSQLTags mixin providing .__getitem__(type_subname,key).
+cs.sqltags,cs.cdrip: move the MBDB.find method into UsesSQLTags.
+Drop HasSQLTags (HasTags does it all now), make UsesSQLTags subclass UsesTagSets and just set TagSetsClass=SQLTags.
+New SQLTags.dbshell() method to run an interactive db prompt.
+SQLTags: new .preload(*criteria) method to preload and return TagSets.
+tagset,fstags,sqltags: make _id only special to SQLTagSet (the db row id), drop all mentions elsewhere.
+SQLTagSet.set: new optional force=False parameter, skips db update if false and value unchanged.
+SQLTags.default_factory: drop skip_refresh support, will be covered by the Refreshable stuff.

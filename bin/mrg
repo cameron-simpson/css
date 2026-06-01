@@ -1,259 +1,66 @@
-#!/usr/bin/perl
+#!/usr/bin/env python3
+#
+# Merge files into a directory.
+# - Cameron Simpson <cs@cskk.id.au>
+#
 
-use strict qw(vars);
+''' Merge files into a directory. '''
 
-use cs::Upd;
-use cs::Misc;
-use cs::Pathname;
-use Getopt::Std;
-use File::Copy;
-use File::Compare;
-use File::Find;
+from dataclasses import dataclass
+from getopt import GetoptError
+from os.path import basename, isfile as isfilepath, join as joinpath
+import sys
 
-$::Usage="Usage: $::cmd [-npsv] [dir files...]
-	-n	No unlink of source file.
-	-p	Make directory if missing, including parents.
-	-z	Consider zero length files to be like missing files.
-	-Z	Consider a file that is a prefix of its counterpart
-		suitable for replacement.
-	-s	Silent.
-	-r	Relative.
-	-v	Verbose.
-";
+from cs.cmdutils import BaseCommand, popopts
+from cs.hashindex import HASHNAME_DEFAULT, merge
+from cs.logutils import warning
+from cs.pfx import Pfx
 
-$::NoUnlink=0;
-$::MakeDir=0;
-$::Relative=0;
-$::Verbose=-t STDOUT;
-$::EmptyIsMissing=0;
+from cs.debug import trace
 
-$::badopts=0;
-getopts("nprsvzZ") || ($::badopts=1);
+def main(argv=None):
+  ''' CLI for the `mrg` command.
+  '''
+  return MrgCommand(argv).run()
 
-$::NoUnlink=1 if $::opt_n;
-$::MakeDir=1 if $::opt_p;
-$::Relative=1 if $::opt_r;
-$::Verbose=0 if $::opt_s;
-$::Verbose=1 if $::opt_v;
-$::EmptyIsMissing=1 if $::opt_z;
-$::OverwritePrefixes=1 if $::opt_Z;
+class MrgCommand(BaseCommand):
+  ''' The `mrg` command line implementation.
+  '''
 
-if (! @ARGV)
-{ undef $::Dir;
-  if (-t STDIN)
-  { warn "$::cmd: stdin may not be a terminal in filter mode\n";
-    $::badopts=1;
-  }
-}
-else
-{ $::Dir=shift(@ARGV);
-  if (! $::MakeDir && ! -d "$::Dir/.")
-  { warn "$::cmd: $::Dir: not a directory\n";
-    $::badopts=1;
-  }
+  @dataclass
+  class Options(BaseCommand.Options):
+    ''' Options for `MrgCommand`.
+    '''
+    hashname: str = HASHNAME_DEFAULT
 
-  if (! @ARGV)
-  { warn "$::cmd: missing files\n";
-    $::badopts=1;
-  }
-  else
-  { @::Files=@ARGV;
-  }
-}
+  @popopts
+  def main(self, argv):
+    ''' Usage: {cmd} targetdir paths...
+          Merge files from paths into the target directory.
+    '''
+    options = self.options
+    doit = options.doit
+    hashname = options.hashname
+    if not argv:
+      raise GetoptError("missing targetdir")
+    targetpath = argv.pop(0)
+    if not argv:
+      raise GetoptError("missing paths")
+    xit = 0
+    for path in argv:
+      with Pfx(path):
+        if not isfilepath(path):
+          warning("not a regular file")
+          xit = 1
+          continue
+      target = joinpath(targetpath, basename(path))
+      with Pfx("-> %s", target):
+        try:
+          merge(path, target, hashname=hashname, move_mode=True, doit=doit)
+        except FileExistsError as e:
+          warning("%s", e)
+          xit = 1
+    return xit
 
-die $::Usage if $::badopts;
-
-$::Xit=0;
-
-if (defined $::Dir)
-{ for my $file (@::Files)
-  { if (-d $file)
-    { find({ wanted => \&submerge, no_chdir => 1 }, $file);
-    }
-    elsif (-f _)
-    { mrg($::Dir,$file,$::MakeDir,$::NoUnlink,$::Relative) || ($::Xit=1);
-    }
-  }
-}
-else
-# expect "dir file" on stdin
-{ INPUT:
-  while (defined ($_=<STDIN>))
-  { chomp;
-    if (! /^(\S+) /)
-    { warn "$::cmd: bad input: $_\n";
-      $::Xit=1;
-      last INPUT;
-    }
-
-    mrg($1,$',$::MakeDir,$::NoUnlink,$::Relative) || ($::Xit=1);
-  }
-}
-
-exit $::Xit;
-
-sub submerge
-{
-  out($_);
-  if (-f $_)
-  { mrg($::Dir,$File::Find::name,$::MakeDir,$::NoUnlink,$::Relative);
-  }
-}
-
-sub mrg($$$$$)
-{ my($dir,$file,$makedir,$nounlink,$relative)=@_;
-
-  my $ok = 0;
-  my $mrg;
-
-  if ($mrg=mrginto($dir,$file,$makedir,$relative))
-  {
-    if ($nounlink)
-    { $ok=1;
-    }
-    elsif (unlink($file))
-    { $ok=1;
-    }
-    else
-    { warn "$::cmd: unlink($file): $!\n";
-    }
-  }
-
-  out('') if $::Verbose;
-
-  $ok;
-}
-
-# merge file into dir; return:
-#	2 - identical file already in place
-#	1 - success
-#	0 - failure - different existing file, etc
-sub mrginto($$$$)
-{ my($dir,$file,$makedir,$relative)=@_;
-  
-  if ($relative)
-  { my $fdir = cs::Pathname::dirname($file);
-    $dir.="/$fdir" if $fdir ne ".";
-    ## warn "fdir=$fdir\ndir=$dir\n";
-  }
-
-  my $base = cs::Pathname::basename($file);
-  my $dirfile = "$dir/$base";
-
-  out("$file => $dir") if $::Verbose;
-
-  # construct directory if missing
-  if (! stat($dir))
-  { if ($makedir)
-    { if (! cs::Pathname::makedir($dir))
-      { warn "$::cmd: makedir($dir): $!\n";
-	return 0;
-      }
-    }
-    else
-    { warn "$::cmd: $dir: $!\n";
-      return 0;
-    }
-  }
-
-  # source file missing?
-  my @s = stat($file);
-  if (! @s)
-  { warn "$::cmd: $file: $!\n";
-    return 0;
-  }
-
-  # source not a file?
-  if (! -f _)
-  { warn "$::cmd: $file: not a regular file: $!\n";
-    return 0;
-  }
-
-  # target missing?
-  my @t = stat($dirfile);
-  if (@t && ! -f _)
-  { warn "$::cmd: $dirfile: not a regular file\n";
-    return 0;
-  }
-
-  # if target (exists and empty) or missing, replace
-  if (
-      ($::EmptyIsMissing && @t && $t[7] == 0)
-   || ! lstat($dirfile)
-     )
-  {
-    # unlink target if present
-    if (@t && !unlink($dirfile))
-    { warn "$::cmd: unlink($dirfile): $!\n";
-      return 0;
-    }
-
-    # prefer link to copy
-    if (link($file,$dirfile)
-     || File::Copy::copy($file,$dirfile))
-    { nl("$file => $dirfile");
-      return 1;
-    }
-
-    warn "$::cmd: File::Copy::copy($file,$dirfile): $!\n";
-
-    if (lstat($dirfile) && !unlink($dirfile))
-    { warn "$::cmd: unlink($dirfile): $!\n";
-    }
-
-    return 0;
-  }
-
-  if (! @t)
-  { warn "$::cmd: $dirfile: can lstat but not stat - bad symnlink?\n";
-    return 0;
-  }
-
-  # check for hard link - probably means merging tree with self
-  my($sdev,$sino,$smode,$snlink)=@s;
-  my($tdev,$tino)=@t;
-  if ($sino == $tino && $sdev == $tdev)
-  {
-    if ($snlink > 1)
-    # check that these files are distinct hard links
-    # if so we can remove one safely
-    {
-      my $sdir = cs::Pathname::dirname($file);
-      my $tdir = cs::Pathname::dirname($dirfile);
-      my @sd = stat($sdir);
-      my @td = stat($tdir);
-      if (@sd && @td && ($sd[0] != $td[0]  || $sd[1] != $td[1]))
-      # different dirs - unlink source file anyway
-      { ##warn "$::cmd: $file and $dirfile are distinct hard links, removing $file\n";
-	return 2;
-      }
-    }
-
-    warn "$::cmd: $file and $dirfile "
-	.($s[3] == 1 ? "are the same file!" : "hardlinked")
-	.", not merged\n";
-    return 0;
-  }
-
-  my $cmp = cs::Pathname::compare($file,$dirfile);
-  ##warn "cmp($file,$dirfile) = $cmp\n";
-
-  if (! defined $cmp)
-  { warn "$::cmd: compare fails: $!\n";
-    return 0;
-  }
-
-  if ($cmp == 0)
-  { nl("$file => $dirfile: identical");
-    return 2;
-  }
-
-  if ($cmp == -1 && $::OverwritePrefixes)
-  { nl("$file <=> $dirfile: prefix");
-    return 2;
-  }
-
-  warn "$::cmd: $file and $dirfile differ\n";
-
-  return 0;
-}
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

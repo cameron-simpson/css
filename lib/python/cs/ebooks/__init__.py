@@ -70,12 +70,10 @@ DISTINFO = {
         'cs.buffer',
         'cs.cmdutils',
         'cs.context',
-        'cs.debug',
         'cs.deco',
         'cs.fileutils',
         'cs.fs',
         'cs.fstags',
-        'cs.gimmicks',
         'cs.lex',
         'cs.logutils',
         'cs.numeric',
@@ -99,6 +97,9 @@ DISTINFO = {
         'sqlalchemy',
         'typeguard',
     ],
+    'extras_requires': {
+        'dedrm': ['cs.gimmicks', 'pycryptodomex'],
+    },
     'entry_points': {
         'console_scripts': {
             'ebooks': 'cs.ebooks.__main__:main'

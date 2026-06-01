@@ -1,0 +1,60 @@
+lib/python/cs/app/playon.py: cs.app.playon: move dl_jobs, ls_format and queue_format into the Options class, use popopts for these options
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.Options: omit "password" from the info listing
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: use @popopts for more option parsing
+lib/python/cs/app/playon.py: cs.app.playon: make LS_FORMAT and QUEUE_FORMAT globals
+lib/python/cs/app/playon.py: cs.app.playon: set uninitialise variable
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTags.recording_ids_from_str: workaround for missing series or name
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: print the download summary if not quiet (eg from the -q CLI option)
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.{cmd_feature,cmd_rename}: set omitted variable
+lib/python/cs/app/playon.py: cs.*: use format strings in a common GetoptError incantation
+lib/python/cs/app/playon.py: cs.app.playon: use cs.rfc2616.content_length to get the download content-length, open the download file with 'xb'
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: only warn about nothing to download if stderr is a tty
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: give a meaningful name to the download Thread
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: print download size and timing if (not quiet if sys.stdout.isatty() else verbose)
+lib/python/cs/app/playon.py: cs.app.playon: fix docstring typo
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnSQLTags.infer_db_url: has to be a class method
+lib/python/cs/app/playon.py: cs.app.playon: tweak docstring
+lib/python/cs/app/playon.py: cs.app.playon: cite PLAYON_DBURL_ENVVAR and PLAYON_DBURL_DEFAULT instead of DBURL_ENVVAR and DBURL_DEFAULT; PlayOnSQLTags now just an SQLTags with custom DBURL_ENVVAR and DBURL_DEFAULT
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.run_context: the api will open its own SQLTags
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: modern @popopts usage
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI is now the source of the sqltags, do not expect to access it outside
+lib/python/cs/app/playon.py: cs.app.playon: new _PlayOnEntity(HasSQLTags) base class for Recording and LoginState; PlayOnAPI._entry_entities: no need to open the sqltags, done in enter/exit
+lib/python/cs/app/playon.py: cs.app.playon: PlayonSeriesEpisodeInfo: improve the init process
+lib/python/cs/app/playon.py: cs.app.playon: drop old LoginState, new one defined above Recording
+lib/python/cs/app/playon.py: cs.app.playon: Recording.is_stale: better logic
+lib/python/cs/app/playon.py: cs.app.playon: Recording: .resolution: return None if no playon.Quality; .nice_name: fall back to playon.Name if there is no episode title
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: new .login_userid property for external use
+lib/python/cs/app/playon.py: cs.app.playon: some type annotations and docstring tweaks
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.__getitem__: an int index is promoted to ('recording,str(index)) for lookup
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: new .recordings() finding playon.recording.*; use it for __iter__
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: new .recording_ids_from_str() method for use by the CLI
+lib/python/cs/app/playon.py: cs.app.playon: import updates
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: use the new UsesTagSets stuff
+lib/python/cs/app/playon.py: cs.app.playon: update imports, improve warning
+lib/python/cs/app/playon.py: cs.app.playon: Recording.ls: use printt() for the long listing, rename ls_format to format
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_rename: get the playon Recording from the "playon.id" tag via by_zone_key() instead of via the "playon.ID" tag
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand: cmd_ls,cmd_queue: use new PlayOnAPI.ls method for the listing, drop _list()
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.__getitem__: promote int index to ('recording',int) instead of ('recording',str(int))
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI._entry_entities: pass the entry_id straight through
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: record the Recording entity id as the playon.id tag
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_poll: tweak reference to self.options.api.notifications()
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: do not record the Recording tags on the tagged file, they belong in the db only not that we set playon.id="recording.nnnn"
+lib/python/cs/app/playon.py: cs.app.playon: update call to .zone_entity('playon') from old name
+lib/python/cs/app/playon.py: cs.app.playon,cs.sqltags: drop obsolete @has_format_attributes
+lib/python/cs/app/playon.py: cs.app.playon: The PlayOn API has started reciting times with a microsecond field
+lib/python/cs/app/playon.py: cs.app.playon: start using (Recording,recording_id) indices instead of ('recording',recording_id)
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.recording_ids_from_str: iterating the API yields Recordings already
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.from_playon_date: accomodate time formats with an without microseconds
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: drop references to sqltags, reference the API
+lib/python/cs/app/playon.py: cs.app.playon: PlayonSeriesEpisodeInfo.from_Recording: include the episode_title, somehow lost
+lib/python/cs/app/playon.py: cs.app.playon: update imports
+lib/python/cs/app/playon.py: cs.app.playon: get UTC timezone from datetime.timezone.utc instead of datetime.UTC (3.11 onward)
+lib/python/cs/app/playon.py: cs.app.playon: update the setting of the download path and the reference to the PlayOn recording entity
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.recording_ids_from_str: drop use of subtags
+lib/python/cs/app/playon.py: cs.app.playon: _PlayOnEntity: update for Refreshable
+lib/python/cs/app/playon.py: cs.app.playon: Recording.STALE_AGE -> Recording.refresh_lifespan for Refreshable
+lib/python/cs/app/playon.py: cs.app.playon:" PlayOnAPI.suburl_data: report timing is verbose; PlayOnAPI.fetch_recordings: recite entities if verbose
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: updates for the new HTTPServiceAPI changes
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_account: use printt() for the output
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_dl: use pmap() to run the downloads in parallel
+lib/python/cs/app/playon.py: cs.app.playon: remove strayu debug

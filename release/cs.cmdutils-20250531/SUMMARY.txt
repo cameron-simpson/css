@@ -1,0 +1,3 @@
+Fix @popopts internals for recent @decorator internal changes.
+Fix BaseCommandOptions.getopt_spec_map to let the subcommand options override the inherited common options.
+Fix a format string.

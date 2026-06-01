@@ -1,0 +1,1 @@
+@OBSOLETE: update to use the new @decorator mode to set __name__ and __doc__.

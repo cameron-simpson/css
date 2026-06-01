@@ -1,0 +1,21 @@
+lib/python/cs/lex.py: cs.lex: new without_prefix(s,prefix) and without_suffix(s,suffix) returning s with the prefix or suffix removed if present, otherwise None
+lib/python/cs/lex.py: cs.lex: fix/improve some type annotations
+lib/python/cs/lex.py: cs.lex: typed_str: make all the optional parameters keyword only
+lib/python/cs/lex.py: cs.lex: BaseToken: fix parse calls
+lib/python/cs/lex.py: cs.lex: drop unused import and exception variables
+lib/python/cs/lex.py: merge default ==> pilfer
+lib/python/cs/lex.py: cs.lex: tabulate: expose the default PrettyPrinter subclass as the TabulatePrettyPrinter class for easy reuse
+lib/python/cs/lex.py: cs.lex: tweak docstring
+lib/python/cs/lex.py: cs.lex: printt: accept an int for the indent, convert to spaces
+lib/python/cs/lex.py: cs.lex: FormatMapping.__getitem__: bugfix indent error with raise
+lib/python/cs/lex.py: cs.lex: tabulate: replace ppcls parameter with as_str parameter, expose the default as tabulate.default_as_str
+lib/python/cs/lex.py: cs.lex: tabulate: expose the row -> grid-of-cells as the new function row_cells
+lib/python/cs/lex.py: cs.lex: row_cells: add the optional `as_str` parameter as we'll be doing that conversion here, also promote str to [str]
+lib/python/cs/lex.py: cs.lex: tabulate: support nested subtables via new flatten_table_rows() function to unfold subtables into a flat list of rows-of-str
+lib/python/cs/lex.py: cs.lex: drop unused import
+lib/python/cs/lex.py: cs.lex: flatten_table_rows: consistent checking of the subtable for attachable rows
+lib/python/cs/lex.py: cs.lex: tabulate: document the substable stuff
+lib/python/cs/lex.py: cs.lex: tiny cleanup
+lib/python/cs/lex.py: cs.lex: flatten_table_rows: treat str like list[str]
+lib/python/cs/lex.py: cs.lex: flatten_table_rows: better handling of subtables not below a list, and single row subtables
+lib/python/cs/lex.py: cs.lex: tabulate: demo the new subtable stuff in the doctest

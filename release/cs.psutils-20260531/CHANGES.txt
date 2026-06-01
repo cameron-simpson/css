@@ -1,0 +1,2 @@
+lib/python/cs/psutils.py: cs.psutils: utilise the new @fmtdoc {name==} syntax
+lib/python/cs/psutils.py: cs.psutils: serialise command traces, avoids interleaving things like pipelines

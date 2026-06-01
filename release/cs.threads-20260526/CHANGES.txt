@@ -1,0 +1,5 @@
+lib/python/cs/threads.py: cs.threads: fix docstring typo
+lib/python/cs/threads.py: cs.threads: HasThreadState.bg: docstring clarifications
+lib/python/cs/threads.py: cs.threads: new pmap(func,items) concurrent version ofmap()
+lib/python/cs/threads.py: cs.threads: pmap: docstring fixes
+lib/python/cs/threads.py: cs.threads: update DISTINFO

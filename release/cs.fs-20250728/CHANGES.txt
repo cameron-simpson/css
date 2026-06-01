@@ -1,0 +1,3 @@
+lib/python/cs/fs.py: cs.fs: remove_protecting: truncate the portion of the basename in the temp file prefix, can blow the filesystem limit
+lib/python/cs/fs.py: cs.fs: shortpath: cope if there is no pwd.getpwuid function (nonUNIX)
+lib/python/cs/fs.py: cs.fs: update DISTINFO

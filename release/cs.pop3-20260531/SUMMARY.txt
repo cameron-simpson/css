@@ -1,0 +1,1 @@
+POP3Command.cmd_dl: add -1 (once) option for testing, notice SIGINT (though the RETRs get queued so fast it hardly helps), new --limit=n option to limit the number of messages fetched.

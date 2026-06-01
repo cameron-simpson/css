@@ -1,0 +1,2 @@
+HashIndexCommand.cmd_rsync: accept arbitrary rsync options after dstdir.
+merge: fall back to shutil.move if the link is a cross device link.

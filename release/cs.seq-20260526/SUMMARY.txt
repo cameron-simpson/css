@@ -1,0 +1,1 @@
+Update some type annotations for pre-Python 3.13.

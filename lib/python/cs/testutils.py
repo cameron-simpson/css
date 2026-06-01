@@ -7,14 +7,15 @@
 ''' Hacks to assist with testing.
 '''
 
+from contextlib import contextmanager
 from itertools import product
+import sys
 import threading
 
 from cs.context import push_cmgr, pop_cmgr
-from cs.debug import thread_dump
 from cs.deco import decorator
 
-__version__ = '20250426-post'
+__version__ = '20251020-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -26,7 +27,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
-        'cs.debug',
         'cs.deco',
     ],
 }
@@ -106,6 +106,11 @@ class SetupTeardownMixin:
     pop_cmgr(self, '_SetupTeardownMixin__tearDown')
     super().tearDown()
 
+  @contextmanager
+  def setupTeardown(self):
+    '''Base class `setupTeardown` context manager which does nothing.'''
+    yield
+
 def assertSingleThread(include_daemon=False, exclude=None):
   ''' Test that there is only one `Thread` still running.
 
@@ -122,8 +127,13 @@ def assertSingleThread(include_daemon=False, exclude=None):
   ]
   if not Ts:
     return True
-  with open('/dev/tty', 'w') as tty:
-    thread_dump(Ts, fp=tty)
+  try:
+    from cs.debug import thread_dump
+  except ImportError:
+    print('no cs.debug.thread_dump', sys.stderr)
+  else:
+    with open('/dev/tty', 'w') as tty:
+      thread_dump(Ts, fp=tty)
   raise AssertionError(
       "%d excess %s Threads: %s" % (
           len(Ts),
@@ -138,7 +148,8 @@ if __name__ == '__main__':
   from contextlib import contextmanager
   import sys
   import unittest
-  from cs.debug import trace
+
+  ##from cs.debug import trace
 
   class TestSetupTeardownMixin(SetupTeardownMixin, unittest.TestCase):
 

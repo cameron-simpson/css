@@ -5,6 +5,7 @@
 '''
 
 from collections import namedtuple
+from contextlib import contextmanager
 import errno
 from fnmatch import filter as fnfilter
 from functools import partial
@@ -26,17 +27,21 @@ from os.path import (
     splitext,
 )
 from pathlib import Path
-from pwd import getpwuid
-from tempfile import TemporaryDirectory
+try:
+  from pwd import getpwuid
+except ImportError:
+  # not UNIX? we'll try to cope later
+  getpwuid = None
+from tempfile import mkstemp, TemporaryDirectory
 from threading import Lock
 from typing import Any, Callable, Iterable, Optional, Union
 
-from cs.deco import decorator, fmtdoc, Promotable
+from cs.deco import fmtdoc, Promotable
 from cs.lex import r
 from cs.obj import SingletonMixin
-from cs.pfx import pfx, pfx_call
+from cs.pfx import pfx, pfx_call, Pfx
 
-__version__ = '20250414-post'
+__version__ = '20260526-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -46,6 +51,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.lex',
         'cs.obj',
         'cs.pfx',
     ],
@@ -56,6 +62,7 @@ DISTINFO = {
 pfx_listdir = partial(pfx_call, os.listdir)
 pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_makedirs = partial(pfx_call, os.makedirs)
+pfx_open = partial(pfx_call, open)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
@@ -82,25 +89,51 @@ def needdir(dirpath, mode=0o777, *, use_makedirs=False, log=None) -> bool:
     pfx_mkdir(dirpath, mode)
   return True
 
-@decorator
-def atomic_directory(infill_func, make_placeholder=False):
-  ''' Decorator for a function which fills in a directory
-      which calls the function against a temporary directory
-      then renames the temporary to the target name on completion.
+def atomic_directory(
+    dirpath_or_func: Union[str, Callable], *, make_placeholder=False
+):
+  ''' RUn code in a temporary directory, which will be renamed to
+      the target directory if no exception occurs.
 
       Parameters:
-      * `infill_func`: the function to fill in the target directory
       * `make_placeholder`: optional flag, default `False`:
         if true an empty directory will be make at the target name
         and after completion it will be removed and the completed
         directory renamed to the target name
-  '''
 
-  def atomic_directory_wrapper(dirpath, *a, **kw):
-    assert isinstance(
-        dirpath,
-        str,
-    ), f'dirpath not a str: {r(dirpath)}'
+      This may be used as a context manager or as a decorator.
+
+      As a contextmanager:
+
+          with atimoc_directory(target_directory) as tmpdirpath:
+              do work inside tmpdirpath
+
+      This will rename the `tmpdirpath` to `target_directory` on exit.
+
+      As a decorator:
+
+          @atomic_directory
+          def produce_dir_content(tmpdirpath,.....):
+
+      This produces a function which will accept a target directory
+      path as its first argument and calls `produce_dir_content`
+      with the temporary directory.
+      On return the temporary directory will be renamed to the target directory.
+  '''
+  if callable(dirpath_or_func):
+    func = dirpath_or_func
+
+    def atomic_directory_wrapper(dirpath: str, *a, **kw):
+      with atomic_directory(dirpath,
+                            make_placeholder=make_placeholder) as tmpdirpath:
+        return func(tmpdirpath, *a, **kw)
+
+    return atomic_directory_wrapper
+  assert isinstance(dirpath_or_func, str)
+  dirpath = dirpath_or_func
+
+  @contextmanager
+  def atomic_directory_cm(dirpath: str, *, make_placeholder=False):
     remove_placeholder = False
     if make_placeholder:
       # prevent other users from using this directory
@@ -115,7 +148,7 @@ def atomic_directory(infill_func, make_placeholder=False):
           prefix='.tmp--atomic_directory--',
           suffix='--' + basename(dirpath),
       ) as tmpdirpath:
-        result = infill_func(tmpdirpath, *a, **kw)
+        yield tmpdirpath
         if remove_placeholder:
           pfx_rmdir(dirpath)
           remove_placeholder = False
@@ -127,9 +160,8 @@ def atomic_directory(infill_func, make_placeholder=False):
       if remove_placeholder and isdirpath(dirpath):
         pfx_rmdir(dirpath)
       raise
-    return result
 
-  return atomic_directory_wrapper
+  return atomic_directory_cm(dirpath, make_placeholder=make_placeholder)
 
 @pfx
 def scandirtree(
@@ -225,10 +257,12 @@ def update_linkdir(linkdirpath: str, paths: Iterable[str], trim=False):
   ''' Update `linkdirpath` with symlinks to `paths`.
       Remove unused names if `trim`.
       Return a mapping of names in `linkdirpath` to absolute forms of `paths`.
+
+      My example use is maintaining a small directory of wallpapers
+      to shuffle, selected from a reference image tree.
   '''
   # TODO: deal with paths which conflict by basename
   # TODO: hard link mode?
-  # TODO: move to cs.fs
   name_map = {basename(path): abspath(path) for path in paths}
   for name, linkpath in sorted(name_map.items()):
     linkpath_short = shortpath(linkpath)
@@ -512,19 +546,20 @@ def shortpath(
     if collapseuser:
       # scan for the lowest homedir in the path
       pws = {}
-      for i, path in enumerate(paths):
-        try:
-          st = path.stat()
-        except OSError:
-          continue
-        try:
-          pw = pws[st.st_uid]
-        except KeyError:
-          pw = pws[st.st_uid] = getpwuid(st.st_uid)
-        if path.samefile(pw.pw_dir):
-          base_s = '~' if pw.pw_uid == os.geteuid() else f'~{pw.pw_name}'
-          paths = paths[:i + 1]
-          break
+      if getpwuid is not None:
+        for i, path in enumerate(paths):
+          try:
+            st = path.stat()
+          except OSError:
+            continue
+          try:
+            pw = pws[st.st_uid]
+          except KeyError:
+            pw = pws[st.st_uid] = getpwuid(st.st_uid)
+          if path.samefile(pw.pw_dir):
+            base_s = '~' if pw.pw_uid == os.geteuid() else f'~{pw.pw_name}'
+            paths = paths[:i + 1]
+            break
     # a list of (Path,display) from base to leaf
     paths_as = [[path, None] for path in reversed(paths)]
     # note the display for the base Path
@@ -575,7 +610,7 @@ def shortpath(
         except OSError:
           i += 1
     parts = [
-        (path_as[1] or (path_as[0].path if i == 0 else path_as[0].name))
+        (path_as[1] or (str(path_as[0]) if i == 0 else path_as[0].name))
         for i, path_as in enumerate(keep_as)
     ]
     parts.append(paths_as[-1][1] or leaf.name)
@@ -684,3 +719,56 @@ def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
       break
     dirpath = new_dirpath
   return None
+
+@pfx
+def remove_protecting(rmpath, safepath):
+  ''' Remove the file at `rmpath` while protecting `safepath` from destruction.
+
+      This is for situations such as "merging" two equivalent
+      files where the "source" file (`rmpath`) is to be removed,
+      leaving the destination file (`safepath`). It can be that
+      these are the same file (not merely links to the same file,
+      but the same link/name); this is surprisingly hard to detect,
+      and removing the source will then destroy the destination.
+
+      Instead of checking carefully and unreliably, we instead make
+      a "safe" hard link of the destination, remove the source,
+      then try to link the safe link back to the destination.
+      If that succeeds, we have recovered from the destruction.
+      If that fails with `FileExistsError` then the destruction did
+      not occur. Both are good. Other exceptions are released with
+      an accompanying note about the path to the "safe" link.
+
+      Example use:
+
+          if srcpath != dstpath and same_content(srcpath, dstpath):
+              remove_protecting(srcpath, dstpath)
+  '''
+  # To avoid unlinking the only name we make a hard link of safepath,
+  # remove rmpath, link the safety hard link back to safepath.
+  temppath = None
+  try:
+    # preparethe safe hard link
+    tfd, temppath = pfx_call(
+        mkstemp,
+        dir=dirname(safepath),
+        prefix=f'.safelink--{basename(safepath)[:80]}--',
+    )
+    os.close(tfd)
+    pfx_call(os.remove, temppath)
+    pfx_call(os.link, safepath, temppath)
+    # we now have a recover path here
+    safelinkpath = temppath
+    with Pfx(f'safe link of {safepath=} at {safelinkpath=}'):
+      # now remove the source
+      pfx_call(os.remove, rmpath)
+      # link the safety link back to the safepath
+      try:
+        pfx_call(os.link, safelinkpath, safepath)
+      except FileExistsError:
+        # safepath still there, this is ok
+        pass
+  finally:
+    # tidy up
+    if temppath is not None:
+      pfx_call(os.remove, temppath)

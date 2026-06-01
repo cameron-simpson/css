@@ -1,0 +1,4 @@
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rsync: accept arbitrary rsync options after dstdir
+lib/python/cs/hashindex.py: cs.hashindex: HashIndexCommand.cmd_rsync: pumb options.doit to the rearrange or remote_rearrange calls
+lib/python/cs/hashindex.py: cs.hashindex: merge: fall back to shutil.move if the link is a cross device link
+lib/python/cs/hashindex.py: cs.hashindex: a Pfx context

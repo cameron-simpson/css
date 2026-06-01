@@ -1,0 +1,15 @@
+lib/python/cs/fstags.py: cs.fstags: fix type annotations
+lib/python/cs/fstags.py: cs.fstags: FSTags.__getitem__: bump the slow parse time waring to 5s, add some module docstringage
+lib/python/cs/fstags.py: cs.fstags: FSTags.__getitem__: only warning about slow access if verbose or on a tty
+lib/python/cs/fstags.py: cs.fstags: clean some lint
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.__lt__: use HasFSPath.__lt__ to compare the .fspath attribute
+lib/python/cs/fstags.py: cs.fstags: new TaggedPathSet implementing a set of taggedPaths
+lib/python/cs/fstags.py: merge default ==> tagger
+lib/python/cs/fstags.py: merge default => tagger
+lib/python/cs/fstags.py: merge default -> tagger
+lib/python/cs/fstags.py: cs.fstags: TaggedPathSet.update: fix type annotation
+lib/python/cs/fstags.py: cs.ftags: use ('.',) instead of ['.'], overtly frozen
+lib/python/cs/fstags.py: cs.fstags: backport typing annotation, failing on python 3.8
+lib/python/cs/fstags.py: cs.fstags: tweak docstring
+lib/python/cs/fstags.py: cs.fstags: some docstring tweaks
+lib/python/cs/fstags.py: cs.fstags: FSTags.mv: link then remove to avoid tromping dstpath

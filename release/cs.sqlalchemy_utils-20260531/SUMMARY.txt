@@ -1,0 +1,3 @@
+Expose the db URL normalisation stuff as methods.
+ORM.startup_shutdown: do not obtain the db lock, we will now do this per orchestrated_session().
+New ORM.dbshell() method to run an interactive db prompt.

@@ -32,7 +32,7 @@ from cs.binary import AbstractBinary
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.deco import promote
-from cs.lex import r
+from cs.lex import r, s
 from cs.logutils import debug, warning
 from cs.pfx import pfx, Pfx, pfx_call, pfx_method
 from cs.queues import IterableQueue
@@ -42,7 +42,6 @@ from cs.threads import bg
 from .cbz import make_cbz
 from .common import EBooksCommonBaseCommand
 
-from cs.debug import s
 from cs.x import X
 
 pfx_open = partial(pfx_call, open)

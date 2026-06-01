@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: update to use the new @decorator mode to set __name__ and __doc__
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: improve the generated docstring

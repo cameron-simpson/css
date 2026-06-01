@@ -1,0 +1,15 @@
+New TagSetTyping mixin for TagSets providing .type_name, .type_key, .type_zone and .type_subname properties based on partitioning .name into zone.type_subname.key; inherited by TagSet.
+New HasTags mixin for classes whose instances have a .tags attribute which is a TagSet, proxying several mapping methods .deref, and __getattr__ to the .tags.
+BaseTagSets: new deref(TagSet) method to dereference values in a TagSet's tags to their corresponding TagSets.
+New UsesTagSets, the bulk of UsesSQLTags, deref which promotes the result of BaseTagSets.deref and relies on subclasses to provide a .find(), such as SQLTags.find.
+TagSet: drop get_value() and get_format_attribute().
+New TagSet.json() and HasTags.json() methods, usable as format conversions.
+New HasTags.printt() method calling cs.lex.printt().
+TagSet: new printt() method.
+jsonable: support transcribe datetime.date.
+tagset,fstags,sqltags: make _id only special to SQLTagSet (the db row id), drop all mentions elsewhere.
+TagSet.dump: make as obsolete, prefer TagSet.printt.
+TagSet and HasTags:: make Refreshable, drop the .is_stale() method, superceded by .refresh_needed().
+TagFile.save_tagset: have atomic_filename fall back to overwrite on PermissionError, uses new write_tagsets class method.
+HasTags: new .print() method for a nice summary, default calls .printt().
+Many other small changes.

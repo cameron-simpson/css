@@ -1,0 +1,2 @@
+lib/python/cs/progress.py: cs.progress: porgressbar,Progress.iterbar,Progress.bar: default report_print to the ambient verbose setting
+lib/python/cs/progress.py: cs.progress: modernise time transcription

@@ -1,0 +1,5 @@
+BaseCOmmand.repl: fix the definition of the locals and improve the default banner.
+BaseCommand: new .pop_buffer(argv) and .pop_buffers(argv) methods to get CornuCopyBuffers from CLI filespecs.
+OptionSpec: support opt__= to indicate an accruing option.
+BaseComman.run_context: yield the new self.options object.
+BaseCommand.run: no longer detect a return from the run_context() call as early exit as it is now the options.

@@ -1,0 +1,21 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand._prerun_setup: set new self.subcmd to the subcommand name if using a subcommand, None if not
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCOmmand.repl: fix the definition of the locals and improve the default banner
+lib/python/cs/cmdutils.py: cs.cmdutils: remove unused import
+lib/python/cs/cmdutils.py: merge default ==> pilfer: ClonedIterator fix
+lib/python/cs/cmdutils.py: cs.cmdutils: tweak docstring wording
+lib/python/cs/cmdutils.py: cs.cmdutils: fix f-string
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new .pop_buffer(argv) and .pop_buffers(argv) methods to get CornuCopyBuffers from CLI filespecs
+lib/python/cs/cmdutils.py: merge default ==> media
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring tweaks
+lib/python/cs/cmdutils.py: merge pilfer ==> default
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec: support opt__= to indicate an accruing option
+lib/python/cs/cmdutils.py: cs.cmdutils: OptionSpec: the rest of the accrues support
+lib/python/cs/cmdutils.py: cs.cmdutils: lint
+lib/python/cs/cmdutils.py: cs.cmdutils: update construction of the usage message now that tuples indicate subtables
+lib/python/cs/cmdutils.py: cs.cmdutils: remove debugging
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_info: update call to printt()
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseComman.un_context: yield the new self.options object, be a little more thorough infilling the new options
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: docstring fix
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: w no longer detect a return from the run_context(0 call as early exit as it is now the options
+lib/python/cs/cmdutils.py: cs.cmdutils: remove stray debug
+lib/python/cs/cmdutils.py: cs.cmdutils: DISTINFO + cs.buffer

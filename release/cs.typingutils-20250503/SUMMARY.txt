@@ -1,0 +1,1 @@
+is_optional: bugfix: Optional[T] has a get_args of (T,<NoneType>), not (T,None).

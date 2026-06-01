@@ -29,6 +29,7 @@ from code import interact
 from collections import ChainMap
 from contextlib import contextmanager
 from dataclasses import dataclass, field, fields
+from datetime import datetime
 try:
   from functools import cache  # 3.9 onward
 except ImportError:
@@ -41,9 +42,9 @@ except ImportError:
 
 from getopt import getopt, GetoptError
 from inspect import isclass
+from itertools import chain
 import os
 from os.path import basename
-from pprint import pformat
 import re
 # this enables readline support in the docmd stuff
 try:
@@ -54,12 +55,15 @@ import shlex
 from signal import SIGHUP, SIGINT, SIGQUIT, SIGTERM
 import sys
 from textwrap import dedent
-from typing import Any, Callable, List, Mapping, Optional, Tuple, Union
+from typing import (
+    Any, Callable, Iterable, List, Mapping, Optional, Tuple, Union
+)
 
 from typeguard import typechecked
 
+from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import decorator, OBSOLETE, uses_cmd_options
+from cs.deco import decorator, OBSOLETE, uses_cmd_options, uses_quiet
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -79,7 +83,7 @@ from cs.threads import HasThreadState, ThreadState
 from cs.typingutils import subtype
 from cs.upd import Upd, uses_upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20250426-post'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -88,8 +92,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.buffer',
         'cs.context',
-        'cs.deco',
+        'cs.deco>=decorator__attrs',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -162,6 +167,8 @@ class OptionSpec:
   # the argument usage name or None
   # eg "username"
   arg_name: Optional[str] = None
+  # whether multiple options accrue into a list instead of overwriting
+  accrues: bool = False
   # the name of the options field/attribute
   field_name: Optional[str] = None
   # the initial value of the option
@@ -223,15 +230,20 @@ class OptionSpec:
     '''
     # produce needs_arg and cleaned up opt_name from the opt_k
     needs_arg = False
+    accrues_arg = False
     # leading underscore for numeric options like -1
     if opt_k.startswith('_'):
       opt_k = opt_k[1:]
       if is_identifier(opt_k):
         warning("unnecessary leading underscore on valid identifier option")
     # trailing underscore indicates that the option expected an argument
+    # two underscore indicates that the argument accrues as a list
     if opt_k.endswith('_'):
       needs_arg = True
       opt_k = opt_k[:-1]
+      if opt_k.endswith('_'):
+        accrues_arg = True
+        opt_k = opt_k[:-1]
     opt_name = opt_k.replace('_', '-')
     field_name = opt_k.replace('-', '_')
     field_default = None
@@ -266,7 +278,7 @@ class OptionSpec:
       field_name = spec0[1:]
       if needs_arg:
         raise ValueError(
-            f'field name {field_name!r} expects an aegument'
+            f'field name {field_name!r} expects an argument'
             ': inverted options only make sense for Boolean options'
         )
       field_default = True
@@ -293,7 +305,11 @@ class OptionSpec:
       spec0 = specs.pop(0) if specs else None
     if spec0 is not None:
       raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
-    if not needs_arg:
+    if needs_arg:
+      if accrues_arg:
+        if field_default is None:
+          field_default = list
+    else:
       # sanity check Boolean option
       if field_default is None:
         field_default = False
@@ -306,6 +322,7 @@ class OptionSpec:
     self = cls(
         opt_name=opt_name,
         arg_name=(field_name.replace('_', '-') if needs_arg else None),
+        accrues=accrues_arg,
         field_name=field_name,
         field_default=field_default,
         help_text=help_text,
@@ -380,7 +397,10 @@ class OptionSpec:
     '''
     parser.add_argument(
         self.getopt_opt,
-        action=('store' if self.arg_name else 'store_true'),
+        action=(
+            ('append' if self.accrues else 'store')
+            if self.arg_name else 'store_true'
+        ),
         dest=self.field_name,
         help=self.help_text,
         default=(
@@ -539,7 +559,7 @@ class SubCommand:
   def usage_format_parts(
       self
   ) -> Tuple[str, Union[str, None], Union[str, None]]:
-    ''' The usage description format string brokoen into:
+    ''' The usage description format string broken into:
         - the usage line (or lines if slosh extended)
         - the first line of the description, or `None`
         - the trailing lines of the description, or `None`
@@ -768,9 +788,8 @@ class SubCommand:
         if common_subcmds:
           subusage_listing.append(indent(common_subcmds_line))
         subusage_listing.extend(map(indent, subusages))
-      else:
-        if common_subcmds:
-          subusage_listing.append(common_subcmds_line)
+      elif common_subcmds:
+        subusage_listing.append(common_subcmds_line)
     if subusage_listing:
       subusage = "\n".join(subusage_listing)
       usage = f'{usage}\n{indent(subusage)}'
@@ -844,6 +863,11 @@ class BaseCommandOptions(HasThreadState):
   opt_spec_class = OptionSpec
 
   perthread_state = ThreadState()
+
+  def __post_init__(self):
+    ''' A empty base post `__init__` method so that all subclasses'
+        `__post_init__`s  can call their `super().__post_init__`.
+    '''
 
   def as_dict(self):
     ''' Return the options as a `dict`.
@@ -932,19 +956,20 @@ class BaseCommandOptions(HasThreadState):
          where `opt` is as from `opt,val` from `getopt()`
          and `opt_spec` is the associated `OptionSpec` instance
     '''
+    if common_opt_specs is None:
+      common_opt_specs = cls.COMMON_OPT_SPECS
     opt_spec_cls = cls.opt_spec_class
     shortopts = ''
     longopts = []
     getopt_spec_map = {}
     # gather up the option specifications and make getopt arguments
-    for opt_k, opt_specs in ChainMap(
-        opt_specs_kw,
-        cls.COMMON_OPT_SPECS if common_opt_specs is None else common_opt_specs,
-    ).items():
+    for opt_k, opt_specs in chain(opt_specs_kw.items(),
+                                  common_opt_specs.items()):
       with Pfx("opt_spec[%r]=%r", opt_k, opt_specs):
         opt_spec = opt_spec_cls.from_opt_kw(opt_k, opt_specs)
         if opt_spec.getopt_opt in getopt_spec_map:
-          raise ValueError(f'repeated spec for {opt_spec.getopt_opt}')
+          # keep the earlier definition
+          continue
         getopt_spec_map[opt_spec.getopt_opt] = opt_spec
         # update the arguments for getopt()
         shortopts += opt_spec.getopt_short
@@ -1036,11 +1061,15 @@ class BaseCommandOptions(HasThreadState):
             DemoOptions(cmd=None, dry_run=False, force=False, quiet=False, runstate_signals=(...), verbose=True, all=False, jobs=4, number=0, once=True, path='/foo', trace_exec=False)
     '''
     shortopts, longopts, getopt_spec_map = self.getopt_spec_map(opt_specs_kw)
-    # infill default False/None for new fields
+    # infill default False/None/etc for new fields
     for opt_spec in getopt_spec_map.values():
       field_name = opt_spec.field_name
       if not hasattr(self, field_name):
-        setattr(self, field_name, opt_spec.field_default)
+        setattr(
+            self, field_name,
+            opt_spec.field_default()
+            if callable(opt_spec.field_default) else opt_spec.field_default
+        )
     opts, argv[:] = getopt(argv, shortopts, longopts)
     for opt, val in opts:
       with Pfx(opt):
@@ -1048,9 +1077,16 @@ class BaseCommandOptions(HasThreadState):
         if opt_spec.needs_arg:
           with Pfx("%r", val):
             value = opt_spec.parse_value(val)
+          if opt_spec.accrues:
+            # append to list
+            getattr(self, opt_spec.field_name).append(value)
+          else:
+            # overwrite
+            setattr(self, opt_spec.field_name, value)
         else:
           value = not opt_spec.field_default
-        setattr(self, opt_spec.field_name, value)
+          # overwrite
+          setattr(self, opt_spec.field_name, value)
 
   @classmethod
   def usage_options_format(
@@ -1071,23 +1107,23 @@ class BaseCommandOptions(HasThreadState):
     return headline + "\n" + indent(
         "\n".join(
             tabulate(
-                *(
-                    (
+                *[
+                    [
                         opt_spec.option_terse(),
                         stripped_dedent(opt_spec.help_text)
-                    ) for _, opt_spec in sorted(
+                    ] for _, opt_spec in sorted(
                         getopt_spec_map.items(),
                         key=lambda kv: kv[0].lstrip('-').lower()
                     )
-                ),
+                ],
             )
         )
     )
 
 @decorator
 def popopts(cmd_method, **opt_specs_kw):
-  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`
-      and update `self.options`. This also updates the method's usage message.
+  ''' A decorator to parse command line options from a `cmd_`*method*'s `argv`,
+      updating `self.options`. This also updates the method's usage message.
 
       Example:
 
@@ -1105,10 +1141,11 @@ def popopts(cmd_method, **opt_specs_kw):
       inside the method.
   '''
 
-  def popopts_cmd_method_wrapper(self, argv, *method_a, **method_kw):
+  def _popopts_cmd_method_wrapper(self, argv, *method_a, **method_kw):
     self.options.popopts(argv, **opt_specs_kw)
     return cmd_method(self, argv, *method_a, **method_kw)
 
+  wrapper_attrs = {}
   if opt_specs_kw:
     # patch the cmd_method usage text
     pre_usage, usage_format, post_usage = split_usage(cmd_method.__doc__ or '')
@@ -1122,17 +1159,29 @@ def popopts(cmd_method, **opt_specs_kw):
               )
           )
       )
-    cmd_method.__doc__ = f'{pre_usage}\n\n{usage_format}\n\n{post_usage}'.strip(
-    )
+      wrapper_attrs.update(
+          __doc__=f'{pre_usage}\n\n{usage_format}\n\n{post_usage}'.strip(),
+      )
 
-  return popopts_cmd_method_wrapper
+  return _popopts_cmd_method_wrapper, wrapper_attrs
+
+def cli_datetime(dt_s: str) -> datetime:
+  ''' Parse an ISO8601 date into a datetime.
+      Being for the command line, this assumes the local timezone
+      if a UTC offset is not specified.
+  '''
+  dt = datetime.fromisoformat(dt_s)
+  if dt.tzinfo is None:
+    # create a nonnaive datetime in the local zone
+    dt = dt.astimezone()
+  return dt
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
 
       This class provides the basic parse and dispatch mechanisms
       for command lines.
-      To implement a command line one instantiates a subclass of `BaseCommand`:
+      To implement a command line one defines a subclass of `BaseCommand`:
 
           class MyCommand(BaseCommand):
               """ My command to do something. """
@@ -1140,7 +1189,8 @@ class BaseCommand:
       and provides either a `main` method if the command has no subcommands
       or a suite of `cmd_`*subcommand* methods, one per subcommand.
 
-      Running a command is done by:
+      Running a command is done by instantiating it with `argv` and
+      then calling `.run()`:
 
           MyCommand(argv).run()
 
@@ -1163,7 +1213,7 @@ class BaseCommand:
       The `self.options` object is an instance of the class' `Options` class.
       The default comes from `BaseCommand.Options` (aka `BaseCommandOptions`)
       but classes with additional command line options will usually
-      provide their own subclass:
+      provide their own `Options` subclass:
 
           class MyCommand(BaseCommand):
 
@@ -1364,6 +1414,7 @@ class BaseCommand:
       # now prepare self._run, a callable
       if not has_subcmds:
         # no subcommands, just use the main() method
+        subcmd = None
         try:
           main = self.main
         except AttributeError:
@@ -1373,11 +1424,7 @@ class BaseCommand:
         self._run = self.SubCommandClass(self, main)
       else:
         # expect a subcommand on the command line
-        subcmd = argv[0] if argv else None
-        if subcmd is not None and re.match(r'^[a-z][-_\w]*$', subcmd):
-          # looks like a subcommand name, take it
-          argv.pop(0)
-        else:
+        if not argv or not re.match(r'^[a-z][-_\w]*$', argv[0]):
           # not a command name, is there a default command?
           default_argv = self.SUBCOMMAND_ARGV_DEFAULT
           if not default_argv:
@@ -1392,7 +1439,7 @@ class BaseCommand:
             if isinstance(default_argv, str):
               default_argv = [default_argv]
             argv = [*default_argv, *argv]
-          subcmd = argv.pop(0)
+        subcmd = argv.pop(0)
         try:
           subcommand = self.subcommand(subcmd)
         except KeyError:
@@ -1408,6 +1455,7 @@ class BaseCommand:
           with Pfx(subcmd):
             return subcommand(argv)
 
+        self.subcmd = subcmd
         self._argv = argv
         self._run = _run
     except GetoptError as e:
@@ -1518,7 +1566,7 @@ class BaseCommand:
       else:
         # default usage text - include the docstring below a header
         paragraph1 = doc.split("\n\n", 1)[0]
-        subusage_format = f'{cmd} ...\n  {paragraph1}'
+        subusage_format = f'{{cmd}} ...\n  {paragraph1}'
     if subusage_format:
       if short:
         subusage_format, *_ = subusage_format.split('\n', 1)
@@ -1679,6 +1727,43 @@ class BaseCommand:
         argv.insert(0, arg0)
       raise
 
+  @staticmethod
+  def pop_buffers(
+      argv: List[str]
+  ) -> Iterable[Tuple[str, Optional[CornuCopyBuffer]]]:
+    ''' A generator yielding `(filespec,CornuCopyBuffer)` 2-tuples
+        for each string in `argv` specifying a file.
+        The name `"-"` means the standard input (`sys.stdin`).
+        If a file is missing or stdin is a tty the yielded buffer is `None`.
+        Filespecs are consumed from `argv` one at a time, so ceasing
+        iteration of the generator leaves the tail of argv unconsumed.
+    '''
+    while argv:
+      filespec = argv.pop(0)
+      with Pfx(filespec):
+        if filespec == '-' and sys.stdin.isatty():
+          warning('stdin is a tty, not reading from it')
+          bfr = None
+        else:
+          try:
+            bfr = CornuCopyBuffer.from_cli_filespec(filespec)
+          except FileNotFoundError as e:
+            warning("not found: %s", e)
+            bfr = None
+      yield filespec, bfr
+
+  @classmethod
+  def pop_buffer(cls,
+                 argv: List[str]) -> Tuple[str, Optional[CornuCopyBuffer]]:
+    ''' Return a `(filespec,CornuCopyBuffer)` 2-tuple
+        from thw first string in `argv`.
+        The name `"-"` means the standard input (`sys.stdin`).
+        If the file is missing or stdin is a tty the yielded buffer is `None`.
+    '''
+    for filespec, bfr in cls.pop_buffers(argv):
+      return filespec, bfr
+    raise GetoptError('missing filespec, expected "-" or filesystem path')
+
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, **kw_options):
     ''' Run a command.
@@ -1705,10 +1790,7 @@ class BaseCommand:
     options = self.options
     try:
       try:
-        with self.run_context(**kw_options) as xit:
-          if xit is not None:
-            error("exit status from run_context: %s", xit)
-            return xit
+        with self.run_context(**kw_options):
           return self._run(self._argv)
       except CancellationError:
         error("cancelled")
@@ -1782,19 +1864,21 @@ class BaseCommand:
   @uses_upd
   def run_context(self, *, runstate: RunState, upd: Upd, **options_kw):
     ''' The context manager which surrounds `main` or `cmd_`*subcmd*.
-        Normally this will have a bare `yield`, but you can yield
-        a not `None` value to exit before the command, for example
-        if the run setup fails.
+
+        A new `self.options` object is prepared as a copy of the
+        current `self.options` so that subcommands are free to
+        modify its values; this is yielded from the context manager.
 
         This default does several things, and subclasses should
         override it like this:
 
             @contextmanager
             def run_context(self):
-              with super().run_context():
+              with super().run_context() as options:
                 try:
                   ... subclass context setup ...
-                  yield
+                  ... possibly modifying the new options ...
+                  yield options
                 finally:
                   ... any unconditional cleanup ...
 
@@ -1812,20 +1896,24 @@ class BaseCommand:
     runstate = self.options.runstate or runstate
     # redundant try/finally to remind subclassers of correct structure
     try:
-      run_options = self.options.copy(runstate=runstate, **options_kw)
-      with run_options:  # make the default ThreadState
-        with stackattrs(
-            self,
-            options=run_options,
-        ):
-          with upd:
-            with runstate:
-              with runstate.catch_signal(
-                  run_options.runstate_signals,
-                  call_previous=False,
-                  handle_signal=self.handle_signal,
-              ):
-                yield
+      run_options = self.options.copy()
+      infill = self.options.__dict__.copy()
+      infill.update(runstate=runstate)
+      infill.update(**options_kw)
+      with stackattrs(run_options, **infill):
+        with run_options:  # make the default ThreadState
+          with stackattrs(
+              self,
+              options=run_options,
+          ):
+            with upd:
+              with runstate:
+                with runstate.catch_signal(
+                    run_options.runstate_signals,
+                    call_previous=False,
+                    handle_signal=self.handle_signal,
+                ):
+                  yield run_options
 
     finally:
       pass
@@ -1908,7 +1996,7 @@ class BaseCommand:
       )
     printt(
         *(
-            (f'{field_name}:', getattr(options, field_name))
+            [f'{field_name}:', getattr(options, field_name)]
             for field_name in field_names
         )
     )
@@ -1938,27 +2026,29 @@ class BaseCommand:
           if k and not k.startswith('_')
       }
       local = pub_mapping(self.__dict__)
-      del local['options']
-      local.update(
-          {
-              f'options.{k}': v
-              for k, v in sorted(pub_mapping(options.__dict__).items())
-          }
-      )
       local.update(argv=argv, cmd=self.cmd, self=self)
     if banner is None:
-      vars_banner = indent(
-          "\n".join(
-              tabulate(
-                  *(
-                      [k, pformat(v, compact=True)]
-                      for k, v in sorted(local.items())
-                      if k and not k.startswith('_')
-                  )
-              )
+      banner_mapping = dict(local)
+      del banner_mapping['options']
+      banner_mapping.update(
+          {
+              f'options.{k}': v
+              for k, v in pub_mapping(options.__dict__).items()
+          }
+      )
+      del banner_mapping['self']
+      banner_mapping.update(
+          {
+              f'self.{k}': v
+              for k, v in pub_mapping(self.__dict__).items()
+          }
+      )
+      banner = "\n".join(
+          tabulate(
+              [f'{self.cmd} {self.subcmd}:'],
+              *([f'  {k}', v] for k, v in sorted(banner_mapping.items()))
           )
       )
-      banner = f'{self.cmd}\n\n{vars_banner}\n'
     try:
       # pylint: disable=import-outside-toplevel
       from bpython import embed
@@ -2063,11 +2153,24 @@ def qvprint(*print_a, quiet, verbose, **print_kw):
   if verbose and not quiet:
     print(*print_a, **print_kw)
 
+@uses_quiet
+def qprint(*print_a, quiet: bool, **qvprint_kw):
+  ''' Call `print()` if `not options.quiet`.
+      This is a compatibility shim for `qvprint()` with `verbose=not
+      quiet` and `quiet=False`.
+  '''
+  qvprint_kw.update(
+      quiet=False,
+      verbose=not quiet,
+  )
+  return qvprint(*print_a, **qvprint_kw)
+
 def vprint(*print_a, **qvprint_kw):
   ''' Call `print()` if `options.verbose`.
       This is a compatibility shim for `qvprint()` with `quiet=False`.
   '''
-  return qvprint(*print_a, quiet=False, **qvprint_kw)
+  qvprint_kw.update(quiet=False)
+  return qvprint(*print_a, **qvprint_kw)
 
 if __name__ == '__main__':
 

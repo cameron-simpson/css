@@ -1,0 +1,17 @@
+lib/python/cs/fstags.py: cs.fstags: TaggedPath: provide __hash__ so that we can put these in sets or mapping keys
+lib/python/cs/fstags.py: cs.fstags: TaggedPathSet: preserve insertion order, add a .find() to return the index of a path
+lib/python/cs/fstags.py: cs.fstags: fix some private member references
+lib/python/cs/fstags.py: cs.fstags: TaggedPathSet: make promotable from a list of filesystem paths
+lib/python/cs/fstags.py: cs.fstags: TaggedPathSet: new len() support, new .fspaths property with a list of the filesystem paths
+lib/python/cs/fstags.py: cs.fstags: FSTags: subclass UsesTagSets but make the .tags attribute optional (None if not supplied)
+lib/python/cs/fstags.py: cs.fstags: update imports
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ls: suppress FormatAsError error messages is -q (quiet)
+lib/python/cs/fstags.py: cs.fstags: new FSTagsCommand.cmd_as_envvars: export tags values as shell compatible assignments
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_as_envvars: fix the --prefix option and provide a default prefix
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ls: get the runstate from self.options
+lib/python/cs/fstags.py: cs.fstags: cosmetic indent fix
+lib/python/cs/fstags.py: merge default ==> pilfer
+lib/python/cs/fstags.py: cs.tagset,fstags,sqltags: make _id only special to SQLTagSet (the db row id), drop all mentions elsewhere
+lib/python/cs/fstags.py: cs.fstags: drop obsolete state.verbose global, use @uses_verbose and vprint
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.infer: drop @uses_verbose
+lib/python/cs/fstags.py: cs.fstags: DISTINFO + cs.seq, brush off some lint

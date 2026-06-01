@@ -1,0 +1,3 @@
+lib/python/cs/deco.py: cs.deco: new @with_(func,obj) decorator to call func inside with obj:, primarily for Thread targets
+lib/python/cs/deco.py: cs.deco: uses_cmd_options: move the import of stackattrs earlier, for early failure, if we're going to fail
+lib/python/cs/deco.py: cs.deco: @promote: fix variable name, update docstring

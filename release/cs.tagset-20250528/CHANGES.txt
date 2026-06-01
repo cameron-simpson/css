@@ -1,0 +1,13 @@
+lib/python/cs/tagset.py: cs.tagset: TagSet.set: expose the super().__setitem__(tag_name, value) call as `TagSet._set` so that a side-effect free set method can be called in sync operations on shutdown
+lib/python/cs/tagset.py: cs.tagset: TagFile: move the update_mapping stuff from the save_tagsets() class method to the save() instance method, use TagSet._set() to set the UUID if there is an update_mapping
+lib/python/cs/tagset.py: cs.tagset: TagFile.save: bugfix for the code extracted from save_tagsets
+lib/python/cs/tagset.py: cs.*: use format strings in a common GetoptError incantation
+lib/python/cs/tagset.py: cs.tagset: TagFile.save_tagsets: only divert PermissionError to a warning, not all OSErrors; fix a docstring typo
+lib/python/cs/tagset.py: cs.tagset: fix exception name spelling
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: docstring improvements, since I still have trouble understanding this
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.startup_shutdown: use cs.context.with_all() to open/close the subtagsets
+lib/python/cs/tagset.py: merge default ==> pilfer: pull in the cs.units refactor
+lib/python/cs/tagset.py: cs.tagset: TagSet: docstring improvements
+lib/python/cs/tagset.py: cs.tagset: Tag: rename Tag.from_str2 to Tag.parse, drop offset parameter of Tag.from_str, reorder methods for clarity, some docstring improvements
+lib/python/cs/tagset.py: cs.tagset: a few type annotations
+lib/python/cs/tagset.py: cs.tagset: fix some lint

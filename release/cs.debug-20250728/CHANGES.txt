@@ -1,0 +1,6 @@
+lib/python/cs/debug.py: cs.debug: @trace: consistent and more readable tracing, remove dup log line
+lib/python/cs/debug.py: cs.debug: @trace: default with_caller to True, present called FROM on a line below the call as with RAISE and RETURN
+lib/python/cs/debug.py: cs.debug: @trace: include the exception class name in the RAISE output
+lib/python/cs/debug.py: cs.debug: @trace: colour RAISE output in white, red was unreadable to me (dark bg; light bg users will find this white possibly even worse - palette approach needed)
+lib/python/cs/debug.py: cs.debug: @trace: adjust the message indenting so that RAISE and DONE are also indents from CALL
+lib/python/cs/debug.py: cs.debug: update DISTINFO

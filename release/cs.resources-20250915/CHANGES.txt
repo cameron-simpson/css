@@ -1,0 +1,3 @@
+lib/python/cs/resources.py: cs.resources: _MultiOpenMixinOpenCloseState.close: do not decrement on open underflow
+lib/python/cs/resources.py: cs.resource: leave in commented out debug for the elusive underflow close issue
+lib/python/cs/resources.py: cs.resources: @OBSOLETE(not_closed) stub for cs.semantics.not_closed

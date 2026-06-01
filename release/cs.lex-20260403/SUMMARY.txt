@@ -1,0 +1,7 @@
+New without_prefix(s,prefix) and without_suffix(s,suffix) returning s with the prefix or suffix removed if present, otherwise None.
+typed_str: make all the optional parameters keyword only.
+tabulate: expose the default PrettyPrinter subclass as the TabulatePrettyPrinter class for easy reuse.
+printt: accept an int for the indent, convert to spaces.
+tabulate: replace ppcls parameter with as_str parameter, expose the default as tabulate.default_as_str.
+tabulate: expose the row -> grid-of-cells as the new function row_cells.
+tabulate: support nested subtables via new flatten_table_rows() function to unfold subtables into a flat list of rows-of-str.

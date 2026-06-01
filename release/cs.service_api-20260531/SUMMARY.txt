@@ -1,0 +1,5 @@
+HTTPServiceAPI: add __truediv__(suburl) which does a GET.
+HTTPServiceAPI: default .API_HOSTNAME comes from the subclass.
+HTTPServiceAPI.json: catch requests.exceptions.JSONDecodeError also.
+HTTPServiceAPI: new mode ("response", "json", "data", callable) parameter.
+HTTPServiceAPI: new check_json optional dict of expected fields and values in JSON responses.

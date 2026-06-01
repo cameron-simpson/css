@@ -34,7 +34,7 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import pipefrom, print_argv
 from cs.tagset import TagSet
 
-__version__ = '20241122-post'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -67,7 +67,7 @@ FFMPEG_EXE_ENVVAR = 'FFMPEG_EXE'
 
 # executable and image for use with docker
 FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
-FFMPEG_DOCKER_IMAGE_DEFAULT = 'linuxserver/ffmpeg'
+FFMPEG_DOCKER_IMAGE_DEFAULT = 'docker.io/linuxserver/ffmpeg'
 FFMPEG_DOCKER_IMAGE_ENVVAR = 'FFMPEG_DOCKER_IMAGE'
 
 def main_ffmpeg_docker(argv=None):
@@ -236,7 +236,21 @@ def convert(
     extra_opts=None,
 ) -> List[str]:
   ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
+
+      Parameters:
+      * `srcs`: the positional parameters specify source files
+      * `doit`: optional flag (default `True`); do not procude the output if false
+      * `dstfmt`: optional destination format
+      * `ffmpeg_exe`: optional `ffmepg` executable
+      * `conversions`: optional format conversions
+      * `metadata`: an optional mapping of metadata values
+      * `timespans`: optional timespans to select form the sources
+      * `overwrite`: optional flag (default `False`); if true allow overwriting an existing destination file
+      * `acodec`: optional target audio codec
+      * `vcodec`: optional target video codec
+      * `extra_opts`: an optional mapping of additional ffmpeg output options
   '''
+  # TODO: append mode? original formats are kept with the desired formats added as additional streams
   if conversions is None:
     conversions = DEFAULT_CONVERSIONS
   if metadata is None:
@@ -348,7 +362,6 @@ def ffmpeg_docker(
     doit: Optional[bool] = None,
     quiet: Optional[bool] = None,
     ffmpeg_exe: Optional[str] = None,
-    docker_exe: Optional[str] = None,
     image: Optional[str] = None,
     output_hostdir: Optional[str] = None,
 ) -> Optional[CompletedProcess]:
@@ -436,4 +449,4 @@ def ffmpeg_docker(
         else:
           ffmpeg_argv.extend([arg, ffmpeg_args.pop(0)])
   DR.output_hostdir = output_hostdir
-  return DR.run(*ffmpeg_argv, docker_exe=docker_exe, doit=doit, quiet=quiet)
+  return DR.run(*ffmpeg_argv, doit=doit, quiet=quiet)

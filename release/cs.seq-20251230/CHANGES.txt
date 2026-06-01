@@ -1,0 +1,3 @@
+lib/python/cs/seq.py: cs.seq: new not_none(*iterables) generator yielding items which are not none, handy in the RSS generator
+lib/python/cs/seq.py: cs.seq: new range() class accepting ... for the stop
+lib/python/cs/seq.py: cs.seq: some lint

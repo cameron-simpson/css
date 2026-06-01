@@ -1,0 +1,1 @@
+New qprint() which prints if not quiet a bit like vprint(), which prints if verbose and not quiet.

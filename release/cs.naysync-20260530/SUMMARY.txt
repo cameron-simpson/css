@@ -1,0 +1,1 @@
+amap: add with_exceptions like cs.threads.pmap, use cs.seq.Ordered for the in-order yields.

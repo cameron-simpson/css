@@ -1,0 +1,2 @@
+@cachedmethod: rewrite the internal logic to support use on methods acception arguments.
+ConvCache.convof: if verbose, print a message when writing a cache entry.

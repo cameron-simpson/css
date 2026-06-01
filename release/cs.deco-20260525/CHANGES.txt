@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: @decorator: new optional decorable parameter to specify the function-presence test, default callable

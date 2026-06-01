@@ -1,0 +1,9 @@
+lib/python/cs/buffer.py: cs.buffer: some trite ruff autofixes
+lib/python/cs/buffer.py: cs.buffer: ruff else-if -> elif autofixes
+lib/python/cs/buffer.py: cs.buffer: replace percent formatting with format strings
+lib/python/cs/buffer.py: cs.buffer: add missed string closing quote
+lib/python/cs/buffer.py: cs.buffer: DISTINFO + requires_python>=3.3
+lib/python/cs/buffer.py: merge default => pypi
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: new from_cli_filespec() factory method accepting "-" or a filename for use but CLIs
+lib/python/cs/buffer.py: cs.buffer: some type annotations, check against Buffer instead of (bytes,bytearray,mmap.mmap,memoryview), streamline a little logic, some docstring updates
+lib/python/cs/buffer.py: merge main -> media

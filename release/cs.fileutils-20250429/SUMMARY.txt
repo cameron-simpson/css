@@ -1,0 +1,1 @@
+lockfile: protect in-process calls with an NRLock to reduce filesystem contention between threads and to detect recursive attempts at the same lockfile.

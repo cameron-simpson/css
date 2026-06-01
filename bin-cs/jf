@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Run the csjellyfin CLI mode.
+# - Cameron Simpson <cs@cskk.id.au> 07may2026
+#
+
+set -ue
+
+media=${JELLYFIN_MEDIA:-"$HOME/media"}
+datadir=${JELLYFIN_DATA:-"$HOME/var/jellyfin"}
+
+exec python3 -m cs.jellyfin ${1+"$@"}

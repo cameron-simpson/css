@@ -8,15 +8,17 @@
 set -ue
 
 tags=
+ctags_opts=
 
 cmd=$(basename "$0")
-usage="Usage: $cmd [-o tagfile] [--] paths..."
+usage="Usage: $cmd [-o tagfile] [--] [ctags-options...] paths..."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -a) ctags_opts="$ctags_opts $1" ;;
     -o) tags=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -39,4 +41,7 @@ exec 1>&2
 
 ##[ -s "$tags" ] || set --
 set -x
-exec lock -P "$tags" ctags -R -a -o "$tags" --tag-relative --links=no --extras=fq ${1+"$@"}
+exec lock -P "$tags" \
+       ctags -R $ctags_opts -o "$tags" \
+         --tag-relative --links=no --extras=fq \
+         ${1+"$@"}

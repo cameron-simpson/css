@@ -1,0 +1,3 @@
+lib/python/cs/py/doc.py: cs.py.doc: fix doc access, fix formatting of class doc header
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: class doc_item - do not preprovide markdown backticks, they are provided by doc_item()
+lib/python/cs/py/doc.py: cs.py.doc: add cs.fsm, cs.gvutils to DISTINFO

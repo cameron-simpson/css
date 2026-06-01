@@ -25,12 +25,12 @@ from typing import List
 
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, BaseCommandOptions
+from cs.cmdutils import BaseCommand, BaseCommandOptions, uses_quiet
 from cs.context import stackattrs
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.psutils import run
 
-__version__ = '20240519-post'
+__version__ = '20260531-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -124,7 +124,7 @@ class DockerUtilCommand(BaseCommand):
     options = self.options
     return docker(
         *dk_argv,
-        exe=options.docker_command,
+        docker_exe=options.docker_command,
         doit=options.doit,
         quiet=options.quiet,
     )
@@ -157,21 +157,18 @@ class DockerUtilCommand(BaseCommand):
           The command's working directory will be /output.
           -i inputpath
               Mount inputpath as /input/basename(inputpath)
-          --root
-              Do not switch to the current effective uid:gid inside
-              the container.
           -U  Update the local copy of image before running.
           Other options are passed to "docker run".
     '''
     options = self.options
-    DR = DockerRun()
+    DR = DockerRun(docker_exe=options.docker_command)
     DR.popopts(argv)
     if not argv:
       raise GetoptError("missing image")
     DR.image = argv.pop(0)
-    with TemporaryDirectory(dir='.') as T:
+    with TemporaryDirectory(dir='.', prefix='.tmp-docker-run') as T:
       with stackattrs(DR, outputpath=T):
-        DR.run(*argv, exe=options.docker_command)
+        DR.run(*argv)
 
 def docker(*dk_argv, exe=None, doit=True, quiet=True) -> CompletedProcess:
   ''' Invoke `docker` with `dk_argv`.
@@ -242,6 +239,10 @@ class DockerRun:
 
   INPUTDIR_DEFAULT = '/input'
   OUTPUTDIR_DEFAULT = '/output'
+  docker_exe: str = field(
+      default_factory=default_docker_command
+  )  # vs eg podan
+  exe_mode: str = None
   image: str = None
   network: str = 'none'
   options: List[str] = field(default_factory=list)
@@ -250,7 +251,7 @@ class DockerRun:
   output_root: str = OUTPUTDIR_DEFAULT
   output_hostdir: str = '.'
   output_map: dict = field(default_factory=dict)
-  as_root: bool = False
+  user: str = None
   pull_mode: str = 'missing'
 
   @typechecked
@@ -260,9 +261,6 @@ class DockerRun:
         The command's working directory will be /output.
         -i inputpath
             Mount inputpath as /input/basename(inputpath)
-        --root
-            Do not switch to the current effective uid:gid inside
-            the container.
         -U  Update the local copy of image before running.
         Other options are passed to "docker run".
     '''
@@ -279,8 +277,6 @@ class DockerRun:
         if arg0 == '-i':
           inputpath = argv.pop(0)
           self.add_input(inputpath)
-        elif arg0 == '--root':
-          self.as_root = True
         elif arg0 == '-U':
           self.options.append('--pull-mode')
           self.options.append('always')
@@ -354,7 +350,8 @@ class DockerRun:
 
   # pylint: disable=too-many-branches
   @pfx_method
-  def run(self, *argv, doit=None, quiet=None, docker_exe=None):
+  @uses_quiet
+  def run(self, *argv, doit=None, quiet=None):
     ''' Run a command via `docker run`.
         Return the `CompletedProcess` result or `None` if `doit` is false.
     '''
@@ -363,8 +360,8 @@ class DockerRun:
     if quiet is None:
       quiet = True
     argv = list(argv)  # work with a mutable copy
-    if docker_exe is None:
-      docker_exe = default_docker_command()
+    is_podman = basename(self.docker_exe).startswith("podman")
+    is_docker = not is_podman
     if self.image is None:
       raise ValueError("self.image is still None")
     with Pfx("input_root:%r", self.input_root):
@@ -384,20 +381,27 @@ class DockerRun:
       if not isdirpath(self.output_hostdir):
         raise ValueError('not a directory')
     docker_argv = [
-        docker_exe,
+        self.docker_exe,
         'run',
+        quiet and '--quiet',
         '--rm',
         ('--network', self.network),
-        '-w',
-        self.output_root,
+        ('--workdir', self.output_root),
+        # ('--cap-drop', 'all'),
+        is_podman and not self.user and ('--userns', 'keep-id'),
+        # this requires the "crun" container runtime to be installed
+        is_podman and not self.user and ('--group-add', 'keep-groups'),
+        is_podman and self.user and ('--user', self.user),
+        is_docker
+        and ('--user', self.user or f'{os.geteuid()}:{os.getegid()}'),
         *self.options,
     ]
     # input readonly mounts
     for inbase, infspath in self.input_map.items():
       mnt = joinpath(self.input_root, inbase)
       with Pfx("%r->%r", mnt, infspath):
-        docker_argv.extend(
-            [
+        docker_argv.append(
+            (
                 '--mount',
                 mount_escape(
                     'type=bind',
@@ -405,18 +409,18 @@ class DockerRun:
                     f'source={infspath}',
                     f'destination={mnt}',
                 ),
-            ]
+            ),
         )
     # mount the output directory
-    docker_argv.extend(
-        [
+    docker_argv.append(
+        (
             '--mount',
             mount_escape(
                 'type=bind',
                 f'source={abspath(self.output_hostdir)}',
                 f'destination={self.output_root}',
             ),
-        ]
+        ),
     )
     # if any named outputs exist, mount them inside /output
     for outbase, outfspath in self.output_map.items():
@@ -424,28 +428,22 @@ class DockerRun:
         continue
       mnt = joinpath(self.output_root, outbase)
       with Pfx("%r->%r", mnt, outfspath):
-        docker_argv.extend(
-            [
+        docker_argv.append(
+            (
                 '--mount',
                 mount_escape(
                     'type=bind',
                     f'source={outfspath}',
                     f'destination={mnt}',
                 ),
-            ]
+            ),
         )
-    if self.as_root:
-      entrypoint = argv.pop(0)
-    else:
-      entrypoint = '/usr/bin/s6-setuidgid'
-      uid = os.geteuid()
-      gid = os.getegid()
-      argv.insert(0, f'{uid}:{gid}')
-    docker_argv.extend(['--entrypoint', entrypoint])
+    entrypoint = argv.pop(0)
+    docker_argv.append(('--entrypoint', entrypoint))
     docker_argv.append('--')
     docker_argv.append(self.image)
     docker_argv.extend(argv)
-    return run(docker_argv, doit=doit, quiet=quiet)
+    return run(docker_argv, doit=doit, quiet=quiet, fold=True)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

@@ -1,0 +1,1 @@
+New IndexByPK mixin for Models, supporting Model[pk].

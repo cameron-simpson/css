@@ -220,11 +220,12 @@ class TaggerCommand(BaseCommand):
     return 0
 
   def cmd_gui(self, argv):
-    ''' Usage: {cmd} paths...
+    ''' Usage: {cmd} [paths...]
           Run a GUI to tag paths.
+          Tag the contents of the current directory if paths are not supplied.
     '''
     if not argv:
-      raise GetoptError("missing paths")
+      argv = ['.']
     from .gui_tk import main as gui_main  # pylint: disable=import-outside-toplevel
     return gui_main([self.cmd, *argv])
 

@@ -1,0 +1,52 @@
+lib/python/cs/urlutils.py: cs.urlutils: require html5lib and lxml and python 3 urllib modules
+lib/python/cs/urlutils.py: cs.urlutils: replace @property with @safe_property which transmutes inner AttributeErrors into RuntimeErrors
+lib/python/cs/urlutils.py: cs.urlutils: move several per-URL attributes into a thread local stackable state global `context`
+lib/python/cs/urlutils.py: cs.urlutils: make URL a singleton, redo the caching for GET/HEAD etc based on this, use the requests module for HTTP access
+lib/python/cs/urlutils.py: cs.urlutils: URL.flush: clean out define cached attributes; new __str__ method
+lib/python/cs/urlutils.py: cs.urlutils: URL: new session() context manager to make a requests.Session; drop obsolete _response() method
+lib/python/cs/urlutils.py: cs.urlutils: URL.parsed: refactor
+lib/python/cs/urlutils.py: cs.urlutils: update imports, tweak docstring
+lib/python/cs/urlutils.py: cs.urlutils: URL: hrefs, srcs: return a URLs collection
+lib/python/cs/urlutils.py: merge default => pilfer
+lib/python/cs/urlutils.py: cs.urlutils: URL.promote: move to the bottom of the class definition
+lib/python/cs/urlutils.py: cs.urlutils: URL.content: bugfix mistyped attribute access
+lib/python/cs/urlutils.py: cs.urlutils: URL can be promoted, rename variable, tweak docstring, adjust call to URLs()
+lib/python/cs/urlutils.py: merge default -> pilfer
+lib/python/cs/urlutils.py: cs.urlutils: moar imports, add missing `self` to method
+lib/python/cs/urlutils.py: cs.urlutils: drop skip_errs (never worked) and @can_skip_url_errs, replace with skip_url_errs(func,*iterables) based on cs.seq.skip_map()
+lib/python/cs/urlutils.py: cs.urlutils: update imports
+lib/python/cs/urlutils.py: cs.urlutils: URL: __str__ now returns self.url_s and __repr__ returns the descriptive string
+lib/python/cs/urlutils.py: cs.urlutils: replace urljoin with a shim with accepts URL or str
+lib/python/cs/urlutils.py: cs.urlutils: URL.hrefs: type annotation
+lib/python/cs/urlutils.py: cs.urlutils: URL: accomodate the optional referer parameter, remove redundant @promote, remove debug
+lib/python/cs/urlutils.py: cs.excutils: drop @safe_property, will be using @property @unattributable instead
+lib/python/cs/urlutils.py: cs.*: moved @cachedmethod from cs.deco to cs.cache
+lib/python/cs/urlutils.py: cs.urlutils: URL: replace caching methods .GET() and .HEAD() with @cached_property .GET_response and .HEAD_response
+lib/python/cs/urlutils.py: cs.urlutils: move __version__ and DISTINFO to below the imports
+lib/python/cs/urlutils.py: cs.urlutils: URL: do not subclass SingletonMixin, we will cache externally if needed
+lib/python/cs/urlutils.py: cs.urlutils: update imports
+lib/python/cs/urlutils.py: cs.urlutils: URL: new .url_parsed property being the namedtuple from urlparse, drop .parts
+lib/python/cs/urlutils.py: cs.urlutils: URL: new .query_dict() method, returning the query parameters as a dict
+lib/python/cs/urlutils.py: cs.urlutils: URL.dirname: properties do not have parameters
+lib/python/cs/urlutils.py: cs.urlutils: URL.query:dict: update docstring, clarifying that this returns a _new_ dict
+lib/python/cs/urlutils.py: cs.urlutils: tweak docstring for clarity
+lib/python/cs/urlutils.py: cs.urlutils: UR: new .cleanpath and .cleanrpath properties
+lib/python/cs/urlutils.py: cs.urlutils: URL: new .urlto(other_url) to resolve other_url against self, use it in hrefs() and srcs()
+lib/python/cs/urlutils.py: cs.urlutils: URL: accept optional soup or text parameters to prefill these, rename URL.parsed to URL.soup
+lib/python/cs/urlutils.py: cs.urlutils: URL.__init__: set self.url_s=str(url_s) to accomodate being handed a URL instance
+lib/python/cs/urlutils.py: cs.urlutils: URL.soup: drastic simplification, untested
+lib/python/cs/urlutils.py: cs.urlutils: URL: rename content_type to content_type_full, make content_type the plain text/html value
+lib/python/cs/urlutils.py: cs.urlutils: URL.content_type, content_type_full: make @cached_property
+lib/python/cs/urlutils.py: cs.urlutils: URL.soup: small streamlining, add pfx_call
+lib/python/cs/urlutils.py: cs.urlutils: drop old commented out incantation
+lib/python/cs/urlutils.py: cs.urlutils: URL.content_type_full: warn and return None if the COntent-Type header is missing
+lib/python/cs/urlutils.py: cs.urlutils: URL: make .text a cached_property, get the soup using just lxml (the list-=of-parsers approach seems unsupported)
+lib/python/cs/urlutils.py: cs.urlutils: URL.promote: pass None through unpromoted
+lib/python/cs/urlutils.py: cs.urlutils: URL: new .short attrubute being a shortend URL for messages, .rapth being .path without leading slashes
+lib/python/cs/urlutils.py: cs.urlutils: docstring updates
+lib/python/cs/urlutils.py: cs.urlutils: URL: new .ext property for the URL file extension
+lib/python/cs/urlutils.py: cs.urlutils: URL: subclass FormatableMixin, add .format_kwargs() method
+lib/python/cs/urlutils.py: cs.urlurls: URL: drop ._info (superceded by @cached_property), drop an unwanted @locked, fix for last_modified()
+lib/python/cs/urlutils.py: cs.urlutils: URL: new isabs() method to test is a URL has a hostname and a path commencing with /
+lib/python/cs/urlutils.py: cs.urlutils: URL.format_kwargs: drop content_length and mtime, not available
+lib/python/cs/urlutils.py: cs.urlutils: URL: support extending a URL with /

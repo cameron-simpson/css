@@ -1,0 +1,58 @@
+lib/python/cs/ascii_art.py: cs.ascii_art: initial commit, basic railroad diagrams working
+lib/python/cs/ascii_art.py: cs.ascii_art: docstring updates
+lib/python/cs/ascii_art.py: cs.ascii_art: _RailRoadMulti: add a .append method; also fix a docstring typo
+lib/python/cs/ascii_art.py: cs.ascii_art: make the concrete boxes hashable
+lib/python/cs/ascii_art.py: cs.ascii_art: Boxy: add .ns, .ss, .ws, .es properties being tuples of all the attachment offsets
+lib/python/cs/ascii_art.py: cs.ascii_art: new Stack class representing a vertical stack of Boxy things, usually an intermediary
+lib/python/cs/ascii_art.py: c.ascii_art: now that Choice subclasses Stack, update render_lines and .w and .e - NB now .w does not necessarily == .e
+lib/python/cs/ascii_art.py: cs.ascii_art: Choice: add missed inner_width (shouldn't this be super().width?)
+lib/python/cs/ascii_art.py: cs.ascii_art: Choice.width: yes, it _should_ have been super().width + 2
+lib/python/cs/ascii_art.py: cs.ascii_art: add a Stack to the test function
+lib/python/cs/ascii_art.py: cs.ascii_art: new @render decorator to push render state onto a render context object to aid nested rendering without pain
+lib/python/cs/ascii_art.py: cs.ascii_art: Boxy: move from_str up the top
+lib/python/cs/ascii_art.py: cs.ascii_art: Boxy: new .render_context on demand @cached_property
+lib/python/cs/ascii_art.py: cs.ascii_art: Boxy: move .render() down the bottom so as not to interfere with the @render decorator
+lib/python/cs/ascii_art.py: cs.ascii_art: Boxy: new .print() accepting render modes
+lib/python/cs/ascii_art.py: cs.ascii_art: Boxy: new .top_w, .bottom_w, .top_e, .bottom_e being the bounds of .ws and .es
+lib/python/cs/ascii_art.py: cs.ascii_art: Boxy: new .conn_char() method for drawing the connective characters for the left or right edges; drop spurious @dataclass
+lib/python/cs/ascii_art.py: cs.ascii_art: add missing @dataclass, drop frozen=True from a dataclass
+lib/python/cs/ascii_art.py: cs.ascii_art: Stack: new .inner_width being the maximum box width of the .content boxes
+lib/python/cs/ascii_art.py: cs.ascii_art: apply the @render decorator as required, and there was much rejoicing
+lib/python/cs/ascii_art.py: cs.ascii_art: Choice: replace w, ws, e, ws, width
+lib/python/cs/ascii_art.py: cs.ascii_art Choice.render_lines: redo using self.conn_char, drop old .inner_width now in the Stack class
+lib/python/cs/ascii_art.py: csascii_art: new Merge and Split classes
+lib/python/cs/ascii_art.py: csascii_art: Sequence: width now a render mode aware property, add height, drop the assertion that self.w == self.e, we need to redo the height stuff
+lib/python/cs/ascii_art.py: cs.ascii_art: test_railroad: add demos of Merge and Split
+lib/python/cs/ascii_art.py: cs.ascii_art: Sequence.render_lines: actually measure how the boxes align when connected and pad on that basis
+lib/python/cs/ascii_art.py: cs.ascii_art: there are no HEAVY arc characters :-(
+lib/python/cs/ascii_art.py: cs.ascii_art: @render how works on a class or instance method; make a real Boxy.render_context attribute as the default context (it was making per-instance contexts, unhelpful)
+lib/python/cs/ascii_art.py: cs.ascii_art: @render: fix self/cls reference, missed in previous commit
+lib/python/cs/ascii_art.py: cs.ascii_art: @Boxy.horiz: use @render, honour the heavy setting
+lib/python/cs/ascii_art.py: cs.ascii_art: fix a use of @render, honour the heavy setting
+lib/python/cs/ascii_art.py: cs.ascii_art: comment out a broken assertion (need a render aware size computation); add a couple of heavy=True tests to test_railroad
+lib/python/cs/ascii_art.py: cs.ascii_art: note that there are single direction box characters [TODO]
+lib/python/cs/ascii_art.py: cs/ascii_art: _RailRoadMulti.content: default to an empty list because we've started assembling these incrementally
+lib/python/cs/ascii_art.py: cs.ascii_art: docstring and comment fixes, remove superfluous print
+lib/python/cs/ascii_art.py: cs.ascii_art: Sequence.render_lines; fix off by one in total_lines
+lib/python/cs/ascii_art.py: cs.ascii_art: clean some lint
+lib/python/cs/ascii_art.py: cs.ascii_art: add some docstrings
+lib/python/cs/ascii_art.py: cs.ascii_art: rename several railroad diagram classes to start with RR; update a docstring
+lib/python/cs/ascii_art.py: cs.ascii_art: Boxy to RRBase and TextBox to RRTextBox
+lib/python/cs/ascii_art.py: cs.ascii_art: RRBase et al: new .desc property for a terse node description
+lib/python/cs/ascii_art.py: cs.ascii_art: rename START to RR_START and END to RR_END
+lib/python/cs/ascii_art.py: cs.ascii_art: fix class name
+lib/python/cs/ascii_art.py: cs.ascii_art: drop RRBase.desc in favour of repr(), preprovide .refobj in RRBase and .name in RRSymbol/RRTarget
+lib/python/cs/ascii_art.py: cs.ascii_art: dataclass tweaks, fix class name
+lib/python/cs/ascii_art.py: cs.ascii_art: add promotion methods to RRBase: from_(int,float,tuple,list,set) to aid expressing diagrams from these types as literals; new rrprint() which makes an RRSequence by promotion and prints it
+lib/python/cs/ascii_art.py: cs.ascii_art: rrprint: new sep= parameter for a marker, plumb to RRSequence.render,print
+lib/python/cs/ascii_art.py: cs.ascii_art: RRStack.render_lines: use the inner_width to compute the padding
+lib/python/cs/ascii_art.py: cs.ascii_art: remove debug, consolidate test function
+lib/python/cs/ascii_art.py: cs.ascii_art: move RRBase.render_context to global DEFAULT_RENDER_CONTEXT; extract the context change into the render_mode() context manager and rework @render to use it
+lib/python/cs/ascii_art.py: cs.ascii_art: @render: remove debug
+lib/python/cs/ascii_art.py: cs.ascii_art: ascii mode for box_char and RRBase.horiz() and Terminal
+lib/python/cs/ascii_art.py: cs.ascii_art: lint
+lib/python/cs/ascii_art.py: cs.ascii_art: test_railroad: exercise the ascii mode
+lib/python/cs/ascii_art.py: cs.ascii_art: RRBase.horiz: make midle keyword only
+lib/python/cs/ascii_art.py: cs.ascii_art: update the demo mode and associated docstring
+lib/python/cs/ascii_art.py: cs.ascii_art: lint
+lib/python/cs/ascii_art.py: cs.ascii_art: add DISTINFO, update docstring

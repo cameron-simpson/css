@@ -1,0 +1,5 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: @popopts: return (wrapper,{__doc__="doc with updated usage"}) 2-tuple
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommandOptions.getopt_spec_map: let the subcommand options override the inherited common options
+lib/python/cs/cmdutils.py: cs.cmdutils: clean tiny lint
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.subcommand_usage_text: fix default usage format string
+lib/python/cs/cmdutils.py: cs.cmdutils: update DISTINFO for new @decorator feature

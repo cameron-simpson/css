@@ -1,0 +1,9 @@
+lib/python/cs/deco.py: cs.deco: @Promotable: docstring tweak
+lib/python/cs/deco.py: merge tagger ==> default: for some cs.fstags/tagset fixes
+lib/python/cs/deco.py: cs.deco: @fmtdoc: support {name=} and {name==} formats
+lib/python/cs/deco.py: cs.deco: @fmtdoc: code changes missed from previous commit
+lib/python/cs/deco.py: cs.deco: @decorator: small docstring improvement
+lib/python/cs/deco.py: cs.deco: @default_params: docstring improvement
+lib/python/cs/deco.py: cs.deco: clean some whitepace, add a TODO for @promote
+lib/python/cs/deco.py: cs.deco: Promotable.promote: improve the final TypeError on failure of the fallback cls(obj)
+lib/python/cs/deco.py: cs.deco: @promote: if an annotation is a string, try to resolve, but warn and skip if it is unknown

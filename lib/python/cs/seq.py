@@ -12,15 +12,20 @@ will consume some or all of the derived iterator
 in the course of its function.
 '''
 
-import heapq
+from builtins import range as builtin_range
+from heapq import heappop, heappush
 import itertools
 from threading import Lock, Condition, Thread
-from typing import Callable, Hashable, Iterable, Optional, Tuple, TypeVar
+from typing import (
+    Any, Callable, GenericAlias, Generator, Hashable, Iterable, Optional,
+    Tuple, TypeVar
+)
 
 from cs.deco import decorator
 from cs.gimmicks import warning
+from cs.typingutils import Sortable
 
-__version__ = '20250306-post'
+__version__ = '20260526-post'
 
 DISTINFO = {
     'description':
@@ -33,12 +38,13 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
+        'cs.typingutils',
     ],
     'python_requires':
     '>=3',
 }
 
-class Seq(object):
+class Seq:
   ''' A numeric sequence implemented as a thread safe wrapper for
       `itertools.count()`.
 
@@ -175,16 +181,16 @@ def imerge(*iters, **kw):
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, _MergeHeapItem((head, it)))
+      heappush(heap, _MergeHeapItem((head, it)))
   while heap:
-    head, it = heapq.heappop(heap)
+    head, it = heappop(heap)
     yield head
     try:
       head = next(it)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, _MergeHeapItem((head, it)))
+      heappush(heap, _MergeHeapItem((head, it)))
 
 def onetoone(func):
   ''' A decorator for a method of a sequence to merge the results of
@@ -270,7 +276,7 @@ def common_suffix_length(*seqs):
   '''
   return common_prefix_length(list(map(lambda s: list(reversed(s)), *seqs)))
 
-class TrackingCounter(object):
+class TrackingCounter:
   ''' A wrapper for a counter which can be incremented and decremented.
 
       A facility is provided to wait for the counter to reach a specific value.
@@ -369,7 +375,7 @@ class TrackingCounter(object):
       watcher.acquire()
     watcher.wait()
 
-class StatefulIterator(object):
+class StatefulIterator:
   ''' A trivial iterator which wraps another iterator to expose some tracking state.
 
       This has 2 attributes:
@@ -377,13 +383,13 @@ class StatefulIterator(object):
       * `.state`: the last state value from the internal iterator
 
       The originating use case is resuse of an iterator by independent
-      calls that are typically sequential, specificly the .read
+      calls that are typically sequential, specificly the `.read`
       method of file like objects. Naive sequential reads require
       the underlying storage to locate the data on every call, even
       though the previous call has just performed this task for the
       previous read. Saving the iterator used from the preceeding
       call allows the iterator to pick up directly if the file
-      offset hasn't been fiddled in the meantime.
+      offset hasn't been modified in the meantime.
   '''
 
   def __init__(self, it):
@@ -397,6 +403,53 @@ class StatefulIterator(object):
     item, new_state = next(self.it)
     self.state = new_state
     return item
+
+class ClonedIterator(Iterable):
+  ''' A thread safe clone of some orginal iterator.
+
+      `next()` of this yields the next item from the supplied iterator.
+      `iter()` of this returns a generator yielding from the
+      historic items and then from the original iterator.
+
+      Note that this accrues all of the items from the original
+      iterator in memory.
+  '''
+
+  def __init__(self, it: Iterable):
+    ''' Initialise the clone with the iterable `it`.
+    '''
+    self._iterator = iter(it)
+    self._cloned = []
+    self._lock = Lock()
+
+  def __next__(self):
+    ''' Return the next item from the original iterator.
+    '''
+    with self._lock:
+      item = next(self._iterator)
+      self._cloned.append(item)
+    return item
+
+  def __iter__(self):
+    ''' Iterate over the clone, returning a new iterator.
+
+        In mild violation of the iterator protocol, instead of
+        returning `self`, `iter(self)` returns a generator yielding
+        the historic and then current contents of the original iterator.
+    '''
+    i = 0
+    while True:
+      with self._lock:
+        try:
+          item = self._cloned[i]
+        except IndexError:
+          try:
+            item = next(self._iterator)
+          except StopIteration:
+            return
+          self._cloned.append(item)
+      yield item
+      i += 1
 
 def splitoff(sq, *sizes):
   ''' Split a sequence into (usually short) prefixes and a tail,
@@ -729,6 +782,238 @@ def infill_from_batches(
     yield from infill(
         objs, obj_keys=obj_keys, existing_keys=existing_keys, all=all
     )
+
+def not_none(*iterables):
+  ''' Filter the iterables for items which are not `None`.
+  '''
+  for iterable in iterables:
+    yield from filter(lambda item: item is not None, iterable)
+
+class range:
+  ''' A class like the builtin `range` exceppt that it will
+      accept `...` as the stop value, indicating an unbound range.
+      Note that if initialised like a normal range it returns a
+      builtin `range` instance.
+
+      Examples:
+
+      Normal instantiation returns a builin `range`:
+
+          >>> r = range(9)
+          >>> type(r)
+          <class 'range'>
+          >>> r
+          range(0, 9)
+
+      The basic unbound range:
+
+          >>> r0 = range(...)
+          >>> type(r0)
+          <class 'cs.seq.range'>
+          >>> r0
+          range(0:...:1)
+          >>> str(r0)
+          '0...'
+          >>> list(r0[:10])
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+          >>> 99999999999999999 in r0
+          True
+          >>> -10 in r0
+          False
+
+      An unbound instantiation starting at 9:
+
+          >>> r = range(9,...)
+          >>> type(r)
+          <class 'cs.seq.range'>
+          >>> r
+          range(9:...:1)
+          >>> r[:10]
+          range(9, 19)
+          >>> r2 = r[:10]
+          >>> type(r2)
+          <class 'range'>
+          >>> r2
+          range(9, 19)
+
+  '''
+
+  def __new__(cls, start, stop=None, step=1):
+    if stop is None:
+      stop = start
+      start = 0
+    if stop is not ...:
+      return builtin_range(start, stop, step)
+    return super().__new__(cls)
+
+  def __init__(self, start, stop=None, step=1):
+    if stop is None:
+      stop = start
+      start = 0
+    assert stop is ...
+    self.start = start
+    self.step = step
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}({self.start}:...:{self.step})'
+
+  def __str__(self):
+    if self.step == 1:
+      return f'{self.start}...'
+    return f'{self.start}:...:{self.step}'
+
+  def __contains__(self, index):
+    if index < self.start:
+      return False
+    return (index - self.start) % self.step == 0
+
+  def __getitem__(self, index):
+    if isinstance(index, int):
+      return range(0, index + 1)[index]
+    if isinstance(index, slice):
+      start, stop, step = index.start, index.stop, index.step
+      if start is None:
+        start = 0
+      elif start < 0:
+        raise ValueError(f'{start=} may not be negative')
+      if stop is ...:
+        stop = None
+      elif stop is not None and stop < 0:
+        raise ValueError(f'{stop=} may not be negative')
+      if step is None:
+        step = 1
+      if stop is not None:
+        return builtin_range(
+            self.start + start, self.start + stop, self.step * step
+        )
+      return self.__class__(self.start + start, ..., self.step * step)
+    raise TypeError(repr(type(index)))
+
+  @classmethod
+  def __class_getitem__(cls, index):
+    if isinstance(index, slice):
+      return range(...)[index]
+    if isinstance(index, type):
+      return GenericAlias(cls, (index,))
+    raise TypeError(f'{type(index)}:{index!r} is not a slice')
+
+  def __iter__(self):
+    i = self.start
+    while True:
+      yield i
+      i += self.step
+
+class Ordered:
+  ''' A class to yield indexed but out of order values in index
+      order such as you may receive from completion of concurrent actions
+      which you want to process in submission order but otherwise as
+      soon as possible.
+
+      Example:
+
+          >>> ordered = Ordered()
+          >>> for i, result in (2, "third"), (0, "first"), (1, "second"):
+          ...   for oi, oresult in ordered.push(i, result):
+          ...     print(oi, oresult)
+          ...
+          0 first
+          1 second
+          2 third
+
+      The class may be initialised with an arbitrary iterable of
+      expected indices; these must still be `Sortable` and in fact
+      in order.
+      The default expected indices start at 0 and count up by 1.
+  '''
+
+  def __init__(self, indices: Iterable[Sortable] = None):
+    if indices is None:
+      indices = range(...)
+    self.heap = []
+    self.indices = iter(indices)
+    self.next_index = next(self.indices)
+
+  def push(self, index, value) -> Generator[Tuple[Sortable, Any], None, None]:
+    ''' A generator to push an (index,value) 2-tuple onto the heap
+        and then yield (index,value) 2-tuples from the heap while it
+        is not empty and the top element equals the expected next index
+        from `self.indices`.
+    '''
+    heappush(self.heap, (index, value))
+    # This contortion is to infer == by excluding < and >
+    # thus requiring only < support in the indices.
+    while self.heap and (not self.heap[0][0] < self.next_index
+                         and not self.next_index < self.heap[0][0]):
+      index, value = heappop(self.heap)
+      self.next_index = next(self.indices)
+      yield index, value
+
+  def drain(self) -> Generator[Tuple[Sortable, Any], None, None]:
+    ''' A generator yielding (index,value) 2-tuples from the heap until it is empty.
+    '''
+    while self.heap:
+      yield heappop(self.heap)
+
+def order(
+    indexed_items: Iterable[Tuple[Sortable, Any]],
+    indices: Iterable[Sortable] = None
+) -> Generator[Tuple[Sortable, Any], None, None]:
+  ''' A convenience wrapper for an `Ordered` instance to order the `indexed_items`.
+
+      Example:
+
+          >>> # an iterator yielding unordered results, just because
+          >>> unordered_results = iter( ((2, "third"), (0, "first"), (1, "second")) )
+          >>> for i, result in order(unordered_results):
+          ...   print(i, result)
+          ...
+          0 first
+          1 second
+          2 third
+
+  '''
+  ordered = Ordered(indices)
+  for i, item in indexed_items:
+    yield from ordered.push(i, item)
+  yield from ordered.drain()
+
+def with_neighbours(it: Iterable, no_neighbour=None):
+  ''' Return 3-tuples of `(prev,curr,next)` from the iterable `it`
+      where `curr` is each item from `it` and `prev` and `next` are
+      the preceeding and following items respectively.
+
+      The first item will have a `prev` of `no_neighbour`
+      and the last item will have a `next` of `no_neighbour`.
+
+      `no_neighbour` defaults to `None`, but may be specified as
+      another sentinel if `None` is anticipated in the iterable.
+
+      Examples:
+
+          >>> list(with_neighbours((1,2,3)))
+          [(None, 1, 2), (1, 2, 3), (2, 3, None)]
+          >>> list(with_neighbours(()))
+          []
+          >>> list(with_neighbours((1,)))
+          [(None, 1, None)]
+          >>> list(with_neighbours((1,2)))
+          [(None, 1, 2), (1, 2, None)]
+          >>> list(with_neighbours((1,None,3),"END"))
+          [('END', 1, None), (1, None, 3), (None, 3, 'END')]
+
+  '''
+  it = iter(it)
+  prev_item = no_neighbour
+  try:
+    curr_item = next(it)
+  except StopIteration:
+    return
+  for next_item in it:
+    yield prev_item, curr_item, next_item
+    prev_item = curr_item
+    curr_item = next_item
+  # we're already set up for the next iteration
+  yield prev_item, curr_item, no_neighbour
 
 if __name__ == '__main__':
   import sys

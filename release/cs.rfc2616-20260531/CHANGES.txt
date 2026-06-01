@@ -1,0 +1,3 @@
+lib/python/cs/rfc2616.py: cs.rfc2616: header(): new default=None optional parameter
+lib/python/cs/rfc2616.py: cs.rfc2616: content_length,content_type: plumb keyword arguments through to header()
+lib/python/cs/rfc2616.py: cs.rfc2616: new content_encodings(headers) returning a list of the content encodings from headers

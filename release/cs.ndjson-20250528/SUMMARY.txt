@@ -1,0 +1,1 @@
+New dump_ndjson and dumps_ndjson for transcribing obj as NDJSON (includes the trailing newline).

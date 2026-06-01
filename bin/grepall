@@ -17,6 +17,7 @@ usage="Usage: $cmd [-H]... [-i] [-o] sed-regexps...
 
 any=
 icase=
+sedsfx=
 nheaders=0
 trace=
 colour=
@@ -28,7 +29,7 @@ do
   case $1 in
     -C) colour=1 ;;
     -H) nheaders=$((nheaders + 1)) ;;
-    -i) icase=1 ;;
+    -i) icase=1 sedsfx="${sedsfx}I";;
     -o) any=1 ;;
     -x) trace=set-x ;;
     --) shift; break ;;
@@ -62,16 +63,16 @@ do
   case "$word" in
     !*)
       word=`expr "x$word" : 'x.\(.*\)'`
-      set -- -e "/$word/d" ${1+"$@"}
+      set -- -e "/$word/${sedsfx}d" ${1+"$@"}
       ;;
     *)if [ $any ]
-      then set -- ${1+"$@"} -e "/$word/b ok"
-      else set -- ${1+"$@"} -e "/$word/!d"
+      then set -- ${1+"$@"} -e "/$word/${sedsfx}b ok"
+      else set -- ${1+"$@"} -e "/$word/${sedsfx}!d"
       fi
       if [ $colour ]
       then
         [ -z "$replwords" ] || replwords="$replwords; "
-        [ $colour ] && replwords="${replwords}s${word}${replsubst}g"
+        [ $colour ] && replwords="${replwords}s${word}${replsubst}${sedsfx}g"
       fi
       ;;
   esac
@@ -81,7 +82,8 @@ done
 
 [ $ok ] || exit 1
 
-[ $icase ] && set -- -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
+set -- -e h ${1+"$@"}
+##[ $icase ] && set -- -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
 [ $any ] && set -- ${1+"$@"} -e d -e ':ok'
 [ $icase ] && set -- ${1+"$@"} -e g
 [ $colour ] && set -- ${1+"$@"} -e "$replwords"

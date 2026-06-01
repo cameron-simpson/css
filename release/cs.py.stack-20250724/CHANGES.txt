@@ -1,0 +1,1 @@
+lib/python/cs/py/stack.py: cs.py.stack: frames: tweak the exception frame access
