@@ -1029,7 +1029,6 @@ trace_DEBUG()
 
 # insert names into builtins
 builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
-print('$CS_DEBUG_BUILTINS ->', repr(builtin_names_s))
 if builtin_names_s:
   try:
     import builtins  # pylint: disable=unused-import
