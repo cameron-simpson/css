@@ -42,7 +42,7 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import (
     content_encodings, content_length, content_type, datetime_from_http_date
 )
-from cs.seq import ClonedIterator
+from cs.seq import ReIterable
 from cs.tagset import BaseTagSets, HasTags, TagSet, TagSetTyping, UsesTagSets
 from cs.threads import HasThreadState, ThreadState
 from cs.units import BINARY_BYTES_SCALE
@@ -720,7 +720,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     self.url = url
     self._new_content()
     # this should be the decoded content, eg ungzipped
-    self.iterable_content = ClonedIterator(rsp.iter_content(chunk_size=None))
+    self.iterable_content = ReIterable(rsp.iter_content(chunk_size=None))
     return rsp
 
   @cached_property
@@ -751,7 +751,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       # no mitmproxy.http.HTTPFlow, use requests
       # requests.Response.iter_content?
       iter_content = self.response.iter_content
-      return ClonedIterator(iter_content(chunk_size=65536))
+      return ReIterable(iter_content(chunk_size=65536))
     # TODO: can we accomodate a flow whose content is streaming in?
     return [flow.response.content]
 
@@ -1808,7 +1808,7 @@ class SiteMap(UsesTagSets, Promotable):
     #             updated entities
     start_time = time.time()
     ent_spQ = IterableQueue()
-    ent_sps = ClonedIterator(ent_spQ)
+    ent_sps = ReIterable(ent_spQ)
     ent_fsQ = IterableQueue()
 
     def process_entities():

@@ -21,7 +21,7 @@ from typing import (
     Tuple, TypeVar
 )
 
-from cs.deco import decorator
+from cs.deco import decorator, OBSOLETE
 from cs.gimmicks import warning
 from cs.typingutils import Sortable
 
@@ -404,7 +404,7 @@ class StatefulIterator:
     self.state = new_state
     return item
 
-class ClonedIterator(Iterable):
+class ReIterable(Iterable):
   ''' A thread safe clone of some orginal iterator.
 
       `next()` of this yields the next item from the supplied iterator.
@@ -450,6 +450,9 @@ class ClonedIterator(Iterable):
           self._cloned.append(item)
       yield item
       i += 1
+
+# better name suggested by λambda @ python.discord
+ClonedIterator = OBSOLETE(ReIterable)
 
 def splitoff(sq, *sizes):
   ''' Split a sequence into (usually short) prefixes and a tail,
