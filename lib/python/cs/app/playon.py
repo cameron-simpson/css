@@ -745,6 +745,7 @@ class PlayOnAPI(HTTPServiceAPI):
 
   # pylint: disable=too-many-locals
   @pfx_method
+  @uses_fstags
   @uses_quiet
   @uses_verbose
   @uses_runstate
@@ -754,6 +755,7 @@ class PlayOnAPI(HTTPServiceAPI):
       download_id: int,
       filename=None,
       *,
+      fstags: FSTags,
       quiet: bool,
       runstate: RunState,
       verbose: bool,
@@ -820,7 +822,7 @@ class PlayOnAPI(HTTPServiceAPI):
     recording = self[download_id]
     if dl_rsp is not None:
       recording['download_path'] = fullpath
-    tagged = self.fstags[fullpath]
+    tagged = fstags[fullpath]
     # add the Series/Season/Episode info
     tagged.update(recording.sei.as_dict())
     # add a reference to the recording
