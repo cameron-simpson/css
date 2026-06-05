@@ -1399,6 +1399,43 @@ class TagSet(
       return self[attr]
     raise ValueError("cannot infer value for %r" % (attr,))
 
+  class _EntityMap:
+    ''' The `.entity` attribute space.
+    '''
+
+    def __init__(self, tags):
+      self.tags = tags
+
+    def __getattr__(self, attr):
+      ''' Consult th tag `id.{attr}` and return the corresponding
+          entity from the appropriate `UsesTagSets` instance.
+
+          Example:
+
+              tags = TagSet({'id.playon':'recording.1234567'})
+              playon_recording = tags.entity.playon
+      '''
+      zone_id_tag = f'id.{attr}'
+      try:
+        zone_key = self.tags[zone_id_tag]
+      except KeyError as e:
+        raise AttributeError(f'no .entity.{attr}: {e}') from e
+      entity_id = f'{attr}.{zone_key}'
+      return UsesTagSets.by_entity_id(entity_id)
+
+  @cached_property
+  def entity(self):
+    ''' The `.entity` attribute space, whose attributes map to
+        entities which are `UsesTags` instances from the appropriate
+        `UsesTagSets` instances according to their zone.
+
+          Example:
+
+              tags = TagSet({'id.playon':'recording.1234567'})
+              playon_recording = tags.entity.playon
+    '''
+    return self._EntityMap(self)
+
   #############################################################################
   # Edit tags.
 
