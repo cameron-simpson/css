@@ -3281,7 +3281,7 @@ class UsesTagSets:
   # a mapping of type zone names to their most recent UsesTagSets subclass instance
   by_type_zone = WeakValueDictionary()
 
-  def __init__(self, *, tagsets=None, **kw):
+  def __init__(self, tagsets=None, **kw):
     super().__init__(**kw)
     self.tagsets = tagsets or self.TagSetsClass()
     cls = self.__class__
@@ -3297,10 +3297,13 @@ class UsesTagSets:
       except KeyError:
         pass
       else:
-        warning(
-            "%s.%s: type zone %r already mapped to %s, replacing with %s",
-            cls.__module__, cls.__name__, type_zone, old, self
-        )
+        if old is not self:
+          warning(
+              "%s.%s: type zone %r already mapped to %s, replacing with %s",
+              cls.__module__, cls.__name__, type_zone, old, self
+          )
+          breakpoint()
+      vprint(f'{cls.by_type_zone}.by_type_zone[{self.TYPE_ZONE=}] = {self=}')
       subclass_map[type_zone] = self
 
   def tagged(self, te: TagSet) -> HasTags:
@@ -3336,10 +3339,10 @@ class UsesTagSets:
   def zone_entity(self, zone: str) -> "HasTags":
     ''' Return the `HasTags` entity associated with a per-type-zone key.
         For example, `self.zone_entity('tvdb')` would return the entity
-        for `tvdb.`*tvdb_id* where `tvdb_id` comes from `self['tvdb.id']`.
+        for `tvdb.`*tvdb_id* where `tvdb_id` comes from `self['id.tvdb']`.
     '''
     assert '.' not in zone
-    zone_key = self[f'{zone}.id']
+    zone_key = self[f'id.{zone}']
     assert isinstance(zone_key, str) and '.' in zone_key, (
         f'no . in {zone_key=} (from self[{zone=}.id])'
     )
