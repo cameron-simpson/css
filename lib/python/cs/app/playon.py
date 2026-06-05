@@ -125,408 +125,6 @@ def main(argv=None):
   '''
   return PlayOnCommand(argv).run()
 
-class PlayOnCommand(BaseCommand):
-  ''' Playon command line implementation.
-  '''
-  USAGE_KEYWORDS = {
-      'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
-      'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
-      'FILENAME_FORMAT_ENVVAR': FILENAME_FORMAT_ENVVAR,
-      'LS_FORMAT': LS_FORMAT,
-      'PLAYON_DBURL_ENVVAR': PLAYON_DBURL_ENVVAR,
-      'PLAYON_DBURL_DEFAULT': PLAYON_DBURL_DEFAULT,
-      'QUEUE_FORMAT': QUEUE_FORMAT,
-  }
-
-  USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
-
-    Environment:
-      PLAYON_USER               PlayOn login name, default from $EMAIL.
-      PLAYON_PASSWORD           PlayOn password.
-                                This is obtained from .netrc if omitted.
-      {FILENAME_FORMAT_ENVVAR}  Format string for downloaded filenames.
-                                Default: {DEFAULT_FILENAME_FORMAT}
-      {PLAYON_DBURL_ENVVAR:17}         Location of state tags database.
-                                Default: {PLAYON_DBURL_DEFAULT}
-
-    Recording specification:
-      an int        The specific recording id.
-      all           All known recordings.
-      downloaded    Recordings already downloaded.
-      expired       Recording which are no longer available.
-      pending       Recordings not already downloaded.
-      /regexp       Recordings whose Series or Name match the regexp,
-                    case insensitive.
-  '''
-
-  @dataclass
-  class Options(BaseCommand.Options):
-    INFO_SKIP_NAMES = (*BaseCommand.Options.INFO_SKIP_NAMES, 'password')
-    user: Optional[str] = field(
-        default_factory=lambda: environ.
-        get('PLAYON_USER', environ.get('EMAIL'))
-    )
-    password: Optional[str] = field(
-        default_factory=lambda: environ.get('PLAYON_PASSWORD')
-    )
-    dl_jobs: int = DEFAULT_DL_PARALLELISM
-    filename_format: str = field(
-        default_factory=lambda: environ.
-        get('FILENAME_FORMAT_ENVVAR', DEFAULT_FILENAME_FORMAT)
-    )
-    ls_format: str = LS_FORMAT
-    queue_format: str = QUEUE_FORMAT
-
-  @contextmanager
-  def run_context(self):
-    ''' Prepare the `PlayOnAPI` around each command invocation.
-    '''
-    with super().run_context():
-      options = self.options
-      runstate = options.runstate
-      api = PlayOnAPI(options.user, options.password)
-      with api:
-        with stackattrs(options, api=api):
-          # preload all the recordings from the db
-          ##list(sqltags.recordings())
-          # if there are unexpired stale entries or no unexpired entries,
-          # refresh them
-          self._refresh_sqltags_data(api)
-          runstate.raiseif()
-          yield
-
-  @popopts
-  def cmd_account(self, argv):
-    ''' Usage: {cmd}
-          Report account state.
-    '''
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    api = self.options.api
-    printt(*([k, v] for k, v in sorted(api.account().items())))
-
-  @popopts
-  def cmd_api(self, argv):
-    ''' Usage: {cmd} suburl
-          GET suburl via the API, print result.
-    '''
-    if not argv:
-      raise GetoptError("missing suburl")
-    suburl = argv.pop(0)
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    api = self.options.api
-    result = api.suburl_data(suburl)
-    pprint(result)
-
-  @popopts
-  def cmd_cds(self, argv):
-    ''' Usage: {cmd} suburl
-          GET suburl via the content delivery API, print result.
-          Example subpaths:
-            content
-            content/provider-name
-    '''
-    if not argv:
-      raise GetoptError("missing suburl")
-    suburl = argv.pop(0)
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    api = self.options.api
-    login_state = api.login_state
-    pprint(login_state)
-    result = api.cdsurl_data(suburl)
-    pprint(result)
-
-  @popopts(o_='filename_format')
-  @uses_fstags
-  def cmd_rename(self, argv, *, fstags: FSTags):
-    ''' Usage: {cmd} [-o filename_format] filenames...
-          Rename the filenames according to their fstags.
-          -n    No action, dry run.
-          -o filename_format
-                Format for the new filename, default {DEFAULT_FILENAME_FORMAT!r}.
-    '''
-    options = self.options
-    api = options.api
-    doit = options.doit
-    filename_format = options.filename_format
-    if not argv:
-      raise GetoptError("missing filenames")
-    xit = 0
-    for fspath in argv:
-      with Pfx(fspath):
-        if not existspath(fspath):
-          warning("does not exist")
-          xit = 1
-          continue
-        _, ext = splitext(basename(fspath))
-        try:
-          recording = fstags[fspath].zone_entity('playon')
-        except KeyError as e:
-          warning("no playon zone key, skipping: %s", e)
-          continue
-        new_filename = recording.filename(filename_format)
-        new_pfx, new_ext = splitext(new_filename)
-        new_filename = new_pfx + ext
-        if new_filename in (fspath, basename(fspath)):
-          continue
-        with Pfx("-> %s", new_filename):
-          if existspath(new_filename):
-            warning("already exists")
-            if not samefile(fspath, new_filename):
-              xit = 1
-            continue
-          print("mv", fspath, new_filename)
-          if doit:
-            fstags.mv(fspath, new_filename)
-            fstags[new_filename].update(recording)
-    return xit
-
-  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-  @popopts(j_=('dl_jobs', 'Concurrent download jobs.', int))
-  def cmd_dl(self, argv):
-    ''' Usage: {cmd} [recordings...]
-          Download the specified recordings, default "pending".
-    '''
-    options = self.options
-    dl_jobs = options.dl_jobs
-    no_download = options.dry_run
-    if not argv:
-      argv = ['pending']
-    api = options.api
-    filename_format = options.filename_format
-    runstate = options.runstate
-
-    def recordings_from_argv(argv):
-      for arg in argv:
-        with Pfx(arg):
-          recording_ids = api.recording_ids_from_str(arg)
-          if not recording_ids:
-            if sys.stderr.isatty():
-              warning("no recording ids")
-            continue
-          for dl_id in recording_ids:
-            print(f'recordings_from_argv: {dl_id=}')
-            recording = api[dl_id]
-            with Pfx(recording.name):
-              citation = recording.nice_name()
-              if recording.is_expired():
-                warning("expired, skipping %r", citation)
-                continue
-              if not recording.is_available():
-                warning("not yet available, skipping %r", citation)
-                continue
-              if recording.is_downloaded():
-                warning(
-                    "already downloaded %r to %r", citation,
-                    recording.download_path
-                )
-              print(f'recordings_from_argv: yield {recording=}')
-              yield recording
-
-    recordings = list(unrepeated(recordings_from_argv(argv)))
-    if no_download:
-      for recording in recordings:
-        recording.ls(format=filename_format)
-      return 0
-
-    @typechecked
-    def _dl(recording, *, runstate: RunState):
-      dl_id = recording.recording_id()
-      with api:
-        filename = api[dl_id].filename(filename_format)
-        try:
-          api.download(dl_id, filename=filename, runstate=runstate)
-        except ValueError as e:
-          warning("download fails: %s", e)
-          return None
-        return filename
-
-    xit = 0
-    for i, (filename, dl_exc) in pmap(
-        partial(_dl, runstate=runstate),
-        recordings,
-        concurrent=dl_jobs,
-        indexed=True,
-        unordered=True,
-        with_exceptions=True,
-    ):
-      recording = recordings[i]
-      print(f'{recording=}')
-      if dl_exc is not None:
-        warning("%s -> %s: %s", recording.nice_name(), filename, dl_exc)
-        xit = 1
-        raise dl_exc
-    return xit
-
-  @uses_runstate
-  def _refresh_sqltags_data(self, api, runstate: RunState, lifespan=None):
-    ''' Refresh the queue and recordings if any unexpired records are stale
-        or if all records are expired.
-    '''
-    recordings = set(api.fetch_recordings())
-    need_refresh = (
-        # any current recordings whose state is stale
-        any(
-            recording.refresh_needed(lifespan=lifespan)
-            for recording in recordings
-        ) or
-        # no recording is current
-        all(recording.is_expired() for recording in recordings)
-    )
-    if need_refresh:
-      with run_task("refresh queue and recordings"):
-        Ts = [runstate.bg(api.queue), runstate.bg(api.recordings)]
-        for T in Ts:
-          T.join()
-
-  @popopts
-  def cmd_downloaded(self, argv, locale='en_US'):
-    ''' Usage: {cmd} recordings...
-          Mark the specified recordings as downloaded and no longer pending.
-    '''
-    if not argv:
-      raise GetoptError("missing recordings")
-    api = self.options.api
-    xit = 0
-    for spec in argv:
-      with Pfx(spec):
-        recording_ids = api.recording_ids_from_str(spec)
-        if not recording_ids:
-          warning("no recording ids")
-          xit = 1
-          continue
-        for dl_id in recording_ids:
-          with Pfx("%s", dl_id):
-            recording = api[dl_id]
-            print(dl_id, '+ downloaded')
-            recording.add("downloaded")
-    return xit
-
-  @popopts(l='long_mode')
-  def cmd_feature(self, argv, locale='en_US'):
-    ''' Usage: {cmd} [feature_id]
-          List features.
-    '''
-    options = self.options
-    long_mode = options.long_mode
-    if argv:
-      feature_id = argv.pop(0)
-    else:
-      feature_id = None
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    api = self.options.api
-    for feature in sorted(api.features(), key=lambda svc: svc['playon.ID']):
-      playon = feature.subtags('playon', as_tagset=True)
-      if feature_id is not None and playon.ID != feature_id:
-        print("skip", playon.ID)
-        continue
-      print(playon.ID)
-      if feature_id is None and not long_mode:
-        continue
-      for tag in playon:
-        print(" ", tag)
-
-  @popopts(
-      l=('long_mode', 'Long listing: list tags below each entry.'),
-      o_=(
-          'ls_format',
-          ''' Format string for each entry. Default format:
-              {LS_FORMAT}
-          ''',
-      ),
-  )
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} [recordings...]
-          List available downloads.
-    '''
-    options = self.options
-    options.api.ls(
-        argv or ['available'],
-        format=options.ls_format,
-        long_mode=options.long_mode,
-    )
-
-  @popopts
-  def cmd_poll(self, argv):
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    pprint(self.options.api.notifications())
-
-  @popopts(
-      l=('long_mode', 'Long listing: list tags below each entry.'),
-      o_=(
-          'queue_format',
-          ''' Format string for each entry. Default format:
-              {QUEUE_FORMAT}
-          ''',
-      ),
-  )
-  def cmd_queue(self, argv):
-    ''' Usage: {cmd} [recordings...]
-          List queued recordings.
-    '''
-    options = self.options
-    options.api.ls(
-        argv or ['available'],
-        format=options.ls_format,
-        long_mode=options.long_mode,
-    )
-
-  cmd_q = cmd_queue
-
-  @popopts
-  def cmd_refresh(self, argv):
-    ''' Usage: {cmd} [queue] [recordings]
-          Update the db state from the PlayOn service.
-    '''
-    api = self.options.api
-    if not argv:
-      argv = ['queue', 'recordings']
-    xit = 0
-    Ts = []
-    for state in argv:
-      with Pfx(state):
-        if state == 'queue':
-          print("refresh queue...")
-          Ts.append(bg_thread(api.queue))
-        elif state == 'recordings':
-          print("refresh recordings...")
-          Ts.append(bg_thread(api.recordings))
-        else:
-          warning("unsupported update target")
-          xit = 1
-    print("wait for API...")
-    for T in Ts:
-      T.join()
-    return xit
-
-  @popopts
-  def cmd_service(self, argv, locale='en_US'):
-    ''' Usage: {cmd} [service_id]
-          List services.
-    '''
-    if argv:
-      service_id = argv.pop(0)
-    else:
-      service_id = None
-    if argv:
-      raise GetoptError(f'extra arguments: {argv!r}')
-    api = self.options.api
-    for service in sorted(api.services(), key=lambda svc: svc['playon.ID']):
-      playon = service.subtags('playon')
-      if service_id is not None and playon.ID != service_id:
-        print("skip", playon.ID)
-        continue
-      login_meta = playon.LoginMetadata
-      print(playon.ID, playon.Name, login_meta['URL'] if login_meta else {})
-      if service_id is None:
-        continue
-      for tag in playon:
-        print(" ", tag)
-
 class _PlayOnEntity(HasTags):
   ''' The base class of the entity subclasses.
       This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
@@ -1228,6 +826,408 @@ class PlayOnAPI(HTTPServiceAPI):
     # add a reference to the recording
     recording.type_reference_apply_to(tagged)
     return recording
+
+class PlayOnCommand(BaseCommand):
+  ''' Playon command line implementation.
+  '''
+  USAGE_KEYWORDS = {
+      'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
+      'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
+      'FILENAME_FORMAT_ENVVAR': FILENAME_FORMAT_ENVVAR,
+      'LS_FORMAT': LS_FORMAT,
+      'PLAYON_DBURL_ENVVAR': PLAYON_DBURL_ENVVAR,
+      'PLAYON_DBURL_DEFAULT': PLAYON_DBURL_DEFAULT,
+      'QUEUE_FORMAT': QUEUE_FORMAT,
+  }
+
+  USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
+
+    Environment:
+      PLAYON_USER               PlayOn login name, default from $EMAIL.
+      PLAYON_PASSWORD           PlayOn password.
+                                This is obtained from .netrc if omitted.
+      {FILENAME_FORMAT_ENVVAR}  Format string for downloaded filenames.
+                                Default: {DEFAULT_FILENAME_FORMAT}
+      {PLAYON_DBURL_ENVVAR:17}         Location of state tags database.
+                                Default: {PLAYON_DBURL_DEFAULT}
+
+    Recording specification:
+      an int        The specific recording id.
+      all           All known recordings.
+      downloaded    Recordings already downloaded.
+      expired       Recording which are no longer available.
+      pending       Recordings not already downloaded.
+      /regexp       Recordings whose Series or Name match the regexp,
+                    case insensitive.
+  '''
+
+  @dataclass
+  class Options(BaseCommand.Options):
+    INFO_SKIP_NAMES = (*BaseCommand.Options.INFO_SKIP_NAMES, 'password')
+    user: Optional[str] = field(
+        default_factory=lambda: environ.
+        get('PLAYON_USER', environ.get('EMAIL'))
+    )
+    password: Optional[str] = field(
+        default_factory=lambda: environ.get('PLAYON_PASSWORD')
+    )
+    dl_jobs: int = DEFAULT_DL_PARALLELISM
+    filename_format: str = field(
+        default_factory=lambda: environ.
+        get('FILENAME_FORMAT_ENVVAR', DEFAULT_FILENAME_FORMAT)
+    )
+    ls_format: str = LS_FORMAT
+    queue_format: str = QUEUE_FORMAT
+
+  @contextmanager
+  def run_context(self):
+    ''' Prepare the `PlayOnAPI` around each command invocation.
+    '''
+    with super().run_context():
+      options = self.options
+      runstate = options.runstate
+      api = PlayOnAPI(options.user, options.password)
+      with api:
+        with stackattrs(options, api=api):
+          # preload all the recordings from the db
+          ##list(sqltags.recordings())
+          # if there are unexpired stale entries or no unexpired entries,
+          # refresh them
+          self._refresh_sqltags_data(api)
+          runstate.raiseif()
+          yield
+
+  @popopts
+  def cmd_account(self, argv):
+    ''' Usage: {cmd}
+          Report account state.
+    '''
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    api = self.options.api
+    printt(*([k, v] for k, v in sorted(api.account().items())))
+
+  @popopts
+  def cmd_api(self, argv):
+    ''' Usage: {cmd} suburl
+          GET suburl via the API, print result.
+    '''
+    if not argv:
+      raise GetoptError("missing suburl")
+    suburl = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    api = self.options.api
+    result = api.suburl_data(suburl)
+    pprint(result)
+
+  @popopts
+  def cmd_cds(self, argv):
+    ''' Usage: {cmd} suburl
+          GET suburl via the content delivery API, print result.
+          Example subpaths:
+            content
+            content/provider-name
+    '''
+    if not argv:
+      raise GetoptError("missing suburl")
+    suburl = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    api = self.options.api
+    login_state = api.login_state
+    pprint(login_state)
+    result = api.cdsurl_data(suburl)
+    pprint(result)
+
+  @popopts(o_='filename_format')
+  @uses_fstags
+  def cmd_rename(self, argv, *, fstags: FSTags):
+    ''' Usage: {cmd} [-o filename_format] filenames...
+          Rename the filenames according to their fstags.
+          -n    No action, dry run.
+          -o filename_format
+                Format for the new filename, default {DEFAULT_FILENAME_FORMAT!r}.
+    '''
+    options = self.options
+    api = options.api
+    doit = options.doit
+    filename_format = options.filename_format
+    if not argv:
+      raise GetoptError("missing filenames")
+    xit = 0
+    for fspath in argv:
+      with Pfx(fspath):
+        if not existspath(fspath):
+          warning("does not exist")
+          xit = 1
+          continue
+        _, ext = splitext(basename(fspath))
+        try:
+          recording = fstags[fspath].zone_entity('playon')
+        except KeyError as e:
+          warning("no playon zone key, skipping: %s", e)
+          continue
+        new_filename = recording.filename(filename_format)
+        new_pfx, new_ext = splitext(new_filename)
+        new_filename = new_pfx + ext
+        if new_filename in (fspath, basename(fspath)):
+          continue
+        with Pfx("-> %s", new_filename):
+          if existspath(new_filename):
+            warning("already exists")
+            if not samefile(fspath, new_filename):
+              xit = 1
+            continue
+          print("mv", fspath, new_filename)
+          if doit:
+            fstags.mv(fspath, new_filename)
+            fstags[new_filename].update(recording)
+    return xit
+
+  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+  @popopts(j_=('dl_jobs', 'Concurrent download jobs.', int))
+  def cmd_dl(self, argv):
+    ''' Usage: {cmd} [recordings...]
+          Download the specified recordings, default "pending".
+    '''
+    options = self.options
+    dl_jobs = options.dl_jobs
+    no_download = options.dry_run
+    if not argv:
+      argv = ['pending']
+    api = options.api
+    filename_format = options.filename_format
+    runstate = options.runstate
+
+    def recordings_from_argv(argv):
+      for arg in argv:
+        with Pfx(arg):
+          recording_ids = api.recording_ids_from_str(arg)
+          if not recording_ids:
+            if sys.stderr.isatty():
+              warning("no recording ids")
+            continue
+          for dl_id in recording_ids:
+            print(f'recordings_from_argv: {dl_id=}')
+            recording = api[dl_id]
+            with Pfx(recording.name):
+              citation = recording.nice_name()
+              if recording.is_expired():
+                warning("expired, skipping %r", citation)
+                continue
+              if not recording.is_available():
+                warning("not yet available, skipping %r", citation)
+                continue
+              if recording.is_downloaded():
+                warning(
+                    "already downloaded %r to %r", citation,
+                    recording.download_path
+                )
+              print(f'recordings_from_argv: yield {recording=}')
+              yield recording
+
+    recordings = list(unrepeated(recordings_from_argv(argv)))
+    if no_download:
+      for recording in recordings:
+        recording.ls(format=filename_format)
+      return 0
+
+    @typechecked
+    def _dl(recording, *, runstate: RunState):
+      dl_id = recording.recording_id()
+      with api:
+        filename = api[dl_id].filename(filename_format)
+        try:
+          api.download(dl_id, filename=filename, runstate=runstate)
+        except ValueError as e:
+          warning("download fails: %s", e)
+          return None
+        return filename
+
+    xit = 0
+    for i, (filename, dl_exc) in pmap(
+        partial(_dl, runstate=runstate),
+        recordings,
+        concurrent=dl_jobs,
+        indexed=True,
+        unordered=True,
+        with_exceptions=True,
+    ):
+      recording = recordings[i]
+      print(f'{recording=}')
+      if dl_exc is not None:
+        warning("%s -> %s: %s", recording.nice_name(), filename, dl_exc)
+        xit = 1
+        raise dl_exc
+    return xit
+
+  @uses_runstate
+  def _refresh_sqltags_data(self, api, runstate: RunState, lifespan=None):
+    ''' Refresh the queue and recordings if any unexpired records are stale
+        or if all records are expired.
+    '''
+    recordings = set(api.fetch_recordings())
+    need_refresh = (
+        # any current recordings whose state is stale
+        any(
+            recording.refresh_needed(lifespan=lifespan)
+            for recording in recordings
+        ) or
+        # no recording is current
+        all(recording.is_expired() for recording in recordings)
+    )
+    if need_refresh:
+      with run_task("refresh queue and recordings"):
+        Ts = [runstate.bg(api.queue), runstate.bg(api.recordings)]
+        for T in Ts:
+          T.join()
+
+  @popopts
+  def cmd_downloaded(self, argv, locale='en_US'):
+    ''' Usage: {cmd} recordings...
+          Mark the specified recordings as downloaded and no longer pending.
+    '''
+    if not argv:
+      raise GetoptError("missing recordings")
+    api = self.options.api
+    xit = 0
+    for spec in argv:
+      with Pfx(spec):
+        recording_ids = api.recording_ids_from_str(spec)
+        if not recording_ids:
+          warning("no recording ids")
+          xit = 1
+          continue
+        for dl_id in recording_ids:
+          with Pfx("%s", dl_id):
+            recording = api[dl_id]
+            print(dl_id, '+ downloaded')
+            recording.add("downloaded")
+    return xit
+
+  @popopts(l='long_mode')
+  def cmd_feature(self, argv, locale='en_US'):
+    ''' Usage: {cmd} [feature_id]
+          List features.
+    '''
+    options = self.options
+    long_mode = options.long_mode
+    if argv:
+      feature_id = argv.pop(0)
+    else:
+      feature_id = None
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    api = self.options.api
+    for feature in sorted(api.features(), key=lambda svc: svc['playon.ID']):
+      playon = feature.subtags('playon', as_tagset=True)
+      if feature_id is not None and playon.ID != feature_id:
+        print("skip", playon.ID)
+        continue
+      print(playon.ID)
+      if feature_id is None and not long_mode:
+        continue
+      for tag in playon:
+        print(" ", tag)
+
+  @popopts(
+      l=('long_mode', 'Long listing: list tags below each entry.'),
+      o_=(
+          'ls_format',
+          ''' Format string for each entry. Default format:
+              {LS_FORMAT}
+          ''',
+      ),
+  )
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [recordings...]
+          List available downloads.
+    '''
+    options = self.options
+    options.api.ls(
+        argv or ['available'],
+        format=options.ls_format,
+        long_mode=options.long_mode,
+    )
+
+  @popopts
+  def cmd_poll(self, argv):
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    pprint(self.options.api.notifications())
+
+  @popopts(
+      l=('long_mode', 'Long listing: list tags below each entry.'),
+      o_=(
+          'queue_format',
+          ''' Format string for each entry. Default format:
+              {QUEUE_FORMAT}
+          ''',
+      ),
+  )
+  def cmd_queue(self, argv):
+    ''' Usage: {cmd} [recordings...]
+          List queued recordings.
+    '''
+    options = self.options
+    options.api.ls(
+        argv or ['available'],
+        format=options.ls_format,
+        long_mode=options.long_mode,
+    )
+
+  cmd_q = cmd_queue
+
+  @popopts
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} [queue] [recordings]
+          Update the db state from the PlayOn service.
+    '''
+    api = self.options.api
+    if not argv:
+      argv = ['queue', 'recordings']
+    xit = 0
+    Ts = []
+    for state in argv:
+      with Pfx(state):
+        if state == 'queue':
+          print("refresh queue...")
+          Ts.append(bg_thread(api.queue))
+        elif state == 'recordings':
+          print("refresh recordings...")
+          Ts.append(bg_thread(api.recordings))
+        else:
+          warning("unsupported update target")
+          xit = 1
+    print("wait for API...")
+    for T in Ts:
+      T.join()
+    return xit
+
+  @popopts
+  def cmd_service(self, argv, locale='en_US'):
+    ''' Usage: {cmd} [service_id]
+          List services.
+    '''
+    if argv:
+      service_id = argv.pop(0)
+    else:
+      service_id = None
+    if argv:
+      raise GetoptError(f'extra arguments: {argv!r}')
+    api = self.options.api
+    for service in sorted(api.services(), key=lambda svc: svc['playon.ID']):
+      playon = service.subtags('playon')
+      if service_id is not None and playon.ID != service_id:
+        print("skip", playon.ID)
+        continue
+      login_meta = playon.LoginMetadata
+      print(playon.ID, playon.Name, login_meta['URL'] if login_meta else {})
+      if service_id is None:
+        continue
+      for tag in playon:
+        print(" ", tag)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
