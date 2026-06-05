@@ -1378,7 +1378,7 @@ class TagSet(
       '''
       return iter(self.__prefixed_view)
 
-  @property
+  @cached_property
   def auto(self):
     ''' The automatic namespace.
         Here we can refer to dotted tag names directly as attributes.
