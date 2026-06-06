@@ -832,6 +832,18 @@ class PlayOnAPI(HTTPServiceAPI):
     recording.type_reference_apply_to(tagged)
     return recording
 
+class PlayOn(UsesTagSets):
+
+  TagSetsClass = PlayOnSQLTags
+  HasTagsClass = _PlayOnEntity
+  TYPE_ZONE = 'playon'
+
+  def __init__(self, api: PlayOnAPI | None = None, *, tagsets=None):
+    if api is None:
+      api = PlayOnAPI()
+    super().__init__(tagsets=tagsets)
+    self.api = api
+
 class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
   '''
@@ -893,14 +905,16 @@ class PlayOnCommand(BaseCommand):
       runstate = options.runstate
       api = PlayOnAPI(options.user, options.password)
       with api:
-        with stackattrs(options, api=api):
-          # preload all the recordings from the db
-          ##list(sqltags.recordings())
-          # if there are unexpired stale entries or no unexpired entries,
-          # refresh them
-          self._refresh_sqltags_data(api)
-          runstate.raiseif()
-          yield
+        playon = PlayOn(api=api)
+        with playon.for_zone():
+          with stackattrs(options, api=api, playon=playon):
+            # preload all the recordings from the db
+            ##list(sqltags.recordings())
+            # if there are unexpired stale entries or no unexpired entries,
+            # refresh them
+            self._refresh_sqltags_data(api)
+            runstate.raiseif()
+            yield
 
   @popopts
   def cmd_account(self, argv):
