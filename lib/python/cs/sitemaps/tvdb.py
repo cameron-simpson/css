@@ -29,6 +29,7 @@ from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.service_api import HTTPServiceAPI
 from cs.tagset import HasTags, TagSet, UsesTagSets
+from cs.threads import pmap
 
 from bs4.element import Tag as BS4Tag
 from typeguard import typechecked
@@ -254,6 +255,9 @@ class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
   TVDB_API_KEY_ENVVAR = 'TVDB_API_KEY'
   TVDB_API_TOKEN_ENVVAR = 'TVDB_API_TOKEN'
 
+  # the default concurrency limit for API calls
+  DEFAULT_CONCURRENT = 2
+
   @classmethod
   def _singleton_key(cls, api_key: str = None):
     ''' The filesystem path for the `db_url` or `None`.
@@ -262,7 +266,13 @@ class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
       api_key = os.environ[cls.TVDB_API_KEY_ENVVAR]
     return api_key
 
-  def __init__(self, api_key: str = None, **httpapi_kw):
+  def __init__(
+      self,
+      api_key: str = None,
+      *,
+      concurrent: Optional[int] = None,
+      **httpapi_kw,
+  ):
     if hasattr(self, 'api_key'):
       return
     super().__init__(mode="data", **httpapi_kw)
@@ -270,6 +280,8 @@ class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
       api_key = os.environ[self.TVDB_API_KEY_ENVVAR]
     self.api_key = api_key
     self.token = os.environ.get(self.TVDB_API_TOKEN_ENVVAR)
+    if concurrent is None: concurrent = self.DEFAULT_CONCURRENT
+    self.concurrent_sem = Semaphore(concurrent)
 
   def parse_object_id(self, type_id: str) -> TVDBEntity:
     ''' Resolve a TVDB entity spec such as `"series-1234"` into the `TVDBEntity` instance.
