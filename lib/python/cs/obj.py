@@ -542,9 +542,22 @@ class Refreshable(ABC):
     ''' Refresh the object from `resource`, typically an URL.
         Return `True` if the object was updated, `False` otherwise.
 
+        If `resource` is not supplied to `refresh()` its default
+        value will be obtained from the `self.refresh_resource`
+        property, and supplied diectly here - there is no need to
+        compute a default from `self ` here.
+
         If `data` is not `None`, apply `data` to `self` and return `True`
         instead of making whatever API call or other action that would
         normally be performed.
+
+        A typical example looks like this:
+
+            def _refresh(self, api_subpath=None, data=None):
+              if data is None:
+                data = data_from_api(api_subpath)
+              self.tags.update(data, prefix=self.type_zone)
+              return True
     '''
     raise NotImplementedError
 
@@ -612,9 +625,9 @@ class Refreshable(ABC):
         `self.refresh_last_poll` and `self.refresh_last_update`.
 
         Positional parameters:
-        * `resource`: the reference resource, default from
-          `self.refresh_resource`, passed to `self._refresh()` as its
-          first argument
+        * `resource`: optional reference resource, default from the
+          `self.refresh_resource` property, passed to `self._refresh()`
+          as its first argument
 
         Keyword parameters:
         * `data`: optional object providing the refresh data,
@@ -633,7 +646,12 @@ class Refreshable(ABC):
         * `recurse`: optional flag, default `False`; if true the
           recursively refresh the objects from `self.refresh_related()`
         * `seen`: optional set of keys to prevent unbound recursion
+
         Other keyword parameters are passed to `self._refresh()` if it is called.
+
+        It is probably a mistake to call this with non-`None` `data`
+        and `recurse` true. It will be accepts and the `data` applied
+        to `self` and the recursion done without `data`.
     '''
     lifespan0 = lifespan
     ratelimit0 = ratelimit
