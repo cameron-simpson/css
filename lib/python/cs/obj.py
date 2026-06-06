@@ -562,13 +562,6 @@ class Refreshable(ABC):
     '''
     raise NotImplementedError
 
-  def refreshed(self, now: float = None):
-    ''' Mark `self` as refreshed as of `now`, default `time.time()`.
-    '''
-    if now is None:
-      now = time.time()
-    self.refresh_last_update = now
-
   def refresh_needed(
       self,
       *,
@@ -710,6 +703,13 @@ class Refreshable(ABC):
       ):
         pass
     return refreshed
+
+  def refreshed(self, resource: Optional = None, **refresh_kw):
+    ''' A variant on `refresh()` which returns `self` to support chaining.
+        This isn't the default because that's not Pythonic.
+    '''
+    self.refresh(resource, **refresh_kw)
+    return self
 
 def public_subclasses(cls, extras=()):
   ''' Return a set of the subclasses of `cls` which have public names.
