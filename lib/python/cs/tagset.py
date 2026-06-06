@@ -3466,6 +3466,10 @@ class UsesTagSets:
         )
     )
 
+  def items(self, subname=None):
+    for k in self.keys(subname=subname):
+      yield k, self[k]
+
   def find(self, *criteria, **crit_kw) -> List[HasTags]:
     ''' Find entities in the database.
 
