@@ -3201,6 +3201,12 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
     '''
     return self.tags_db.deref(self, tag_name, attr=attr, subtype=subtype)
 
+  @property
+  def entity(self):
+    ''' The `TagSet.entity` poperty.
+    '''
+    return self.tags.entity
+
   #######################################################
   # Methods supports FormatableMixin
 
