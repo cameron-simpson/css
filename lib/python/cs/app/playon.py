@@ -433,45 +433,21 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
     self.login_userid = login
     self._password = password
 
-  @cached_property
-  @typechecked
-  def login_userid(self) -> str:
-    ''' The default `login_userid` comes from the netrc entry for `self.API_HOSTNAME`.
+  def _get_credentials(self):
+    ''' Obtain the PlayOn login and password for (API_HOSTNAME,login) from the `.netrc` file.
     '''
-    N = netrc()
-    with Pfx(".netrc host %r", self.API_HOSTNAME):
-      entry = N.hosts.get(self.API_HOSTNAME)
-    if entry is None:
-      raise AttributeError(
-          f'{self.__class__.__name__}.login_userid'
-          f': no netrc entry for {self.API_HOSTNAME=}'
-      )
-    return entry[0]
-
-  @pfx_method
-  def login(self):
-    ''' Perform a login, return the resulting `dict`.
-        *Does not* update the state of `self`.
-    '''
-    login = self.login_userid
+    login = self.login
     password = self._password
-    if not login or not password:
+    if password is None:
       N = netrc()
-      netrc_hosts = []
-      if login:
-        assert login is not None and login != 'None', "login=%r" % login
-        netrc_host = f"{login}:{self.API_HOSTNAME}"
-        netrc_hosts.append(netrc_host)
+      netrc_hosts = [f"{self.login}:{self.API_HOSTNAME}", self.API_HOSTNAME]
+      for netrc_host in netrc_hosts:
         with Pfx(".netrc host %r", netrc_host):
           entry = N.hosts.get(netrc_host)
+        if entry is not None:
+          break
       else:
-        entry = None
-      if not entry:
-        netrc_hosts.append(self.API_HOSTNAME)
-        with Pfx(".netrc host %r", self.API_HOSTNAME):
-          entry = N.hosts.get(self.API_HOSTNAME)
-      if not entry:
-        raise ValueError("no netrc entry for %r" % (netrc_hosts,))
+        raise ValueError(f'no netrc entry for {netrc_hosts}')
       n_login, _, n_password = entry
       if login is None:
         login = n_login
@@ -480,6 +456,14 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
             "netrc: supplied login:%r != netrc login:%r" % (login, n_login)
         )
       password = n_password
+    return login, password
+
+  @pfx_method
+  def login(self):
+    ''' Perform a login, return the resulting `dict`.
+        *This does not* update the state of `self`.*
+    '''
+    login, password = self._get_credentials()
     return self.post(
         'login',
         headers={'x-mmt-app': 'web'},
