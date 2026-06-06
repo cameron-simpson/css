@@ -296,7 +296,7 @@ def update_linkdir(linkdirpath: str, paths: Iterable[str], trim=False):
   return name_map
 
 # pylint: disable=too-few-public-methods
-class HasFSPath:
+class HasFSPath(PathLike):
   ''' A mixin for an object with a `.fspath` attribute representing
       a filesystem location.
 
@@ -314,6 +314,11 @@ class HasFSPath:
 
   def __lt__(self, other):
     return self.fspath < other.fspath
+
+  def __fspath__(self):
+    ''' Return the filesystem path string, for `os.PathLike`.
+    '''
+    return self.fspath
 
   @property
   def shortpath(self):
