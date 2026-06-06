@@ -14,7 +14,8 @@ from os.path import basename
 import re
 import sys
 from textwrap import wrap
-from typing import Generator
+from threading import Semaphore
+from typing import Generator, Optional
 
 from cs.app.pilfer.pilfer import Pilfer, uses_pilfer
 from cs.app.pilfer.sitemap import SiteEntity, SiteMap, on
@@ -25,6 +26,7 @@ from cs.deco import default_params, Promotable
 from cs.lex import printt, r, s
 from cs.logutils import warning
 from cs.mappings import change_mapping
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.service_api import HTTPServiceAPI
@@ -189,7 +191,7 @@ class Series(TVDBEntity):
         character.refresh()
         chartable.append(
             [
-                character['tvdb.name'],
+                character.get('tvdb.name', 'no tvdb.name'),
                 character['tvdb.personName'],
             ]
         )
@@ -220,7 +222,7 @@ class Series(TVDBEntity):
             epitable.append(
                 [
                     episode['tvdb.number'],
-                    f'{episode["tvdb.name"]}\n{"\n".join(wrap(episode.get("tvdb.overview","No overview."),60))}'
+                    f'{episode.get("tvdb.name","no tvb.name")}\n{"\n".join(wrap(episode.get("tvdb.overview","No overview."),60))}'
                 ]
             )
           seatable.append(tuple(epitable))
@@ -240,7 +242,7 @@ Series.TVDB_SUBENTITY_FIELDS = (
     ('tvdb.seasons', Season),
 )
 
-class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
+class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
 
   TYPE_ZONE = 'tvdb'
   HasTagsClass = TVDBEntity
@@ -259,7 +261,7 @@ class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
   DEFAULT_CONCURRENT = 2
 
   @classmethod
-  def _singleton_key(cls, api_key: str = None):
+  def _singleton_key(cls, api_key: str = None, **_):
     ''' The filesystem path for the `db_url` or `None`.
     '''
     if api_key is None:
@@ -275,7 +277,9 @@ class TheTVDBAPI(HTTPServiceAPI, UsesTagSets):
   ):
     if hasattr(self, 'api_key'):
       return
-    super().__init__(mode="data", **httpapi_kw)
+    super().__init__(
+        mode="data", check_json={"status": "success"}, **httpapi_kw
+    )
     if api_key is None:
       api_key = os.environ[self.TVDB_API_KEY_ENVVAR]
     self.api_key = api_key
