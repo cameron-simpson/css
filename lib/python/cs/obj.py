@@ -611,6 +611,9 @@ class Refreshable(ABC):
     ''' Refresh this object; if it is stale attempt to refresh via `self._refresh()`.
         Return `True` if the object was updated, `False` otherwise.
 
+        Note that this returns `False` if the object was considered
+        still current; `False` is not an error.
+
         The refresh policy is: if `force` or (the object's information
         is stale and the rate limit does not preclude a refresh),
         call `self._refresh(resource)`.
@@ -685,8 +688,8 @@ class Refreshable(ABC):
     if resource is None:
       resource = getattr(self, 'refresh_resource', None)
     self.refresh_last_poll = now
-    refreshed = self._refresh(resource, data=data, **_refresh_kw)
-    if refreshed:
+    was_updated = self._refresh(resource, data=data, **_refresh_kw)
+    if was_updated:
       self.refresh_last_update = now
     if recurse:
       for _ in map(
@@ -702,7 +705,7 @@ class Refreshable(ABC):
           self.refresh_related(),
       ):
         pass
-    return refreshed
+    return was_updated
 
   def refreshed(self, resource: Optional = None, **refresh_kw):
     ''' A variant on `refresh()` which returns `self` to support chaining.
