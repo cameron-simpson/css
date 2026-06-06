@@ -45,6 +45,7 @@ from cs.lex import (
 )
 from cs.logutils import warning
 from cs.mediainfo import SeriesEpisodeInfo
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
@@ -378,7 +379,7 @@ class PlayOnSQLTags(SQLTags):
 
 # pylint: disable=too-many-instance-attributes
 @monitor
-class PlayOnAPI(HTTPServiceAPI):
+class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
   ''' Access to the PlayOn API.
   '''
 
@@ -396,10 +397,40 @@ class PlayOnAPI(HTTPServiceAPI):
   CDS_HOSTNAME_LOCAL = 'cds-au.playonrecorder.com'
   CDS_BASE_LOCAL = f'https://{CDS_HOSTNAME_LOCAL}/api/v6/'
 
+  PLAYON_ACCOUNT_ENVVAR = 'PLAYON_ACCOUNT'
+
+  @classmethod
+  def default_user_id(cls):
+    ''' The default `login_userid` comes from the netrc entry for `cls.API_HOSTNAME`.
+    '''
+    user_id = os.environ.get(cls.PLAYON_ACCOUNT_ENVVAR)
+    if not user_id:
+      N = netrc()
+      with Pfx(".netrc host %r", cls.API_HOSTNAME):
+        entry = N.hosts.get(cls.API_HOSTNAME)
+      if entry is None:
+        raise KeyError(
+            f'{cls.__name__}.default_user_id'
+            f': no ${PLAYON_ACCOUNT_ENVVAR} and no netrc entry for {cls.API_HOSTNAME=}'
+        )
+      user_id = entry[0]
+    return user_id
+
+  @classmethod
+  def _singleton_key(cls, login: str = None, **_):
+    ''' The filesystem path for the `db_url` or `None`.
+    '''
+    if login is None:
+      login = cls.default_user_id()
+    return cls.API_HOSTNAME, login
+
   def __init__(self, login=None, password=None, **kw):
+    if hasattr(self, 'login_userid'):
+      return
     super().__init__(mode="data", check_json={"success": True}, **kw)
-    if login:
-      self.login_userid = login
+    if login is None:
+      login = self.default_user_id()
+    self.login_userid = login
     self._password = password
 
   @cached_property
