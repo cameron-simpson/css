@@ -7,7 +7,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
-from functools import cached_property
+from functools import cached_property, partial
 from itertools import batched
 import os
 from os.path import basename
@@ -69,6 +69,16 @@ class TVDBEntity(SiteEntity, Promotable):
         return ref_type
     raise ValueError(
         f'no entity type for {field_name=} in {cls}.TVDB_SUBENTITY_FIELDS={cls.TVDB_SUBENTITY_FIELDS}'
+    )
+
+  #################################################################
+  # Refreshable support.
+  @uses_tvdb
+  def refresh(self, *rfa, tvdb_api: "TheTVDBAPI", **rfkw):
+    ''' Call `Refreshable.refresh` with a curried `pmap` using the API `concurrent_sem`.
+    '''
+    return super().refresh(
+        *rfa, map=partial(pmap, concurrent=tvdb_api.concurrent_sem), **rfkw
     )
 
   @property
