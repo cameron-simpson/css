@@ -314,7 +314,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, vprint
-from cs.context import withall
+from cs.context import stackkeys, withall
 from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable, uses_verbose
 from cs.edit import edit_strings, edit as edit_lines
@@ -3305,6 +3305,17 @@ class UsesTagSets:
           breakpoint()
       vprint(f'{cls.by_type_zone}.by_type_zone[{self.TYPE_ZONE=}] = {self=}')
       subclass_map[type_zone] = self
+
+  @contextmanager
+  def for_zone(self, type_zone=None):
+    ''' Push this `UsesTagSets` instance as the default mapping for
+        `type_zone`, whose default is `self.__class__.TYPE_ZONE`.
+    '''
+    cls = self.__class__
+    if type_zone is None:
+      type_zone = cls.TYPE_ZONE
+    with stackkeys(cls.by_type_zone, **{type_zone: cls}):
+      yield
 
   def tagged(self, te: TagSet) -> HasTags:
     ''' Promote `te` to a `HasTags` in this zone.
