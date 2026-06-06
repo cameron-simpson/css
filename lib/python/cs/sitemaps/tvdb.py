@@ -88,25 +88,20 @@ class TVDBEntity(SiteEntity, Promotable):
     return self.format_as(self.TVDB_API_ENTITY_SUBPATH_FORMAT)
 
   @uses_tvdb
-  def _refresh(self, subpath=None, *, tvdb_api: "TheTVDBAPI"):
+  def _refresh(self, subpath=None, *, data=None, tvdb_api: "TheTVDBAPI"):
     ''' Refresh this entity from the TVDB API.
     '''
-    if subpath is None:
-      from cs.py.stack import caller
-      warning(
-          f'{self.__class__.__name__}:{self.name}._refresh: {subpath=} FROM {caller()}'
+    if data is None:
+      if subpath is None:
+        raise ValueError(
+            f'no data or subpath provided to {self.__class__.__name__}:{self.name}._refresh()'
+        )
+      api_id = int(self.type_key)
+      data = tvdb_api / subpath
+      assert data["id"] == api_id, (
+          f'TVDB API {data["id"]=} != {api_id=} (from {self.type_key=})'
       )
-      breakpoint()
-      subpath = self.refresh_resource
-    api_id = int(self.type_key)
-    data = tvdb_api / subpath
-    assert data["id"] == api_id, (
-        f'TVDB API {data["id"]=} != {api_id=} (from {self.type_key=})'
-    )
-    for field, value in data.items():
-      if field == "id":
-        continue
-      self[f'{self.type_zone}.{field}'] = value
+    self.update(data, prefix=self.type_zone)
     return True
 
   def refresh_related(self) -> Generator["TVDBEntity"]:
