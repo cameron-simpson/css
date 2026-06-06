@@ -538,9 +538,13 @@ class Refreshable(ABC):
   REFRESH_RATELIMIT = 1.0
 
   @abstractmethod
-  def _refresh(self, resource) -> bool:
+  def _refresh(self, resource=None, *, data=None) -> bool:
     ''' Refresh the object from `resource`, typically an URL.
         Return `True` if the object was updated, `False` otherwise.
+
+        If `data` is not `None`, apply `data` to `self` and return `True`
+        instead of making whatever API call or other action that would
+        normally be performed.
     '''
     raise NotImplementedError
 
@@ -588,6 +592,7 @@ class Refreshable(ABC):
       self,
       resource: Optional = None,
       *,
+      data=None,
       force=False,
       lifespan: float = None,
       ratelimit: float = None,
@@ -606,8 +611,17 @@ class Refreshable(ABC):
         State about the refresh poll times is kept in
         `self.refresh_last_poll` and `self.refresh_last_update`.
 
-        Parameters:
-        * `resource`: the reference resource, default from `self.refresh_resource`
+        Positional parameters:
+        * `resource`: the reference resource, default from
+          `self.refresh_resource`, passed to `self._refresh()` as its
+          first argument
+
+        Keyword parameters:
+        * `data`: optional object providing the refresh data,
+          passed to `self._refresh()` as the `data` keyword argument;
+          if not `None` then `_refresh` is always called and should
+          apply it instead of making whatever API call or other
+          action it would perform passed to `self._refresh()
         * `force`: optional flag, default `False`; if true attempt
           a refresh regardless of staleness or the rate limit
         * `lifespan`: how many seconds before updated information
@@ -631,7 +645,7 @@ class Refreshable(ABC):
         return
     seen.add(key)
     now = time.time()
-    if not force:
+    if not force and data is None:
       if not self.refresh_needed(lifespan=lifespan, now=now):
         return False
       last_poll = getattr(self, 'refresh_last_poll', 0.0)
@@ -648,7 +662,7 @@ class Refreshable(ABC):
     if resource is None:
       resource = getattr(self, 'refresh_resource', None)
     self.refresh_last_poll = now
-    refreshed = self._refresh(resource, **_refresh_kw)
+    refreshed = self._refresh(resource, data=data, **_refresh_kw)
     if refreshed:
       self.refresh_last_update = now
     if recurse:
