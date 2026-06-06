@@ -8,6 +8,7 @@ Convenience facilities for objects.
 '''
 
 from abc import ABC, abstractmethod
+import builtins
 from collections import defaultdict
 from copy import copy as copy0
 import sys
@@ -15,7 +16,7 @@ from threading import Lock
 import time
 import traceback
 from types import SimpleNamespace
-from typing import Optional
+from typing import Iterable, Optional
 from weakref import WeakValueDictionary
 
 from cs.deco import OBSOLETE
@@ -589,7 +590,7 @@ class Refreshable(ABC):
     last_update = getattr(self, 'refresh_last_update', 0.0)
     return last_update + lifespan < now
 
-  def refresh_related(self):
+  def refresh_related(self) -> Iterable:
     ''' Return the related objects which should also be refreshed in recursive refreshes.
     '''
     return ()
@@ -608,6 +609,7 @@ class Refreshable(ABC):
       data=None,
       force=False,
       lifespan: float = None,
+      map=builtins.map,
       ratelimit: float = None,
       recurse=False,
       seen=None,
@@ -640,6 +642,10 @@ class Refreshable(ABC):
         * `lifespan`: how many seconds before updated information
           is considered no stale, default from `self.refresh_lifespan`,
           or `type(self).REFRESH_RATELIMIT`
+        * `map`: optional `map()`-like function to call
+          refresh on the related objects; this hook exists to allow
+          for example APIs to pass in a curried `pmap()` call to
+          refresh some objects in parallel; the default map function is `map()`
         * `ratelimit`: how many seconds should elapsed before
           attempting a refresh, default from `self.refresh_ratelimit`
           or `type(self).REFRESH_RATELIMIT`
@@ -648,6 +654,12 @@ class Refreshable(ABC):
         * `seen`: optional set of keys to prevent unbound recursion
 
         Other keyword parameters are passed to `self._refresh()` if it is called.
+
+        Note that because a `recurse=True` call descends a potentially
+        arbitrary tree of related objects, if `map` is supplied as,
+        for example, `pmap`, that should be a curried call with a
+        shared `Semaphore` to control the concurrency, such as
+        `partial(pmap,concurrent=Semaphore(4))`.
 
         It is probably a mistake to call this with non-`None` `data`
         and `recurse` true. It will be accepts and the `data` applied
@@ -684,15 +696,19 @@ class Refreshable(ABC):
     if refreshed:
       self.refresh_last_update = now
     if recurse:
-      for obj in self.refresh_related():
-        obj.refresh(
-            recurse=True,
-            force=force,
-            lifespan=lifespan0,
-            ratelimit=ratelimit0,
-            seen=seen,
-            **_refresh_kw
-        )
+      for _ in map(
+          lambda obj: obj.refresh(
+              recurse=True,
+              map=map,
+              force=force,
+              lifespan=lifespan0,
+              ratelimit=ratelimit0,
+              seen=seen,
+              **_refresh_kw,
+          ),
+          self.refresh_related(),
+      ):
+        pass
     return refreshed
 
 def public_subclasses(cls, extras=()):
