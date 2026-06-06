@@ -126,257 +126,6 @@ def main(argv=None):
   '''
   return PlayOnCommand(argv).run()
 
-class _PlayOnEntity(HasTags):
-  ''' The base class of the entity subclasses.
-      This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
-  '''
-
-  def _refresh(self, resource, data=None):
-    if data is None:
-      warning("no individual {self.__class__.__name__}._refresh method")
-      return False
-    self.tags.update(data, prefix=self.type_zone)
-    return True
-
-class LoginState(_PlayOnEntity):
-
-  TYPE_SUBNAME = 'login.state'
-
-  @property
-  def expiry(self):
-    ''' Expiry unixtime of the login state information.
-        `-1` if the `'exp'` field is not present.
-    '''
-    return self.tags.get('exp') or -1
-
-class Recording(_PlayOnEntity):
-  ''' A PlayOn recording.
-  '''
-
-  TYPE_SUBNAME = 'recording'
-
-  # recording data are considered stale after 10 minutes
-  refresh_lifespan = 600
-
-  RECORDING_QUALITY = {
-      1: '720p',
-      2: '1080p',
-  }
-
-  @format_attribute
-  def resolution(self):
-    ''' The recording resolution derived from the quality
-        via the `Recording.RECORDING_QUALITY` mapping.
-    '''
-    quality = self.tags.get('playon.Quality')
-    if quality is None:
-      return None
-    return self.RECORDING_QUALITY.get(quality, quality)
-
-  @format_attribute
-  def recording_id(self):
-    ''' The recording id or `None`.
-    '''
-    return self.get('playon.ID')
-
-  @cached_property
-  def sei(self):
-    ''' A `PlayonSeriesEpisodeInfo` inferred from this `Recording`.
-    '''
-    return PlayonSeriesEpisodeInfo.from_Recording(self)
-
-  @format_attribute
-  def nice_name(self):
-    ''' A nice name for the recording: the PlayOn series and name,
-        omitting the series if that is `None`.
-    '''
-    sei = self.sei
-    if sei.series:
-      citation = f'{sei.series} - s{sei.season:02d}e{sei.episode:02d} - {sei.episode_title}'
-      if sei.episode_part:
-        citation += f' - pt{sei.episode_part:02d}'
-    else:
-      citation = sei.episode_title or self['playon.Name']
-    return citation
-
-  @format_attribute
-  def status(self):
-    ''' Return a short status string.
-    '''
-    for status_label in 'queued', 'expired', 'downloaded', 'pending':
-      if getattr(self, f'is_{status_label}')():
-        return status_label
-    raise RuntimeError("cannot infer a status string: %s" % (self,))
-
-  @format_attribute
-  def series_prefix(self):
-    ''' Return a series prefix for recording containing the series name
-        and season and episode, or `''`.
-    '''
-    sei = self.sei
-    sep = '--'
-    parts = []
-    if sei.series:
-      parts.append(sei.series)
-      se_parts = []
-      if sei.season:
-        se_parts.append(f's{sei.season:02d}')
-      if sei.episode is not None:
-        se_parts.append(f'e{sei.episode:02d}')
-      if se_parts:
-        parts.append(''.join(se_parts))
-    if not parts:
-      return ''
-    return sep.join(parts) + sep
-
-  @format_attribute
-  def series_episode_name(self):
-    sei = self.sei
-    name = sei.episode_title
-    if sei.episode_part:
-      name += f'--pt{sei.episode_part:02d}'
-    return name.strip()
-
-  @format_attribute
-  def is_available(self):
-    ''' Is a recording available for download?
-    '''
-    return not self.is_expired() and not self.is_queued()
-
-  @format_attribute
-  def is_queued(self):
-    ''' Is a recording still in the queue?
-    '''
-    return 'playon.Created' not in self
-
-  @format_attribute
-  def is_downloaded(self):
-    ''' Test whether this recording has been downloaded
-        based on the presence of a `download_path` `Tag`
-        or a true `downloaded` `Tag`.
-    '''
-    return self.get('download_path') is not None or 'downloaded' in self
-
-  @format_attribute
-  def is_pending(self):
-    ''' A pending download: available and not already downloaded.
-    '''
-    return self.is_available() and not self.is_downloaded()
-
-  @format_attribute
-  def is_expired(self):
-    ''' Test whether this recording is expired,
-        which implies that it is no longer available for download.
-    '''
-    expires = self.get('playon.Expires')
-    if not expires:
-      return True
-    return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
-
-  def refresh_needed(self, **kw):
-    ''' Override for `Refreshable.refresh_needed` which always
-        returns `False` for expired recordings.
-    '''
-    if self.is_expired():
-      # an expired recording will never become stale
-      return False
-    return super().refresh_needed(**kw)
-
-  @fmtdoc
-  def filename(self, filename_format=None) -> str:
-    ''' Return the computed filename per `filename_format`,
-        default from `DEFAULT_FILENAME_FORMAT`: `{DEFAULT_FILENAME_FORMAT!r}`.
-    '''
-    if filename_format is None:
-      filename_format = DEFAULT_FILENAME_FORMAT
-    filename = self.format_as(filename_format)
-    filename = (
-        filename.lower().replace(' - ', '--').replace(' ', '-')
-        .replace('_', ':').replace(os.sep, ':') + '.'
-    )
-    filename = re.sub('---+', '--', filename)
-    return filename
-
-  def ls(self, *, format=None, long_mode=False, print_func=None):
-    ''' List a recording.
-    '''
-    if format is None:
-      format = LS_FORMAT
-    if print_func is None:
-      print_func = print
-    print_func(self.format_as(format))
-    if long_mode:
-      printt(
-          *([f'  {tag.name}', tag.value] for tag in sorted(self.tags)),
-          print_func=print_func,
-      )
-
-@dataclass
-class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
-  ''' A `SeriesEpisodeInfo` with a `from_Recording()` factory method to build
-      one from a PlayOn `Recording` instead or other mapping with `playon.*` keys.
-  '''
-
-  @classmethod
-  def from_Recording(cls, R: Mapping[str, Any]):
-    ''' Infer series episode information from a `Recording`
-        or any mapping with ".playon.*" keys.
-    '''
-    # get a basic SEI from the title
-    episode_title = R.get('playon.Name')
-    playon_series = R.get('playon.Series')
-    playon_season = R.get('playon.Season')
-    playon_episode = R.get('playon.Episode')
-    # now override various fields from the playon tags
-    ###############################################################
-    # match a Playon browse path like "... | The Flash | Season 9"
-    browse_path = R['playon.BrowsePath']
-    browse_re_s = r'\|\s+(?P<series_s>[^|\s][^|]*[^|\s])\s+\|\s+season\s+(?P<season_s>\d+)$'
-    m = re.search(
-        browse_re_s,
-        browse_path,
-        re.I,
-    )
-    browse_series = m and m.group('series_s')
-    browse_season = m and int(m.group('season_s'))
-    # ignore the series "None", still unsure if this is some furphy
-    # from a genuine None value
-    if playon_series and playon_series.lower() == 'none':
-      playon_series = None
-    # sometimes the series is prepended to the episode title
-    if playon_series:
-      episode_title = cutprefix(episode_title, f'{playon_series} - ')
-    # strip the trailing part info eg ": Part One"
-    part_suffix, episode_part = get_suffix_part(episode_title)
-    if part_suffix:
-      episode_title = cutsuffix(episode_title, part_suffix)
-    # strip leading "sSSeEE - " prefix
-    spfx, episode_title_season, offset = get_prefix_n(
-        episode_title.lower(), 's', n=playon_season
-    )
-    epfx, episode_title_episode, offset = get_prefix_n(
-        episode_title.lower(), 'e', n=playon_episode, offset=offset
-    )
-    if offset > 0:
-      # strip the sSSeEE and any spaces or dashes which follow it
-      episode_title = episode_title[offset:].lstrip(' -')
-    # fall back from provided stuff to inferred stuff
-    return cls(
-        series=playon_series or browse_series,
-        season=playon_season or episode_title_season or browse_season,
-        episode=playon_episode or episode_title_episode,
-        episode_title=episode_title,
-        episode_part=episode_part,
-    )
-
-# pylint: disable=too-many-ancestors
-class PlayOnSQLTags(SQLTags):
-  ''' PlayOn flavoured `SQLTags`; it just has custom values for the default db location.
-  '''
-
-  DBURL_ENVVAR = PLAYON_DBURL_ENVVAR
-  DBURL_DEFAULT = PLAYON_DBURL_DEFAULT
-
 # pylint: disable=too-many-instance-attributes
 @monitor
 class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
@@ -847,6 +596,260 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
     recording.type_reference_apply_to(tagged)
     return recording
 
+class _PlayOnEntity(HasTags):
+  ''' The base class of the entity subclasses.
+      This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
+  '''
+
+  def _refresh(self, resource, data=None):
+    if data is None:
+      warning("no individual {self.__class__.__name__}._refresh method")
+      return False
+    self.tags.update(data, prefix=self.type_zone)
+    return True
+
+class LoginState(_PlayOnEntity):
+
+  TYPE_SUBNAME = 'login.state'
+
+  @property
+  def expiry(self):
+    ''' Expiry unixtime of the login state information.
+        `-1` if the `'exp'` field is not present.
+    '''
+    return self.tags.get('exp') or -1
+  @uses_playon_api
+  def _refresh(self,login_subpath,*,data=None,playon_api:"PlayOnAPI"):
+    if data is None:
+      data=
+
+class Recording(_PlayOnEntity):
+  ''' A PlayOn recording.
+  '''
+
+  TYPE_SUBNAME = 'recording'
+
+  # recording data are considered stale after 10 minutes
+  refresh_lifespan = 600
+
+  RECORDING_QUALITY = {
+      1: '720p',
+      2: '1080p',
+  }
+
+  @format_attribute
+  def resolution(self):
+    ''' The recording resolution derived from the quality
+        via the `Recording.RECORDING_QUALITY` mapping.
+    '''
+    quality = self.tags.get('playon.Quality')
+    if quality is None:
+      return None
+    return self.RECORDING_QUALITY.get(quality, quality)
+
+  @format_attribute
+  def recording_id(self):
+    ''' The recording id or `None`.
+    '''
+    return self.get('playon.ID')
+
+  @cached_property
+  def sei(self):
+    ''' A `PlayonSeriesEpisodeInfo` inferred from this `Recording`.
+    '''
+    return PlayonSeriesEpisodeInfo.from_Recording(self)
+
+  @format_attribute
+  def nice_name(self):
+    ''' A nice name for the recording: the PlayOn series and name,
+        omitting the series if that is `None`.
+    '''
+    sei = self.sei
+    if sei.series:
+      citation = f'{sei.series} - s{sei.season:02d}e{sei.episode:02d} - {sei.episode_title}'
+      if sei.episode_part:
+        citation += f' - pt{sei.episode_part:02d}'
+    else:
+      citation = sei.episode_title or self['playon.Name']
+    return citation
+
+  @format_attribute
+  def status(self):
+    ''' Return a short status string.
+    '''
+    for status_label in 'queued', 'expired', 'downloaded', 'pending':
+      if getattr(self, f'is_{status_label}')():
+        return status_label
+    raise RuntimeError("cannot infer a status string: %s" % (self,))
+
+  @format_attribute
+  def series_prefix(self):
+    ''' Return a series prefix for recording containing the series name
+        and season and episode, or `''`.
+    '''
+    sei = self.sei
+    sep = '--'
+    parts = []
+    if sei.series:
+      parts.append(sei.series)
+      se_parts = []
+      if sei.season:
+        se_parts.append(f's{sei.season:02d}')
+      if sei.episode is not None:
+        se_parts.append(f'e{sei.episode:02d}')
+      if se_parts:
+        parts.append(''.join(se_parts))
+    if not parts:
+      return ''
+    return sep.join(parts) + sep
+
+  @format_attribute
+  def series_episode_name(self):
+    sei = self.sei
+    name = sei.episode_title
+    if sei.episode_part:
+      name += f'--pt{sei.episode_part:02d}'
+    return name.strip()
+
+  @format_attribute
+  def is_available(self):
+    ''' Is a recording available for download?
+    '''
+    return not self.is_expired() and not self.is_queued()
+
+  @format_attribute
+  def is_queued(self):
+    ''' Is a recording still in the queue?
+    '''
+    return 'playon.Created' not in self
+
+  @format_attribute
+  def is_downloaded(self):
+    ''' Test whether this recording has been downloaded
+        based on the presence of a `download_path` `Tag`
+        or a true `downloaded` `Tag`.
+    '''
+    return self.get('download_path') is not None or 'downloaded' in self
+
+  @format_attribute
+  def is_pending(self):
+    ''' A pending download: available and not already downloaded.
+    '''
+    return self.is_available() and not self.is_downloaded()
+
+  @format_attribute
+  def is_expired(self):
+    ''' Test whether this recording is expired,
+        which implies that it is no longer available for download.
+    '''
+    expires = self.get('playon.Expires')
+    if not expires:
+      return True
+    return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
+
+  def refresh_needed(self, **kw):
+    ''' Override for `Refreshable.refresh_needed` which always
+        returns `False` for expired recordings.
+    '''
+    if self.is_expired():
+      # an expired recording will never become stale
+      return False
+    return super().refresh_needed(**kw)
+
+  @fmtdoc
+  def filename(self, filename_format=None) -> str:
+    ''' Return the computed filename per `filename_format`,
+        default from `DEFAULT_FILENAME_FORMAT`: `{DEFAULT_FILENAME_FORMAT!r}`.
+    '''
+    if filename_format is None:
+      filename_format = DEFAULT_FILENAME_FORMAT
+    filename = self.format_as(filename_format)
+    filename = (
+        filename.lower().replace(' - ', '--').replace(' ', '-')
+        .replace('_', ':').replace(os.sep, ':') + '.'
+    )
+    filename = re.sub('---+', '--', filename)
+    return filename
+
+  def ls(self, *, format=None, long_mode=False, print_func=None):
+    ''' List a recording.
+    '''
+    if format is None:
+      format = LS_FORMAT
+    if print_func is None:
+      print_func = print
+    print_func(self.format_as(format))
+    if long_mode:
+      printt(
+          *([f'  {tag.name}', tag.value] for tag in sorted(self.tags)),
+          print_func=print_func,
+      )
+
+@dataclass
+class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
+  ''' A `SeriesEpisodeInfo` with a `from_Recording()` factory method to build
+      one from a PlayOn `Recording` instead or other mapping with `playon.*` keys.
+  '''
+
+  @classmethod
+  def from_Recording(cls, R: Mapping[str, Any]):
+    ''' Infer series episode information from a `Recording`
+        or any mapping with ".playon.*" keys.
+    '''
+    # get a basic SEI from the title
+    episode_title = R.get('playon.Name')
+    playon_series = R.get('playon.Series')
+    playon_season = R.get('playon.Season')
+    playon_episode = R.get('playon.Episode')
+    # now override various fields from the playon tags
+    ###############################################################
+    # match a Playon browse path like "... | The Flash | Season 9"
+    browse_path = R['playon.BrowsePath']
+    browse_re_s = r'\|\s+(?P<series_s>[^|\s][^|]*[^|\s])\s+\|\s+season\s+(?P<season_s>\d+)$'
+    m = re.search(
+        browse_re_s,
+        browse_path,
+        re.I,
+    )
+    browse_series = m and m.group('series_s')
+    browse_season = m and int(m.group('season_s'))
+    # ignore the series "None", still unsure if this is some furphy
+    # from a genuine None value
+    if playon_series and playon_series.lower() == 'none':
+      playon_series = None
+    # sometimes the series is prepended to the episode title
+    if playon_series:
+      episode_title = cutprefix(episode_title, f'{playon_series} - ')
+    # strip the trailing part info eg ": Part One"
+    part_suffix, episode_part = get_suffix_part(episode_title)
+    if part_suffix:
+      episode_title = cutsuffix(episode_title, part_suffix)
+    # strip leading "sSSeEE - " prefix
+    spfx, episode_title_season, offset = get_prefix_n(
+        episode_title.lower(), 's', n=playon_season
+    )
+    epfx, episode_title_episode, offset = get_prefix_n(
+        episode_title.lower(), 'e', n=playon_episode, offset=offset
+    )
+    if offset > 0:
+      # strip the sSSeEE and any spaces or dashes which follow it
+      episode_title = episode_title[offset:].lstrip(' -')
+    # fall back from provided stuff to inferred stuff
+    return cls(
+        series=playon_series or browse_series,
+        season=playon_season or episode_title_season or browse_season,
+        episode=playon_episode or episode_title_episode,
+        episode_title=episode_title,
+        episode_part=episode_part,
+    )
+
+# pylint: disable=too-many-ancestors
+class PlayOnSQLTags(SQLTags):
+  ''' PlayOn flavoured `SQLTags`; it just has custom values for the default db location.
+  '''
+
+  DBURL_ENVVAR = PLAYON_DBURL_ENVVAR
+  DBURL_DEFAULT = PLAYON_DBURL_DEFAULT
 class PlayOn(UsesTagSets):
 
   TagSetsClass = PlayOnSQLTags
