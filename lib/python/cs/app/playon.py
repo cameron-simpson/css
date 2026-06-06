@@ -53,7 +53,7 @@ from cs.rfc2616 import content_length
 from cs.seq import unrepeated
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags
-from cs.tagset import HasTags
+from cs.tagset import BaseTagSets, HasTags, UsesTagSets
 from cs.threads import monitor, bg as bg_thread, pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -130,8 +130,12 @@ class _PlayOnEntity(HasTags):
       This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
   '''
 
-  def _refresh(self, recourse):
-    warning("no individual {self.__class__.__name__}._refresh method")
+  def _refresh(self, resource, data=None):
+    if data is None:
+      warning("no individual {self.__class__.__name__}._refresh method")
+      return False
+    self.tags.update(data, prefix=self.type_zone)
+    return True
 
 class LoginState(_PlayOnEntity):
 
@@ -680,8 +684,7 @@ class PlayOnAPI(HTTPServiceAPI):
                   else:
                     entry[e_field] = value2
         entity = self[entity_type, entry_id]
-        entity.tags.update(entry, prefix='playon')
-        entity.refreshed(now)
+        entity.refresh(data=entry)
         entities.add(entity)
     return entities
 
