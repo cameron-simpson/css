@@ -266,7 +266,7 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
     '''
     if api_key is None:
       api_key = os.environ[cls.TVDB_API_KEY_ENVVAR]
-    return api_key
+    return cls.API_HOSTNAME, api_key
 
   def __init__(
       self,
