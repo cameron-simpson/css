@@ -156,15 +156,7 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
     '''
     user_id = os.environ.get(cls.PLAYON_ACCOUNT_ENVVAR)
     if not user_id:
-      N = netrc()
-      with Pfx(".netrc host %r", cls.API_HOSTNAME):
-        entry = N.hosts.get(cls.API_HOSTNAME)
-      if entry is None:
-        raise KeyError(
-            f'{cls.__name__}.default_user_id'
-            f': no ${cls.PLAYON_ACCOUNT_ENVVAR} and no netrc entry for {cls.API_HOSTNAME=}'
-        )
-      user_id = entry[0]
+      return cls.default_credentials().login
     return user_id
 
   @classmethod
@@ -185,33 +177,6 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
     self._password = password
     self._login_state = None
 
-  def _get_credentials(self):
-    ''' Obtain the PlayOn login and password for (API_HOSTNAME,login) from the `.netrc` file.
-    '''
-    login = self.login_userid
-    password = self._password
-    if password is None:
-      N = netrc()
-      netrc_hosts = [
-          f"{self.login_userid}:{self.API_HOSTNAME}", self.API_HOSTNAME
-      ]
-      for netrc_host in netrc_hosts:
-        with Pfx(".netrc host %r", netrc_host):
-          entry = N.hosts.get(netrc_host)
-        if entry is not None:
-          break
-      else:
-        raise ValueError(f'no netrc entry for {netrc_hosts}')
-      n_login, _, n_password = entry
-      if login is None:
-        login = n_login
-      elif n_login and login != n_login:
-        raise ValueError(
-            "netrc: supplied login:%r != netrc login:%r" % (login, n_login)
-        )
-      password = n_password
-    return login, password
-
   @pfx_method
   def login(self, login_subpath='login'):
     ''' Perform a login, return the resulting `dict`.
@@ -219,7 +184,12 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
 
         The `.login_state` property tracks the current auth state.
     '''
-    login, password = self._get_credentials()
+    login = self.login_userid
+    password = self._password
+    if password is None:
+      password = self.credentials(
+          f'{self.login_userid}:{self.API_HOSTNAME}'
+      ).password
     return self.post(
         login_subpath,
         headers={'x-mmt-app': 'web'},
