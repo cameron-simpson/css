@@ -14,8 +14,8 @@ from collections import namedtuple
 from contextlib import contextmanager
 from functools import cached_property
 from json import JSONDecodeError
-from threading import RLock
 from netrc import netrc
+from threading import RLock, Semaphore
 import time
 from typing import Mapping, Set, Union
 
@@ -106,14 +106,21 @@ class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
   API_AUTH_GRACETIME = None
   API_RETRY_COUNT = 3  # number of request attempts
   API_RETRY_DELAY = 5  # interval between request retries
+  API_CONCURRENCY_LIMIT = None
 
   @uses_fstags
   def __init__(
       self,
       *,
       fstags: FSTags,
+      concurrency=None,
       tagsets: UsesTagSets = None,
   ):
+    if concurrency is None:
+      concurrency = self.API_CONCURRENCY_LIMIT
+    if isinstance(concurrency, int):
+      concurrency = Semaphore(concurrency)
+    self.concurrency = concurrency
     super().__init__(tagsets=tagsets)
     self.fstags = fstags
     self._lock = RLock()
@@ -184,7 +191,7 @@ class HTTPServiceAPI(ServiceAPI):
       default_headers=None,
       mode='response',
       check_json=None,
-      **service_api_kw
+      **service_api_kw,
   ):
     if api_hostname is None:
       api_hostname = type(self).API_HOSTNAME
