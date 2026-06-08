@@ -10,10 +10,12 @@
     - downloads, if that is a thing, with `FSTags` for file annotations
 '''
 
+from collections import namedtuple
 from contextlib import contextmanager
 from functools import cached_property
 from json import JSONDecodeError
 from threading import RLock
+from netrc import netrc
 import time
 from typing import Mapping, Set, Union
 
@@ -57,7 +59,47 @@ DISTINFO = {
     ],
 }
 
-class ServiceAPI(MultiOpenMixin, UsesSQLTags):
+class LoginPasswordCredentials(namedtuple('LoginPasswordCredentials',
+                                          'login password')):
+  ''' A credentials class for login/password authentication.
+
+      Its default `from_str(credname)` factory accesses the netrc(5) file.
+  '''
+
+  @classmethod
+  def from_netrc(cls, host, netrc_path=None):
+    ''' Create an instance from a netrc(5) `host`.
+        Raise `KeyError` if `host` is unknown.
+    '''
+    N = netrc(netrc_path)
+    login_account_password = N.authenticators(host)
+    if login_account_password is None:
+      raise KeyError(f'no entry for {host=}')
+    return cls(
+        login=login_account_password[0], password=login_account_password[2]
+    )
+
+  @classmethod
+  def from_str(self, credname):
+    return self.from_netrc(credname)
+
+class UsesCredentials:
+  ''' A mixin for accessing credentials.
+  '''
+  CREDENTIALS_CLASS = LoginPasswordCredentials
+
+  def credentials(self, credname):
+    ''' Return the credentials for `credname`.
+    '''
+    return self.CREDENTIALS_CLASS.from_str(credname)
+
+  @classmethod
+  def default_credentials(cls):
+    ''' Return the default credentials for `cls.API_HOSTNAME`.
+    '''
+    return cls.CREDENTIALS_CLASS.from_str(cls.API_HOSTNAME)
+
+class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
   ''' `SewrviceAPI` base class for other APIs talking to services.
   '''
 
