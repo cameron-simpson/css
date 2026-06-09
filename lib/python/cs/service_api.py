@@ -12,7 +12,7 @@
 
 from collections import namedtuple
 from contextlib import contextmanager
-from functools import cached_property
+from functools import cached_property, partial
 from json import JSONDecodeError
 from netrc import netrc
 from threading import RLock, Semaphore
@@ -27,13 +27,14 @@ try:
 except ImportError:
   RequestsJSONDecodeError = JSONDecodeError
 
+from cs.context import contextif
 from cs.deco import uses_verbose
 from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.tagset import HasTags, UsesTagSets
-from cs.sqltags import SQLTagSet, UsesSQLTags
+from cs.threads import pmap
 from cs.upd import run_task
 
 __version__ = '20260531-post'
@@ -116,11 +117,33 @@ class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
       concurrency=None,
       tagsets: UsesTagSets = None,
   ):
+    ''' Initialise a `ServiceAPI` instance.
+
+        The `concurrency` parameter may take the following values:
+        * `None`: API calls are serialised, setting `.concurrency_sem=None`
+          and `.pmap=partial(pmap,concurrent=1)`
+        * an `int`: API calls are constrained by `.concurrency_sem`,
+          set to a `Semaphore` with this initial value, and `.pmap=pmap`
+        * a `Semaphore`: API calls are constrained by `.concurrency_sem`,
+          set to this `Semaphore`, and `.pmap=pmap`
+    '''
     if concurrency is None:
       concurrency = self.API_CONCURRENCY_LIMIT
-    if isinstance(concurrency, int):
-      concurrency = Semaphore(concurrency)
+    if concurrency is None:
+      concurrency_sem = Semaphore(1)
+      _pmap = partial(pmap, concurrent=1)
+    elif isinstance(concurrency, int):
+      concurrency_sem = Semaphore(concurrency)
+      if concurrency == 1:
+        _pmap = pmap
+      else:
+        _pmap = pmap
+    else:
+      concurrency_sem = concurrency
+      _pmap = pmap
     self.concurrency = concurrency
+    self.concurrency_sem = concurrency_sem
+    self.pmap = _pmap
     super().__init__(tagsets=tagsets)
     self.fstags = fstags
     self._lock = RLock()
@@ -284,21 +307,22 @@ class HTTPServiceAPI(ServiceAPI):
     with run_task(f'{method} {url}', report_print=verbose):
       for retry in range(self.API_RETRY_COUNT, 0, -1):
         runstate.raiseif()
-        try:
-          rsp = pfx_call(
-              rqm,
-              url,
-              cookies=cookies,
-              headers=rq_headers,
-              **rqkw,
-          )
-          break
-        except requests.ConnectionError as e:
-          if retry <= 1:
-            # last retry
-            raise
-          warning("%s: %s, retrying in %ds", url, e, self.API_RETRY_DELAY)
-          runstate.sleep(self.API_RETRY_DELAY)
+        with contextif(self.concurrency_sem):
+          try:
+            rsp = pfx_call(
+                rqm,
+                url,
+                cookies=cookies,
+                headers=rq_headers,
+                **rqkw,
+            )
+            break
+          except requests.ConnectionError as e:
+            if retry <= 1:
+              # last retry
+              raise
+            warning("%s: %s, retrying in %ds", url, e, self.API_RETRY_DELAY)
+            runstate.sleep(self.API_RETRY_DELAY)
     if check:
       rsp.raise_for_status()
     if callable(mode):
