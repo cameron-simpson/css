@@ -129,7 +129,6 @@ def main(argv=None):
 uses_playon_api = default_params(playon_api=lambda: PlayOnAPI())
 
 # pylint: disable=too-many-instance-attributes
-@monitor
 class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
   ''' Access to the PlayOn API.
   '''
@@ -452,8 +451,6 @@ class LoginState(_PlayOnEntity):
     if data is None:
       # obtain new state from the API - it self refreshes
       data = playon_api.login_state
-      print("LOGIN REFRESH")
-      pprint(data)
     self.update(data, self.type_zone)
     return True
 
