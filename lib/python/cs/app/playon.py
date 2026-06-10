@@ -12,18 +12,16 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import cached_property, partial
 from getopt import GetoptError
-from netrc import netrc
 import os
 from os import environ
 from os.path import (
     basename, exists as existspath, realpath, samefile, splitext
 )
-from pprint import pformat, pprint
+from pprint import pprint
 import re
 import sys
-from threading import Semaphore
 import time
-from typing import Any, Generator, Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping, Optional
 from urllib.parse import unquote as unpercent
 
 from icontract import require
@@ -49,13 +47,12 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
-from cs.result import bg as bg_result, report as report_results, CancellationError
 from cs.rfc2616 import content_length
 from cs.seq import unrepeated
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags
-from cs.tagset import BaseTagSets, HasTags, UsesTagSets
-from cs.threads import monitor, bg as bg_thread, pmap
+from cs.tagset import HasTags, UsesTagSets
+from cs.threads import bg as bg_thread, pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
