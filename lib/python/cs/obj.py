@@ -21,7 +21,7 @@ from weakref import WeakValueDictionary
 
 from cs.deco import OBSOLETE
 
-__version__ = '20260526-post'
+__version__ = '20260610'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

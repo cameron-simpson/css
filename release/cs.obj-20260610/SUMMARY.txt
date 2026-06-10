@@ -1,0 +1,3 @@
+Refreshable._refresh: this method must now accept an optional `data=` parameter which will be used to update the entity instead of consulting the original source.
+Refrehable.refresh: new map parameter to specify a function instead of map for the recursion, such as pmap().
+Refreshable.refreshed: change the meaning of `.refreshd()` to be self after a `.refresh()`, supporting chaining.

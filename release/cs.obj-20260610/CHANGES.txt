@@ -1,0 +1,5 @@
+lib/python/cs/obj.py: cs.obj: Refreshable: _refresh must now accept an optional `data=` parameter which will be used to update the entity instead of consulting the original source
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: docstring updates
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh(): new map parameter to specify a function instead of map for the recursion, such as pmap()
+lib/python/cs/obj.py: cs.obj: Refreshable.refreshed: change the meaning of `.refreshd()` to be self after a `.refresh()`, supporting chaining
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: docstring tweak, local variable rename for clarity
