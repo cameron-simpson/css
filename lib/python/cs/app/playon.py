@@ -447,6 +447,12 @@ class LoginState(_PlayOnEntity):
     self.update(data, self.type_zone)
     return True
 
+class Feature(_PlayOnEntity):
+  ''' A PlayOn featured show record. I think.
+  '''
+
+  TYPE_SUBNAME = 'feature'
+
 class Recording(_PlayOnEntity):
   ''' A PlayOn recording.
   '''
