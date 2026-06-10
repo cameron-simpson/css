@@ -33,6 +33,7 @@ from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
 from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
+from cs.sqltags import SQLTagSet, UsesSQLTags
 from cs.tagset import HasTags, UsesTagSets
 from cs.threads import pmap
 from cs.upd import run_task
