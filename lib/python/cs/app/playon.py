@@ -432,10 +432,30 @@ class LoginState(_PlayOnEntity):
         `-1` if the `'exp'` field is not present.
     '''
     return self.tags.get('exp') or -1
+
+  @property
+  def refresh_resource(self):
+    ''' The login API endpoint subpath, `'login'`.
+    '''
+    return 'login'
+
+  def refresh_needed(self):
+    if super().refresh_needed():
+      return True
+    exp = self.get(f'{self.type_zone}.exp')
+    if exp is None:
+      return True
+    return exp < time.time() + self.API_AUTH_GRACETIME
+
   @uses_playon_api
-  def _refresh(self,login_subpath,*,data=None,playon_api:"PlayOnAPI"):
+  def _refresh(self, login_subpath, *, data=None, playon_api: PlayOnAPI):
     if data is None:
-      data=
+      # obtain new state from the API - it self refreshes
+      data = playon_api.login_state
+      print("LOGIN REFRESH")
+      pprint(data)
+    self.update(data, self.type_zone)
+    return True
 
 class Recording(_PlayOnEntity):
   ''' A PlayOn recording.
