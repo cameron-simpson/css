@@ -1,3 +1,4 @@
+amap,pmap: rename concurrent to concurrency
 ReIterable: sometimes we need to continue iteration, which iter() would normally do, eg for item in reit:
 move cs.py.doc.obj_docstring to cs.obj? or will inspect.cleandoc do the same thing?
 pmap: mode to terminate other tasks on exception or not, currently inferred from with_exceptions
