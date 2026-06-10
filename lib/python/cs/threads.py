@@ -979,6 +979,8 @@ def pmap(
       except Exception as e:
         if sem is not None: sem.release()
         warning(f'pmap: Thread({name}).start(): {e}', exc_info=sys.exc_info())
+    # indicate all functions dispatched
+    resultQ.put(None)
 
   name = f'pmap dispatcher:{func=}'
   DT = builtin_Thread(name=name, target=dispatcher)
@@ -988,8 +990,13 @@ def pmap(
     ordered = None
   else:
     ordered = Ordered()
-  while DT.is_alive() or consumed < ndispatched:
-    i, (result, exc) = resultQ.get()
+  all_dispatched = False
+  while not all_dispatched or consumed < ndispatched:
+    qitem = resultQ.get()
+    if qitem is None:
+      all_dispatched = True
+      continue
+    i, (result, exc) = qitem
     consumed += 1
     if unordered:
       yield yield_value(i, result, exc)
