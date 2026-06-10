@@ -41,7 +41,7 @@ from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call, Pfx
 
-__version__ = '20260610'
+__version__ = '20260610-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
