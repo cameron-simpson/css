@@ -3308,7 +3308,7 @@ class UsesTagSets:
               "%s.%s: type zone %r already mapped to %s, replacing with %s",
               cls.__module__, cls.__name__, type_zone, old, self
           )
-          breakpoint()
+          ##breakpoint()
       vprint(f'{cls.by_type_zone}.by_type_zone[{self.TYPE_ZONE=}] = {self=}')
       subclass_map[type_zone] = self
 
