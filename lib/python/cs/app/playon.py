@@ -130,10 +130,6 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
   ''' Access to the PlayOn API.
   '''
 
-  TYPE_ZONE = 'playon'
-  HasTagsClass = _PlayOnEntity
-  TagSetsClass = PlayOnSQLTags
-
   API_HOSTNAME = 'api.playonrecorder.com'
   API_BASE = f'https://{API_HOSTNAME}/v3/'
   API_AUTH_GRACETIME = 30
