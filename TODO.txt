@@ -1,3 +1,4 @@
+amap: redo the docstring to be more like pmap
 amap: accept async sem for concurrency, restructure like pmap with a dispatcher task and run_func etc
 amap: add fast_iter to pass to async_iter
 amap,pmap: rename concurrent to concurrency
