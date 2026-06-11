@@ -1488,7 +1488,7 @@ class SiteEntity(HasTags):
         Example:
 
             @paginated
-            def grok_sitepage(self,flowstate:FlowState,method=None,*,pagenum:int):
+            def grok_sitepage(self, flowstate:FlowState, method=None, *, pagenum:int):
                 # process the flowstate, expecting to be called once for each page
     '''
 
@@ -1664,8 +1664,8 @@ class SiteMap(UsesTagSets, Promotable):
   pilfer: object = None
   tagsets: BaseTagSets = None
 
-  # a registry of SiteMap subclasses by their TYPE_ZONE
-  sitemap_by_type_zone = {}
+  ##  # a registry of SiteMap subclasses by their TYPE_ZONE
+  ##  by_type_zone = {}
 
   URL_KEY_PATTERNS = ()
 
@@ -1704,7 +1704,7 @@ class SiteMap(UsesTagSets, Promotable):
   def zone_sitemap(cls, type_zone: str):
     ''' The `SiteMap` associated with `type_zone`.
     '''
-    return cls.sitemap_by_type_zone[type_zone]
+    return cls.by_type_zone[type_zone]
 
   @classmethod
   def by_db_key(cls, db_key: str) -> SiteEntity:
@@ -1715,7 +1715,7 @@ class SiteMap(UsesTagSets, Promotable):
     except ValueError as e:
       raise KeyError(f'{db_key=}: cannot parse into type parts: {e}') from e
     try:
-      sitemap = cls.sitemap_by_type_zone[zone]
+      sitemap = cls.by_type_zone[zone]
     except KeyError as e:
       raise KeyError(f'{db_key=}: no SiteMap registered for {zone=}') from e
     return sitemap[subname, key]
@@ -1824,7 +1824,7 @@ class SiteMap(UsesTagSets, Promotable):
             warning("not a SiteEntity: %s", r(entity))
             continue
           # TODO: a better staleness criterion
-          if not force and not entitiy.refresh_needed():
+          if not force and not entity.refresh_needed():
             # do not update
             ent_fsQ.put((entity, None))
             continue
