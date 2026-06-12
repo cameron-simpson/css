@@ -81,9 +81,10 @@ cd "$wd"
   # locate VCS top
   case "$vcs_type" in
     hg)   findup_test='[ -e "$FINDUP_DIR/.hg" ]' ;;
+    jj)   findup_test='[ -e "$FINDUP_DIR/.jj" ]' ;;
     git)  findup_test='[ -e "$FINDUP_DIR/.git" ]' ;;
     ?*)   echo "$cmd: unsupported VCS \"$vcs_type\"" >&2; exit 1 ;;
-    *)    findup_test='[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' ;;
+    *)    findup_test='[ -e "$FINDUP_DIR/.jj" -o -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' ;;
   esac
   vcs_top=$(
       set -ue
@@ -95,13 +96,17 @@ cd "$wd"
 }
 
 [ -n "$vcs_type" ] || {
-  if [ -e "$vcs_top/.hg" ]
-  then  vcs_type=hg
+  if [ -e "$vcs_top/.jj" ]
+  then  vcs_type=jj
   else
-    if [ -e "$vcs_top/.git" ]
-    then  vcs_type=git
-    else  echo "$cmd: cannot infer VCS type from top dir $vcs_top" >&2
-          exit 1
+    if [ -e "$vcs_top/.hg" ]
+    then  vcs_type=hg
+    else
+      if [ -e "$vcs_top/.git" ]
+      then  vcs_type=git
+      else  echo "$cmd: cannot infer VCS type from top dir $vcs_top" >&2
+            exit 1
+      fi
     fi
   fi
 }
