@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# jj microcommit - add desired changes as a new change.
+# - Cameron Simpson <cs@cskk.id.au> 12jun2026
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+
+trace=
+[ -t 2 ] && trace='set-x'
+
+modified=$( jj diff --name-only )
+[ -n "$modified" ] || {
+  echo "$cmd: nothing modified, add aborted" >&2
+  exit 1
+}
+
+described=
+
+description=$( readdottext )
+if [ -n "$description" ]
+then  described=1
+else  echo "Will ask for the description at the end."
+fi
+
+if $trace jj new -B @ -m "$description" --no-edit
+then
+  if $trace jj squash -i
+  then
+    if [ $described ] || description=$( readdottext )
+    then  $trace jj describe -r @- -m "$description"
+    fi
+  else
+    $trace jj abandon --restore-descendants @-
+    exit 1
+  fi
+fi
