@@ -208,6 +208,8 @@ case "$op" in
       report,hg)    hg summary
                     hg status -C ${1+"$@"} | grep '^[^?]'
                     ;;
+      report,jj)    jj diff --summary
+                    ;;
       status,hg | st,hg)
                     hg status -C ${1+"$@"}
                     ;;
