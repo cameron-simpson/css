@@ -30,6 +30,7 @@ from cs.deco import strable
 from cs.ffmpegutils import (
     MetaData as FFmpegMetaData,
     convert as ffconvert,
+    FFMpegError,
 )
 from cs.fileutils import atomic_filename, crop_name
 from cs.fs import HasFSPath
@@ -221,7 +222,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
           if not isfilepath(fspath):
             warning("not a file")
 
-  def move_info(self, dstdirpath: str, *, doit=False):
+  def move_into(self, dstdirpath: str, *, doit=False):
     ''' Move all the files associated with this recording into `dstdirpath`.
     '''
     for fspath in self.fspaths:
@@ -231,7 +232,10 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
         if doit:
           if existspath(dstpath):
             raise FileExistsError(dstpath)
-          pfx_call(os.rename, fspath, dstpath)
+          try:
+            pfx_call(os.rename, fspath, dstpath)
+          except FileNotFoundError as e:
+            warning(str(e))
         else:
           if not isfilepath(fspath):
             warning("not a file")
@@ -389,7 +393,7 @@ class _Recording(ABC, HasFSPath, HasFSTagsMixin):
             vcodec=vcodec,
             extra_opts=extra_opts,
         )
-      except CalledProcessError as e:
+      except (CalledProcessError, FFMpegError) as e:
         warning("conversion fails: %s", e)
         return False
     return True
