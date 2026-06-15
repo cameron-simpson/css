@@ -1406,7 +1406,7 @@ class TagSet(
     def __init__(self, tags):
       self.tags = tags
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr) -> "HasTags":
       ''' Consult th tag `id.{attr}` and return the corresponding
           entity from the appropriate `UsesTagSets` instance.
 
@@ -1422,6 +1422,24 @@ class TagSet(
         raise AttributeError(f'no .entity.{attr}: {e}') from e
       entity_id = f'{attr}.{zone_key}'
       return UsesTagSets.by_entity_id(entity_id)
+
+    def __iadd__(self, ent: TagSetTyping):
+      ''' Store a reference to `ent` as the tag `ent.type_zone` with value `ent.zone_key`.
+      '''
+      self.tags[f'id.{ent.type_zone}'] = ent.type_zone_key
+
+    def __isub__(self, ent: TagSetTyping):
+      ''' Remove the reference to `ent` if present.
+          Raise `KeyError` if there is no reference.
+          Raise `ValueError` if the reference is to another entity.
+      '''
+      tags = self.tags
+      zone_key = tags[ent.type_zone]
+      if zone_key != ent.zone_key:
+        raise ValueError(
+            '{tags.name!r}-={ent!r}: {ent.type_zone}=zone_key refers to a different entity'
+        )
+      del tags[ent.zone_key]
 
   @cached_property
   def entity(self):
