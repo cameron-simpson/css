@@ -3063,6 +3063,12 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
       Note that this mixin brings its own `__new__` method which
       can choose a subclass based on the subclass' `.TYPE_SUBNAME`
       attribute. See the `__new__` docstring.
+
+      This also provides some behaviour based around updating
+      entities based on some kind of API call; the direct values
+      from the API call land on attributes named `{zone}.{key}` -
+      the `.type_zone_update(mapping)` provides a convenient call
+      for this.
   '''
 
   def __new__(cls, tags: TagSet, *_, **__):
@@ -3262,6 +3268,14 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
       return method
 
     return FormatMapping(self, kwargs, missing)
+
+  def type_zone_update(self, mapping, prefix=None):
+    ''' Update `self` with `mapping`, using `prefix`.
+        The default `prefix` is self.type_zone`.
+    '''
+    if prefix is None:
+      prefix = self.type_zone
+    self.update(mapping, prefix=prefix)
 
   #################################################################
   # Properties supporting Refreshable.
