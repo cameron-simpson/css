@@ -974,9 +974,21 @@ class SiteEntity(HasTags):
       attribute to enable a `.sitepage_url` attribute which returns the
       primary web page for the entity.
 
-      Entity update: entities support individual update viathe
-      Refreshable.refresh() mixin method and bulk update via
+      Entity update: entities support individual update via the
+      `Refreshable.refresh()` mixin method and bulk update via
       `SiteMap.refreshed_entities(Iterabe[SiteEntity])`.
+
+      The following class attributes have special meaning:
+      * *NAME*`_URL_PATTERN`:
+        this is a `URLPattern` string to match URLs associated with
+        this kind of entity
+
+      The `SITEPAGE_URL_PATTERN` is a pattern for the canonical
+      page for this entity and should contain enough information
+      to `.refresh()` it. The `SiteMap.scan_matchs` method will
+      call `entity.refresh(data=data)` instead of
+      `entity.type_zone_update(data)` if the URL matches the entity's
+      sitepage.
   '''
 
   # default staleness is 1 day
@@ -1113,7 +1125,7 @@ class SiteEntity(HasTags):
   def url_pattern_mapping(
       cls,
       *,
-      sitemap: "SiteMap" = None,
+      sitemap: Optional["SiteMap"] = None,
   ) -> dict[str, URLPattern]:
     ''' Return a mapping of `pattern_name`->`URLPattern` derived
         from the `*_URL_PATTERN` attributes of this class and its
@@ -1926,7 +1938,7 @@ class SiteMap(UsesTagSets, Promotable):
           it a regular expression. to apply against the URL path.
           If a regular expression containing a `'<'` is desired it
           should be inserted as a _regexp_ `\N{LESS-THAN SIGN}`
-          escape (_not_ a Python string escape.
+          escape (_not_ a Python string escape).
           A leading slash anchors a regexp against the start of the path
           otherwise it may match anywhere in the path.
         - a regular expression object to apply against the URL path
@@ -1938,7 +1950,8 @@ class SiteMap(UsesTagSets, Promotable):
           or `True` or a `Mapping[str,str]` for a match
 
         Note that to avoid confusing the decorator the first condition
-        cannot be a callable. However, it's usually a domain glob anyway.
+        cannot be a callable (unless it's a class, such as a `SiteEntity` subclass.
+        However, it's usually a domain glob anyway.
 
         The keyword parameters specify `Tag`s to set on the match `TagSet`
         if the conditions have matched. The parameter value may be:
