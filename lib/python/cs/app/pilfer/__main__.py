@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -49,6 +50,7 @@ from . import (
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
+from .print import dump_soup
 from .rss import RSSChannelMixin
 from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
 
@@ -838,12 +840,14 @@ class PilferCommand(BaseCommand):
     xit = 0
     if not argv:
       # list site maps
-      printt(
-          *[
-              [pattern, str(sitemap)]
-              for pattern, sitemap in self.options.pilfer.sitemaps
-          ]
-      )
+      sitemaps = P.sitemaps
+      if not sitemaps:
+        warning("no sitemaps defined in %s", ", ".join(P.rcpaths))
+        return 0
+      maps = defaultdict(list)
+      for pattern, sitemap in sitemaps:
+        maps[sitemap.name].append(pattern)
+      printt({name: "\n".join(patterns) for name, patterns in maps.items()})
       return 0
     # use a particular sitemap
     map_name = argv.pop(0)
