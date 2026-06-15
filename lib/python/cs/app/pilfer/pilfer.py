@@ -3,7 +3,7 @@
 import asyncio
 from collections import defaultdict
 import configparser
-from configparser import ConfigParser, UNNAMED_SECTION
+from configparser import ConfigParser, NoSectionError, UNNAMED_SECTION
 from contextlib import contextmanager
 import copy
 from dataclasses import dataclass, field
@@ -513,8 +513,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         warning("ConfigParser.read(%r): %s", rcpath, e)
         continue
       msection = mapping[None]
-      for field_name, value in cfg[UNNAMED_SECTION].items():
-        msection[field_name] = value
+      try:
+        UNNAMED = cfg[UNNAMED_SECTION]
+      except KeyError as e:
+        warning("%s.rc_map: %s: no %r: %s", self, rcpath, UNNAMED_SECTION, e)
+      else:
+        for field_name, value in UNNAMED.items():
+          msection[field_name] = value
       for section_name, section in cfg.items():
         msection = mapping[section_name]
         for field_name, value in section.items():
