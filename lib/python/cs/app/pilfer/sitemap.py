@@ -276,7 +276,7 @@ class URLPattern(Promotable):
         subpaths.append(part)
       else:
         name, converter = part
-        value = fields[name]
+        value = fields.get(name, f'no-{name}')
         value_s = converter.to_str(value)
         try:
           vaule2 = converter.from_str(value_s)
