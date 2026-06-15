@@ -136,7 +136,7 @@ class BWizCmd(BaseCommand):
         R.remove(doit=doit)
     else:
       if faileddir:
-        R.moveinto(faileddir, doit=doit)
+        R.move_into(faileddir, doit=doit)
       return 1
 
   def cmd_ffprobe(self, argv):
