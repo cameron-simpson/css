@@ -1558,7 +1558,7 @@ def row_cells(
 
 @typechecked
 def flatten_table_rows(
-    table_rows: list[str | list | tuple],
+    table_rows: list,
     as_str: Callable[Any, str] | None = None,
 ) -> tuple[list[list[str]], list[int]]:
   ''' Flatten a list of table rows or tuples-of-table-rows into a
@@ -1572,6 +1572,26 @@ def flatten_table_rows(
   if as_str is None:
     as_str = tabulate.default_as_str
 
+  def into_lists_and_tuples(raw_rows):
+    ''' Expand the rows into a list of list or tuple.
+    '''
+    lt_rows = []
+    for row in raw_rows:
+      if isinstance(row, (list, tuple)):
+        lt_rows.append(row)
+      elif isinstance(row, Mapping):
+        m_rows = list(row.items())
+        # we do not sort in place because the state is a TypeError
+        # is raised during the sort is undefined
+        try:
+          m_rows = sorted(m_rows)
+        except TypeError:
+          pass
+        lt_rows.extend(map(list, m_rows))
+      else:
+        lt_rows.append([row])
+    return lt_rows
+
   def is_attachable_cell_grid(cells):
     ''' Test if a cell row has nonwhitepace in column 0
       '''
@@ -1580,11 +1600,12 @@ def flatten_table_rows(
   # promote rows to lists or AttachedLines
   rows: list[list[str]] = []
   attach: list[int] = []
-  for prev_trow, trow, next_trow in with_neighbours(table_rows):
+  for prev_trow, trow, next_trow in with_neighbours(
+      into_lists_and_tuples(table_rows)):
     # FIXME: this calls row_cells twice on each row
     #        maybe call cell_rows on all lists?
     #        in a prepass?
-    if isinstance(trow, (list, str)):
+    if isinstance(trow, list):
       attach_below = bool(
           isinstance(next_trow, tuple) and next_trow
           and is_attachable_cell_grid(row_cells(next_trow[0]))
@@ -1652,6 +1673,10 @@ def tabulate(
       A row may also be a `tuple`, indicating a subtable, which
       will be embedded with its column 0 indented and joined up
       with lines to indicate structure.
+
+      A row may also be a mapping, in which case it is transformed
+      into multiple rows of `[key,value]` from the `row.items()`,
+      sorted by `key` if possible.
 
       The default `as_str` function is `TabulatePrettyPrinter().pformat`;
       the `TabulatePrettyPrinter` class is a subclass of `pprint.PrettyPrinter`
