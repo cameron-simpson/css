@@ -951,9 +951,11 @@ def promote(func, params=None, types=None):
                   return obj
               ... recognise various types ...
               ... and return a suitable instance of cls ...
-              raise TypeError(
-                  "%s.promote: cannot promote %s:%r",
-                  cls.__name__, obj.__class__.__name__, obj)
+              return super().promote(obj)
+
+      The above example is for subclasses of `Promotable`, which
+      has a default `promote()` class method. In another class the
+      `super()` call would be replace with raising a `TypeError`.
 
       Example:
 
@@ -1028,6 +1030,31 @@ def promote(func, params=None, types=None):
             "@promote(%r,params=%r): no %r parameter in signature (sig.parameters=%r)"
             % (func, params, param_name, dict(sig.parameters))
         )
+  func_module = sys.modules[func.__module__]
+
+  def promote_str_annotation(param_name, annotation_s: str):
+    ''' Promote a string (deferred) annotation to a type.
+        We actually do this at promotion time.
+    '''
+    try:
+      return func_module.__dict__[annotation]
+    except KeyError as e:
+      module_keys = sorted(
+          filter(
+              lambda key: getattr(
+                  getattr(func_module, key, None), '__module__', None
+              ) == func.__module__, func_module.__dict__.keys()
+          )
+      )
+      print("@promote: cannot resolve", annotation_s)
+      breakpoint()
+      raise ValueError(
+          f'@promote({func}): skip param {param_name}:{annotation_s!r}'
+          f': cannot be resolved from sys.modules[{func.__name__!r}]'
+          f', available keys [{",".join(module_keys)}]'
+          f': {e}'
+      ) from e
+
   promotions = {}  # mapping of arg->(type,promote)
   for param_name, param in sig.parameters.items():
     if params is not None and param_name not in params:
@@ -1035,22 +1062,6 @@ def promote(func, params=None, types=None):
     annotation = param.annotation
     if annotation is Parameter.empty:
       continue
-    if isinstance(annotation, str):
-      resolved = sys.modules[func.__module__].__dict__.get(annotation)
-      if resolved is None:
-        warning(
-            "@promote(%s): skip param %s:%r: cannot be resolved from sys.modules[%r]",
-            func,
-            param_name,
-            annotation,
-            func.__module__,
-        )
-        continue
-      ##warning(
-      ##    "@promote(%s): param %s: str:%r -> %r", func, param_name, annotation,
-      ##    resolved
-      ##)
-      annotation = resolved
     # recognise optional parameters and use their primary type
     optional = False
     if param.default is not Parameter.empty:
@@ -1080,8 +1091,11 @@ def promote(func, params=None, types=None):
     # pylint: disable=unnecessary-lambda-assignment
     get_context = lambda: (
         "@promote(%s.%s)(%s=%s:%r)" % (
-            func.__module__, func.__name__, param_name, arg_value.__class__.
-            __name__, arg_value
+            func.__module__,
+            func.__name__,
+            param_name,
+            arg_value.__class__.__name__,
+            arg_value,
         )
     )
     for param_name, (param, annotation, promote_method,
@@ -1094,8 +1108,29 @@ def promote(func, params=None, types=None):
           continue
         # fill in the default values
         arg_value = param.default
-      if isinstance(arg_value, annotation):
-        # already of the desired type
+      if isinstance(annotation, str):
+        try:
+          annotation = promote_str_annotation(param_name, annotation)
+        except ValueError as e:
+          warning(
+              "%s: skip param %s, cannot resolve %r: %s",
+              get_context(),
+              param_name,
+              annotation,
+              e,
+          )
+          continue
+      try:
+        if isinstance(arg_value, annotation):
+          # already of the desired type
+          continue
+      except TypeError as e:
+        warning(
+            "%s: skip param %s, annotation is not a type: %r",
+            get_context(),
+            param_name,
+            type(annotation),
+        )
         continue
       try:
         try:
