@@ -2070,7 +2070,7 @@ class SiteMap(UsesTagSets, Promotable):
             test_name = f'{entity_class.__name__}.match_url(flowstate.url)'
 
             def test(flowstate, match):
-              vprint(f'@on: {test_name}')
+              vprint(f'@on: {test_name}: {flowstate.url=}')
               m = entity_class.match_url(flowstate.url)
               if m is not None:
                 _, m = m
@@ -2103,7 +2103,7 @@ class SiteMap(UsesTagSets, Promotable):
               test_name = f'flowstate.method == {method_name=}'
 
               def test(flowstate, match):
-                vprint(f'@on: {method_name=} vs {method_name=}')
+                vprint(f'@on: {flowstate.method=} vs {method_name=}')
                 return flowstate.method == method_name
 
               test.__name__ = test_name
