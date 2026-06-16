@@ -2502,10 +2502,8 @@ class SiteMap(UsesTagSets, Promotable):
     for ent_class in public_subclasses(base_entity_class):
       try:
         entity = ent_class.from_URL(url, self)
-      except ValueError as e:
-        vprint(
-            f'url_entity({url=}): SKIP {ent_class=}, does not match {ent_class=}: {e}'
-        )
+      except URLPatternMatchError as e:
+        vprint(f'url_entity({url.short}): SKIP {ent_class.__name__}')
         continue
       entities.append(entity)
     if not entities:
