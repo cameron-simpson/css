@@ -581,6 +581,26 @@ class TagSetTyping:
       * `.type_key`: `1234``
   '''
 
+  def __getattr__(self, attr):
+    ''' Accessing `.foo` falls back to `["zone.foo"]`
+    '''
+    try:
+      return self[attr]
+    except KeyError:
+      zattr = f'{self.type_zone}.{attr}'
+      try:
+        return self[zattr]
+      except KeyError:
+        try:
+          sga = super().__getattr__
+        except AttributeError:
+          pass
+        else:
+          return sga(attr)
+    raise AttributeError(
+        f'{self.__class__.__name__}:{self.name}: neither [{attr!r} nor [{zattr!r}]'
+    )
+
   @staticmethod
   def type_parts_of(name: str) -> Tuple[str, str, str]:
     ''' Return the `(zone,subname,key)` 3 tuple from an entity
@@ -3158,17 +3178,6 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
           f'{self.__class__.__name__}:HasSQLTags.tags_entity_key: no .tags attribute!'
       )
     return self.tags.name
-
-  def __getattr__(self, tag_name: str):
-    ''' Convenience attributes which go via the `.tags`.
-        A missing tag raises an `AttributeError`.
-    '''
-    try:
-      return self.tags[tag_name]
-    except KeyError as e:
-      raise AttributeError(
-          f'{self.__class__.__name__}.{tag_name=}: {e}'
-      ) from e
 
   def __contains__(self, key):
     return key in self.tags
