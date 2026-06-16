@@ -671,26 +671,34 @@ class Refreshable(ABC):
         return
     seen.add(key)
     now = time.time()
-    if not force and data is None:
-      if not self.refresh_needed(lifespan=lifespan, now=now):
-        return False
-      last_poll = getattr(self, 'refresh_last_poll', 0.0)
-      if ratelimit is None:
-        # optional instance attribute
-        ratelimit = getattr(
-            self, 'refresh_ratelimit',
-            type(self).REFRESH_RATELIMIT
-        )
-      if now - last_poll < ratelimit:
-        # too early to repoll
-        return False
-    # the object is stale (or force is true)
-    if resource is None:
+    do_refresh = True
+    last_poll = None
+    was_updated = False
+    if data is None:
+      if not force:
+        if not self.refresh_needed(lifespan=lifespan, now=now):
+          # not stale
+          do_refresh = False
+        elif ratelimit is not None:
+          # rate limit on polls
+          last_poll = getattr(self, 'refresh_last_poll', None)
+          # optional instance attribute
+          ratelimit = getattr(
+              self, 'refresh_ratelimit',
+              type(self).REFRESH_RATELIMIT
+          )
+          if now - last_poll > ratelimit:
+            # too soon
+            do_refresh = False
+    if do_refresh:
+      if data is None:
+        # the refresh will be doing a poll, whatever that means
+        self.refresh_last_poll = now
       resource = getattr(self, 'refresh_resource', None)
-    self.refresh_last_poll = now
-    was_updated = self._refresh(resource, data=data, **_refresh_kw)
-    if was_updated:
-      self.refresh_last_update = now
+      was_updated = self._refresh(resource, data=data, **_refresh_kw)
+      if was_updated:
+        # good poll and data updated
+        self.refresh_last_update = now
     if recurse:
       for _ in map(
           lambda obj: obj.refresh(
