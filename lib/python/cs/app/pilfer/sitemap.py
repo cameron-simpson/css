@@ -1486,17 +1486,6 @@ class SiteEntity(HasTags):
       return datetime_from_http_date(http_date).timestamp()
     return 0
 
-  def _refresh(self, resource=None):
-    ''' Try to refresh this entity from the sitepage, supporting `Refreshable`.
-    '''
-    ''' Refetch and reparse `self.sitepage_url` via `self.grok_sitepage()`
-        if the page is stale (or if `force` is true).
-    '''
-    if resource is None:
-      resource = self.sitepage_url
-    self.grok_sitepage(resource)
-    return True
-
   def update_from_meta(self, flowstate: FlowState, **update_kw):
     ''' Update this entity from the `flowstate.meta`.
     '''
