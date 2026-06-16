@@ -968,19 +968,27 @@ def pmap(
   def dispatcher():
     ''' Dispatch `Thread`s to run `func` against each item.
     '''
-    nonlocal ndispatched
-    for i, item in enumerate(it):
-      name = f'pmap[{i}]:{func=},{item=}'
-      T = builtin_Thread(name=name, target=run_func, args=(sem, func, i, item))
-      if sem is not None: sem.acquire()
-      try:
-        T.start()
-        ndispatched += 1
-      except Exception as e:
-        if sem is not None: sem.release()
-        warning(f'pmap: Thread({name}).start(): {e}', exc_info=sys.exc_info())
-    # indicate all functions dispatched
-    resultQ.put(None)
+    try:
+      nonlocal ndispatched
+      for i, item in enumerate(it):
+        name = f'pmap[{i}]:{func=},{item=}'
+        T = builtin_Thread(
+            name=name, target=run_func, args=(sem, func, i, item)
+        )
+        if sem is not None: sem.acquire()
+        try:
+          T.start()
+          ndispatched += 1
+        except Exception as e:
+          if sem is not None: sem.release()
+          warning(
+              f'pmap: Thread({name}).start(): {e}', exc_info=sys.exc_info()
+          )
+      # indicate all functions dispatched
+      resultQ.put(None)
+    except Exception as e:
+      warning("pmap: dispatcher: %r %s", type(e), e)
+      raise
 
   name = f'pmap dispatcher:{func=}'
   DT = builtin_Thread(name=name, target=dispatcher)
