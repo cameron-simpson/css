@@ -430,7 +430,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           default from `self.verify` (itself default `True`)
         Other keyword arguments are passed to the `session` request method.
     '''
-    vprint(f'{self.__class__.__name__}: {method} {url}')
+    vprint(f'{self.__class__.__name__}.request: {method} {url}')
     if session is None:
       session = self.session
     if verify is None:
@@ -440,8 +440,10 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     if headers is not None:
       hdrs.update(headers)
     if verbose:
-      print(f'{method.upper()} request headers:')
-      printt(*[[hdr, body] for hdr, body in sorted(hdrs.items())], indent=2)
+      printt(
+          f'{method.upper()} request headers:',
+          tuple([hdr, body] for hdr, body in sorted(hdrs.items())),
+      )
     return pfx_call(
         getattr(session, method.lower()),
         str(url),
