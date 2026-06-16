@@ -18,7 +18,7 @@ import sys
 from threading import Thread
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Generator, Iterable, Mapping, Optional
+from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Union
 from uuid import UUID
 
 from cs.binary import bs
@@ -966,6 +966,70 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     return kwargs
 
 uses_flowstate = default_params(flowstate=FlowState.default)
+
+class ScanData:
+  ''' A class to manage data obtained by scanning a web page
+      containing a `.sitemap` for the reference `SiteMap`
+      and a `.ent_data_map` for the mapping from `SiteEntity`
+      instances to their scanned data `dict`.
+  '''
+
+  def __init__(self, sitemap: "SiteMap"):
+    # mapping of SiteEntity instances to a data dict
+    self.sitemap = sitemap
+    self.ent_data_map = defaultdict(dict)
+
+  def __iter__(self):
+    ''' Iteration yields `(SiteEntity,datadict)` 2-tuples.
+    '''
+    return iter(self.ent_data_map.items())
+
+  @typechecked
+  def __getitem__(self, ent: Union["SiteEntity", tuple]):
+    ''' The data for the supplied `ent`.
+    '''
+    if isinstance(ent, tuple):
+      ent = self.sitemap[ent]
+    return self.ent_data_map[ent]
+
+  def keys(self):
+    return self.ent_data_map.keys()
+
+  def update(self, ent: Union["SiteEntity", tuple], **data_kw):
+    ''' Update the data for `ent` from `data_kw`.
+          If `ent` is a tuple, use it to obtain a `SiteEntity` from `self.sitemap`.
+      '''
+    self[ent].update(**data_kw)
+
+  def conv(self, ent: Union["SiteEntity", tuple], mapping, key, conv=None):
+    ''' Update the data for `ent` from `mapping[key]` if present.
+        If `conv` is not `None` it should be a callable accepting
+        the value from `mapping[key]` and returning a converted
+        value to store in the entity data.
+    '''
+    try:
+      value = mapping[key]
+    except KeyError:
+      warning("no mapping[%r]", key)
+      return
+    if conv is None:
+      cvalue = value
+    else:
+      try:
+        cvalue = conv(value)
+      except ValueError as e:
+        warning("%s(mapping[%r]:%r) -> %s", conv, key, value, e)
+        return
+    self.update(ent, **{key: cvalue})
+
+  def apply(self, *refresh_ents):
+    for ent, data in self:
+      if ent in refresh_ents:
+        # if this is the sitepage, consider the entity refreshed
+        ent.refresh(data=data)
+      else:
+        # otherwise just annotate it with whatever was learned
+        ent.type_zone_update(data)
 
 class SiteEntity(HasTags):
   ''' A base class for entities associated with a `SiteMap`.
