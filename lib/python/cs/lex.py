@@ -1784,6 +1784,7 @@ def printt(
   if isinstance(indent, int):
     indent = ' ' * indent
   if print_func is None:
+    # obtain the _current_ builtins.print
     from builtins import print as print_func
   for line in tabulate(*table, **tabulate_kw):
     print_func(indent + line, file=file, flush=flush)
