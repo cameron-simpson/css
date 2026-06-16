@@ -2073,9 +2073,7 @@ class SiteMap(UsesTagSets, Promotable):
               vprint(f'@on: {test_name}: {flowstate.url=}')
               m = entity_class.match_url(flowstate.url)
               if m is not None:
-                _, m = m
-                if m is not None:
-                  match.update(m)
+                match.update(m)
               return m
 
             test.__name__ = test_name
