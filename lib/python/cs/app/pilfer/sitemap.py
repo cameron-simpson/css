@@ -2855,6 +2855,16 @@ class SiteMap(UsesTagSets, Promotable):
               )(force=self.options.force, recurse=self.options.recurse)
         ent.printt()
 
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} URLs...
+          Scan the suppplied URLs, update entities accordingly.
+    '''
+    if not argv:
+      raise GetoptError('missing URLs')
+    for url in argv:
+      print("scan", url)
+      self.scan_matches(url)
+
 # expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on
 grok_entity_page = SiteMap.grok_entity_page
