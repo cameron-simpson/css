@@ -1370,6 +1370,23 @@ class SiteEntity(HasTags):
     '''
     return self.sitepage_url
 
+  def _refresh(self, url=None, *, data=None):
+    ''' Refresh this entity.
+    '''
+    if data is not None:
+      self.type_zone_update(data)
+      return True
+    if url is None:
+      url = self.sitepage_url
+      if url is None:
+        warning(
+            f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
+        )
+        return False
+    for ent, data in self.scan_sitepage(url):
+      ent.type_zone_update(data)
+    return True
+
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
 
