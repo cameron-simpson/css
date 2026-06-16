@@ -1216,34 +1216,34 @@ class SiteEntity(HasTags):
     }
 
   @classmethod
-  def match_url(cls,
-                url: URL,
-                *,
-                pattern_name="sitepage_url") -> tuple[str, dict] | None:
-    ''' Test whether this `SiteEntity` subclass matches `url`.
-        Return `None` if there is no pattern for `pattern_name`
-        (default `"sitepage_url"`), otherwise the result of the
-        pattern's `.match(url)` method (`None` on no match, a mapping
-        on a match).
-        If the optional argument `match` is not `None` it should
-        be a mapping, and will be updated by the mapping from a
-        successful match.
+  def match_url(
+      cls,
+      url: URL,
+      *,
+      pattern_name="sitepage_url",
+      sitemap: Optional["SiteMap"] = None
+  ) -> dict | None:
+    ''' Test whether `url` matches this `SiteEntity` subclass'
+        pattern named `pattern_name` (default `"sitepage_url"`).
+        Return `None` if there is no pattern for `pattern_name`.
+        Otherwise return the result if `pattern.match(url)`.
     '''
     try:
-      pattern_mapping = cls.url_pattern_mapping()
+      pattern_mapping = cls.url_pattern_mapping(sitemap=sitemap)
     except Exception as e:
       warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
-      return
-    for pattern_name, pattern in pattern_mapping.items():
-      try:
-        m = pattern.match(url)
-      except Exception as e:
-        warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
-        continue
-      if m is not None:
-        return pattern_name, m
-
-    return None
+      return None
+    pattern = cls.pattern(pattern_name)
+    if pattern is None:
+      ##print(
+      ##    f'match_url: no pattern_mapping[{pattern_name=}]: {sorted(pattern_mapping.keys())}'
+      ##)
+      return None
+    try:
+      return pattern.match(url)
+    except Exception as e:
+      warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
+      return None
 
   @mapped_property
   def patterns(self, pattern_name: str):
