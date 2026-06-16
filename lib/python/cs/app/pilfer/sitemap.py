@@ -1387,6 +1387,12 @@ class SiteEntity(HasTags):
       ent.type_zone_update(data)
     return True
 
+  @pfx_method
+  @pagemethod
+  def scan_sitepage(self, flowstate: FlowState) -> ScanData:
+    warning("%s: no method to scan a sitepage", self.__class__.__name__)
+    return ScanData(self.sitemap)
+
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
 
