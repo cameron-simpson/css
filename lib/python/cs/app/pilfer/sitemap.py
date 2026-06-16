@@ -1757,8 +1757,8 @@ class SiteMap(UsesTagSets, Promotable):
   pilfer: object = None
   tagsets: BaseTagSets = None
 
-  ##  # a registry of SiteMap subclasses by their TYPE_ZONE
-  ##  by_type_zone = {}
+  # a registry of SiteMap subclasses by their TYPE_ZONE
+  by_type_zone = {}
 
   URL_KEY_PATTERNS = ()
 
@@ -1770,27 +1770,26 @@ class SiteMap(UsesTagSets, Promotable):
   ):
     ''' Initialise `.pilfer` if omitted`, and then `.tagsets` from `self.pilfer`.
     '''
+    cls = self.__class__
     if self.name is None:
       self.name = self.TYPE_ZONE
     if self.pilfer is None:
       self.pilfer = P
     # Register this `SiteMap` by its `TYPE_ZONE`.
-    sitemap_by_type_zone = self.__class__.sitemap_by_type_zone
+    by_type_zone = cls.by_type_zone
     try:
       self.TYPE_ZONE
     except AttributeError:
       vprint(f'no .TYPE_ZONE for SiteMap instance {self}')
-      pass
     else:
       try:
-        other_map = sitemap_by_type_zone[self.TYPE_ZONE]
+        other_map = by_type_zone[self.TYPE_ZONE]
       except KeyError:
         # not already taken
         pass
       else:
         warning(f'replacing {self.TYPE_ZONE=} -> {other_map} with {self}')
-      vprint(f'sitemap_by_type_zone[{self.TYPE_ZONE=}] = {self=}')
-      sitemap_by_type_zone[self.TYPE_ZONE] = self
+      by_type_zone[self.TYPE_ZONE] = self
     super().__init__(tagsets=self.pilfer.sqltags)
 
   @classmethod
