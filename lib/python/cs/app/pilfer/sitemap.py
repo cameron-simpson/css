@@ -138,6 +138,10 @@ def parse_img_srcset(srcset, offset=0) -> Mapping[str, list[str]]:
     mapping[url].append(condition)
   return mapping
 
+class URLPatternMatchError(ValueError):
+  ''' A subclass of `ValueError` for failure to match a `URLPattern`.
+  '''
+
 @dataclass
 class URLPattern(Promotable):
   ''' A class for matching a `URL` against a `(hostname_fnmatch,url_regexp)` pair.
