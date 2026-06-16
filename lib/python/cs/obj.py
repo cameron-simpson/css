@@ -668,11 +668,16 @@ class Refreshable(ABC):
       seen = set()
     else:
       if key in seen:
-        return
+        return False
     seen.add(key)
+    if ratelimit is None:
+      # optional instance attribute
+      ratelimit = getattr(
+          self, 'refresh_ratelimit',
+          type(self).REFRESH_RATELIMIT
+      )
     now = time.time()
     do_refresh = True
-    last_poll = None
     was_updated = False
     if data is None:
       if not force:
@@ -682,11 +687,6 @@ class Refreshable(ABC):
         elif ratelimit is not None:
           # rate limit on polls
           last_poll = getattr(self, 'refresh_last_poll', None)
-          # optional instance attribute
-          ratelimit = getattr(
-              self, 'refresh_ratelimit',
-              type(self).REFRESH_RATELIMIT
-          )
           if now - last_poll > ratelimit:
             # too soon
             do_refresh = False
