@@ -2324,6 +2324,53 @@ class SiteMap(UsesTagSets, Promotable):
 
   @pfx_method
   @promote
+  def scan_matches(
+      self,
+      flowstate: FlowState,
+      flowattr: str | None = None,
+      methodglob: str = 'scan_*',
+      **match_kw,
+  ):
+    ''' Run all the scan methods in this `SiteMap` for `flowstate.url`.
+        This runs:
+        - `entity.scan_sitepage()` if the URL matches a `SiteEntty` sitepage pattern
+        - all the `SiteMap.scan+*` methods whose `.on_conditions` match 
+          `flowstate` and ``match_kw`, as matched by `SiteMap.on_matches`
+          an apply the scan results.
+        The result of each scan, a `ScanData`, is applied to its relevant entities.
+
+        Parameters:
+        * `flowstate`: the `FlowState` on which to match
+        * `flowattr`: an optional attribute name of the `flowstate`
+        * `methodglob`: an optional filename glob constraining the
+          chosen method names; the default is `"scan_*"`
+        * `match_kw`: the `on_match` keyword arguments which must match
+
+        Each method should return a `ScanData` instance containing
+        the information scanned from the page and its associated
+        entities.
+    '''
+    ent0 = self.url_entity(flowstate.url)
+    if ent0 is not None:
+      scanned = ent0.scan_sitepage(flowstate)
+      scanned.apply(ent0)
+    for method, match in self.on_matches(flowstate, methodglob, **match_kw):
+      with Pfx("call %s", method.__qualname__):
+        try:
+          scanned = method(self, flowstate, match)
+          scanned.apply(
+              # provie the entities whose sitepage patterns match the URL
+              *(
+                  ent for ent in scanned.keys()
+                  if ent.match_url(flowstate.url, sitemap=self)
+              )
+          )
+        except Exception as e:
+          warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
+          raise
+
+  @pfx_method
+  @promote
   def run_matches(
       self,
       flowstate: FlowState,
