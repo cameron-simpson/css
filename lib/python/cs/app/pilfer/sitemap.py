@@ -1106,22 +1106,22 @@ class SiteEntity(HasTags):
       pattern_name="sitepage_url",
   ):
     ''' Return the `SiteEntity` from `sitemap` matching `url`.
-        Raises `ValueError` if the `url.path` does not match via
+        Raises `URLPatternMatchError` (a subclass of `ValueError`)
+        if the `url.path` does not match via
         `cls.match_url(,url,pattern_name=pattern_name)`.
     '''
     if sitemap is None:
       sitemap = cls.default_sitemap()
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
-      m = cls.match_url(url, pattern_name=pattern_name)
-      if m is None:
-        raise ValueError(
+      match = cls.match_url(url, pattern_name=pattern_name)
+      if match is None:
+        raise URLPatternMatchError(
             f'no match from {cls.__name__}.match_url({url},{pattern_name=})'
         )
-      pattern_name, match = m
       try:
         type_key = match["type_key"]
       except KeyError as e:
-        raise ValueError(
+        raise URLPatternMatchError(
             f'no type_key in match from {cls.__name__}.match_url({url},{pattern_name=}): {match=}'
         )
       # fill in from the match if not already set
