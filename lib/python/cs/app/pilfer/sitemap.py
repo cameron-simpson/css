@@ -2837,6 +2837,10 @@ class SiteMap(UsesTagSets, Promotable):
         for (attr, subents) in ent.related():
           print(attr, '->', [subent.name for subent in subents])
 
+  @popopts(
+      f=('force', 'Force refresh of entities even if not stale.'),
+      r=('recurse', 'Recursively refresh related entities.'),
+  )
   def cmd_refresh(self, argv):
     ''' Usage: {cmd} entity...
           Refresh the specified entities by fetching and grokking their site pages.
@@ -2845,9 +2849,11 @@ class SiteMap(UsesTagSets, Promotable):
       raise GetoptError("missing entities")
     for ent_spec in argv:
       with Pfx("entity %r", ent_spec):
-        ent = self[ent_spec]
+        ent_key = ent_spec.removeprefix(f'{self.TYPE_ZONE}.')
+        ent = self[ent_key]
+        trace(ent.refresh
+              )(force=self.options.force, recurse=self.options.recurse)
         ent.printt()
-        ent.grok_sitepage()
 
 # expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on
