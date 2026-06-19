@@ -687,7 +687,7 @@ class Refreshable(ABC):
         elif ratelimit is not None:
           # rate limit on polls
           last_poll = getattr(self, 'refresh_last_poll', None)
-          if now - last_poll > ratelimit:
+          if last_poll is not None and now - last_poll < ratelimit:
             # too soon
             do_refresh = False
     if do_refresh:
