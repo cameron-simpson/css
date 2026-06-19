@@ -1010,6 +1010,41 @@ def print_obj(obj, label=None):
   ##pprint(table, indent=2)
   return printt(*table)
 
+@ALL
+def tabulate_class(cls):
+  ''' Construct a table reporting about `cls` and its subclasses.
+  '''
+  table = [
+      [cls.__name__, f'{cls.__module__}'],
+  ]
+  if cls.__annotations__:
+    table.append('.__annotations__')
+    table.append(
+        tuple(
+            [f'.{name}', annotation]
+            for name, annotation in cls.__annotations__.items()
+        ),
+    )
+  subclasses = cls.__subclasses__()
+  if subclasses:
+    table.append('Subclasses:')
+    subtable = []
+    for subclass in subclasses:
+      subclstable = tabulate_class(subclass)
+      subtable.append(subclstable.pop(0))
+      if subclstable:
+        subtable.append(tuple(subclstable))
+    table.append(tuple(subtable))
+  ##pprint(table, width=50)
+  ##breakpoint()
+  return table
+
+@ALL
+def print_class(cls):
+  ''' Call `tabulate_class(cls)` and pass to `cs.lex.printt()`.
+  '''
+  printt(*tabulate_class(cls))
+
 def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
   '''
