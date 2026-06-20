@@ -303,6 +303,7 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
     if api_key is None:
       api_key = os.environ[self.TVDB_API_KEY_ENVVAR]
     self.api_key = api_key
+    # reuse a token from the environment if present
     self.token = os.environ.get(self.TVDB_API_TOKEN_ENVVAR)
 
   def parse_object_id(self, type_id: str) -> TVDBEntity:
@@ -317,7 +318,9 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
         This sets `self.token` and `self.default_headers['Authorization']`
         as a side effect.
     '''
-    data = self.suburl("login", method='POST', json={"apikey": self.api_key})
+    data = super().suburl(
+        "login", method='POST', json={"apikey": self.api_key}
+    )
     self.token = data["token"]
     return data
 
@@ -336,6 +339,10 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
       self.default_headers.pop('Authorization', None)
     else:
       self.default_headers['Authorization'] = new_token
+
+  def suburl(self, suburl, **suburl_kw):
+    self.token
+    return super().suburl(suburl, **suburl_kw)
 
   @cached_property
   def artwork_types(self):
