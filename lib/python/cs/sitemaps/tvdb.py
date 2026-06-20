@@ -100,7 +100,13 @@ class TVDBEntity(SiteEntity, Promotable):
             f'no data or subpath provided to {self.__class__.__name__}:{self.name}._refresh()'
         )
       api_id = int(self.type_key)
-      data = tvdb_api / subpath
+      try:
+        data = tvdb_api / subpath
+      except HTTPError as e:
+        if e.response.status_code == 404:
+          warning(f'{self.name}:_refresh({subpath=}) not found: {e}')
+          return False
+        raise
       assert data["id"] == api_id, (
           f'TVDB API {data["id"]=} != {api_id=} (from {self.type_key=})'
       )
