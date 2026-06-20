@@ -77,12 +77,12 @@ class TVDBEntity(SiteEntity, Promotable):
   #################################################################
   # Refreshable support.
   @uses_tvdb
-  def refresh(self, *rfa, tvdb_api: "TheTVDBAPI", **rfkw):
-    ''' Call `Refreshable.refresh` with a curried `pmap` using the API `concurrent_sem`.
+  def refresh(self, *rfa, tvdb_api: "TheTVDBAPI", map=None, **rfkw):
+    ''' Call `Refreshable.refresh` with `map=tvdb_api.pmap`.
     '''
-    return super().refresh(
-        *rfa, map=partial(pmap, concurrent=tvdb_api.concurrent_sem), **rfkw
-    )
+    if map is None:
+      map = tvdb_api.pmap
+    return super().refresh(*rfa, map=map, **rfkw)
 
   @property
   def refresh_resource(self):
