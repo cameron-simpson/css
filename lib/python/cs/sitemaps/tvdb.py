@@ -362,6 +362,15 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
     results = self.suburl('search', params=params, **_rqkw)
     return [(result, self.parse_object_id(result['id'])) for result in results]
 
+  def refresh_entities(
+      self,
+      entities: Iterable[Refreshable],
+      **refresh_kw,
+  ) -> Generator[bool]:
+    ''' Refresh the `entities` in parallel using `self.pmap`.
+    '''
+    return pmap(lambda ent: ent.refresh(**refresh_kw), entities)
+
 @dataclass
 class TheTVDBSite(SiteMap):
   ''' A site map for `thetvdb.com`.
