@@ -31,7 +31,7 @@ from cs.context import contextif
 from cs.deco import uses_verbose
 from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
-from cs.pfx import pfx_call
+from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTagSet, UsesSQLTags
 from cs.tagset import HasTags, UsesTagSets
@@ -301,42 +301,51 @@ class HTTPServiceAPI(ServiceAPI):
     if mode is None:
       mode = self.mode
     url = base_url + suburl
-    rq_headers = {}
-    rq_headers.update(self.default_headers)
-    if headers is not None:
-      rq_headers.update(headers)
-    with run_task(f'{method} {url}', report_print=verbose):
-      for retry in range(self.API_RETRY_COUNT, 0, -1):
-        runstate.raiseif()
-        with contextif(self.concurrency_sem):
-          try:
-            rsp = pfx_call(
-                rqm,
-                url,
-                cookies=cookies,
-                headers=rq_headers,
-                **rqkw,
-            )
-            break
-          except requests.ConnectionError as e:
-            if retry <= 1:
-              # last retry
-              raise
-            warning("%s: %s, retrying in %ds", url, e, self.API_RETRY_DELAY)
-            runstate.sleep(self.API_RETRY_DELAY)
-    if check:
-      rsp.raise_for_status()
-    if callable(mode):
-      return mode(rsp)
-    if mode == 'response':
-      return rsp
-    if mode == 'json':
-      return self.response_as_json(rsp)
-    if mode == 'data':
-      return self.response_as_json_data(rsp)
-    raise ValueError(
-        f'unsupported {mode=}, expected "data", "json", "response" or a callable'
-    )
+    with Pfx('%s %s', method, url):
+      rq_headers = {}
+      rq_headers.update(self.default_headers)
+      if headers is not None:
+        rq_headers.update(headers)
+      with run_task(
+          f'{method} {url}',
+          report_print=verbose,
+          tick_deferred=True,
+      ) as proxy:
+        for retry in range(self.API_RETRY_COUNT, 0, -1):
+          runstate.raiseif()
+          with contextif(self.concurrency_sem):
+            try:
+              with proxy.ticker():
+                rsp = pfx_call(
+                    rqm,
+                    url,
+                    cookies=cookies,
+                    headers=rq_headers,
+                    **rqkw,
+                )
+                break
+            except requests.ConnectionError as e:
+              if retry <= 1:
+                # last retry
+                raise
+              warning("%s, retrying in %ds", e, self.API_RETRY_DELAY)
+              runstate.sleep(self.API_RETRY_DELAY)
+      if check:
+        if rsp.status_code != 200:
+          print(dir(rsp))
+          warning(f'{rsp.status_code} {rsp.reason}')
+        rsp.raise_for_status()
+      if callable(mode):
+        return mode(rsp)
+      if mode == 'response':
+        return rsp
+      if mode == 'json':
+        return self.response_as_json(rsp)
+      if mode == 'data':
+        return self.response_as_json_data(rsp)
+      raise ValueError(
+          f'unsupported {mode=}, expected "data", "json", "response" or a callable'
+      )
 
   def get(self, suburl, **kw) -> Response:
     ''' Call `slef.suburl` with `method="GET"`.
