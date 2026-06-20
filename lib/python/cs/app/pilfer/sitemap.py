@@ -1953,9 +1953,9 @@ class SiteMap(UsesTagSets, Promotable):
         ent_fsQ.put((None, None))
 
     # dispatch the workers
-    process_entitiesT = Thread(target=with_(process_entities, P), daemon=True)
+    process_entitiesT = Thread(target=with_(P, process_entities), daemon=True)
     process_entity_sitepagesT = Thread(
-        target=with_(process_entity_sitepages, P), daemon=True
+        target=with_(P, process_entity_sitepages), daemon=True
     )
     process_entitiesT.start()
     process_entity_sitepagesT.start()
