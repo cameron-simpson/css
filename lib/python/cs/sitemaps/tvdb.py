@@ -186,48 +186,64 @@ class Series(TVDBEntity):
   TVDB_API_ENTITY_SUBPATH_FORMAT = 'series/{type_key}/extended'
 
   @uses_runstate
-  def print(self, *, runstate: RunState):
-    table = [[self.name, self['tvdb.name']]]
+  @uses_tvdb
+  def print(self, *, runstate: RunState, tvdb_api: "TheTVDBAPI"):
+    table = [[self.name, self.get('tvdb.name')]]
     characters = list(self.related('tvdb.characters'))
+    seasons = list(self.related('tvdb.seasons'))
+    list(tvdb_api.refresh_entities(characters + seasons))
+    runstate.raiseif()
     if characters:
       table.append(['Characters', len(characters)])
       chartable = []
-      for character in characters:
-        runstate.raiseif()
-        character.refresh()
+      actors = [
+          self.sitemap[Person, character['tvdb.peopleId']]
+          for character in characters
+      ]
+      list(tvdb_api.refresh_entities(actors))
+      runstate.raiseif()
+      for character, actor in zip(characters, actors):
         chartable.append(
             [
-                character.get('tvdb.name', 'no tvdb.name'),
-                character['tvdb.personName'],
+                f"{character.get('tvdb.name', 'no tvdb.name')} {character.name}",
+                f"{character['tvdb.personName']} - {actor.name}",
             ]
         )
       table.append(tuple(chartable))
-    seasons = list(self.related('tvdb.seasons'))
     if seasons:
+      # there are repeated season entries, keep the last
+      season_map = {season['tvdb.number']: season for season in seasons}
       table.append(['Seasons', len(seasons)])
       seatable = []
-      # refresh the seasons because we sort on tvdb.number
-      for season in seasons:
-        runstate.raiseif()
-        season.refresh()
-      for season in sorted(seasons, key=lambda season: season['tvdb.number']):
+      for season_number, season in sorted(season_map.items()):
         runstate.raiseif()
         episodes = list(season.related('tvdb.episodes'))
         seatable.append(
             [
-                f'Season {season["tvdb.number"]} {season.name}',
-                'No episodes.' if len(episodes) == 0 else '1 episode.'
-                if len(episodes) == 1 else f'{len(episodes)} episodes.'
+                (
+                    f'Specials {season.name}' if season_number == 0 else
+                    f'Season {season_number} {season.name}'
+                ),
+                (
+                    'No episodes.' if len(episodes) == 0 else '1 episode.'
+                    if len(episodes) == 1 else f'{len(episodes)} episodes.'
+                ),
             ]
         )
         if episodes:
+          list(tvdb_api.refresh_entities(episodes))
+          # there are repeated episodes, keep the last
+          episode_map = {
+              episode['tvdb.number']: episode
+              for episode in episodes
+          }
           epitable = []
-          for episode in episodes:
+          for episode_number, episode in sorted(episode_map.items()):
             runstate.raiseif()
             episode.refresh()
             epitable.append(
                 [
-                    episode['tvdb.number'],
+                    f'{episode_number} {episode.name}',
                     f'{episode.get("tvdb.name","no tvb.name")}\n{"\n".join(wrap(episode.get("tvdb.overview","No overview."),60))}'
                 ]
             )
