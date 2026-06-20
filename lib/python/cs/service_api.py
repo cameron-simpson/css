@@ -146,9 +146,9 @@ class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
     self.concurrency_sem = concurrency_sem
     self.pmap = _pmap
     super().__init__(tagsets=tagsets)
-    self.fstags = fstags
     self._lock = RLock()
     self.login_state_mapping = None
+    self.fstags = fstags
 
   @contextmanager
   def startup_shutdown(self):
