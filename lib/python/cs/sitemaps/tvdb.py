@@ -280,7 +280,7 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
   TVDB_API_TOKEN_ENVVAR = 'TVDB_API_TOKEN'
 
   # the default concurrency limit for API calls
-  DEFAULT_CONCURRENT = 2
+  API_CONCURRENCY_LIMIT = 3
 
   @classmethod
   def _singleton_key(cls, api_key: str = None, **_):
@@ -293,8 +293,6 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
   def __init__(
       self,
       api_key: str = None,
-      *,
-      concurrent: Optional[int] = None,
       **httpapi_kw,
   ):
     if hasattr(self, 'api_key'):
@@ -306,8 +304,6 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
       api_key = os.environ[self.TVDB_API_KEY_ENVVAR]
     self.api_key = api_key
     self.token = os.environ.get(self.TVDB_API_TOKEN_ENVVAR)
-    if concurrent is None: concurrent = self.DEFAULT_CONCURRENT
-    self.concurrent_sem = Semaphore(concurrent)
 
   def parse_object_id(self, type_id: str) -> TVDBEntity:
     ''' Resolve a TVDB entity spec such as `"series-1234"` into the `TVDBEntity` instance.
