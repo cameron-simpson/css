@@ -15,7 +15,7 @@ import re
 import sys
 from textwrap import wrap
 from threading import Semaphore
-from typing import Generator, Optional
+from typing import Generator, Iterable, Optional
 
 from cs.app.pilfer.pilfer import Pilfer, uses_pilfer
 from cs.app.pilfer.sitemap import SiteEntity, SiteMap, on
@@ -26,7 +26,7 @@ from cs.deco import default_params, Promotable
 from cs.lex import printt, r, s
 from cs.logutils import warning
 from cs.mappings import change_mapping
-from cs.obj import SingletonMixin
+from cs.obj import Refreshable, SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.service_api import HTTPServiceAPI
@@ -34,6 +34,7 @@ from cs.tagset import HasTags, TagSet, UsesTagSets
 from cs.threads import pmap
 
 from bs4.element import Tag as BS4Tag
+from requests.exceptions import HTTPError
 from typeguard import typechecked
 
 from cs.debug import trace, X, r, s, pprint, printt
@@ -402,8 +403,6 @@ class TheTVDBSite(SiteMap):
     ##for li in div.ul.find_all('li', recursive=False):
     for li in child_tags(div.ul, 'li'):
       with Pfx("LI %s", li):
-        print("==========================================================")
-        print("LI", li)
         field_tag, *value_tags = child_tags(li)
         if field_tag.name != 'strong':
           warning("expected a leading <strong> tag, ignoring %s", r(field_tag))
@@ -441,9 +440,7 @@ class TheTVDBSite(SiteMap):
             if span.name != 'span':
               warning("skipping nonspan")
               continue
-            print("SPAN", span_flat)
             field_text = span.get_text(' ', strip=True)
-            print("field_text", repr(field_text))
             if field_name == 'id':
               field_key = None
               field_value = int(field_text)
@@ -542,9 +539,6 @@ class TheTVDBSite(SiteMap):
           if actors:
             actor_map = defaultdict(list)
             actors_as = list(actors.find('a'))
-            for a in actors_as:
-              print("actors A", a)
-            ##actors_a, = actors.find('a')
             actors_a = actors_as[0]
             for actor_name, role_name in batched(actors_a.stripped_strings, 2):
               print("actor", actor_name, "role", role_name)
@@ -569,6 +563,7 @@ class TheTVDBCommand(BaseCommand):
   )
   def cmd_refresh(self, argv):
     ''' Usage: {cmd} entities...
+          Refresh the specified entities and then print them.
     '''
     force = self.options.force
     recurse = self.options.recurse
