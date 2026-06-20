@@ -352,7 +352,7 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
              query: str,
              *,
              _rqkw=None,
-             **search_params) -> Generator[tuple[dict, TVDBEntity]]:
+             **search_params) -> list[tuple[dict, TVDBEntity]]:
     if _rqkw is None:
       _rqkw = {}
     params = dict(
@@ -360,8 +360,7 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
         **search_params,
     )
     results = self.suburl('search', params=params, **_rqkw)
-    for result in results:
-      yield result, self.parse_object_id(result["id"])
+    return [(result, self.parse_object_id(result['id'])) for result in results]
 
 @dataclass
 class TheTVDBSite(SiteMap):
