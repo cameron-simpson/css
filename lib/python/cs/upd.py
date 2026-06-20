@@ -936,6 +936,7 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
       report_print=False,
       tick_delay: int = 0.3,
       tick_chars='|/-\\',
+      tick_deferred=False,
   ):
     ''' Context manager to display an `UpdProxy` for the duration of some task.
         It yields the proxy.
@@ -958,27 +959,18 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
             "run_task(%r,...,tick_delay=%s): tick_delay should be >=0" %
             (label, tick_delay)
         )
-      with self.insert(1, prefix=label + ' ') as proxy:
-        if tick_delay > 0:
-          cancel_ticker = False
-
-          def _ticker():
-            i = 0
-            while not cancel_ticker:
-              proxy.suffix = ' ' + tick_chars[i % len(tick_chars)]
-              i += 1
-              time.sleep(tick_delay)
-
-          Thread(
-              target=_ticker, name="%s-task-ticker" % label, daemon=True
-          ).start()
-        proxy.text = '...'
-        start_time = time.time()
-        try:
-          yield proxy
-        finally:
-          end_time = time.time()
-          cancel_ticker = True
+      with self.insert(
+          1,
+          prefix=label + ' ',
+          tick_delay=tick_delay,
+          tick_chars=tick_chars,
+      ) as proxy:
+        with contextif(not tick_deferred, proxy.ticker):
+          start_time = time.time()
+          try:
+            yield proxy
+          finally:
+            end_time = time.time()
       elapsed_time = end_time - start_time
       if ((report_print > 0.0 and report_print <= elapsed_time)
           if isinstance(report_print, (int, float)) else report_print):
@@ -1107,6 +1099,8 @@ class UpdProxy(object):
       '_suffix': 'The fixed trailing suffix or this slot, default "".',
       'update_period': 'Update time interval.',
       'last_update': 'Time of last update.',
+      'tick_delay': 'Time between animations of the ticker.',
+      'tick_chars': 'Characters used in the ticker animation.',
   }
 
   @uses_upd
@@ -1120,6 +1114,8 @@ class UpdProxy(object):
       suffix: Optional[str] = None,
       text_auto=None,
       update_period: Optional[float] = None,
+      tick_delay: int = 0.3,
+      tick_chars='|/-\\',
   ):
     ''' Initialise a new `UpdProxy` status line.
 
@@ -1137,6 +1133,8 @@ class UpdProxy(object):
     self._text_auto = text_auto
     self._suffix = suffix or ''
     self.update_period = update_period
+    self.tick_delay = tick_delay
+    self.tick_chars = tick_chars
     self.last_update = None
     if index is None:
       self.upd = upd
@@ -1144,7 +1142,7 @@ class UpdProxy(object):
       self.upd = None
       upd.insert(index, proxy=self)
       assert self.index is not None
-    if text:
+    if prefix or text or suffix:
       self(text)
 
   def __str__(self):
@@ -1304,6 +1302,34 @@ class UpdProxy(object):
       if self.index is not None:
         index += self.index
       return upd.insert(index, txt)
+
+  @contextmanager
+  def ticker(self, label=None):
+    ''' A context manager which runs a ticker animation on this proxy.
+        Yields the `Thread` running the ticker.
+    '''
+    if label is None:
+      label = self.prefix.strip()
+    tick_delay = self.tick_delay
+    if tick_delay <= 0:
+      yield
+    else:
+      tick_chars = self.tick_chars
+      cancel_ticker = False
+
+      def _ticker():
+        i = 0
+        while not cancel_ticker:
+          self.suffix = ' ' + tick_chars[i % len(tick_chars)]
+          i += 1
+          time.sleep(tick_delay)
+
+      T = Thread(target=_ticker, name=f'{label}-ticker', daemon=True).start()
+    self.text = '...'
+    try:
+      yield T
+    finally:
+      cancel_ticker = True
 
 @decorator
 def with_upd_proxy(func, prefix=None, insert_at=1):
