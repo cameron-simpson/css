@@ -3278,9 +3278,15 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
 
   @property
   def entity(self):
-    ''' The `TagSet.entity` poperty.
+    ''' The `TagSet.entity` property.
     '''
     return self.tags.entity
+
+  @property
+  def entity_(self):
+    ''' The `TagSet.entity_` property.
+    '''
+    return self.tags.entity_
 
   #######################################################
   # Methods supports FormatableMixin
