@@ -1423,8 +1423,9 @@ class TagSet(
     ''' The `.entity` attribute space.
     '''
 
-    def __init__(self, tags):
+    def __init__(self, tags, missing_ok=False):
       self.tags = tags
+      self.missing_ok = missing_ok
 
     def __getattr__(self, attr) -> "HasTags":
       ''' Consult th tag `id.{attr}` and return the corresponding
@@ -1439,6 +1440,8 @@ class TagSet(
       try:
         zone_key = self.tags[zone_id_tag]
       except KeyError as e:
+        if self.missing_ok:
+          return None
         raise AttributeError(f'no .entity.{attr}: {e}') from e
       entity_id = f'{attr}.{zone_key}'
       return UsesTagSets.by_entity_id(entity_id)
@@ -1473,6 +1476,21 @@ class TagSet(
               playon_recording = tags.entity.playon
     '''
     return self._EntityMap(self)
+
+  @cached_property
+  def entity_(self):
+    ''' The `.entity_` attribute space, whose attributes map to
+        entities which are `UsesTags` instances from the appropriate
+        `UsesTagSets` instances according to their zone.
+        Unlike `.entity`, a missing `id.` tag returns `None` instead
+        of raising `AttributeError`.
+
+          Example:
+
+              tags = TagSet({'id.playon':'recording.1234567'})
+              playon_recording = tags.entity.playon
+    '''
+    return self._EntityMap(self, missing_ok=True)
 
   #############################################################################
   # Edit tags.
