@@ -285,7 +285,7 @@
 
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
-from collections.abc import MutableMapping
+from collections.abc import MutableMapping, Sequence
 from configparser import ConfigParser
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -3129,6 +3129,30 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
   def __repr__(self):
     return f'{self.__class__.__name__}:{self.tags}'
 
+  def __getattr__(self, attr):
+    ''' The following synthetic attibutes are implemented.
+        - *subtype*>`_ent`: the entity with name
+          *type_zone*`.`*subtype*`.`*id* or `None` where `id` comes
+          from the `.`*attr*`_id` value
+        - *subtype*>`_ents`: the entities with name
+          *type_zone*`.`*subtype*`.`*id* or `None` where each `id` comes
+          from the `.`*attr*`_id` values
+    '''
+    try:
+      base, suffix = attr.rsplit('_', 1)
+    except ValueError:
+      pass
+    else:
+      cls = self.__class__
+      suffix_handler = getattr(cls, f'suffix_{suffix}', None)
+      if suffix_handler is not None:
+        return trace(suffix_handler, retval=True)(self, attr)
+    try:
+      gsa = super().__getattr__
+    except AttributeError as e:
+      raise AttributeError(f'{self}.{attr}: {e}') from e
+    return trace(gsa)(attr)
+
   @cached_property
   def tags(self):
     ''' A default `.tags` property which obtains a `TagSet` from `self.tags_db`
@@ -3304,6 +3328,43 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
     ''' Save the last refresh update time.
     '''
     self.tags.refresh_last_update = when
+
+  #################################################################
+  # Attribute suffix resolvers.
+
+  @require(lambda attr: attr.endswith('_ent'))
+  def suffix_ent(self, attr):
+    ''' Resolve *subtype*`_ent` to `self[type_zone.`*subtype*`.id]`
+        or `None` if no `self[`*subtype*`_id]`
+    '''
+    ref_subtype = attr.removesuffix('_ent')
+    ref_key = f'{ref_subtype}_id'
+    idvalue = self.get(ref_key, None)
+    if idvalue is None:
+      return None
+    if not isinstance(idvalue, str) and isinstance(idvalue, Sequence):
+      if len(idvalue) == 0:
+        return None
+      idvalue = idvalue[0]
+    ref_name = f'{self.type_zone}.{ref_subtype}.{idvalue}'
+    return self.tags_db[ref_name]
+
+  @require(lambda attr: attr.endswith('_ents'))
+  def suffix_ents(self, attr):
+    ''' Resolve *subtype*`_ents` to [self[type_zone.`*subtype*`.id]]`
+        or `()` if no `self[`*subtype*`_id]]`.
+    '''
+    ref_subtype = attr.removesuffix('_ents')
+    ref_key = f'{ref_subtype}_id'
+    idvalues = self.get(ref_key, None)
+    if idvalues is None:
+      return ()
+    if isinstance(idvalues, str) or not isinstance(idvalues, Sequence):
+      idvalues = [idvalues]
+    return [
+        # NB: no zone because UsesTagSets.__getitem__ knows its zone
+        self.tags_db[ref_subtype, idvalue] for idvalue in idvalues
+    ]
 
 class UsesTagSets:
   ''' A mixin to support classes which use a `BaseTagSets` to store their data.
