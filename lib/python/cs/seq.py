@@ -17,8 +17,8 @@ from heapq import heappop, heappush
 import itertools
 from threading import Lock, Condition, Thread
 from typing import (
-    Any, Callable, GenericAlias, Generator, Hashable, Iterable, Optional,
-    Tuple, TypeVar
+    Any, Callable, GenericAlias, Generator, Hashable, Iterable, Iterator,
+    Optional, Tuple, TypeVar
 )
 
 from cs.deco import decorator, OBSOLETE
@@ -124,6 +124,19 @@ def get0(iterable, default=None):
   except IndexError:
     return default
   return i
+
+def consume(it: Iterator, last_item=lambda _: False, *, no_items=None):
+  ''' Consume the iterator `it`.
+      If `last_item(item)` is true for some `item` from the iterator,
+      cease at that item; the default `last_item` returns `False`,
+      which consumes everything from the iterator.
+      Return the last item, or `no_items` (default `None`) if there were no items.
+  '''
+  item = no_items
+  for item in it:
+    if last_item(item):
+      break
+  return item
 
 def tee(iterable, *Qs):
   ''' A generator yielding the items from an iterable
