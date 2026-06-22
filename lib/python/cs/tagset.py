@@ -331,7 +331,7 @@ from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
 )
-from cs.obj import public_subclasses, Refreshable, SingletonMixin
+from cs.obj import NoAttrs, public_subclasses, Refreshable, SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin, openif
@@ -591,15 +591,7 @@ class TagSetTyping:
       try:
         return self[zattr]
       except KeyError:
-        try:
-          sga = super().__getattr__
-        except AttributeError:
-          pass
-        else:
-          return sga(attr)
-    raise AttributeError(
-        f'{self.__class__.__name__}:{self.name}: neither [{attr!r} nor [{zattr!r}]'
-    )
+        return super().__getattr__(attr)
 
   @staticmethod
   def type_parts_of(name: str) -> Tuple[str, str, str]:
@@ -3091,7 +3083,7 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
+class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
   ''' A mixin for classes which have a `.tags:TagSet` attribute.
 
       The subclass may itself define its `.tags` instance attribute
@@ -3165,11 +3157,7 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable):
       suffix_handler = getattr(cls, f'suffix_{suffix}', None)
       if suffix_handler is not None:
         return trace(suffix_handler, retval=True)(self, attr)
-    try:
-      gsa = super().__getattr__
-    except AttributeError as e:
-      raise AttributeError(f'{self}.{attr}: {e}') from e
-    return trace(gsa)(attr)
+    return super().__getattr__(attr)
 
   @cached_property
   def tags(self):
