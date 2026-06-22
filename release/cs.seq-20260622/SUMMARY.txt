@@ -1,0 +1,3 @@
+Rename ClonedIteraor to ReIterable, sugestion by λambda @ python.discord.
+New consume(Iterable) function to "run" an iterable without storing the results.
+New consumed(Iterator) returning an Iterator with the last consumed item and the tail of the original iterator.
