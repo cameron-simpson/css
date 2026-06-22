@@ -1025,18 +1025,12 @@ class TagSet(
             AttributeError: 'int' object has no attribute 'z'
 
     '''
-    sup = super()
+    # see if there's a superclass attribute
     try:
-      sgattr = sup.__getattr__
+      return super().__getattr__(attr)
     except AttributeError:
-      # no superclass __getattr__
+      # superclass does not resolve attr
       pass
-    else:
-      try:
-        return sgattr(attr)
-      except AttributeError:
-        # superclass does not resolve attr
-        pass
     # an exact key match is returned directly
     try:
       return self[attr]
