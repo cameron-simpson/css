@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: @promote: resolve string (deferred) annotations at promote time, update docstring to suit Promotable classes
