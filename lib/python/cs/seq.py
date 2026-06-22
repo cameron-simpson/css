@@ -129,8 +129,8 @@ def consume(it: Iterator, last_item=lambda _: False, *, no_items=None):
   ''' Consume the iterator `it`.
       If `last_item(item)` is true for some `item` from the iterator,
       cease at that item; the default `last_item` returns `False`,
-      which consumes everything from the iterator.
-      Return the last item, or `no_items` (default `None`) if there were no items.
+      consuming everything from the iterator.
+      Return the last item consumed, or `no_items` (default `None`) if there were no items.
   '''
   item = no_items
   for item in it:
