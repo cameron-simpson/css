@@ -748,7 +748,10 @@ class PilferCommand(BaseCommand):
       print(method, match_tags)
     print(flowstate.soup)
 
-  @popopts(f='Force: refresh the entity even if it is not stale.')
+  @popopts(
+      f=('force', 'Force: refresh the entity even if it is not stale.'),
+      r=('recurse', 'Recursively refresh the related subentities.'),
+  )
   def cmd_refresh(self, argv):
     ''' Usage: {cmd} entity...
           Refresh the specified entities by fetching and grokking their site pages.
@@ -757,8 +760,7 @@ class PilferCommand(BaseCommand):
       raise GetoptError("missing entities")
     while argv:
       ent = self.popentity(argv)
-      ent.printt()
-      ent.refresh(force=self.options.force)
+      ent.refresh(force=self.options.force, recurse=self.options.recurse)
       ent.printt()
 
   @popopts(
