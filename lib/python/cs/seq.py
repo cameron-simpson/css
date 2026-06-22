@@ -135,8 +135,23 @@ def consume(it: Iterator, last_item=lambda _: False, *, no_items=None):
   item = no_items
   for item in it:
     if last_item(item):
-      break
-  return item
+      return item
+  return no_items
+
+def consumed(it: Iterator, last_item=lambda _: False) -> Generator:
+  ''' Consume the iterator `it`, a variation on `consume()`.
+      If `last_item(item)` is true for some `item` from the iterator,
+      cease at that item; the default `last_item` returns `False`,
+      consuming everything from the iterator.
+      Return an iterator yielding the last item consumed (if any)
+      and then the remaining items from `it`.
+  '''
+  no_items = object()
+  last_item = consume(it, last_item=last_item, no_items=no_items)
+  if last_item is no_items:
+    return
+  yield last_item
+  yield from it
 
 def tee(iterable, *Qs):
   ''' A generator yielding the items from an iterable
