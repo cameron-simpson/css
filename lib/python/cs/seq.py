@@ -25,7 +25,7 @@ from cs.deco import decorator, OBSOLETE
 from cs.gimmicks import warning
 from cs.typingutils import Sortable
 
-__version__ = '20260622'
+__version__ = '20260622-post'
 
 DISTINFO = {
     'description':
