@@ -1,3 +1,4 @@
+UsesTagSets -> Entities, HAsTags -> Entity, HasTagsClass -> EntityClass, TagSetTyping -> ZonedEntity, merge the zone stuff back into UsesTagSets/Entities, TYPE_ZONE optional
 maybe "ont tag ont-entry [-]tags..."
 convenient ontology editing, something like "add cast_member name detail-tags"
 TagsOntology: where do metadata live in a split ontology? ideally the subontology - move to a tag_metadata method to keep the context?
