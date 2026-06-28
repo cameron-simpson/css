@@ -43,7 +43,7 @@ from cs.lex import (
 )
 from cs.logutils import warning
 from cs.mediainfo import SeriesEpisodeInfo
-from cs.obj import SingletonMixin
+from cs.obj import Refreshable, SingletonMixin
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
@@ -709,7 +709,7 @@ class PlayOnSQLTags(SQLTags):
   DBURL_ENVVAR = PLAYON_DBURL_ENVVAR
   DBURL_DEFAULT = PLAYON_DBURL_DEFAULT
 
-class PlayOn(Entities):
+class PlayOn(Entities, Refreshable):
 
   # the entity class and its zone
   EntityClass = _PlayOnEntity
@@ -741,6 +741,15 @@ class PlayOn(Entities):
     if isinstance(index, int):
       index = Recording, index
     return super().__getitem__(index)
+
+  def _refresh(self, targets=None, *, data=None):
+    assert data is None
+    if targets is None:
+      targets = (self.recordings, self.queue)
+    api = self.api
+    api.login_state
+    for _ in pmap(lambda f: f(), targets):
+      pass
 
   @pfx_method
   @require(
@@ -796,10 +805,16 @@ class PlayOn(Entities):
     return self._entry_entities(self.api.services, Feature)
 
   @typechecked
+  def queue(self) -> set[Recording]:
+    ''' Return a set of `Recording`s in the queue.
+    '''
+    return self._entry_entities(self.api.queue(), Recording)
+
+  @typechecked
   def recordings(self) -> set[Recording]:
     ''' Return a set of `Recording`s known to the API.
     '''
-    return self._entry_entities(self.api.services, Recording)
+    return self._entry_entities(self.api.recordings(), Recording)
 
   @typechecked
   def all_recordings(self) -> Iterable[Recording]:
@@ -952,15 +967,13 @@ class PlayOnCommand(BaseCommand):
         with playon.as_zone():
           with stackattrs(
               options,
-              ##api=api,
               playon=playon,
           ):
+            playon.refresh()
             # preload all the recordings from the db
             ##list(sqltags.recordings())
             # if there are unexpired stale entries or no unexpired entries,
             # refresh them
-            self._refresh_sqltags_data(api)
-            runstate.raiseif()
             yield
 
   @popopts
