@@ -3426,7 +3426,7 @@ class Entities:
     except AttributeError:
       pass
     else:
-      cls.set_as_zone(zone, if_unset=True)
+      self.set_as_zone(zone, if_unset=True)
 
   def set_as_zone(self, zone: str, if_unset=False):
     ''' Set this `Entities` instance as the one handling entities in `zone`.
@@ -3460,9 +3460,9 @@ class Entities:
         zone = cls.TYPE_ZONE
       except AttributeError:
         yield None
-    else:
-      with stackkeys(cls.by_type_zone, **{zone: self}):
-        yield zone
+        return
+    with stackkeys(cls.by_type_zone, **{zone: self}):
+      yield zone
 
   @classmethod
   def by_entity_id(cls, entity_id: str) -> Entity:
