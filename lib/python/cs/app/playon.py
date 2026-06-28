@@ -1229,29 +1229,12 @@ class PlayOnCommand(BaseCommand):
 
   @popopts
   def cmd_refresh(self, argv):
-    ''' Usage: {cmd} [queue] [recordings]
+    ''' Usage: {cmd}
           Update the db state from the PlayOn service.
     '''
-    api = self.options.api
-    if not argv:
-      argv = ['queue', 'recordings']
-    xit = 0
-    Ts = []
-    for state in argv:
-      with Pfx(state):
-        if state == 'queue':
-          print("refresh queue...")
-          Ts.append(bg_thread(api.queue))
-        elif state == 'recordings':
-          print("refresh recordings...")
-          Ts.append(bg_thread(api.recordings))
-        else:
-          warning("unsupported update target")
-          xit = 1
-    print("wait for API...")
-    for T in Ts:
-      T.join()
-    return xit
+    if argv:
+      raise GetoptError('extra arguments: {argv}')
+    self.options.playon.refresh()
 
   @popopts
   def cmd_service(self, argv, locale='en_US'):
