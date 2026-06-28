@@ -710,11 +710,13 @@ class PlayOn(Entities, Refreshable):
     return super().__getitem__(index)
 
   def _refresh(self, targets=None, *, data=None):
+    ''' Refresh the `PlayOn` as a whole.
+        Presently this fetches the queue and the library (concurrently).
+    '''
     assert data is None
     if targets is None:
       targets = (self.recordings, self.queue)
-    api = self.api
-    api.login_state
+    self.api.login_state  # do once, before the API calls
     for _ in pmap(lambda f: f(), targets):
       pass
 
@@ -769,7 +771,7 @@ class PlayOn(Entities, Refreshable):
   def features(self) -> set[Feature]:
     ''' Return a set of `Feature`s known to the API.
     '''
-    return self._entry_entities(self.api.services, Feature)
+    return self._entry_entities(self.api.features, Feature)
 
   @typechecked
   def queue(self) -> set[Recording]:
