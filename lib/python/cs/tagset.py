@@ -2895,7 +2895,8 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       attr=None,
       *,
       type_zone,
-      subtype=None
+      subtype=None,
+      default=None,
   ) -> Union[
       None,  # no match
       TagSet,  # key -> TagSet
@@ -2979,9 +2980,9 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     try:
       value = te[tag_name]
     except KeyError:
-      return None
+      return default
     if value is None:
-      return None
+      return default
     if subtype is None:
       subtype = cutsuffix(tag_name, '_id')
     if not isinstance(value, str) and isinstance(value, Sequence):
@@ -3593,6 +3594,7 @@ class UsesTagSets:
       tag_name: str,
       attr: Optional[str] = None,
       *,
+      default=None,
       subtype: Optional[str] = None
   ):
     ''' Call `self.tagsets.deref` on `tagged.tags` and promote the
@@ -3606,7 +3608,7 @@ class UsesTagSets:
         subtype=subtype
     )
     if result is None:
-      return None
+      return default
     if attr is None:
       # look up of .name, returns a `TagSet` or list of `TagSet`s
       if isinstance(result, TagSet):
