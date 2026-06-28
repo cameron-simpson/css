@@ -3501,6 +3501,20 @@ class UsesTagSets:
           Tuple[str, str, Union[str, int]],
       ],
   ) -> HasTags:
+    ''' `self.__getitem__(index)` calls `self.entity(index)`.
+    '''
+    return self.entity(index, zone=None)
+
+  @pfx_method
+  def entity(
+      self,
+      index: Union[
+          str,
+          Tuple[str, Union[str, int]],
+          Tuple[str, str, Union[str, int]],
+      ],
+      zone=None
+  ) -> HasTags:
     ''' Fetch the `HasTags` instance for the supplied `index`.
 
         The meaning of the type *zone*, *subname* and *key* are as
@@ -3546,37 +3560,59 @@ class UsesTagSets:
             artist_uuid = UUID('a417f0e5-2c14-445a-9a07-5a7ad2bdeafa')
             artist = mbdb[Artist, artist_uuid]
     '''
-    with Pfx("%s[%s]", s(self), r(index)):
-      if isinstance(index, str):
-        type_, key = index.rsplit('.', 1)
-        zone = self.TYPE_ZONE
-      elif isinstance(index, tuple):
-        try:
-          # (type,key) -> TYPE_ZONE, type, key
-          type_, key = index
-        except ValueError:
-          # (zone,type,key)
-          zone, type_, key = index
-        else:
-          zone = self.TYPE_ZONE
-        if isinstance(type_, type):
-          type_ = type_.TYPE_SUBNAME
-        if isinstance(key, (int, UUID)):
-          key = str(key)
-      else:
-        raise TypeError(
-            f'{self}[{r(index)}]: expected str or (subname,key) or (zone,subname,key)'
-        )
-      if not isinstance(key, str):
-        print("%s[%s]: key=%s" % (self, r(index), r(key)))
-        breakpoint()
-      assert '.' not in zone, f'dot in {zone=}'
-      assert '.' not in key, f'dot in {key=}'
+    if zone is None:
+      zone = getattr(self, 'TYPE_ZONE', None)
+    if zone is not None:
       assert isinstance(zone, str), f'zone={r(zone)} is not a str'
-      assert isinstance(type_, str), f'type_={r(type_)} is not a str'
-      assert isinstance(key, str), f'key={r(key)} is not a str'
-      te = self.tagsets[f'{zone}.{type_}.{key}']
-      return self.tagged(te)
+      assert '.' not in zone, f'dot in {zone=}'
+    if isinstance(index, str):
+      if zone is None:
+        tag_key = index
+      else:
+        type_, key = index.rsplit('.', 1)
+        # strip leading zone if it's ours (common misuse)
+        type_ = type_.removeprefix(f'{zone}.')
+        tag_key = f'{zone}.{type_}.{key}'
+    elif isinstance(index, tuple):
+      try:
+        # (type,key) -> TYPE_ZONE, type, key
+        type_, key = index
+      except ValueError:
+        # (zone,type,key)
+        zone, type_, key = index
+        tag_key = f'{zone}.{type_}.{key}'
+      else:
+        assert zone is not None
+      # an Entity subclass may be named
+      if isinstance(type_, type):
+        type_ = type_.TYPE_SUBNAME
+      if isinstance(key, (int, UUID)):
+        key = str(key)
+      assert '.' not in key, f'dot in {key=}'
+      tag_key = f'{zone}.{type_}.{key}'
+    else:
+      raise TypeError(
+          f'{self}[{r(index)}]: expected str or (subname|EntityType,key) or (zone,subname|EntityType,key)'
+      )
+    if zone is None or zone == getattr(self, 'TYPE_ZONE', None):
+      # no zone or our zone
+      entity_zone = self
+    else:
+      # an enitty with another zone may come from a different data store
+      entity_zone = self.by_type_zone[zone]
+    tags = entity_zone.tagsets[tag_key]
+    ent = entity_zone.HasTagsClass(tags, entity_zone)
+    return ent
+
+  def _DISABLED_tagged(self, te: TagSet) -> HasTags:
+    ''' Promote `te` to a `HasTags` in this zone.
+        Return a `self.HasTagSetsClass` instance tagged with `te`.
+    '''
+    if te.type_zone != self.TYPE_ZONE:
+      raise ValueError(
+          f'{self}.tagged({te.__class__.__name__}[{te.name!r}]): {te.type_zone=} != {self.TYPE_ZONE=}'
+      )
+    return self.HasTagsClass(te, self)
 
   def keys(self, subname=None):
     ''' Return the keys from `self.tagsets` as `(subname,type_key)` 2-tuples
