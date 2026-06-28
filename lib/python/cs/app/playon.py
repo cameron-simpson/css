@@ -52,7 +52,7 @@ from cs.seq import unrepeated
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags
 from cs.tagset import Entity, Entities
-from cs.threads import bg as bg_thread, pmap
+from cs.threads import pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
