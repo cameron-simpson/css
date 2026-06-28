@@ -148,7 +148,7 @@ from cs.tagset import (
     TagsCommandMixin,
     TagsOntology,
     TagsOntologyCommand,
-    UsesTagSets,
+    Entities,
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property
@@ -1074,7 +1074,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
 
 # pylint: disable=too-many-public-methods
-class FSTags(MultiOpenMixin, UsesTagSets):
+class FSTags(MultiOpenMixin, Entities):
   ''' A class to examine filesystem tags.
   '''
 
@@ -1099,7 +1099,7 @@ class FSTags(MultiOpenMixin, UsesTagSets):
         * `physical`: optional flag for the associated `FSTagsConfig`
           specifying whether `TagFile`s are indexed by their physical or logical
           filesystem paths
-        * `tagsets`: an optional `BaseTagSets` to be used via the `UsesTagSets` methods
+        * `tagsets`: an optional `BaseTagSets` to be used via the `Entities` methods
         * `update_mapping`: optional secondary mapping to which to mirror
           tags, such as an `SQLTags`;
           the default comes from an `SQLTags` specified by the
@@ -1119,7 +1119,7 @@ class FSTags(MultiOpenMixin, UsesTagSets):
     if tagsets is None:
       self.tagsets = None
     else:
-      UsesTagSets.__init__(self, tagsets=tagsets)
+      Entities.__init__(self, tagsets=tagsets)
     if update_mapping is None:
       update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
       if update_mapping:

@@ -110,46 +110,46 @@
     example to cache MusicBrainzNG knowledge when ripping CDs.
     The direct subclassing approach scales poorly.
 
-    Instead the preferred approach is to use the `HasTags` and
-    `UsesTagSets` base classes. The `HasTags` class is essentially
+    Instead the preferred approach is to use the `Entity` and
+    `Entities` base classes. The `Entity` class is essentially
     a proxy which stores the entityt state in its `.tags` attribute,
     a `TagSet` and has a reference to a `.tags_db`, which is an
-    instance of a `UsesTagSets`, the larger collection of `TagSet`s.
-    The `UsesTagSets` class has a `.tagsets` attribute referring
+    instance of a `Entities`, the larger collection of `TagSet`s.
+    The `Entities` class has a `.tagsets` attribute referring
     to an instance of a `BaseTagSets`, a collection of `TagSets`.
 
     Setting up a class for a particular knowledge domain requires
-    defining 2 classes: a `HasTags` subclass to be the base class
-    for members of the domain and a `UsesTagSets` class for the
+    defining 2 classes: a `Entity` subclass to be the base class
+    for members of the domain and a `Entities` class for the
     domain itself.
     Here is the basis of the MusicBrainzNG domain from `cs.cdrip`:
 
-        class _MBEntity(HasTags):
+        class _MBEntity(Entity):
             ... common methods for all MB entities ...
 
-        class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
+        class MBDB(Entities, MultiOpenMixin, RunStateMixin):
           """ An interface to MusicBrainz with a local `SQLTags` cache.
           """
 
           TYPE_ZONE = 'mbdb'
-          HasTagsClass = _MBEntity
-          TagSetsClass = MBSQLTags
+          EntityClass = _MBEntity
+          EntitiesClass = MBSQLTags
 
-    The `MBDB` class subclasses `UsesTagSets` and defines the
+    The `MBDB` class subclasses `Entities` and defines the
     following class attributes:
     - `TYPE_ZONE`: a name prefix for enetities in this domain,
       as typical use stores multiple domains in a common `SQLTags`
       database
-    - `HasTagsClass`: the base class for entities in this domain
-    - `TagSetsClass`: the `BaseTagSets` subclass which stores the
+    - `EntityClass`: the base class for entities in this domain
+    - `EntitiesClass`: the `BaseTagSets` subclass which stores the
       entities; this will often be `SQLTags`; in this case the
       `MBSQLTags` class is just an `SQLTags` subclass with a different
       default location for the database
 
-    The purpose of the distinct `HasTagsClass` subclass for entities
+    The purpose of the distinct `EntityClass` subclass for entities
     is so that `UsesTags.__new__` can locate a further subclass for
     a particular entity based on its type; it starts its search at
-    the `HasTagsClass` class. For example, `_MBEntity` has several
+    the `EntityClass` class. For example, `_MBEntity` has several
     subclasses for discs, releases and so forth. The `MBDisc`
     subclass starts like this:
 
@@ -548,7 +548,7 @@ class _FormatStringTagProxy:
   def __getattr__(self, attr):
     return getattr(self.__proxied, attr)
 
-class TagSetTyping:
+class ZonedTypes:
   ''' A mixin to support `TagSet` types based on their `.name` attribute.
       These see proper use in the `cs.sqltags.SQLTagSets` class where
       dereferences of tag values to other `TagSet`s may be done.
@@ -595,7 +595,7 @@ class TagSetTyping:
 
         Example:
 
-            >>> TagSetTyping.type_parts_of('tvdb.series.1234')
+            >>> ZonedTypes.type_parts_of('tvdb.series.1234')
             ('tvdb', 'series', '1234')
     '''
     type_zone, zone_parts = name.split('.', 1)
@@ -617,7 +617,7 @@ class TagSetTyping:
 
         Example:
 
-            >>> TagSetTyping.type_name_of('tvdb.series.1234')
+            >>> ZonedTypes.type_name_of('tvdb.series.1234')
             'tvdb.series'
     '''
     parts = cls.type_parts_of(name)
@@ -635,7 +635,7 @@ class TagSetTyping:
 
         Example:
 
-            >>> TagSetTyping.type_key_of('tvdb.series.1234')
+            >>> ZonedTypes.type_key_of('tvdb.series.1234')
             '1234'
     '''
     return cls.type_parts_of(name)[2]
@@ -653,7 +653,7 @@ class TagSetTyping:
         For example the `.type_zone_of` of an entity named `tvdb.series.1234` is `tvdb`.
         Example:
 
-            >>> TagSetTyping.type_zone_of('tvdb.series.1234')
+            >>> ZonedTypes.type_zone_of('tvdb.series.1234')
             'tvdb'
     '''
     return cls.type_parts_of(name)[0]
@@ -670,7 +670,7 @@ class TagSetTyping:
 
         Example:
 
-            >>> TagSetTyping.type_zone_key_of('tvdb.series.1234')
+            >>> ZonedTypes.type_zone_key_of('tvdb.series.1234')
             'series.1234'
     '''
     parts = cls.type_parts_of(name)
@@ -692,7 +692,7 @@ class TagSetTyping:
 
         Example:
 
-            >>> TagSetTyping.type_subname_of('tvdb.series.1234')
+            >>> ZonedTypes.type_subname_of('tvdb.series.1234')
             'series'
     '''
     return cls.type_parts_of(name)[1]
@@ -739,12 +739,12 @@ class TagSetTyping:
     ref, key = self.type_reference
     other[ref] = key
 
-  def type_references(self, tags_db: "UsesTagSets") -> Mapping[str, "HasTags"]:
+  def type_references(self, tags_db: "Entities") -> Mapping[str, "Entity"]:
     ''' Return a `dict` mapping `type_zone` to the entity from that zone
         in `tags_db` for all tags whose tag name has the form *zone*`.zone_key`.
 
         Parameters:
-        * `tags_db`: the `HasTags` from which to obtain the entities
+        * `tags_db`: the `Entity` from which to obtain the entities
 
         For example, `tags.type_references(sitemap,('tvdb',))`
         where `tags` had a `id.tvdb.series='1234'` tag
@@ -757,10 +757,12 @@ class TagSetTyping:
         entities[type_name] = tags_db[type_name, type_key]
     return entities
 
+TagSetTyping = OBSOLETE(ZonedTypes)
+
 class TagSet(
     dict,
     UNIXTimeMixin,
-    TagSetTyping,
+    ZonedTypes,
     FormatableMixin,
     AttrableMappingMixin,
     Promotable,
@@ -1406,9 +1408,9 @@ class TagSet(
       self.tags = tags
       self.missing_ok = missing_ok
 
-    def __getattr__(self, attr) -> "HasTags":
+    def __getattr__(self, attr) -> "Entity":
       ''' Consult th tag `id.{attr}` and return the corresponding
-          entity from the appropriate `UsesTagSets` instance.
+          entity from the appropriate `Entities` instance.
 
           Example:
 
@@ -1423,14 +1425,14 @@ class TagSet(
           return None
         raise AttributeError(f'no .entity.{attr}: {e}') from e
       entity_id = f'{attr}.{zone_key}'
-      return UsesTagSets.by_entity_id(entity_id)
+      return Entities.by_entity_id(entity_id)
 
-    def __iadd__(self, ent: TagSetTyping):
+    def __iadd__(self, ent: ZonedTypes):
       ''' Store a reference to `ent` as the tag `ent.type_zone` with value `ent.zone_key`.
       '''
       self.tags[f'id.{ent.type_zone}'] = ent.type_zone_key
 
-    def __isub__(self, ent: TagSetTyping):
+    def __isub__(self, ent: ZonedTypes):
       ''' Remove the reference to `ent` if present.
           Raise `KeyError` if there is no reference.
           Raise `ValueError` if the reference is to another entity.
@@ -1447,7 +1449,7 @@ class TagSet(
   def entity(self):
     ''' The `.entity` attribute space, whose attributes map to
         entities which are `UsesTags` instances from the appropriate
-        `UsesTagSets` instances according to their zone.
+        `Entities` instances according to their zone.
 
           Example:
 
@@ -1460,7 +1462,7 @@ class TagSet(
   def entity_(self):
     ''' The `.entity_` attribute space, whose attributes map to
         entities which are `UsesTags` instances from the appropriate
-        `UsesTagSets` instances according to their zone.
+        `Entities` instances according to their zone.
         Unlike `.entity`, a missing `id.` tag returns `None` instead
         of raising `AttributeError`.
 
@@ -3072,7 +3074,7 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
+class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
   ''' A mixin for classes which have a `.tags:TagSet` attribute.
 
       The subclass may itself define its `.tags` instance attribute
@@ -3117,10 +3119,10 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
     # return the generic version
     return super().__new__(cls)
 
-  def __init__(self, tags: TagSet, tags_db: "UsesTagSets" = None):
+  def __init__(self, tags: TagSet, tags_db: "Entities" = None):
     super().__init__()
     if tags_db is None:
-      tags_db = UsesTagSets.by_type_zone[self.TYPE_ZONE]
+      tags_db = Entities.by_type_zone[self.TYPE_ZONE]
     self.tags = tags
     self.tags_db = tags_db
 
@@ -3188,7 +3190,7 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
     ''' Our tagged entity key, `self.tags.name`.
 
         This is only really needed by the `.tags` cached
-        property; most subclasses of `HasTags` set `.tags` during
+        property; most subclasses of `Entity` set `.tags` during
         `__init__`.
         If you have an "on demand" subclass you should override
         this method to compute the entity key without relying on
@@ -3286,7 +3288,7 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
     # partly for correctness and partly to allow fallback if a tag is missing,
     # since the attribute's implementation  might choose the tag if present.
     kwargs.update(self.format_attributes)
-    # TODO: grab type_* from TagSetTyping.__dict__.keys() ?
+    # TODO: grab type_* from ZonedTypes.__dict__.keys() ?
     for type_attr in (
         'type_key',
         'type_name',
@@ -3369,33 +3371,35 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
     if isinstance(idvalues, str) or not isinstance(idvalues, Sequence):
       idvalues = [idvalues]
     return [
-        # NB: no zone because UsesTagSets.__getitem__ knows its zone
+        # NB: no zone because Entities.__getitem__ knows its zone
         self.tags_db[ref_subtype, idvalue] for idvalue in idvalues
     ]
 
-class UsesTagSets:
+HasTags = OBSOLETE(Entity)
+
+class Entities:
   ''' A mixin to support classes which use a `.tagsets:BaseTagSets` attribute to store their data.
 
       Subclasses may define the following class attributes:
-      - `HasTagsClass`: a subclass of `HasTags` which represents data entities;
-        the default is `HasTags` which should be enough if there is no `.tYPE_ZONE`
+      - `EntityClass`: a subclass of `Entity` which represents data entities;
+        the default is `Entity` which should be enough if there is no `.tYPE_ZONE`
       - `TYPE_ZONE`: the type zone identifying entities in the
         larger `BaseTagSets` data; if this is not supplied it is
-        obtained from `HasTagsClass.TYPE_ZONE`, if defined
+        obtained from `EntityClass.TYPE_ZONE`, if defined
 
       A typical use subclasses `cs.sqltags.UsesSQLTags`, a subclass
       of this which uses an `SQLTags` as the storage backend.
 
       If there is a `.TYPE_ZONE`, the meaning of the type *zone*,
-      *subname* and *key* are as described for the `TagSetTyping`
+      *subname* and *key* are as described for the `ZonedTypes`
       class.
   '''
 
   # see if we can get by with the minimal example
   # typically a would use a lass with a TYPEZONE
-  HasTagsClass = HasTags
+  EntityClass = Entity
 
-  # a mapping of type zone names to their most recent UsesTagSets subclass instance
+  # a mapping of type zone names to their most recent Entities subclass instance
   by_type_zone = WeakValueDictionary()
 
   def __init_subclass__(cls, **kw):
@@ -3405,7 +3409,7 @@ class UsesTagSets:
     try:
       cls.TYPE_ZONE
     except AttributeError:
-      entity_class = cls.HasTagsClass
+      entity_class = cls.EntityClass
       try:
         zone = entity_class.TYPE_ZONE
       except AttributeError:
@@ -3415,7 +3419,7 @@ class UsesTagSets:
 
   def __init__(self, tagsets=None, **kw):
     super().__init__(**kw)
-    self.tagsets = tagsets or self.TagSetsClass()
+    self.tagsets = tagsets or self.EntitiesClass()
     cls = self.__class__
     try:
       zone = cls.TYPE_ZONE
@@ -3425,7 +3429,7 @@ class UsesTagSets:
       cls.set_as_zone(zone, if_unset=True)
 
   def set_as_zone(self, zone: str, if_unset=False):
-    ''' Set this `UsesTagSets` instance as the one handling entities in `zone`.
+    ''' Set this `Entities` instance as the one handling entities in `zone`.
     '''
     cls = self.__class__
     by_type_zone = cls.by_type_zone
@@ -3446,7 +3450,7 @@ class UsesTagSets:
 
   @contextmanager
   def as_zone(self, zone=None):
-    ''' Push this `UsesTagSets` instance as the default mapping for
+    ''' Push this `Entities` instance as the default mapping for
         `zone`, whose default is `self.__class__.TYPE_ZONE`.
         Yields the zone, or `None` if there is no 
     '''
@@ -3461,14 +3465,14 @@ class UsesTagSets:
         yield zone
 
   @classmethod
-  def by_entity_id(cls, entity_id: str) -> HasTags:
-    ''' Return the `HasTags` instance corresponding to `entity_id`
+  def by_entity_id(cls, entity_id: str) -> Entity:
+    ''' Return the `Entity` instance corresponding to `entity_id`
         from the full tb 
         Raise `ValueError` is `entity_id` cannot be parsed by
-        `TagSetTyping.type_parts_of`.
-        Raise `KeyError` if there is no `UsesTagSets` instance for the zone.
+        `ZonedTypes.type_parts_of`.
+        Raise `KeyError` if there is no `Entities` instance for the zone.
     '''
-    zone, subname, key = TagSetTyping.type_parts_of(entity_id)
+    zone, subname, key = ZonedTypes.type_parts_of(entity_id)
     try:
       tags_db = cls.by_type_zone[zone]
     except KeyError as e:
@@ -3479,9 +3483,9 @@ class UsesTagSets:
     return tags_db[subname, key]
 
   #############################################################################
-  # HasTags interface
-  def zone_entity(self, zone: str) -> "HasTags":
-    ''' Return the `HasTags` entity associated with a per-type-zone key.
+  # Entity interface
+  def zone_entity(self, zone: str) -> "Entity":
+    ''' Return the `Entity` entity associated with a per-type-zone key.
         For example, `self.zone_entity('tvdb')` would return the entity
         for `tvdb.`*tvdb_id* where `tvdb_id` comes from `self['id.tvdb']`.
     '''
@@ -3500,7 +3504,7 @@ class UsesTagSets:
           Tuple[str, Union[str, int]],
           Tuple[str, str, Union[str, int]],
       ],
-  ) -> HasTags:
+  ) -> Entity:
     ''' `self.__getitem__(index)` calls `self.entity(index)`.
     '''
     return self.entity(index, zone=None)
@@ -3514,21 +3518,21 @@ class UsesTagSets:
           Tuple[str, str, Union[str, int]],
       ],
       zone=None
-  ) -> HasTags:
-    ''' Fetch the `HasTags` instance for the supplied `index`.
+  ) -> Entity:
+    ''' Fetch the `Entity` instance for the supplied `index`.
 
         The meaning of the type *zone*, *subname* and *key* are as
-        described for the `TagSetTyping` class.
+        described for the `ZonedTypes` class.
 
         The `index` may take the following forms:
         - `str`: a string which will be split into *subname* and *key*
           for use in `self.TYPE_ZONE`
         - `(subname,key)`: a 2-tuple of the type *subname* and *key*
           in `self.TYPE_ZONE`
-          the subname make also be a subclass of `self.HasTagsClass`
+          the subname make also be a subclass of `self.EntityClass`
         - `(zone,subname,key)`: a 3-tuple of the type zone, subname and key
         The *subname* may also be a class (normally a subclass of
-        `HasTags`, usually a subclass of `type(self).HasTagsClass`);
+        `Entity`, usually a subclass of `type(self).EntityClass`);
         in this case the *subname* will be taken from `type(self).TYPE_SUBNAME`
         attribute.
         The *key* may also be an `int` or a `uuid.UUID`, in which
@@ -3536,7 +3540,7 @@ class UsesTagSets:
 
         Examples:
 
-            # the HasTags subclass Artist, and the UsesTagSets
+            # the Entity subclass Artist, and the Entities
             # subclass MBDB which hold MusicbrainzNG information
             from cs.cdrip import Artist, MBDB
             mbdb = MBDB()
@@ -3601,18 +3605,18 @@ class UsesTagSets:
       # an enitty with another zone may come from a different data store
       entity_zone = self.by_type_zone[zone]
     tags = entity_zone.tagsets[tag_key]
-    ent = entity_zone.HasTagsClass(tags, entity_zone)
+    ent = entity_zone.EntityClass(tags, entity_zone)
     return ent
 
-  def _DISABLED_tagged(self, te: TagSet) -> HasTags:
-    ''' Promote `te` to a `HasTags` in this zone.
-        Return a `self.HasTagSetsClass` instance tagged with `te`.
+  def _DISABLED_tagged(self, te: TagSet) -> Entity:
+    ''' Promote `te` to a `Entity` in this zone.
+        Return a `self.HasEntitiesClass` instance tagged with `te`.
     '''
     if te.type_zone != self.TYPE_ZONE:
       raise ValueError(
           f'{self}.tagged({te.__class__.__name__}[{te.name!r}]): {te.type_zone=} != {self.TYPE_ZONE=}'
       )
-    return self.HasTagsClass(te, self)
+    return self.EntityClass(te, self)
 
   def keys(self, subname=None):
     ''' Return the keys from `self.tagsets` as `(subname,type_key)` 2-tuples
@@ -3620,7 +3624,7 @@ class UsesTagSets:
         If `subname` is not `None`, restrict the keys to those with that subname.
     '''
     yield from map(
-        lambda key: tuple(TagSetTyping.type_zone_key_of(key).rsplit('.', 1)),
+        lambda key: tuple(ZonedTypes.type_zone_key_of(key).rsplit('.', 1)),
         self.tagsets.keys(
             prefix=(
                 f'{self.TYPE_ZONE}.' if subname is
@@ -3633,21 +3637,21 @@ class UsesTagSets:
     for k in self.keys(subname=subname):
       yield k, self[k]
 
-  def find(self, *criteria, **crit_kw) -> List[HasTags]:
+  def find(self, *criteria, **crit_kw) -> List[Entity]:
     ''' Find entities in the database.
 
         This runs a find of the `BaseTagSets` and returns the associated
-        `HasTagSetsClass` instances.
+        `HasEntitiesClass` instances.
     '''
     return [
-        self.HasTagsClass(te, self)
+        self.EntityClass(te, self)
         for te in self.tagsets.find(*criteria, **crit_kw)
     ]
 
   @typechecked
   def _DISABLED_deref(
       self,
-      tagged: HasTags,
+      tagged: Entity,
       tag_name: str,
       attr: Optional[str] = None,
       *,
@@ -3655,7 +3659,7 @@ class UsesTagSets:
       subtype: Optional[str] = None
   ):
     ''' Call `self.tagsets.deref` on `tagged.tags` and promote the
-        result to use our `HasTags` instances.
+        result to use our `Entity` instances.
     '''
     result = self.tagsets.deref(
         tagged.tags,
@@ -3679,6 +3683,8 @@ class UsesTagSets:
             (item[0], self.tagged(item[1]))
         ) for item in result
     ]
+
+UsesTagSets = OBSOLETE(Entities)
 
 class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
   ''' A wrapper for a `TagSets` instance backing an ontology.

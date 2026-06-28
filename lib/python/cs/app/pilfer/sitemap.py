@@ -44,7 +44,7 @@ from cs.rfc2616 import (
     content_encodings, content_length, content_type, datetime_from_http_date
 )
 from cs.seq import ReIterable
-from cs.tagset import BaseTagSets, HasTags, TagSet, TagSetTyping, UsesTagSets
+from cs.tagset import BaseTagSets, Entity, TagSet, ZonedTypes, Entities
 from cs.threads import HasThreadState, ThreadState
 from cs.units import BINARY_BYTES_SCALE
 from cs.urlutils import URL
@@ -1031,7 +1031,7 @@ class ScanData:
         # otherwise just annotate it with whatever was learned
         ent.type_zone_update(data)
 
-class SiteEntity(HasTags, NoAttrs):
+class SiteEntity(Entity, NoAttrs):
   ''' A base class for entities associated with a `SiteMap`.
 
       This provides the following additional facilities:
@@ -1093,7 +1093,7 @@ class SiteEntity(HasTags, NoAttrs):
   def default_sitemap(cls) -> "SiteMap":
     ''' Return the default `SiteMap` instance for `cls.TYPE_ZONE`.
     '''
-    return SiteMap.zone_sitemap(cls.TYPE_ZONE)
+    return SiteMap.by_type_zone[cls.TYPE_ZONE]
 
   @classmethod
   @pfx
@@ -1277,7 +1277,7 @@ class SiteEntity(HasTags, NoAttrs):
         This may also be just the `tag_name`, and `direct` will be set to `False`.
 
         Opengraph fallback:
-        If `HasTags.__getattr__(attr)` raises `AttributeError` and
+        If `Entity.__getattr__(attr)` raises `AttributeError` and
         the tag `opengraph.{attr}` exists, return that.
     '''
     cls = self.__class__
@@ -1397,7 +1397,7 @@ class SiteEntity(HasTags, NoAttrs):
     ''' The format keyword mapping for a `SiteEntity`.
 
         This includes:
-        - the `HasTags.format_kwargs()`
+        - the `Entity.format_kwargs()`
         - the values for any names in `type(self.tags)` with an
           upper case leading letter such as `URL_DOMAIN`
     '''
@@ -1707,18 +1707,18 @@ class SiteMapPatternMatch(namedtuple(
     return self.pattern_arg.format_map(ChainMap(self.mapping, extra or {}))
 
 @dataclass
-class SiteMap(UsesTagSets, Promotable):
+class SiteMap(Entities, Promotable):
   ''' A base dataclass for site maps.
 
       A `SiteMap` data class embodies domain specific knowledge about a
       particular website or collection of websites.
 
-      It subclasses `cs.tagset.UsesTagSets` and gets its `.tagsets`
+      It subclasses `cs.tagset.Entities` and gets its `.tagsets`
       from `self.pilfer` if unspecified. Use as a `UsesTagSet`
       domain requires setting:
       - `TYPE_ZONE` to the domain prefix
-      - `HasTagsClass` to the base `HasTags` entity class
-      See `cs.tagset.UsesTagSets` for details.
+      - `EntityClass` to the base `Entity` entity class
+      See `cs.tagset.Entities` for details.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
       clause in the configuration file, see the `Pilfer.sitemaps`
@@ -1739,7 +1739,7 @@ class SiteMap(UsesTagSets, Promotable):
       of this `SiteMap` base class.
 
       `SiteMap`s have a few class attributes:
-      * `TYPE_ZONE`: the `TagSetTyping.type_zone` value for entities
+      * `TYPE_ZONE`: the `ZonedTypes.type_zone` value for entities
         associated with this class
       * `URL_KEY_PATTERNS`: this is a list of `(match,keyformat)`
         2-tuples specifying cache keys for caching URL contents; the
@@ -1756,9 +1756,6 @@ class SiteMap(UsesTagSets, Promotable):
   name: str = None
   pilfer: object = None
   tagsets: BaseTagSets = None
-
-  # a registry of SiteMap subclasses by their TYPE_ZONE
-  by_type_zone = {}
 
   URL_KEY_PATTERNS = ()
 
@@ -1803,7 +1800,7 @@ class SiteMap(UsesTagSets, Promotable):
     ''' Return the `SiteEntity` for the database wide `key`.
     '''
     try:
-      zone, subname, key = TagSetTyping.type_parts_of(db_key)
+      zone, subname, key = ZonedTypes.type_parts_of(db_key)
     except ValueError as e:
       raise KeyError(f'{db_key=}: cannot parse into type parts: {e}') from e
     try:
@@ -2492,10 +2489,10 @@ class SiteMap(UsesTagSets, Promotable):
         Raise `ValueError` if multiple entities match the URL.
     '''
     try:
-      base_entity_class = self.HasTagsClass
+      base_entity_class = self.EntityClass
     except AttributeError as e:
       vprint(
-          f'{self.__class__.__name__}.url_entity: no .HasTagsClass, skipping'
+          f'{self.__class__.__name__}.url_entity: no .EntityClass, skipping'
       )
       return None
     entities = []

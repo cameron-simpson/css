@@ -51,7 +51,7 @@ from cs.rfc2616 import content_length
 from cs.seq import unrepeated
 from cs.service_api import HTTPServiceAPI, RequestsNoAuth
 from cs.sqltags import SQLTags
-from cs.tagset import HasTags, UsesTagSets
+from cs.tagset import Entity, Entities
 from cs.threads import bg as bg_thread, pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -237,9 +237,9 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
     raise ValueError(f'failed to parse PlayOn time string {date_s=}')
 
   @typechecked
-  def __getitem__(self, index: tuple | int) -> HasTags:
+  def __getitem__(self, index: tuple | int) -> Entity:
     ''' If `index` is an `int` return the associated `Recording`.
-        Otherwise `index` should be a `tuple`, returns the associated `HasTags`.
+        Otherwise `index` should be a `tuple`, returns the associated `Entity`.
     '''
     if isinstance(index, int):
       index = Recording, index
@@ -402,10 +402,13 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
                 assert offset <= length
           assert offset == length
 
-class _PlayOnEntity(HasTags):
+class _PlayOnEntity(Entity):
   ''' The base class of the entity subclasses.
       This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
   '''
+
+  # which zone holds these entities
+  TYPE_ZONE = 'playon'
 
   def _refresh(self, resource, data=None):
     if data is None:
@@ -706,11 +709,13 @@ class PlayOnSQLTags(SQLTags):
   DBURL_ENVVAR = PLAYON_DBURL_ENVVAR
   DBURL_DEFAULT = PLAYON_DBURL_DEFAULT
 
-class PlayOn(UsesTagSets):
+class PlayOn(Entities):
 
-  TagSetsClass = PlayOnSQLTags
-  HasTagsClass = _PlayOnEntity
-  TYPE_ZONE = 'playon'
+  # the entity class and its zone
+  EntityClass = _PlayOnEntity
+  TYPE_ZONE = EntityClass.TYPE_ZONE
+
+  EntitiesClass = PlayOnSQLTags
 
   TYPE_CONVERSIONS = {
       Recording: dict(Episode=int, ReleaseYear=int, Season=int),
@@ -729,9 +734,9 @@ class PlayOn(UsesTagSets):
     return self.all_recordings()
 
   @typechecked
-  def __getitem__(self, index: tuple | int) -> HasTags:
+  def __getitem__(self, index: tuple | int) -> Entity:
     ''' If `index` is an `int` return the associated `Recording`.
-        Otherwise `index` should be a `tuple`, returns the associated `HasTags`.
+        Otherwise `index` should be a `tuple`, returns the associated `Entity`.
     '''
     if isinstance(index, int):
       index = Recording, index
@@ -751,7 +756,7 @@ class PlayOn(UsesTagSets):
       entity_type: type,
       conversions: Optional[dict] = None
   ) -> set[_PlayOnEntity]:
-    ''' Return a `set` of `HasTags` instances from PlayOn API data entries.
+    ''' Return a `set` of `Entity` instances from PlayOn API data entries.
         This refreshes the entities from the data in `entries` as a side effect.
     '''
     if conversions is None:
@@ -944,7 +949,7 @@ class PlayOnCommand(BaseCommand):
       api = PlayOnAPI(options.user, password=options.password)
       with api:
         playon = PlayOn(api=api)
-        with playon.for_zone():
+        with playon.as_zone():
           with stackattrs(
               options,
               ##api=api,

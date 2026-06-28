@@ -86,7 +86,7 @@ from cs.tagset import (
     TagSetCriterion,
     TagsCommandMixin,
     TagsOntology,
-    UsesTagSets,
+    Entities,
     as_unixtime,
     tag_or_tag_value,
 )
@@ -2068,11 +2068,11 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         with Pfx(tag):
           dbe.add_tag(tag)
 
-class UsesSQLTags(UsesTagSets):
-  ''' A mixin subclassing `UsesTagSets` to support classes which
+class UsesSQLTags(Entities):
+  ''' A mixin subclassing `Entities` to support classes which
       use an `SQLTags` to store their data.
 
-      As with `cs.tagset.UsesTagSets`, subclasses must supply a
+      As with `cs.tagset.Entities`, subclasses must supply a
       `hastags_class` and _may_ supply a `tagsets_class` if it
       should not be `SQLTags`. The subclass must also define a
       `.TYPE_ZONE` class attribute.
@@ -2081,12 +2081,12 @@ class UsesSQLTags(UsesTagSets):
           class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin:
 
               TYPE_ZONE = 'mbdb'
-              HasTagsClass = _MBEntity
-              TagSetsClass = MBSQLTags
+              EntityClass = _MBEntity
+              EntitiesClass = MBSQLTags
 
   '''
 
-  TagSetsClass = SQLTags
+  EntitiesClass = SQLTags
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
