@@ -314,6 +314,7 @@ class HTTPServiceAPI(ServiceAPI):
         for retry in range(self.API_RETRY_COUNT, 0, -1):
           runstate.raiseif()
           with contextif(self.concurrency_sem):
+            runstate.raiseif()
             try:
               with proxy.ticker():
                 rsp = pfx_call(
