@@ -118,10 +118,6 @@
     The `UsesTagSets` class has a `.tagsets` attribute referring
     to an instance of a `BaseTagSets`, a collection of `TagSets`.
 
-    It's important to know that `BaseTagSets`, `HasTags`, and
-    `UsesTagSets` all have a `.deref()` method for dereferencing
-    tags which refer to other entity ids.
-
     Setting up a class for a particular knowledge domain requires
     defining 2 classes: a `HasTags` subclass to be the base class
     for members of the domain and a `UsesTagSets` class for the
@@ -2895,7 +2891,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
           te.name = new_name
 
   @typechecked
-  def deref(
+  def _DISABLED_deref(
       self,
       te: TagSet,
       tag_name,
@@ -3253,10 +3249,14 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
     '''
     self.tags.update(*update_a, **update_kw)
 
-  def deref(self, tag_name, attr=None, *, subtype=None):
+  def _DISABLED_deref(
+      self, tag_name, attr=None, *, subtype=None, default=None
+  ):
     ''' Call `.tags_db.deref(self,tag_name,...)`.
     '''
-    return self.tags_db.deref(self, tag_name, attr=attr, subtype=subtype)
+    return trace(
+        self.tags_db.deref, retval=True
+    )(self, tag_name, attr=attr, subtype=subtype, default=default)
 
   @property
   def entity(self):
@@ -3590,7 +3590,7 @@ class UsesTagSets:
     ]
 
   @typechecked
-  def deref(
+  def _DISABLED_deref(
       self,
       tagged: HasTags,
       tag_name: str,
