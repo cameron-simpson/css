@@ -300,9 +300,7 @@ from pprint import pformat
 import re
 import sys
 import time
-from typing import (
-    Any, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
-)
+from typing import (Any, Iterable, List, Mapping, Optional, Tuple, Union)
 from uuid import UUID, uuid4
 from weakref import WeakValueDictionary
 
@@ -319,8 +317,7 @@ from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatMapping,
-    FormatableMixin, format_attribute, FStr, printt, r, s, without_prefix,
-    without_suffix
+    FormatableMixin, format_attribute, FStr, printt, r, s, without_prefix
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
@@ -2902,8 +2899,9 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
   ) -> Union[
       None,  # no match
       TagSet,  # key -> TagSet
-      List[TagSet],  # attr -> TagSet matches
-      List[Tuple[Any, TagSet]],  # attr:List[values]] -> List[(value,TagSet)]
+      Sequence[TagSet],  # attr -> TagSet matches
+      Sequence[Tuple[Any,
+                     TagSet]],  # attr:List[values]] -> List[(value,TagSet)]
   ]:
     ''' Dereference the tag `tag_name` through `te`, a `TagSet`.
         Return the entities it implies, using the tag value as the
@@ -3402,7 +3400,6 @@ class UsesTagSets:
     try:
       type_zone = cls.__dict__['TYPE_ZONE']
     except KeyError:
-      # no direct .TYPE_ZONE attribute, do not map
       pass
     else:
       subclass_map = cls.by_type_zone
