@@ -34,7 +34,7 @@ from cs.lex import (
 )
 from cs.logutils import warning
 from cs.mappings import mapped_property
-from cs.obj import public_subclasses
+from cs.obj import NoAttrs, public_subclasses
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py.func import funccite
 from cs.progress import progressbar
@@ -1031,7 +1031,7 @@ class ScanData:
         # otherwise just annotate it with whatever was learned
         ent.type_zone_update(data)
 
-class SiteEntity(HasTags):
+class SiteEntity(HasTags, NoAttrs):
   ''' A base class for entities associated with a `SiteMap`.
 
       This provides the following additional facilities:
