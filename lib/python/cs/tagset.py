@@ -3117,8 +3117,10 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
     # return the generic version
     return super().__new__(cls)
 
-  def __init__(self, tags: TagSet, tags_db: "UsesTagSets"):
+  def __init__(self, tags: TagSet, tags_db: "UsesTagSets" = None):
     super().__init__()
+    if tags_db is None:
+      tags_db = UsesTagSets.by_type_zone[self.TYPE_ZONE]
     self.tags = tags
     self.tags_db = tags_db
 
