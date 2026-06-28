@@ -3374,72 +3374,91 @@ class HasTags(TagSetTyping, FormatableMixin, Promotable, Refreshable, NoAttrs):
     ]
 
 class UsesTagSets:
-  ''' A mixin to support classes which use a `BaseTagSets` to store their data.
+  ''' A mixin to support classes which use a `.tagsets:BaseTagSets` attribute to store their data.
+
+      Subclasses may define the following class attributes:
+      - `HasTagsClass`: a subclass of `HasTags` which represents data entities;
+        the default is `HasTags` which should be enough if there is no `.tYPE_ZONE`
+      - `TYPE_ZONE`: the type zone identifying entities in the
+        larger `BaseTagSets` data; if this is not supplied it is
+        obtained from `HasTagsClass.TYPE_ZONE`, if defined
 
       A typical use subclasses `cs.sqltags.UsesSQLTags`, a subclass
       of this which uses an `SQLTags` as the storage backend.
 
-      The meaning of the type *zone*, *subname* and *key* are as
-      described for the `TagSetTyping` class.
-
-      Subclasses must define the following class attributes:
-      - `TYPE_ZONE`: the type zone identifying entities in the larger `BaseTagSets` data
-      - `HasTagsClass`: a subclass of `HasTags` which represents data entities
-
-      This mixin requires the subclass or its instances to provide:
-
-      This mixin provides:
-      - a `__getitem__` method: accepting a `(subname,key)` 2-tuple
-        and returning the appropriate instance of the `HasTagSetsClass`
+      If there is a `.TYPE_ZONE`, the meaning of the type *zone*,
+      *subname* and *key* are as described for the `TagSetTyping`
+      class.
   '''
+
+  # see if we can get by with the minimal example
+  # typically a would use a lass with a TYPEZONE
+  HasTagsClass = HasTags
 
   # a mapping of type zone names to their most recent UsesTagSets subclass instance
   by_type_zone = WeakValueDictionary()
+
+  def __init_subclass__(cls, **kw):
+    ''' Inititialise a subclass by defining `.TYPE_ZNE` if not present.
+    '''
+    super().__init_subclass__(**kw)
+    try:
+      cls.TYPE_ZONE
+    except AttributeError:
+      entity_class = cls.HasTagsClass
+      try:
+        zone = entity_class.TYPE_ZONE
+      except AttributeError:
+        pass
+      else:
+        cls.TYPE_ZONE = zone
 
   def __init__(self, tagsets=None, **kw):
     super().__init__(**kw)
     self.tagsets = tagsets or self.TagSetsClass()
     cls = self.__class__
     try:
-      type_zone = cls.__dict__['TYPE_ZONE']
+      zone = cls.TYPE_ZONE
+    except AttributeError:
+      pass
+    else:
+      cls.set_as_zone(zone, if_unset=True)
+
+  def set_as_zone(self, zone: str, if_unset=False):
+    ''' Set this `UsesTagSets` instance as the one handling entities in `zone`.
+    '''
+    cls = self.__class__
+    by_type_zone = cls.by_type_zone
+    try:
+      old = by_type_zone[zone]
     except KeyError:
       pass
     else:
-      subclass_map = cls.by_type_zone
-      try:
-        old = subclass_map[type_zone]
-      except KeyError:
-        pass
-      else:
-        if old is not self:
-          warning(
-              "%s.%s: type zone %r already mapped to %s, replacing with %s",
-              cls.__module__, cls.__name__, type_zone, old, self
-          )
-          ##breakpoint()
-      vprint(f'{cls.by_type_zone}.by_type_zone[{self.TYPE_ZONE=}] = {self=}')
-      subclass_map[type_zone] = self
+      if if_unset or old is self:
+        return
+      warning(
+          "%s.%s: type zone %r already mapped to %s, replacing with %s",
+          cls.__module__, cls.__name__, zone, old, self
+      )
+      ##breakpoint()
+    vprint(f'{cls.by_type_zone}.by_type_zone[{zone=}] = {self=}')
+    by_type_zone[zone] = self
 
   @contextmanager
-  def for_zone(self, type_zone=None):
+  def as_zone(self, zone=None):
     ''' Push this `UsesTagSets` instance as the default mapping for
-        `type_zone`, whose default is `self.__class__.TYPE_ZONE`.
+        `zone`, whose default is `self.__class__.TYPE_ZONE`.
+        Yields the zone, or `None` if there is no 
     '''
     cls = self.__class__
-    if type_zone is None:
-      type_zone = cls.TYPE_ZONE
-    with stackkeys(cls.by_type_zone, **{type_zone: cls}):
-      yield
-
-  def tagged(self, te: TagSet) -> HasTags:
-    ''' Promote `te` to a `HasTags` in this zone.
-        Return a `self.HasTagSetsClass` instance tagged with `te`.
-    '''
-    if te.type_zone != self.TYPE_ZONE:
-      raise ValueError(
-          f'{self}.tagged({te.__class__.__name__}[{te.name!r}]): {te.type_zone=} != {self.TYPE_ZONE=}'
-      )
-    return self.HasTagsClass(te, self)
+    if zone is None:
+      try:
+        zone = cls.TYPE_ZONE
+      except AttributeError:
+        yield None
+    else:
+      with stackkeys(cls.by_type_zone, **{zone: self}):
+        yield zone
 
   @classmethod
   def by_entity_id(cls, entity_id: str) -> HasTags:
