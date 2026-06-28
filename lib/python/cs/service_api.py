@@ -34,7 +34,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTagSet, UsesSQLTags
-from cs.tagset import HasTags, UsesTagSets
+from cs.tagset import Entity, Entities
 from cs.threads import pmap
 from cs.upd import run_task
 
@@ -116,7 +116,7 @@ class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
       *,
       fstags: FSTags,
       concurrency=None,
-      tagsets: UsesTagSets = None,
+      tagsets: Entities = None,
   ):
     ''' Initialise a `ServiceAPI` instance.
 
@@ -152,7 +152,7 @@ class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Open/close the `FSTags` and `UsesTagSets`.
+    ''' Open/close the `FSTags` and `Entities`.
     '''
     with self.tagsets:
       with self.fstags:
@@ -173,8 +173,8 @@ class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
     '''
     return None
 
-  def get_login_state(self, do_refresh=False) -> HasTags:
-    ''' The login state, a `HasTags`, stored as `login.state.`*login_userid*.
+  def get_login_state(self, do_refresh=False) -> Entity:
+    ''' The login state, a `Entity`, stored as `login.state.`*login_userid*.
         This performs a login if necessary or if `do_refresh` is true
         (default `False`).
     '''
@@ -188,7 +188,7 @@ class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
     return state
 
   @cached_property
-  def login_state(self) -> HasTags:
+  def login_state(self) -> Entity:
     ''' The login state, a mapping. Performs a login if necessary.
     '''
     return self.get_login_state()
