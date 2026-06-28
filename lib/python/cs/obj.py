@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Random stuff for "objects". - Cameron Simpson <cs@cskk.id.au>
 #
@@ -20,6 +20,7 @@ from typing import Iterable, Optional
 from weakref import WeakValueDictionary
 
 from cs.deco import OBSOLETE
+from cs.gimmicks import warning
 
 __version__ = '20260610-post'
 
@@ -29,7 +30,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco'],
+    'install_requires': ['cs.deco', 'cs.gimmicks'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -232,6 +233,59 @@ class Proxy(object):
   def __len__(self):
     _proxied = object.__getattribute__(self, '_proxied')
     return len(_proxied)
+
+class NoAttrs:
+  ''' A stub class whose `__getattr__` raises `AttributeError`.
+      This exists to be put at the end of the subclasses for concrete
+      nonmixin classes which have multiple `__getattr__` methods
+      in their MRO, so that they can always call `super().__getattr__`.
+
+      This exists because `object` has no `__getattr__`, necessitating
+      this ugly shuffle in mixin `__getattr__` methods:
+
+          def __getattr__(self, attr):
+              ... return the mixin's special attr ...
+              try:
+                  gsa = super().__getattr__
+              except AttributeError:
+                  raise AttributeError(f'{self.__class__.__name__}.{attr}')
+              else:
+                  return gsa(attr)
+
+      With `NoAttrs` at the end of the MRO every mixin's `__geattr__` can be:
+
+          def __getattr__(self, attr):
+              ... return the mixin's special attr ...
+              return super().__getattr__(attr)
+
+      A concrete class is then defined as:
+
+          class C(AMixin,BMixin,NoAttrs):
+
+      Because of Python's MRO construction rules, a subclass like:
+
+          class D(C,DMixin,NoAttrs):
+
+      still places `NoAttrs` at the end of the MRO, producing correct behaviour.
+
+      `NoAttrs.__getattr__` issues a warning if `super().__getattr__` actually exists.
+  '''
+
+  def __getattr__(self, attr):
+    ''' Just raise `AttributeError`.
+    '''
+    try:
+      gsa = super().__getattr__
+    except AttributeError:
+      pass
+    else:
+      warning(
+          "%s.%s: NoAttrs.__getattr__: IGNORING super().__getattr__ = %s",
+          self.__class__.__name__,
+          attr,
+          gsa,
+      )
+    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
 class TrackedClassMixin(object):
   ''' A mixin to track all instances of a particular class.
