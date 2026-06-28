@@ -1103,7 +1103,6 @@ class PlayOnCommand(BaseCommand):
         with_exceptions=True,
     ):
       recording = recordings[i]
-      print(f'{recording=}')
       if dl_exc is not None:
         warning("%s -> %s: %s", recording.nice_name(), filename, dl_exc)
         xit = 1
