@@ -602,7 +602,7 @@ class Recording(_PlayOnEntity):
         int(self.type_key), filename=filename, runstate=runstate
     )
     self['download_path'] = realpath(filename)
-    fstags[filename][f'id.{self.type_zone}'] = self.type_subname
+    fstags[filename].entity += self
 
 class Service(_PlayOnEntity):
   ''' A PlayOn service description.
