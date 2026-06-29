@@ -578,7 +578,7 @@ class Recording(_PlayOnEntity):
       format = LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(self.format_as(format))
+    print_func(self.format_as(format, strict=False))
     if long_mode:
       printt(
           *([f'  {tag.name}', tag.value] for tag in sorted(self.tags)),
