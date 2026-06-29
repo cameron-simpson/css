@@ -1581,13 +1581,13 @@ def flatten_table_rows(
         lt_rows.append(row)
       elif isinstance(row, Mapping):
         m_rows = list(row.items())
-        # we do not sort in place because the state is a TypeError
-        # is raised during the sort is undefined
+        # we do not sort in place because a TypeError is raised
+        # during the sort if the keys are not all comparable
         try:
           m_rows = sorted(m_rows)
         except TypeError:
           pass
-        lt_rows.extend(map(list, m_rows))
+        lt_rows.append(tuple(map(list, m_rows)))
       else:
         lt_rows.append([row])
     return lt_rows
@@ -1603,7 +1603,7 @@ def flatten_table_rows(
   for prev_trow, trow, next_trow in with_neighbours(
       into_lists_and_tuples(table_rows)):
     # FIXME: this calls row_cells twice on each row
-    #        maybe call cell_rows on all lists?
+    #        maybe call row_cells on all lists?
     #        in a prepass?
     if isinstance(trow, list):
       attach_below = bool(
@@ -1614,7 +1614,7 @@ def flatten_table_rows(
       attachable = is_attachable_cell_grid(cells)
       if attachable:
         attach.append(len(rows))
-      # append the cell rows, possibly indents and attached
+      # append the cell rows, possibly indented and attached
       for ci, cell_row in enumerate(cells):
         if ci > 0 and attach_below:
           indent = box_char(
