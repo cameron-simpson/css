@@ -1219,12 +1219,7 @@ class PlayOnCommand(BaseCommand):
     ''' Usage: {cmd} [recordings...]
           List queued recordings.
     '''
-    options = self.options
-    options.api.ls(
-        argv or ['available'],
-        format=options.ls_format,
-        long_mode=options.long_mode,
-    )
+    return self.cmd_ls(['queued'] + argv)
 
   cmd_q = cmd_queue
 
