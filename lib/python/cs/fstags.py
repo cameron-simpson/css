@@ -124,7 +124,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts, vprint
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, promote, Promotable, uses_verbose
+from cs.deco import decorator, default_params, fmtdoc, promote, Promotable, uses_verbose
 from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
 from cs.fs import HasFSPath, FSPathBasedSingleton, scandirpaths, scandirtree
 from cs.lex import (
@@ -1070,8 +1070,19 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = argv
     self.options.fstags.import_xattrs(paths)
 
-# A decorator for functions expecting an fstags parameter.
-uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
+@decorator
+def uses_fstags(func):
+  ''' Provide the ambient `FSTags` instance as the `fstags` parameter is omitted.
+      Also run the original function inside `with fstags`, ensuring
+      a sync on the final close.
+  '''
+
+  @default_params(fstags=lambda: DEFAULT_FSTAGS)
+  def using_fstags(*a, fstags: FSTags, **kw):
+    with fstags:
+      return func(*a, fstags=fstags, **kw)
+
+  return using_fstags
 
 # pylint: disable=too-many-public-methods
 class FSTags(MultiOpenMixin, Entities):
