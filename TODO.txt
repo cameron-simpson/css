@@ -1,3 +1,4 @@
+default_params: a mode to use with with some params eg uses_fstags
 rework cs.logutils to shim loguru
 hashindex rearrange: refdir to be optional, default . ?
 pmap dispatcher: put the exception onto the resultQ?
