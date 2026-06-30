@@ -342,9 +342,10 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
       quiet: bool,
       runstate: RunState,
       verbose: bool,
-  ):
+  ) -> tuple[str, dict]:
     ''' Download the file with `download_id` to `filename_basis`.
-        Return the `TagSet` for the recording.
+        Return a 2-tuple of `(saved,api_data)` being the saved
+        filesystem path and the data component of the API response.
 
         The default `filename` is the basename of the filename
         from the download.
@@ -401,6 +402,7 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
                 offset += written
                 assert offset <= length
           assert offset == length
+    return filename, dl_data
 
 class _PlayOnEntity(Entity):
   ''' The base class of the entity subclasses.
@@ -598,11 +600,11 @@ class Recording(_PlayOnEntity):
   ):
     ''' Download this recording to `filename`.
     '''
-    playon_api.download(
+    saved_as, dl_data = playon_api.download(
         int(self.type_key), filename=filename, runstate=runstate
     )
-    self['download_path'] = realpath(filename)
-    fstags[filename].entity += self
+    self['download_path'] = realpath(saved_as)
+    fstags[saved_as].entity += self
 
 class Service(_PlayOnEntity):
   ''' A PlayOn service description.
