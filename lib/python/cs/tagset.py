@@ -3397,13 +3397,15 @@ class Entities:
 
   # a mapping of type zone names to their most recent Entities subclass instance
   by_type_zone = WeakValueDictionary()
+  class_by_type_zone = {}
 
   def __init_subclass__(cls, **kw):
     ''' Inititialise a subclass by defining `.TYPE_ZNE` if not present.
     '''
     super().__init_subclass__(**kw)
+    zone = None
     try:
-      cls.TYPE_ZONE
+      zone = cls.TYPE_ZONE
     except AttributeError:
       entity_class = cls.EntityClass
       try:
@@ -3412,6 +3414,8 @@ class Entities:
         pass
       else:
         cls.TYPE_ZONE = zone
+    if zone is not None:
+      cls.class_by_type_zone[zone] = cls
 
   def __init__(self, tagsets=None, **kw):
     super().__init__(**kw)
@@ -3466,15 +3470,27 @@ class Entities:
         from the full tb 
         Raise `ValueError` is `entity_id` cannot be parsed by
         `ZonedTypes.type_parts_of`.
-        Raise `KeyError` if there is no `Entities` instance for the zone.
+        Raise `KeyError` if there is no `Entities` instance for the zone
+        and we cannot make a default instance.
     '''
     zone, subname, key = ZonedTypes.type_parts_of(entity_id)
     try:
       tags_db = cls.by_type_zone[zone]
     except KeyError as e:
-      raise KeyError(
-          f'{cls.__module__}.{cls.__name__}.for_entity_id({entity_id=}): no zone {zone=}'
-      ) from e
+      try:
+        entcls = cls.class_by_type_zone[zone]
+      except KeyError:
+        raise KeyError(
+            f'{cls.__module__}.{cls.__name__}.for_entity_id({entity_id=}): no zone {zone=}'
+        ) from e
+      else:
+        # make the default instance
+        try:
+          tags_db = entcls()
+        except TypeError as e:
+          raise KeyError(
+              f'{cls.__module__}.{cls.__name__}.for_entity_id({entity_id=}): cannot make default {entcls} instance for zone {zone=}: {e}'
+          ) from e
     assert tags_db.TYPE_ZONE == zone
     return tags_db[subname, key]
 
