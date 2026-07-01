@@ -396,8 +396,6 @@ class SeriesEpisodeInfo(Promotable):
     '''
     return {k: v for k, v in asdict(self).items() if v is not None}
 
-if __name__ == '__main__':
-  sys.exit(main(sys.argv))
   @classmethod
   def from_Mapping(cls, tags: Mapping, refresh_entities=False):
     '''
@@ -450,3 +448,5 @@ if __name__ == '__main__':
     sei = cls(**fields)
     return sei
 
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
