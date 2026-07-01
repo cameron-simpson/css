@@ -21,7 +21,7 @@ from pprint import pprint
 import re
 import sys
 import time
-from typing import Any, Iterable, Mapping, Optional
+from typing import Iterable, Optional
 from urllib.parse import unquote as unpercent
 
 from icontract import require
@@ -30,7 +30,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, Promotable, uses_quiet, uses_verbose
+from cs.deco import default_params, fmtdoc, uses_quiet, uses_verbose
 from cs.fileutils import atomic_filename
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import (
@@ -507,8 +507,8 @@ class Recording(_PlayOnEntity):
     )
 
   @cached_property
-  def sei(self):
-    ''' A `PlayonSeriesEpisodeInfo` inferred from this `Recording`.
+  def sei(self) -> SeriesEpisodeInfo:
+    ''' A `SeriesEpisodeInfo` inferred from this `Recording`.
     '''
     return self.as_SeriesEpisodeInfo()
 
@@ -662,64 +662,6 @@ class Service(_PlayOnEntity):
   '''
 
   TYPE_SUBNAME = 'service'
-
-@dataclass
-class PlayonSeriesEpisodeInfo(SeriesEpisodeInfo, Promotable):
-  ''' A `SeriesEpisodeInfo` with a `from_Recording()` factory method to build
-      one from a PlayOn `Recording` instead or other mapping with `playon.*` keys.
-  '''
-
-  @classmethod
-  def from_Recording(cls, R: Mapping[str, Any]):
-    ''' Infer series episode information from a `Recording`
-        or any mapping with ".playon.*" keys.
-    '''
-    # get a basic SEI from the title
-    episode_title = R.get('playon.Name')
-    playon_series = R.get('playon.Series')
-    playon_season = R.get('playon.Season')
-    playon_episode = R.get('playon.Episode')
-    # now override various fields from the playon tags
-    ###############################################################
-    # match a Playon browse path like "... | The Flash | Season 9"
-    browse_path = R['playon.BrowsePath']
-    browse_re_s = r'\|\s+(?P<series_s>[^|\s][^|]*[^|\s])\s+\|\s+season\s+(?P<season_s>\d+)$'
-    m = re.search(
-        browse_re_s,
-        browse_path,
-        re.I,
-    )
-    browse_series = m and m.group('series_s')
-    browse_season = m and int(m.group('season_s'))
-    # ignore the series "None", still unsure if this is some furphy
-    # from a genuine None value
-    if playon_series and playon_series.lower() == 'none':
-      playon_series = None
-    # sometimes the series is prepended to the episode title
-    if playon_series:
-      episode_title = cutprefix(episode_title, f'{playon_series} - ')
-    # strip the trailing part info eg ": Part One"
-    part_suffix, episode_part = get_suffix_part(episode_title)
-    if part_suffix:
-      episode_title = cutsuffix(episode_title, part_suffix)
-    # strip leading "sSSeEE - " prefix
-    spfx, episode_title_season, offset = get_prefix_n(
-        episode_title.lower(), 's', n=playon_season
-    )
-    epfx, episode_title_episode, offset = get_prefix_n(
-        episode_title.lower(), 'e', n=playon_episode, offset=offset
-    )
-    if offset > 0:
-      # strip the sSSeEE and any spaces or dashes which follow it
-      episode_title = episode_title[offset:].lstrip(' -')
-    # fall back from provided stuff to inferred stuff
-    return cls(
-        series=playon_series or browse_series,
-        season=playon_season or episode_title_season or browse_season,
-        episode=playon_episode or episode_title_episode,
-        episode_title=episode_title,
-        episode_part=episode_part,
-    )
 
 # pylint: disable=too-many-ancestors
 class PlayOnSQLTags(SQLTags):
