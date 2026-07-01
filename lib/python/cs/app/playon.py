@@ -455,11 +455,62 @@ class Recording(_PlayOnEntity):
     '''
     return self.get('playon.ID')
 
+  def as_SeriesEpisodeInfo(self) -> SeriesEpisodeInfo:
+    ''' Infer series episode information from a `Recording`
+        (or any mapping with "playon.*" keys).
+    '''
+    # get a basic SEI from the title
+    episode_title = self.get('playon.Name')
+    playon_series = self.get('playon.Series')
+    playon_season = self.get('playon.Season')
+    playon_episode = self.get('playon.Episode')
+    # now override various fields from the playon tags
+    ###############################################################
+    # match a Playon browse path like "... | The Flash | Season 9"
+    browse_path = self.get('playon.BrowsePath', '')
+    browse_re_s = r'\|\s+(?P<series_s>[^|\s][^|]*[^|\s])\s+\|\s+season\s+(?P<season_s>\d+)$'
+    m = re.search(
+        browse_re_s,
+        browse_path,
+        re.I,
+    )
+    browse_series = m and m.group('series_s')
+    browse_season = m and int(m.group('season_s'))
+    # ignore the series "None", still unsure if this is some furphy
+    # from a genuine None value
+    if playon_series and playon_series.lower() == 'none':
+      playon_series = None
+    # sometimes the series is prepended to the episode title
+    if playon_series:
+      episode_title = cutprefix(episode_title, f'{playon_series} - ')
+    # strip the trailing part info eg ": Part One"
+    part_suffix, episode_part = get_suffix_part(episode_title)
+    if part_suffix:
+      episode_title = cutsuffix(episode_title, part_suffix)
+    # strip leading "sSSeEE - " prefix
+    spfx, episode_title_season, offset = get_prefix_n(
+        episode_title.lower(), 's', n=playon_season
+    )
+    epfx, episode_title_episode, offset = get_prefix_n(
+        episode_title.lower(), 'e', n=playon_episode, offset=offset
+    )
+    if offset > 0:
+      # strip the sSSeEE and any spaces or dashes which follow it
+      episode_title = episode_title[offset:].lstrip(' -')
+    # fall back from provided stuff to inferred stuff
+    return SeriesEpisodeInfo(
+        series=playon_series or browse_series,
+        season=playon_season or episode_title_season or browse_season,
+        episode=playon_episode or episode_title_episode,
+        episode_title=episode_title,
+        episode_part=episode_part,
+    )
+
   @cached_property
   def sei(self):
     ''' A `PlayonSeriesEpisodeInfo` inferred from this `Recording`.
     '''
-    return PlayonSeriesEpisodeInfo.from_Recording(self)
+    return self.as_SeriesEpisodeInfo()
 
   @format_attribute
   def nice_name(self):
