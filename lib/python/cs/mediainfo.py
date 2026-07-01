@@ -41,13 +41,16 @@ from os.path import basename, splitext
 import re
 import sys
 from types import SimpleNamespace as NS
-from typing import Optional
+from typing import Mapping, Optional
 
 from cs.deco import Promotable
 from cs.gimmicks import warning
-from cs.lex import cutsuffix, get_prefix_n, get_suffix_part
+from cs.lex import cutprefix, cutsuffix, get_prefix_n, get_suffix_part
+from cs.obj import Refreshable
 from cs.pfx import Pfx, pfx
-from cs.tagset import Tag
+from cs.seq import consume
+from cs.tagset import Entities, Tag
+from cs.threads import pmap
 
 __version__ = '20260531-post'
 
@@ -61,8 +64,11 @@ DISTINFO = {
         'cs.deco',
         'cs.gimmicks',
         'cs.lex',
+        'cs.obj',
         'cs.pfx',
+        'cs.seq',
         'cs.tagset',
+        'cs.threads',
     ],
 }
 
@@ -344,6 +350,7 @@ class SeriesEpisodeInfo(Promotable):
   series: str
   season: int
   episode: int
+  season_title: Optional[str] = None
   episode_title: Optional[str] = None
   episode_part: Optional[int] = None
 
@@ -391,3 +398,55 @@ class SeriesEpisodeInfo(Promotable):
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
+  @classmethod
+  def from_Mapping(cls, tags: Mapping, refresh_entities=False):
+    '''
+    '''
+    fields = {}
+    entities = None
+    for field in 'series', 'season', 'episode', 'season_title', 'episode_title', 'episode_part':
+      value = tags.get(field)  # direct tag wins
+      if value is None:
+        if entities is None:
+          # obtain and optionally refresh the id.* entities
+          entities = []
+          for tagname in tags.keys():
+            zone = cutprefix(tagname, 'id.')
+            if zone == tagname:
+              # no leading "id."
+              continue
+            zone_key = tags[tagname]
+            entity_id = f'{zone}.{zone_key}'
+            try:
+              ent = Entities.by_entity_id(entity_id)
+            except KeyError as e:
+              warning(
+                  f'{tagname}={zone_key!r}: no entity with {entity_id=}: {e}'
+              )
+              continue
+            entities.append(ent)
+          if refresh_entities:
+            consume(
+                pmap(
+                    lambda ent: ent.refresh(),
+                    (ent for ent in entities if isinstance(ent, Refreshable))
+                )
+            )
+        for ent in entities:
+          value = ent.get(field)
+          if value is None:
+            try:
+              value = getattr(value, field)
+            except AttributeError:
+              try:
+                sei = ent.as_SeriesEpisodeInfo()
+              except AttributeError:
+                pass
+              else:
+                value = getattr(sei, field)
+          if value is not None:
+            break
+      fields[field] = value
+    sei = cls(**fields)
+    return sei
+
