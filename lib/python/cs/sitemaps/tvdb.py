@@ -374,179 +374,179 @@ class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, Entities):
     '''
     return pmap(lambda ent: ent.refresh(**refresh_kw), entities)
 
-@dataclass
-class TheTVDBSite(SiteMap):
-  ''' A site map for `thetvdb.com`.
-  '''
-
-  TYPE_ZONE = 'tvdb'
-  HasTagsClass = TVDBEntity
-
-  BASE_DOMAIN = 'thetvdb.com'
-  URL_DOMAIN = f'www.{BASE_DOMAIN}'
-
-  @staticmethod
-  def parse_date(date_s) -> date:
-    ''' Parse a *Month day, year* string into a `datetime.date`.
-    '''
-    dt = pfx_call(datetime.strptime, date_s, '%B %d, %Y')
-    return date(dt.year, dt.month, dt.day)
-
-  @classmethod
-  @typechecked
-  def parse_basic_info_div(cls, div: BS4Tag, entity_type: str) -> TagSet:
-    ''' Parse the basic info `DIV`, return a `TagSet`.
-
-        The basic info `DIV` contains a single `UL` whose `LI` tags
-        contain a `<strong>` tag with the item title text and a
-        number of `<span>` tags containing their values.
-    '''
-    tags = TagSet()
-    ##for li in div.ul.find_all('li', recursive=False):
-    for li in child_tags(div.ul, 'li'):
-      with Pfx("LI %s", li):
-        field_tag, *value_tags = child_tags(li)
-        if field_tag.name != 'strong':
-          warning("expected a leading <strong> tag, ignoring %s", r(field_tag))
-          continue
-        field_name = '_'.join(field_tag.get_text(strip=True).split()).lower()
-        if field_name == f'thetvdb.com_{entity_type}_id':
-          field_name = 'id'
-        field_subname = None
-        # Prepare filed as the object to store the parsed values.
-        # A list for foreign entity references,
-        # a mapping for various things,
-        # None for unrecognised things.
-        if field_name in ('genres', 'network'):
-          # a list of keys to other entity types
-          field_subname = {
-              'network': 'company',
-              'genres': 'genre',
-          }[field_name]
-          field = []
-        elif field_name in (
-            'created',
-            'first_aired',
-            'modified',
-            'on_other_sites',
-            'recent',
-        ):
-          field = {}
-        else:
-          assert len(value_tags) == 1
-          field = None
-        # now parse the tags after the field name
-        for span in value_tags:
-          span_flat = "\\n".join(map(str.strip, str(span).split("\n")))
-          with Pfx("SPAN %s", span_flat):
-            if span.name != 'span':
-              warning("skipping nonspan")
-              continue
-            field_text = span.get_text(' ', strip=True)
-            if field_name == 'id':
-              field_key = None
-              field_value = int(field_text)
-            elif field_name in ('created', 'modified'):
-              # Created MMM DD, YYYY by <div>username</div>
-              date_s, by_user = field_text.split("\n", 1)
-              when = cls.parse_date(date_s).isoformat()
-              _by, username = by_user.split()
-              assert _by == 'by'
-              field_key = when
-              field_value = username
-            elif field_name == 'favorited':
-              fav_count_s, = re.match(
-                  fr'This {entity_type} has been favorited by (\d+) people\.',
-                  field_text,
-              ).groups(1)
-              field_key = None
-              field_value = int(fav_count_s)
-            else:
-              # we kind of expect an href or an href inside a span
-              a = span.a if span.name == 'span' else span
-              if field_name in ('first_aired', 'recent'):
-                # an href surrounding a date
-                field_key = cls.parse_date(field_text).isoformat()
-                field_value = a['href']
-              elif a:
-                # an href surrounding some text
-                field_key = field_text
-                field_value = a['href']
-              else:
-                # no href, so no key, just use the text
-                field_key = None
-                field_value = field_text
-            # apply the parsed value
-            if field_key is None:
-              # scalar text value
-              assert field is None, f'{field_name=}, {field=}'
-              field = field_value
-            else:
-              if field_subname is None:
-                change_mapping(field, field_key, field_value, field_name)
-              else:
-                field.append(basename(field_value))
-        change_mapping(tags, field_name, field, "tags")
-    return tags
-
-  @on(
-      URL_DOMAIN,
-      r'/(?P<entity_type>companies|genres|series)/(?P<entity_name>[^/]+)$',
-      # the entity_key requires an id from the page contents
-  )
-  @uses_pilfer
-  def grok_info_page(self, flowstate, match: TagSet, P: Pilfer = None):
-    ''' Parse a `/series/{series_name}` page.
-    '''
-    with Pfx(
-        "%s.grok_info_page(%s)",
-        self.__class__.__name__,
-        flowstate.url.short,
-    ):
-      type_subname = {
-          'companies': 'company',
-          'genres': 'genre',
-          'series': 'series',
-      }[match.entity_type]
-      soup = flowstate.soup
-      for div_id in {
-          'series': ['series_basic_info'],
-          'company': ['general'],
-      }.get(type_subname, ()):
-        with Pfx("div#%s", div_id):
-          basic_info_div = soup.find(id='series_basic_info')
-          if basic_info_div is None:
-            warning("no DIV with id #%s", div_id)
-            continue
-          assert basic_info_div is not None
-          try:
-            basic_tags = self.parse_basic_info_div(
-                basic_info_div, type_subname
-            )
-          except Exception as e:
-            warning("parse_basic_info_div: %s", s(e))
-            return None
-          printt(["basic_tags"], *sorted(basic_tags.items()))
-          tve = self[type_subname, basic_tags["id"]]
-          tve.update(
-              **{
-                  k: v
-                  for k, v in basic_tags.items()
-                  if k not in ('id', 'name')
-              }
-          )
-          title_h1 = soup.find('h1', id='series_title')
-          tve["fullname"] = title_h1.get_text(' ', strip=True)
-          actors = soup.find(id='people-actor')
-          if actors:
-            actor_map = defaultdict(list)
-            actors_as = list(actors.find('a'))
-            actors_a = actors_as[0]
-            for actor_name, role_name in batched(actors_a.stripped_strings, 2):
-              print("actor", actor_name, "role", role_name)
-              actor_map[actor_name].append(role_name)
-            pprint(actor_map, width=60)
-    return tve
+##@dataclass
+##class TheTVDBSite:  ## not needed? conflicts with TheTVDBAPI registration (SiteMap):
+##  ''' A site map for `thetvdb.com`.
+##  '''
+##
+##  TYPE_ZONE = 'tvdb'
+##  EntityClass = TVDBEntity
+##
+##  BASE_DOMAIN = 'thetvdb.com'
+##  URL_DOMAIN = f'www.{BASE_DOMAIN}'
+##
+##  @staticmethod
+##  def parse_date(date_s) -> date:
+##    ''' Parse a *Month day, year* string into a `datetime.date`.
+##    '''
+##    dt = pfx_call(datetime.strptime, date_s, '%B %d, %Y')
+##    return date(dt.year, dt.month, dt.day)
+##
+##  @classmethod
+##  @typechecked
+##  def parse_basic_info_div(cls, div: BS4Tag, entity_type: str) -> TagSet:
+##    ''' Parse the basic info `DIV`, return a `TagSet`.
+##
+##        The basic info `DIV` contains a single `UL` whose `LI` tags
+##        contain a `<strong>` tag with the item title text and a
+##        number of `<span>` tags containing their values.
+##    '''
+##    tags = TagSet()
+##    ##for li in div.ul.find_all('li', recursive=False):
+##    for li in child_tags(div.ul, 'li'):
+##      with Pfx("LI %s", li):
+##        field_tag, *value_tags = child_tags(li)
+##        if field_tag.name != 'strong':
+##          warning("expected a leading <strong> tag, ignoring %s", r(field_tag))
+##          continue
+##        field_name = '_'.join(field_tag.get_text(strip=True).split()).lower()
+##        if field_name == f'thetvdb.com_{entity_type}_id':
+##          field_name = 'id'
+##        field_subname = None
+##        # Prepare filed as the object to store the parsed values.
+##        # A list for foreign entity references,
+##        # a mapping for various things,
+##        # None for unrecognised things.
+##        if field_name in ('genres', 'network'):
+##          # a list of keys to other entity types
+##          field_subname = {
+##              'network': 'company',
+##              'genres': 'genre',
+##          }[field_name]
+##          field = []
+##        elif field_name in (
+##            'created',
+##            'first_aired',
+##            'modified',
+##            'on_other_sites',
+##            'recent',
+##        ):
+##          field = {}
+##        else:
+##          assert len(value_tags) == 1
+##          field = None
+##        # now parse the tags after the field name
+##        for span in value_tags:
+##          span_flat = "\\n".join(map(str.strip, str(span).split("\n")))
+##          with Pfx("SPAN %s", span_flat):
+##            if span.name != 'span':
+##              warning("skipping nonspan")
+##              continue
+##            field_text = span.get_text(' ', strip=True)
+##            if field_name == 'id':
+##              field_key = None
+##              field_value = int(field_text)
+##            elif field_name in ('created', 'modified'):
+##              # Created MMM DD, YYYY by <div>username</div>
+##              date_s, by_user = field_text.split("\n", 1)
+##              when = cls.parse_date(date_s).isoformat()
+##              _by, username = by_user.split()
+##              assert _by == 'by'
+##              field_key = when
+##              field_value = username
+##            elif field_name == 'favorited':
+##              fav_count_s, = re.match(
+##                  fr'This {entity_type} has been favorited by (\d+) people\.',
+##                  field_text,
+##              ).groups(1)
+##              field_key = None
+##              field_value = int(fav_count_s)
+##            else:
+##              # we kind of expect an href or an href inside a span
+##              a = span.a if span.name == 'span' else span
+##              if field_name in ('first_aired', 'recent'):
+##                # an href surrounding a date
+##                field_key = cls.parse_date(field_text).isoformat()
+##                field_value = a['href']
+##              elif a:
+##                # an href surrounding some text
+##                field_key = field_text
+##                field_value = a['href']
+##              else:
+##                # no href, so no key, just use the text
+##                field_key = None
+##                field_value = field_text
+##            # apply the parsed value
+##            if field_key is None:
+##              # scalar text value
+##              assert field is None, f'{field_name=}, {field=}'
+##              field = field_value
+##            else:
+##              if field_subname is None:
+##                change_mapping(field, field_key, field_value, field_name)
+##              else:
+##                field.append(basename(field_value))
+##        change_mapping(tags, field_name, field, "tags")
+##    return tags
+##
+##  @on(
+##      URL_DOMAIN,
+##      r'/(?P<entity_type>companies|genres|series)/(?P<entity_name>[^/]+)$',
+##      # the entity_key requires an id from the page contents
+##  )
+##  @uses_pilfer
+##  def grok_info_page(self, flowstate, match: TagSet, P: Pilfer = None):
+##    ''' Parse a `/series/{series_name}` page.
+##    '''
+##    with Pfx(
+##        "%s.grok_info_page(%s)",
+##        self.__class__.__name__,
+##        flowstate.url.short,
+##    ):
+##      type_subname = {
+##          'companies': 'company',
+##          'genres': 'genre',
+##          'series': 'series',
+##      }[match.entity_type]
+##      soup = flowstate.soup
+##      for div_id in {
+##          'series': ['series_basic_info'],
+##          'company': ['general'],
+##      }.get(type_subname, ()):
+##        with Pfx("div#%s", div_id):
+##          basic_info_div = soup.find(id='series_basic_info')
+##          if basic_info_div is None:
+##            warning("no DIV with id #%s", div_id)
+##            continue
+##          assert basic_info_div is not None
+##          try:
+##            basic_tags = self.parse_basic_info_div(
+##                basic_info_div, type_subname
+##            )
+##          except Exception as e:
+##            warning("parse_basic_info_div: %s", s(e))
+##            return None
+##          printt(["basic_tags"], *sorted(basic_tags.items()))
+##          tve = self[type_subname, basic_tags["id"]]
+##          tve.update(
+##              **{
+##                  k: v
+##                  for k, v in basic_tags.items()
+##                  if k not in ('id', 'name')
+##              }
+##          )
+##          title_h1 = soup.find('h1', id='series_title')
+##          tve["fullname"] = title_h1.get_text(' ', strip=True)
+##          actors = soup.find(id='people-actor')
+##          if actors:
+##            actor_map = defaultdict(list)
+##            actors_as = list(actors.find('a'))
+##            actors_a = actors_as[0]
+##            for actor_name, role_name in batched(actors_a.stripped_strings, 2):
+##              print("actor", actor_name, "role", role_name)
+##              actor_map[actor_name].append(role_name)
+##            pprint(actor_map, width=60)
+##    return tve
 
 class TheTVDBCommand(BaseCommand):
   ''' Command line interface to accessing the TVDB API.
