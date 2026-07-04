@@ -3511,23 +3511,7 @@ class Entities:
         and we cannot make a default instance.
     '''
     zone, subname, key = ZonedTypes.type_parts_of(entity_id)
-    try:
-      tags_db = cls.by_type_zone[zone]
-    except KeyError as e:
-      try:
-        entcls = cls.class_by_type_zone[zone]
-      except KeyError:
-        raise KeyError(
-            f'{cls.__module__}.{cls.__name__}.for_entity_id({entity_id=}): no zone {zone=}'
-        ) from e
-      else:
-        # make the default instance
-        try:
-          tags_db = entcls()
-        except TypeError as e:
-          raise KeyError(
-              f'{cls.__module__}.{cls.__name__}.for_entity_id({entity_id=}): cannot make default {entcls} instance for zone {zone=}: {e}'
-          ) from e
+    tags_db = cls.default(zone)
     assert tags_db.TYPE_ZONE == zone
     return tags_db[subname, key]
 
