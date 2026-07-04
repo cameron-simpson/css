@@ -1031,6 +1031,34 @@ class ScanData:
         # otherwise just annotate it with whatever was learned
         ent.type_zone_update(data)
 
+@decorator
+def with_base_url(method):
+  ''' Decorator for methods which may require a `base_url`
+        parameter, for example as context for some soup to parse where
+        relative URLs must be resolved.
+
+        Example:
+
+            @with_base_url
+            def soup_abs_hrefs(self, soup, *, base_url:str):
+                """ Yield absolute URLs from `soup`. """
+                for a in soup.find_all('a'):
+                    href = a.get("href", "")
+                    if not href or href=="#":
+                        continue
+                    href_url = URL(href)
+                    if not href_url.isabs():
+                        href_url = href_url.resolve(base_url)
+                    yield href_url
+    '''
+
+  def based_method(self, *method_a, base_url=None, **method_kw):
+    if base_url is None:
+      base_url = self.sitepage_url
+    return method(self, *method_a, base_url=base_url, **method_kw)
+
+  return based_method
+
 class SiteEntity(Entity, NoAttrs):
   ''' A base class for entities associated with a `SiteMap`.
 
