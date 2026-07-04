@@ -1425,8 +1425,31 @@ class SiteEntity(Entity, NoAttrs):
   @pfx_method
   @pagemethod
   def scan_sitepage(self, flowstate: FlowState) -> ScanData:
-    warning("%s: no method to scan a sitepage", self.__class__.__name__)
-    return ScanData(self.sitemap)
+    ''' The default scan of a sitepage - this returns a nearly empty `ScanData`
+        because a site's pages need an entity specific parse.
+
+        This base implementation updates the `ScanData` data for `self` with:
+        - `http.request`: a record of the request and response headers from the `flowstate`
+        - `html.meta`: the `flowstate.meta` tags
+        - `html.properties`: the `flowstate.meta.properties`
+        - `opengraph`: the flowstate.opengraph_tags`
+
+        A subclass' `scan_sitepage` method should call this base
+        method to get the initial `ScanData` and then further update
+        it from the scan.
+    '''
+    scanned = ScanData(self.sitemap)
+    data = scanned[self]
+    data[self.rq.tag_name] = self.rq(
+        "sitepage",
+        flowstate=flowstate,
+        no_save=True,
+    )
+    # update the record of the flowstate's request
+    data["html.meta"] = flowstate.meta.tags.as_dict()
+    data["html.properties"] = flowstate.meta.properties.as_dict()
+    data['opengraph'] = dict(flowstate.opengraph)
+    return scanned
 
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
