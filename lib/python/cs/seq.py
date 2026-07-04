@@ -922,6 +922,9 @@ class range:
 
   @classmethod
   def __class_getitem__(cls, index):
+    ''' You can also index this `range` type` with a slice, obtaining
+        a range matching the slice.
+    '''
     if isinstance(index, slice):
       return range(...)[index]
     if isinstance(index, type):
