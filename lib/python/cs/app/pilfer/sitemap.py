@@ -2902,6 +2902,24 @@ class SiteMap(Entities, Promotable):
     ]
     return super().find(*criteria, **crit_kw)
 
+  def pop_entity(self, argv):
+    try:
+      ent_spec = argv.pop(0)
+    except IndexError:
+      raise GetoptError('missing entity')
+    ent_key = ent_spec.removeprefix(f'{self.TYPE_ZONE}.')
+    ent = self[ent_key]
+    return ent
+
+  def cmd_ent(self, argv):
+    ''' Usage: {cmd} entity
+          Set entity and provide a REPL.
+    '''
+    if not argv:
+      raise GetoptError('missing entity')
+    ent = self.pop_entity(argv)
+    BaseCommand.repl(self, local=dict(ent=ent))
+
   @popopts(
       f=('force', 'Force refresh of entities even if not stale.'),
       l=('long_mode', 'Long Mode.'),
