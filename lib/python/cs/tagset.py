@@ -3439,6 +3439,32 @@ class Entities:
     else:
       self.set_as_zone(zone, if_unset=True)
 
+  @classmethod
+  def default(cls, zone: str) -> "Entities":
+    ''' Return the default `Entities` instance for `zone`.
+        Raise `KeyError` for an unregistered `zone`.
+        Raise `TypeError` if there is no registered default
+        an the class for `zone` cannot be instantiated with `entcls()`.
+    '''
+    try:
+      entities = cls.by_type_zone[zone]
+    except KeyError as e:
+      try:
+        entcls = cls.class_by_type_zone[zone]
+      except KeyError:
+        raise KeyError(
+            f'{cls.__module__}.{cls.__name__}.default({zone=}): no zone {zone=}'
+        ) from e
+      else:
+        # make the default instance
+        try:
+          entities = entcls()
+        except TypeError as e:
+          raise KeyError(
+              f'{cls.__module__}.{cls.__name__}.default({zone=}): cannot make default {entcls} instance for zone {zone=}: {e}'
+          ) from e
+    return entities
+
   def set_as_zone(self, zone: str, if_unset=False):
     ''' Set this `Entities` instance as the one handling entities in `zone`.
     '''
