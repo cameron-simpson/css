@@ -300,7 +300,9 @@ from pprint import pformat
 import re
 import sys
 import time
-from typing import (Any, Iterable, List, Mapping, Optional, Tuple, Union)
+from typing import (
+    Any, GenericAlias, Iterable, List, Mapping, Optional, Tuple, Union
+)
 from uuid import UUID, uuid4
 from weakref import WeakValueDictionary
 
@@ -3464,6 +3466,36 @@ class Entities:
               f'{cls.__module__}.{cls.__name__}.default({zone=}): cannot make default {entcls} instance for zone {zone=}: {e}'
           ) from e
     return entities
+
+  @classmethod
+  def __class_getitem__(cls, index):
+    ''' An `Entities` subclass may be indexed with a string.
+        If there is no `cls.TYPE_ZONE` the string is treated as an
+        `Entity.name` and looked up with `cls.by_entity_id(index)`.
+        If there is a `cls.TYPE_ZONE`, such as with a `SiteMap`,
+        the string is treated as a `ZonedTypes.type_zone_key` and
+        looked up as by indexing that zone's `Entities` instance.
+
+        Example using `TheTVDBAPI`:
+
+            # fetch the TV series entity with id 1234
+            # there is a TheTVDBAPI.TYPE_ZONE
+            series = TheTVDBAPI['series.1234']
+
+            # fetch an arbtrary Entity
+            # the value of `TheTVDBAPI.TYPE_ZONE` is "tvdb"
+            series = Entities['tvdb.series.1234']
+    '''
+    if isinstance(index, type):
+      return GenericAlias(cls, (index,))
+    if isinstance(index, str):
+      try:
+        zone = cls.TYPE_ZONE
+      except AttributeError:
+        return cls.by_entity_id(index)
+      entities = cls.default(zone)
+      return entities[index]
+    raise TypeError(f'{type(index)}:{index!r} is not a type or a string')
 
   def set_as_zone(self, zone: str, if_unset=False):
     ''' Set this `Entities` instance as the one handling entities in `zone`.
