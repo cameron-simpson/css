@@ -939,7 +939,7 @@ class Module:
         "content-type": "text/markdown",
     }
     # check that everything was covered off
-    if dinfo:
+    if dinfo and dinfo != {'py_modules': [self.name]}:
       warning("dinfo not emptied: %r", dinfo)
     return pyproject
 
