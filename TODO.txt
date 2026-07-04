@@ -1,3 +1,4 @@
+Entity[zone_type_key] gets an entity?
 SiteMap.__iter__: provide the top level items?
 default_params: a mode to use with with some params eg uses_fstags
 rework cs.logutils to shim loguru
