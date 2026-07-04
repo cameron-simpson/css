@@ -3130,6 +3130,15 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
   def __repr__(self):
     return f'{self.__class__.__name__}:{self.tags}'
 
+  def __hash__(self):
+    return hash((hash(self.tags['name']), id(self.tags_db)))
+
+  def __eq__(self, other):
+    return (
+        self.tags['name'] == other.tags['name']
+        and self.tags_db is other.tags_db
+    )
+
   def __getattr__(self, attr):
     ''' The following synthetic attibutes are implemented.
         - *subtype*>`_ent`: the entity with name
