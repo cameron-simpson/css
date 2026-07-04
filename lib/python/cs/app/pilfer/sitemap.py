@@ -2329,6 +2329,7 @@ class SiteMap(Entities, Promotable):
       flowstate: FlowState,
       flowattr: str | None = None,
       methodglob: str = 'scan_*',
+      no_apply=False,
       **match_kw,
   ):
     ''' Run all the scan methods in this `SiteMap` for `flowstate.url`.
@@ -2336,7 +2337,7 @@ class SiteMap(Entities, Promotable):
         - `entity.scan_sitepage()` if the URL matches a `SiteEntty` sitepage pattern
         - all the `SiteMap.scan+*` methods whose `.on_conditions` match 
           `flowstate` and ``match_kw`, as matched by `SiteMap.on_matches`
-          an apply the scan results.
+          and apply the scan results (unless `no_apply` is true).
         The result of each scan, a `ScanData`, is applied to its relevant entities.
 
         Parameters:
@@ -2345,6 +2346,8 @@ class SiteMap(Entities, Promotable):
         * `methodglob`: an optional filename glob constraining the
           chosen method names; the default is `"scan_*"`
         * `match_kw`: the `on_match` keyword arguments which must match
+        * `no_apply`: do not apply the results of the matches and scans,
+          default `False`
 
         Each method should return a `ScanData` instance containing
         the information scanned from the page and its associated
@@ -2353,17 +2356,25 @@ class SiteMap(Entities, Promotable):
     ent0 = self.url_entity(flowstate.url)
     if ent0 is not None:
       scanned = ent0.scan_sitepage(flowstate)
-      scanned.apply(ent0)
+      if not no_apply:
+        scanned.apply(ent0)
     for method, match in self.on_matches(flowstate, methodglob, **match_kw):
       with Pfx("call %s", method.__qualname__):
         try:
-          scanned = method(self, flowstate, match)
-          scanned.apply(
-              # provie the entities whose sitepage patterns match the URL
-              *(
-                  ent for ent in scanned.keys()
-                  if ent.match_url(flowstate.url, sitemap=self)
-              )
+          scanned: ScanData = method(self, flowstate, match)
+          if not no_apply:
+            scanned.apply(
+                # provie the entities whose sitepage patterns match the URL
+                *(
+                    ent for ent in scanned.keys()
+                    if ent.match_url(flowstate.url, sitemap=self)
+                )
+            )
+          printt(
+              ["Scanned", flowstate.url], {
+                  ent.name: data
+                  for ent, data in scanned
+              }
           )
         except Exception as e:
           warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
@@ -2855,6 +2866,7 @@ class SiteMap(Entities, Promotable):
               )(force=self.options.force, recurse=self.options.recurse)
         ent.printt()
 
+  @popopts
   def cmd_scan(self, argv):
     ''' Usage: {cmd} URLs...
           Scan the suppplied URLs, update entities accordingly.
@@ -2863,7 +2875,7 @@ class SiteMap(Entities, Promotable):
       raise GetoptError('missing URLs')
     for url in argv:
       print("scan", url)
-      self.scan_matches(url)
+      self.scan_matches(url, no_apply=self.options.dry_run)
 
 # expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on
