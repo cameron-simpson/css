@@ -29,6 +29,7 @@ from uuid import UUID, uuid4
 from cs.deco import decorator, OBSOLETE, strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix, r, snakecase, stripped_dedent
 from cs.logutils import warning
+from cs.obj import NoAttrs
 from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 from cs.sharedfile import SharedAppendLines
@@ -1114,7 +1115,7 @@ class JSONableMappingMixin:
   def __repr__(self):
     return type(self).__name__ + str(self)
 
-class IndexedSetMixin(ABC):
+class IndexedSetMixin(ABC, NoAttrs):
   ''' A base mixin to provide `.by_`* attributes
       which index records from an autoloaded backing store,
       which might be a file or might be another related data structure.
@@ -1218,12 +1219,7 @@ class IndexedSetMixin(ABC):
       # .__indexed
       indexed = self.__indexed = set()
       return indexed
-    try:
-      supergetattr = super().__getattr__
-    except AttributeError:
-      return getattr(type(self), attr)
-    else:
-      return supergetattr(attr)
+    return super().__getattr__(attr)
 
   def __len__(self):
     ''' The length of the primary key mapping.
