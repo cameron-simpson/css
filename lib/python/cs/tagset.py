@@ -1406,8 +1406,8 @@ class TagSet(
       self.tags = tags
       self.missing_ok = missing_ok
 
-    def __getattr__(self, attr) -> "Entity":
-      ''' Consult th tag `id.{attr}` and return the corresponding
+    def __getattr__(self, zone) -> "Entity":
+      ''' Consult the tag `id.{zone}` and return the corresponding
           entity from the appropriate `Entities` instance.
 
           Example:
@@ -1415,14 +1415,14 @@ class TagSet(
               tags = TagSet({'id.playon':'recording.1234567'})
               playon_recording = tags.entity.playon
       '''
-      zone_id_tag = f'id.{attr}'
+      zone_id_tag = f'id.{zone}'
       try:
         zone_key = self.tags[zone_id_tag]
       except KeyError as e:
         if self.missing_ok:
           return None
-        raise AttributeError(f'no .entity.{attr}: {e}') from e
-      entity_id = f'{attr}.{zone_key}'
+        raise AttributeError(f'no .entity.{zone}: {e}') from e
+      entity_id = f'{zone}.{zone_key}'
       return Entities.by_entity_id(entity_id)
 
     def __iadd__(self, ent: ZonedTypes):
