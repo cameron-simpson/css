@@ -88,8 +88,8 @@ def uses_pilfer(func):
 
 @decorator
 def pagemethod(method):
-  ''' A decorator for `SiteEntity` methods whose names end in
-      `_`*nom*`page` to provide a default URL for the flowstate
+  ''' A decorator for `SiteEntity` methods whose names have the form
+      *action*`_`*name*`page` to provide a default URL for the flowstate
       parameter from `self.`*nom*`page_url`.
 
       Note that the optional `flowstate` parameter must be the first
@@ -920,7 +920,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
 
   @cached_property
   def opengraph(self) -> dict:
-    ''' The open graph properties as a dict, with their leading
+    ''' The open graph properties as a `dict`, with their leading
         `"og:"` prefix removed.
         See https://ogp.me/
     '''
@@ -1269,6 +1269,7 @@ class SiteEntity(Entity, NoAttrs):
         and the format string need only specify the path after the domain.
 
         Related entities:
+        (Now using DEREFFED_PROPERTIES, but I might scrap this.)
         If the attribute name is present in `self.DEREFFED_PROPERTIES`
         (a mapping of attribute name to `(tag_name,direct)` 2-tuples)
         then the corresponding `tag_name` is obtained and returned
@@ -1350,7 +1351,8 @@ class SiteEntity(Entity, NoAttrs):
 
   @property
   def sitepage_url(self):
-    ''' Allow `self["sitepage"]` to override `self.SITEPAGE_URL_FORMAT`.
+    ''' The URL of the primary page on the site for this entity.
+        This implementation allows `self["sitepage"]` to override `self.SITEPAGE_URL_FORMAT`.
         This may return `None` for entities with no primary site URL.
     '''
     try:
@@ -1845,6 +1847,7 @@ class SiteMap(Entities, Promotable):
     return self.urlto('')
 
   # TODO: some notion of staleness
+  # TODO: use pmap and Refreshablerefresh
   @classmethod
   @uses_pilfer
   @typechecked
