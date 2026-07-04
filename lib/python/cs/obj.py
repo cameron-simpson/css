@@ -644,7 +644,7 @@ class Refreshable(ABC):
 
   def refresh_key(self):
     ''' Return the key value for the `seen` set used in a recursive refresh.
-        This default returns `id(self)`; classes like `HasTags`
+        This default returns `id(self)`; classes like `Entity`
         would use a characteristic value like `self.name`.
     '''
     return id(self)
