@@ -46,6 +46,8 @@ class TVDBEntity(SiteEntity, Promotable):
   ''' The base class for TheTVDB entities.
   '''
 
+  TYPE_ZONE = 'tvdb'
+
   API_ENTITY_SUBPATH_FORMAT = '{type_subname}/{type_key}'
   TVDB_SUBENTITY_FIELDS = ()  # list of (fieldname,entity-type)
   TVDB_LINKENTITY_FIELDS = ()
@@ -268,7 +270,6 @@ Series.TVDB_SUBENTITY_FIELDS = (
 
 class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, Entities):
 
-  TYPE_ZONE = 'tvdb'
   EntityClass = TVDBEntity
   EntitiesClass = SQLTags
 
