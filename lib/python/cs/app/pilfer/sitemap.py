@@ -1401,7 +1401,12 @@ class SiteEntity(Entity, NoAttrs):
     return self.sitepage_url
 
   def _refresh(self, url=None, *, data=None):
-    ''' Refresh this entity.
+    ''' The default `_refresh` method runs
+        `self.scan_sitepage(self.sitepage_url)` and applies the resulting
+        `ScanData` instance to the relevant (detected/recognised) entities.
+
+        The relevant per-entity-type scan should be provided by
+        each subclass' `.scan_sitepage(FlowState)->ScanData` method.
     '''
     if data is not None:
       self.type_zone_update(data)
