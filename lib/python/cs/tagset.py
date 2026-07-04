@@ -3156,7 +3156,7 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
       cls = self.__class__
       suffix_handler = getattr(cls, f'suffix_{suffix}', None)
       if suffix_handler is not None:
-        return trace(suffix_handler, retval=True)(self, attr)
+        return suffix_handler(self, attr)
     return super().__getattr__(attr)
 
   @cached_property
@@ -3353,9 +3353,10 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
     '''
     ref_subtype = attr.removesuffix('_ent')
     ref_key = f'{ref_subtype}_id'
-    idvalue = self.get(ref_key, None)
+    idvalue = getattr(self, ref_key, None)
     if idvalue is None:
       return None
+    # demote sequence to first value or None
     if not isinstance(idvalue, str) and isinstance(idvalue, Sequence):
       if len(idvalue) == 0:
         return None
@@ -3370,9 +3371,10 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
     '''
     ref_subtype = attr.removesuffix('_ents')
     ref_key = f'{ref_subtype}_id'
-    idvalues = self.get(ref_key, None)
+    idvalues = getattr(self, ref_key, None)
     if idvalues is None:
       return ()
+    # promote scalar to list
     if isinstance(idvalues, str) or not isinstance(idvalues, Sequence):
       idvalues = [idvalues]
     return [
