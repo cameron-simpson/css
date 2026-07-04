@@ -24,7 +24,7 @@ from uuid import UUID
 from cs.binary import bs
 from cs.cmdutils import BaseCommand, popopts, qvprint, vprint
 from cs.deco import (
-    decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
+    attr, decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
 )
 from cs.fileutils import atomic_filename
@@ -1486,36 +1486,90 @@ class SiteEntity(Entity, NoAttrs):
     # scan the soup for known widgets
     1 in self.grok_soup(flowstate.soup, self.sitemap)
 
-  def _request(self, *, page="sitepage", method="GET"):
-    ''' Return the dict which caches the HTTP Response from the last request for `page`.
-        Note that just updating this dict does not reflect in the database.
-        Instead the `._request_update(flowstate)` method should be called.
-    '''
-    _request = self.tags.get('_request') or {}
-    _request.setdefault(page, {}).setdefault(method, {})
-    self.tags['_request'] = _request
-    return _request
+##  def _request(self, *, page="sitepage", method="GET"):
+##    ''' Return the dict which caches the HTTP Response from the last request for `page`.
+##        Note that just updating this dict does not reflect in the database.
+##        Instead the `._request_update(flowstate)` method should be called.
+##    '''
+##    _request = self.tags.get('_request') or {}
+##    _request.setdefault(page, {}).setdefault(method, {})
+##    self.tags['_request'] = _request
+##    return _request
+##
+##  def _request_update(
+##      self, flowstate: FlowState, *, page="sitepage", method="GET"
+##  ):
+##    ''' Update the cached HTTP response information for `page` from `flowstate`.
+##    '''
+##    _request = self._request(page="sitepage", method=flowstate.method)
+##    _request[page][method].update(
+##        url=flowstate.url.url_s,
+##        request={
+##            hdr.lower(): value
+##            for hdr, value in sorted(flowstate.request.headers.items())
+##            if hdr.lower() != 'authorization'
+##        },
+##        response={
+##            hdr.lower(): value
+##            for hdr, value in sorted(flowstate.response.headers.items())
+##        },
+##    )
+##    # update the database
+##    self.tags.set('_request', _request, force=True)
 
-  def _request_update(
-      self, flowstate: FlowState, *, page="sitepage", method="GET"
+  @attr(tag_name='http.request')
+  def rq(
+      self,
+      page="sitepage",
+      *,
+      flowstate: FlowState | None = None,
+      method=None,
+      no_save=False,
+      tag_name=None,
   ):
-    ''' Update the cached HTTP response information for `page` from `flowstate`.
+    ''' Return and possibly update the entry in `self['http.request']`
+        for the last request for this entity.
+        If `flowstate` is provided, update the record from the `flowstate`
+        (unless `no_save` is true, default `False`).
     '''
-    _request = self._request(page="sitepage", method=flowstate.method)
-    _request[page][method].update(
-        url=flowstate.url.url_s,
-        request={
-            hdr.lower(): value
-            for hdr, value in sorted(flowstate.request.headers.items())
-            if hdr.lower() != 'authorization'
-        },
-        response={
-            hdr.lower(): value
-            for hdr, value in sorted(flowstate.response.headers.items())
-        },
-    )
-    # update the database
-    self.tags.set('_request', _request, force=True)
+    if method is None:
+      if flowstate is None:
+        method = 'GET'
+      else:
+        method = flowstate.method
+    if tag_name is None:
+      tag_name = self.rq.tag_name
+    tags = self.tags
+    needs_save = False
+    _rq = tags.get(tag_name)
+    if _rq is None:
+      needs_save = True
+      _rq = {}
+    for_page = _rq.get(page)
+    if for_page is None:
+      needs_save = True
+      for_page = _rq[page] = {}
+    for_method = for_page.get(method)
+    if for_method is None:
+      needs_save = True
+      for_method = for_page[method] = {}
+    if flowstate is not None:
+      needs_save = True
+      for_method.update(
+          url=flowstate.url.url_s,
+          request={
+              hdr.lower(): value
+              for hdr, value in sorted(flowstate.request.headers.items())
+              if hdr.lower() != 'authorization'
+          },
+          response={
+              hdr.lower(): value
+              for hdr, value in sorted(flowstate.response.headers.items())
+          },
+      )
+    if needs_save and not no_save:
+      tags[tag_name] = _rq
+    return _rq
 
   def rq_timestamp(self, *, page="sitepage", method="GET"):
     ''' Return the cached HTTP Response `Date` field for `page` as a UNIX timestamp.
