@@ -709,7 +709,7 @@ def observable_class(property_names, only_unequal=False):
 def default_params(func, _strict=False, **param_defaults):
   ''' A decorator to provide factory functions for default parameters.
 
-      This decorator accepts the following special keyword parameters:
+      This decorator accepts the following special keyword parameter:
       * `_strict`: default `False`; if true only replace genuinely
         missing parameters; if false also replace the traditional
         `None` placeholder value
