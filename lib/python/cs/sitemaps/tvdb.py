@@ -30,7 +30,8 @@ from cs.obj import Refreshable, SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.resources import RunState, uses_runstate
 from cs.service_api import HTTPServiceAPI
-from cs.tagset import HasTags, TagSet, UsesTagSets
+from cs.sqltags import SQLTags
+from cs.tagset import Entity, TagSet, Entities
 from cs.threads import pmap
 
 from bs4.element import Tag as BS4Tag
@@ -45,7 +46,7 @@ class TVDBEntity(SiteEntity, Promotable):
   ''' The base class for TheTVDB entities.
   '''
 
-  TVDB_API_ENTITY_SUBPATH_FORMAT = '{type_subname}/{type_key}'
+  API_ENTITY_SUBPATH_FORMAT = '{type_subname}/{type_key}'
   TVDB_SUBENTITY_FIELDS = ()  # list of (fieldname,entity-type)
   TVDB_LINKENTITY_FIELDS = ()
   TVDB_ENTITYTYPE_BY_TVDB_TYPENAME = {}
@@ -89,7 +90,7 @@ class TVDBEntity(SiteEntity, Promotable):
   def refresh_resource(self):
     ''' The refresh resource, which is the API endpoint.
     '''
-    return self.format_as(self.TVDB_API_ENTITY_SUBPATH_FORMAT)
+    return self.format_as(self.API_ENTITY_SUBPATH_FORMAT)
 
   @uses_tvdb
   def _refresh(self, subpath=None, *, data=None, tvdb_api: "TheTVDBAPI"):
@@ -150,17 +151,17 @@ class TVDBEntity(SiteEntity, Promotable):
 class Character(TVDBEntity):
   TYPE_SUBNAME = 'character'
   SITEPAGE_URL_FORMAT = '/characters/{type_key}'
-  TVDB_API_ENTITY_SUBPATH_FORMAT = 'characters/{type_key}'
+  API_ENTITY_SUBPATH_FORMAT = 'characters/{type_key}'
 
 class Company(TVDBEntity):
   TYPE_SUBNAME = 'company'
   SITEPAGE_URL_FORMAT = '/companies/{type_key}'
-  TVDB_API_ENTITY_SUBPATH_FORMAT = 'companies/{type_key}'
+  API_ENTITY_SUBPATH_FORMAT = 'companies/{type_key}'
 
 class Episode(TVDBEntity):
   TYPE_SUBNAME = 'episode'
   SITEPAGE_URL_FORMAT = '/series/{series_name!lc_}/episodes/{type_key}'
-  TVDB_API_ENTITY_SUBPATH_FORMAT = 'episodes/{type_key}/extended'
+  API_ENTITY_SUBPATH_FORMAT = 'episodes/{type_key}/extended'
 
 class Genre(TVDBEntity):
   TYPE_SUBNAME = 'genre'
@@ -169,22 +170,22 @@ class Genre(TVDBEntity):
 class Movie(TVDBEntity):
   TYPE_SUBNAME = 'movie'
   SITEPAGE_URL_FORMAT = '/movies/{type_key}'
-  TVDB_API_ENTITY_SUBPATH_FORMAT = 'movies/{type_key}/extended'
+  API_ENTITY_SUBPATH_FORMAT = 'movies/{type_key}/extended'
 
 class Person(TVDBEntity):
   TYPE_SUBNAME = 'person'
   SITEPAGE_URL_FORMAT = '/people/{type_key}'
-  TVDB_API_ENTITY_SUBPATH_FORMAT = 'people/{type_key}/extended'
+  API_ENTITY_SUBPATH_FORMAT = 'people/{type_key}/extended'
 
 class Season(TVDBEntity):
   TYPE_SUBNAME = 'season'
   SITEPAGE_URL_FORMAT = '/seasons/{fullname:lc_}'
-  TVDB_API_ENTITY_SUBPATH_FORMAT = 'seasons/{type_key}/extended'
+  API_ENTITY_SUBPATH_FORMAT = 'seasons/{type_key}/extended'
 
 class Series(TVDBEntity):
   TYPE_SUBNAME = 'series'
   SITEPAGE_URL_FORMAT = '/{type_subname}/{fullname:lc_}'
-  TVDB_API_ENTITY_SUBPATH_FORMAT = 'series/{type_key}/extended'
+  API_ENTITY_SUBPATH_FORMAT = 'series/{type_key}/extended'
 
   @uses_runstate
   @uses_tvdb
@@ -265,10 +266,11 @@ Series.TVDB_SUBENTITY_FIELDS = (
     ('tvdb.seasons', Season),
 )
 
-class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, UsesTagSets):
+class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, Entities):
 
   TYPE_ZONE = 'tvdb'
-  HasTagsClass = TVDBEntity
+  EntityClass = TVDBEntity
+  EntitiesClass = SQLTags
 
   # for attrubting data, sourced from https://thetvdb.com/api-information#attribution
   ATTRIBUTION_HTML = 'Metadata provided by TheTVDB. Please consider adding missing information or subscribing.'
