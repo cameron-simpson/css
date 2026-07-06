@@ -272,14 +272,16 @@ def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   return argv
 
 # pylint: disable=too-many-ancestors
-class _MBEntity(HasTags):
-  ''' A `HasTags` subclass for MB entities.
+class _MBEntity(Entity):
+  ''' A `Entity` subclass for MB entities.
       This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
 
       All the state is proxied through the `.tags`, which is an `SQLTagSet`.
       Instances are constructed via `MBDB.mbentity(SQLTagSet)`,
       which also sets the `.mbdb` and `.tags_db` on the instance.
   '''
+
+  TYPE_ZONE = 'mbdb'
 
   MB_QUERY_PREFIX = 'musicbrainzngs.api.query'
   MB_QUERY_PREFIX_ = f'{MB_QUERY_PREFIX}.'
@@ -347,25 +349,19 @@ class _MBEntity(HasTags):
     '''
     return self.mbdb.ontology
 
-  @require(lambda type_name: is_identifier(type_name))  # pylint: disable=unnecessary-lambda
-  @typechecked
-  def resolve_id(
-      self,
-      type_name: str,
-      id: Union[str, dict],  # pylint: disable=redefined-builtin
-  ) -> '_MBEntity':
-    ''' Fetch the object `{type_name}.{id}`.
+  @property
+  def artist_id(self):
+    ''' A list of the `Artist` ids from `self.artist_credit`.
     '''
-    if type_name == 'disc':
-      try:
-        UUID(id)
-      except ValueError:
-        pass
-      else:
-        raise RuntimeError("type_name=%r, id=%r is UUID" % (type_name, id))
-    if isinstance(id, dict):
-      id = id["id"]
-    return self.mbdb[type_name, id]
+    artist_credit = self.artist_credit
+    print(f'{artist_credit=}')
+    return [ad['artist'] for ad in artist_credit if isinstance(ad, dict)]
+
+  @property
+  def artists(self):
+    ''' A list of the `Artist` instances for this entty.
+    '''
+    return self.artist_ents
 
   @cached_property
   def artist_credit_v(self):
@@ -391,23 +387,14 @@ class _MBEntity(HasTags):
         artists.append(self.mbdb['artist', artist_info])
     return artists
 
-  @property
-  def artists(self):
-    ''' A list of the `MBArtist`s from `self.tags.artist_credit`.
-    '''
-    return [
-        artist for artist in self.artist_credit_v
-        if not isinstance(artist, str)
-    ]
-
   def artist_names(self):
     ''' A list of the artist names from `self.tags.artist_credit`.
     '''
     return [artist.fullname for artist in self.artists]
 
   @property
-  def artist_credit(self) -> str:
-    '''A credit string computed from `self.tags.artist_credit`.
+  def artist_credit_s(self) -> str:
+    '''A credit string computed from `self.artist_credit_v`.
     '''
     strs = []
     sep = ''
@@ -470,9 +457,9 @@ class MBDisc(_MBEntity):
       for medium in release_entry['medium-list']:
         for disc_entry in medium['disc-list']:
           if disc_entry['id'] == discid:
-            release = self.resolve_id('release', release_entry['id'])
+            release = self.mbdb['release', release_entry['id']]
             if release is None:
-              warning("no release found for id %r", release)
+              warning("no release found for discid %r", release)
             else:
               releases.append(release)
     return releases
@@ -493,7 +480,7 @@ class MBDisc(_MBEntity):
       if not all_releases:
         warning("%s: no nonmatching relases", self.name)
         return None
-      return self.resolve_id('release', all_releases[0]['id'])
+      return self.mbdb['release', all_releases[0]['id']]
     return releases[0]
 
   @property
@@ -564,7 +551,7 @@ class MBDisc(_MBEntity):
     '''
     recordings = []
     for track_rec in self.medium['track-list']:
-      recording = self.resolve_id('recording', track_rec['recording']['id'])
+      recording = self.mbdb['recording', track_rec['recording']['id']]
       recordings.append(recording)
     return recordings
 
@@ -593,7 +580,7 @@ class MBDisc(_MBEntity):
     release = self.release
     return TagSet(
         disc_id=self.mbkey,
-        disc_artist_credit='' if release is None else release.artist_credit,
+        disc_artist_credit='' if release is None else release.artist_credit_s,
         disc_title=self.title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
@@ -611,7 +598,7 @@ class MBDisc(_MBEntity):
     return TagSet(
         track_number=track_index + 1,
         track_total=int(self.medium['track-count']),
-        track_artist_credit=recording.artist_credit,
+        track_artist_credit=recording.artist_credit_s,
         track_title=recording.title,
     )
 
@@ -641,7 +628,7 @@ class MBTrack(_MBEntity):
   TYPE_SUBNAME = 'track'
 
 class MBRelease(_MBEntity):
-  ''' A Musicbrainz recording entry, a single track.
+  ''' A Musicbrainz release.
   '''
 
   TYPE_SUBNAME = 'release'
@@ -663,13 +650,12 @@ class MBSQLTags(SQLTags):
   DBURL_ENVVAR = MBDB_PATH_ENVVAR
   DBURL_DEFAULT = MBDB_PATH_DEFAULT
 
-class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
+class MBDB(Entities, MultiOpenMixin, RunStateMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
   '''
 
-  TYPE_ZONE = 'mbdb'
-  HasTagsClass = _MBEntity
-  TagSetsClass = MBSQLTags
+  EntityClass = _MBEntity
+  EntitiesClass = MBSQLTags
 
   # Mapping of MusicbrainzNG tag names whose type is not themselves.
   TYPE_NAME_REMAP = {
@@ -696,7 +682,7 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
   QUERY_INCLUDES_NEED_LOGIN = ['user-tags', 'user-ratings']
 
   def __init__(self, mbdb_path=None):
-    UsesTagSets.__init__(self, tagsets=MBSQLTags(mbdb_path))
+    Entities.__init__(self, tagsets=MBSQLTags(mbdb_path))
     RunStateMixin.__init__(self)
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
@@ -726,10 +712,20 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
       # discid stuff:
       # https://github.com/metabrainz/libdiscid/blob/192edd70f17661f1a13ac3b349a2a2d96f5f0351/src/base64.c#L85
       # this is amazingly ill specified AFAICT
-      index = (
-          mbtype.replace('-', '_') if isinstance(mbtype, str) else mbtype,
-          key.replace('.', '+'),
-      )
+      if isinstance(mbtype, str):
+        mbtype = mbtype.replace('-', '_')
+      key = key.replace('.', '+')
+      if mbtype == 'disc' or mbtype is MBDisc:
+        # discids are not valid UUIDs
+        try:
+          UUID(key)
+        except ValueError:
+          pass
+        else:
+          raise RuntimeError(
+              f'{self.__class__.__getitem__[{index=}]: {mbtype=},{key=}: disc keys should not be UUIDs'
+          )
+      index = (mbtype, key)
     return super().__getitem__(index)
 
   # pylint: disable=too-many-arguments
