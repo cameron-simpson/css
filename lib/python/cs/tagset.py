@@ -577,7 +577,7 @@ class ZonedTypes:
   '''
 
   def __getattr__(self, attr):
-    ''' Accessing `.foo` falls back to `["zone.foo"]`
+    ''' Accessing `.foo` tries `["foo"]` but falls back to `["zone.foo"]`
     '''
     try:
       return self[attr]
@@ -1247,10 +1247,23 @@ class TagSet(
       if name not in other:
         self.discard(name, verbose=verbose)
 
-  def update(self, other=None, *, prefix=None, verbose=None, **other_kw):
+  def update(
+      self, other=None, *, lc_=False, prefix=None, verbose=None, **other_kw
+  ):
     ''' Update this `TagSet` from `other` or `other_kw`,
         a dict of `{name:value}`
         or an iterable of `Tag`like or `(name,value)` things.
+
+        Parameters:
+        * `other`: optional update object, a dict or iterable of `(key,value)`
+        * `lc_`: if true (default `False`) lowercase the update
+          names and replace dashes with underscores; this mode aids
+          use with attribute access, for example via `ZonedTypes.__getattr__`
+        * `prefix`: optional prefix; if set the each update `name`
+          updates the key `{prefix}.{name}`
+        * `verbose`: passed to `self.set` when applying each update
+
+        Other keyword parameters are also used to update self.
     '''
     try:
       # produce (name,value) from dict
@@ -1265,10 +1278,14 @@ class TagSet(
           name, value = item
         except ValueError:
           name, value = item.name, item.value
+        if lc_:
+          name = name.lower().replace('-', '_')
         if prefix:
           name = prefix + '.' + name
         self.set(name, value, verbose=verbose)
     for name, value in other_kw.items():
+      if lc_:
+        name = name.lower().replace('-', '_')
       if prefix:
         name = prefix + '.' + name
       self.set(name, value, verbose=verbose)
@@ -3318,13 +3335,13 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
 
     return FormatMapping(self, kwargs, missing)
 
-  def type_zone_update(self, mapping, prefix=None):
+  def type_zone_update(self, mapping, prefix=None, *, lc_=False):
     ''' Update `self` with `mapping`, using `prefix`.
         The default `prefix` is self.type_zone`.
     '''
     if prefix is None:
       prefix = self.type_zone
-    self.update(mapping, prefix=prefix)
+    self.update(mapping, lc_=lc_, prefix=prefix)
 
   #################################################################
   # Properties supporting Refreshable.
