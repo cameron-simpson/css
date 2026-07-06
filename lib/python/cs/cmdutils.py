@@ -2019,17 +2019,18 @@ class BaseCommand:
         * the attributes of `self`
     '''
     options = self.options
-    if local is None:
-      pub_mapping = lambda d: {
-          k: v
-          for k, v in d.items()
-          if k and not k.startswith('_')
-      }
-      local = pub_mapping(self.__dict__)
-      local.update(argv=argv, cmd=self.cmd, self=self)
+    pub_mapping = lambda d: {
+        k: v
+        for k, v in d.items()
+        if k and not k.startswith('_')
+    }
+    local_map = pub_mapping(self.__dict__)
+    local_map.update(argv=argv, cmd=self.cmd, self=self)
+    if local is not None:
+      local_map.update(local)
     if banner is None:
-      banner_mapping = dict(local)
-      del banner_mapping['options']
+      banner_mapping = dict(local_map)
+      banner_mapping.pop('options', None)
       banner_mapping.update(
           {
               f'options.{k}': v
@@ -2055,11 +2056,11 @@ class BaseCommand:
     except ImportError:
       return interact(
           banner=banner,
-          local=local,
+          local=local_map,
       )
     return embed(
         banner=banner,
-        locals_=local,
+        locals_=local_map,
     )
 
   @popopts(banner_=None)
