@@ -830,14 +830,17 @@ class MBDB(Entities, MultiOpenMixin, RunStateMixin):
     return mb_info
 
   @classmethod
-  def key_type_name(cls, k):
+  def key_type_name(cls, k: str) -> tuple[str, str | None]:
     ''' Derive a type name from a MusicBrainzng key name.
         Return `(type_name,suffix)`.
 
         A key such as `'disc-list'` will return `('disc','list')`.
         A key such as `'recording'` will return `('recording',None)`.
+
+        Some type names are remapped through the `cls.TYPE_NAME_REMAP`
+        mapping, for example mapping `"artist-credit"` to `"artist"`.
     '''
-    # NB: ordering matters
+    # NB: the suffix ordering matters
     for suffix in 'relation-list', 'count', 'list', 'relation':
       _suffix = '-' + suffix
       type_name = cutsuffix(k, _suffix)
