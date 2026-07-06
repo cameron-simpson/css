@@ -3768,6 +3768,75 @@ class Entities:
 
 UsesTagSets = OBSOLETE(Entities)
 
+class ScanData:
+  ''' A class to manage data obtained about `Entity` instances,
+      for example from an API or scanning a web page.
+      This contains a `.entities` for the reference `Entities`
+      and a `.ent_data_map` for the mapping from `Entity`
+      instances to their scanned data `dict`.
+
+      The data for an `Entity` can be obtained by indexing the
+      `ScanData` instance with an `Entity` instance or a valid index
+      for the `entities` such as a `(Entity-subclass, key)` 2-tuple.
+  '''
+
+  def __init__(self, entities: Entities):
+    # mapping of Entity instances to a data dict
+    self.entities = entities
+    self.ent_data_map = defaultdict(dict)
+
+  def __iter__(self):
+    ''' Iteration yields `(Entity,datadict)` 2-tuples.
+    '''
+    return iter(self.ent_data_map.items())
+
+  @typechecked
+  def __getitem__(self, ent: Union["Entity", tuple]):
+    ''' The data for the supplied `ent`.
+    '''
+    if isinstance(ent, tuple):
+      ent = self.entities[ent]
+    return self.ent_data_map[ent]
+
+  def keys(self):
+    return self.ent_data_map.keys()
+
+  def update(self, ent: Union["Entity", tuple], **data_kw):
+    ''' Update the data for `ent` from `data_kw`.
+          If `ent` is a tuple, use it to obtain a `Entity` from `self.entities`.
+      '''
+    self[ent].update(**data_kw)
+
+  def conv(self, ent: Union["Entity", tuple], mapping, key, conv=None):
+    ''' Update the data for `ent` from `mapping[key]` if present.
+        If `conv` is not `None` it should be a callable accepting
+        the value from `mapping[key]` and returning a converted
+        value to store in the entity data.
+    '''
+    try:
+      value = mapping[key]
+    except KeyError:
+      warning("no mapping[%r]", key)
+      return
+    if conv is None:
+      cvalue = value
+    else:
+      try:
+        cvalue = conv(value)
+      except ValueError as e:
+        warning("%s(mapping[%r]:%r) -> %s", conv, key, value, e)
+        return
+    self.update(ent, **{key: cvalue})
+
+  def apply(self, *refresh_ents):
+    for ent, data in self:
+      if ent in refresh_ents:
+        # if this is the sitepage, consider the entity refreshed
+        ent.refresh(data=data)
+      else:
+        # otherwise just annotate it with whatever was learned
+        ent.type_zone_update(data)
+
 class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
   ''' A wrapper for a `TagSets` instance backing an ontology.
 
