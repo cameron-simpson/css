@@ -466,8 +466,14 @@ def OBSOLETE(func, suggestion=None):
           "OBSOLETE call" if suggestion is None else
           ("OBSOLETE (suggest %r) call" % suggestion)
       ),
-      func.__code__.co_filename,
-      func.__code__.co_firstlineno,
+      (
+          func.__module__
+          if isinstance(func, type) else func.__code__.co_filename
+      ),
+      (
+          func.__firstlineno__
+          if isinstance(func, type) else func.__code__.co_firstlineno
+      ),
       func.__name__,
   )
 
@@ -487,7 +493,7 @@ def OBSOLETE(func, suggestion=None):
       )
     return func(*args, **kwargs)
 
-  # mark as deprecated if available
+  # mark as deprecated iE available
   try:
     from warnings import deprecated
   except ImportError:
