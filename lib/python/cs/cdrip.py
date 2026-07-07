@@ -288,34 +288,34 @@ class _MBEntity(Entity):
   MB_QUERY_RESULT_TAG_NAME = f'{MB_QUERY_PREFIX}.result'
 
   def _refresh(self, resource=None, *, data=None):
+    if data is not None:
+      self.type_zone_update(data, lc_=True)
+      return True
     mbdb = self.mbdb
     mbtype = self.mbtype
     mbkey = self.mbkey
-    if data is None:
-      if mbtype in ('cdstub',):
-        warning("no refresh for mbtype=%r", mbtype)
-        return False
-      query_get_type = mbtype
-      id_name = 'id'
-      record_key = None
-      if mbtype == 'disc':
-        # we use get_releases_by_discid() for discs
-        query_get_type = 'releases'
-        id_name = 'discid'
-        record_key = 'disc'
-      try:
-        A = self.mbdb.query(
-            query_get_type, mbkey, id_name, record_key=record_key
-        )
-      except (musicbrainzngs.musicbrainz.MusicBrainzError,
-              musicbrainzngs.musicbrainz.ResponseError) as e:
-        warning("%s: not refreshed: %s", type(e).__name__, e)
-        return False
-      self[self.MB_QUERY_RESULT_TAG_NAME] = A
-      scanned = mbdb.scan_mb_response(mbtype, A)
-      scanned.apply(self)
-    else:
-      self.type_zone_update(data, lc_=True)
+    if mbtype in ('cdstub',):
+      warning("no refresh for mbtype=%r", mbtype)
+      return False
+    query_get_type = mbtype
+    id_name = 'id'
+    record_key = None
+    if mbtype == 'disc':
+      # we use get_releases_by_discid() for discs
+      query_get_type = 'releases'
+      id_name = 'discid'
+      record_key = 'disc'
+    try:
+      A = self.mbdb.query(
+          query_get_type, mbkey, id_name, record_key=record_key
+      )
+    except (musicbrainzngs.musicbrainz.MusicBrainzError,
+            musicbrainzngs.musicbrainz.ResponseError) as e:
+      warning("%s: not refreshed: %s", type(e).__name__, e)
+      return False
+    self[self.MB_QUERY_RESULT_TAG_NAME] = A
+    scanned = mbdb.scan_mb_response(mbtype, A)
+    scanned.apply(self)
     return True
 
   @property
