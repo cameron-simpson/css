@@ -14,7 +14,6 @@ from inspect import isgeneratorfunction, ismethod, signature, Parameter
 import sys
 import traceback
 import typing
-from warnings import deprecated
 
 from cs.gimmicks import warning
 from cs.typingutils import is_optional
@@ -472,7 +471,6 @@ def OBSOLETE(func, suggestion=None):
       func.__name__,
   )
 
-  @deprecated(deprecation_message)
   def OBSOLETE_func_wrapper(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
@@ -488,6 +486,16 @@ def OBSOLETE(func, suggestion=None):
           frame[2],
       )
     return func(*args, **kwargs)
+
+  try:
+    from warnings import deprecated
+  except ImportError:
+    # @deprecated arrived in Python 3.13
+    pass
+  else:
+    OBSOLETE_func_wrapper = deprecated(deprecation_message)(
+        OBSOLETE_func_wrapper
+    )
 
   funcname = getattr(func, '__name__', str(func))
   funcdoc = getattr(func, '__doc__', None) or ''
