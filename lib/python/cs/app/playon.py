@@ -714,6 +714,7 @@ class PlayOn(Entities, Refreshable):
     self.api.login_state  # do once, before the API calls
     for _ in pmap(lambda f: f(), targets):
       pass
+    return True
 
   @pfx_method
   @require(
