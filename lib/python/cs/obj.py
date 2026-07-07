@@ -750,6 +750,9 @@ class Refreshable(ABC):
         self.refresh_last_poll = now
       resource = getattr(self, 'refresh_resource', None)
       was_updated = self._refresh(resource, data=data, **_refresh_kw)
+      # catch accidental None, mostly
+      assert isinstance(was_updated, bool), \
+          f'{self._refresh=} -> not a bool: {type(was_updated)} {was_updated=}'
       if was_updated:
         # good poll and data updated
         self.refresh_last_update = now
