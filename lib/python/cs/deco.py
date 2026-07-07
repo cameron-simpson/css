@@ -487,6 +487,7 @@ def OBSOLETE(func, suggestion=None):
       )
     return func(*args, **kwargs)
 
+  # mark as deprecated if available
   try:
     from warnings import deprecated
   except ImportError:
