@@ -14,6 +14,7 @@ from inspect import isgeneratorfunction, ismethod, signature, Parameter
 import sys
 import traceback
 import typing
+from warnings import deprecated
 
 from cs.gimmicks import warning
 from cs.typingutils import is_optional
@@ -143,7 +144,6 @@ def decorator(deco=None, *, decorable=callable):
       The `@mydeco` decorator itself is then written as though the
       arguments were always supplied.
   '''
-
   if deco is None:
     return lambda func, **kw: decorator(func, decorable=decorable, **kw)
 
@@ -458,9 +458,21 @@ def OBSOLETE(func, suggestion=None):
 
       This emits a warning log message before calling the decorated function.
       Only one warning is emitted per calling location.
+
+      It also marks the function as deprecated using `@warnings.deprecated`.
   '''
   callers = set()
+  deprecation_message = "%s to %s:%d:%s()" % (
+      (
+          "OBSOLETE call" if suggestion is None else
+          ("OBSOLETE (suggest %r) call" % suggestion)
+      ),
+      func.__code__.co_filename,
+      func.__code__.co_firstlineno,
+      func.__name__,
+  )
 
+  @deprecated(deprecation_message)
   def OBSOLETE_func_wrapper(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
@@ -468,16 +480,13 @@ def OBSOLETE(func, suggestion=None):
     caller = frame[0], frame[1]
     if caller not in callers:
       callers.add(caller)
-      prefix = (
-          "OBSOLETE call" if suggestion is None else
-          ("OBSOLETE (suggest %r) call" % suggestion)
+      warning(
+          "%s, called from %s:%d:%s",
+          deprecation_message,
+          frame[0],
+          frame[1],
+          frame[2],
       )
-      fmt = "%s to %s:%d:%s(), called from %s:%d:%s"
-      fmtargs = [
-          prefix, func.__code__.co_filename, func.__code__.co_firstlineno,
-          func.__name__, frame[0], frame[1], frame[2]
-      ]
-      warning(fmt, *fmtargs)
     return func(*args, **kwargs)
 
   funcname = getattr(func, '__name__', str(func))
@@ -1124,7 +1133,7 @@ def promote(func, params=None, types=None):
         if isinstance(arg_value, annotation):
           # already of the desired type
           continue
-      except TypeError as e:
+      except TypeError:
         warning(
             "%s: skip param %s, annotation is not a type: %r",
             get_context(),
