@@ -1,3 +1,4 @@
+cs.cmdutils: bad usage from subcommand should preempt the run-context call
 ChainedHashCode to produce a progressive and computable-from-midway style hash based checksum of a data stream
 ffmpegutils: mark video as interlaced
 printt: colspan
