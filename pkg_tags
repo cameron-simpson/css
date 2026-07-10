@@ -99,6 +99,7 @@ cs.seq pypi.release="20260622" ok_revision="1259a3959bad111eb6b4189723ae4448c40e
 cs.service_api ok_revision="7ad64b8a036b26f1f93471f296ee262214a73aee" pypi.release="20260531"
 cs.sh ok_revision="3af3cf2c5da8cc18eafa8a65437eaf1e7b7f1db3"
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
+cs.socketutils
 cs.splink ok_revision=d931f30ab0db0d1e1aef4df8295a1b20e364a4be pypi.release="20240316"
 cs.sqlalchemy_utils ok_revision=a24881e9b395ffdf7b4d01f65bf3e2a05eded692 pypi.release="20260531" features={"20230612":["orchestrated_session"],"20260531":["ORM__dbshell"]}
 cs.sqlalchemyutils
@@ -122,6 +123,7 @@ django
 "ffmpeg-python"
 html5lib
 icontract
+lmdb
 lxml
 matplotlib
 mobi
