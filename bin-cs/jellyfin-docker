@@ -10,6 +10,11 @@ image=${JELLYFIN_DOCKER_IMAGE:-ghcr.io/jellyfin/jellyfin:latest}
 config=${JELLYFIN_CONFIG:-$HOME/var/jellyfin}
 media=${JELLYFIN_MEDIA:-$HOME/media}
 cache=${JELLYFIN_CACHE:-~/var/cache/jellyfin}
+runopts=
+
+case "$1" in
+  -U)   runopts="$runopts $1"; shift
+esac
 
 set -x
-exec run-docker --restart unless-stopped "rw:config:$config" "rw:cache:$cache" "ro:media:$media" "$image"
+exec run-docker --restart unless-stopped $runopts "rw:config:$config" "rw:cache:$cache" "ro:media:$media" "$image"
