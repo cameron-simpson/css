@@ -9,10 +9,15 @@ discid
 enum34
 ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git@master
 html5lib
+hg-git @ https://foss.heptapod.net/mercurial/hg-git/-/archive/branch/default/hg-git-branch-default.tar.gz?ref_type=heads
 icontract
 lmdb
 lxml
 matplotlib
+# 7.2 breaks the hg-git extension, changes yet to be debugged
+# something to do with bundle mapping changes
+# hg-git uses the @bundle2.parthandler decorator, which is no more
+mercurial==7.1
 mobi
 mypy
 musicbrainzngs
@@ -26,7 +31,7 @@ pyflakes
 pyicontract-lint
 pylint
 ##pylzma - seems to be stale, what was I using this for? - cameron 30nov2024
-##pyobjc[allbindings]  ## macos only
+pyobjc[allbindings]; sys_platform == "darwin"
 pytest
 python-dateutil
 railroad-diagrams
