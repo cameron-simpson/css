@@ -1068,8 +1068,24 @@ class SiteEntity(Entity, NoAttrs):
   @classmethod
   def default_sitemap(cls) -> "SiteMap":
     ''' Return the default `SiteMap` instance for `cls.TYPE_ZONE`.
+  def widget_classes(cls) -> list[type]:
+    ''' Return a list of the applicable `SiteWidget` subclasses for `cls`.
+        This is the `SiteWidget` subclasses listed in the
+        `WIDGET_CLASSES` class attribute of each class in `cls.__mro__`.
+
+        Typically a `SiteMap`'s root `SiteEntity` subclass would
+        have a list of widgets which might appear on any site page,
+        and specific `iteEntity` subclasses might have widgets which
+        appear only on their primary site web page.
     '''
     return SiteMap.by_type_zone[cls.TYPE_ZONE]
+    return list(
+        unrepeated(
+            chain(
+                *(getattr(wcls, 'WIDGET_CLASSES', ()) for wcls in cls.__mro__)
+            )
+        )
+    )
 
   @classmethod
   @pfx
@@ -1364,7 +1380,13 @@ class SiteEntity(Entity, NoAttrs):
     data["html.meta"] = flowstate.meta.tags.as_dict()
     data["html.properties"] = flowstate.meta.properties.as_dict()
     data['opengraph'] = dict(flowstate.opengraph)
-    return scanned
+    sitemap = self.sitemap
+    for widget_cls in self.widget_classes():
+      for widget in widget_cls.from_soup(flowstate.soup):
+        ent = widget.entity
+        wdata = widget.parse()
+        scandata[ent].update(wdata, scandata)
+    return scandata
 
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
@@ -1400,29 +1422,19 @@ class SiteEntity(Entity, NoAttrs):
     return self.sitemap.urlto(path)
 
   @classmethod
-  def grok_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteEntity"]:
-    ''' Scan the soup for the widgets associated with this `SiteEntity` type.
+  @uses_scandata
+  def scan_soup(
+      cls, soup, sitemap: "SiteMap", *, scandata: ScanData
+  ) -> ScanData:
+    ''' Scan the `soup` for the widgets associated with this `SiteEntity` type.
+        Return `scandata` (because it may have been made by the call).
     '''
-    for widget_class in cls.WIDGET_CLASSES:
+    for widget_class in cls.widget_classes():
       vprint("scan soup for", widget_class)
-      for widget in widget_class.scan_soup(soup, sitemap):
-        widget.grok()
-        yield widget.entity
+      for widget in widget_class.from_soup(soup, sitemap):
+        widget.scan(scandata=scandata)
+    return scandata
 
-  @pagemethod
-  def grok_sitepage(self, flowstate: FlowState, match=None):
-    ''' The basic sitepage grok:
-        - update the entity cache of the request
-        - record the metadata
-        - record the opengraph tags
-        - call `self.grok_soup`, which scans the page soup for the
-          known widgets
-    '''
-    self._request_update(flowstate, page="sitepage")
-    self.update_from_meta(flowstate)
-    self.update(flowstate.opengraph_tags)
-    # scan the soup for known widgets
-    1 in self.grok_soup(flowstate.soup, self.sitemap)
 
 ##  def _request(self, *, page="sitepage", method="GET"):
 ##    ''' Return the dict which caches the HTTP Response from the last request for `page`.
@@ -1669,13 +1681,11 @@ class SiteWidget(ABC):
   sitemap: "SiteMap"
   tag: BS4Tag
 
-  def __init_subclass__(cls, *, sitemap_class, **kw):
+  def __init_subclass__(cls, *, entity_class, **kw):
     ''' Record this widget class against its entity type.
     '''
     super().__init_subclass__(**kw)
-    cls.SITEMAP_CLASS = sitemap_class
-    sitemap_class.WIDGET_CLASSES.append(cls)
-    cls.ENTITY_CLASS.WIDGET_CLASSES.append(cls)
+    entity_class.WIDGET_CLASSES.append(cls)
 
   # most site widgets are DIVs
   TAG_NAME = 'div'
@@ -1692,12 +1702,6 @@ class SiteWidget(ABC):
     ''' The `SiteEntity` associated with this `SiteWidget`.
     '''
     return self.sitemap[self.__class__.ENTITY_CLASS, self.entity_key]
-
-  @abstractmethod
-  def grok(self):
-    ''' Examine the content of `self.tag`, apply to `self.entity`.
-    '''
-    raise NotImplementedError
 
   def check_tag(cls, tag: BS4Tag) -> bool:
     ''' Test whether this tag is in fact an instance of the widget.
