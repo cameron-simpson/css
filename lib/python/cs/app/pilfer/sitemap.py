@@ -10,7 +10,7 @@ from datetime import datetime
 from fnmatch import fnmatch
 from functools import cached_property
 from getopt import GetoptError
-from itertools import zip_longest
+from itertools import chain, zip_longest
 import json
 from os.path import abspath
 import re
@@ -22,6 +22,7 @@ from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Union
 from uuid import UUID
 
 from cs.binary import bs
+from cs.bs4utils import printt_soup
 from cs.cmdutils import BaseCommand, popopts, qvprint, vprint
 from cs.deco import (
     attr, decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
@@ -43,8 +44,8 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import (
     content_encodings, content_length, content_type, datetime_from_http_date
 )
-from cs.seq import ReIterable
-from cs.tagset import BaseTagSets, Entity, TagSet, ZonedTypes, Entities
+from cs.seq import ReIterable, unrepeated
+from cs.tagset import BaseTagSets, Entity, ScanData, uses_scandata, TagSet, ZonedTypes, Entities
 from cs.threads import HasThreadState, ThreadState
 from cs.units import BINARY_BYTES_SCALE
 from cs.urlutils import URL
@@ -964,11 +965,10 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     )
     if 'response' in self.__dict__:
       hdrs = self.response.headers
-      kwargs.update(content_length=content_length(hdrs),)
+      kwargs.update(content_length=content_length(hdrs))
     return kwargs
 
 uses_flowstate = default_params(flowstate=FlowState.default)
-
 
 @decorator
 def with_base_url(method):
@@ -1327,7 +1327,7 @@ class SiteEntity(Entity, NoAttrs):
     except KeyError:
       page_url = self.__getattr__('sitepage_url')
     if page_url is None:
-      warning("%s.site-age_url: no site page, returning None")
+      warning("%s.site-age_url: no site page, returning None", self.name)
     else:
       if page_url.startswith('/'):
         page_url = self.urlto(page_url)
@@ -1733,7 +1733,7 @@ class SiteWidget(ABC):
     return True
 
   @classmethod
-  def scan_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
+  def from_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
     ''' Scan some soup for this kind of widget, yield instances of `cls`.
     '''
     for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
@@ -2404,26 +2404,27 @@ class SiteMap(Entities, Promotable):
     '''
     ent0 = self.url_entity(flowstate.url)
     if ent0 is not None:
-      scanned = ent0.scan_sitepage(flowstate)
+      scandata = ent0.scan_sitepage(flowstate)
       if not no_apply:
-        scanned.apply(ent0)
+        scandata.apply(ent0)
     for method, match in self.on_matches(flowstate, methodglob, **match_kw):
       with Pfx("call %s", method.__qualname__):
         try:
-          scanned: ScanData = method(self, flowstate, match)
+          scandata: ScanData = method(self, flowstate, match)
           if not no_apply:
-            scanned.apply(
+            scandata.apply(
                 # provie the entities whose sitepage patterns match the URL
                 *(
-                    ent for ent in scanned.keys()
+                    ent for ent in scandata.keys()
                     if ent.match_url(flowstate.url, sitemap=self)
                 )
             )
           printt(
-              ["Scanned", flowstate.url], {
+              ["scandata", flowstate.url],
+              {
                   ent.name: data
-                  for ent, data in scanned
-              }
+                  for ent, data in scandata
+              },
           )
         except Exception as e:
           warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
