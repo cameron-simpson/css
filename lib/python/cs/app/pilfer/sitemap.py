@@ -1029,13 +1029,6 @@ class SiteEntity(Entity, NoAttrs):
   # default staleness is 1 day
   REFRESH_LIFESPAN = 86400
 
-  # keys which can be obtained by grokking a web page
-  # a mapping of tag_name to page name eg "sitepage"
-  DERIVED_KEYS = {"_request": "sitepage"}
-  # properties which are obtained by defer()ing keys
-  # a mapping of property name to tag_name
-  DEREFFED_PROPERTIES = {}
-
   def __init_subclass__(cls, **kw):
     ''' `SiteEntity` subclass init - set `cls.url_re` from `cls.URL_RE` if present.
     '''
@@ -1235,15 +1228,6 @@ class SiteEntity(Entity, NoAttrs):
         Example: `.sitepage_url` can be derived from `.SITEPAGE_URL_FORMAT`
         and the format string need only specify the path after the domain.
 
-        Related entities:
-        (Now using DEREFFED_PROPERTIES, but I might scrap this.)
-        If the attribute name is present in `self.DEREFFED_PROPERTIES`
-        (a mapping of attribute name to `(tag_name,direct)` 2-tuples)
-        then the corresponding `tag_name` is obtained and returned
-        directly if `direct`.  Otherwise `self.deref(tag_name)` is
-        returned.
-        This may also be just the `tag_name`, and `direct` will be set to `False`.
-
         Opengraph fallback:
         If `Entity.__getattr__(attr)` raises `AttributeError` and
         the tag `opengraph.{attr}` exists, return that.
@@ -1284,37 +1268,19 @@ class SiteEntity(Entity, NoAttrs):
           if attr.endswith('_url') and formatted.startswith('/'):
             formatted = self.urlto(formatted)
           return formatted
-    # indirect derived attributes
-    DEREFFED_PROPERTIES = cls.DEREFFED_PROPERTIES
     try:
-      deref_from = DEREFFED_PROPERTIES[attr]
-    except KeyError:
-      # not a DEREFFED_PROPERTIES, try the superclass
+      return super().__getattr__(attr)
+    except AttributeError as e:
+      # try from the tags, may autofetch
       try:
-        return super().__getattr__(attr)
-      except AttributeError as e:
-        # try from the tags, may autofetch
+        return self[attr]
+      except KeyError:
+        # no superclass attribute, try the opengraph property
+        og_tag_name = f'opengraph.{attr}'
         try:
-          return self[attr]
+          return self[og_tag_name]
         except KeyError:
-          # no superclass attribute, try the opengraph property
-          og_tag_name = f'opengraph.{attr}'
-          try:
-            return self[og_tag_name]
-          except KeyError:
-            raise e
-    if isinstance(deref_from, str):
-      tag_name, direct = deref_from, False
-    else:
-      tag_name, direct = deref_from
-    # obtain the value; some tags will fetch info from the web if missing
-    # NB: always access the tag, triggers page fetch if missing
-    value = self[tag_name]
-    if direct:
-      return value
-    else:
-      value = self.deref(tag_name)
-    return value
+          raise e
 
   @property
   def sitepage_url(self):
