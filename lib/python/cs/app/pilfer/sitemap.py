@@ -1268,9 +1268,7 @@ class SiteEntity(Entity, NoAttrs):
         pass
       else:
         pattern = self.patterns[attr]
-        fields = dict(self)
-        fields.setdefault('type_key', self.type_key)
-        return pattern.url_path_for(fields)
+        return pattern.url_path_for(self)
       # *_FORMAT derived attributes
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
       fmtattr_name = f'{attr.upper()}_FORMAT'
