@@ -1337,8 +1337,8 @@ class SiteEntity(Entity, NoAttrs):
         method to get the initial `ScanData` and then further update
         it from the scan.
     '''
-    scanned = ScanData(self.sitemap)
-    data = scanned[self]
+    scandata = ScanData(self.sitemap)
+    data = scandata[self]
     data[self.rq.tag_name] = self.rq(
         "sitepage",
         flowstate=flowstate,
