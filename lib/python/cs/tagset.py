@@ -3883,6 +3883,9 @@ class ScanData:
         # otherwise just annotate it with whatever was learned
         ent.type_zone_update(data)
 
+# provide a default scandata:ScanData parameter
+uses_scandata = default_params(scandata=ScanData)
+
 class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
   ''' A wrapper for a `TagSets` instance backing an ontology.
 
