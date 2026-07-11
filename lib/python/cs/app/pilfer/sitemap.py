@@ -1133,20 +1133,14 @@ class SiteEntity(Entity, NoAttrs):
       return default
 
   @classmethod
-  def pattern(
-      cls,
-      pattern_name="sitepage_url",
-      *,
-      sitemap: "SiteMap" = None,
-  ) -> URLPattern | None:
+  def pattern(cls, pattern_name="sitepage_url") -> URLPattern | None:
     ''' Return a `URLPattern` for the specified page name, default `"sitepage_url"`.
     '''
-    if sitemap is None:
-      sitemap = cls.default_sitemap()
     try:
       pattern_s = getattr(cls, f'{pattern_name.upper()}_PATTERN')
     except AttributeError as e:
       return None
+    sitemap = SiteMap.default(cls.TYPE_ZONE)
     return URLPattern(pattern_s, sitemap.URL_DOMAIN)
 
   @classmethod
