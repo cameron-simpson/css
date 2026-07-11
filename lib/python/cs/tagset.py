@@ -312,7 +312,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand, vprint
 from cs.context import stackkeys, withall
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator, fmtdoc, OBSOLETE, Promotable, uses_verbose
+from cs.deco import decorator, default_params, fmtdoc, OBSOLETE, Promotable, uses_verbose
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
@@ -3166,6 +3166,8 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
   def __init__(self, tags: TagSet, tags_db: "Entities" = None):
     super().__init__()
     if tags_db is None:
+      # TODO: I should use Entity.default(zone) but only if it remembers
+      # so leaving this breaking if the Entities subclass isn't defined
       tags_db = Entities.by_type_zone[self.TYPE_ZONE]
     self.tags = tags
     self.tags_db = tags_db
