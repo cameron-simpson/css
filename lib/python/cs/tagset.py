@@ -3094,6 +3094,9 @@ class MappingTagSets(BaseTagSets):
 class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
   ''' A mixin for classes which have a `.tags:TagSet` attribute.
 
+      Usually these are considered part of a "zone" - a group of
+      entities in a particular applicaiton domain.
+
       The subclass may itself define its `.tags` instance attribute
       or rely on the default cached property `.tags`, which will return
       `self.tags_db[self.tags_entity_key]`.
@@ -3107,6 +3110,30 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
       from the API call land on attributes named `{zone}.{key}` -
       the `.type_zone_update(mapping)` provides a convenient call
       for this.
+
+      `Entity` instances are designed as representing entities in
+      some "zone", a set of entities in some domain or organise
+      grouping; typical examples include entities describes by some
+      API like MusicBrainzNG or objects presented by some website.
+      As such, they subclass `ZonedTypes`, which expects the entity's
+      `.name` to be of the form *zone*`.`*subname*`.`*key*; the
+      *zone* partitions entities off into their own domain, the
+      *subname* is in effect the entity's type within that domain
+      and the *key* is the entity id within that type.
+
+      On this basis, entities updated with data from the zone,
+      for example from an API call or by scraping a web page,
+      normally update tag keys named *zone*`.`*field* where the *field*
+      is the top level field from the data.
+
+      The `ZonedTypes.__getattr__(attr)` method looks first for a
+      direct tag named `attr` but falls back to a tag named
+      *zone*`.`*attr*. This allows entities to be tagged with the
+      data from an API, but to be overridden by the direct tag if
+      the API data are considered incorrect or unsuitable.
+
+      The `ScanData.apply()` method follows this principle,
+      applying the scanned data to tags named *zone*`.`*field*.
   '''
 
   def __new__(cls, tags: TagSet, *_, **__):
@@ -3459,12 +3486,15 @@ class Entities:
       self.set_as_zone(zone, if_unset=True)
 
   @classmethod
-  def default(cls, zone: str) -> "Entities":
+  def default(cls, zone: str | None = None) -> "Entities":
     ''' Return the default `Entities` instance for `zone`.
+        If `zone` is not defined it is taken from `cls.TYPE_ZONE`.
         Raise `KeyError` for an unregistered `zone`.
         Raise `TypeError` if there is no registered default
-        an the class for `zone` cannot be instantiated with `entcls()`.
+        and the class for `zone` cannot be instantiated with `entcls()`.
     '''
+    if zone is None:
+      zone = cls.TYPE_ZONE
     try:
       entities = cls.by_type_zone[zone]
     except KeyError as e:
@@ -3829,6 +3859,22 @@ class ScanData:
     self.update(ent, **{key: cvalue})
 
   def apply(self, *refresh_ents):
+    ''' Apply the scanned data to its entities.
+
+        If an entity `ent` is a member of `refresh_ents` then call
+        `ent.refresh(data=data)` on the basis that the data are
+        complete enough to consider the entity refreshed, otherwise
+        call `ent.type_zone_update(data)`.
+
+        The purpose of the call to `ent.refresh()` is to exercise
+        the refresh machinery. On a `Refreshable` object `ent` this
+        marks the object as current with the new data; the data are
+        applied with `Refreshable._refresh()`, the zone specific
+        method, which typically _also_ uses `ent.type_zone_update(data)`.
+
+        This follows the tag name design outlined in the `Entity` docstring,
+        where API/site data are stored with tags named *zone*`.`*field*.
+    '''
     for ent, data in self:
       if ent in refresh_ents:
         # if this is the sitepage, consider the entity refreshed
