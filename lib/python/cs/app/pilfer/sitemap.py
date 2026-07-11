@@ -1049,6 +1049,22 @@ class SiteEntity(Entity, NoAttrs):
           URL_RE if isinstance(URL_RE, re.Pattern) else re.compile(URL_RE)
       )
 
+  @property
+  def sitemap(self):
+    ''' This property is the entity's `SiteMap`.
+        If one has not been set, obtain it from the `SiteMap.default()` class method
+        for `self.TYPE_ZONE` and record the result.
+    '''
+    try:
+      return self.__dict__['sitemap']
+    except KeyError:
+      sitemap = self.sitemap = SiteMap.default(self.TYPE_ZONE)
+      return sitemap
+
+  @sitemap.setter
+  def sitemap(self, new_sitemap: "SiteMap"):
+    self.__dict__['sitemap'] = new_sitemap
+
   @classmethod
   def default_sitemap(cls) -> "SiteMap":
     ''' Return the default `SiteMap` instance for `cls.TYPE_ZONE`.
