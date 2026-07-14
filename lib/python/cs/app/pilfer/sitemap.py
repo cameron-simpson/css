@@ -1082,8 +1082,6 @@ class SiteEntity(Entity, NoAttrs):
     self.__dict__['sitemap'] = new_sitemap
 
   @classmethod
-  def default_sitemap(cls) -> "SiteMap":
-    ''' Return the default `SiteMap` instance for `cls.TYPE_ZONE`.
   def widget_classes(cls) -> list[type]:
     ''' Return a list of the applicable `SiteWidget` subclasses for `cls`.
         This is the `SiteWidget` subclasses listed in the
@@ -1094,7 +1092,6 @@ class SiteEntity(Entity, NoAttrs):
         and specific `iteEntity` subclasses might have widgets which
         appear only on their primary site web page.
     '''
-    return SiteMap.by_type_zone[cls.TYPE_ZONE]
     return list(
         unrepeated(
             chain(
