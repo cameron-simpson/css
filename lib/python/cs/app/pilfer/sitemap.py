@@ -1067,6 +1067,16 @@ class SiteEntity(Entity, NoAttrs):
       sitemap = self.sitemap = SiteMap.default(self.TYPE_ZONE)
       return sitemap
 
+  @classmethod
+  def default_class_sitemap(cls, zone=None) -> "SiteMap":
+    ''' The default `SiteMap` instance for this class based on `zone`.
+        The default `zone` comes from `cls.TYPE_ZONE`.
+        This is a wrapper for `SiteMap.default()`.
+    '''
+    if zone is None:
+      zone = cls.TYPE_ZONE
+    return SiteMap.default(zone=zone)
+
   @sitemap.setter
   def sitemap(self, new_sitemap: "SiteMap"):
     self.__dict__['sitemap'] = new_sitemap
@@ -1109,7 +1119,7 @@ class SiteEntity(Entity, NoAttrs):
         `cls.match_url(,url,pattern_name=pattern_name)`.
     '''
     if sitemap is None:
-      sitemap = cls.default_sitemap()
+      sitemap = cls.default_class_sitemap()
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
       match = cls.match_url(url, pattern_name=pattern_name)
       if match is None:
@@ -1192,7 +1202,7 @@ class SiteEntity(Entity, NoAttrs):
         superclasses.
     '''
     if sitemap is None:
-      sitemap = cls.default_sitemap()
+      sitemap = cls.default_class_sitemap()
     pattern_map = {}
     for supercls in reversed(cls.__mro__):
       for clsattr, pattern_s in supercls.__dict__.items():
