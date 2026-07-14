@@ -174,6 +174,8 @@ class URLPattern(Promotable):
       # the default stops at / or &
       '':
       Converter(r'[^/?&]+', str, str),
+      '*':
+      Converter(r'.*', str, str),
       # a nonnegative integer
       'int':
       Converter(r'0|[1-9]\d*', int, str),
@@ -194,7 +196,7 @@ class URLPattern(Promotable):
 
     # a <converter:name> placeholder
     PLACEHOLDER_re = re.compile(
-        r'<((?P<converter>[a-zA-Z][a-zA-Z0-9_]*):)?(?P<name>[a-z_][a-z0-9_]*)>'
+        r'<((?P<converter>([a-zA-Z][a-zA-Z0-9_]*|\*)):)?(?P<name>[a-z_][a-z0-9_]*)>'
     )
 
     @classmethod
@@ -249,11 +251,14 @@ class URLPattern(Promotable):
           f'cannot promote {pattern!r} to URLPattern, looks like an HTTP METHOD name'
       )
     if '/' in pattern:
+      # just match the path with a regexp
       if not pattern.startswith('/'):
+        # llow anything before the text
         pattern = f'/<*:preamble>{pattern}'
       hostname_fnmatch = None
       path_pattern = pattern
     else:
+      # just match the hostname with a glob
       hostname_fnmatch = pattern
       path_pattern = None
     return cls(hostname_fnmatch, path_pattern)
