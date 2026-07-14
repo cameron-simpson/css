@@ -1135,7 +1135,36 @@ class SiteEntity(Entity, NoAttrs):
         entity.setdefault(match_key, value)
       return entity
 
+  @classmethod
+  @uses_runstate
+  def from_soup_hrefs(cls, soup, *, base_url: str,
+                      runstate: RunState) -> set["SiteEntity"]:
+    ''' Return a set of `SiteEntity` instances for anchor `href`s
+        which match `cls`' sitepages.
+
+        Example:
+
+            @with_base_url
+            def soup_articles(self, soup) -> set["Article"]:
+              """ Return a set of `Article`s from some soup. """
+              return Article.from_soup_hrefs(soup,base_url=base_url)
+    '''
+    ents = set()
+    for a in soup.find_all('a'):
+      runstate.raiseif()
+      href = a.get("href", "")
+      if not href or href == "#":
+        continue
+      ent_url = URL(href)
+      if not ent_url.isabs():
+        ent_url = ent_url.resolve(base_url)
       try:
+        ent = cls.from_URL(ent_url)
+      except ValueError as e:
+        # unrecognised, skip
+        continue
+      ents.add(ent)
+    return ents
 
   def get(self, key, default=None):
     ''' The `Mapping.get` method, to ensure that it goes through `__getitem__`.
