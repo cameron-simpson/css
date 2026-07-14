@@ -3638,6 +3638,7 @@ class Entities:
       zone=None
   ) -> Entity:
     ''' Fetch the `Entity` instance for the supplied `index`.
+        This underlies the `__getitem__` method.
 
         The meaning of the type *zone*, *subname* and *key* are as
         described for the `ZonedTypes` class.
@@ -3726,16 +3727,6 @@ class Entities:
     ent = entity_zone.EntityClass(tags, entity_zone)
     return ent
 
-  def _DISABLED_tagged(self, te: TagSet) -> Entity:
-    ''' Promote `te` to a `Entity` in this zone.
-        Return a `self.HasEntitiesClass` instance tagged with `te`.
-    '''
-    if te.type_zone != self.TYPE_ZONE:
-      raise ValueError(
-          f'{self}.tagged({te.__class__.__name__}[{te.name!r}]): {te.type_zone=} != {self.TYPE_ZONE=}'
-      )
-    return self.EntityClass(te, self)
-
   def keys(self, subname=None):
     ''' Return the keys from `self.tagsets` as `(subname,type_key)` 2-tuples
         suitable as indices of `self`.
@@ -3758,48 +3749,12 @@ class Entities:
   def find(self, *criteria, **crit_kw) -> List[Entity]:
     ''' Find entities in the database.
 
-        This runs a find of the `BaseTagSets` and returns the associated
-        `HasEntitiesClass` instances.
+        This calls `self.tagsets.find()` and returns the associated
+        `Entity` instances.
     '''
     return [
         self.EntityClass(te, self)
         for te in self.tagsets.find(*criteria, **crit_kw)
-    ]
-
-  @typechecked
-  def _DISABLED_deref(
-      self,
-      tagged: Entity,
-      tag_name: str,
-      attr: Optional[str] = None,
-      *,
-      default=None,
-      subtype: Optional[str] = None
-  ):
-    ''' Call `self.tagsets.deref` on `tagged.tags` and promote the
-        result to use our `Entity` instances.
-    '''
-    result = self.tagsets.deref(
-        tagged.tags,
-        tag_name,
-        attr=attr,
-        type_zone=self.TYPE_ZONE,
-        subtype=subtype
-    )
-    if result is None:
-      return default
-    if attr is None:
-      # look up of .name, returns a `TagSet` or list of `TagSet`s
-      if isinstance(result, TagSet):
-        return self.tagged(result)
-      return [self.tagged(te) for te in result]
-    # lookup by attribute
-    # return a list of TagSets or a list of (value,TagSet) 2-tuples
-    return [
-        (
-            self.tagged(item) if isinstance(item, TagSet) else
-            (item[0], self.tagged(item[1]))
-        ) for item in result
     ]
 
 UsesTagSets = OBSOLETE(Entities)
