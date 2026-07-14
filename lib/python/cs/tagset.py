@@ -3204,7 +3204,10 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
       cls = self.__class__
       suffix_handler = getattr(cls, f'suffix_{suffix}', None)
       if suffix_handler is not None:
-        return suffix_handler(self, attr)
+        try:
+          return pfx_call(suffix_handler)(self, attr)
+        except ValueError as e:
+          raise AttributeError(f'{self.__class__.__name__}.{attr}: {e}') from e
     return super().__getattr__(attr)
 
   @cached_property
