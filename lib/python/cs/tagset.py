@@ -133,7 +133,7 @@
 
           TYPE_ZONE = 'mbdb'
           EntityClass = _MBEntity
-          EntitiesClass = MBSQLTags
+          TagsetsClass = MBSQLTags
 
     The `MBDB` class subclasses `Entities` and defines the
     following class attributes:
@@ -141,7 +141,7 @@
       as typical use stores multiple domains in a common `SQLTags`
       database
     - `EntityClass`: the base class for entities in this domain
-    - `EntitiesClass`: the `BaseTagSets` subclass which stores the
+    - `TagsetsClass`: the `BaseTagSets` subclass which stores the
       entities; this will often be `SQLTags`; in this case the
       `MBSQLTags` class is just an `SQLTags` subclass with a different
       default location for the database
