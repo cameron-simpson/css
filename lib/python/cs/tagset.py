@@ -3100,6 +3100,7 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
       The subclass may itself define its `.tags` instance attribute
       or rely on the default cached property `.tags`, which will return
       `self.tags_db[self.tags_entity_key]`.
+      (`self.tags_entity_key` is `self.tags.name` by default.)
 
       Note that this mixin brings its own `__new__` method which
       can choose a subclass based on the subclass' `.TYPE_SUBNAME`
@@ -3112,7 +3113,7 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
       for this.
 
       `Entity` instances are designed as representing entities in
-      some "zone", a set of entities in some domain or organise
+      some "zone", a set of entities in some domain or organised
       grouping; typical examples include entities describes by some
       API like MusicBrainzNG or objects presented by some website.
       As such, they subclass `ZonedTypes`, which expects the entity's
@@ -3134,6 +3135,16 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
 
       The `ScanData.apply()` method follows this principle,
       applying the scanned data to tags named *zone*`.`*field*.
+
+      We relate entities using attributes named *field*`_id`,
+      which may be a single key for another entity or a list of keys.
+
+      Various derived attributes are also provided, see the
+      `__getattr__` docstring for details:
+      - *field*`_ent`: the related `Entity` named *zone*`.`*field*`.`*key*
+        where *key* comes from the `.`*field*`_id` attribute
+      - *field*`_ents`: multiple related `Entity` named
+        *zone*`.`*field*`.`*key* where *key* comes from the `.`*field*`_id` attribute
   '''
 
   def __new__(cls, tags: TagSet, *_, **__):
