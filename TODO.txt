@@ -1,3 +1,4 @@
+cs.tagset: ENtity: prefix_ents: map .ents_subtype[_field] to the Entity whose .field_id is our key, field defaults to our subtype; likewise .ent_*
 cs.cmdutils: bad usage from subcommand should preempt the run-context call
 ChainedHashCode to produce a progressive and computable-from-midway style hash based checksum of a data stream
 ffmpegutils: mark video as interlaced
