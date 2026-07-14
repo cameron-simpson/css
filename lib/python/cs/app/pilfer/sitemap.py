@@ -1135,39 +1135,7 @@ class SiteEntity(Entity, NoAttrs):
         entity.setdefault(match_key, value)
       return entity
 
-  def __getitem__(self, key):
-    super_getitem = super().__getitem__
-    try:
-      return super_getitem(key)
-    except KeyError as super_ee:
-      # the key is not (yet) present, see if we can fetch it by
-      # grokking some web page
       try:
-        page_name = self.DERIVED_KEYS[key]
-      except KeyError:
-        raise super_ee
-      if isinstance(page_name, str):
-        # a string naming an instance attribute such as .sitepage_url
-        # and a grokking method such as .grok_sitepage
-        page_url = getattr(self, f'{page_name}_url')
-        grok_method = getattr(self, f'grok_{page_name}')
-        vprint(f'{self.name}[{key!r}] -> grok_{page_name}({page_url!r})')
-        grok_method(page_url)
-        # infill keys not obtained so as to not pointlessly refetch
-        missing_expected_keys = sorted(
-            k for k, kpage in self.DERIVED_KEYS.items()
-            if kpage == page_name and k not in self.tags
-        )
-        if missing_expected_keys:
-          vprint(
-              f'{self.name}.tags missing {missing_expected_keys=}, (not set by {grok_method.__name__})'
-          )
-          for k in missing_expected_keys:
-            self.tags[k] = None
-        return super_getitem(key)
-      raise TypeError(
-          f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(page_name)}'
-      )
 
   def get(self, key, default=None):
     ''' The `Mapping.get` method, to ensure that it goes through `__getitem__`.
