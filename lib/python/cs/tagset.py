@@ -3453,6 +3453,7 @@ class Entities:
   # see if we can get by with the minimal example
   # typically a would use a lass with a TYPEZONE
   EntityClass = Entity
+  TagsetsClass = None
 
   # a mapping of type zone names to their most recent Entities subclass instance
   by_type_zone = WeakValueDictionary()
@@ -3478,8 +3479,8 @@ class Entities:
 
   def __init__(self, tagsets=None, **kw):
     super().__init__(**kw)
-    self.tagsets = tagsets or self.EntitiesClass()
     cls = self.__class__
+    self.tagsets = tagsets or self.TagsetsClass()
     try:
       zone = cls.TYPE_ZONE
     except AttributeError:

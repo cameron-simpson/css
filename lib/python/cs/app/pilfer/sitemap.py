@@ -45,6 +45,7 @@ from cs.rfc2616 import (
     content_encodings, content_length, content_type, datetime_from_http_date
 )
 from cs.seq import ReIterable, unrepeated
+from cs.sqltags import SQLTags
 from cs.tagset import BaseTagSets, Entity, ScanData, uses_scandata, TagSet, ZonedTypes, Entities
 from cs.threads import HasThreadState, ThreadState
 from cs.units import BINARY_BYTES_SCALE
@@ -1790,6 +1791,9 @@ class SiteMap(Entities, Promotable):
   name: str = None
   pilfer: object = None
   tagsets: BaseTagSets = None
+
+  EntityClass = SiteEntity
+  TagsetsClass = SQLTags
 
   URL_KEY_PATTERNS = ()
 
