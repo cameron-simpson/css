@@ -1135,6 +1135,8 @@ class SiteEntity(Entity, NoAttrs):
       entity = sitemap[cls, type_key]
       for match_key, value in match.items():
         entity.setdefault(match_key, value)
+      # store the source URL as ._url, the originating URL
+      entity._url = url
       return entity
 
   @classmethod
@@ -1336,7 +1338,10 @@ class SiteEntity(Entity, NoAttrs):
   def refresh_resource(self):
     ''' The default refresh resource is `self.sitepage_url`, supporting `Refreshable`.
     '''
-    return self.sitepage_url
+    try:
+      return self._url
+    except AttributeError:
+      return self.sitepage_url
 
   def _refresh(self, url=None, *, data=None):
     ''' The default `_refresh` method runs
@@ -1350,13 +1355,16 @@ class SiteEntity(Entity, NoAttrs):
       self.type_zone_update(data)
       return True
     if url is None:
-      url = self.sitepage_url
-      if url is None:
-        warning(
-            f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
-        )
-        return False
     for ent, data in self.scan_sitepage(url):
+      try:
+        url = self._url
+      except AttributeError:
+        url = self.sitepage_url
+        if url is None:
+          warning(
+              f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
+          )
+          return False
       ent.type_zone_update(data)
     return True
 
