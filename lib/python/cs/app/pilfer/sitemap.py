@@ -53,6 +53,7 @@ from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag as BS4Tag
+from icontract import require
 from mitmproxy.flow import Flow
 import requests
 from typeguard import typechecked
@@ -517,7 +518,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       else:
         rsp_close()
 
-  # NB: no __getattr__, it preemptys @cached_property
+  # NB: no __getattr__, it preempts @cached_property
 
   def as_URL(self) -> URL:
     ''' Return the `URL` from this `FlowState`, utilised by `@promote`.
@@ -911,9 +912,10 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
               meta_properties[prop_name] = [current, tag_content]
           if http_equiv := tag.get('http-equiv'):
             meta_http_equiv[http_equiv] = tag['content']
-    return NS(
+    meta = NS(
         tags=meta_tags, properties=meta_properties, http_equiv=meta_http_equiv
     )
+    return meta
 
   @cached_property
   def links(self) -> Mapping[str, list[str]]:
@@ -1231,9 +1233,6 @@ class SiteEntity(Entity, NoAttrs):
       return None
     pattern = cls.pattern(pattern_name)
     if pattern is None:
-      ##print(
-      ##    f'match_url: no pattern_mapping[{pattern_name=}]: {sorted(pattern_mapping.keys())}'
-      ##)
       return None
     try:
       return pattern.match(url)
@@ -2566,7 +2565,7 @@ class SiteMap(Entities, Promotable):
   def matches(
       self,
       url: URL,
-      patterns: Iterable,  # [Tuple[Tuple[str, str], Any]],
+      patterns: Iterable,  # [Tuple[URLMatcher|Tuple[str, str], Any]],
       extra: Mapping | None = None,
   ) -> Iterable[SiteMapPatternMatch]:
     ''' A generator to match `url` against `patterns`, an iterable
