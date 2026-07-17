@@ -3199,27 +3199,40 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
     )
 
   def __getattr__(self, attr):
-    ''' The following synthetic attibutes are implemented.
+    ''' Try `ZonedTypes.__getattr__` (which lokks up `[attr]` then `[f'{zone}.{attr}']`)
+        then fall back to suffix based synthetic attributes where
+        an attribute ending in `_`*suffix* is implemented by the
+        `suffix_`*suffix*`(attr)` method if it exists.
+
+        The following synthetic attibutes are implemented:
         - *subtype*>`_ent`: the entity with name
           *type_zone*`.`*subtype*`.`*id* or `None` where `id` comes
-          from the `.`*attr*`_id` value
+          from the `.`*attr*`_id` value;
+          see the `suffix_ent` method.
         - *subtype*>`_ents`: the entities with name
           *type_zone*`.`*subtype*`.`*id* or `None` where each `id` comes
-          from the `.`*attr*`_id` values
+          from the `.`*attr*`_id` values;
+          see the `suffix_ents` method.
     '''
     try:
-      base, suffix = attr.rsplit('_', 1)
-    except ValueError:
-      pass
-    else:
-      cls = self.__class__
-      suffix_handler = getattr(cls, f'suffix_{suffix}', None)
-      if suffix_handler is not None:
-        try:
-          return pfx_call(suffix_handler)(self, attr)
-        except ValueError as e:
-          raise AttributeError(f'{self.__class__.__name__}.{attr}: {e}') from e
-    return super().__getattr__(attr)
+      return super().__getattr__(attr)
+    except AttributeError:
+      try:
+        base, suffix = attr.rsplit('_', 1)
+      except ValueError:
+        pass
+      else:
+        cls = self.__class__
+        suffix_handler = getattr(cls, f'suffix_{suffix}', None)
+        if suffix_handler is not None:
+          try:
+            return suffix_handler(self, attr)
+          ##return pfx_call(suffix_handler)(self, attr)
+          except ValueError as e:
+            raise AttributeError(
+                f'{self.__class__.__name__}.{attr}: {e}'
+            ) from e
+    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
   @cached_property
   def tags(self):
