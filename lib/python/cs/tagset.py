@@ -3793,9 +3793,11 @@ class ScanData:
       The data for an `Entity` can be obtained by indexing the
       `ScanData` instance with an `Entity` instance or a valid index
       for the `entities` such as a `(Entity-subclass, key)` 2-tuple.
+      The (optional) supplied `entities` is only required for the
+      tuple indexing, in order to resolve the index to an `Entity`.
   '''
 
-  def __init__(self, entities: Entities):
+  def __init__(self, entities: Entities | None = None):
     # mapping of Entity instances to a data dict
     self.entities = entities
     self.ent_data_map = defaultdict(dict)
@@ -3810,6 +3812,10 @@ class ScanData:
     ''' The data for the supplied `ent`.
     '''
     if isinstance(ent, tuple):
+      if self.entities is None:
+        raise KeyError(
+            f'self.entities is None, tuple indices cannot be resolved: {ent=}'
+        )
       ent = self.entities[ent]
     return self.ent_data_map[ent]
 
