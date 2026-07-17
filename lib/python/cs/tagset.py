@@ -3874,6 +3874,17 @@ class ScanData:
         # otherwise just annotate it with whatever was learned
         ent.type_zone_update(data)
 
+  def printt(self, title=None):
+    ''' Call `cs.lex.printt()` to print the scanned data.
+    '''
+    rows = []
+    if title is not None:
+      rows.append(title)
+    for ent, data in sorted(self, key=lambda ed: ed[0].name):
+      rows.append(ent.name)
+      rows.append(data)
+    printt(*rows)
+
 # provide a default scandata:ScanData parameter
 uses_scandata = default_params(scandata=ScanData)
 
