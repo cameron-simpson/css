@@ -1370,9 +1370,13 @@ class SiteEntity(Entity, NoAttrs):
 
   @pfx_method
   @pagemethod
-  def scan_sitepage(self, flowstate: FlowState) -> ScanData:
+  @uses_scandata
+  def scan_sitepage(
+      self, flowstate: FlowState, *, scandata: ScanData
+  ) -> ScanData:
     ''' The default scan of a sitepage - this returns a nearly empty `ScanData`
         because a site's pages need an entity specific parse.
+        Return `scandata` (because it may have been made by the call).
 
         This base implementation updates the `ScanData` data for `self` with:
         - `http.request`: a record of the request and response headers from the `flowstate`
@@ -1391,16 +1395,25 @@ class SiteEntity(Entity, NoAttrs):
         flowstate=flowstate,
         no_save=True,
     )
-    # update the record of the flowstate's request
+    data["html.links"] = {
+        rel: [tag.attrs.get('href')
+              for tag in tags]
+        for rel, tags in flowstate.links.items()
+    }
+    try:
+      sitepage_urls = data['html.links']['canonical']
+    except KeyError:
+      pass
+    else:
+      if len(sitepage_urls) != 1:
+        warning(
+            f"expected 1 canonical link: {data['html.links']['canonical']=}"
+        )
+      data['sitepage_url'] = sitepage_urls[0]
     data["html.meta"] = flowstate.meta.tags.as_dict()
     data["html.properties"] = flowstate.meta.properties.as_dict()
     data['opengraph'] = dict(flowstate.opengraph)
-    sitemap = self.sitemap
-    for widget_cls in self.widget_classes():
-      for widget in widget_cls.from_soup(flowstate.soup):
-        ent = widget.entity
-        wdata = widget.parse()
-        scandata[ent].update(wdata, scandata)
+    self.scan_soup(flowstate.soup, self.sitemap, scandata=scandata)
     return scandata
 
   def format_kwargs(self):
