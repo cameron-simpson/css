@@ -1288,17 +1288,29 @@ class SiteEntity(Entity, NoAttrs):
         If `Entity.__getattr__(attr)` raises `AttributeError` and
         the tag `opengraph.{attr}` exists, return that.
     '''
-    cls = self.__class__
-    if attr.replace('_', '').islower():
-      # *_PATTERN derived attributes
-      ptnattr_name = f'{attr.upper()}_PATTERN'
-      try:
-        pattern_s = getattr(cls, ptnattr_name)
-      except AttributeError:
-        pass
-      else:
-        pattern = self.patterns[attr]
-        return pattern.url_path_for(self)
+    # first the usual entity stuff
+    # which includes things like *_url because we define a .suffix_url method
+    try:
+      return super().__getattr__(attr)
+    except AttributeError as e:
+      cls = self.__class__
+      # lower_case_name -> UPPER_CASE_NAME_PATTERN ?
+      if attr.replace('_', '').islower():
+        # *_PATTERN derived attributes
+        ptnattr_name = f'{attr.upper()}_PATTERN'
+        try:
+          pattern_s = getattr(cls, ptnattr_name)
+        except AttributeError:
+          pass
+        else:
+          pattern = self.patterns[attr]
+          url_s = pattern.url_path_for(self)
+          # something of a hack to turn the URL path into a full URL
+          # TODO: scheme etc from the sitemap eg as .url_preifx?
+          if attr.endswith('_url') and '::/' not in url_s:
+            s0 = url_s
+            url_s = f'https://{self.sitemap.URL_DOMAIN}/{url_s.lstrip("/")}'
+          return url_s
       # *_FORMAT derived attributes
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
       fmtattr_name = f'{attr.upper()}_FORMAT'
@@ -1322,36 +1334,50 @@ class SiteEntity(Entity, NoAttrs):
           if attr.endswith('_url') and formatted.startswith('/'):
             formatted = self.urlto(formatted)
           return formatted
-    try:
-      return super().__getattr__(attr)
-    except AttributeError as e:
-      # try from the tags, may autofetch
-      try:
-        return self[attr]
-      except KeyError:
-        # no superclass attribute, try the opengraph property
-        og_tag_name = f'opengraph.{attr}'
+      # no superclass attribute, try the opengraph property
+      # TODO: opengraph allows multiple tags or multiple instancesand also structured tags eg og:image:url
+      if attr != 'opengraph':
         try:
-          return self[og_tag_name]
-        except KeyError:
-          raise e
+          og = self.opengraph  ## opengraph
+        except AttributeError:
+          pass
+        else:
+          try:
+            return og[attr]
+          except KeyError:
+            pass
+      raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
-  @property
-  def sitepage_url(self):
-    ''' The URL of the primary page on the site for this entity.
-        This implementation allows `self["sitepage"]` to override `self.SITEPAGE_URL_FORMAT`.
-        This may return `None` for entities with no primary site URL.
+  @trace
+  @require(lambda attr: attr.endswith('_url'))
+  def suffix_url(self, attr) -> str:
+    ''' The handler for attribute names ending in `"_url"`.
+        We know there's no ['*_url'] tag at this point.
+        We first try `self.urls[attr]` to derive if from the entity `*_URL_PATTERN`s
+        then fall back to the opengraph tags.
+        `sitepage_url` comes from `og:url`.
+        Other URLs such as `image_url` come from `og:image` and so forth.
+        If the URL is not an absolute URL it is resolved using `self.urlto()`.
     '''
     try:
-      page_url = self.tags["sitepage"]
+      url_s = self.urls[attr]
     except KeyError:
-      page_url = self.__getattr__('sitepage_url')
-    if page_url is None:
-      warning("%s.site-age_url: no site page, returning None", self.name)
-    else:
-      if page_url.startswith('/'):
-        page_url = self.urlto(page_url)
-    return page_url
+      try:
+        og = self.opengraph
+      except AttributeError:
+        raise ValueError(f'no opengraph tags')
+      urlname = attr.removesuffix('_url')
+      if urlname == 'sitepage':
+        ogname = 'url'
+      else:
+        ogname = urlname
+      try:
+        url_s = og[ogname]
+      except KeyError as e:
+        raise ValueError(f'no opengraph[{ogname=}] tag') from e
+    if '://' not in url_s:
+      url_s = self.urlto(url_s)
+    return url_s
 
   @property
   def refresh_resource(self):
