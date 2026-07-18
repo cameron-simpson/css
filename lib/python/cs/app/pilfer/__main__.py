@@ -133,7 +133,7 @@ class PilferCommand(BaseCommand):
       return Pilfer(
           later=self.later,
           rcpaths=self.configpaths,
-          sqltags_db_url=self.db_url,
+          sqltags=self.db_url,
           verify=not self.no_check_certificates,
       )
 

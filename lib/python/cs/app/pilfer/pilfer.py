@@ -250,6 +250,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
       Notable attributes include:
       * `flush_print`: flush output after print(), default `False`.
+      * `sqltags`: an `SQLTags` instance or the URL for the
+        `.sqltags:SQLTags` instance or `None` for the default or `...`
+        for an in-memory SQLTags instance
       * `user_agent`: specify user-agent string, default `None`.
       * `user_vars`: mapping of user variables for arbitrary use.
   '''
@@ -265,7 +268,8 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   do_trace: bool = False
   flags: Mapping = field(default_factory=PolledFlags)
   fspath: str = None
-  sqltags_db_url: str = None
+  # the default is '', which uses the common SQLTags; set to None for no .sqltags
+  sqltags: SQLTags | str | type(Ellipsis) | None = None
   user_agent: str = 'Pilfer'
   # verify SSL certificates by default
   verify: bool = True
@@ -296,7 +300,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         * a `NetrcHTTPPasswordMgr` is supplied as an `HTTPBasicAuthHandler`
         * `.fspath`: `$PILFERDIR` or the `var` defaults setting or `~/var/pilfer`
         * `.content_cache`: the `cache` defaults setting or the `cache` subdirectory
-        * `.sqltags_db_url`: `$PILFER_SQLTAGS` or the `sqltags` defaults setting
+        * `.sqltags`: `$PILFER_SQLTAGS` or the `sqltags` defaults setting
     '''
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     # TODO: should this be in the PilferSession? find out how it is used
@@ -311,16 +315,22 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       self.content_cache = ContentCache(
           expanduser(self.defaults['cache'] or self.pathto('cache'))
       )
-    if self.sqltags_db_url is None:
-      sqltags_db_url = os.environ.get('PILFER_SQLTAGS') or None
-      if sqltags_db_url is None:
-        sqltags_db_url = self.defaults['sqltags'] or None
-        if sqltags_db_url is not None:
-          if sqltags_db_url.startswith('~/'):
-            sqltags_db_url = expanduser(sqltags_db_url)
-          elif not sqltags_db_url.startswith(('/', 'file://', 'memory:')):
-            sqltags_db_url = self.pathto(sqltags_db_url)
-      self.sqltags_db_url = sqltags_db_url
+    if not isinstance(self.sqltags, SQLTags):
+      db_url = self.sqltags
+      if db_url is ...:
+        db_url = SQLTags.DB_URL_MEMORY
+      else:
+        if db_url is None:
+          db_url = (
+              os.environ.get('PILFER_SQLTAGS') or self.defaults['sqltags']
+              or None
+          )
+        if db_url is not None and '://' not in db_url:
+          if db_url.startswith('~'):
+            db_url = expanduser(db_url)
+          elif not db_url.startswith('/'):
+            db_url = abspath(db_url)
+      self.sqltags = SQLTags.promote(db_url)
     # default session named '_'
     if self.session is None:
       self.session = '_'
@@ -370,13 +380,6 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   @_.setter
   def _(self, value):
     self.user_vars['_'] = value
-
-  @cached_property
-  def sqltags(self):
-    ''' A reference to the `SQLTags` knowledge base
-        if `self.sqltags_db_url` is not `None`.
-    '''
-    return SQLTags(self.sqltags_db_url) if self.sqltags_db_url else None
 
   def dbshell(self):
     ''' Run an interactive database prompt for `self.sqltags`.
