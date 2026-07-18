@@ -1458,6 +1458,9 @@ class SiteEntity(Entity, NoAttrs):
     data["html.meta"] = flowstate.meta.tags.as_dict()
     data["html.properties"] = flowstate.meta.properties.as_dict()
     data['opengraph'] = dict(flowstate.opengraph)
+    # no canonical link in the html? look in the opengraph for og:url
+    if 'sitepage_url' not in data and 'url' in data['opengraph']:
+      data['sitepage_url'] = data['opengraph']['url']
     self.scan_soup(flowstate.soup, self.sitemap, scandata=scandata)
     return scandata
 
