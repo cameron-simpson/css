@@ -3,12 +3,15 @@
 ''' Some little utility functions for working with the soup from `beautifulsoup4`.
 '''
 
+import json
+from json.decoder import JSONDecodeError
+from pprint import pformat
 from typing import Iterable
 
 from bs4 import BeautifulSoup, Tag as BS4Tag, NavigableString
 from typeguard import typechecked
 
-from cs.lex import printt
+from cs.lex import cropped_repr, printt
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -88,11 +91,12 @@ def tabulate_soup(
       label += f' #{id_attr}'
     # pop off the name attribute if present, include in the label
     try:
-      id_attr = attrs.pop('name')
+      name_attr = attrs.pop('name')
     except KeyError:
       pass
     else:
-      label += f' {id_attr!r}'
+      # I saw an amazon page embed an obscene amount of JSON in a name attribute :-(
+      label += f' name={cropped_repr(name_attr)}'
     children = list(
         child for child in tag.children if isinstance(child, NavigableString)
         or child.name not in ('script', 'style')
