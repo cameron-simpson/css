@@ -369,6 +369,8 @@ class PilferCommand(BaseCommand):
     '''
     options = self.options
     P = options.pilfer
+    if not argv and not sys.stdin.isatty():
+      argv = ['-']
     if argv and argv[0] == '-':
       # "-" means dump the content of stdin
       url = argv.pop(0)
@@ -405,7 +407,7 @@ class PilferCommand(BaseCommand):
     if url == '-':
       text = sys.stdin.read()
       soup = BeautifulSoup(text, BS4_PARSER_DEFAULT)
-      dump_soup(soup)
+      printt_soup(soup)
       return 0
     printt(
         [method, url],
@@ -488,25 +490,12 @@ class PilferCommand(BaseCommand):
             )
         )
       printt(*table)
-    table = []
-    for i, (method, match_tags,
-            grokked) in enumerate(self.options.pilfer.grok(flowstate)):
-      if i == 0:
-        table.append(['Grokked:'])
-      table.append(
-          [
-              f'  {method.__qualname__}',
-              "\n".join(map(str, sorted(match_tags)))
-          ]
-      )
-      if grokked is not None:
-        for k, v in grokked.items():
-          table.append([[f'    {k}', dict(v)] if isinstance(v, TagSet) else v])
-    printt(*table)
     if self.options.dump_content:
       print("Content:", flowstate.content_type)
       if flowstate.content_type in ('text/html',):
         soup = flowstate.soup
+        meta = flowstate.meta
+        printt(meta)
         printt_soup(soup)
       elif flowstate.content_type in ('application/json',):
         jdata = flowstate.json
