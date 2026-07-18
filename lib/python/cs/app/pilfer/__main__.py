@@ -13,6 +13,7 @@ from pprint import pformat, pprint
 import re
 import sys
 from typing import Iterable
+from uuid import uuid4
 
 from bs4 import BeautifulSoup, NavigableString
 from lxml.etree import tostring as xml_tostring
@@ -768,13 +769,16 @@ class PilferCommand(BaseCommand):
       f=('force', 'Force overwrite of the RSS file if it already exists.'),
       o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
       refresh='Refresh the required web pages even if not stale.',
+      uuid=
+      'Allocate a UUID to the entity for RSS purposes, and use it as the default output filename.',
       xmlv='Provide a leading xml version tag.',
   )
   def cmd_rss(self, argv):
     ''' Usage: {cmd} entity|URL
           Generate an RSS feed for the specified entity or URL.
     '''
-    pilfer = self.options.pilfer
+    options = self.options
+    pilfer = options.pilfer
     if not argv:
       raise GetoptError('missing entity or URL')
     entity = self.popentity(argv)
@@ -784,14 +788,26 @@ class PilferCommand(BaseCommand):
       raise GetoptError(
           f'entity {entity} is not an instance of RSSChannelMixin'
       )
+    if options.uuid:
+      try:
+        rss_uuid = entity['rss.uuid']
+      except KeyError:
+        rss_uuid = entity['rss.uuid'] = uuid4()
+    else:
+      rss_uuid = None
+    entity.refresh(recurse=True)
     output_fspath = joinpath(
-        self.options.dirpath or ".", self.options.output_fspath
-        or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
+        options.dirpath or ".", (
+            options.output_fspath or (
+                f'{rss_uuid}.rss' if rss_uuid else
+                f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
+            )
+        )
     )
-    rss = entity.rss(refresh=self.options.refresh)
+    rss = entity.rss(refresh=options.refresh)
     with atomic_filename(output_fspath, mode='w',
-                         exists_ok=self.options.force) as T:
-      if self.options.xmlv:
+                         exists_ok=options.force) as T:
+      if options.xmlv:
         print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
       print(
           xml_tostring(rss, encoding='unicode', pretty_print=True),
