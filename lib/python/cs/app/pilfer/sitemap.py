@@ -1215,6 +1215,35 @@ class SiteEntity(Entity, NoAttrs):
         for pattern_name, pattern_s in pattern_map.items()
     }
 
+  @mapped_property
+  def patterns(self, pattern_name: str) -> URLPattern:
+    ''' A mapping of `pattern_name` to the `URLPattern`
+        derived from `getattr(self,f'{pattern_name.upper()}_PATTERN')`.
+    '''
+    ptn = self.pattern(pattern_name)
+    if ptn is None:
+      raise KeyError(pattern_name)
+    return ptn
+
+  @mapped_property
+  def url_paths(self, pattern_name) -> str:
+    ''' A mapping of `pattern_name` to the URL path derived from
+        that pattern via its `.url_path_for` method.
+        derived from `getattr(self,f'{pattern_name.upper()}_PATTERN')`.
+    '''
+    ptn = self.patterns[pattern_name]
+    return ptn.url_path_for(self)
+
+  @mapped_property
+  def urls(self, pattern_name) -> str:
+    ''' A mapping of `pattern_name` to its pattern derived URL.
+    '''
+    url_s = self.url_paths[pattern_name]
+    if '://' not in url_s:
+      # just a URL path, resolve it
+      url_s = self.url_to(url_s)
+    return url_s
+
   @classmethod
   def match_url(
       cls,
@@ -1241,16 +1270,6 @@ class SiteEntity(Entity, NoAttrs):
     except Exception as e:
       warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
       return None
-
-  @mapped_property
-  def patterns(self, pattern_name: str):
-    ''' A mapping of `pattern_name` to the `URLPattern`
-        derived from `getattr(self,f'{pattern_name.upper()}_PATTERN')`.
-    '''
-    ptn = self.pattern(pattern_name)
-    if ptn is None:
-      raise KeyError(pattern_name)
-    return ptn
 
   def __getattr__(self, attr):
     ''' A `SiteEntity` supports various automatic attributes.
