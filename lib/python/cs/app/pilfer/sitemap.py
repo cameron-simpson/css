@@ -1731,6 +1731,7 @@ class SiteWidget(ABC):
     '''
     return self.sitemap[self.__class__.ENTITY_CLASS, self.entity_key]
 
+  @classmethod
   def check_tag(cls, tag: BS4Tag) -> bool:
     ''' Test whether this tag is in fact an instance of the widget.
 
@@ -1747,6 +1748,20 @@ class SiteWidget(ABC):
     for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
       if cls.check_tag(tag):
         yield cls(sitemap=sitemap, tag=tag)
+
+  @abstractmethod
+  @uses_scandata
+  def scan(self, *, scandata: ScanData) -> ScanData:
+    ''' Scan `self.tag` and update `scandata[self.entity]`.
+        Return `scandata` (because it may have been made with the call).
+
+        If the widget contains references to other entities
+        their information should also be saved into the `scanata`.
+    '''
+    raise NotImplementedError
+
+  def printt(self, **printt_kw):
+    printt_soup(self.tag, **printt_kw)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
