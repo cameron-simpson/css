@@ -361,7 +361,7 @@ class HashIndexCommand(BaseCommand):
               Rearrange the remote media directory based on the local media directory.
             {cmd} remote:dldir remote:storedir
               Rearrange the files in a remote download directory
-              into a remote storeage directory based on the locations
+              into a remote storage directory based on the locations
               in the local current directory.
     '''
     options = self.options
