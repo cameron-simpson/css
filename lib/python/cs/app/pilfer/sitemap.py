@@ -885,7 +885,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
         warning("no HEAD tag")
         print(soup)
       else:
-        for tag in soup.head.descendants:
+        for tag in soup.descendants:  # was .head
           if isinstance(tag, str):
             continue
           if tag.name != 'meta':
