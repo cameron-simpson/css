@@ -809,6 +809,7 @@ def rearrange(
     move_mode: bool = False,
     once: bool = False,
     symlink_mode=False,
+    do0=False,
     doit: bool,
     fstags: FSTags,
     runstate: RunState,
@@ -826,6 +827,7 @@ def rearrange(
       * `hashname`: the file content hash algorithm name
       * `move_mode`: move files instead of linking them
       * `symlink_mode`: symlink files instead of linking them
+      * `do0`: rearrange files even of they are empty
       * `doit`: if true do the link/move/symlink, otherwise just print
   '''
   if dstdirpath is None:
@@ -850,6 +852,16 @@ def rearrange(
         if filename.startswith('.') or filename == fstags.tagsfile_basename:
           # skip hidden or fstags files
           continue
+        if not do0:
+          # skip empty files
+          try:
+            st = os.lstat(srcpath)
+          except OSError as e:
+            warning(f'lstat({srcpath=}): {e}')
+            continue
+          else:
+            if st.st_size == 0:
+              continue
         opname = "ln -s" if symlink_mode else "mv" if move_mode else "ln"
         with Pfx(srcpath):
           rsrcpath = relpath(srcpath, srcdirpath)
