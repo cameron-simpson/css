@@ -1400,7 +1400,6 @@ class SiteEntity(Entity, NoAttrs):
       self.type_zone_update(data)
       return True
     if url is None:
-    for ent, data in self.scan_sitepage(url):
       try:
         url = self._url
       except AttributeError:
@@ -1410,7 +1409,8 @@ class SiteEntity(Entity, NoAttrs):
               f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
           )
           return False
-      ent.type_zone_update(data)
+    scandata = self.scan_sitepage(url)
+    scandata.apply(self)
     return True
 
   @pfx_method
