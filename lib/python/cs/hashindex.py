@@ -339,11 +339,12 @@ class HashIndexCommand(BaseCommand):
   @popopts(
       _1=('once', 'Rearrange only one file.'),
       ln=('link_mode', 'Hard link files instead of moving them.'),
+      refdir_='Reference directory, default the current directory.',
       s='symlink_mode',
   )
   @typechecked
   def cmd_rearrange(self, argv):
-    ''' Usage: {cmd} {{[[user@]host:]refdir|-}} [[user@]rhost:]srcdir [dstdir]
+    ''' Usage: {cmd} [--refdir {{[[user@]host:]refdir|-}}] [[user@]rhost:]srcdir [dstdir]
           Rearrange files from srcdir into dstdir based on their positions in refdir.
           Arguments:
             refdir    The reference directory, which may be local or remote
@@ -353,6 +354,15 @@ class HashIndexCommand(BaseCommand):
                       which may be local or remote.
             dstdir    Optional destination directory for the rearranged files.
                       Default is the srcdir.
+          Examples:
+            {cmd} backupdir
+              Rearrange the contents of backupdir based on the current directory.
+            {cmd} --refdir ~/media remote:media
+              Rearrange the remote media directory based on the local media directory.
+            {cmd} remote:dldir remote:storedir
+              Rearrange the files in a remote download directory
+              into a remote storeage directory based on the locations
+              in the local current directory.
     '''
     options = self.options
     badopts = False
@@ -361,16 +371,16 @@ class HashIndexCommand(BaseCommand):
     move_mode = not options.link_mode
     once = options.once
     quiet = options.quiet
+    refdir = options.refdir or '.'
+    refdir0 = refdir
+    ref_host, ref_fspath = refdir = RemotePath.from_str(refdir)
+    if ref_host is None:
+      if ref_fspath == '-':
+        refdir = None
+      elif not isdirpath(ref_fspath):
+        raise GetoptError('refdir is not a directory: {refdir!r}')
     verbose = options.verbose or not quiet
     symlink_mode = options.symlink_mode
-    if not argv:
-      warning("missing refdir")
-      badopts = True
-    elif argv[0] == '-':
-      argv.pop(0)
-      refdir = None  # read hashindex from standard input
-    else:
-      refdir = self.poppathspec(argv, 'refdir', check_isdir=True)
     srcdir = self.poppathspec(argv, 'srcdir', check_isdir=True)
     if argv:
       dstdir = self.poppathspec(argv, 'dstdir', check_isdir=True)
