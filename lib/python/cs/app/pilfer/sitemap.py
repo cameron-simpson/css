@@ -1500,14 +1500,19 @@ class SiteEntity(Entity, NoAttrs):
   @classmethod
   @uses_scandata
   def scan_soup(
-      cls, soup, sitemap: "SiteMap", *, scandata: ScanData
+      cls,
+      soup,
+      sitemap: "SiteMap",
+      *,
+      scandata: ScanData,
   ) -> ScanData:
     ''' Scan the `soup` for the widgets associated with this `SiteEntity` type.
         Return `scandata` (because it may have been made by the call).
     '''
-    for widget_class in cls.widget_classes():
-      vprint("scan soup for", widget_class)
-      for widget in widget_class.from_soup(soup, sitemap):
+    # update the record of the flowstate's request
+    for widget_cls in cls.widget_classes():
+      vprint("scan soup for", widget_cls)
+      for widget in widget_cls.from_soup(soup, sitemap):
         widget.scan(scandata=scandata)
     return scandata
 
