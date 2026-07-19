@@ -756,64 +756,89 @@ class PilferCommand(BaseCommand):
   @popopts(
       d_=('dirpath', 'Output directory for output_fspath, default ".".'),
       f=('force', 'Force overwrite of the RSS file if it already exists.'),
-      o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
+      o_=(
+          'output_fspath',
+          'Output the RSS to the file output_fspath; "-" means the standard output.'
+      ),
       refresh='Refresh the required web pages even if not stale.',
+      reparse='Parse the generated RSS file as a sanity check.',
       uuid=
       'Allocate a UUID to the entity for RSS purposes, and use it as the default output filename.',
       xmlv='Provide a leading xml version tag.',
   )
   def cmd_rss(self, argv):
-    ''' Usage: {cmd} entity|URL
-          Generate an RSS feed for the specified entity or URL.
+    ''' Usage: {cmd} entity|URL...
+          Generate RSS feeds for the specified entities (by name or URL).
     '''
     options = self.options
     pilfer = options.pilfer
     if not argv:
       raise GetoptError('missing entity or URL')
-    entity = self.popentity(argv)
-    if argv:
-      raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
-    if not isinstance(entity, RSSChannelMixin):
+    # TODO: treat the output_fspath as a format?
+    if options.output_fspath and len(argv) > 1:
       raise GetoptError(
-          f'entity {entity} is not an instance of RSSChannelMixin'
+          'cannot specify the output path with more than 1 entity.'
       )
-    if options.uuid:
-      try:
-        rss_uuid = entity['rss.uuid']
-      except KeyError:
-        rss_uuid = entity['rss.uuid'] = uuid4()
-    else:
-      rss_uuid = None
-    entity.refresh(recurse=True)
-    output_fspath = joinpath(
-        options.dirpath or ".", (
-            options.output_fspath or (
+    xit = 0
+    while argv:
+      with Pfx(argv[0]):
+        try:
+          entity = self.popentity(argv)
+        except GetoptError as e:
+          warning(f'cannot recognise as an entity: {e}')
+          xit = 1
+          continue
+        if not isinstance(entity, RSSChannelMixin):
+          warning(f'entity {entity} is not an instance of RSSChannelMixin')
+          xit = 1
+          continue
+        if options.uuid:
+          try:
+            rss_uuid = entity['rss.uuid']
+          except KeyError:
+            rss_uuid = entity['rss.uuid'] = uuid4()
+        else:
+          rss_uuid = None
+        output_fspath = options.output_fspath
+        if output_fspath != '-':
+          if not output_fspath:
+            output_fspath = (
                 f'{rss_uuid}.rss' if rss_uuid else
                 f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
             )
-        )
-    )
-    rss = entity.rss(refresh=options.refresh)
-    with atomic_filename(output_fspath, mode='w',
-                         exists_ok=options.force) as T:
-      if options.xmlv:
-        print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
-      print(
-          xml_tostring(rss, encoding='unicode', pretty_print=True),
-          end='',
-          file=T
-      )
-    print(output_fspath)
-    print("Reparse", output_fspath)
-    from rss_parser import RSSParser
-    with open(output_fspath) as rssf:
-      parsed = RSSParser.parse(rssf.read())
-    print("Language", parsed.channel.language)
-    print("RSS", parsed.version)
-    # Iteratively print feed items
-    for item in parsed.channel.items:
-      print(item.title)
-      print(item.description[:50])
+          if not isabspath(output_fspath):
+            output_fspath = joinpath(options.dirpath or ".", output_fspath)
+        rss = entity.rss(refresh=options.refresh)
+        if output_fspath == '-':
+          if options.xmlv:
+            print('<?xml version="1.0" encoding="UTF-8"?>')
+          print(
+              xml_tostring(rss, encoding='unicode', pretty_print=True),
+              end='',
+          )
+        else:
+          with atomic_filename(output_fspath, mode='w',
+                               exists_ok=options.force) as T:
+            if options.xmlv:
+              print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+            print(
+                xml_tostring(rss, encoding='unicode', pretty_print=True),
+                end='',
+                file=T
+            )
+          print(entity.name, output_fspath)
+          if options.reparse:
+            print("Reparse", output_fspath)
+            from rss_parser import RSSParser
+            with open(output_fspath) as rssf:
+              parsed = RSSParser.parse(rssf.read())
+            print("Language", parsed.channel.language)
+            print("RSS", parsed.version)
+            # Iteratively print feed items
+            for item in parsed.channel.items:
+              print(item.title)
+              print(item.description[:50])
+    return xit
 
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
