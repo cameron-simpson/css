@@ -931,6 +931,29 @@ uses_force = uses_cmd_options(force=False)
 uses_quiet = uses_cmd_options(quiet=False)
 uses_verbose = uses_cmd_options(verbose=False)
 
+@decorator
+def verbosity(func, verbosity_level: int):
+  ''' A decorator to run `func` if the ambient verbosity is >= `verbosity_level`.
+  '''
+
+  @uses_cmd_options(verbosity=0)
+  def verbose_wrapper(*a, verbosity, **kw):
+    if verbosity >= verbosity_level:
+      return func(*a, **kw)
+    return None
+
+  return verbose_wrapper
+
+def verbose(func):
+  ''' A decorator to run `func` if the ambient verbosity is >=1.
+  '''
+  return verbosity(func, 1)
+
+def vv(func):
+  ''' A decorator to run `func` if the ambient verbosity is >=2.
+  '''
+  return verbosity(func, 2)
+
 # TODO: handle async functions
 # pylint: disable=too-many-statements
 @decorator
