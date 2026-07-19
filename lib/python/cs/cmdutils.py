@@ -63,7 +63,7 @@ from typeguard import typechecked
 
 from cs.buffer import CornuCopyBuffer
 from cs.context import stackattrs
-from cs.deco import decorator, OBSOLETE, uses_cmd_options, uses_quiet
+from cs.deco import decorator, OBSOLETE, uses_cmd_options, uses_quiet, uses_verbose
 from cs.lex import (
     cutprefix,
     cutsuffix,
@@ -315,7 +315,7 @@ class OptionSpec:
       spec0 = specs.pop(0) if specs else None
       if accrues_arg:
         raise ValueError(
-            f'cannot spply custom {apply=} function when {accrue=}'
+            f'cannot spply custom {apply=} function when {accrues_arg=}'
         )
     if spec0 is not None:
       raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
@@ -822,24 +822,24 @@ def apply_quiet(opts, field_name, _):
   '''
   assert field_name == "quiet"
   verbosity = opts.verbosity
-  if self.verbosity > -1:
+  if verbosity > -1:
     verbosity = -1
   else:
     verbosity -= 1
   opts.verbosity = verbosity
 
-def apply_verbose(self, field_name, _):
+def apply_verbose(opts, field_name, _):
   ''' Apply a `-v` (verbose) option to the verbosity.
       If we're not quiet, make us quiet.
       If we're already quiet, make us quieter.
   '''
   assert field_name == "verbose"
-  verbosity = self.verbosity
-  if self.verbosity < 1:
+  verbosity = opts.verbosity
+  if verbosity < 1:
     verbosity = 1
   else:
     verbosity += 1
-  self.verbosity = verbosity
+  opts.verbosity = verbosity
 
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
