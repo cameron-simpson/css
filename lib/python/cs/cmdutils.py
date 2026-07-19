@@ -181,6 +181,8 @@ class OptionSpec:
   validate: Optional[Callable[[Any], bool]] = None
   # optional message for invalid values
   unvalidated_message: str = UNVALIDATED_MESSAGE_DEFAULT
+  # custom apply function
+  apply: Optional[Callable[["BaseCommandOptions", str, Any], None]] = None
 
   def __post_init__(self):
     ''' Infer `field_name` and `help_text` if unspecified.
@@ -224,9 +226,11 @@ class OptionSpec:
         - an identifier specifying the `arg_name`,
           optionally prepended with a dash to indicate an inverted option
         - a help text about the option
-        - a callable to parse the option string value to obtain the actual value
-        - a callable to validate the option value
-        - a message for use when validation fails
+        - if the option expects an argument:
+          * a callable to parse the option string value to obtain the actual value
+          * a callable to validate the option value
+          * a message for use when validation fails
+        - a callable to apply the option as `apply(options,field,value)`
     '''
     # produce needs_arg and cleaned up opt_name from the opt_k
     needs_arg = False
@@ -251,7 +255,8 @@ class OptionSpec:
     parse = None
     validate = None
     unvalidated_message = None
-    # apply the provided specifications
+    apply = None
+    # promote the spec to a list
     if specs is None:
       specs = [field_name]
     elif isinstance(specs, str):
@@ -287,22 +292,31 @@ class OptionSpec:
     if isinstance(spec0, str):
       help_text = spec0
       spec0 = specs.pop(0) if specs else None
-    # optional parse callable
+    if needs_arg:
+      # optional parse callable
+      if callable(spec0):
+        parse = spec0
+        spec0 = specs.pop(0) if specs else None
+      # optional validate callable
+      if callable(spec0):
+        validate = spec0
+        spec0 = specs.pop(0) if specs else None
+      # optional unvalidated_message
+      if isinstance(spec0, str):
+        if not parse and not validate:
+          raise ValueError(
+              f'unexpected unvalidated_message {spec0!r} when there is no parse or validate callable'
+          )
+        unvalidated_message = spec0
+        spec0 = specs.pop(0) if specs else None
+    # optional apply(opts,field,value) function
     if callable(spec0):
-      parse = spec0
+      apply = spec0
       spec0 = specs.pop(0) if specs else None
-    # optional validate callable
-    if callable(spec0):
-      validate = spec0
-      spec0 = specs.pop(0) if specs else None
-    # optional unvalidated_message
-    if isinstance(spec0, str):
-      if not parse and not validate:
+      if accrues_arg:
         raise ValueError(
-            f'unexpected unvalidated_message {spec0!r} when there is no parse or validate callable'
+            f'cannot spply custom {apply=} function when {accrue=}'
         )
-      unvalidated_message = spec0
-      spec0 = specs.pop(0) if specs else None
     if spec0 is not None:
       raise ValueError(f'unhandled specifications: {[spec0]+specs!r}')
     if needs_arg:
@@ -329,6 +343,7 @@ class OptionSpec:
         parse=parse,
         validate=validate,
         unvalidated_message=unvalidated_message,
+        apply=apply,
     )
     return self
 
@@ -799,6 +814,33 @@ class SubCommand:
 SSH_EXE_DEFAULT = 'ssh'
 SSH_EXE_ENVVAR = 'SSH_EXE'
 
+# some convenient apply functions for -q (quiet) and -v (verbose)
+def apply_quiet(opts, field_name, _):
+  ''' Apply a `-q` (quiet) option to the verbosity.
+      If we're not quiet, make us quiet.
+      If we're already quiet, make us quieter.
+  '''
+  assert field_name == "quiet"
+  verbosity = opts.verbosity
+  if self.verbosity > -1:
+    verbosity = -1
+  else:
+    verbosity -= 1
+  opts.verbosity = verbosity
+
+def apply_verbose(self, field_name, _):
+  ''' Apply a `-v` (verbose) option to the verbosity.
+      If we're not quiet, make us quiet.
+      If we're already quiet, make us quieter.
+  '''
+  assert field_name == "verbose"
+  verbosity = self.verbosity
+  if self.verbosity < 1:
+    verbosity = 1
+  else:
+    verbosity += 1
+  self.verbosity = verbosity
+
 # gimmicked name to support @fmtdoc on BaseCommandOptions.popopts
 _COMMON_OPT_SPECS = dict(
     dry_run=('dry_run', 'Dry run, aka no action.'),
@@ -808,8 +850,8 @@ _COMMON_OPT_SPECS = dict(
             The string is a shell-like command string parsable by shlex.split.''',
     ),
     n=('dry_run', 'No action, aka dry run.'),
-    q='quiet',
-    v='verbose',
+    q=('quiet', apply_quiet),
+    v=('verbose', apply_verbose),
 )
 
 @dataclass
@@ -849,7 +891,7 @@ class BaseCommandOptions(HasThreadState):
   # dry run, no action
   dry_run: bool = False
   force: bool = False
-  quiet: bool = False
+  verbosity: int = 0
   runstate: Optional[RunState] = None
   runstate_signals: Tuple[int] = DEFAULT_SIGNALS
   ssh_exe: str = field(
@@ -858,7 +900,6 @@ class BaseCommandOptions(HasThreadState):
           SSH_EXE_DEFAULT
       )
   )
-  verbose: bool = False
 
   opt_spec_class = OptionSpec
 
@@ -949,7 +990,7 @@ class BaseCommandOptions(HasThreadState):
 
   @classmethod
   def getopt_spec_map(cls, opt_specs_kw: Mapping, common_opt_specs=None):
-    ''' Return a 3-tuple of (shortopts,longopts,getopt_spec_map)` being:
+    ''' Return a 3-tuple of `(shortopts,longopts,getopt_spec_map)` being:
        - `shortopts`: the `getopt()` short options specification string
        - `longopts`: the `getopts()` long option specification list
        - `getopt_spec_map`: a mapping of `opt`->`OptionSpec`
@@ -1077,16 +1118,22 @@ class BaseCommandOptions(HasThreadState):
         if opt_spec.needs_arg:
           with Pfx("%r", val):
             value = opt_spec.parse_value(val)
-          if opt_spec.accrues:
+          if opt_spec.apply is not None:
+            opt_spec.apply(self, opt_spec.field_name, value)
+          elif opt_spec.accrues:
             # append to list
             getattr(self, opt_spec.field_name).append(value)
           else:
             # overwrite
             setattr(self, opt_spec.field_name, value)
         else:
-          value = not opt_spec.field_default
           # overwrite
-          setattr(self, opt_spec.field_name, value)
+          if opt_spec.apply is not None:
+            opt_spec.apply(self, opt_spec.field_name, 1)
+          else:
+            # assume a Boolean
+            value = not opt_spec.field_default
+            setattr(self, opt_spec.field_name, value)
 
   @classmethod
   def usage_options_format(
@@ -1119,6 +1166,44 @@ class BaseCommandOptions(HasThreadState):
             )
         )
     )
+
+  @property
+  def quiet(self):
+    ''' True if `self.verbosity` is negative otherwise `False`.
+    '''
+    return self.verbosity < 0
+
+  @quiet.setter
+  def quiet(self, quietness: Union[int, bool]):
+    ''' Set `self.verbosity` according to the `quietness` values below.
+        * `True`: `-1`
+        * `False`: 0
+        * an `int`: this must be >=0, and we set `self.verbosity = -quietness`
+    '''
+    if isinstance(quietness, bool):
+      self.verbosity = -int(quietness)
+    else:
+      assert quietness >= 0
+      self.verbosity = -quietness
+
+  @property
+  def verbose(self):
+    ''' True if `self.verbosity` is negative otherwise `False`.
+    '''
+    return self.verbosity > 0
+
+  @verbose.setter
+  def verbose(self, verbosity: Union[int, bool]):
+    ''' Set `self.verbosity` according to the `verbosity` values below.
+        * `True`: `1`
+        * `False`: 0
+        * an `int`: this must be >=0, and we set `self.verbosity = verbosity`
+    '''
+    if isinstance(verbosity, bool):
+      self.verbosity = int(verbosity)
+    else:
+      assert verbosity >= 0
+      self.verbosity = verbosity
 
 @decorator
 def popopts(cmd_method, **opt_specs_kw):
@@ -1168,7 +1253,7 @@ def popopts(cmd_method, **opt_specs_kw):
 def cli_datetime(dt_s: str) -> datetime:
   ''' Parse an ISO8601 date into a datetime.
       Being for the command line, this assumes the local timezone
-      if a UTC offset is not specified.
+      has a UTC offset if not specified.
   '''
   dt = datetime.fromisoformat(dt_s)
   if dt.tzinfo is None:
@@ -2155,28 +2240,23 @@ def qvprint(*print_a, quiet, verbose, **print_kw):
     print(*print_a, **print_kw)
 
 @uses_quiet
-def qprint(*print_a, quiet: bool, **qvprint_kw):
+def qprint(*print_a, quiet: bool, **print_kw):
   ''' Call `print()` if `not options.quiet`.
-      This is a compatibility shim for `qvprint()` with `verbose=not
-      quiet` and `quiet=False`.
   '''
-  qvprint_kw.update(
-      quiet=False,
-      verbose=not quiet,
-  )
-  return qvprint(*print_a, **qvprint_kw)
+  if not quiet:
+    print(*print_a, **print_kw)
 
-def vprint(*print_a, **qvprint_kw):
+@uses_verbose
+def vprint(*print_a, verbose: bool, **print_kw):
   ''' Call `print()` if `options.verbose`.
-      This is a compatibility shim for `qvprint()` with `quiet=False`.
   '''
-  qvprint_kw.update(quiet=False)
-  return qvprint(*print_a, **qvprint_kw)
+  if verbose:
+    print(*print_a, **print_kw)
 
 if __name__ == '__main__':
 
   class DemoCommand(BaseCommand):
-    ''' A deomnstration CLI.
+    ''' A demonstration CLI.
     '''
 
     @popopts
