@@ -471,7 +471,7 @@ def OBSOLETE(func, suggestion=None):
           if isinstance(func, type) else func.__code__.co_filename
       ),
       (
-          func.__firstlineno__
+          getattr(func,'__firstlineno__',0)
           if isinstance(func, type) else func.__code__.co_firstlineno
       ),
       func.__name__,
