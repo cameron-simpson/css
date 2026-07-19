@@ -2253,6 +2253,13 @@ def vprint(*print_a, verbose: bool, **print_kw):
   if verbose:
     print(*print_a, **print_kw)
 
+@uses_cmd_options(verbosity=0)
+def vvprint(*print_a, verbosity: int, **print_kw):
+  ''' Call `print()` if `options.verbosity>=2`.
+  '''
+  if verbosity >= 2:
+    print(*print_a, **print_kw)
+
 if __name__ == '__main__':
 
   class DemoCommand(BaseCommand):
