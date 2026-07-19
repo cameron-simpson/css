@@ -122,7 +122,7 @@ from typing import (
 from icontract import ensure, require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, popopts, vprint
+from cs.cmdutils import BaseCommand, popopts, vprint, vvprint
 from cs.context import stackattrs
 from cs.deco import decorator, default_params, fmtdoc, promote, Promotable, uses_verbose
 from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
@@ -1175,7 +1175,7 @@ class FSTags(MultiOpenMixin, Entities):
     ''' Flush modified tag files.
     '''
     for tagfile in self._tagfiles.values():
-      vprint("save", tagfile)
+      vvprint("save", tagfile)
       try:
         tagfile.save()
       except FileNotFoundError as e:
