@@ -963,7 +963,7 @@ def remote_rearrange(
           quiet and '-q',
           not (move_mode or symlink_mode) and '--ln',
           symlink_mode and '-s',
-          '-',
+          ('--refdir', '-'),
           RemotePath.str(None, srcdir),
           RemotePath.str(None, dstdir),
       ],
