@@ -321,7 +321,7 @@ from cs.lex import (
     is_dotted_identifier, is_identifier, skipwhite, FormatMapping,
     FormatableMixin, format_attribute, FStr, printt, r, s, without_prefix
 )
-from cs.logutils import setup_logging, warning, ifverbose
+from cs.logutils import setup_logging, vwarning, warning, ifverbose
 from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
@@ -3498,7 +3498,9 @@ class Entities:
       try:
         zone = entity_class.TYPE_ZONE
       except AttributeError:
-        pass
+        vwarning(
+            f'new subclass {cls.__name__}, no cls.TYPE_ZONE or {cls.EntityClass.__name__}.TYPE_ZONE'
+        )
       else:
         cls.TYPE_ZONE = zone
     if zone is not None:
