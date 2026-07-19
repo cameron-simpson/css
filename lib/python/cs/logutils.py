@@ -64,7 +64,7 @@ from types import SimpleNamespace as NS
 
 from cs.ansi_colour import colourise, env_no_color
 from cs.context import stackattrs
-from cs.deco import fmtdoc, logging_wrapper
+from cs.deco import fmtdoc, logging_wrapper, verbose as v, vv
 from cs.lex import is_dotted_identifier
 import cs.pfx
 from cs.pfx import Pfx, XP
@@ -648,6 +648,9 @@ def warning(msg, *args, **kwargs):
   ''' Emit a log at `logging.WARNING` level with the current `Pfx` prefix.
   '''
   log(logging.WARNING, msg, *args, **kwargs)
+
+vwarning = v(warning)
+vvwarning = vv(warning)
 
 @logging_wrapper(stacklevel_increment=1)
 def error(msg, *args, **kwargs):
