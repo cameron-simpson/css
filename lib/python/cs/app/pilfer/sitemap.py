@@ -59,7 +59,7 @@ import requests
 from typeguard import typechecked
 
 # The default HTML parser to use with BeautifulSoup.
-BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
+BS4_PARSER_DEFAULT = 'html5lib'  ## 'lxml'  # vs eg 'html5lib'
 
 debug_fs_counts = False
 
@@ -1028,10 +1028,7 @@ class SiteEntity(Entity, NoAttrs):
 
       The `SITEPAGE_URL_PATTERN` is a pattern for the canonical
       page for this entity and should contain enough information
-      to `.refresh()` it. The `SiteMap.scan_matchs` method will
-      call `entity.refresh(data=data)` instead of
-      `entity.type_zone_update(data)` if the URL matches the entity's
-      sitepage.
+      to `.refresh()` it.
   '''
 
   # default staleness is 1 day
@@ -1347,6 +1344,12 @@ class SiteEntity(Entity, NoAttrs):
           except KeyError:
             pass
       raise AttributeError(f'{self.__class__.__name__}.{attr}')
+
+  @mapped_property
+  def og(self):
+    ''' A mapping of the opengraph tags.
+    '''
+    return self.opengraph
 
   @trace
   @require(lambda attr: attr.endswith('_url'))
