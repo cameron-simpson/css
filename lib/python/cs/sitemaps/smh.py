@@ -283,9 +283,6 @@ class Topic(_SMHWebPage, RSSChannelMixin):
   def short_title(self):
     return self.title.split('|', 1)[0].strip()
 
-  def refresh_related(self):
-    return self.articles
-
   @property
   def articles(self):
     ''' The `.articles` property returns the articles prefilled with a topic.
@@ -298,6 +295,12 @@ class Topic(_SMHWebPage, RSSChannelMixin):
       article.setdefault("topic_id", type_key)
     ##breakpoint()
     return articles
+
+  def refresh_related(self):
+    return self.articles
+
+  def refresh_related1(self):
+    return self.authors
 
   def rss_content_signature(self):
     ''' Return the RSS content signature - the ordered list of article ids.
