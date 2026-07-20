@@ -2232,13 +2232,6 @@ class BaseCommandCmd(Cmd):
         return lambda _: True
     raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
-@uses_cmd_options(quiet=False, verbose=False)
-def qvprint(*print_a, quiet, verbose, **print_kw):
-  ''' Call `print()` if `options.verbose` and not `options.quiet`.
-  '''
-  if verbose and not quiet:
-    print(*print_a, **print_kw)
-
 @uses_quiet
 def qprint(*print_a, quiet: bool, **print_kw):
   ''' Call `print()` if `not options.quiet`.
@@ -2252,6 +2245,8 @@ def vprint(*print_a, verbose: bool, **print_kw):
   '''
   if verbose:
     print(*print_a, **print_kw)
+
+qvprint = OBSOLETE("vprint, since verbose and quiet are no longer independant")
 
 @uses_cmd_options(verbosity=0)
 def vvprint(*print_a, verbosity: int, **print_kw):
