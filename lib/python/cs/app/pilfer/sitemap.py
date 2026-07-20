@@ -23,7 +23,7 @@ from uuid import UUID
 
 from cs.binary import bs
 from cs.bs4utils import printt_soup
-from cs.cmdutils import BaseCommand, popopts, qvprint, vprint
+from cs.cmdutils import BaseCommand, popopts, vprint, vvprint
 from cs.deco import (
     attr, decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
@@ -312,27 +312,35 @@ class URLPattern(Promotable):
         Return `None` on no match.
         Return the regexp `groupdict()` on a match.
     '''
+    PR = lambda *a: vvprint(f'match {url.short} vs {self}:', *a)
     if self.hostname_fnmatch is not None and (
         not isinstance(url.hostname, str)
         or not fnmatch(url.hostname, self.hostname_fnmatch)):
       # hostname mismatch
+      PR(f'REJECT on {self.hostname_fnmatch=} vs {url.hostname=}')
       return None
     if self.path_pattern is None:
       # no pattern, accept and return empty match dict
+      PR('MATCH, no path_pattern')
       return {}
     qpath = url.path
     if url.query:
       qpath = f'{qpath}?{url.query}'
     # first try /path?query
+    PR(f'TRY {self.pattern_re=} vs {qpath=}')
     m = self.pattern_re.match(qpath)
     if m is None and qpath != url.path:
       # otherwise try /path
+      PR(f'TRY {self.pattern_re=} vs {url.path=}')
       m = self.pattern_re.match(url.path)
     if m is None:
+      PR("REJECT, neither matches")
       return None
     if m.end() < len(url.path):
+      PR(f'REJECT, {m.end()=} < {len(url.path)=}')
       return None
     # return the public named matches (excludes _* names)
+    PR('MATCH, return groupdict')
     return {k: v for k, v in m.groupdict().items() if not k.startswith('_')}
 
   @classmethod
@@ -815,7 +823,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
           total=dl_length,
           units_scale=BINARY_BYTES_SCALE,
           itemlenfunc=len,
-          report_print=qvprint,
+          report_print=vprint,
       ):
         runstate.raiseif()
         offset = 0
