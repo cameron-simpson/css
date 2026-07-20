@@ -224,11 +224,22 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
   ) -> ScanData:
     scanadata = super().scan_sitepage(flowstate, scandata=scandata)
     data = scandata[self]
-    # TODO: date, byline etc
-    data["title"] = flowstate.meta.tags["title"]
+    soup = flowstate.soup
+    # TODO: date, etc
+    try:
+      data["title"] = flowstate.meta.tags["title"]
+    except KeyError as e:
+      warning(f'no flowstate.meta.tags "title": {e}')
     topic_id = self.url_topic_part(flowstate.url)
     assert '.' not in topic_id
     data["topic_id"] = topic_id
+    author_ids = data['author_id'] = []
+    # TODO: scan for Author hrefs, I forget the method name
+    for author_span in soup.find_all('span', **{'data-testid': 'author-bio'}):
+      a = author_span.find('a')
+      href = a.attrs['href']
+      if href.startswith('/by/'):
+        author_ids.append(href.rsplit('-', 1)[1])
     return scandata
 
   @trace
