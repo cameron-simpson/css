@@ -25,7 +25,7 @@ from cs.app.pilfer.pilfer import Pilfer, uses_pilfer
 from cs.app.pilfer.rss import RSSChannelMixin, RSSChannelItemMixin
 from cs.app.pilfer.sitemap import (
     on, FlowState, pagemethod, ScanData, SiteEntity, SiteMap,
-    SiteMapPatternMatch, with_base_url
+    SiteMapPatternMatch, uses_scandata, with_base_url
 )
 from cs.binary import bs
 from cs.cmdutils import popopts
@@ -215,20 +215,23 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
     self.sitemap.update_tagset_from_meta(self, flowstate, **update_kw)
 
   @trace
+  @uses_scandata
   @promote
   def scan_sitepage(
       self,
       flowstate: FlowState,
       match: Optional[Mapping[str, Any]] = None,
+      *,
+      scandata: ScanData,
   ) -> ScanData:
-    scanned = super().scan_sitepage(flowstate)
-    data = scanned[self]
+    scanadata = super().scan_sitepage(flowstate, scandata=scandata)
+    data = scandata[self]
     # TODO: date, byline etc
     data["title"] = flowstate.meta.tags["title"]
     topic_id = self.url_topic_part(flowstate.url)
     assert '.' not in topic_id
     data["topic_id"] = topic_id
-    return scanned
+    return scandata
 
   @trace
   @promote
@@ -270,16 +273,19 @@ class Topic(_SMHWebPage, RSSChannelMixin):
 
   @pfx_method
   @pagemethod
-  def scan_sitepage(self, flowstate: FlowState) -> ScanData:
+  @uses_scandata
+  def scan_sitepage(
+      self, flowstate: FlowState, *, scandata: ScanData
+  ) -> ScanData:
     ''' Scan `flowstate.soup` for `Article` references.
     '''
-    scanned = super().scan_sitepage(flowstate)
-    data = scanned[self]
+    scandata = super().scan_sitepage(flowstate, scandata=scandata)
+    data = scandata[self]
     soup = flowstate.soup
     data['article_id'] = sorted(
         set(article.type_key for article in self.soup_articles(soup))
     )
-    return scanned
+    return scandata
 
   @property
   def short_title(self):
