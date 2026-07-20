@@ -271,7 +271,7 @@ Series.TVDB_SUBENTITY_FIELDS = (
 class TheTVDBAPI(SingletonMixin, HTTPServiceAPI, Entities):
 
   EntityClass = TVDBEntity
-  EntitiesClass = SQLTags
+  TagsetsClass = SQLTags
 
   # for attrubting data, sourced from https://thetvdb.com/api-information#attribution
   ATTRIBUTION_HTML = 'Metadata provided by TheTVDB. Please consider adding missing information or subscribing.'
