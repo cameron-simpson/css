@@ -100,6 +100,12 @@ class _SMHWebPage(_SMHEntity):
     return Article.from_soup_hrefs(soup, base_url=base_url)
 
   @with_base_url
+  def soup_authors(self, soup, *, base_url: str) -> set["Author"]:
+    ''' Return a set of `Author`s from some soup.
+    '''
+    return Author.from_soup_hrefs(soup, base_url=base_url)
+
+  @with_base_url
   def soup_topics(self, soup, *, base_url: str) -> set["Topic"]:
     ''' Return a set of `Topic`s from some soup.
     '''
