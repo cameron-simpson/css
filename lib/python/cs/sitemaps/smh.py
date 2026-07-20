@@ -200,14 +200,6 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
     return self.mtime
     ##return self["properties"].get('article:published_time')
 
-  @cached_property
-  def og(self):
-    ''' A mapping to the Opengraph tags.
-    '''
-    return self.opengraph
-
-  ##return PrefixedMappingProxy(self.tags, 'opengraph.')
-
   def update_from_flowstate_meta(self, flowstate: FlowState, **update_kw):
     ''' Call `SiteMap.update_tagset_from_meta` to apply the `flowstate`
         meta tags to this entity.
