@@ -317,6 +317,35 @@ class Topic(_SMHWebPage, RSSChannelMixin):
     '''
     return self.articles
 
+class Author(Topic):
+  ''' An author, much like a topic by for a journalist.
+  '''
+  TYPE_SUBNAME = 'author'
+  # https://www.smh.com.au/by/richard-glover-hve2q
+  SITEPAGE_URL_PATTERN = '/by/<name_url_part>-<type_key>'
+
+  @pfx_method
+  @pagemethod
+  @uses_scandata
+  def scan_sitepage(
+      self, flowstate: FlowState, *, scandata: ScanData
+  ) -> ScanData:
+    ''' Scan `flowstate.soup` for `Article` references.
+    '''
+    scandata = super().scan_sitepage(flowstate, scandata=scandata)
+    data = scandata[self]
+    soup = flowstate.soup
+    try:
+      og = self.opengraph
+    except AttributeError as e:
+      print("NO .OPENGRAPH")
+    else:
+      try:
+        data['fullname'] = og['title'].split('|', 1)[0].strip()
+      except (KeyError, AttributeError) as e:
+        warning(str(e))
+    return scandata
+
 class TOC(_SMHWebPage):
   ''' Table of contents entities.
   '''
