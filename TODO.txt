@@ -1,3 +1,4 @@
+replace all qvprint with vprint since verbose and quiet are no longer independant
 refresh: allow recursion depth as a recurse= value
 cs.tagset: ENtity: prefix_ents: map .ents_subtype[_field] to the Entity whose .field_id is our key, field defaults to our subtype; likewise .ent_*
 cs.cmdutils: bad usage from subcommand should preempt the run-context call
