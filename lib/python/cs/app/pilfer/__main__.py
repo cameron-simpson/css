@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 import logging
 import os
-from os.path import expanduser, join as joinpath
+from os.path import expanduser, isabs as isabspath, join as joinpath
 from getopt import GetoptError
 from pprint import pformat, pprint
 import re
@@ -15,7 +15,7 @@ import sys
 from typing import Iterable
 from uuid import uuid4
 
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup
 from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
@@ -37,9 +37,7 @@ import cs.logutils
 from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
-from cs.queues import ListQueue
 from cs.sqltags import SQLTagSet
-from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from . import (
@@ -51,7 +49,6 @@ from . import (
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .print import dump_soup
 from .rss import RSSChannelMixin
 from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
 
@@ -189,7 +186,6 @@ class PilferCommand(BaseCommand):
               pilfer.load_browser_cookies(pilfer.session.cookies)
             yield options
 
-  # TODO: accept a URL and look it up?
   def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
     ''' Return a `SiteEntity` bound to the entity-name at `argv[0]`.
     '''
@@ -494,8 +490,9 @@ class PilferCommand(BaseCommand):
       print("Content:", flowstate.content_type)
       if flowstate.content_type in ('text/html',):
         soup = flowstate.soup
-        meta = flowstate.meta
-        printt(meta)
+        ##meta = flowstate.meta
+        ##printt(meta)
+        ##breakpoint()
         printt_soup(soup)
       elif flowstate.content_type in ('application/json',):
         jdata = flowstate.json
@@ -916,7 +913,12 @@ class PilferCommand(BaseCommand):
           raise GetoptError(
               f'unknown sitemap command, expected one of {", ".join(cmds)}'
           )
-        with stackattrs(sitemap, options=self.options):
+        with stackattrs(
+            sitemap,
+            cmd=f'{options.cmd} {sitecmd}',
+            options=self.options,
+            subcmd=sitecmd,
+        ):
           return cmdmethod(argv)
     # match URLs against the sitemap
     table = []
