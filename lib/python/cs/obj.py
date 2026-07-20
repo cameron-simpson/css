@@ -642,6 +642,12 @@ class Refreshable(ABC):
     '''
     return ()
 
+  def refresh_related1(self) -> Iterable:
+    ''' Return the related objects which should also be refreshed
+        in recursive refreshes, but nonrecursively.
+    '''
+    return ()
+
   def refresh_key(self):
     ''' Return the key value for the `seen` set used in a recursive refresh.
         This default returns `id(self)`; classes like `Entity`
@@ -699,11 +705,27 @@ class Refreshable(ABC):
         * `ratelimit`: how many seconds should elapsed before
           attempting a refresh, default from `self.refresh_ratelimit`
           or `type(self).REFRESH_RATELIMIT`
-        * `recurse`: optional flag, default `False`; if true the
-          recursively refresh the objects from `self.refresh_related()`
+        * `recurse`: optional flag, default `False`; if true then
+          refresh the objects from `self.refresh_related1()` nonrecursively
+          and recursively refresh the objects from `self.refresh_related()`
         * `seen`: optional set of keys to prevent unbound recursion
 
         Other keyword parameters are passed to `self._refresh()` if it is called.
+
+        Note the two related-object methods, `refresh_related()`
+        and `refresh_related1()`.  These exist to allow a recursive
+        refresh to refresh "descendant" objects recursively and
+        other related "adjacent" or "superior" objects nonrecursively.
+
+        Supposing you're refreshing a section topic in a news site;
+        you might recursively refresh all the articles in the topic
+        and the authors of the articules. However you likely also
+        want to refresh other objects related to the topic, perhaps
+        the table of topics and other things; recursing into those
+        objects might refresh everything on the entire site.
+        Accordingly the descendant objects would be enumerated by
+        `refresh_related()` and the adjacent/superior objects by
+        `refresh_related1()`.
 
         Note that because a `recurse=True` call descends a potentially
         arbitrary tree of related objects, if `map` is supplied as,
@@ -757,6 +779,21 @@ class Refreshable(ABC):
         # good poll and data updated
         self.refresh_last_update = now
     if recurse:
+      # refresh some objects nonrecursively
+      for _ in map(
+          lambda obj: obj.refresh(
+              recurse=False,
+              map=map,
+              force=force,
+              lifespan=lifespan0,
+              ratelimit=ratelimit0,
+              seen=seen,
+              **_refresh_kw,
+          ),
+          self.refresh_related1(),
+      ):
+        pass
+      # refresh other related objects recursively
       for _ in map(
           lambda obj: obj.refresh(
               recurse=True,
