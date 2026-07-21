@@ -2082,11 +2082,11 @@ class UsesSQLTags(Entities):
 
               TYPE_ZONE = 'mbdb'
               EntityClass = _MBEntity
-              EntitiesClass = MBSQLTags
+              TagsetsClass = MBSQLTags
 
   '''
 
-  EntitiesClass = SQLTags
+  TagsetsClass = SQLTags
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 
