@@ -257,6 +257,7 @@ class SeriesInfoRow(SiteWidget, entity_class=_AmazonEntity):
         - the member books ASINs and titles
     '''
     ent = self.entity
+    series_asin = ent.type_key
     data = scandata[ent]
     image_div = self.tag.find('div', id='seriesImageContainer')
     # scan the series members
@@ -270,7 +271,7 @@ class SeriesInfoRow(SiteWidget, entity_class=_AmazonEntity):
       breakpoint()
     book_asins = []
     author_asins = set()
-    for li in child_tags(carousel_div.find('ol'), 'li'):
+    for pos, li in enumerate(child_tags(carousel_div.find('ol'), 'li'), 1):
       title_span = li.find('span', **{'data-test-id': 'itemTitle'})
       anchor = title_span.parent
       book_asin = asin_from_href(anchor.attrs['href'])
@@ -283,6 +284,8 @@ class SeriesInfoRow(SiteWidget, entity_class=_AmazonEntity):
       author_anchor = li.find('a', **{'data-test-id': 'itemByLine'})
       author_asin = asin_from_href(author_anchor.attrs['href'], '/e/')
       book_data['author_id'] = author_asin
+      book_data['series_id'] = series_asin
+      book_data['series_position'] = pos
       author_asins.add(author_asin)
       author = ent.sitemap[AmazonAuthor, author_asin]
       author_data = scandata[author]
@@ -375,8 +378,6 @@ class ProductDetails(SiteWidget, entity_class=_AmazonEntity):
         except ValueError as e:
           warning(f'unhandled {key_span.string} {value=}: {e}')
       parsed[key] = value
-    printt("ProductDetails PARSED:", parsed)
-    breakpoint()
     return parsed
 
   @trace
