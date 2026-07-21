@@ -416,7 +416,7 @@ class _PlayOnEntity(Entity):
     if data is None:
       warning("no individual {self.__class__.__name__}._refresh method")
       return False
-    self.tags.update(data, prefix=self.type_zone)
+    self.type_zone_update(data)
     return True
 
 class Feature(_PlayOnEntity):
@@ -677,7 +677,7 @@ class PlayOn(Entities, Refreshable):
   EntityClass = _PlayOnEntity
   TYPE_ZONE = EntityClass.TYPE_ZONE
 
-  EntitiesClass = PlayOnSQLTags
+  TagsetsClass = PlayOnSQLTags
 
   TYPE_CONVERSIONS = {
       Recording: dict(Episode=int, ReleaseYear=int, Season=int),
