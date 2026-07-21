@@ -1669,7 +1669,7 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     if db_url.startswith('~') or isabspath(db_url):
       # expect filesystem path to an SQLite file
       if not db_url.endswith('.sqlite'):
-        raise ValueError("expected path to .sqlite file")
+        raise ValueError(f'expected path to .sqlite file, got {db_url=}')
       db_url = expanduser(db_url)
     return cls(db_url=db_url)
 
