@@ -8,14 +8,16 @@
 '''
 
 from __future__ import print_function
+import array
 from collections import namedtuple
 from contextlib import contextmanager
 import errno
+import fcntl
 import os
 import re
 from subprocess import Popen, PIPE
 import sys
-from termios import tcsetattr, tcgetattr, TCSANOW
+from termios import tcsetattr, tcgetattr, TCSANOW, TIOCGWINSZ
 from cs.gimmicks import warning
 
 __version__ = '20210316-post'
@@ -62,6 +64,21 @@ def ttysize(fd):
     else:
       rows, columns = None, None
   return WinSize(rows, columns)
+
+WinSizePX = namedtuple('WinSizePX', 'rows columns widthpx heightpx')
+
+def ttysizepx(fd):
+  ''' Return a `(rows,columns,widthpx,heightpx)` tuple for the
+      specified file descriptor being the terminal character rows
+      and columns and pixel width and height respectively.
+
+      This function relies on the `fcntl.ioctl` using `termios.TIOCGWINSZ`.
+  '''
+  if not isinstance(fd, int):
+    fd = fd.fileno()
+  buf = array.array('H', [0, 0, 0, 0])
+  fcntl.ioctl(fd, TIOCGWINSZ, buf)
+  return WinSizePX(*buf)
 
 _ti_setup = False
 
