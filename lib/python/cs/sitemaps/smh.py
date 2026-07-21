@@ -28,6 +28,7 @@ from cs.app.pilfer.sitemap import (
     SiteMapPatternMatch, uses_scandata, with_base_url
 )
 from cs.binary import bs
+from cs.bs4utils import child_tags
 from cs.cmdutils import popopts
 from cs.deco import promote
 from cs.excutils import unattributable
@@ -240,6 +241,21 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
       href = a.attrs['href']
       if href.startswith('/by/'):
         author_ids.append(href.rsplit('-', 1)[1])
+    paragraphs = []
+    main = soup.find('main', id='content')
+    main_div = main.div
+    for div in child_tags(main_div, 'div'):
+      if div.attrs.get('data-testid') == 'article-footer':
+        break
+      for p in child_tags(div, 'p'):
+        para = p.string
+        if not para:
+          continue
+        paragraphs.append(para.strip())
+    if paragraphs:
+      data['paragraphs'] = paragraphs
+    else:
+      warning("no paragraphs found")
     return scandata
 
   @trace
