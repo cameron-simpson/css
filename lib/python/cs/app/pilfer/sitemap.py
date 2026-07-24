@@ -1253,7 +1253,7 @@ class SiteEntity(Entity, NoAttrs):
     url_s = self.url_paths[pattern_name]
     if '://' not in url_s:
       # just a URL path, resolve it
-      url_s = self.url_to(url_s)
+      url_s = self.urlto(url_s)
     return url_s
 
   @classmethod
@@ -1411,7 +1411,6 @@ class SiteEntity(Entity, NoAttrs):
     except AttributeError:
       return self.sitepage_url
 
-  def _refresh(self, url=None, *, data=None):
   def clean_url(self, url_s: str) -> str:
     ''' Sometimes bogus URLs get into the data from bad web page metadata (or bugs).
         This implements cleanup of such URLs if that's possible.
@@ -1419,6 +1418,12 @@ class SiteEntity(Entity, NoAttrs):
     '''
     return url_s
 
+  @pfx_method
+  @uses_runstate
+  @uses_verbose
+  def _refresh(
+      self, url=None, *, data=None, runstate: RunState, verbose: bool
+  ):
     ''' The default `_refresh` method runs
         `self.scan_sitepage(self.sitepage_url)` and applies the resulting
         `ScanData` instance to the relevant (detected/recognised) entities.
@@ -1433,12 +1438,16 @@ class SiteEntity(Entity, NoAttrs):
       try:
         url = self._url
       except AttributeError:
-        url = self.sitepage_url
+        url = getattr(self, 'sitepage_url', None)
         if url is None:
           warning(
               f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
           )
           return False
+    if isinstance(url, URL):
+      url = str(url)
+    url = self.clean_url(url)
+    vprint(f'{self} refresh from {url}')
     with run_task(
         f'{self.__class__.__name__}[{self.name}].scan_sitepage({URL(url).short})',
         report_print=verbose,
