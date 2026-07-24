@@ -873,8 +873,15 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     if self.content_type == 'text/html':
       soup = BeautifulSoup(self.text, self.bs4parser)
       self.url.soup = soup
-      return soup
-    return None
+    elif self.content_type in ('text/xml', 'application/rss+xml'):
+      soup = BeautifulSoup(self.text, 'xml')
+      self.url.soup = soup
+    else:
+      warning(
+          f'{self.__class__.__name__}.soup: unsupported content type {self.content_type=}'
+      )
+      soup = None
+    return soup
 
   @cached_property
   def meta(self):

@@ -488,7 +488,8 @@ class PilferCommand(BaseCommand):
       printt(*table)
     if self.options.dump_content:
       print("Content:", flowstate.content_type)
-      if flowstate.content_type in ('text/html',):
+      if flowstate.content_type in ('text/html', 'text/xml',
+                                    'application/rss+xml'):
         soup = flowstate.soup
         ##meta = flowstate.meta
         ##printt(meta)
