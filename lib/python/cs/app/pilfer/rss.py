@@ -62,6 +62,9 @@ class RSSCommon(ABC):
     '''
     return None
 
+  def rss_author(self):
+    return getattr(self, 'author_email', '')
+
   def rss_description(self):
     return getattr(self, 'description', '')
 
@@ -199,6 +202,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
       self,
       *,
       E=None,
+      author=None,
       category=None,
       description=None,
       image_url=None,
@@ -215,6 +219,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
 
         Optional parameters:
         * `E`: optional `ElementMaker` instance; the default comes from `RSSCommon.ElementMaker()`
+        * `author`: the email address of the author
         * `category`: the item category, default from `self.rss_category()`
         * `description`: the item description, default from `self.rss_description()`
         * `image_url`: an optional URL for an image for this item
@@ -222,7 +227,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
         * `image_title`: an optional title associate with the image,
           default from `self.rss-image_title()`
         * `language`: the channel title, default from `self.rss_language()`
-        * `link`: the channel title, default from `self.rss_link()`
+        * `link`: the URL of the item, default from `self.rss_link()`
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
         * `title`: the channel title, default from `self.rss_title()`
     '''
@@ -230,6 +235,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
       E = self.ElementMaker()
     if refresh:
       self.refresh()
+    if author is None: author = self.rss_author()
     if category is None: category = self.rss_category()
     if category is None:
       categories = ()
@@ -257,17 +263,18 @@ class RSSChannelItemMixin(RSSCommon, ABC):
             (
                 E.guid(self.name, isPermaLink="false"),
                 E.title(title),
-                description and E.description(description),
+                author and Eauthor(author),
                 E.link(link),
                 *(E.category(cat) for cat in categories),
                 pub_date and E.pubDate(self.rss_date_string(pub_date)),
                 image_url and E.image(
                     E.url(image_url),
                     E.title(image_title),
-                    E.link(self.rss_link()),
+                    E.link(link),
                     image_width and E.width(str(image_width)),
                     image_height and E.height(str(image_height)),
                 ),
+                description and E.description(description),
             ),
         ),
     )
