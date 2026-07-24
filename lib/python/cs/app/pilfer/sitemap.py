@@ -1397,6 +1397,11 @@ class SiteEntity(Entity, NoAttrs):
       url_s = self.urlto(url_s)
     return url_s
 
+  def refresh(self, resource: Optional = None, *, map=pmap, **refresh_kw):
+    ''' We refresh related items in parallel.
+    '''
+    return super().refresh(resource=resource, map=map, **refresh_kw)
+
   @property
   def refresh_resource(self):
     ''' The default refresh resource is `self.sitepage_url`, supporting `Refreshable`.
