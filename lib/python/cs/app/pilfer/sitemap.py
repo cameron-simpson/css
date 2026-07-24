@@ -1412,6 +1412,13 @@ class SiteEntity(Entity, NoAttrs):
       return self.sitepage_url
 
   def _refresh(self, url=None, *, data=None):
+  def clean_url(self, url_s: str) -> str:
+    ''' Sometimes bogus URLs get into the data from bad web page metadata (or bugs).
+        This implements cleanup of such URLs if that's possible.
+        This default implementation returns the URL unchanged.
+    '''
+    return url_s
+
     ''' The default `_refresh` method runs
         `self.scan_sitepage(self.sitepage_url)` and applies the resulting
         `ScanData` instance to the relevant (detected/recognised) entities.
@@ -1432,7 +1439,15 @@ class SiteEntity(Entity, NoAttrs):
               f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
           )
           return False
-    scandata = self.scan_sitepage(url)
+    with run_task(
+        f'{self.__class__.__name__}[{self.name}].scan_sitepage({URL(url).short})',
+        report_print=verbose,
+        tick_deferred=True,
+    ) as proxy:
+      with self.sitemap.request_semaphore:
+        runstate.raiseif()
+        with proxy.ticker():
+            scandata = self.scan_sitepage(url)
     scandata.apply(self)
     return True
 
