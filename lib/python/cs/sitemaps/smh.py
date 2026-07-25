@@ -244,6 +244,7 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
       if href.startswith('/by/'):
         author_ids.append(href.rsplit('-', 1)[1])
     paragraphs = []
+    paragraph_tags = []
     main = soup.find('main', id='content')
     main_div = main.div
     for div in child_tags(main_div, 'div'):
@@ -254,8 +255,12 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
         if not para:
           continue
         paragraphs.append(para.strip())
+        paragraph_tags.append(p)
     if paragraphs:
       data['paragraphs'] = paragraphs
+      span = BS4Tag(name='span')
+      span.extend(paragraph_tags)
+      data['paragraphs_html'] = span.prettify().rstrip()
     else:
       warning("no paragraphs found")
     return scandata
