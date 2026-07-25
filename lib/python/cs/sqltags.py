@@ -1616,6 +1616,9 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
   DBURL_ENVVAR = DBURL_ENVVAR
   DBURL_DEFAULT = DBURL_DEFAULT
 
+  # a URL for an in-memory SQLite db
+  DB_URL_MEMORY = 'sqlite://'
+
   @classmethod
   def _singleton_key(cls, db_url=None, ontology=None):
     ''' The filesystem path for the `db_url` or `None`.
