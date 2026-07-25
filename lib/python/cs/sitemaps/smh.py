@@ -16,7 +16,7 @@ from typing import Any, Mapping, Optional
 from urllib.parse import parse_qs, urlparse, urljoin as up_urljoin
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag as BS4Tag
+from bs4.element import CData, Tag as BS4Tag
 from lxml.etree import Element, tostring as xml_tostring
 import xml.etree.ElementTree as ET
 from typeguard import typechecked
@@ -32,7 +32,7 @@ from cs.bs4utils import child_tags
 from cs.cmdutils import popopts
 from cs.deco import promote
 from cs.excutils import unattributable
-from cs.lex import format_attribute, lc_, printt
+from cs.lex import format_attribute, htmlify, lc_, printt
 from cs.logutils import warning
 from cs.mappings import PrefixedMappingProxy
 from cs.pfx import Pfx, pfx_method
@@ -132,7 +132,7 @@ class _SMHWebPage(_SMHEntity):
 
   @property
   def title(self):
-    return self.refreshed()['smh.opengraph']['title']
+    return self.refreshed().opengraph['title']
 
 class Article(_SMHWebPage, RSSChannelItemMixin):
   ''' An article.
@@ -189,7 +189,9 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
     return self.refreshed().topic_ent
 
   def rss_category(self):
-    return self.topic
+    print("RSS CATEGORY")
+    self.printt()
+    return self.topic_ent.type_key
 
   def rss_description(self):
     meta = self['smh.html.meta']
