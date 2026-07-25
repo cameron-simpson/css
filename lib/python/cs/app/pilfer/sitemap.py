@@ -1930,6 +1930,9 @@ class SiteMap(Entities, Promotable):
   name: str = None
   pilfer: object = None
   tagsets: BaseTagSets = None
+  request_semaphore: Semaphore = None
+
+  DEFAULT_CONCURRENCY = 3
 
   EntityClass = SiteEntity
   TagsetsClass = SQLTags
@@ -1949,6 +1952,10 @@ class SiteMap(Entities, Promotable):
       self.name = self.TYPE_ZONE
     if self.pilfer is None:
       self.pilfer = P
+    if self.request_semaphore is None:
+      self.request_semaphore = Semaphore(self.DEFAULT_CONCURRENCY)
+    elif isinstance(self.request_semaphore, int):
+      self.request_semaphore = Semaphore(self.request_semaphore)
     # Register this `SiteMap` by its `TYPE_ZONE`.
     by_type_zone = cls.by_type_zone
     try:
