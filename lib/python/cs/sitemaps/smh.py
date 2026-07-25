@@ -229,7 +229,6 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
     '''
     self.sitemap.update_tagset_from_meta(self, flowstate, **update_kw)
 
-  @trace
   @uses_scandata
   @promote
   def scan_sitepage(
@@ -278,24 +277,6 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
     else:
       warning("no paragraphs found")
     return scandata
-
-  @trace
-  @promote
-  def OBSOLETE_grok_sitepage(
-      self, flowstate: FlowState, match: Optional[Mapping[str, Any]] = None
-  ):
-    if str(flowstate.url).startswith('/'):
-      breakpoint()
-    super().grok_sitepage(flowstate, match=match)
-    self["title"] = flowstate.meta.tags["title"]
-    topic = self.url_topic_part(flowstate.url)
-    assert '.' not in topic
-    self["topic"] = topic
-    # infill some sometimes missing items so that we do not
-    # gratuitously refetch the page
-    self.setdefault('opengraph.description', None)
-    ##self.printt()
-    return self
 
 class Topic(_SMHWebPage, RSSChannelMixin):
   ''' A topic.
