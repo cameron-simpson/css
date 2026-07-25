@@ -1860,7 +1860,9 @@ class SiteWidget(ABC):
     '''
     raise NotImplementedError
 
-  def printt(self, **printt_kw):
+  def printt(self, label=None, **printt_kw):
+    if label is None:
+      label = f'{self.__class__.__name__}:{id(self)}'
     printt_soup(self.tag, **printt_kw)
 
 class SiteMapPatternMatch(namedtuple(
@@ -2689,7 +2691,7 @@ class SiteMap(Entities, Promotable):
       base_entity_class = self.EntityClass
     except AttributeError as e:
       vprint(
-          f'{self.__class__.__name__}.url_entity: no .EntityClass, skipping'
+          f'{self.__class__.__name__}.url_entity: skipping, no .EntityClass ({e})'
       )
       return None
     entities = []
