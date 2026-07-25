@@ -194,14 +194,28 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
     return self.topic_ent.type_key
 
   def rss_description(self):
-    meta = self['smh.html.meta']
+    self.refresh()
     try:
-      return f'{meta["description"]} - {meta.get("author","no author")}, {meta["pubdate"]}'
+      meta = self['smh.html.meta']
     except KeyError as e:
-      warning(f'{self.name}.rss_description: {e}')
-      printt(meta)
-      breakpoint()
-      return "no description"
+      warning("no smh.html.meta")
+      meta = {}
+    try:
+      description_html = self.paragraphs_html
+    except AttributeError as e:
+      warning(f'no .paragraphs_html, maybe it\'s a video?: {e}')
+      description_html = None
+    if not description_html:
+      description_html = htmlify(meta.get('description', ''))
+    by_line = ", ".join(
+        htmlify(str(field)) for field in (
+            meta.get("author"),
+            meta.get("pubdate"),
+        ) if field
+    )
+    if by_line:
+      description_html = f'{by_line}<br/>{description_html}'
+    return str(CData(description_html))
 
   def rss_pubdate(self) -> None | str:
     ''' Return the publication date, or `None` if not available.
