@@ -3222,16 +3222,16 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
       except ValueError:
         pass
       else:
-        cls = self.__class__
-        suffix_handler = getattr(cls, f'suffix_{suffix}', None)
-        if suffix_handler is not None:
-          try:
-            return suffix_handler(self, attr)
-          ##return pfx_call(suffix_handler)(self, attr)
-          except ValueError as e:
-            raise AttributeError(
-                f'{self.__class__.__name__}.{attr}: {e}'
-            ) from e
+        if base:
+          cls = self.__class__
+          suffix_handler = getattr(cls, f'suffix_{suffix}', None)
+          if suffix_handler is not None:
+            try:
+              return pfx_call(suffix_handler, self, attr)
+            except ValueError as e:
+              raise AttributeError(
+                  f'{self.__class__.__name__}.{attr}: {e}'
+              ) from e
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
   @cached_property
