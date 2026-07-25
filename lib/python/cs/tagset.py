@@ -281,7 +281,7 @@
 
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
-from collections.abc import MutableMapping, Sequence
+from collections.abc import MutableMapping
 from configparser import ConfigParser
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -301,7 +301,8 @@ import re
 import sys
 import time
 from typing import (
-    Any, GenericAlias, Iterable, List, Mapping, Optional, Tuple, Union
+    Any, GenericAlias, Iterable, List, Mapping, Optional, Self, Sequence,
+    Tuple, Union
 )
 from uuid import UUID, uuid4
 from weakref import WeakValueDictionary
@@ -359,6 +360,8 @@ DISTINFO = {
         'icontract',
         'typeguard',
     ],
+    'python_requires':
+    '>=3.11',  # for typing.Self
 }
 
 pfx_open = partial(pfx_call, open)
@@ -3422,7 +3425,7 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
   # Attribute suffix resolvers.
 
   @require(lambda attr: attr.endswith('_ent'))
-  def suffix_ent(self, attr):
+  def suffix_ent(self, attr) -> Self | None:
     ''' Resolve *subtype*`_ent` to `self[type_zone.`*subtype*`.id]`
         or `None` if no `self[`*subtype*`_id]`
     '''
@@ -3440,7 +3443,7 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
     return self.tags_db[ref_name]
 
   @require(lambda attr: attr.endswith('_ents'))
-  def suffix_ents(self, attr):
+  def suffix_ents(self, attr) -> Sequence[Self]:
     ''' Resolve *subtype*`_ents` to [self[type_zone.`*subtype*`.id]]`
         or `()` if no `self[`*subtype*`_id]]`.
     '''
