@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from functools import cached_property
 import logging
 import os
@@ -38,6 +39,7 @@ from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.sqltags import SQLTagSet
+from cs.tagset import Entity
 from cs.urlutils import URL
 
 from . import (
@@ -187,7 +189,16 @@ class PilferCommand(BaseCommand):
             yield options
 
   def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
-    ''' Return a `SiteEntity` bound to the entity-name at `argv[0]`.
+    ''' Pop off the leading item of `argv` and return a `SiteEntity` bound to the entity it specifies.
+
+        Recognised spcifications in order of test:
+        - a string containing `://`: this is a URL which will be
+          matches against the `*_URL_PATTERN` patterns of the
+          `SiteEntity` classes
+        - *zone*`.`*subtype*`:`*field*`=`*value: return `SiteEntity`
+          insteances whose *field* is equal to *value*, or which
+          contain *value* if the *field* is a list
+        - entity name: the `SiteEntity` with this name
     '''
     if not argv:
       raise GetoptError('missing site-entity')
@@ -199,11 +210,33 @@ class PilferCommand(BaseCommand):
         raise GetoptError(
             f'{entity_spec=} does not match a known SiteEntity subclass'
         )
+      return ent
+    # tvdb.actor:fullname="Job Bloggs"
+    try:
+      lhs, rhs = entity_spec.split(':', 1)
+      zone, subtype = lhs.split('.', 1)
+      field, value = rhs.split('=', 1)
+    except ValueError:
+      pass
     else:
+      # see if it's a number
       try:
-        ent = SiteMap.by_db_key(entity_spec)
-      except KeyError as e:
-        raise GetoptError(f'unrecognised {entity_spec=}: {e}') from e
+        value = float(value)
+      except ValueError:
+        if field == 'name':
+          value = f'{zone}.{subtype}.{value}'
+      sitemap = SiteMap[zone]
+      name_prefix = f'{zone}.{subtype}.'
+      for tag_name in field, f'{zone}.{field}':
+        for ent in trace(sitemap.find)(**{tag_name: value}):
+          if not ent.name.startswith(name_prefix):
+            continue
+          return ent
+      raise GetoptError(f'no matches for {entity_spec=}')
+    try:
+      ent = SiteMap.by_db_key(entity_spec)
+    except KeyError as e:
+      raise GetoptError(f'unrecognised {entity_spec=}: {e}') from e
     return ent
 
   @staticmethod
