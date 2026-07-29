@@ -1122,9 +1122,9 @@ class SiteEntity(Entity, NoAttrs):
       url: URL,
       sitemap: "SiteMap" = None,
       *,
-      pattern_name="sitepage_url",
-  ):
-    ''' Return the `SiteEntity` from `sitemap` matching `url`.
+      pattern_name=None,
+  ) -> tuple[Self, dict]:
+    ''' Return the `SiteEntity` from `sitemap` matching `url` and the match `dict`.
         Raises `URLPatternMatchError` (a subclass of `ValueError`)
         if the `url.path` does not match via
         `cls.match_url(,url,pattern_name=pattern_name)`.
@@ -1143,13 +1143,8 @@ class SiteEntity(Entity, NoAttrs):
         raise URLPatternMatchError(
             f'no type_key in match from {cls.__name__}.match_url({url},{pattern_name=}): {match=}'
         )
-      # fill in from the match if not already set
       entity = sitemap[cls, type_key]
-      for match_key, value in match.items():
-        entity.setdefault(match_key, value)
-      # store the source URL as ._url, the originating URL
-      entity._url = url
-      return entity
+      return entity, match
 
   @classmethod
   @uses_runstate
