@@ -266,23 +266,26 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
     paragraphs = []
     paragraph_tags = []
     main = soup.find('main', id='content')
-    main_div = main.div
-    for div in child_tags(main_div, 'div'):
-      if div.attrs.get('data-testid') == 'article-footer':
-        break
-      for p in child_tags(div, 'p'):
-        para = p.string
-        if not para:
-          continue
-        paragraphs.append(para.strip())
-        paragraph_tags.append(p)
-    if paragraphs:
-      data['paragraphs'] = paragraphs
-      span = BS4Tag(name='span')
-      span.extend(paragraph_tags)
-      data['paragraphs_html'] = span.prettify().rstrip()
+    if main is None:
+      warning("no #content DIV")
     else:
-      warning("no paragraphs found")
+      main_div = main.div
+      for div in child_tags(main_div, 'div'):
+        if div.attrs.get('data-testid') == 'article-footer':
+          break
+        for p in child_tags(div, 'p'):
+          para = p.string
+          if not para:
+            continue
+          paragraphs.append(para.strip())
+          paragraph_tags.append(p)
+      if paragraphs:
+        data['paragraphs'] = paragraphs
+        span = BS4Tag(name='span')
+        span.extend(paragraph_tags)
+        data['paragraphs_html'] = span.prettify().rstrip()
+      else:
+        warning("no paragraphs found")
     return scandata
 
 class Topic(_SMHWebPage, RSSChannelMixin):
