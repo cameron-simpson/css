@@ -1987,8 +1987,15 @@ class SiteMap(Entities, Promotable):
   @classmethod
   def zone_sitemap(cls, type_zone: str):
     ''' The `SiteMap` associated with `type_zone`.
+        This is also available as `SiteMap[type_zone]`.
     '''
     return cls.by_type_zone[type_zone]
+
+  @classmethod
+  def __class_getitem__(cls, type_zone: str):
+    ''' Indexing `SiteMap` returns `zone_sitemap(type_zone)`.
+    '''
+    return cls.zone_sitemap(type_zone)
 
   @classmethod
   def by_db_key(cls, db_key: str) -> SiteEntity:
