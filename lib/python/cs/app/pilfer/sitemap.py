@@ -315,7 +315,7 @@ class URLPattern(Promotable):
         Return the regexp `groupdict()` on a match.
     '''
     PR = lambda *a: vvprint(f'match {url.short} vs {self}:', *a)
-    if self.hostname_fnmatch is not None and (
+    if url.hostname is not None and self.hostname_fnmatch is not None and (
         not isinstance(url.hostname, str)
         or not fnmatch(url.hostname, self.hostname_fnmatch)):
       # hostname mismatch
