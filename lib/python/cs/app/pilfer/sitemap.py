@@ -183,6 +183,8 @@ class URLPattern(Promotable):
       Converter(r'0|[1-9]\d*', int, str),
       'lc_':
       Converter(r'[^/&A-Z]+', str, lc_),
+      'isodate':
+      Converter(r'\d{4}-\d\d-\d\d', date.fromisoformat, str),
       'uuid':
       Converter(
           r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}', UUID, str
