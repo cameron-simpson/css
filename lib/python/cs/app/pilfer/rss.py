@@ -152,7 +152,7 @@ class RSSChannelMixin(RSSCommon, ABC):
       categories = list(category)
     if description is None: description = self.rss_description()
     if generator is None:
-      generator = self.sitemap.pilfer.__class__.__module__.rsplit('.', 1)[0]
+      generator = f'{self.__class__.__module__}:{self.__class__.__name__}'
     if image_url is None: image_url = self.rss_image_url()
     if image_size:
       image_width, image_height = image_size
