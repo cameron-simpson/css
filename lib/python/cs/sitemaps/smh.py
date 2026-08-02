@@ -193,6 +193,13 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
     self.printt()
     return self.topic_ent.type_key
 
+  def rss_creator(self):
+    return ", ".join(
+        fullname for fullname in
+        (getattr(author, 'fullname', '') for author in self.author_ents)
+        if fullname
+    )
+
   def rss_description(self):
     self.refresh()
     try:
