@@ -265,10 +265,10 @@ class RSSChannelItemMixin(RSSCommon, ABC):
             (
                 E.guid(self.name, isPermaLink="false"),
                 E.title(title),
-                author and Eauthor(author),
+                author and E.author(author),
                 creator and E.creator(creator),
                 E.link(link),
-                *(E.category(cat) for cat in categories),
+                *map(E.category, categories),
                 pub_date and E.pubDate(self.rss_date_string(pub_date)),
                 image_url and E.image(
                     E.url(image_url),
