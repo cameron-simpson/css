@@ -204,6 +204,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
       E=None,
       author=None,
       category=None,
+      creator=None,
       description=None,
       image_url=None,
       image_size=None,
@@ -243,6 +244,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
       categories = category,
     else:
       categories = list(category)
+    if creator is None: creator = self.rss_creator()
     if description is None: description = self.rss_description()
     if image_url is None:
       image_url = self.rss_image_url()
@@ -264,6 +266,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
                 E.guid(self.name, isPermaLink="false"),
                 E.title(title),
                 author and Eauthor(author),
+                creator and E.creator(creator),
                 E.link(link),
                 *(E.category(cat) for cat in categories),
                 pub_date and E.pubDate(self.rss_date_string(pub_date)),
