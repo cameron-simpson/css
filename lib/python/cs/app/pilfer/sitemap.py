@@ -1254,11 +1254,12 @@ class SiteEntity(Entity, NoAttrs):
     return url_s
 
   @classmethod
+  @promote
   def match_url(
       cls,
       url: URL,
       *,
-      pattern_name="sitepage_url",
+      pattern_name=None,
       sitemap: Optional["SiteMap"] = None
   ) -> dict | None:
     ''' Test whether `url` matches this `SiteEntity` subclass'
@@ -1271,14 +1272,25 @@ class SiteEntity(Entity, NoAttrs):
     except Exception as e:
       warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
       return None
-    pattern = cls.pattern(pattern_name)
-    if pattern is None:
-      return None
-    try:
-      return pattern.match(url)
-    except Exception as e:
-      warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
-      return None
+    for name, pattern in pattern_mapping.items():
+      if pattern_name is not None and name != pattern_name:
+        continue
+      ##pattern = cls.pattern(pattern_name)
+      if pattern is None:
+        continue  # an erased pattern
+      try:
+        match = pattern.match(url)
+      except Exception as e:
+        warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
+        continue
+      if match is not None:
+        match.update(
+            pattern_name=(
+                name.lower().removesuffix('_pattern').removesuffix('_url')
+            )
+        )
+        return match
+    return None
 
   def __getattr__(self, attr):
     ''' A `SiteEntity` supports various automatic attributes.
