@@ -210,6 +210,10 @@ class PilferCommand(BaseCommand):
         raise GetoptError(
             f'{entity_spec=} does not match a known SiteEntity subclass'
         )
+      # infill an assumed sitepage_url
+      # will get overridden by the canonical link if found
+      # and anyway can be overridden by 'sitepage_url'
+      ent.setdefault(f'{ent.type_zone}.sitepage_url', entity_spec)
       return ent
     # tvdb.actor:fullname="Job Bloggs"
     try:
