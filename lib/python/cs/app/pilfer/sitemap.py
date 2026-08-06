@@ -1512,7 +1512,21 @@ class SiteEntity(Entity, NoAttrs):
         warning(
             f"expected 1 canonical link: {data['html.links']['canonical']=}, keeping the last"
         )
-      data['sitepage_url'] = sitepage_urls[0]
+      sitepage_url = sitepage_urls[-1]
+      try:
+        junk, real_url_suffix = sitepage_url.rsplit('|https://', 1)
+      except ValueError:
+        if not sitepage_url.startswith('https://'):
+          warning(
+              f'{self.name}: no HTTPS on canonical URL {sitepage_url=} ignoring'
+          )
+          sitepage_url = None
+        pass
+      else:
+        warning(f'{self.name}: BOGUS canonical URL {sitepage_url=} adjusting')
+        sitepage_url = f'https://{real_url_suffix}'
+      if sitepage_url is not None:
+        data['sitepage_url'] = sitepage_urls[0]
     data["html.meta"] = flowstate.meta.tags.as_dict()
     data["html.properties"] = flowstate.meta.properties.as_dict()
     data['opengraph'] = dict(flowstate.opengraph)
