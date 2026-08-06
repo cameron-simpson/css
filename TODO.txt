@@ -1,3 +1,4 @@
+cs.timeseries: array typecodes may vary in size from cpu to cpu and os to os, struct_format etc may need measuring using array.itemsize
 cs.imageutils: try importing libsixel, fall back to img2sixel if not available
 replace all qvprint with vprint since verbose and quiet are no longer independant
 refresh: allow recursion depth as a recurse= value
