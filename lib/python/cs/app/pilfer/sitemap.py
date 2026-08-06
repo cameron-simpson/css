@@ -1197,6 +1197,12 @@ class SiteEntity(Entity, NoAttrs):
     return URLPattern(pattern_s, sitemap.URL_DOMAIN)
 
   @classmethod
+  def url_pattern_names(cls, *, sitemap: Optional['SiteMap'] = None):
+    ''' The known URL pattern names, from a call to `cls.url_pattern_mapping()`.
+    '''
+    return cls.url_pattern_mapping(sitemap=sitemap).keys()
+
+  @classmethod
   def url_pattern_mapping(
       cls,
       *,
