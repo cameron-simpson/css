@@ -2014,18 +2014,92 @@ class SiteMap(Entities, Promotable):
     return cls.zone_sitemap(type_zone)
 
   @classmethod
-  def by_db_key(cls, db_key: str) -> SiteEntity:
+  def by_db_key(cls, db_key: str | tuple, *, site_zone=None) -> SiteEntity:
     ''' Return the `SiteEntity` for the database wide `key`.
+        Raise `ValueError` for invalid `db_key`.
+        Raise `KeyError` for an unknown `db_key`.
     '''
-    try:
+    if isinstance(db_key, tuple):
+      zone, subname, key = db_key
+    else:
       zone, subname, key = ZonedTypes.type_parts_of(db_key)
-    except ValueError as e:
-      raise KeyError(f'{db_key=}: cannot parse into type parts: {e}') from e
     try:
       sitemap = cls.by_type_zone[zone]
     except KeyError as e:
       raise KeyError(f'{db_key=}: no SiteMap registered for {zone=}') from e
     return sitemap[subname, key]
+
+  def entities_for(self, spec) -> Iterable[SiteEntity]:
+    ''' Produce the `SiteEntity` instances for `spec`.
+
+        `spec` may be:
+        - a URL matched by `SiteMap.entities_for(url)` method
+        - a *zone*`.`*subtype*`:`*field*`=`*value* search string
+        - a *zone*`.`*subtype*`.`*key* string
+
+        Examples:
+
+            http://example.com/section/article.html
+            tvdb.actor:fullname=Joe Bloggs
+            tvdb.actor.1234
+
+        URLs are passed to `sitemap.entities_for()` for each `SiteMap`
+        registered for that URL in the `pilferrc`.
+
+        `zone.subtype:field=value` searches are pass to
+        `SiteMap[zone].entities_for()`.
+
+        Plain `zone.subtype.name` is passed to `SiteMap.by_db_key()`.
+    '''
+    # URLs
+    if isinstance(spec, URL) or '://' in spec:
+      base_entity_class = getattr(self, 'EntityClass', SiteEntity)
+      entities = []
+      for ent_class in public_subclasses(base_entity_class):
+        try:
+          ent, _ = ent_class.from_URL(spec, self)
+        except URLPatternMatchError as e:
+          continue
+        yield ent
+      return
+    # zone.subname.key
+    try:
+      zone, subname, key = ZonedTypes.type_parts_of(spec)
+    except ValueError as e:
+      pass
+    else:
+      ent = self.by_db_key((zone, subname, key))
+      yield ent
+      return
+    # tvdb.actor:fullname="Job Bloggs"
+    try:
+      zone, subtype, field, value = ZonedTypes.parse_zone_search(spec)
+    except ValueError:
+      pass
+    else:
+      try:
+        site_zone = self.TYPE_ZONE
+      except AttributeError:
+        pass
+      else:
+        if zone != site_zone:
+          warning(f'search {zone=} does not match {self.TYPE_ZONE=}')
+        else:
+          name_prefix = f'{zone}.{subtype}.'
+          for tag_name in field, f'{zone}.{field}':
+            for ent in trace(self.find)(**{tag_name: value}):
+              if not ent.name.startswith(name_prefix):
+                print(f'skip {ent.name=}')
+                continue
+              print("FOUND", ent)
+              yield ent
+      return
+    raise ValueError(f'unrecognised {spec=}')
+
+  def entity_for(self, spec) -> SiteEntity | None:
+    ''' Return the first entity from `self.entities_for(spec)` or `None`.
+    '''
+    return get0(self.entities_for(spec))
 
   @classmethod
   @uses_pilfer
@@ -2569,7 +2643,7 @@ class SiteMap(Entities, Promotable):
         the information scanned from the page and its associated
         entities.
     '''
-    ent0 = self.url_entity(flowstate.url)
+    ent0 = self.entity_for(flowstate.url)
     if ent0 is not None:
       scandata = ent0.scan_sitepage(flowstate)
       if not no_apply:
@@ -2625,7 +2699,7 @@ class SiteMap(Entities, Promotable):
         method result is not `None` then the result is set as an
         updated value on `flowstate`.
     '''
-    ent = self.url_entity(flowstate.url)
+    ent = self.entity_for(flowstate.url)
     if ent is not None:
       ent.grok_sitepage(flowstate)
     else:
@@ -2712,32 +2786,6 @@ class SiteMap(Entities, Promotable):
       return entity
 
     return _grok_sitepage_wrapper
-
-  @promote
-  def url_entity(self, url: URL):
-    ''' Return the `SiteEntity` associated with this URL, or `None`
-        for an unrecognised URL.
-        Raise `ValueError` if multiple entities match the URL.
-    '''
-    try:
-      base_entity_class = self.EntityClass
-    except AttributeError as e:
-      vprint(
-          f'{self.__class__.__name__}.url_entity: skipping, no .EntityClass ({e})'
-      )
-      return None
-    entities = []
-    for ent_class in public_subclasses(base_entity_class):
-      try:
-        entity = ent_class.from_URL(url, self)
-      except URLPatternMatchError as e:
-        vprint(f'url_entity({url.short}): SKIP {ent_class.__name__}')
-        continue
-      entities.append(entity)
-    if not entities:
-      return None
-    entity, = entities
-    return entity
 
   def matches(
       self,
