@@ -150,16 +150,19 @@ class AmazonAuthor(_AmazonASIN):
   TYPE_SUBNAME = 'author'
   SITEPAGE_URL_PATTERN = '.*/author/<type_key>'
 
-class AmazonDigitalProduct(_AmazonEntity):
-  ''' An Amazon item, which has an ASIN.
+class AmazonBook(_AmazonASIN):
+  ''' An author.
   '''
-  TYPE_SUBNAME = 'item'
-  SITEPAGE_URL_PATTERN = '<*:pretext>/dp/<type_key><*:tracking>'
+  TYPE_SUBNAME = 'book'
 
   def grok_sitepage(self, flowstate: FlowState):
     self.generic_grok_amazon_page(flowstate)
+class AmazonMusic(_AmazonASIN):
+  ''' An music volume.
+  '''
+  TYPE_SUBNAME = 'music'
 
-class AmazonSeries(_AmazonEntity):
+class AmazonSeries(_AmazonASIN):
   ''' A book series.
   '''
   TYPE_SUBNAME = 'series'
@@ -173,7 +176,7 @@ class AmazonGeneralProduct(_AmazonEntity):
 @dataclass
 class AmazonMap(SiteMap):
 
-  EntitiesClass = _AmazonEntity
+  EntityClass = _AmazonEntity
   TYPE_ZONE = 'amazon'
   WIDGET_CLASSES = []
   URL_DOMAIN = 'www.amazon.com.au'
