@@ -3,7 +3,7 @@
 import asyncio
 from collections import defaultdict
 import configparser
-from configparser import ConfigParser, NoSectionError, UNNAMED_SECTION
+from configparser import ConfigParser, UNNAMED_SECTION
 from contextlib import contextmanager
 import copy
 from dataclasses import dataclass, field
@@ -54,9 +54,9 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
-from cs.seq import seq
+from cs.seq import get0, seq
 from cs.sqltags import SQLTags
-from cs.tagset import TagSet
+from cs.tagset import TagSet, ZonedTypes
 from cs.threads import locked, HasThreadState, ThreadState
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
@@ -65,8 +65,9 @@ from .cache import ContentCache
 from .cookies import morsel, read_firefox_cookies
 from .format import FormatMapping
 from .parse import import_name
-from .sitemap import FlowState, SiteMap
+from .sitemap import FlowState, SiteEntity, SiteMap
 from .urls import hrefs, srcs
+
 
 @decorator
 def one_to_many(func, fast=None, with_P=False, new_P=False):
@@ -371,6 +372,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return self.rc_map[None]
 
+  # TODO: should this be off in some PipeLineStageState instead of the Pilfer?
   @property
   def _(self):
     ''' Shortcut to this `Pilfer`'s `user_vars['_']` entry - the current item value.
@@ -751,11 +753,55 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         yield sitemap
 
   def sitemap_for(self, url: str | URL) -> SiteMap | None:
-    ''' Return the first sitemap which matches the `url`, or `None`.
+    ''' Return the first sitemap which matches the `url` host, or `None`.
     '''
-    for sitemap in self.sitemaps_for_url_host(url):
-      return sitemap
-    return None
+    return get0(self.sitemaps_for_url_host(url))
+
+  def entities_for(self, spec: str | URL) -> Iterable[SiteEntity]:
+    ''' Produce the `SiteEntity` instances for `spec`.
+
+        `spec` may be:
+        - a URL matched by a `SiteMap.entities_for(url)` method
+        - a *zone*`.`*subtype*`:`*field*`=`*value* search string
+        - a *zone*`.`*subtype*`.`*key* string
+
+        Examples:
+
+            http://example.com/section/article.html
+            tvdb.actor:fullname=Joe Bloggs
+            tvdb.actor.1234
+
+        URLs are passed to `sitemap.entities_for()` for each `SiteMap`
+        registered for that URL in the `pilferrc`.
+
+        `zone.subtype:field=value` searches are pass to
+        `SiteMap[zone].entities_for()`.
+
+        Plain `zone.subtype.name` is passed to `SiteMap.by_db_key()`.
+    '''
+    if isinstance(spec, URL) or '://' in spec:
+      # match a URL to an entity
+      url = URL.promote(spec)
+      for sitemap in self.sitemaps_for_url_host(url):
+        yield from sitemap.entities_for(url)
+      return
+    # tvdb.actor:fullname="Job Bloggs"
+    try:
+      zone, subtype, field, value = ZonedTypes.parse_zone_search(spec)
+    except ValueError:
+      pass
+    else:
+      sitemap = SiteMap[zone]
+      yield from sitemap.entities_for(spec)
+      return
+    # straight up db key zone.subtype.id
+    ent = SiteMap.by_db_key(spec)
+    return ent
+
+  def entity_for(self, spec) -> SiteEntity | None:
+    ''' Return the first entity from `self.entities_for(spec)` or `None`.
+    '''
+    return get0(self.entities_for(spec))
 
   @promote
   @typechecked
@@ -807,14 +853,6 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       patterns = getattr(sitemap, f'{pattern_type}_PATTERNS', None)
       if patterns:
         yield from sitemap.matches(url, patterns, extra=extra)
-
-  @promote
-  def url_entity(self, url: URL, *, methodglob='grok_*', **match_kw):
-    for sitemap in self.sitemaps_for_url_host(url):
-      entity = sitemap.url_entity(url)
-      if entity is not None:
-        return entity
-    return None
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
