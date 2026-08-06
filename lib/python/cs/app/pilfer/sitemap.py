@@ -1067,6 +1067,16 @@ class SiteEntity(Entity, NoAttrs):
           URL_RE if isinstance(URL_RE, re.Pattern) else re.compile(URL_RE)
       )
 
+  @classmethod
+  def default_class_sitemap(cls, zone=None) -> "SiteMap":
+    ''' The default `SiteMap` instance for this class based on `zone`.
+        The default `zone` comes from `cls.TYPE_ZONE`.
+        This is a wrapper for `SiteMap.default()`.
+    '''
+    if zone is None:
+      zone = cls.TYPE_ZONE
+    return SiteMap.default(zone=zone)
+
   @property
   def sitemap(self):
     ''' This property is the entity's `SiteMap`.
@@ -1078,16 +1088,6 @@ class SiteEntity(Entity, NoAttrs):
     except KeyError:
       sitemap = self.sitemap = SiteMap.default(self.TYPE_ZONE)
       return sitemap
-
-  @classmethod
-  def default_class_sitemap(cls, zone=None) -> "SiteMap":
-    ''' The default `SiteMap` instance for this class based on `zone`.
-        The default `zone` comes from `cls.TYPE_ZONE`.
-        This is a wrapper for `SiteMap.default()`.
-    '''
-    if zone is None:
-      zone = cls.TYPE_ZONE
-    return SiteMap.default(zone=zone)
 
   @sitemap.setter
   def sitemap(self, new_sitemap: "SiteMap"):
