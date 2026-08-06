@@ -203,44 +203,12 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError('missing site-entity')
     entity_spec = argv.pop(0)
-    if '://' in entity_spec:
-      # match a URL to an entity
-      ent = self.options.pilfer.url_entity(entity_spec)
-      if ent is None:
-        raise GetoptError(
-            f'{entity_spec=} does not match a known SiteEntity subclass'
-        )
-      # infill an assumed sitepage_url
-      # will get overridden by the canonical link if found
-      # and anyway can be overridden by 'sitepage_url'
-      ent.setdefault(f'{ent.type_zone}.sitepage_url', entity_spec)
-      return ent
-    # tvdb.actor:fullname="Job Bloggs"
     try:
-      lhs, rhs = entity_spec.split(':', 1)
-      zone, subtype = lhs.split('.', 1)
-      field, value = rhs.split('=', 1)
-    except ValueError:
-      pass
-    else:
-      # see if it's a number
-      try:
-        value = float(value)
-      except ValueError:
-        if field == 'name':
-          value = f'{zone}.{subtype}.{value}'
-      sitemap = SiteMap[zone]
-      name_prefix = f'{zone}.{subtype}.'
-      for tag_name in field, f'{zone}.{field}':
-        for ent in trace(sitemap.find)(**{tag_name: value}):
-          if not ent.name.startswith(name_prefix):
-            continue
-          return ent
-      raise GetoptError(f'no matches for {entity_spec=}')
-    try:
-      ent = SiteMap.by_db_key(entity_spec)
-    except KeyError as e:
-      raise GetoptError(f'unrecognised {entity_spec=}: {e}') from e
+      ent = self.options.pilfer.entity_for(entity_spec)
+    except ValueError as e:
+      raise GetoptError(f'invalid {entity_spec=}')
+    if ent is None:
+      raise GetoptError(f'no atch for {entity_spec=}')
     return ent
 
   @staticmethod
