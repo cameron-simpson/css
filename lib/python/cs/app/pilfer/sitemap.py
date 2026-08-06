@@ -6,7 +6,7 @@
 from abc import ABC, abstractmethod
 from collections import ChainMap, defaultdict, namedtuple
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from fnmatch import fnmatch
 from functools import cached_property
 from getopt import GetoptError
@@ -15,10 +15,10 @@ import json
 from os.path import abspath
 import re
 import sys
-from threading import Thread
+from threading import Semaphore, Thread
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Union
+from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Self
 from uuid import UUID
 
 from cs.binary import bs
@@ -30,8 +30,8 @@ from cs.deco import (
 )
 from cs.fileutils import atomic_filename
 from cs.lex import (
-    cutprefix, cutsuffix, FormatableMixin, FormatAsError, get_nonwhite, lc_,
-    printt, r, s, skipwhite
+    cutprefix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s,
+    skipwhite
 )
 from cs.logutils import warning
 from cs.mappings import mapped_property
@@ -44,11 +44,12 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import (
     content_encodings, content_length, content_type, datetime_from_http_date
 )
-from cs.seq import ReIterable, unrepeated
+from cs.seq import get0, ReIterable, unrepeated
 from cs.sqltags import SQLTags
 from cs.tagset import BaseTagSets, Entity, ScanData, uses_scandata, TagSet, ZonedTypes, Entities
-from cs.threads import HasThreadState, ThreadState
+from cs.threads import pmap, HasThreadState, ThreadState
 from cs.units import BINARY_BYTES_SCALE
+from cs.upd import print, run_task
 from cs.urlutils import URL
 
 from bs4 import BeautifulSoup
@@ -77,11 +78,7 @@ def uses_pilfer(func):
   ''' Set the optional `P:Pilfer` parameter via a late import.
   '''
 
-  def func_with_Pilfer(
-      *a,
-      P: "Pilfer" = None,  # noqa: F821
-      **kw
-  ):
+  def func_with_Pilfer(*a, P: "Pilfer" = None, **kw):
     if P is None:
       P = default_Pilfer()
     with P:
@@ -565,7 +562,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
   def iterable_flowstates(
       cls,
       flowstates: Iterable,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
       runstate: RunState,
       **later_map_kw,
   ):
@@ -724,7 +721,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       self,
       url: URL = None,
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
       **rq_kw,
   ) -> requests.Response:
     ''' Do a `Pilfer.GET` of `self.url` and return the `requests.Response`.
@@ -900,7 +897,6 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     if soup is not None:
       if soup.head is None:
         warning("no HEAD tag")
-        print(soup)
       else:
         for tag in soup.descendants:  # was .head
           if isinstance(tag, str):
@@ -1375,7 +1371,6 @@ class SiteEntity(Entity, NoAttrs):
     '''
     return self.opengraph
 
-  @trace
   @require(lambda attr: attr.endswith('_url'))
   def suffix_url(self, attr) -> str:
     ''' The handler for attribute names ending in `"_url"`.
@@ -1489,7 +1484,6 @@ class SiteEntity(Entity, NoAttrs):
         method to get the initial `ScanData` and then further update
         it from the scan.
     '''
-    scandata = ScanData(self.sitemap)
     data = scandata[self]
     data[self.rq.tag_name] = self.rq(
         "sitepage",
@@ -1508,7 +1502,7 @@ class SiteEntity(Entity, NoAttrs):
     else:
       if len(sitepage_urls) != 1:
         warning(
-            f"expected 1 canonical link: {data['html.links']['canonical']=}"
+            f"expected 1 canonical link: {data['html.links']['canonical']=}, keeping the last"
         )
       data['sitepage_url'] = sitepage_urls[0]
     data["html.meta"] = flowstate.meta.tags.as_dict()
@@ -1899,9 +1893,9 @@ class SiteMap(Entities, Promotable):
       particular website or collection of websites.
 
       It subclasses `cs.tagset.Entities` and gets its `.tagsets`
-      from `self.pilfer` if unspecified. Use as a `UsesTagSet`
+      via `self.pilfer` if unspecified. Use as a `UsesTagSet`
       domain requires setting:
-      - `TYPE_ZONE` to the domain prefix
+      - `TYPE_ZONE` to the entity zone
       - `EntityClass` to the base `Entity` entity class
       See `cs.tagset.Entities` for details.
 
@@ -1954,7 +1948,7 @@ class SiteMap(Entities, Promotable):
   def __post_init__(
       self,
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
   ):
     ''' Initialise `.pilfer` if omitted`, and then `.tagsets` from `self.pilfer`.
     '''
@@ -2017,7 +2011,7 @@ class SiteMap(Entities, Promotable):
       cls,
       sitemap_name: str,
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
   ) -> "SiteMap":
     ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
     '''
@@ -2047,7 +2041,7 @@ class SiteMap(Entities, Promotable):
     return self.urlto('')
 
   # TODO: some notion of staleness
-  # TODO: use pmap and Refreshablerefresh
+  # TODO: use pmap and Refreshable.refresh
   @classmethod
   @uses_pilfer
   @typechecked
@@ -2055,7 +2049,7 @@ class SiteMap(Entities, Promotable):
       cls,
       entities: Iterable["SiteEntity"],
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
       force=False,
   ) -> Generator[SiteEntity]:
     ''' A generator yielding updated `SiteEntity` instances
@@ -2839,7 +2833,7 @@ class SiteMap(Entities, Promotable):
       flow,
       content_bs: bs,
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
   ):
     ''' The generic prefetch handler.
 
