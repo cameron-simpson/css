@@ -8,8 +8,8 @@ import re
 from typeguard import typechecked
 
 from cs.app.pilfer.sitemap import (
-    FlowState, SiteEntity, SiteMap, SiteWidget, URLMatcher, uses_scandata,
-    grok_entity_page, on
+    FlowState, SiteEntity, SiteMap, SiteWidget, URLPattern,
+    uses_scandata
 )
 from cs.bs4utils import child_tags, printt_soup
 from cs.deco import promote
@@ -125,7 +125,26 @@ class _AmazonEntity(SiteEntity):
     print("GROK GENERIC")
     printt(*map(list, sorted(self.items())), indent="  ")
 
-class AmazonAuthor(_AmazonEntity):
+class _AmazonASIN(_AmazonEntity):
+  ''' Superclass for Amazon eneities with an ASIN.
+      We always set the `'asin'` key to be the `type_key i.e. the ASIN.
+
+      This sophistry is because you can't recognise an Amazon URL
+      with an ASIN in it as a specific type of thing (book, author,
+      series, whatever), so instead we recognise them as a side
+      effect of creating them from references when we scan a page.
+
+      The flip side of this is that `AmazonSite.from_URL` looks up
+      entities by ASIN, not by `.name`.
+  '''
+
+  SITEPAGE_URL_PATTERN = '<*:pretext>/dp/<type_key><*:tracking>'
+
+  def __init__(self, *a, **kw):
+    super().__init__(*a, **kw)
+    self['asin'] = self.type_key
+
+class AmazonAuthor(_AmazonASIN):
   ''' An author.
   '''
   TYPE_SUBNAME = 'author'
