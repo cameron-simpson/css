@@ -232,7 +232,6 @@ class AmazonMap(SiteMap):
 
 @dataclass
 class ItemWidget(SiteWidget, entity_class=_AmazonEntity):
-  ENTITY_CLASS = AmazonDigitalProduct
   FIND_ALL_CRITERIA = dict(class_='product-card')
 
   @property
@@ -249,7 +248,7 @@ class ItemWidget(SiteWidget, entity_class=_AmazonEntity):
         self.entity['title'] = title
 
 @dataclass
-class SeriesInfoRow(SiteWidget, entity_class=_AmazonEntity):
+class SeriesInfoRow(SiteWidget, entity_class=AmazonSeries):
   ''' The Series Information DIV.
   '''
 
@@ -293,7 +292,7 @@ class SeriesInfoRow(SiteWidget, entity_class=_AmazonEntity):
       anchor = title_span.parent
       book_asin = asin_from_href(anchor.attrs['href'])
       book_asins.append(book_asin)
-      book = ent.sitemap[AmazonDigitalProduct, book_asin]
+      book = ent.sitemap[AmazonBook, book_asin]
       book_data = scandata[book]
       book_data['title'] = prune_book_title(
           title_span.string.strip(), series=data['title']
@@ -312,11 +311,11 @@ class SeriesInfoRow(SiteWidget, entity_class=_AmazonEntity):
     return scandata
 
 @dataclass
-class ProductDetails(SiteWidget, entity_class=_AmazonEntity):
+class ProductDetails(SiteWidget, entity_class=AmazonBook):
   ''' The Product Details DIV.
   '''
 
-  ENTITY_CLASS = AmazonDigitalProduct
+  ENTITY_CLASS = AmazonBook
   FIND_ALL_CRITERIA = dict(id='detailBullets_feature_div')
 
   @cached_property
@@ -417,7 +416,7 @@ class MusicTracks:  ## ABC ## (SiteWidget, entity_class=_AmazonEntity):
   ''' The Product Details DIV.
   '''
 
-  ENTITY_CLASS = AmazonDigitalProduct
+  ENTITY_CLASS = AmazonMusic
   FIND_ALL_CRITERIA = dict(id='detailBullets_feature_div')
 
   def grok_sitepage(self, flowstate: FlowState):
