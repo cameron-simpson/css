@@ -150,11 +150,6 @@ class AmazonAuthor(_AmazonASIN):
   TYPE_SUBNAME = 'author'
   SITEPAGE_URL_PATTERN = '.*/author/<type_key>'
 
-  def grok_sitepage(self, flowstate: FlowState):
-    self.generic_grok_amazon_page(flowstate)
-    soup = flowstate.soup
-    print("MISSING AUTHOR GROK CODE")
-
 class AmazonDigitalProduct(_AmazonEntity):
   ''' An Amazon item, which has an ASIN.
   '''
