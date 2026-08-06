@@ -1141,8 +1141,10 @@ class SiteEntity(Entity, NoAttrs):
         raise URLPatternMatchError(
             f'no type_key in match from {cls.__name__}.match_url({url},{pattern_name=}): {match=}'
         )
-      entity = sitemap[cls, type_key]
-      return entity, match
+      ent = sitemap[cls, type_key]
+      # annotate the entity with zone.sitepage_url or similar
+      ent.setdefault(f'{ent.type_zone}.{pattern_name}', str(url))
+      return ent, match
 
   @classmethod
   @uses_runstate
