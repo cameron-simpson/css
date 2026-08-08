@@ -577,40 +577,6 @@ class PilferCommand(BaseCommand):
     asyncio.run(run())
 
   @popopts
-  def cmd_grok(self, argv):
-    ''' Usage: {cmd} URL
-          Call every matching @on grok_* method for sitemaps matching URL.
-    '''
-    if not argv:
-      raise GetoptError("missing URL")
-    url = argv.pop(0)
-    if argv:
-      raise GetoptError(f'extra arguments after URL: {argv!r}')
-    options = self.options
-    P = options.pilfer
-    print(url)
-    table = []
-    for method, match_tags, grokked in P.grok(url):
-      table.append(
-          [
-              f'  {method.__qualname__}',
-              "\n".join(map(str, sorted(match_tags)))
-          ]
-      )
-      if grokked is None:
-        table.append(['    grokked =>', 'None'])
-      else:
-        if isinstance(grokked, SQLTagSet):
-          table.append(
-              ['    grokked =>', f'{grokked.sqltags}[{grokked.name}]']
-          )
-        else:
-          table.append(['    grokked =>', s(grokked)])
-        for k, v in grokked.items():
-          table.append([f'      {k}', v])
-    printt(*table)
-
-  @popopts
   def pop_mitm_action(self, argv):
     ''' Pop a mitm action specification, return `(action,hook_names,criteria)`.
     '''
@@ -860,6 +826,40 @@ class PilferCommand(BaseCommand):
           [f'GET {url.short} => {rsp.status_code}'],
           *([f'  {hdr}', value] for hdr, value in rsp.headers.items()),
       )
+
+  @popopts(apply='Apply the scanned information.')
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} URL
+          Call every matching @on grok_* method for sitemaps matching URL.
+    '''
+    if not argv:
+      raise GetoptError("missing URL")
+    url = argv.pop(0)
+    if argv:
+      raise GetoptError(f'extra arguments after URL: {argv!r}')
+    options = self.options
+    P = options.pilfer
+    print(url)
+    table = []
+    for method, match_tags, grokked in P.grok(url):
+      table.append(
+          [
+              f'  {method.__qualname__}',
+              "\n".join(map(str, sorted(match_tags)))
+          ]
+      )
+      if grokked is None:
+        table.append(['    grokked =>', 'None'])
+      else:
+        if isinstance(grokked, SQLTagSet):
+          table.append(
+              ['    grokked =>', f'{grokked.sqltags}[{grokked.name}]']
+          )
+        else:
+          table.append(['    grokked =>', s(grokked)])
+        for k, v in grokked.items():
+          table.append([f'      {k}', v])
+    printt(*table)
 
   def cmd_sitemap(self, argv):
     ''' Usage: {cmd} [sitemap|domain {{sitecmd [args...] | [URL...]}}]
