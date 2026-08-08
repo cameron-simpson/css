@@ -2029,7 +2029,9 @@ class SiteMap(Entities, Promotable):
       raise KeyError(f'{db_key=}: no SiteMap registered for {zone=}') from e
     return sitemap[subname, key]
 
-  def entities_for(self, spec) -> Iterable[SiteEntity]:
+  def entities_for(self,
+                   spec,
+                   pattern_name: str | None = None) -> Iterable[SiteEntity]:
     ''' Produce the `SiteEntity` instances for `spec`.
 
         `spec` may be:
@@ -2057,7 +2059,7 @@ class SiteMap(Entities, Promotable):
       entities = []
       for ent_class in public_subclasses(base_entity_class):
         try:
-          ent, _ = ent_class.from_URL(spec, self)
+          ent, _ = ent_class.from_URL(spec, self, pattern_name=pattern_name)
         except URLPatternMatchError as e:
           continue
         yield ent
@@ -2096,10 +2098,12 @@ class SiteMap(Entities, Promotable):
       return
     raise ValueError(f'unrecognised {spec=}')
 
-  def entity_for(self, spec) -> SiteEntity | None:
+  def entity_for(
+      self, spec, *, pattern_name: str | None = None
+  ) -> SiteEntity | None:
     ''' Return the first entity from `self.entities_for(spec)` or `None`.
     '''
-    return get0(self.entities_for(spec))
+    return get0(self.entities_for(spec, pattern_name=pattern_name))
 
   @classmethod
   @uses_pilfer
