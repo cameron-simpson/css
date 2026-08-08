@@ -1,21 +1,42 @@
 #!/usr/bin/env python3
 
-''' RSS XML.
+''' Class mixins to support feeds in RSS (and soon Atom) formats.
 '''
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Iterable
-from xml.etree.ElementTree import ElementTree
 
 from lxml.builder import ElementMaker
 
-from cs.lex import r
+from cs.obj import NoAttrs
 from cs.seq import not_none
 
-class RSSCommon(ABC):
-  ''' Common methods for RSS channel and item entities.
+ATOM_CONTENT_TYPE = 'application/atom+xml'
+RSS_CONTENT_TYPE = 'application/rss+xml'
+
+class FeedCommon(NoAttrs, ABC):
+  ''' Common methods for for feeds, supporting RSS channel and items
+      and soon Atom feeds and entries.
+
+      The `.atom()` method will return an Atom XML element (feed or entry)
+      following [the Atom Format RFC4287](https://www.rfc-editor.org/info/rfc4287/).
+
+      The `.rss()` method returns an RSS XML element (channel or item)
+      following [the RSS 2.0 Specification](https://www.rssboard.org/rss-specification).
+
+      As such the core implementation expects methdos named `feed_*`,
+      with format specific methods named `atom_*` an `rss_*`.
+
+      Missing `atom_*` or `rss_*` methods fall back to their `feed_*`
+      names.
+
+      Missing `feed_*` methods fall back to `getattr(self,suffix,None)`
+      where `suffix` is the name after `feed_`. The `getattr`
+      fallback allows the main class to provide attributes to support
+      these; for example, for `ZonedType` subclasses such as `Entity`
+      or `SiteEntity`, this tries first the `suffix` then
+      `{zone}.{suffix}`.
   '''
 
   @staticmethod
@@ -33,6 +54,31 @@ class RSSCommon(ABC):
             webfeeds="http://webfeeds.org/rss/1.0",
         ),
     )
+
+  def __getattr__(self, attr: str):
+    ''' Definition of various uniimplemented methods.
+
+        All `feed_*`, `atom_*` or `rss_*` attributes return callables.
+
+        Missing `atom_*` or `rss_*` attributes fall back to the
+        common `feed_*` attributes.
+
+        Missing `feed_*` attributes return callables accessing the
+        `.suffix` attribute (where `suffix` is the name after
+        `feed_`). For example, for `ZonedType` subclasses such as
+        `Entity` or `SiteEntity`, this tries first the `suffix` then
+        `{zone}.{suffix}`.
+    '''
+    if attr.startswth('atom_'):
+      return getattr(self, f'feed_{attr[5:]}')
+    if attr.startswth('rss_'):
+      return getattr(self, f'feed_{attr[4:]}')
+    if attr.startswith('feed_'):
+      return lambda: getattr(self, attr[5:])
+    return super().__getattr__(attr)
+
+  def feed_author_email(self):
+    return getattr(self, 'author_email', None)
 
   def rss_category(self):
     return getattr(self, 'category', None)
@@ -54,7 +100,9 @@ class RSSCommon(ABC):
         except ValueError:
           dt = datetime.strptime("%a, %d %b %Y %H:%M:%S %z")
       else:
-        raise TypeError(f'cannot convert {r(dt)} to a datetime')
+        raise TypeError(
+            f'cannot convert {type(dt).__name__}:{dt!r} to a datetime'
+        )
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
   def rss_pubdate(self) -> None | str:
@@ -63,13 +111,10 @@ class RSSCommon(ABC):
     return None
 
   def rss_author(self):
-    return getattr(self, 'author_email', '')
+    return self.feed_author_email()
 
   def rss_description(self):
     return getattr(self, 'description', '')
-
-  def rss_title(self):
-    return self.title
 
   def rss_image_url(self):
     return self.get('opengraph.image')
@@ -86,7 +131,7 @@ class RSSCommon(ABC):
       return None
     return og_locale.lower().replace('_', '-')
 
-class RSSChannelMixin(RSSCommon, ABC):
+class FeedMixin(FeedCommon, ABC):
   '''" The RSS top level.
   '''
 
@@ -102,7 +147,7 @@ class RSSChannelMixin(RSSCommon, ABC):
     )
 
   @abstractmethod
-  def rss_items(self) -> Iterable["RSSChannelItemMixin"]:
+  def feed_entries(self) -> Iterable["FeedEntryMixin"]:
     raise NotImplementedError
 
   def rss(
@@ -125,7 +170,7 @@ class RSSChannelMixin(RSSCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `E`: optional `ElementMaker` instance; the default comes from `RSSCommon.ElementMaker()`
+        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.ElementMaker()`
         * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
           default from `self.rss_last_build_timestamp()`
           which is help in the `timestamp.rss_content` tag
@@ -186,17 +231,16 @@ class RSSChannelMixin(RSSCommon, ABC):
                     ),
                 )
             ),
-            ##E( 'atom:link', href="https://www.rssboard.org/files/sample-rss-2.xml", rel="self", type="application/rss+xml"),
             *(
                 item.rss_item(refresh=refresh, E=E)
-                for item in (items or self.rss_items())
+                for item in (items or self.feed_entries())
             ),
         ),
         version="2.0",
     )
     return rss
 
-class RSSChannelItemMixin(RSSCommon, ABC):
+class FeedEntryMixin(FeedCommon, ABC):
 
   def rss_item(
       self,
@@ -219,7 +263,7 @@ class RSSChannelItemMixin(RSSCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `E`: optional `ElementMaker` instance; the default comes from `RSSCommon.ElementMaker()`
+        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.ElementMaker()`
         * `author`: the email address of the author
         * `category`: the item category, default from `self.rss_category()`
         * `description`: the item description, default from `self.rss_description()`
