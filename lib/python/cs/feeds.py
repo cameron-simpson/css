@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Class mixins to support feeds in RSS (and soon Atom) formats.
+''' Class mixins to support generating feeds in RSS (and soon Atom) formats.
 '''
 
 from abc import ABC, abstractmethod
@@ -40,7 +40,7 @@ class FeedCommon(NoAttrs, ABC):
   '''
 
   @staticmethod
-  def ElementMaker():
+  def RSSElementMaker():
     ''' Return an `lxml.builder.ElementMaker` instance for making RSS XML.
     '''
     return ElementMaker(
@@ -170,7 +170,7 @@ class FeedMixin(FeedCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.ElementMaker()`
+        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.RSSElementMaker()`
         * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
           default from `self.rss_last_build_timestamp()`
           which is help in the `timestamp.rss_content` tag
@@ -185,7 +185,7 @@ class FeedMixin(FeedCommon, ABC):
         * `title`: the channel title, default from `self.rss_title()`
     '''
     if E is None:
-      E = self.ElementMaker()
+      E = self.RSSElementMaker()
     if refresh:
       self.refresh()
     if category is None: category = self.rss_category()
@@ -263,7 +263,7 @@ class FeedEntryMixin(FeedCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.ElementMaker()`
+        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.RSSElementMaker()`
         * `author`: the email address of the author
         * `category`: the item category, default from `self.rss_category()`
         * `description`: the item description, default from `self.rss_description()`
@@ -277,7 +277,7 @@ class FeedEntryMixin(FeedCommon, ABC):
         * `title`: the channel title, default from `self.rss_title()`
     '''
     if E is None:
-      E = self.ElementMaker()
+      E = self.RSSElementMaker()
     if refresh:
       self.refresh()
     if author is None: author = self.rss_author()
