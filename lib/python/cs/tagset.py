@@ -762,6 +762,22 @@ class ZonedTypes:
         entities[type_name] = tags_db[type_name, type_key]
     return entities
 
+  @staticmethod
+  def type_search(ent_pattern: str) -> Tuple[str, str, str, str]:
+    ''' Recognised a zone.subtyp:tag=value search term.
+    '''
+    # tvdb.actor:fullname="Job Bloggs"
+    lhs, rhs = ent_pattern.split(':', 1)
+    zone, subtype = lhs.split('.', 1)
+    field, value = rhs.split('=', 1)
+    # see if it's a number
+    try:
+      value = float(value)
+    except ValueError:
+      if field == 'name':
+        value = f'{zone}.{subtype}.{value}'
+    return zone, subtype, field, value
+
 TagSetTyping = OBSOLETE(ZonedTypes)
 
 class TagSet(
