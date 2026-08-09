@@ -1133,7 +1133,7 @@ class SiteEntity(Entity, NoAttrs):
     if sitemap is None:
       sitemap = cls.default_class_sitemap()
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
-      match = cls.match_url(url, pattern_name=pattern_name)
+      match, match_name = cls.match_url(url, pattern_name=pattern_name)
       if match is None:
         raise URLPatternMatchError(
             f'no match from {cls.__name__}.match_url({url},{pattern_name=})'
@@ -1146,7 +1146,7 @@ class SiteEntity(Entity, NoAttrs):
         )
       ent = sitemap[cls, type_key]
       # annotate the entity with zone.sitepage_url or similar
-      ent.setdefault(f'{ent.type_zone}.{pattern_name}', str(url))
+      ent.setdefault(f'{ent.type_zone}.{match_name}_url', str(url))
       return ent, match
 
   @classmethod
@@ -1173,7 +1173,7 @@ class SiteEntity(Entity, NoAttrs):
       if not ent_url.isabs():
         ent_url = ent_url.resolve(base_url)
       try:
-        ent = cls.from_URL(ent_url)
+        ent, _ = cls.from_URL(ent_url)
       except ValueError as e:
         # unrecognised, skip
         continue
@@ -1268,17 +1268,19 @@ class SiteEntity(Entity, NoAttrs):
       *,
       pattern_name=None,
       sitemap: Optional["SiteMap"] = None
-  ) -> dict | None:
+  ) -> tuple[dict | None, str | None]:
     ''' Test whether `url` matches this `SiteEntity` subclass'
         pattern named `pattern_name` (default `"sitepage_url"`).
-        Return `None` if there is no pattern for `pattern_name`.
-        Otherwise return the result if `pattern.match(url)`.
+        Return `(None,None)` if there is no pattern for `pattern_name`.
+        Otherwise return `(match,pattern_name)` where `match` is
+        the result of `pattern.match(url)` and `pattern_name` is
+        the name of the matchined pattern.
     '''
     try:
       pattern_mapping = cls.url_pattern_mapping(sitemap=sitemap)
     except Exception as e:
       warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
-      return None
+      return None, None
     for name, pattern in pattern_mapping.items():
       if pattern_name is not None and name != pattern_name:
         continue
@@ -1291,13 +1293,14 @@ class SiteEntity(Entity, NoAttrs):
         warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
         continue
       if match is not None:
-        match.update(
-            pattern_name=(
-                name.lower().removesuffix('_pattern').removesuffix('_url')
-            )
-        )
-        return match
-    return None
+        match_name = name.lower().removesuffix('_pattern').removesuffix('_url')
+        return match, match_name
+    return None, None
+
+  def matches_url(cls, url, **match_url_kw) -> bool:
+    ''' Test whether `url` matches, a Boolean wrapper for `match_url()`.
+    '''
+    return self.match_url(url, **match_url_kw)[0] is not None
 
   def __getattr__(self, attr):
     ''' A `SiteEntity` supports various automatic attributes.
@@ -2368,7 +2371,7 @@ class SiteMap(Entities, Promotable):
 
             def test(flowstate, match):
               vprint(f'@on: {test_name}: {flowstate.url=}')
-              m = entity_class.match_url(flowstate.url)
+              m, _ = entity_class.match_url(flowstate.url)
               if m is not None:
                 match.update(m)
               return m
@@ -2664,7 +2667,7 @@ class SiteMap(Entities, Promotable):
                 # provie the entities whose sitepage patterns match the URL
                 *(
                     ent for ent in scandata.keys()
-                    if ent.match_url(flowstate.url, sitemap=self)
+                    if ent.matches_url(flowstate.url, sitemap=self)
                 )
             )
           printt(
