@@ -874,7 +874,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     if self.content_type == 'text/html':
       soup = BeautifulSoup(self.text, self.bs4parser)
       self.url.soup = soup
-    elif self.content_type in ('text/xml', 'application/rss+xml'):
+    elif self.content_type in ('text/xml', ATOM_CONTENT_TYPE,
+                               RSS_CONTENT_TYPE):
       soup = BeautifulSoup(self.text, 'xml')
       self.url.soup = soup
     else:
