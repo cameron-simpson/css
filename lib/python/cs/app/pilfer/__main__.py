@@ -23,6 +23,7 @@ from typeguard import typechecked
 from cs.bs4utils import printt_soup
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
+from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedMixin
 from cs.fileutils import atomic_filename
 from cs.later import Later
 from cs.lex import (
@@ -51,7 +52,6 @@ from . import (
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .rss import RSSChannelMixin
 from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
 
 def main(argv=None):
@@ -236,6 +236,93 @@ class PilferCommand(BaseCommand):
       spec = PipeLineSpec(pipe_name, argv[spec_offset:argv_offset])
       argv_offset += 1
       return spec, argv_offset
+
+  @popopts(
+      d_=('dirpath', 'Output directory for output_fspath, default ".".'),
+      f=('force', 'Force overwrite of the Atom file if it already exists.'),
+      o_=(
+          'output_fspath',
+          'Output the Atom to the file output_fspath; "-" means the standard output.'
+      ),
+      refresh='Refresh the required web pages even if not stale.',
+      reparse='Parse the generated Atom file as a sanity check.',
+      uuid='Allocate a feed.uuid to the entity for Atom or RSS purposes,\n'
+      'and use it in the default output filename.',
+      xmlv='Provide a leading xml version tag.',
+  )
+  def cmd_atom(self, argv):
+    ''' Usage: {cmd} entity|URL...
+          Generate Atom feeds for the specified entities (by name or URL).
+    '''
+    options = self.options
+    pilfer = options.pilfer
+    if not argv:
+      raise GetoptError('missing entity or URL')
+    # TODO: treat the output_fspath as a format?
+    if options.output_fspath and len(argv) > 1:
+      raise GetoptError(
+          'cannot specify the output path with more than 1 entity.'
+      )
+    xit = 0
+    while argv:
+      with Pfx(argv[0]):
+        try:
+          entity = self.popentity(argv)
+        except GetoptError as e:
+          warning(f'cannot recognise as an entity: {e}')
+          xit = 1
+          continue
+        if not isinstance(entity, FeedMixin):
+          warning(f'entity {entity} is not an instance of FeedMixin')
+          xit = 1
+          continue
+        if options.uuid:
+          try:
+            atom_uuid = entity['atom.uuid']
+          except KeyError:
+            atom_uuid = entity['atom.uuid'] = uuid4()
+        else:
+          atom_uuid = None
+        output_fspath = options.output_fspath
+        if output_fspath != '-':
+          if not output_fspath:
+            output_fspath = (
+                f'{atom_uuid}.atom' if atom_uuid else
+                f'{entity.sitemap.URL_DOMAIN}--{entity.name}.atom'
+            )
+          if not isabspath(output_fspath):
+            output_fspath = joinpath(options.dirpath or ".", output_fspath)
+        atom = entity.atom(refresh=options.refresh)
+        if output_fspath == '-':
+          if options.xmlv:
+            print('<?xml version="1.0" encoding="UTF-8"?>')
+          print(
+              xml_tostring(atom, encoding='unicode', pretty_print=True),
+              end='',
+          )
+        else:
+          with atomic_filename(output_fspath, mode='w',
+                               exists_ok=options.force) as T:
+            if options.xmlv:
+              print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+            print(
+                xml_tostring(atom, encoding='unicode', pretty_print=True),
+                end='',
+                file=T
+            )
+          print(entity.name, output_fspath)
+          if options.reparse:
+            print("Reparse", output_fspath)
+            from rss_parser import parse
+            with open(output_fspath) as rssf:
+              parsed = parse(rssf.read())
+            print("Language", parsed.channel.language)
+            print("Atom", parsed.version)
+            # Iteratively print feed items
+            for item in parsed.channel.items:
+              print(item.title)
+              print(item.description[:50])
+    return xit
 
   @popopts(
       md=('show_md', 'Show metadata.'),
@@ -493,8 +580,12 @@ class PilferCommand(BaseCommand):
       printt(*table)
     if self.options.dump_content:
       print("Content:", flowstate.content_type)
-      if flowstate.content_type in ('text/html', 'text/xml',
-                                    'application/rss+xml'):
+      if flowstate.content_type in (
+          'text/html',
+          'text/xml',
+          ATOM_CONTENT_TYPE,
+          RSS_CONTENT_TYPE,
+      ):
         soup = flowstate.soup
         ##meta = flowstate.meta
         ##printt(meta)
@@ -731,8 +822,8 @@ class PilferCommand(BaseCommand):
       ),
       refresh='Refresh the required web pages even if not stale.',
       reparse='Parse the generated RSS file as a sanity check.',
-      uuid=
-      'Allocate a UUID to the entity for RSS purposes, and use it as the default output filename.',
+      uuid='Allocate a feed.uuid to the entity for Atom or RSS purposes,\n'
+      'and use it in the default output filename.',
       xmlv='Provide a leading xml version tag.',
   )
   def cmd_rss(self, argv):
@@ -757,15 +848,15 @@ class PilferCommand(BaseCommand):
           warning(f'cannot recognise as an entity: {e}')
           xit = 1
           continue
-        if not isinstance(entity, RSSChannelMixin):
-          warning(f'entity {entity} is not an instance of RSSChannelMixin')
+        if not isinstance(entity, FeedMixin):
+          warning(f'entity {entity} is not an instance of FeedMixin')
           xit = 1
           continue
         if options.uuid:
           try:
-            rss_uuid = entity['rss.uuid']
+            rss_uuid = entity['feed.uuid']
           except KeyError:
-            rss_uuid = entity['rss.uuid'] = uuid4()
+            rss_uuid = entity['feed.uuid'] = uuid4()
         else:
           rss_uuid = None
         output_fspath = options.output_fspath
