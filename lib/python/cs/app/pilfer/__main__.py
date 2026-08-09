@@ -208,7 +208,7 @@ class PilferCommand(BaseCommand):
     except ValueError as e:
       raise GetoptError(f'invalid {entity_spec=}')
     if ent is None:
-      raise GetoptError(f'no atch for {entity_spec=}')
+      raise GetoptError(f'no match for {entity_spec=}')
     return ent
 
   @staticmethod
