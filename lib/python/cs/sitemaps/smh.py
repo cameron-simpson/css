@@ -8,37 +8,29 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import cached_property
 from getopt import GetoptError
-from os.path import basename
-import re
 import sys
 import time
 from typing import Any, Mapping, Optional
-from urllib.parse import parse_qs, urlparse, urljoin as up_urljoin
 
-from bs4 import BeautifulSoup
 from bs4.element import CData, Tag as BS4Tag
-from lxml.etree import Element, tostring as xml_tostring
-import xml.etree.ElementTree as ET
+from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
 from cs.app.pilfer.pilfer import Pilfer, uses_pilfer
-from cs.app.pilfer.rss import RSSChannelMixin, RSSChannelItemMixin
 from cs.app.pilfer.sitemap import (
-    on, FlowState, pagemethod, ScanData, SiteEntity, SiteMap,
-    SiteMapPatternMatch, uses_scandata, with_base_url
+    on, FlowState, pagemethod, ScanData, SiteEntity, SiteMap, uses_scandata,
+    with_base_url
 )
-from cs.binary import bs
 from cs.bs4utils import child_tags
 from cs.cmdutils import popopts
 from cs.deco import promote
 from cs.excutils import unattributable
-from cs.lex import format_attribute, htmlify, lc_, printt
+from cs.feeds import FeedMixin, FeedEntryMixin
+from cs.lex import html_escape, printt
 from cs.logutils import warning
-from cs.mappings import PrefixedMappingProxy
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import pfx_method
 from cs.resources import RunState, uses_runstate
-from cs.rfc2616 import content_type
-from cs.seq import unrepeated, with_neighbours
+from cs.seq import with_neighbours
 from cs.tagset import TagSet
 from cs.urlutils import URL
 from cs.upd import print
@@ -134,12 +126,11 @@ class _SMHWebPage(_SMHEntity):
   def title(self):
     return self.refreshed().opengraph['title']
 
-class Article(_SMHWebPage, RSSChannelItemMixin):
+class Article(_SMHWebPage, FeedEntryMixin):
   ''' An article.
   '''
   TYPE_SUBNAME = 'article'
   SITEPAGE_URL_PATTERN = '/<wordpath:topic_key>/<title_url_part>-<date8>-p<type_key>.html'
-  ##SITEPAGE_URL_FORMAT = '/{topic_url_part}/{title_url_part}-{date8}-p{type_key}.html'
 
   ##URL_RE = r'/(?P<topic_id>[-a-z]+(/[-a-z]+)*)/[a-z][^/]*-(?P<date8>\d\d\d\d\d\d\d\d)-p(?P<type_key>[^./]{5})\.html$'
 
@@ -169,18 +160,6 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
       dt = datetime.fromisoformat(dt)
     return dt.timestamp()
 
-  @format_attribute
-  def topic_url_part(self):
-    ''' The topic section for use in the sitepage URL.
-    '''
-    return self["topic"]
-
-  @format_attribute
-  def title_url_part(self):
-    ''' The title section for use in the sitepage URL.
-    '''
-    return lc_(self.refreshed().get('smh.opengraph', {}).get('title', ''))
-    return lc_(self.get('opengraph.type.twitter:title', self.title))
 
   @property
   def topic(self) -> "Topic":
@@ -213,9 +192,9 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
       warning(f'no .paragraphs_html, maybe it\'s a video?: {e}')
       description_html = None
     if not description_html:
-      description_html = htmlify(meta.get('description', ''))
+      description_html = html_escape(meta.get('description', ''))
     by_line = ", ".join(
-        htmlify(str(field)) for field in (
+        html_escape(str(field)) for field in (
             meta.get("author"),
             meta.get("pubdate"),
         ) if field
@@ -288,7 +267,7 @@ class Article(_SMHWebPage, RSSChannelItemMixin):
         warning("no paragraphs found")
     return scandata
 
-class Topic(_SMHWebPage, RSSChannelMixin):
+class Topic(_SMHWebPage, FeedMixin):
   ''' A topic.
   '''
   TYPE_SUBNAME = 'topic'
@@ -338,21 +317,20 @@ class Topic(_SMHWebPage, RSSChannelMixin):
     for article in articles:
       print(article.name, id(article))
       article.setdefault("topic_id", type_key)
-    ##breakpoint()
     return articles
 
   def refresh_related(self):
     return self.articles
 
   def refresh_related1(self):
-    return self.authors
+    return self.author_ents
 
   def rss_content_signature(self):
     ''' Return the RSS content signature - the ordered list of article ids.
     '''
     return sorted(self.article_id)
 
-  def rss_items(self):
+  def feed_entries(self):
     ''' The RSS items are the articles.
     '''
     return self.articles
@@ -495,7 +473,7 @@ class SMHMap(SiteMap):
       articles = sorted(
           articles,
           key=lambda article: (
-              article.topic.title,
+              article.topic_ent.title,
               article.mtime,
               ##article["properties"].  get("article:modified_time", datetime.utcnow(),),
               article.title,
@@ -508,7 +486,7 @@ class SMHMap(SiteMap):
             [
                 article.name,
                 (
-                    article.topic.short_title if not prev_article
+                    article.topic_ent.short_title if not prev_article
                     or article.topic_id != prev_article.topic_id else ''
                 ),
                 datetime.fromtimestamp(article.mtime).strftime("%Y-%m-%d"),
