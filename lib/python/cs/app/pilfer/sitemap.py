@@ -21,6 +21,13 @@ from types import SimpleNamespace as NS
 from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Self
 from uuid import UUID
 
+from bs4 import BeautifulSoup
+from bs4.element import Tag as BS4Tag
+from icontract import require
+from mitmproxy.flow import Flow
+import requests
+from typeguard import typechecked
+
 from cs.binary import bs
 from cs.bs4utils import printt_soup
 from cs.cmdutils import BaseCommand, popopts, vprint, vvprint
@@ -28,6 +35,7 @@ from cs.deco import (
     attr, decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
 )
+from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE
 from cs.fileutils import atomic_filename
 from cs.lex import (
     cutprefix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s,
@@ -52,12 +60,6 @@ from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task
 from cs.urlutils import URL
 
-from bs4 import BeautifulSoup
-from bs4.element import Tag as BS4Tag
-from icontract import require
-from mitmproxy.flow import Flow
-import requests
-from typeguard import typechecked
 
 # The default HTML parser to use with BeautifulSoup.
 BS4_PARSER_DEFAULT = 'html5lib'  ## 'lxml'  # vs eg 'html5lib'
