@@ -272,19 +272,8 @@ class NoAttrs:
   '''
 
   def __getattr__(self, attr):
-    ''' Just raise `AttributeError`.
+    ''' Just raise `AttributeError` with a nice mesage.
     '''
-    try:
-      gsa = super().__getattr__
-    except AttributeError:
-      pass
-    else:
-      warning(
-          "%s.%s: NoAttrs.__getattr__: IGNORING super().__getattr__ = %s",
-          self.__class__.__name__,
-          attr,
-          gsa,
-      )
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
 class TrackedClassMixin(object):
