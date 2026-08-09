@@ -3,12 +3,10 @@
 ''' Some little utility functions for working with the soup from `beautifulsoup4`.
 '''
 
-import json
-from json.decoder import JSONDecodeError
-from pprint import pformat
 from typing import Iterable
 
 from bs4 import BeautifulSoup, Tag as BS4Tag, NavigableString
+from lxml.builder import ElementMaker
 from typeguard import typechecked
 
 from cs.lex import cropped_repr, printt
@@ -137,6 +135,13 @@ def printt_soup(tag: BS4Tag, **printt_kw):
   else:
     table = tabulate_soup(tag)
   printt(*table, **printt_kw)
+
+def as_xml(tag: BS4Tag, *, E=None):
+  ''' Transfor `tag` into an `lxml` XML element.
+  '''
+  if E is None:
+    E = ElementMaker()
+  return E(tag.name, *map(as_xml, tag.children), **tag.attrs)
 
 if __name__ == '__main__':
   for html in (
