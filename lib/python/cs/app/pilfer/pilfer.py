@@ -795,7 +795,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       return
     # straight up db key zone.subtype.id
     ent = SiteMap.by_db_key(spec)
-    return ent
+    yield ent
 
   def entity_for(self, spec) -> SiteEntity | None:
     ''' Return the first entity from `self.entities_for(spec)` or `None`.
