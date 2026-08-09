@@ -3127,5 +3127,4 @@ class SiteMap(Entities, Promotable):
 
 # expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on
-grok_entity_page = SiteMap.grok_entity_page
 
