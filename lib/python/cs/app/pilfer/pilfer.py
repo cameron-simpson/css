@@ -68,7 +68,6 @@ from .parse import import_name
 from .sitemap import FlowState, SiteEntity, SiteMap
 from .urls import hrefs, srcs
 
-
 @decorator
 def one_to_many(func, fast=None, with_P=False, new_P=False):
   ''' A decorator for one-to-many core functions for use as a stage function.
@@ -787,7 +786,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       return
     # tvdb.actor:fullname="Job Bloggs"
     try:
-      zone, subtype, field, value = ZonedTypes.parse_zone_search(spec)
+      zone, subtype, field, value = ZonedTypes.type_search(spec)
     except ValueError:
       pass
     else:
