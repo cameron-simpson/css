@@ -1099,22 +1099,22 @@ if builtin_names_s:
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
 
-class TestTrace(HasThreadState):
+class Trace(HasThreadState):
   ''' A class/decorator to trace control flow and decisions.
       This makes it possibl to record 
 
       As a trace object:
 
           >>> from builtins import print
-          >>> with TestTrace("decide!") as TT:
+          >>> with Trace("decide!") as T:
           ...   print("start")
-          ...   if TT("test 1 for never", 1==2):
+          ...   if T("test 1 for never", 1==2):
           ...     print("never")
-          ...   elif TT("test 2 for always", 1==1):
+          ...   elif T("test 2 for always", 1==1):
           ...     print("always")
-          ...     with TestTrace("inside test 2", TT) as TT2:
-          ...       assert TT2 in TT.tests
-          ...       if TT2("inside1",1==1):
+          ...     with Trace("inside test 2", T) as T2:
+          ...       assert T2 in T.tests
+          ...       if T2("inside1",1==1):
           ...         print("true")
           ...       else:
           ...         print("false")
@@ -1122,63 +1122,64 @@ class TestTrace(HasThreadState):
           start
           always
           true
-          >>> TT.printt()
+          >>> T.printt()
           decide!
-          ├─test 1 for never   False
-          ├─test 2 for always  True
+          ├─test 1 for never -> bool   False
+          ├─test 2 for always -> bool  True
           ╰─inside test 2
-            ╰─inside1          True
+            ╰─inside1 -> bool          True
 
       As a decorator:
 
-          >>> @TestTrace
+          >>> @Trace
           ... def func(x):
           ...   return x + 2
           ...
-          >>> with TestTrace("func trace") as TT:
-          ...   x2 = TT("call f", func(3))
+          >>> with Trace("func trace") as T:
+          ...   x2 = T("call func with 3", func(3))
           ...   print("x2", x2)
           ...
           x2 5
-          >>> TT.printt() # doctest: +ELLIPSIS
+          >>> T.printt() # doctest: +ELLIPSIS
           func trace
           ├─func(....)
-          │ │ from <module>() <doctest cs.debug.TestTrace[...]>:2
-          │ │ x2 = TT("call f", func(3))
-          │ ╰─return ->                                          5
-          ╰─call f                                               5
+          │ │ from <module>() <doctest cs.debug.Trace[...]>:2
+          │ │ x2 = T("call func with 3", func(3))
+          │ ╰─return -> -> int                               5
+          ╰─call func with 3 -> int                          5
+
   '''
 
   # class attribute holding the per-thread state stack
   perthread_state = ThreadState()
 
-  def __new__(cls, func, *_):
+  def __new__(cls, func, *_, print=None):
     if callable(func):
       # class being used as a decorator
 
       def with_trace(*func_a, **func_kw):
-        upTT = cls.default()
+        upT = cls.default()
         c = caller(-4)
         with cls(f'{func.__name__}(....)'
                  f'\n from {c.name}() {shortpath(c.filename)}:{c.lineno}'
-                 f'\n {c.line}', upTT) as subTT:
+                 f'\n {c.line}', upT) as subT:
           try:
             result = func(*func_a, **func_kw)
           except Exception as e:
-            subTT('RAISE ->', e)
+            subT('RAISE ->', e)
             raise
           else:
-            subTT('return ->', result)
+            subT('return ->', result)
             return result
 
       return with_trace
     return super().__new__(cls)
 
-  def __init__(self, name: str, upTT=None):
+  def __init__(self, name: str, upT=None):
     self.name = name
     self.tests = []
-    if upTT is not None:
-      upTT.tests.append(self)
+    if upT is not None:
+      upT.tests.append(self)
 
   def tabulate(self):
     table = [self.name]
@@ -1201,7 +1202,7 @@ class TestTrace(HasThreadState):
     tt_a = list(tt_a)
     result = tt_a.pop(0)
     assert not tt_a
-    self.tests.append((label, result))
+    self.tests.append((f'{label} -> {type(result).__name__}', result))
     return result
 
 if __name__ == "__main__":
