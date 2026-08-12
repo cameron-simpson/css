@@ -77,7 +77,7 @@ from cs.py.func import funccite, funcname, func_a_kw_fmt
 from cs.py.stack import caller, frames
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
-from cs.threads import ThreadState
+from cs.threads import HasThreadState, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
@@ -1098,6 +1098,111 @@ if builtin_names_s:
         )
         continue
       setattr(builtins, builtin_name, vs[builtin_name])
+
+class TestTrace(HasThreadState):
+  ''' A class/decorator to trace control flow and decisions.
+      This makes it possibl to record 
+
+      As a trace object:
+
+          >>> from builtins import print
+          >>> with TestTrace("decide!") as TT:
+          ...   print("start")
+          ...   if TT("test 1 for never", 1==2):
+          ...     print("never")
+          ...   elif TT("test 2 for always", 1==1):
+          ...     print("always")
+          ...     with TestTrace("inside test 2", TT) as TT2:
+          ...       assert TT2 in TT.tests
+          ...       if TT2("inside1",1==1):
+          ...         print("true")
+          ...       else:
+          ...         print("false")
+          ...
+          start
+          always
+          true
+          >>> TT.printt()
+          decide!
+          ├─test 1 for never   False
+          ├─test 2 for always  True
+          ╰─inside test 2
+            ╰─inside1          True
+
+      As a decorator:
+
+          >>> @TestTrace
+          ... def func(x):
+          ...   return x + 2
+          ...
+          >>> with TestTrace("func trace") as TT:
+          ...   x2 = TT("call f", func(3))
+          ...   print("x2", x2)
+          ...
+          x2 5
+          >>> TT.printt() # doctest: +ELLIPSIS
+          func trace
+          ├─func(....)
+          │ │ from <module>() <doctest cs.debug.TestTrace[...]>:2
+          │ │ x2 = TT("call f", func(3))
+          │ ╰─return ->                                          5
+          ╰─call f                                               5
+  '''
+
+  # class attribute holding the per-thread state stack
+  perthread_state = ThreadState()
+
+  def __new__(cls, func, *_):
+    if callable(func):
+      # class being used as a decorator
+
+      def with_trace(*func_a, **func_kw):
+        upTT = cls.default()
+        c = caller(-4)
+        with cls(f'{func.__name__}(....)'
+                 f'\n from {c.name}() {shortpath(c.filename)}:{c.lineno}'
+                 f'\n {c.line}', upTT) as subTT:
+          try:
+            result = func(*func_a, **func_kw)
+          except Exception as e:
+            subTT('RAISE ->', e)
+            raise
+          else:
+            subTT('return ->', result)
+            return result
+
+      return with_trace
+    return super().__new__(cls)
+
+  def __init__(self, name: str, upTT=None):
+    self.name = name
+    self.tests = []
+    if upTT is not None:
+      upTT.tests.append(self)
+
+  def tabulate(self):
+    table = [self.name]
+    subtable = []
+    for subtest in self.tests:
+      if isinstance(subtest, tuple):
+        label, result = subtest
+        subtable.append([label, result])
+      else:
+        subtable.extend(subtest.tabulate())
+    if subtable:
+      table.append(tuple(subtable))
+    return table
+
+  def printt(self, **printt_kw):
+    printt(*self.tabulate(), **printt_kw)
+
+  def __call__(self, label: str, *tt_a):
+    assert isinstance(label, str)
+    tt_a = list(tt_a)
+    result = tt_a.pop(0)
+    assert not tt_a
+    self.tests.append((label, result))
+    return result
 
 if __name__ == "__main__":
   import os
