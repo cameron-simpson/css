@@ -1101,7 +1101,9 @@ if builtin_names_s:
 
 class Trace(HasThreadState):
   ''' A class/decorator to trace control flow and decisions.
-      This makes it possibl to record 
+      This makes it possible to record function calls and their
+      inner decision chains, and to show these in a nice printout
+      after the fact.
 
       As a trace object:
 
