@@ -135,15 +135,15 @@ class FeedMixin(FeedCommon, ABC):
   '''" The RSS top level.
   '''
 
-  def rss_content_signature(self):
-    ''' Return an object which should change if the content changes.
-        This default base method returns `sorted(self[self.RSS_ITEM_KEYS])`.
+  def feed_last_build_timestamp(self, *, refresh=False, **refresh_kw) -> float:
+    ''' Return an updated timestamp for this feed based on the signatures of its entries.
     '''
-    return sorted(self[self.RSS_ITEM_KEYS])
-
-  def rss_last_build_timestamp(self):
-    return self.update_content_timestamp(
-        'rss_content', self.rss_content_signature()
+    return self.update_timestamp(
+        'feed_content',
+        [
+            entry.feed_entry_signature(refresh=refresh, **refresh_kw)
+            for entry in self.feed_entries()
+        ],
     )
 
   @abstractmethod
