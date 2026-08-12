@@ -1338,7 +1338,7 @@ class SiteEntity(Entity, NoAttrs):
           url_s = pattern.url_path_for(self)
           # something of a hack to turn the URL path into a full URL
           # TODO: scheme etc from the sitemap eg as .url_preifx?
-          if attr.endswith('_url') and '::/' not in url_s:
+          if attr.endswith('_url') and '://' not in url_s:
             s0 = url_s
             url_s = f'https://{self.sitemap.URL_DOMAIN}/{url_s.lstrip("/")}'
           return url_s
