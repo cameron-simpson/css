@@ -1719,10 +1719,10 @@ class SiteEntity(Entity, NoAttrs):
     '''
     return SiteMap.by_db_key(db_key)
 
-  def update_content_timestamp(self, purpose, content_signature) -> float:
+  def update_timestamp(self, purpose, signature) -> float:
     ''' Update the UNIX time recorded for `purpose` based on
-        `content_signature`. Return the old time if there was one
-        and its signature equals `content_signature`.  Otherwise
+        `signature`. Return the old time if there was one
+        and its signature equals `signature`.  Otherwise
         update the timestamp and record it and the new signature.
     '''
     tag_name = f'timestamp.{purpose}'
@@ -1733,11 +1733,11 @@ class SiteEntity(Entity, NoAttrs):
       pass
     else:
       when, old_signature = last_sig
-      if old_signature == content_signature:
+      if old_signature == signature:
         # unchanged
         return when
     when = time.time()
-    self[tag_name] = [when, content_signature]
+    self[tag_name] = [when, signature]
     return when
 
   @staticmethod
@@ -1830,6 +1830,16 @@ class SiteEntity(Entity, NoAttrs):
     self.add('downloaded')
     return save_filename
 
+  def feed_entry_signature(self, *, refresh=False, **refresh_kw):
+    ''' A signature for this entty's content.
+        This default implemnetation just returns the time of last refresh.
+    '''
+    if refresh:
+      self.refresh(**refresh_kw)
+    return dict(
+        name=self.name,
+        refresh_last_update=self.get('refresh_last_update', 0),
+    )
 paginated = SiteEntity.paginated
 
 @dataclass
