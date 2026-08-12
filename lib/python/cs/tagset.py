@@ -3224,11 +3224,12 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
         `suffix_`*suffix*`(attr)` method if it exists.
 
         The following synthetic attibutes are implemented:
-        - *subtype*>`_ent`: the entity with name
+        - *attr0*`_or_none`: return `.attr0` or `None` if that does not exist
+        - *subtype*`_ent`: the entity with name
           *type_zone*`.`*subtype*`.`*id* or `None` where `id` comes
           from the `.`*attr*`_id` value;
           see the `suffix_ent` method.
-        - *subtype*>`_ents`: the entities with name
+        - *subtype*`_ents`: the entities with name
           *type_zone*`.`*subtype*`.`*id* or `None` where each `id` comes
           from the `.`*attr*`_id` values;
           see the `suffix_ents` method.
@@ -3471,10 +3472,11 @@ class Entity(ZonedTypes, FormatableMixin, Promotable, Refreshable, NoAttrs):
     # promote scalar to list
     if isinstance(idvalues, str) or not isinstance(idvalues, Sequence):
       idvalues = [idvalues]
-    return [
+    ents = [
         # NB: no zone because Entities.__getitem__ knows its zone
         self.tags_db[ref_subtype, idvalue] for idvalue in idvalues
     ]
+    return ents
 
 HasTags = OBSOLETE(Entity)
 
@@ -3497,17 +3499,23 @@ class Entities:
   '''
 
   # see if we can get by with the minimal example
-  # typically a would use a lass with a TYPEZONE
+  # typically a would use a class with a TYPE_ZONE
   EntityClass = Entity
   TagsetsClass = None
 
-  # a mapping of type zone names to their most recent Entities subclass instance
-  by_type_zone = WeakValueDictionary()
+  # a mapping of type zone to Entities subclass
   class_by_type_zone = {}
 
+  # a mapping of type zone names to their most recent Entities subclass instance
+  by_type_zone = WeakValueDictionary()
+
   def __init_subclass__(cls, **kw):
-    ''' Inititialise a subclass by defining `.TYPE_ZNE` if not present.
+    ''' Inititialise a subclass by defining `.TYPE_ZNE` if already present.
     '''
+    if hasattr(cls, 'HasTagsClass'):
+      warning(
+          f'new Entities subclass {cls.__name__} has a .HasTagsClass, should have .EntityClass'
+      )
     super().__init_subclass__(**kw)
     zone = None
     try:
@@ -3568,13 +3576,18 @@ class Entities:
   @classmethod
   def __class_getitem__(cls, index):
     ''' An `Entities` subclass may be indexed with a string.
-        If there is no `cls.TYPE_ZONE` the string is treated as an
-        `Entity.name` and looked up with `cls.by_entity_id(index)`.
+
+        If there is no `cls.TYPE_ZONE` the string is treated either as:
+        - if the string ha no dots, a `TYPE_ZONE` value - the
+          `Entities` instance for that zone is returned
+        - if the string has dots, as an `Entity.name` and looked
+          up with `cls.by_entity_id(index)`.
+
         If there is a `cls.TYPE_ZONE`, such as with a `SiteMap`,
         the string is treated as a `ZonedTypes.type_zone_key` and
         looked up as by indexing that zone's `Entities` instance.
 
-        Example using `TheTVDBAPI`:
+        Example using `TheTVDBAPI`, which has a `TYPE_ZONE`:
 
             # fetch the TV series entity with id 1234
             # there is a TheTVDBAPI.TYPE_ZONE
@@ -3583,14 +3596,25 @@ class Entities:
             # fetch an arbtrary Entity
             # the value of `TheTVDBAPI.TYPE_ZONE` is "tvdb"
             series = Entities['tvdb.series.1234']
+
+        Example using `SiteMap`, the base class for site maps, and
+        which has no `.TYPE_ZONE`:
+
+            smh_map = SiteMap['smh']
+            smh_topic = SiteMap['smh.topic.technology']
+            smh_article = SiteMap['smh']['article.abcd']
     '''
+    # preempt the typing stuff
     if isinstance(index, type):
       return GenericAlias(cls, (index,))
     if isinstance(index, str):
       try:
         zone = cls.TYPE_ZONE
       except AttributeError:
-        return cls.by_entity_id(index)
+        if '.' in index:
+          return cls.by_entity_id(index)
+        return cls.by_type_zone[index]
+      # has a TYPE_ZONE
       entities = cls.default(zone)
       return entities[index]
     raise TypeError(f'{type(index)}:{index!r} is not a type or a string')
@@ -3635,7 +3659,7 @@ class Entities:
   def by_entity_id(cls, entity_id: str) -> Entity:
     ''' Return the `Entity` instance corresponding to `entity_id`
         from the full tb 
-        Raise `ValueError` is `entity_id` cannot be parsed by
+        Raise `ValueError` if `entity_id` cannot be parsed by
         `ZonedTypes.type_parts_of`.
         Raise `KeyError` if there is no `Entities` instance for the zone
         and we cannot make a default instance.
