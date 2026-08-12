@@ -1133,7 +1133,9 @@ class Trace(HasThreadState):
 
           >>> @Trace
           ... def func(x):
-          ...   return x + 2
+          ...   with Trace(f'compute x+2') as T:
+          ...     x2 = T(f'{x=} + 2', x+2)
+          ...   return x2
           ...
           >>> with Trace("func trace") as T:
           ...   x2 = T("call func with 3", func(3))
@@ -1143,9 +1145,11 @@ class Trace(HasThreadState):
           >>> T.printt() # doctest: +ELLIPSIS
           func trace
           ├─func(....)
-          │ │ from <module>() <doctest cs.debug.Trace[...]>:2
+          │ │ from <module>() <doctest cs.debug.Trace[4]>:2
           │ │ x2 = T("call func with 3", func(3))
-          │ ╰─return -> -> int                               5
+          │ ├─compute x+2
+          │ │ ╰─x=3 + 2 -> int                               5
+          │ ╰─return -> int                                  5
           ╰─call func with 3 -> int                          5
 
   '''
@@ -1166,10 +1170,10 @@ class Trace(HasThreadState):
           try:
             result = func(*func_a, **func_kw)
           except Exception as e:
-            subT('RAISE ->', e)
+            subT('RAISE', e)
             raise
           else:
-            subT('return ->', result)
+            subT('return', result)
             return result
 
       return with_trace
@@ -1178,6 +1182,8 @@ class Trace(HasThreadState):
   def __init__(self, name: str, upT=None):
     self.name = name
     self.tests = []
+    if upT is None:
+      upT = type(self).default()
     if upT is not None:
       upT.tests.append(self)
 
