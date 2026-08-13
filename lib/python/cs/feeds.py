@@ -140,8 +140,23 @@ class FeedCommon(ABC):
       return lambda: getattr(self, attr[5:])
     return super().__getattr__(attr)
 
-  def feed_author_email(self):
-    return getattr(self, 'author_email', None)
+  def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
+    ''' Return a list of `FeedPerson`s.
+
+        This default implementation assumes that `self` looks like
+        ` cs.tagset.Entity` and that `self.author_ents` produces
+        an iterable of objects which look like `SiteEntity` instances,
+        which have a `.fullname` attribute and which may have
+        `.email` and `.sitepage_url` attributes.
+    '''
+    return [
+        FeedPerson.from_SiteEntity(ent, refresh=refresh)
+        for ent in self.author_ents
+    ]
+
+  def feed_author(self, *, refresh=False) -> FeedPerson | None:
+    return get0(self.feed_authors(refresh=refresh))
+
 
   def rss_category(self):
     return getattr(self, 'category', None)
@@ -173,8 +188,10 @@ class FeedCommon(ABC):
     '''
     return None
 
-  def rss_author(self):
-    return self.feed_author_email()
+  def rss_author(self, refresh=False):
+    ''' RSS presents the author email in its `author` tag.
+    '''
+    return self.feed_author(refreh=refresh).email
 
   def rss_description(self):
     return getattr(self, 'description', '')
