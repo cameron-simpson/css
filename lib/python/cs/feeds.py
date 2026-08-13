@@ -310,6 +310,52 @@ class FeedMixin(FeedCommon, ABC):
   def feed_entries(self) -> Iterable["FeedEntryMixin"]:
     raise NotImplementedError
 
+  def atom(
+      self,
+      *,
+      E=None,
+      entries=None,
+      generator=None,
+      refresh=False,
+      title=None,
+  ):
+    ''' Return the Atom `feed` for this entity as an `lxml feed Element`.
+        It can be converted to text with `ElementTree.tostring()`.
+
+        Optional parameters:
+        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.RSSElementMaker()`
+        * `generator`: the name of the RSS generator, default from `self.__class__`
+        * `refresh`: optional flag, default `False`; if true call `self.refresh()`
+        * `title`: the channel title, default from `self.rss_title()`
+    '''
+    if E is None: E = self.RSSElementMaker()
+    if refresh: self.refresh()
+    if generator is None:
+      generator = f'{self.__class__.__module__}:{self.__class__.__name__}'
+    if title is None:
+      try:
+        title = self.rss_title()
+      except AttributeError as e:
+        from cs.logutils import warning
+        warning(f'{self.name=}.rss_title: {e}')
+        breakpoint()
+        raise
+    atom = E.feed(
+        E.title(title),
+        E.generator(generator),
+        E.updated(self.atom_date_string(self.feed_last_build_timestamp())),
+        *(
+            author.for_atom(E=E)
+            for author in self.feed_authors(refresh=refresh)
+        ),
+        *(
+            entry.atom(refresh=refresh, E=E)
+            for entry in (entries or self.feed_entries())
+        ),
+        xmlns=ATOM_NS,
+    )
+    return atom
+
   def rss(
       self,
       *,
