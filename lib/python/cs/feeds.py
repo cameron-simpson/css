@@ -132,9 +132,9 @@ class FeedCommon(ABC):
         `Entity` or `SiteEntity`, this tries first the `suffix` then
         `{zone}.{suffix}`.
     '''
-    if attr.startswth('atom_'):
+    if attr.startswith('atom_'):
       return getattr(self, f'feed_{attr[5:]}')
-    if attr.startswth('rss_'):
+    if attr.startswith('rss_'):
       return getattr(self, f'feed_{attr[4:]}')
     if attr.startswith('feed_'):
       return lambda: getattr(self, attr[5:])
