@@ -448,7 +448,11 @@ class FeedMixin(FeedCommon, ABC):
 
 class FeedEntryMixin(FeedCommon, ABC):
 
-  def rss_item(
+  @abstractmethod
+  def feed_entry_signature(self, *, refresh=False, **refresh_kw):
+    ''' Return a signature value used to update the 
+    '''
+    raise NotImplementedError
 
   def atom(
       self,
@@ -522,6 +526,8 @@ class FeedEntryMixin(FeedCommon, ABC):
         ),
     )
     return atom
+
+  def rss(
       self,
       *,
       E=None,
