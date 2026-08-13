@@ -2996,7 +2996,17 @@ class SiteMap(Entities, Promotable):
     tags = []
     for link, link_tags in flowstate.links.items():
       for tag in link_tags:
-        if tag.attrs.get('type') == "application/rss+xml":
+        tag_content_type = tag.attrs.get('type')
+        if tag_content_type == ATOM_CONTENT_TYPE:
+          try:
+            href = tag.attrs['href']
+          except KeyError:
+            warning("no href in %s", tag)
+          else:
+            widget = BS4Tag(name='a', attrs=dict(href=href))
+            widget.string = "ATOM"
+            tags.append(widget)
+        if tag_content_type == RSS_CONTENT_TYPE:
           try:
             href = tag.attrs['href']
           except KeyError:
