@@ -162,7 +162,6 @@ class FeedCommon(ABC):
     ''' Return a timestamp (a UNIX time or a timezone aware `datetime`)
         as an RFC3339 date and time with a 4 digit year.
 
-  def rss_category(self):
         Atom date constructs: https://www.rfc-editor.org/info/rfc4287/#section-3.3
     '''
     # turn dt into a UTC datetime
@@ -187,7 +186,11 @@ class FeedCommon(ABC):
       )
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
+  def feed_category(self) -> str:
     return getattr(self, 'category', None)
+
+  def feed_link(self):
+    return self.sitepage_url
 
   @staticmethod
   def rss_date_string(dt: float | str | date | datetime):
@@ -211,7 +214,7 @@ class FeedCommon(ABC):
         )
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
-  def rss_pubdate(self) -> None | str:
+  def feed_pubdate(self) -> None | str:
     ''' Return the publication date, or `None` if not available.
     '''
     return None
@@ -221,19 +224,16 @@ class FeedCommon(ABC):
     '''
     return self.feed_author(refreh=refresh).email
 
-  def rss_description(self):
+  def feed_description(self):
     return getattr(self, 'description', '')
 
-  def rss_image_url(self):
+  def feed_image_url(self):
     return self.get('opengraph.image')
 
-  def rss_image_title(self):
-    return self.rss_title()
+  def feed_image_title(self):
+    return self.feed_title()
 
-  def rss_link(self):
-    return self.sitepage_url
-
-  def rss_language(self):
+  def feed_language(self):
     og_locale = self.get('opengraph.locale')
     if not og_locale:
       return None
