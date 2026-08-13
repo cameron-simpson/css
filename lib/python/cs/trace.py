@@ -3,6 +3,13 @@
 ''' Utilities for tracing operations.
 '''
 
+import builtins
+
+from cs.fs import shortpath
+from cs.lex import printt
+from cs.py.stack import caller
+from cs.threads import HasThreadState, ThreadState
+
 class Trace(HasThreadState):
   ''' A class/decorator to trace control flow and decisions.
       This makes it possible to record function calls and their
@@ -35,12 +42,13 @@ class Trace(HasThreadState):
           ╰─inside test 2
             ╰─inside1 -> bool          True
 
-      As a decorator:
+      As a decorator it calls the function with an additional named
+      argument `T` which is the `Trace` instance for that call of
+      the function:
 
           >>> @Trace
-          ... def func(x):
-          ...   with Trace(f'compute x+2') as T:
-          ...     x2 = T(f'{x=} + 2', x+2)
+          ... def func(x, T):
+          ...   x2 = T(f'{x=} + 2', x+2)
           ...   return x2
           ...
           >>> with Trace("func trace") as T:
@@ -51,10 +59,9 @@ class Trace(HasThreadState):
           >>> T.printt() # doctest: +ELLIPSIS
           func trace
           ├─func(....)
-          │ │ from <module>() <doctest cs.debug.Trace[4]>:2
+          │ │ from <module>() <doctest cs.trace.Trace[4]>:2
           │ │ x2 = T("call func with 3", func(3))
-          │ ├─compute x+2
-          │ │ ╰─x=3 + 2 -> int                               5
+          │ ├─x=3 + 2 -> int                                 5
           │ ╰─return -> int                                  5
           ╰─call func with 3 -> int                          5
 
@@ -63,26 +70,30 @@ class Trace(HasThreadState):
   # class attribute holding the per-thread state stack
   perthread_state = ThreadState()
 
-  def __new__(cls, func, *_, print=None):
+  def __new__(cls, func, *_, print=False):  # noqa: A002
+    ''' Intercept object creation for use as a decorator.
+        If `func` is a callable, decorate it.
+        otherwise fall through to normal class instantiation.
+    '''
     if callable(func):
       # class being used as a decorator
 
-      def with_trace(*func_a, **func_kw):
-        upT = cls.default()
+      def traced_func(*func_a, **func_kw):
         c = caller(-4)
         with cls(f'{func.__name__}(....)'
                  f'\n from {c.name}() {shortpath(c.filename)}:{c.lineno}'
-                 f'\n {c.line}', upT) as subT:
+                 f'\n {c.line}') as T:
           try:
-            result = func(*func_a, **func_kw)
+            result = func(*func_a, T=T, **func_kw)
           except Exception as e:
-            subT('RAISE', e)
+            T('RAISE', e, print=print)
             raise
           else:
-            subT('return', result)
+            T('return', result, print=print)
             return result
 
-      return with_trace
+      return traced_func
+    assert print is False
     return super().__new__(cls)
 
   def __init__(self, name: str, upT=None):
@@ -94,6 +105,8 @@ class Trace(HasThreadState):
       upT.tests.append(self)
 
   def tabulate(self):
+    ''' Tabulate this trace object for use with `cs.lex.printt()`.
+    '''
     table = [self.name]
     subtable = []
     for subtest in self.tests:
@@ -107,12 +120,26 @@ class Trace(HasThreadState):
     return table
 
   def printt(self, **printt_kw):
+    ''' Use `cs.lex.printt()` to print this trace object.
+        Keyword arguments are passed through.
+    '''
     printt(*self.tabulate(), **printt_kw)
 
-  def __call__(self, label: str, *tt_a):
+  def __call__(self, label: str, result, *, print=False):  # noqa: A002
+    ''' Calling the trace object records `(abel,result)` and
+        optionally `print`s.
+    '''
+    if print is False:
+      print = lambda *_, **__: None
+    elif print is True:
+      print = builtins.print
+    elif not callable(print):
+      raise TypeError(
+          f'print should be False, True or a print()-compatible callable, got {print=}'
+      )
     assert isinstance(label, str)
-    tt_a = list(tt_a)
-    result = tt_a.pop(0)
-    assert not tt_a
+    print(
+        f'{type(self).__name__}: {label}: {type(result).__name__}:{result!r}'
+    )
     self.tests.append((f'{label} -> {type(result).__name__}', result))
     return result
