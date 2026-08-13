@@ -19,7 +19,6 @@ ATOM_CONTENT_TYPE = 'application/atom+xml'
 ATOM_NS = 'http://www.w3.org/2005/Atom'
 RSS_CONTENT_TYPE = 'application/rss+xml'
 
-class FeedCommon(NoAttrs, ABC):
 class FeedPerson:
   ''' A class to represent a person, modelled on an Atom person
       construct which has a `.name`, a `.email` (may be `None`
@@ -60,6 +59,7 @@ class FeedPerson:
       raise
     return person
 
+class FeedCommon(ABC):
   ''' Common methods for for feeds, supporting RSS channel and items
       and soon Atom feeds and entries.
 
@@ -69,8 +69,11 @@ class FeedPerson:
       The `.rss()` method returns an RSS XML element (channel or item)
       following [the RSS 2.0 Specification](https://www.rssboard.org/rss-specification).
 
-      As such the core implementation expects methdos named `feed_*`,
+      As such the core implementation expects generic methdos named `feed_*`,
       with format specific methods named `atom_*` an `rss_*`.
+
+      All `feed_*`, `atom_*` or `rss_*` attributes return callables
+      i.e. they all act as methods, not properties.
 
       Missing `atom_*` or `rss_*` methods fall back to their `feed_*`
       names.
