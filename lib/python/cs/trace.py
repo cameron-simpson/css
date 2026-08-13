@@ -16,6 +16,22 @@ class Trace(HasThreadState):
       inner decision chains, and to show these in a nice printout
       after the fact.
 
+      A new trace object adds itself to the records of the ambient trace object.
+
+      A trace object supports the context manager protocol, making
+      it the ambient object, so that it accrues any new trace objects
+      make inside the context.
+
+          with Trace("name') as T:
+              ... add records via T ...
+
+      Calling a trace object adds a new record to the trace
+
+          if T("test x==2", x==2):
+              T("acting on x==2")
+          else:
+              T("x != 2")
+
       As a trace object:
 
           >>> from builtins import print
@@ -74,6 +90,10 @@ class Trace(HasThreadState):
     ''' Intercept object creation for use as a decorator.
         If `func` is a callable, decorate it.
         otherwise fall through to normal class instantiation.
+
+        The decorated function is passed an additional named `T`
+        keyword parameter being the `Trace` instance created for
+        the function call and return, ready for additional records.
     '''
     if callable(func):
       # class being used as a decorator
