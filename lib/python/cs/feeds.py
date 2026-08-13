@@ -378,11 +378,11 @@ class FeedMixin(FeedCommon, ABC):
         Optional parameters:
         * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.RSSElementMaker()`
         * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
-          default from `self.rss_last_build_timestamp()`
+          default from `self.feed_last_build_timestamp()`
           which is help in the `timestamp.rss_content` tag
         * `category`: the item category, default from `self.rss_category()`
         * `description`: the channel title, default from `self.rss_description()`
-        * `generator`: the name of the RSS generator, default from the `Pilfer` package name
+        * `generator`: the name of the RSS generator, default from `self.__class__`
         * `image_url`: an optional URL for an image for this channel
         * `image_size`: optional size information for the image as a `(width,height)` 2-tuple
         * `language`: the channel title, default from `self.rss_language()`
@@ -422,7 +422,7 @@ class FeedMixin(FeedCommon, ABC):
             E.description(description),
             E.generator(generator),
             E.lastBuildDate(
-                self.rss_date_string(self.rss_last_build_timestamp())
+                self.rss_date_string(self.feed_last_build_timestamp())
             ),
             E.docs('https://www.rssboard.org/rss-specification'),
             *not_none(
@@ -532,13 +532,12 @@ class FeedEntryMixin(FeedCommon, ABC):
       image_url=None,
       image_size=None,
       image_title=None,
-      language=None,
       link=None,
       pub_date=None,
       title=None,
       refresh=False,
   ):
-    ''' Return the RSS for this entity as an `lxml item Element`.
+    ''' Return the RSS for this entry as an `lxml item Element`.
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
@@ -550,10 +549,9 @@ class FeedEntryMixin(FeedCommon, ABC):
         * `image_size`: optional size information for the image as a `(width,height)` 2-tuple
         * `image_title`: an optional title associate with the image,
           default from `self.rss-image_title()`
-        * `language`: the channel title, default from `self.rss_language()`
         * `link`: the URL of the item, default from `self.rss_link()`
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
-        * `title`: the channel title, default from `self.rss_title()`
+        * `title`: the entry title, default from `self.rss_title()`
     '''
     if E is None:
       E = self.RSSElementMaker()
