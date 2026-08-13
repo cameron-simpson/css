@@ -16,6 +16,7 @@ from cs.lex import html_escape
 from cs.seq import get0, not_none
 
 ATOM_CONTENT_TYPE = 'application/atom+xml'
+ATOM_NS = 'http://www.w3.org/2005/Atom'
 RSS_CONTENT_TYPE = 'application/rss+xml'
 
 class FeedCommon(NoAttrs, ABC):
@@ -83,6 +84,22 @@ class FeedPerson:
   '''
 
   @staticmethod
+  def AtomElementMaker():
+    ''' Return an `lxml.builder.ElementMaker` instance for making Atom XML.
+    '''
+    return ElementMaker(
+        ##namespace=?,
+        nsmap=dict(
+            content="http://purl.org/rss/1.0/modules/content/",
+            dc="http://purl.org/dc/elements/1.1/",
+            atom=ATOM_NS,
+            sy="http://purl.org/rss/1.0/modules/syndication/",
+            slash="http://purl.org/rss/1.0/modules/slash/",
+            webfeeds="http://webfeeds.org/rss/1.0",
+        ),
+    )
+
+  @staticmethod
   def RSSElementMaker():
     ''' Return an `lxml.builder.ElementMaker` instance for making RSS XML.
     '''
@@ -91,7 +108,7 @@ class FeedPerson:
         nsmap=dict(
             content="http://purl.org/rss/1.0/modules/content/",
             dc="http://purl.org/dc/elements/1.1/",
-            atom="http://www.w3.org/2005/Atom",
+            atom=ATOM_NS,
             sy="http://purl.org/rss/1.0/modules/syndication/",
             slash="http://purl.org/rss/1.0/modules/slash/",
             webfeeds="http://webfeeds.org/rss/1.0",
