@@ -5,17 +5,60 @@
 
 from abc import ABC, abstractmethod
 from datetime import date, datetime, timezone
-from typing import Iterable
+from types import SimpleNamespace as NS
+from typing import Iterable, Sequence
 
+from bs4.element import Tag as BS4Tag
 from lxml.builder import ElementMaker
 
-from cs.obj import NoAttrs
-from cs.seq import not_none
+from cs.bs4utils import as_xml as bs4_as_xml
+from cs.lex import html_escape
+from cs.seq import get0, not_none
 
 ATOM_CONTENT_TYPE = 'application/atom+xml'
 RSS_CONTENT_TYPE = 'application/rss+xml'
 
 class FeedCommon(NoAttrs, ABC):
+class FeedPerson:
+  ''' A class to represent a person, modelled on an Atom person
+      construct which has a `.name`, a `.email` (may be `None`
+      and a `.uri` (may be `None`).
+  '''
+
+  def __init__(self, name, *, uri=None, email=None):
+    self.name = name
+    self.uri = uri
+    self.email = email
+
+  def for_atom(self, tag: str, *, E=None):
+    ''' Return a `tag` Element for this `FeedPerson`.
+    '''
+    if E is None: E = FeedCommon.AtomElementMaker()
+    return E(
+        tag,
+        *(
+            E(tag, value)
+            for tag, value in self.__dict__.items()
+            if value is not None
+        ),
+    )
+
+  @classmethod
+  def from_SiteEntity(cls, ent, *, refresh=False):
+    ''' Produce an `FeedPerson` from a `SiteEntity`.
+    '''
+    if refresh: ent.refresh()
+    try:
+      person = cls(
+          name=ent.fullname,
+          email=getattr(ent, 'eemail', None),
+          uri=getattr(ent, 'sitepage_url', None)
+      )
+    except AttributeError as e:
+      print(f'MISSING ATTRIBUTE {type(ent)}. {e}')
+      raise
+    return person
+
   ''' Common methods for for feeds, supporting RSS channel and items
       and soon Atom feeds and entries.
 
