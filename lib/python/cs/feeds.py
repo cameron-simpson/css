@@ -239,6 +239,58 @@ class FeedCommon(ABC):
       return None
     return og_locale.lower().replace('_', '-')
 
+  @classmethod
+  # TODO: XML element support
+  def atom_text(cls, name, text, type=None, *, E=None):
+    ''' Return an XML Element with tag name `name` containing `text`,
+        which should be a string or a BeautifulSoup `Tag` or an XML Element.
+
+        This is to produce Atom text constructs:
+        https://www.rfc-editor.org/info/rfc4287/#section-3.1
+
+        Parameters:
+        * `name`: the tag name
+        * `text`: the text to enclose
+        * `type`: the type of the enclosed text
+
+        The default `text` type is inferred from the type of `text`:
+        * a string: `"text"`
+        * a BeautifulSoup `Tag`: `"html"`
+        * an XML element: `"xhtml"`
+    '''
+    if E is None:
+      E = cls.AtomElementMaker()
+    if type is None:
+      if isinstance(text, BS4Tag):
+        type = "html"
+        content = html_escape(str(text))
+      elif isinstance(text, str):
+        type = "text"
+        content = html_escape(str(text))
+      else:
+        type = "xhtml"
+        content = E.div(
+            text,
+            xmlns="http://www.w3.org/1999/xhtml",
+        )
+    elif isinstance(text, BS4Tag):
+      if type == "text":
+        content = html_escape(text.get_text())
+      elif type == "html":
+        content = html_escape(str(text))
+      elif type == "xhtml":
+        content = E.div(
+            bs4_as_xml(text),
+            xmlns="http://www.w3.org/1999/xhtml",
+        )
+      else:
+        raise ValueError(f'unsupported {type=}')
+    elif isinstance(text, str):
+      content = html_escape(str(text))
+    else:
+      print("type(text) =", type(text))
+    return E(name, content, type=type)
+
 class FeedMixin(FeedCommon, ABC):
   '''" The RSS top level.
   '''
