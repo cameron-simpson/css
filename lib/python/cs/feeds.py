@@ -157,8 +157,36 @@ class FeedCommon(ABC):
   def feed_author(self, *, refresh=False) -> FeedPerson | None:
     return get0(self.feed_authors(refresh=refresh))
 
+  @staticmethod
+  def atom_date_string(dt: float | str | date | datetime):
+    ''' Return a timestamp (a UNIX time or a timezone aware `datetime`)
+        as an RFC3339 date and time with a 4 digit year.
 
   def rss_category(self):
+        Atom date constructs: https://www.rfc-editor.org/info/rfc4287/#section-3.3
+    '''
+    # turn dt into a UTC datetime
+    if isinstance(dt, datetime):
+      dt = dt.astimezone(tz=timezone.utc)
+    elif isinstance(dt, date):
+      # pretend the date is a UTC date
+      # TODO: I would to assume a localtime date (for no very good reason)
+      # but that seems... surprisingly hard to do.
+      dt = datetime(dt.year, dt.month, dt.day, tz=timezone.utc)
+    elif isinstance(dt, float):
+      dt = datetime.fromtimestamp(dt, tz=timezone.utc)
+    elif isinstance(dt, str):
+      try:
+        dt = datetime.fromisoformat(dt)
+      except ValueError:
+        dt = datetime.strptime("%a, %d %b %Y %H:%M:%S %z")
+      dt = dt.astimezone(tz=timezone.utc)
+    else:
+      raise TypeError(
+          f'cannot convert {type(dt).__name__}:{dt!r} to a datetime'
+      )
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
     return getattr(self, 'category', None)
 
   @staticmethod
