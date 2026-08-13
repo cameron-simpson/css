@@ -449,6 +449,79 @@ class FeedMixin(FeedCommon, ABC):
 class FeedEntryMixin(FeedCommon, ABC):
 
   def rss_item(
+
+  def atom(
+      self,
+      *,
+      E=None,
+      author=None,
+      category=None,
+      description=None,
+      image_url=None,
+      image_size=None,
+      image_title=None,
+      language=None,
+      link=None,
+      pub_date=None,
+      title=None,
+      refresh=False,
+  ):
+    ''' Return the Atom `entry` for this entry as an `lxml entry Element`.
+        It can be converted to text with `ElementTree.tostring()`.
+
+        Optional parameters:
+        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.AtomElementMaker()`
+        * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
+        * `title`: the entry title, default from `self.atom_title()`
+    '''
+    if E is None:
+      E = self.AtomElementMaker()
+    if refresh:
+      self.refresh()
+    if author is None: author = self.atom_author(refresh=refresh)
+    if category is None: category = self.atom_category()
+    if category is None:
+      categories = ()
+    elif isinstance(category, str):
+      categories = category,
+    else:
+      categories = list(category)
+    if description is None: description = self.atom_description()
+    if image_url is None:
+      image_url = self.atom_image_url()
+    if image_size:
+      image_width, image_height = image_size
+    else:
+      image_width = self.get('opengraph.image:width')
+      if image_width: image_width = int(image_width)
+      image_height = self.get('opengraph.image:height')
+      if image_height: image_height = int(image_height)
+    if image_width and image_height: image_size = image_width, image_height
+    if image_title is None: image_title = self.atom_image_title()
+    if link is None: link = self.atom_link()
+    if pub_date is None: pub_date = self.atom_pubdate()
+    if title is None: title = self.atom_title()
+    atom = E.entry(
+        *not_none(
+            (
+                E.guid(self.name, isPermaLink="false"),
+                E.title(title),
+                author and author.for_atom('author', E=E),
+                E.link(link),
+                *map(E.category, categories),
+                pub_date and E.pubDate(self.atom_date_string(pub_date)),
+                image_url and E.image(
+                    E.url(image_url),
+                    E.title(image_title),
+                    E.link(link),
+                    image_width and E.width(str(image_width)),
+                    image_height and E.height(str(image_height)),
+                ),
+                description and E.description(description),
+            ),
+        ),
+    )
+    return atom
       self,
       *,
       E=None,
