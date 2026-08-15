@@ -323,10 +323,11 @@ class FeedCommon(ABC):
       content = html_escape(str(text))
     else:
       print("type(text) =", type(text))
+      raise TypeError(f'unhandled type {type(text)} for {text=}')
     return E(name, content, type=type)
 
 class FeedMixin(FeedCommon, ABC):
-  '''" The RSS top level.
+  '''" The Atom/Rss feed top level.
   '''
 
   def feed_last_build_timestamp(self, *, refresh=False, **refresh_kw) -> float:
@@ -342,6 +343,8 @@ class FeedMixin(FeedCommon, ABC):
 
   @abstractmethod
   def feed_entries(self) -> Iterable["FeedEntryMixin"]:
+    ''' Return an iterable of `FeedEntryMixin` instances.
+    '''
     raise NotImplementedError
 
   def feed_save(
@@ -524,7 +527,7 @@ class FeedMixin(FeedCommon, ABC):
                 )
             ),
             *(
-                item.rss_item(refresh=refresh, E=E)
+                item.rss(refresh=refresh)
                 for item in (items or self.rss_entries())
             ),
         ),
@@ -536,7 +539,7 @@ class FeedEntryMixin(FeedCommon, ABC):
 
   @abstractmethod
   def feed_entry_signature(self, *, refresh=False, **refresh_kw):
-    ''' Return a signature value used to update the 
+    ''' Return a signature value used to update the
     '''
     raise NotImplementedError
 
