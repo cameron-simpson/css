@@ -5,6 +5,7 @@
 
 from abc import ABC, abstractmethod
 from datetime import date, datetime, timezone
+from functools import cached_property
 from types import SimpleNamespace as NS
 from typing import Iterable, Sequence
 
@@ -13,6 +14,7 @@ from lxml.builder import ElementMaker
 
 from cs.bs4utils import as_xml as bs4_as_xml
 from cs.lex import html_escape
+from cs.obj import Refreshable
 from cs.seq import get0, not_none
 
 ATOM_CONTENT_TYPE = 'application/atom+xml'
@@ -45,7 +47,7 @@ class FeedPerson:
 
   @classmethod
   def from_SiteEntity(cls, ent, *, refresh=False):
-    ''' Produce an `FeedPerson` from a `SiteEntity`.
+    ''' Produce a `FeedPerson` from a `SiteEntity`.
     '''
     if refresh: ent.refresh()
     try:
@@ -133,8 +135,10 @@ class FeedCommon(ABC):
         `{zone}.{suffix}`.
     '''
     if attr.startswith('atom_'):
+      # missing atom_field looks for feed_field
       return getattr(self, f'feed_{attr[5:]}')
     if attr.startswith('rss_'):
+      # missing rss_field looks for feed_field
       return getattr(self, f'feed_{attr[4:]}')
     if attr.startswith('feed_'):
       return lambda: getattr(self, attr[5:])
@@ -186,8 +190,14 @@ class FeedCommon(ABC):
       )
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-  def feed_category(self) -> str:
-    return getattr(self, 'category', None)
+  def feed_categories(self) -> Sequence[str]:
+    ''' Obtain the categories from `self.category` if present, default `()`.
+        If `self.category` is a string, return it in a 1-tuple.
+    '''
+    categories = getattr(self, 'category', None) or ()
+    if isinstance(categories, str):
+      categories = (categories,)
+    return categories
 
   def feed_link(self):
     return self.sitepage_url
@@ -337,21 +347,28 @@ class FeedMixin(FeedCommon, ABC):
         title = self.rss_title()
       except AttributeError as e:
         from cs.logutils import warning
-        warning(f'{self.name=}.rss_title: {e}')
+        warning(f'{type(self)}:{self.name=}.rss_title: {e}')
         breakpoint()
         raise
     atom = E.feed(
+        # atomCommonAttributes,
         E.title(title),
+        # subtitle
         E.generator(generator),
-        E.updated(self.atom_date_string(self.feed_last_build_timestamp())),
+        E.updated(self.atom_date_string(self.atom_last_build_timestamp())),
         *(
             author.for_atom(E=E)
-            for author in self.feed_authors(refresh=refresh)
+            for author in self.atom_authors(refresh=refresh)
         ),
+        E.link(self.atom_link()),
+        # icon - from the favicon
+        # logo
+        # rights
         *(
             entry.atom(refresh=refresh, E=E)
-            for entry in (entries or self.feed_entries())
+            for entry in (entries or self.atom_entries())
         ),
+        # extensionElement
         xmlns=ATOM_NS,
     )
     return atom
@@ -378,7 +395,7 @@ class FeedMixin(FeedCommon, ABC):
         Optional parameters:
         * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.RSSElementMaker()`
         * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
-          default from `self.feed_last_build_timestamp()`
+          default from `self.rss_last_build_timestamp()`
           which is help in the `timestamp.rss_content` tag
         * `category`: the item category, default from `self.rss_category()`
         * `description`: the channel title, default from `self.rss_description()`
@@ -394,6 +411,8 @@ class FeedMixin(FeedCommon, ABC):
       E = self.RSSElementMaker()
     if refresh:
       self.refresh()
+    if build_timestamp is None:
+      build_timestamp = self.rss_last_build_timestamp()
     if category is None: category = self.rss_category()
     if category is None:
       categories = ()
@@ -421,9 +440,7 @@ class FeedMixin(FeedCommon, ABC):
             E.link(link),
             E.description(description),
             E.generator(generator),
-            E.lastBuildDate(
-                self.rss_date_string(self.feed_last_build_timestamp())
-            ),
+            E.lastBuildDate(self.rss_date_string(build_timestamp)),
             E.docs('https://www.rssboard.org/rss-specification'),
             *not_none(
                 (
@@ -439,7 +456,7 @@ class FeedMixin(FeedCommon, ABC):
             ),
             *(
                 item.rss_item(refresh=refresh, E=E)
-                for item in (items or self.feed_entries())
+                for item in (items or self.rss_entries())
             ),
         ),
         version="2.0",
