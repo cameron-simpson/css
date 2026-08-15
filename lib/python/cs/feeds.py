@@ -143,7 +143,8 @@ class FeedCommon(ABC):
       # missing rss_field looks for feed_field
       return getattr(self, f'feed_{attr[4:]}')
     if attr.startswith('feed_'):
-      return lambda: getattr(self, attr[5:])
+      # missing feed_field looks for .field
+      return lambda: getattr(self, attr[5:], None)
     return super().__getattr__(attr)
 
   def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
