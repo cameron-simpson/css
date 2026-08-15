@@ -36,10 +36,9 @@ class FeedPerson:
     self.uri = uri
     self.email = email
 
-  def for_atom(self, tag: str, *, E=None):
+  def for_atom(self, tag: str, *, E):
     ''' Return a `tag` Element for this `FeedPerson`.
     '''
-    if E is None: E = FeedCommon.AtomElementMaker()
     return E(
         tag,
         *(
