@@ -344,6 +344,63 @@ class FeedMixin(FeedCommon, ABC):
   def feed_entries(self) -> Iterable["FeedEntryMixin"]:
     raise NotImplementedError
 
+  def feed_save(
+      self,
+      file: TextIOBase | str,
+      xml,
+      *,
+      exists_ok: bool = False,
+      xmlv: bool = False,
+      **gen_kw
+  ):
+    ''' Save a feed to `file`.
+
+        Parameters:
+        * `file`: the save file, a TextIOBase or a filename `str`
+        * `xml`: the feed XML to save
+        * `exists_ok`: default `False`; it is an error if this is false and `file` already exists
+        * `xmlv`: default `False`; if true then prepend the XML version string to the saved XML
+
+        If `file` is a `str`, the value `"-"` saves to `sys.stdout`
+        and other strings are treated as filesystem paths, written
+        to using `atomic_filename`.
+
+        If `xml` is a callable it is called with any other keyword
+        arguments to generated the XML to save, which return an XML
+        top level feed `Element` or a `str` containing the XML text.
+        If not a `str`, the XML is converted to a string using
+        `lxml.etree.tostring(xml,encoding='unicode',pretty_print=True)`.
+
+        The convenience `atom_save` and `rss_save` methods call
+        `feed_save` with `xml=slf.atom` or `xml=self.rss` respectively.
+    '''
+    if isinstance(file, str):
+      if file == "-":
+        return self.atom_save(sys.stdout, xmlv=xmlv, **gen_kw)
+      with atomic_filename(file, mode='w', exists_ok=exists_ok) as T:
+        return self.atom_save(T, xmlv=xmlv, **gen_kw)
+    if callable(xml):
+      xml = xml(**gen_kw)
+    else:
+      assert not gen_kw
+    if not isinstance(xml, str):
+      xml = xml_tostring(xml, encoding='unicode', pretty_print=True)
+    if xmlv:
+      print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+    print(xml, end='', file=file)
+
+  def atom_save(self, file: TextIOBase | str, **feed_save_kw):
+    ''' Generate and save an Atom feed to `file`.
+        Keyword arguments are passed through to `self.feed_save`.
+    '''
+    return self.feed_save(file, xml=self.atom, **feed_save_kw)
+
+  def rss_save(self, file: TextIOBase | str, **feed_save_kw):
+    ''' Generate and save an RSS feed to `file`.
+        Keyword arguments are passed through to `self.feed_save`.
+    '''
+    return self.feed_save(file, xml=self.rss, **feed_save_kw)
+
   def atom(
       self,
       *,
