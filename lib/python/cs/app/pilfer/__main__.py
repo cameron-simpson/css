@@ -4,7 +4,6 @@ import asyncio
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from fnmatch import fnmatch
 from functools import cached_property
 import logging
 import os
@@ -17,14 +16,12 @@ from typing import Iterable, Literal
 from uuid import uuid4
 
 from bs4 import BeautifulSoup
-from lxml.etree import tostring as xml_tostring
 from typeguard import typechecked
 
 from cs.bs4utils import printt_soup
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedMixin
-from cs.fileutils import atomic_filename
 from cs.later import Later
 from cs.lex import (
     cutprefix,
@@ -39,8 +36,8 @@ import cs.logutils
 from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
+from cs.py.modules import extra_import
 from cs.sqltags import SQLTagSet
-from cs.tagset import Entity
 from cs.urlutils import URL
 
 from . import (
@@ -48,11 +45,13 @@ from . import (
     DEFAULT_FLAGS_CONJUNCTION,
     DEFAULT_MITM_LISTEN_HOST,
     DEFAULT_MITM_LISTEN_PORT,
+    DISTINFO,
 )
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
+
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -299,9 +298,9 @@ class PilferCommand(BaseCommand):
           print(entity.name, output_fspath)
           if options.reparse:
             print("Reparse", output_fspath)
-            from rss_parser import parse
+            rss_parser = extra_import('rss_parser', DISTINFO)
             with open(output_fspath) as rssf:
-              parsed = parse(rssf.read())
+              parsed = rss_parser.parse(rssf.read())
             print("Language", parsed.channel.language)
             print("Atom", parsed.version)
             # Iteratively print feed items
