@@ -1504,6 +1504,13 @@ class SiteEntity(Entity, NoAttrs):
         flowstate=flowstate,
         no_save=True,
     )
+    soup = flowstate.soup
+    # <head><title>
+    title = soup.head.title
+    if title:
+      title = title.get_text().strip()
+      if title:
+        data['title'] = title
     data["html.links"] = {
         rel: [tag.attrs.get('href')
               for tag in tags]
