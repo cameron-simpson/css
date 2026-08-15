@@ -13,7 +13,7 @@ from getopt import GetoptError
 from pprint import pformat, pprint
 import re
 import sys
-from typing import Iterable
+from typing import Iterable, Literal
 from uuid import uuid4
 
 from bs4 import BeautifulSoup
@@ -239,21 +239,18 @@ class PilferCommand(BaseCommand):
 
   @popopts(
       d_=('dirpath', 'Output directory for output_fspath, default ".".'),
-      f=('force', 'Force overwrite of the Atom file if it already exists.'),
+      f=('force', 'Force overwrite of the feed file if it already exists.'),
       o_=(
           'output_fspath',
-          'Output the Atom to the file output_fspath; "-" means the standard output.'
+          'Output the feed to the file output_fspath; "-" means the standard output.'
       ),
       refresh='Refresh the required web pages even if not stale.',
-      reparse='Parse the generated Atom file as a sanity check.',
+      reparse='Reparse the generated feed file as a sanity check.',
       uuid='Allocate a feed.uuid to the entity for Atom or RSS purposes,\n'
       'and use it in the default output filename.',
       xmlv='Provide a leading xml version tag.',
   )
-  def cmd_atom(self, argv):
-    ''' Usage: {cmd} entity|URL...
-          Generate Atom feeds for the specified entities (by name or URL).
-    '''
+  def _cmd_feed(self, argv, synd: Literal["atom", "rss"]):
     options = self.options
     pilfer = options.pilfer
     if not argv:
@@ -278,38 +275,27 @@ class PilferCommand(BaseCommand):
           continue
         if options.uuid:
           try:
-            atom_uuid = entity['atom.uuid']
+            feed_uuid = entity['feed.uuid']
           except KeyError:
-            atom_uuid = entity['atom.uuid'] = uuid4()
+            feed_uuid = entity['feed.uuid'] = uuid4()
         else:
-          atom_uuid = None
+          feed_uuid = None
         output_fspath = options.output_fspath
         if output_fspath != '-':
           if not output_fspath:
             output_fspath = (
-                f'{atom_uuid}.atom' if atom_uuid else
-                f'{entity.sitemap.URL_DOMAIN}--{entity.name}.atom'
+                f'{feed_uuid}.{synd}' if feed_uuid else
+                f'{entity.sitemap.URL_DOMAIN}--{entity.name}.{synd}'
             )
           if not isabspath(output_fspath):
             output_fspath = joinpath(options.dirpath or ".", output_fspath)
-        atom = entity.atom(refresh=options.refresh)
-        if output_fspath == '-':
-          if options.xmlv:
-            print('<?xml version="1.0" encoding="UTF-8"?>')
-          print(
-              xml_tostring(atom, encoding='unicode', pretty_print=True),
-              end='',
-          )
-        else:
-          with atomic_filename(output_fspath, mode='w',
-                               exists_ok=options.force) as T:
-            if options.xmlv:
-              print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
-            print(
-                xml_tostring(atom, encoding='unicode', pretty_print=True),
-                end='',
-                file=T
-            )
+        getattr(entity, f'{synd}_save')(
+            output_fspath,
+            exists_ok=options.force,
+            refresh=options.refresh,
+            xmlv=options.xmlv,
+        )
+        if output_fspath != '-':
           print(entity.name, output_fspath)
           if options.reparse:
             print("Reparse", output_fspath)
@@ -323,6 +309,12 @@ class PilferCommand(BaseCommand):
               print(item.title)
               print(item.description[:50])
     return xit
+
+  def cmd_atom(self, argv):
+    ''' Usage: {cmd} entity|URL...
+          Generate feeds for the specified entities (by name or URL).
+    '''
+    return self._cmd_feed(argv, "atom")
 
   @popopts(
       md=('show_md', 'Show metadata.'),
@@ -813,92 +805,11 @@ class PilferCommand(BaseCommand):
       ent.refresh(force=self.options.force, recurse=self.options.recurse)
       ent.printt()
 
-  @popopts(
-      d_=('dirpath', 'Output directory for output_fspath, default ".".'),
-      f=('force', 'Force overwrite of the RSS file if it already exists.'),
-      o_=(
-          'output_fspath',
-          'Output the RSS to the file output_fspath; "-" means the standard output.'
-      ),
-      refresh='Refresh the required web pages even if not stale.',
-      reparse='Parse the generated RSS file as a sanity check.',
-      uuid='Allocate a feed.uuid to the entity for Atom or RSS purposes,\n'
-      'and use it in the default output filename.',
-      xmlv='Provide a leading xml version tag.',
-  )
   def cmd_rss(self, argv):
     ''' Usage: {cmd} entity|URL...
-          Generate RSS feeds for the specified entities (by name or URL).
+          Generate feeds for the specified entities (by name or URL).
     '''
-    options = self.options
-    pilfer = options.pilfer
-    if not argv:
-      raise GetoptError('missing entity or URL')
-    # TODO: treat the output_fspath as a format?
-    if options.output_fspath and len(argv) > 1:
-      raise GetoptError(
-          'cannot specify the output path with more than 1 entity.'
-      )
-    xit = 0
-    while argv:
-      with Pfx(argv[0]):
-        try:
-          entity = self.popentity(argv)
-        except GetoptError as e:
-          warning(f'cannot recognise as an entity: {e}')
-          xit = 1
-          continue
-        if not isinstance(entity, FeedMixin):
-          warning(f'entity {entity} is not an instance of FeedMixin')
-          xit = 1
-          continue
-        if options.uuid:
-          try:
-            rss_uuid = entity['feed.uuid']
-          except KeyError:
-            rss_uuid = entity['feed.uuid'] = uuid4()
-        else:
-          rss_uuid = None
-        output_fspath = options.output_fspath
-        if output_fspath != '-':
-          if not output_fspath:
-            output_fspath = (
-                f'{rss_uuid}.rss' if rss_uuid else
-                f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
-            )
-          if not isabspath(output_fspath):
-            output_fspath = joinpath(options.dirpath or ".", output_fspath)
-        rss = entity.rss(refresh=options.refresh)
-        if output_fspath == '-':
-          if options.xmlv:
-            print('<?xml version="1.0" encoding="UTF-8"?>')
-          print(
-              xml_tostring(rss, encoding='unicode', pretty_print=True),
-              end='',
-          )
-        else:
-          with atomic_filename(output_fspath, mode='w',
-                               exists_ok=options.force) as T:
-            if options.xmlv:
-              print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
-            print(
-                xml_tostring(rss, encoding='unicode', pretty_print=True),
-                end='',
-                file=T
-            )
-          print(entity.name, output_fspath)
-          if options.reparse:
-            print("Reparse", output_fspath)
-            from rss_parser import RSSParser
-            with open(output_fspath) as rssf:
-              parsed = RSSParser.parse(rssf.read())
-            print("Language", parsed.channel.language)
-            print("RSS", parsed.version)
-            # Iteratively print feed items
-            for item in parsed.channel.items:
-              print(item.title)
-              print(item.description[:50])
-    return xit
+    return self._cmd_feed(argv, "rss")
 
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
