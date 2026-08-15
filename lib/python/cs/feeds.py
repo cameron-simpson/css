@@ -147,6 +147,27 @@ class FeedCommon(ABC):
       return lambda: getattr(self, attr[5:], None)
     return super().__getattr__(attr)
 
+  def _feed_kwv(
+      self, field: str, synd: Literal["atom", "rss"], kw, *, refresh: bool
+  ):
+    ''' Return the value of `field` from `kw` or via `.{synd}_{field}()`.
+        `synd` may be one of `"atom"` or `"rss"` as required.
+
+        If the value is `Refreshable` and `refresh` is true, call
+        `value.refresh()` before return.
+
+        This is used in the feed and entry `.atom()` and `.rss()` methods.
+    '''
+    try:
+      value = kw.pop(field)
+    except:
+      method_name = f'{synd}_{field}'
+      method = getattr(self, method_name)
+      value = method()
+    if refresh and isinstance(value, Refreshable):
+      value.refresh()
+    return value
+
   def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
     ''' Return a list of `FeedPerson`s.
 
@@ -326,52 +347,45 @@ class FeedMixin(FeedCommon, ABC):
   def atom(
       self,
       *,
-      entries=None,
-      generator=None,
       refresh=False,
-      title=None,
+      **kw,
   ):
     ''' Return the Atom `feed` for this entity as an `lxml feed Element`.
         It can be converted to text with `ElementTree.tostring()`.
 
-        Optional parameters:
-        * `generator`: the name of the RSS generator, default from `self.__class__`
+        Parameters:
         * `refresh`: optional flag, default `False`; if true call `self.refresh()`
-        * `title`: the channel title, default from `self.rss_title()`
+
+        Other keyword arguments are cnsumed to generate the `feed` XML.
     '''
     E = self.ATOM_MAKER
+    v = lambda field: self._feed_kwv(field, "atom", kw, refresh=refresh)
     if refresh: self.refresh()
-    if generator is None:
-      generator = f'{self.__class__.__module__}:{self.__class__.__name__}'
-    if title is None:
-      try:
-        title = self.rss_title()
-      except AttributeError as e:
-        from cs.logutils import warning
-        warning(f'{type(self)}:{self.name=}.rss_title: {e}')
-        breakpoint()
-        raise
+    generator = (
+        v('generator')
+        or f'{self.__class__.__module__}:{self.__class__.__name__}'
+    )
+    title = v('title')
     atom = E.feed(
         # atomCommonAttributes,
-        E.title(title),
+        title and E.title(title),
         # subtitle
-        E.generator(generator),
+        generator and E.generator(generator),
         E.updated(self.atom_date_string(self.atom_last_build_timestamp())),
         *(
             author.for_atom(E=E)
             for author in self.atom_authors(refresh=refresh)
         ),
-        E.link(self.atom_link()),
+        E.link(v('link')),
         # icon - from the favicon
         # logo
         # rights
-        *(
-            entry.atom(refresh=refresh, E=E)
-            for entry in (entries or self.atom_entries())
-        ),
+        *(entry.atom(feed=self, refresh=refresh) for entry in v('entries')),
         # extensionElement
         xmlns=ATOM_NS,
     )
+    if kw:
+      warning(f'{self!r}.atom: unused keyword arguments: {kw!r}')
     return atom
 
   def rss(
@@ -472,6 +486,7 @@ class FeedEntryMixin(FeedCommon, ABC):
   def atom(
       self,
       *,
+      feed: FeedMixin | None = None,
       image_size=None,
       refresh=False,
       **kw,
@@ -480,31 +495,13 @@ class FeedEntryMixin(FeedCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.AtomElementMaker()`
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
-        * `title`: the entry title, default from `self.atom_title()`
     '''
     if refresh:
       self.refresh()
-
     E = self.ATOM_MAKER
-
-    def v(field):
-      ''' Return the value of `field` from `kw` or via `.atom_{field}()`.
-      '''
-      value = kw.get(field)
-      if not value:
-        method = getattr(self, f'atom_{field}', None)
-        if method:
-          value = method()
-        else:
-          print(f'v({field=}): no atom_{field}, returning None')
-          value = None
-      if refresh and isinstance(value, Refreshable):
-        value.refresh()
-      return value
-
-    author = v('author')
+    v = lambda field: self._feed_kwv(field, "atom", kw, refresh=refresh)
+    author = v('author') or feed.atom_author()
     categories = v('categories') or ()
     description = v('description')
     image_url = v('image_url')
@@ -524,7 +521,7 @@ class FeedEntryMixin(FeedCommon, ABC):
     atom = E.entry(
         *not_none(
             (
-                E.guid(self.name, isPermaLink="false"),
+                E.id(self.name, isPermaLink="false"),
                 E.title(v('title')),
                 author and author.for_atom('author', E=E),
                 E.link(v('link')),
@@ -541,6 +538,8 @@ class FeedEntryMixin(FeedCommon, ABC):
             ),
         ),
     )
+    if kw:
+      warning(f'{self!r}.atom: unused keyword arguments: {kw!r}')
     return atom
 
   def rss(
