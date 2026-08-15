@@ -6,13 +6,17 @@
 from abc import ABC, abstractmethod
 from datetime import date, datetime, timezone
 from functools import cached_property
-from types import SimpleNamespace as NS
-from typing import Iterable, Sequence
+from io import TextIOBase
+import sys
+from typing import Iterable, Literal, Sequence
 
 from bs4.element import Tag as BS4Tag
 from lxml.builder import ElementMaker
+from lxml.etree import tostring as xml_tostring
 
 from cs.bs4utils import as_xml as bs4_as_xml
+from cs.fileutils import atomic_filename
+from cs.gimmicks import warning
 from cs.lex import html_escape
 from cs.obj import Refreshable
 from cs.seq import get0, not_none
