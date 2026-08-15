@@ -88,10 +88,9 @@ class FeedCommon(ABC):
       `{zone}.{suffix}`.
   '''
 
-  @staticmethod
-  def AtomElementMaker():
-    ''' Return an `lxml.builder.ElementMaker` instance for making Atom XML.
-    '''
+  # an `lxml.builder.ElementMaker` instance for making Atom XML
+  @cached_property
+  def ATOM_MAKER(self):
     return ElementMaker(
         ##namespace=?,
         nsmap=dict(
@@ -104,10 +103,10 @@ class FeedCommon(ABC):
         ),
     )
 
-  @staticmethod
-  def RSSElementMaker():
-    ''' Return an `lxml.builder.ElementMaker` instance for making RSS XML.
-    '''
+  # an `lxml.builder.ElementMaker` instance for making RSS XML
+  #cached_property
+  @cached_property
+  def RSS_MAKER(self):
     return ElementMaker(
         ##namespace=?,
         nsmap=dict(
@@ -323,7 +322,6 @@ class FeedMixin(FeedCommon, ABC):
   def atom(
       self,
       *,
-      E=None,
       entries=None,
       generator=None,
       refresh=False,
@@ -333,12 +331,11 @@ class FeedMixin(FeedCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.RSSElementMaker()`
         * `generator`: the name of the RSS generator, default from `self.__class__`
         * `refresh`: optional flag, default `False`; if true call `self.refresh()`
         * `title`: the channel title, default from `self.rss_title()`
     '''
-    if E is None: E = self.RSSElementMaker()
+    E = self.ATOM_MAKER
     if refresh: self.refresh()
     if generator is None:
       generator = f'{self.__class__.__module__}:{self.__class__.__name__}'
@@ -376,7 +373,6 @@ class FeedMixin(FeedCommon, ABC):
   def rss(
       self,
       *,
-      E=None,
       build_timestamp=None,
       category=None,
       description=None,
@@ -393,7 +389,6 @@ class FeedMixin(FeedCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.RSSElementMaker()`
         * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
           default from `self.rss_last_build_timestamp()`
           which is help in the `timestamp.rss_content` tag
@@ -407,8 +402,7 @@ class FeedMixin(FeedCommon, ABC):
         * `refresh`: optional flag, default `False`; if true call `self.refresh()`
         * `title`: the channel title, default from `self.rss_title()`
     '''
-    if E is None:
-      E = self.RSSElementMaker()
+    E = self.RSS_MAKER
     if refresh:
       self.refresh()
     if build_timestamp is None:
@@ -474,7 +468,6 @@ class FeedEntryMixin(FeedCommon, ABC):
   def atom(
       self,
       *,
-      E=None,
       author=None,
       category=None,
       description=None,
@@ -495,8 +488,6 @@ class FeedEntryMixin(FeedCommon, ABC):
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
         * `title`: the entry title, default from `self.atom_title()`
     '''
-    if E is None:
-      E = self.AtomElementMaker()
     if refresh:
       self.refresh()
     if author is None: author = self.atom_author(refresh=refresh)
@@ -522,6 +513,7 @@ class FeedEntryMixin(FeedCommon, ABC):
     if link is None: link = self.atom_link()
     if pub_date is None: pub_date = self.atom_pubdate()
     if title is None: title = self.atom_title()
+    E = self.ATOM_MAKER
     atom = E.entry(
         *not_none(
             (
@@ -547,7 +539,6 @@ class FeedEntryMixin(FeedCommon, ABC):
   def rss(
       self,
       *,
-      E=None,
       author=None,
       category=None,
       creator=None,
@@ -564,7 +555,6 @@ class FeedEntryMixin(FeedCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `E`: optional `ElementMaker` instance; the default comes from `FeedCommon.RSSElementMaker()`
         * `author`: the email address of the author
         * `category`: the item category, default from `self.rss_category()`
         * `description`: the item description, default from `self.rss_description()`
@@ -576,8 +566,7 @@ class FeedEntryMixin(FeedCommon, ABC):
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
         * `title`: the entry title, default from `self.rss_title()`
     '''
-    if E is None:
-      E = self.RSSElementMaker()
+    E = self.RSS_MAKER
     if refresh:
       self.refresh()
     if author is None: author = self.rss_author()
