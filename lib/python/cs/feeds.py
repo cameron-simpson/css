@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 from functools import cached_property
 from io import TextIOBase
 import sys
-from typing import Iterable, Literal, Sequence
+from typing import final, Iterable, Literal, Sequence
 
 from bs4.element import Tag as BS4Tag
 from lxml.builder import ElementMaker
@@ -201,6 +201,7 @@ class FeedCommon(ABC):
   def feed_author(self, *, refresh=False) -> FeedPerson | None:
     return get0(self.feed_authors(refresh=refresh))
 
+  @final
   @staticmethod
   def atom_date_string(dt: float | str | date | datetime):
     ''' Return a timestamp (a UNIX time or a timezone aware `datetime`)
@@ -249,6 +250,7 @@ class FeedCommon(ABC):
     '''
     return self.sitepage_url
 
+  @final
   @staticmethod
   def rss_date_string(dt: float | str | date | datetime):
     ''' Return a timestamp (a UNIX time or a timezone aware `datetime`)
