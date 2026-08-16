@@ -239,7 +239,14 @@ class FeedCommon(ABC):
       categories = (categories,)
     return categories
 
+  def feed_generator(self):
+    ''' The default generator string.
+    '''
+    return f'{self.__class__.__module__}:{self.__class__.__name__}'
+
   def feed_link(self):
+    ''' The default link to the origin, from `self.sitepage_url`.
+    '''
     return self.sitepage_url
 
   @staticmethod
@@ -437,16 +444,12 @@ class FeedMixin(FeedCommon, ABC):
     E = self.ATOM_MAKER
     v = lambda field: self._feed_kwv(field, "atom", kw, refresh=refresh)
     if refresh: self.refresh()
-    generator = (
-        v('generator')
-        or f'{self.__class__.__module__}:{self.__class__.__name__}'
-    )
     title = v('title')
     atom = E.feed(
         # atomCommonAttributes,
         title and E.title(title),
         # subtitle
-        generator and E.generator(generator),
+        E.generator(v('generator')),
         E.updated(self.atom_date_string(self.atom_last_build_timestamp())),
         *(
             author.for_atom(E=E)
