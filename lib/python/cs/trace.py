@@ -4,6 +4,7 @@
 '''
 
 import builtins
+from os.path import relpath
 
 from cs.fs import shortpath
 from cs.lex import printt
@@ -100,8 +101,11 @@ class Trace(HasThreadState):
 
       def traced_func(*func_a, **func_kw):
         c = caller(-4)
+        path = relpath(c.filename)
+        if path.startswith('../'):
+          path = shortpath(c.filename)
         with cls(f'{func.__name__}(....)'
-                 f'\n from {c.name}() {shortpath(c.filename)}:{c.lineno}'
+                 f'\n from {c.name}() {path}:{c.lineno}'
                  f'\n {c.line}') as T:
           try:
             result = func(*func_a, T=T, **func_kw)
@@ -132,7 +136,7 @@ class Trace(HasThreadState):
     for subtest in self.tests:
       if isinstance(subtest, tuple):
         label, result = subtest
-        subtable.append([label, result])
+        subtable.append([f' {label}', result])
       else:
         subtable.extend(subtest.tabulate())
     if subtable:
@@ -145,7 +149,7 @@ class Trace(HasThreadState):
     '''
     printt(*self.tabulate(), **printt_kw)
 
-  def __call__(self, label: str, result, *, print=False):  # noqa: A002
+  def __call__(self, label: str, result='', print=False):  # noqa: A002
     ''' Calling the trace object records `(abel,result)` and
         optionally `print`s.
     '''
