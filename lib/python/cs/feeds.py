@@ -168,6 +168,22 @@ class FeedCommon(ABC):
       value.refresh()
     return value
 
+  def _feed_image_info(self, v, kw):
+    ''' Return a `(image_url,image_width,image_height,image_title,image_link)` 4-tuple.
+    '''
+    image_url = v('image_url')
+    image_size = v('image_size')
+    image_title = v('image_title')
+    image_link = v('image_link')
+    if image_size:
+      image_width, image_height = image_size
+    else:
+      image_width = self.get('opengraph.image:width')
+      if image_width: image_width = int(image_width)
+      image_height = self.get('opengraph.image:height')
+      if image_height: image_height = int(image_height)
+    return image_url, image_width, image_height, image_title, image_link
+
   def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
     ''' Return a list of `FeedPerson`s.
 
@@ -495,17 +511,11 @@ class FeedMixin(FeedCommon, ABC):
     if description is None: description = self.rss_description()
     if generator is None:
       generator = f'{self.__class__.__module__}:{self.__class__.__name__}'
-    if image_url is None: image_url = self.rss_image_url()
-    if image_size:
-      image_width, image_height = image_size
-    else:
-      image_width = self.get('opengraph.image:width')
-      if image_width: image_width = int(image_width)
-      image_height = self.get('opengraph.image:height')
-      if image_height: image_height = int(image_height)
-    if image_width and image_height: image_size = image_width, image_height
     if link is None: link = self.rss_link()
     if title is None: title = self.rss_title()
+    image_url, image_width, image_height, image_title, image_link = self._feed_image_info(
+        v, kw
+    )
     rss = E.rss(
         E.channel(
             E.title(title),
@@ -519,10 +529,13 @@ class FeedMixin(FeedCommon, ABC):
                     language and E.language(language),
                     category and E.category(category),
                     image_url and E.image(
-                        E.url(image_url),
-                        E.link(self.rss_link()),
-                        ##E.width(str(topic['opengraph.image:width'])),
-                        ##E.height(str(topic['opengraph.image:height'])),
+                        *not_none(
+                            E.url(image_url),
+                            image_title and E.title(image_title),
+                            E.link(link),
+                            image_width and E.width(str(image_width)),
+                            image_height and E.height(str(image_height)),
+                        )
                     ),
                 )
             ),
@@ -564,18 +577,9 @@ class FeedEntryMixin(FeedCommon, ABC):
     author = v('author') or feed.atom_author()
     categories = v('categories') or ()
     description = v('description')
-    image_url = v('image_url')
-    if image_url:
-      image_size = v('image_size')
-      if image_size:
-        image_width, image_height = image_size
-      else:
-        image_width = self.get('opengraph.image:width')
-        if image_width: image_width = int(image_width)
-        image_height = self.get('opengraph.image:height')
-        if image_height: image_height = int(image_height)
-      if image_width and image_height: image_size = image_width, image_height
-    image_title = v('image_title')
+    image_url, image_width, image_height, image_title, image_link = self._feed_image_info(
+        v, kw
+    )
     link = v('link')
     pub_date = v('pub_date')
     atom = E.entry(
@@ -588,11 +592,13 @@ class FeedEntryMixin(FeedCommon, ABC):
                 *map(E.category, categories),
                 pub_date and E.pubDate(self.atom_date_string(pub_date)),
                 image_url and E.image(
-                    E.url(image_url),
-                    image_title and E.title(image_title),
-                    E.link(link),
-                    image_width and E.width(str(image_width)),
-                    image_height and E.height(str(image_height)),
+                    *not_none(
+                        E.url(image_url),
+                        image_title and E.title(image_title),
+                        E.link(link),
+                        image_width and E.width(str(image_width)),
+                        image_height and E.height(str(image_height)),
+                    )
                 ),
                 description and E.description(description),
             ),
@@ -645,20 +651,13 @@ class FeedEntryMixin(FeedCommon, ABC):
       categories = list(category)
     if creator is None: creator = self.rss_creator()
     if description is None: description = self.rss_description()
-    if image_url is None:
-      image_url = self.rss_image_url()
-    if image_size:
-      image_width, image_height = image_size
-    else:
-      image_width = self.get('opengraph.image:width')
-      if image_width: image_width = int(image_width)
-      image_height = self.get('opengraph.image:height')
-      if image_height: image_height = int(image_height)
-    if image_width and image_height: image_size = image_width, image_height
     if image_title is None: image_title = self.rss_image_title()
     if link is None: link = self.rss_link()
     if pub_date is None: pub_date = self.rss_pubdate()
     if title is None: title = self.rss_title()
+    image_url, image_width, image_height, image_title, image_link = self._feed_image_info(
+        v, kw
+    )
     rss = E.item(
         *not_none(
             (
@@ -670,11 +669,13 @@ class FeedEntryMixin(FeedCommon, ABC):
                 *map(E.category, categories),
                 pub_date and E.pubDate(self.rss_date_string(pub_date)),
                 image_url and E.image(
-                    E.url(image_url),
-                    E.title(image_title),
-                    E.link(link),
-                    image_width and E.width(str(image_width)),
-                    image_height and E.height(str(image_height)),
+                    *not_none(
+                        E.url(image_url),
+                        image_title and E.title(image_title),
+                        E.link(link),
+                        image_width and E.width(str(image_width)),
+                        image_height and E.height(str(image_height)),
+                    )
                 ),
                 description and E.description(description),
             ),
