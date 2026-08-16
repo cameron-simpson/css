@@ -468,16 +468,9 @@ class FeedMixin(FeedCommon, ABC):
       self,
       *,
       build_timestamp=None,
-      category=None,
-      description=None,
-      generator=None,
-      image_url=None,
       image_size=None,
-      language=None,
-      link=None,
-      title=None,
-      items=None,
       refresh=False,
+      **kw,
   ):
     ''' Return the RSS for this entity as an `lxml rss Element`.
         It can be converted to text with `ElementTree.tostring()`.
@@ -486,48 +479,36 @@ class FeedMixin(FeedCommon, ABC):
         * `build_timestamp`: a UNIX timestamp for `lastBuildDate`,
           default from `self.rss_last_build_timestamp()`
           which is help in the `timestamp.rss_content` tag
-        * `category`: the item category, default from `self.rss_category()`
-        * `description`: the channel title, default from `self.rss_description()`
-        * `generator`: the name of the RSS generator, default from `self.__class__`
-        * `image_url`: an optional URL for an image for this channel
         * `image_size`: optional size information for the image as a `(width,height)` 2-tuple
-        * `language`: the channel title, default from `self.rss_language()`
-        * `link`: the channel title, default from `self.rss_link()`
         * `refresh`: optional flag, default `False`; if true call `self.refresh()`
-        * `title`: the channel title, default from `self.rss_title()`
+        Other keyword parameters override the defaults for various RSS tags.
     '''
-    E = self.RSS_MAKER
     if refresh:
       self.refresh()
+    E = self.RSS_MAKER
+    v = lambda field: self._feed_kwv(field, "rss", kw, refresh=refresh)
     if build_timestamp is None:
       build_timestamp = self.rss_last_build_timestamp()
-    if category is None: category = self.rss_category()
-    if category is None:
-      categories = ()
-    elif isinstance(category, str):
-      categories = category,
-    else:
-      categories = list(category)
-    if description is None: description = self.rss_description()
-    if generator is None:
-      generator = f'{self.__class__.__module__}:{self.__class__.__name__}'
-    if link is None: link = self.rss_link()
-    if title is None: title = self.rss_title()
+    categories = v('categories') or ()
+    description = v('description')
     image_url, image_width, image_height, image_title, image_link = self._feed_image_info(
         v, kw
     )
+    language = v('language')
+    link = v('link')
+    title = v('title')
     rss = E.rss(
         E.channel(
             E.title(title),
             E.link(link),
             E.description(description),
-            E.generator(generator),
+            E.generator(v('generator')),
             E.lastBuildDate(self.rss_date_string(build_timestamp)),
             E.docs('https://www.rssboard.org/rss-specification'),
             *not_none(
                 (
                     language and E.language(language),
-                    category and E.category(category),
+                    *map(E.category, categories),
                     image_url and E.image(
                         *not_none(
                             E.url(image_url),
@@ -539,13 +520,12 @@ class FeedMixin(FeedCommon, ABC):
                     ),
                 )
             ),
-            *(
-                item.rss(refresh=refresh)
-                for item in (items or self.rss_entries())
-            ),
+            *(item.rss(feed=self, refresh=refresh) for item in v('entries')),
         ),
         version="2.0",
     )
+    if kw:
+      warning(f'{self!r}.atom: unused keyword arguments: {kw!r}')
     return rss
 
 class FeedEntryMixin(FeedCommon, ABC):
@@ -569,6 +549,7 @@ class FeedEntryMixin(FeedCommon, ABC):
 
         Optional parameters:
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
+        Other keyword parameters override the defaults for various Atom tags.
     '''
     if refresh:
       self.refresh()
@@ -611,53 +592,33 @@ class FeedEntryMixin(FeedCommon, ABC):
   def rss(
       self,
       *,
-      author=None,
-      category=None,
-      creator=None,
-      description=None,
-      image_url=None,
+      feed: FeedMixin | None = None,
       image_size=None,
-      image_title=None,
-      link=None,
-      pub_date=None,
-      title=None,
       refresh=False,
+      **kw,
   ):
     ''' Return the RSS for this entry as an `lxml item Element`.
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
-        * `author`: the email address of the author
-        * `category`: the item category, default from `self.rss_category()`
-        * `description`: the item description, default from `self.rss_description()`
-        * `image_url`: an optional URL for an image for this item
-        * `image_size`: optional size information for the image as a `(width,height)` 2-tuple
-        * `image_title`: an optional title associate with the image,
-          default from `self.rss-image_title()`
-        * `link`: the URL of the item, default from `self.rss_link()`
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
-        * `title`: the entry title, default from `self.rss_title()`
+        Other keyword parameters override the defaults for various RSS tags.
     '''
-    E = self.RSS_MAKER
     if refresh:
       self.refresh()
-    if author is None: author = self.rss_author()
-    if category is None: category = self.rss_category()
-    if category is None:
-      categories = ()
-    elif isinstance(category, str):
-      categories = category,
-    else:
-      categories = list(category)
-    if creator is None: creator = self.rss_creator()
-    if description is None: description = self.rss_description()
-    if image_title is None: image_title = self.rss_image_title()
-    if link is None: link = self.rss_link()
-    if pub_date is None: pub_date = self.rss_pubdate()
-    if title is None: title = self.rss_title()
+    E = self.RSS_MAKER
+    v = lambda field: self._feed_kwv(field, "rss", kw, refresh=refresh)
+    author = v('author') or feed.rss_author()
+    categories = v('categories') or ()
+    creator = v('creator')
+    description = v('description')
     image_url, image_width, image_height, image_title, image_link = self._feed_image_info(
         v, kw
     )
+    image_title = v('image_title')
+    link = v('link')
+    pub_date = v('pub_date')
+    title = v('title')
     rss = E.item(
         *not_none(
             (
@@ -681,4 +642,6 @@ class FeedEntryMixin(FeedCommon, ABC):
             ),
         ),
     )
+    if kw:
+      warning(f'{self!r}.atom: unused keyword arguments: {kw!r}')
     return rss
