@@ -19,6 +19,7 @@ from types import SimpleNamespace
 from typing import Iterable, Optional
 from weakref import WeakValueDictionary
 
+from cs.context import contextif
 from cs.deco import OBSOLETE
 from cs.gimmicks import warning
 
@@ -30,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.gimmicks'],
+    'install_requires': ['c.context', 'cs.deco', 'cs.gimmicks'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -728,6 +729,7 @@ class Refreshable(ABC):
     '''
     lifespan0 = lifespan
     ratelimit0 = ratelimit
+    lock = getattr(self, 'refresh_lock', None)
     key = self.refresh_key()
     if seen is None:
       seen = set()
@@ -744,58 +746,59 @@ class Refreshable(ABC):
     now = time.time()
     do_refresh = True
     was_updated = False
-    if data is None:
-      if not force:
-        if not self.refresh_needed(lifespan=lifespan, now=now):
-          # not stale
-          do_refresh = False
-        elif ratelimit is not None:
-          # rate limit on polls
-          last_poll = getattr(self, 'refresh_last_poll', None)
-          if last_poll is not None and now - last_poll < ratelimit:
-            # too soon
-            do_refresh = False
-    if do_refresh:
+    with contextif(lock):
       if data is None:
-        # the refresh will be doing a poll, whatever that means
-        self.refresh_last_poll = now
-      resource = getattr(self, 'refresh_resource', None)
-      was_updated = self._refresh(resource, data=data, **_refresh_kw)
-      # catch accidental None, mostly
-      assert isinstance(was_updated, bool), \
-          f'{self._refresh=} -> not a bool: {type(was_updated)} {was_updated=}'
-      if was_updated:
-        # good poll and data updated
-        self.refresh_last_update = now
-    if recurse:
-      # refresh some objects nonrecursively
-      for _ in map(
-          lambda obj: obj.refresh(
-              recurse=False,
-              map=map,
-              force=force,
-              lifespan=lifespan0,
-              ratelimit=ratelimit0,
-              seen=seen,
-              **_refresh_kw,
-          ),
-          self.refresh_related1(),
-      ):
-        pass
-      # refresh other related objects recursively
-      for _ in map(
-          lambda obj: obj.refresh(
-              recurse=True,
-              map=map,
-              force=force,
-              lifespan=lifespan0,
-              ratelimit=ratelimit0,
-              seen=seen,
-              **_refresh_kw,
-          ),
-          self.refresh_related(),
-      ):
-        pass
+        if not force:
+          if not self.refresh_needed(lifespan=lifespan, now=now):
+            # not stale
+            do_refresh = False
+          elif ratelimit is not None:
+            # rate limit on polls
+            last_poll = getattr(self, 'refresh_last_poll', None)
+            if last_poll is not None and now - last_poll < ratelimit:
+              # too soon
+              do_refresh = False
+      if do_refresh:
+        if data is None:
+          # the refresh will be doing a poll, whatever that means
+          self.refresh_last_poll = now
+        resource = getattr(self, 'refresh_resource', None)
+        was_updated = self._refresh(resource, data=data, **_refresh_kw)
+        # catch accidental None, mostly
+        assert isinstance(was_updated, bool), \
+            f'{self._refresh=} -> not a bool: {type(was_updated)} {was_updated=}'
+        if was_updated:
+          # good poll and data updated
+          self.refresh_last_update = now
+      if recurse:
+        # refresh some objects nonrecursively
+        for _ in map(
+            lambda obj: obj.refresh(
+                recurse=False,
+                map=map,
+                force=force,
+                lifespan=lifespan0,
+                ratelimit=ratelimit0,
+                seen=seen,
+                **_refresh_kw,
+            ),
+            self.refresh_related1(),
+        ):
+          pass
+        # refresh other related objects recursively
+        for _ in map(
+            lambda obj: obj.refresh(
+                recurse=True,
+                map=map,
+                force=force,
+                lifespan=lifespan0,
+                ratelimit=ratelimit0,
+                seen=seen,
+                **_refresh_kw,
+            ),
+            self.refresh_related(),
+        ):
+          pass
     return was_updated
 
   def refreshed(self, resource: Optional = None, **refresh_kw):
