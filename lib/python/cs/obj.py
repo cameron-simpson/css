@@ -731,22 +731,22 @@ class Refreshable(ABC):
     ratelimit0 = ratelimit
     lock = getattr(self, 'refresh_lock', None)
     key = self.refresh_key()
-    if seen is None:
-      seen = set()
-    else:
-      if key in seen:
-        return False
-    seen.add(key)
-    if ratelimit is None:
-      # optional instance attribute
-      ratelimit = getattr(
-          self, 'refresh_ratelimit',
-          type(self).REFRESH_RATELIMIT
-      )
-    now = time.time()
-    do_refresh = True
-    was_updated = False
     with contextif(lock):
+      if seen is None:
+        seen = set()
+      else:
+        if key in seen:
+          return False
+      seen.add(key)
+      if ratelimit is None:
+        # optional instance attribute
+        ratelimit = getattr(
+            self, 'refresh_ratelimit',
+            type(self).REFRESH_RATELIMIT
+        )
+      now = time.time()
+      do_refresh = True
+      was_updated = False
       if data is None:
         if not force:
           if not self.refresh_needed(lifespan=lifespan, now=now):
