@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from functools import cached_property, partial
 from json import JSONDecodeError
 from netrc import netrc
-from threading import RLock, Semaphore
+from threading import Lock, RLock, Semaphore
 import time
 from typing import Mapping, Set, Union
 
@@ -31,6 +31,7 @@ from cs.context import contextif
 from cs.deco import uses_verbose
 from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
+from cs.obj import Refreshable
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTagSet, UsesSQLTags
@@ -51,6 +52,7 @@ DISTINFO = {
         'cs.deco',
         'cs.fstags',
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.resources',
         'cs.tagset',
@@ -100,6 +102,13 @@ class UsesCredentials:
     ''' Return the default credentials for `cls.API_HOSTNAME`.
     '''
     return cls.CREDENTIALS_CLASS.from_str(cls.API_HOSTNAME)
+
+class LoginState(Refreshable):
+
+  def __init__(self, api, credentials=None):
+    self.refresh_lock = Lock()
+    self.api = api
+    self.credentials = credentials
 
 class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
   ''' `SewrviceAPI` base class for other APIs talking to services.
