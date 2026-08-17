@@ -49,12 +49,14 @@ from cs.progress import progressbar
 from cs.resources import RunState, uses_runstate
 from cs.rfc2616 import content_length
 from cs.seq import unrepeated
-from cs.service_api import HTTPServiceAPI, RequestsNoAuth
+from cs.service_api import HTTPServiceAPI, LoginState, RequestsNoAuth
 from cs.sqltags import SQLTags
 from cs.tagset import Entity, Entities
 from cs.threads import pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
+
+from cs.debug import trace
 
 __version__ = '20260531-post'
 
@@ -123,6 +125,28 @@ def main(argv=None):
   '''
   return PlayOnCommand(argv).run()
 
+class PlayOnLoginState(LoginState):
+
+  def _refresh(self, _, data=None):
+    if data is not None:
+      self._state = data
+    else:
+      self._state = self.api.login()
+    self.refresh_lifespan = self._state['exp'] - time.time()
+    return True
+
+  @property
+  def auth_token(self):
+    return self.refreshed()._state['auth_token']
+
+  @property
+  def expiry(self):
+    return self.refreshed()._state['exp']
+
+  @property
+  def jwt(self):
+    return self.refreshed()._state['token']
+
 uses_playon_api = default_params(playon_api=lambda: PlayOnAPI())
 
 # pylint: disable=too-many-instance-attributes
@@ -167,14 +191,14 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
       login = self.default_user_id()
     self.login_userid = login
     self._password = password
-    self._login_state = None
+    self.login_state = PlayOnLoginState(self)
 
   @pfx_method
   def login(self, login_subpath='login'):
     ''' Perform a login, return the resulting `dict`.
         *This does not* update the state of `self`.*
 
-        The `.login_state` property tracks the current auth state.
+        The `.login_state` tracks the current auth state.
     '''
     login = self.login_userid
     password = self._password
@@ -188,34 +212,13 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
         params=dict(email=login, password=password)
     )
 
-  @property
-  def login_state(self):
-    ''' The login state, renewed if necessary.
-    '''
-    state = self._login_state
-    if state is None or state['exp'] < time.time() + self.API_AUTH_GRACETIME:
-      state = self._login_state = self.login()
-    return state
-
-  @property
-  def login_expiry(self):
-    ''' Expiry UNIX time for the login state.
-    '''
-    return self.login_state_mapping['exp']
-
   # UNUSED
   @property
   @pfx_method
   def auth_token(self):
     ''' An auth token obtained from the login state.
     '''
-    return self.login_state['auth_token']
-
-  @property
-  def jwt(self):
-    ''' The JWT token.
-    '''
-    return self.login_state['token']
+    return self.login_state.auth_token
 
   # UNUSED
   def renew_jwt(self):
@@ -254,7 +257,7 @@ class PlayOnAPI(SingletonMixin, HTTPServiceAPI):
     if base_url is None:
       base_url = None if api_version is None else f'api/v{api_version}'
     if headers is None:
-      headers = dict(Authorization=self.jwt)
+      headers = dict(Authorization=self.login_state.jwt)
     return super().suburl(suburl, base_url=base_url, headers=headers, **kw)
 
   @pfx_method
@@ -711,7 +714,6 @@ class PlayOn(Entities, Refreshable):
     assert data is None
     if targets is None:
       targets = (self.recordings, self.queue)
-    self.api.login_state  # do once, before the API calls
     for _ in pmap(lambda f: f(), targets):
       pass
     return True
