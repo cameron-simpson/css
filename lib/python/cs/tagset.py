@@ -569,7 +569,7 @@ class ZonedTypes:
 
       The *zone* represents the domain where this `TagSet` have meaning.
       The *subname* represents a type within that domain; it may contain internal dots.
-      The *key* represents a key unique within the *subname* type space.
+      The *key* represents a key unique within the *subname* type space; it may contain internal dots.
 
       For example, a `TagSet` whose `.name` was `tvdb.series.1234` would have
       the following properties from this mixin class:
@@ -603,8 +603,8 @@ class ZonedTypes:
             >>> ZonedTypes.type_parts_of('tvdb.series.1234')
             ('tvdb', 'series', '1234')
     '''
-    type_zone, zone_parts = name.split('.', 1)
-    type_subname, type_key = zone_parts.rsplit('.', 1)
+
+    type_zone, type_subname, type_key = zone_parts.split('.', 2)
     return type_zone, type_subname, type_key
 
   @property
@@ -899,7 +899,7 @@ class TagSet(
 
         Parameters:
         * `keys`: optional iterable of `Tag` names to print
-        * `file`: optional keyword parameter specifying the output filelike 
+        * `file`: optional keyword parameter specifying the output filelike
           object; the default is `sys.stdout`.
         * `preindent`: optional leading indentation for the entire dump,
           either a `str` or an `int` indicating a number of spaces
