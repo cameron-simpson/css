@@ -331,16 +331,19 @@ class Pfx(object):
     ''' Return `text` with the current prefix prepended.
         Return `text` unchanged if it is not a string.
     '''
-    current_prefix = cls._state.prefix
-    if not isinstance(text, StringTypes):
-      ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-      ##  current_prefix, text.__class__, text, sys.exc_info())
+    try:
+      current_prefix = cls._state.prefix
+      if not isinstance(text, StringTypes):
+        ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+        ##  current_prefix, text.__class__, text, sys.exc_info())
+        return text
+      return (
+          current_prefix + DEFAULT_SEPARATOR + ustr(text, errors='replace')
+          # removed, makes messages unreadable
+          ##replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
+      )
+    except (MemoryError, RecursionError):
       return text
-    return (
-        current_prefix + DEFAULT_SEPARATOR + ustr(text, errors='replace')
-        # removed, makes messages unreadable
-        ##replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
-    )
 
   @classmethod
   def prefixify_exception(cls, e):  # noqa: C901
