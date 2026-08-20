@@ -31,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['c.context', 'cs.deco', 'cs.gimmicks'],
+    'install_requires': ['cs.context', 'cs.deco', 'cs.gimmicks'],
 }
 
 T_SEQ = 'SEQUENCE'
