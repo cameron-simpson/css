@@ -1,3 +1,4 @@
+jellyfin diret db support, as SQLTags Entities mirroring db fields, with backfill for specific fields
 rename HasThreadState to Ambient, add registry of Ambients, the .ambience ? overlap with contextvars somehow
 printt: easy way to add heading+mapping/kv-pairs - .name and .kvs object for the table?
 cs.timeseries: array typecodes may vary in size from cpu to cpu and os to os, struct_format etc may need measuring using array.itemsize
