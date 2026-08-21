@@ -138,6 +138,7 @@ from cs.logutils import error, warning
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.seq import unrepeated
+from cs.tagged import Entities
 from cs.tagset import (
     BaseTagSets,
     RegexpTagRule,
@@ -148,7 +149,6 @@ from cs.tagset import (
     TagsCommandMixin,
     TagsOntology,
     TagsOntologyCommand,
-    Entities,
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property
@@ -349,7 +349,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   )
   def cmd_as_envvars(self, argv):
     ''' Usage: {cmd} --prefix path [tag_name...]
-          Export the tags of path as shell command to set 
+          Export the tags of path as shell command to set
           Dots in names are translated into "__".
     '''
     options = self.options
