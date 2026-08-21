@@ -309,18 +309,6 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
     '''
     self.tags.update(*update_a, **update_kw)
 
-  @property
-  def entity(self):
-    ''' The `TagSet.entity` property.
-    '''
-    return self.tags.entity
-
-  @property
-  def entity_(self):
-    ''' The `TagSet.entity_` property.
-    '''
-    return self.tags.entity_
-
   #######################################################
   # Methods supports FormatableMixin
 
@@ -447,6 +435,87 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
       ref_field = self.type_subname
     print(f'{ref_subtype} {ref_field}')
     breakpoint()
+
+  #################################################################
+  # The .entity and .entity_ namespaces, mapping to other Entity
+  # instances from the id.* tags.
+
+  class _EntityMap:
+    ''' The `.entity` attribute space.
+    '''
+
+    def __init__(self, tags, missing_ok=False):
+      self.tags = tags
+      self.missing_ok = missing_ok
+
+    def __getattr__(self, zone) -> "Entity":
+      ''' Consult the tag `id.{zone}` and return the corresponding
+          entity from the appropriate `Entities` instance.
+
+          Example:
+
+              tags = TagSet({'id.playon':'recording.1234567'})
+              playon_recording = tags.entity.playon
+      '''
+      zone_id_tag = f'id.{zone}'
+      try:
+        zone_key = self.tags[zone_id_tag]
+      except KeyError as e:
+        if self.missing_ok:
+          return None
+        raise AttributeError(f'no .entity.{zone}: {e}') from e
+      entity_id = f'{zone}.{zone_key}'
+      return Entities.by_entity_id(entity_id)
+
+    def __iadd__(self, ent: str | ZonedTypes):
+      ''' Store a reference to `ent` as the tag `ent.type_zone` with value `ent.zone_key`.
+      '''
+      if isinstance(ent, str):
+        zone, subname, key = ZonedTypes.type_parts_of(ent)
+      else:
+        zone, subname, key = ent.type_parts
+      self.tags[f'id.{zone}'] = f'{subname}.{key}'
+
+    def __isub__(self, ent: ZonedTypes):
+      ''' Remove the reference to `ent` if present.
+          Raise `KeyError` if there is no reference.
+          Raise `ValueError` if the reference is to another entity.
+      '''
+      tags = self.tags
+      zone_key = tags[ent.type_zone]
+      if zone_key != ent.zone_key:
+        raise ValueError(
+            '{tags.name!r}-={ent!r}: {ent.type_zone}=zone_key refers to a different entity'
+        )
+      del tags[ent.zone_key]
+
+  @cached_property
+  def entity(self):
+    ''' The `.entity` attribute space, whose attributes map to
+        entities which are `UsesTags` instances from the appropriate
+        `Entities` instances according to their zone.
+
+          Example:
+
+              tags = TagSet({'id.playon':'recording.1234567'})
+              playon_recording = tags.entity.playon
+    '''
+    return self._EntityMap(self)
+
+  @cached_property
+  def entity_(self):
+    ''' The `.entity_` attribute space, whose attributes map to
+        entities which are `UsesTags` instances from the appropriate
+        `Entities` instances according to their zone.
+        Unlike `.entity`, a missing `id.` tag returns `None` instead
+        of raising `AttributeError`.
+
+          Example:
+
+              tags = TagSet({'id.playon':'recording.1234567'})
+              playon_recording = tags.entity.playon
+    '''
+    return self._EntityMap(self, missing_ok=True)
 
 class Entities:
   ''' A mixin to support classes which use a `.tagsets:BaseTagSets` attribute to store their data.
