@@ -77,6 +77,7 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
 )
+from cs.tagged import Entities
 from cs.tagset import (
     BaseTagSets,
     Tag,
@@ -86,7 +87,6 @@ from cs.tagset import (
     TagSetCriterion,
     TagsCommandMixin,
     TagsOntology,
-    Entities,
     as_unixtime,
     tag_or_tag_value,
 )
