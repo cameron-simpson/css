@@ -74,24 +74,6 @@ class VarInt(BinarySingleValue, value_type=int):
   @staticmethod
   def decode_bytes(data: bytes, offset=0) -> Tuple[int, int]:
     r'''Decode an extensible byte serialised unsigned `int` from `data` at `offset`.
-        Return value and new offset.
-
-        Continuation octets have their high bit set.
-        The octets are big-endian.
-
-        If you just have a `bytes` instance, this is the go. If you're
-        reading from a stream you're better off with `parse` or `parse_value`.
-
-        Examples:
-
-            >>> BSUInt.decode_bytes(b'\0')
-            (0, 1)
-
-        Note: there is of course the usual `AbstractBinary.parse_bytes`
-        but that constructs a buffer to obtain the individual bytes;
-        this static method will be more performant
-        if all you are doing is reading this serialisation
-        and do not already have a buffer.
     '''
     n = 0
     shift = 0
