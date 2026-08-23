@@ -128,6 +128,7 @@ do
     php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
     py2)
         case $pyformat in
+          NONE)   ;;
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python2 -m yapf --style "$style" -i "$srcfile" ;;
           black)  $trace black -q -t py27 "$srcfile" ;;
@@ -138,6 +139,8 @@ do
         ;;
     py3)
         case $pyformat in
+          NONE)   ;;
+          *' '*)  srcfile=$srcfile sh -c "$trace $pyformat \"\$srcfile\"" ;;
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
           black)  $trace black -q -t py38 $black_opts "$srcfile" ;;
