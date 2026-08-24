@@ -186,13 +186,16 @@ class FeedCommon(ABC):
     image_size = v('image_size')
     image_title = v('image_title')
     image_link = v('image_link')
-    if image_size:
-      image_width, image_height = image_size
+    if image_url:
+      if image_size:
+        image_width, image_height = image_size
+      else:
+        image_width = getattr(self, 'opengraph.image:width', None)
+        if image_width: image_width = int(image_width)
+        image_height = getattr(self, 'opengraph.image:height', None)
+        if image_height: image_height = int(image_height)
     else:
-      image_width = self.get('opengraph.image:width')
-      if image_width: image_width = int(image_width)
-      image_height = self.get('opengraph.image:height')
-      if image_height: image_height = int(image_height)
+      image_width, image_height = None, None
     return image_url, image_width, image_height, image_title, image_link
 
   def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
