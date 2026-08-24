@@ -22,6 +22,7 @@ from weakref import WeakValueDictionary
 from cs.context import contextif
 from cs.deco import OBSOLETE
 from cs.gimmicks import warning
+from cs.seq import not_none
 
 __version__ = '20260610-post'
 
@@ -31,7 +32,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context', 'cs.deco', 'cs.gimmicks'],
+    'install_requires': ['cs.context', 'cs.deco', 'cs.gimmicks', 'cs.seq'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -782,7 +783,7 @@ class Refreshable(ABC):
                 seen=seen,
                 **_refresh_kw,
             ),
-            self.refresh_related1(),
+            not_none(self.refresh_related1()),
         ):
           pass
         # refresh other related objects recursively
@@ -796,7 +797,7 @@ class Refreshable(ABC):
                 seen=seen,
                 **_refresh_kw,
             ),
-            self.refresh_related(),
+            not_none(self.refresh_related()),
         ):
           pass
     return was_updated
