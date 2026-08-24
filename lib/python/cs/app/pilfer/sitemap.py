@@ -18,7 +18,7 @@ import sys
 from threading import Semaphore, Thread
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Self
+from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Self, Sequence
 from uuid import UUID
 
 from bs4 import BeautifulSoup
@@ -36,6 +36,7 @@ from cs.deco import (
     uses_verbose, with_
 )
 from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE
+from cs.excutils import unattributable
 from cs.fileutils import atomic_filename
 from cs.lex import (
     cutprefix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s,
@@ -112,7 +113,7 @@ def pagemethod(method):
   if not pagename.endswith('page') or len(pagename) == 4:
     raise ValueError(
         f'cannot derive default page attribute name from {method.__name__=},'
-        ' which should end in _*nom*page, such as grok_sitepage'
+        ' which should end in _*nom*page, such as scan_sitepage'
     )
   promoting_method = promote(method)
 
@@ -1318,10 +1319,11 @@ class SiteEntity(Entity, NoAttrs):
     T("no matches")
     return None, None
 
+  @classmethod
   def matches_url(cls, url, **match_url_kw) -> bool:
     ''' Test whether `url` matches, a Boolean wrapper for `match_url()`.
     '''
-    return self.match_url(url, **match_url_kw)[0] is not None
+    return cls.match_url(url, **match_url_kw)[0] is not None
 
   def __getattr__(self, attr):
     ''' A `SiteEntity` supports various automatic attributes.
@@ -2673,7 +2675,7 @@ class SiteMap(Entities, Promotable):
     ''' Run all the scan methods in this `SiteMap` for `flowstate.url`.
         This runs:
         - `entity.scan_sitepage()` if the URL matches a `SiteEntty` sitepage pattern
-        - all the `SiteMap.scan+*` methods whose `.on_conditions` match 
+        - all the `SiteMap.scan+*` methods whose `.on_conditions` match
           `flowstate` and ``match_kw`, as matched by `SiteMap.on_matches`
           and apply the scan results (unless `no_apply` is true).
         The result of each scan, a `ScanData`, is applied to its relevant entities.
