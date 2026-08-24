@@ -1573,6 +1573,12 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     self.scan_soup(flowstate.soup, self.sitemap, scandata=scandata)
     return scandata
 
+  def grok_sitepage(self, flowstate: FlowState, match=None):
+    ''' Call `self.scan_sitepage()` and then apply it to `self`.
+    '''
+    scandata = self.scan_sitepage(flowstate)
+    scandata.apply(self)
+
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
 
