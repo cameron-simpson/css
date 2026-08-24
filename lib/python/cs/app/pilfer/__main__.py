@@ -37,7 +37,7 @@ import cs.logutils
 from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
-from cs.py.modules import extra_import
+from cs.py.modules import import_extra
 from cs.sqltags import SQLTagSet
 from cs.trace import Trace
 from cs.urlutils import URL
@@ -306,7 +306,7 @@ class PilferCommand(BaseCommand):
           print(entity.name, output_fspath)
           if options.reparse:
             print("Reparse", output_fspath)
-            rss_parser = extra_import('rss_parser', DISTINFO)
+            rss_parser = import_extra('rss_parser', DISTINFO)
             with open(output_fspath) as rssf:
               parsed = rss_parser.parse(rssf.read())
             print("Language", parsed.channel.language)
