@@ -35,7 +35,6 @@ from cs.deco import (
     attr, decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
 )
-from cs.excutils import unattributable
 from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedEntryMixin, FeedPerson
 from cs.fileutils import atomic_filename
 from cs.lex import (
