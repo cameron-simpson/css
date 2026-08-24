@@ -56,6 +56,7 @@ from cs.seq import get0, ReIterable, unrepeated
 from cs.sqltags import SQLTags
 from cs.tagset import BaseTagSets, Entity, ScanData, uses_scandata, TagSet, ZonedTypes, Entities
 from cs.threads import pmap, HasThreadState, ThreadState
+from cs.trace import Trace
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task
 from cs.urlutils import URL
@@ -168,7 +169,7 @@ class URLPattern(Promotable):
       self.to_str = to_str
 
     def __repr__(self):
-      return f'{self.__class__.__qualname__}({self.match_re},{self.from_str}->{self.to_str})'
+      return f'{self.__class__.__name__}({self.match_re},{self.from_str}->{self.to_str})'
 
   # converter specifications, a mapping of name -> (re,convert,deconvert)
   CONVERTERS = {
@@ -246,6 +247,13 @@ class URLPattern(Promotable):
     ''' Parse the pattern immediately for validation purposes.
     '''
     self._parsed = self.ParsedPattern.from_str(self.path_pattern)
+
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self.short}'
+
+  @property
+  def short(self):
+    return f'{self.hostname_fnmatch}/{self.path_pattern}'
 
   @classmethod
   def from_str(cls, pattern: str):
@@ -1261,13 +1269,15 @@ class SiteEntity(Entity, NoAttrs):
     return url_s
 
   @classmethod
+  @Trace
   @promote
   def match_url(
       cls,
       url: URL,
       *,
       pattern_name=None,
-      sitemap: Optional["SiteMap"] = None
+      sitemap: Optional["SiteMap"] = None,
+      T: Trace,
   ) -> tuple[dict | None, str | None]:
     ''' Test whether `url` matches this `SiteEntity` subclass'
         pattern named `pattern_name` (default `"sitepage_url"`).
@@ -1276,25 +1286,36 @@ class SiteEntity(Entity, NoAttrs):
         the result of `pattern.match(url)` and `pattern_name` is
         the name of the matchined pattern.
     '''
+    T("url", url.short)
     try:
       pattern_mapping = cls.url_pattern_mapping(sitemap=sitemap)
     except Exception as e:
       warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
       return None, None
-    for name, pattern in pattern_mapping.items():
-      if pattern_name is not None and name != pattern_name:
-        continue
-      ##pattern = cls.pattern(pattern_name)
-      if pattern is None:
-        continue  # an erased pattern
-      try:
-        match = pattern.match(url)
-      except Exception as e:
-        warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
-        continue
-      if match is not None:
-        match_name = name.lower().removesuffix('_pattern').removesuffix('_url')
-        return match, match_name
+    T('pattern_mapping', pattern_mapping)
+    with Trace("pattern_mapping") as T2:
+      for name, pattern in pattern_mapping.items():
+        T2(f'{name=}:{pattern.short}')
+        if pattern_name is not None and name != pattern_name:
+          T2("skip, name != pattern_name")
+          continue
+        if pattern is None:
+          T2("skip, erased pattern")
+          continue  # an erased pattern
+        T2(f'try {type(pattern).__name__}.match')
+        try:
+          match = pattern.match(url)
+        except Exception as e:
+          T2("match fails", e)
+          warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
+          continue
+        if match is not None:
+          match_name = name.lower().removesuffix('_pattern'
+                                                 ).removesuffix('_url')
+          T2("match {match_name=}", match)
+          return match, match_name
+        T2("no match")
+    T("no matches")
     return None, None
 
   def matches_url(cls, url, **match_url_kw) -> bool:
