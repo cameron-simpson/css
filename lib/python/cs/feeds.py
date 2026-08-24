@@ -18,7 +18,7 @@ from cs.bs4utils import as_xml as bs4_as_xml
 from cs.fileutils import atomic_filename
 from cs.gimmicks import warning
 from cs.lex import html_escape
-from cs.obj import Refreshable
+from cs.obj import NoAttrs, Refreshable
 from cs.seq import get0, not_none
 
 ATOM_CONTENT_TYPE = 'application/atom+xml'
@@ -138,14 +138,26 @@ class FeedCommon(ABC):
     '''
     if attr.startswith('atom_'):
       # missing atom_field looks for feed_field
-      return getattr(self, f'feed_{attr[5:]}')
-    if attr.startswith('rss_'):
+      value = getattr(self, f'feed_{attr[5:]}')
+    elif attr.startswith('rss_'):
       # missing rss_field looks for feed_field
-      return getattr(self, f'feed_{attr[4:]}')
-    if attr.startswith('feed_'):
-      # missing feed_field looks for .field
-      return lambda: getattr(self, attr[5:], None)
-    return super().__getattr__(attr)
+      value = getattr(self, f'feed_{attr[4:]}')
+    elif attr.startswith('feed_'):
+      # missing feed_field looks for .field, but returns None if missing
+      value = lambda refresh=True: getattr(self, attr[5:], None)
+    else:
+      value = super().__getattr__(attr)
+    self._feed_refreshed(value,)
+    return value
+
+  @staticmethod
+  def _feed_refreshed(obj, refresh=True):
+    ''' Refresh `obj` is it is `Refreshable`, unless `refresh` is false (default `True`).
+        Return `obj`.
+    '''
+    if refresh and isinstance(obj, Refreshable):
+      obj.refresh()
+    return obj
 
   def _feed_kwv(
       self, field: str, synd: Literal["atom", "rss"], kw, *, refresh: bool
@@ -164,8 +176,7 @@ class FeedCommon(ABC):
       method_name = f'{synd}_{field}'
       method = getattr(self, method_name)
       value = method()
-    if refresh and isinstance(value, Refreshable):
-      value.refresh()
+    self._feed_refreshed(value, refresh=refresh)
     return value
 
   def _feed_image_info(self, v, kw):
