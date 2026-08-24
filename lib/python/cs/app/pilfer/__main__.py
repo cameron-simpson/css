@@ -21,6 +21,7 @@ from typeguard import typechecked
 from cs.bs4utils import printt_soup
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
+from cs.deco import vv
 from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedMixin
 from cs.later import Later
 from cs.lex import (
@@ -38,6 +39,7 @@ import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.py.modules import extra_import
 from cs.sqltags import SQLTagSet
+from cs.trace import Trace
 from cs.urlutils import URL
 
 from . import (
@@ -51,7 +53,6 @@ from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
 from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
-
 
 def main(argv=None):
   ''' Pilfer command line function.
@@ -202,12 +203,19 @@ class PilferCommand(BaseCommand):
     if not argv:
       raise GetoptError('missing site-entity')
     entity_spec = argv.pop(0)
-    try:
-      ent = self.options.pilfer.entity_for(entity_spec)
-    except ValueError as e:
-      raise GetoptError(f'invalid {entity_spec=}')
-    if ent is None:
-      raise GetoptError(f'no match for {entity_spec=}')
+    with Trace(f'popentity {entity_spec=}') as T:
+      try:
+        ent = self.options.pilfer.entity_for(entity_spec)
+      except ValueError as e:
+        T("Pilfer.entity_for fails", e)
+        T.printt()
+        raise GetoptError(f'invalid {entity_spec=}')
+      if ent is None:
+        T("no match")
+        T.printt()
+        raise GetoptError(f'no match for {entity_spec=}')
+    T("ent", str(ent))
+    vv(T.printt)()
     return ent
 
   @staticmethod
