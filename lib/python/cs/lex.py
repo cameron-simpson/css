@@ -215,7 +215,7 @@ def strlist(ary: Iterable, sep: str = ", ") -> str:
   return sep.join([str(a) for a in ary])
 
 # pylint: disable=redefined-outer-name
-def htmlify(s: str, nbsp: bool = False) -> str:
+def html_escape(s: str, nbsp: bool = False) -> str:
   ''' Convert a string for safe transcription in HTML.
 
       Parameters:
@@ -229,6 +229,8 @@ def htmlify(s: str, nbsp: bool = False) -> str:
   if nbsp:
     s = s.replace(" ", "&nbsp;")
   return s
+
+htmlify = OBSOLETE(html_escape)
 
 def htmlquote(s: str) -> str:
   ''' Quote a string for use in HTML.
