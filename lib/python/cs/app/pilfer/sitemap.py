@@ -35,8 +35,8 @@ from cs.deco import (
     attr, decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
 )
-from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE
 from cs.excutils import unattributable
+from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedEntryMixin, FeedPerson
 from cs.fileutils import atomic_filename
 from cs.lex import (
     cutprefix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s,
@@ -55,7 +55,8 @@ from cs.rfc2616 import (
 )
 from cs.seq import get0, ReIterable, unrepeated
 from cs.sqltags import SQLTags
-from cs.tagset import BaseTagSets, Entity, ScanData, uses_scandata, TagSet, ZonedTypes, Entities
+from cs.tagged import Entity, Entities, ScanData, uses_scandata
+from cs.tagset import BaseTagSets, TagSet, ZonedTypes
 from cs.threads import pmap, HasThreadState, ThreadState
 from cs.trace import Trace
 from cs.units import BINARY_BYTES_SCALE
@@ -1031,7 +1032,7 @@ def with_base_url(method):
 
   return based_method
 
-class SiteEntity(Entity, NoAttrs):
+class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
   ''' A base class for entities associated with a `SiteMap`.
 
       This provides the following additional facilities:
@@ -1860,6 +1861,26 @@ class SiteEntity(Entity, NoAttrs):
     self.add('downloaded')
     return save_filename
 
+  ########################################################################
+  # FeedEntryMixin methods
+
+  def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
+    ''' Return a list of `FeedPerson`s.
+
+        This default implementation assumes that `self` looks like
+        ` cs.tagset.Entity` and that `self.author_ents` produces
+        an iterable of objects which look like `SiteEntity` instances,
+        which have a `.fullname` attribute and which may have
+        `.email` and `.sitepage_url` attributes.
+    '''
+    return [
+        FeedPerson.from_SiteEntity(ent, refresh=refresh)
+        for ent in self.author_ents
+    ]
+
+  def feed_author(self, *, refresh=False) -> FeedPerson | None:
+    return get0(self.feed_authors(refresh=refresh))
+
   def feed_entry_signature(self, *, refresh=False, **refresh_kw):
     ''' A signature for this entty's content.
         This default implemnetation just returns the time of last refresh.
@@ -1870,6 +1891,29 @@ class SiteEntity(Entity, NoAttrs):
         name=self.name,
         refresh_last_update=self.get('refresh_last_update', 0),
     )
+
+  def feed_id(self):
+    return self.name
+
+  def feed_image_url(self):
+    return self.get('opengraph.image', {}).get('image')
+
+  def feed_last_build_timestamp(self, *, refresh=False, **refresh_kw) -> float:
+    ''' Return an updated timestamp for this feed based on the signatures of its entries.
+    '''
+    return self.update_timestamp(
+        'feed_content',
+        [
+            entry.feed_entry_signature(refresh=refresh, **refresh_kw)
+            for entry in self.feed_entries()
+        ],
+    )
+
+  def feed_link(self):
+    ''' The default link to the origin, from `self.sitepage_url`.
+    '''
+    return self.sitepage_url
+
 paginated = SiteEntity.paginated
 
 @dataclass
