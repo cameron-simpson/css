@@ -1923,6 +1923,27 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     '''
     return self.sitepage_url
 
+  ##################################################################
+  # BS4 methods.
+  @staticmethod
+  def bs4(tag_name, *contents, **attrs) -> BS4Tag:
+    ''' Create a BS4 `Tag` instance.
+    '''
+    tag = BS4Tag(name=tag_name, attrs=attrs)
+    tag.extend(contents)
+    return tag
+
+  def anchor(self, text=None) -> BS4Tag:
+    ''' Return an HTML anchor to this entity as a BS4 `Tag`.
+    '''
+    if text is None:
+      text = self.title
+    return self.bs4(
+        'a',
+        text,
+        href=self.sitepage_url,
+    )
+
 paginated = SiteEntity.paginated
 
 @dataclass
