@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from datetime import date, datetime, timezone
 from functools import cached_property
 from io import TextIOBase
+from os.path import splitext
 import sys
 from typing import final, Iterable, Literal, Sequence
 
@@ -636,6 +637,11 @@ class FeedEntryMixin(FeedCommon, ABC):
         v, kw
     )
     image_title = v('image_title')
+    if image_url:
+      image_ext = splitext(image_url)[1][1:].lower()
+      image_content_type = 'image/' + {
+          'jpg': 'jpeg',
+      }.get(image_ext, image_ext)
     link = v('link')
     pub_date = v('pub_date')
     title = v('title')
