@@ -200,23 +200,6 @@ class FeedCommon(ABC):
       image_width, image_height = None, None
     return image_url, image_width, image_height, image_title, image_link
 
-  def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
-    ''' Return a list of `FeedPerson`s.
-
-        This default implementation assumes that `self` looks like
-        ` cs.tagset.Entity` and that `self.author_ents` produces
-        an iterable of objects which look like `SiteEntity` instances,
-        which have a `.fullname` attribute and which may have
-        `.email` and `.sitepage_url` attributes.
-    '''
-    return [
-        FeedPerson.from_SiteEntity(ent, refresh=refresh)
-        for ent in self.author_ents
-    ]
-
-  def feed_author(self, *, refresh=False) -> FeedPerson | None:
-    return get0(self.feed_authors(refresh=refresh))
-
   @final
   @staticmethod
   def atom_date_string(dt: float | str | date | datetime):
@@ -224,6 +207,7 @@ class FeedCommon(ABC):
         as an RFC3339 date and time with a 4 digit year.
 
         Atom date constructs: https://www.rfc-editor.org/info/rfc4287/#section-3.3
+        RFC3339 Internet Date/Time Format: https://www.rfc-editor.org/info/rfc3339/#section-5.6
     '''
     # turn dt into a UTC datetime
     if isinstance(dt, datetime):
@@ -261,11 +245,6 @@ class FeedCommon(ABC):
     '''
     return f'{self.__class__.__module__}:{self.__class__.__name__}'
 
-  def feed_link(self):
-    ''' The default link to the origin, from `self.sitepage_url`.
-    '''
-    return self.sitepage_url
-
   @final
   @staticmethod
   def rss_date_string(dt: float | str | date | datetime):
@@ -289,21 +268,11 @@ class FeedCommon(ABC):
         )
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
-  def feed_pubdate(self) -> None | str:
-    ''' Return the publication date, or `None` if not available.
-    '''
-    return None
-
-  def rss_author(self, refresh=False):
+  def rss_author(self):
     ''' RSS presents the author email in its `author` tag.
     '''
-    return self.feed_author(refreh=refresh).email
-
-  def feed_description(self):
-    return getattr(self, 'description', '')
-
-  def feed_image_url(self):
-    return self.get('opengraph.image')
+    author = self.feed_author()
+    return None if author is None else getattr(author, 'email', None)
 
   def feed_image_title(self):
     return self.feed_title()
@@ -370,23 +339,6 @@ class FeedCommon(ABC):
 class FeedMixin(FeedCommon, ABC):
   '''" The Atom/Rss feed top level.
   '''
-
-  def feed_last_build_timestamp(self, *, refresh=False, **refresh_kw) -> float:
-    ''' Return an updated timestamp for this feed based on the signatures of its entries.
-    '''
-    return self.update_timestamp(
-        'feed_content',
-        [
-            entry.feed_entry_signature(refresh=refresh, **refresh_kw)
-            for entry in self.feed_entries()
-        ],
-    )
-
-  @abstractmethod
-  def feed_entries(self) -> Iterable["FeedEntryMixin"]:
-    ''' Return an iterable of `FeedEntryMixin` instances.
-    '''
-    raise NotImplementedError
 
   def feed_save(
       self,
