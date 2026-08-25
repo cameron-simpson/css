@@ -1443,7 +1443,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     return url_s
 
   def refresh(self, resource: Optional = None, *, map=pmap, **refresh_kw):
-    ''' We refresh related items in parallel.
+    ''' We refresh related items in parallel by default.
     '''
     return super().refresh(resource=resource, map=map, **refresh_kw)
 
