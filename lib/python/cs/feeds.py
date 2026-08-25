@@ -462,23 +462,31 @@ class FeedMixin(FeedCommon, ABC):
     E = self.ATOM_MAKER
     v = lambda field: self._feed_kwv(field, "atom", kw, refresh=refresh)
     if refresh: self.refresh()
+    authors = self.atom_authors(refresh=refresh)
     title = v('title')
+    link = v('link')
     atom = E.feed(
-        # atomCommonAttributes,
-        title and E.title(title),
-        # subtitle
-        E.generator(v('generator')),
-        E.updated(self.atom_date_string(self.atom_last_build_timestamp())),
-        *(
-            author.for_atom(E=E)
-            for author in self.atom_authors(refresh=refresh)
+        *not_none(
+            (
+                # atomCommonAttributes,
+                title and E.title(title),
+                # subtitle
+                E.generator(v('generator')),
+                E.updated(
+                    self.atom_date_string(self.atom_last_build_timestamp())
+                ),
+                *(author.for_atom(E=E) for author in (authors or ())),
+                link and E.link(link),
+                # icon - from the favicon
+                # logo
+                # rights
+                *(
+                    entry.atom(feed=self, refresh=refresh)
+                    for entry in v('entries')
+                ),
+                # extensionElement
+            )
         ),
-        E.link(v('link')),
-        # icon - from the favicon
-        # logo
-        # rights
-        *(entry.atom(feed=self, refresh=refresh) for entry in v('entries')),
-        # extensionElement
         xmlns=ATOM_NS,
     )
     if kw:
