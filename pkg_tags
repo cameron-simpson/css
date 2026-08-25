@@ -111,6 +111,7 @@ cs.testutils ok_revision="0972084494fc61d065c4a0864224eff7c0c94781" features={"2
 cs.threads ok_revision=fa1689394ee248e9a28a8b317eca7fd5a464af99 pypi.release="20260610" features={"20230125":["HasThreadState"],"20230212":["HasThreadState_Thread"],"20230331":["joinif"],"20240412":["HasThreadState__pre_enter_objects","NRLock"],"20260526":["pmap"]}
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
+cs.trace
 cs.tty
 cs.typeutils
 cs.typingutils ok_revision=f80b38e898d4b414dc6a51dc1658c49adbd19c7b features={"20230331":["subtype"],"20250428":["is_optional"],"20260525":["EQSortable","Sortable"]} pypi.release="20260525"
