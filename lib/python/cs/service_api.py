@@ -35,7 +35,7 @@ from cs.obj import Refreshable
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.sqltags import SQLTagSet, UsesSQLTags
-from cs.tagset import Entity, Entities
+from cs.tagged import Entity, Entities
 from cs.threads import pmap
 from cs.upd import run_task
 
