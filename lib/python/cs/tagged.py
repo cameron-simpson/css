@@ -41,6 +41,7 @@ from cs.lex import format_attribute, FormatMapping, FormatableMixin, printt, r
 from cs.logutils import warning, vwarning, vvwarning
 from cs.obj import public_subclasses, Refreshable, NoAttrs
 from cs.pfx import pfx_call, pfx_method
+from cs.progress import progressbar
 from cs.tagset import TagSet, ZonedTypes
 from cs.trace import Trace
 
@@ -870,8 +871,9 @@ class ScanData:
       tuple indexing, in order to resolve the index to an `Entity`.
   '''
 
-  def __init__(self, entities: Entities | None = None):
+  def __init__(self, entities: Entities | None = None, *, name: str = None):
     # mapping of Entity instances to a data dict
+    self.name = name
     self.entities = entities
     self.ent_data_map = defaultdict(dict)
 
@@ -942,7 +944,11 @@ class ScanData:
         This follows the tag name design outlined in the `Entity` docstring,
         where API/site data are stored with tags named *zone*`.`*field*.
     '''
-    for ent, data in self:
+    ent_data = list(self)
+    for ent, data in progressbar(
+        ent_data,
+        f'{self.__class__.__name__}{repr(self.name) if self.name else ""}.apply',
+    ):
       if ent in refresh_ents:
         # if this is the sitepage, consider the entity refreshed
         ent.refresh(data=data)
