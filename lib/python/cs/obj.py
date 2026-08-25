@@ -213,7 +213,7 @@ def obj_as_dict(o, **kw):
   '''
   raise RuntimeError("please use cs.obj.as_dict")
 
-class Proxy(object):
+class Proxy:
   ''' An extremely simple proxy object
       that passes all unmatched attribute accesses to the proxied object.
 
@@ -277,7 +277,7 @@ class NoAttrs:
     '''
     raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
 
-class TrackedClassMixin(object):
+class TrackedClassMixin:
   ''' A mixin to track all instances of a particular class.
 
       This is aimed at checking the global state of objects of a
@@ -605,8 +605,8 @@ class Refreshable(ABC):
   def refresh_needed(
       self,
       *,
-      lifespan: float = None,
-      now: float = None,
+      lifespan: float | None = None,
+      now: float | None = None,
   ) -> bool:
     ''' Test whether `self` is considered stale.
 
@@ -647,9 +647,9 @@ class Refreshable(ABC):
       *,
       data=None,
       force=False,
-      lifespan: float = None,
+      lifespan: float | None = None,
       map=builtins.map,
-      ratelimit: float = None,
+      ratelimit: float | None = None,
       recurse=False,
       seen=None,
       **_refresh_kw,  # passed to self._refresh()
