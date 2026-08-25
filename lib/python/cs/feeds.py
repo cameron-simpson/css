@@ -9,6 +9,8 @@ from functools import cached_property
 from io import TextIOBase
 from os.path import splitext
 import sys
+import time
+from types import SimpleNamespace as NS
 from typing import final, Iterable, Literal, Sequence
 
 from bs4.element import Tag as BS4Tag
@@ -372,9 +374,9 @@ class FeedMixin(FeedCommon, ABC):
     '''
     if isinstance(file, str):
       if file == "-":
-        return self.atom_save(sys.stdout, xmlv=xmlv, **gen_kw)
+        return self.feed_save(sys.stdout, xml, xmlv=xmlv, **gen_kw)
       with atomic_filename(file, mode='w', exists_ok=exists_ok) as T:
-        return self.atom_save(T, xmlv=xmlv, **gen_kw)
+        return self.feed_save(T, xml, xmlv=xmlv, **gen_kw)
     if callable(xml):
       xml = xml(**gen_kw)
     else:
@@ -382,7 +384,7 @@ class FeedMixin(FeedCommon, ABC):
     if not isinstance(xml, str):
       xml = xml_tostring(xml, encoding='unicode', pretty_print=True)
     if xmlv:
-      print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
+      print('<?xml version="1.0" encoding="UTF-8"?>', file=file)
     print(xml, end='', file=file)
 
   def atom_save(self, file: TextIOBase | str, **feed_save_kw):
@@ -479,12 +481,6 @@ class FeedMixin(FeedCommon, ABC):
     title = v('title') or repr(self)
     rss = E.rss(
         E.channel(
-            E.title(title),
-            E.link(link),
-            E.description(description),
-            E.generator(v('generator')),
-            E.lastBuildDate(self.rss_date_string(build_timestamp)),
-            E.docs('https://www.rssboard.org/rss-specification'),
             *not_none(
                 (
                     E.title(title),
@@ -549,14 +545,16 @@ class FeedEntryMixin(FeedCommon, ABC):
       self.refresh()
     E = self.ATOM_MAKER
     v = lambda field: self._feed_kwv(field, "atom", kw, refresh=refresh)
-    author = v('author') or feed.atom_author()
+    author = v('author')
     categories = v('categories') or ()
     description = v('description')
+    feed_id = self.atom_id()
     image_url, image_width, image_height, image_title, image_link = self._feed_image_info(
         v, kw
     )
     link = v('link')
     pub_date = v('pub_date')
+    title = self.atom_title()
     atom = E.entry(
         *not_none(
             (
