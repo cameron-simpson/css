@@ -301,10 +301,7 @@ from pprint import pformat
 import re
 import sys
 import time
-from typing import (
-    Any, Iterable, Mapping, Optional, Sequence,
-    Tuple, Union
-)
+from typing import (Any, Iterable, Mapping, Optional, Sequence, Tuple, Union)
 from uuid import UUID, uuid4
 
 from icontract import require
@@ -319,7 +316,8 @@ from cs.fileutils import atomic_filename, shortpath
 from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
-    is_dotted_identifier, is_identifier, skipwhite, FormatableMixin, format_attribute, FStr, printt, r, s
+    is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
+    format_attribute, FStr, printt, r, s
 )
 from cs.logutils import setup_logging, warning, ifverbose
 from cs.mappings import (
