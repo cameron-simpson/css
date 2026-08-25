@@ -51,7 +51,7 @@ from cs.rfc2616 import content_length
 from cs.seq import unrepeated
 from cs.service_api import HTTPServiceAPI, LoginState, RequestsNoAuth
 from cs.sqltags import SQLTags
-from cs.tagset import Entity, Entities
+from cs.tagged import Entity, Entities
 from cs.threads import pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
@@ -127,7 +127,7 @@ def main(argv=None):
 
 class PlayOnLoginState(LoginState):
 
-  def _refresh(self, _, data=None):
+  def _refresh(self, *, data=None):
     if data is not None:
       self._state = data
     else:
@@ -415,7 +415,7 @@ class _PlayOnEntity(Entity):
   # which zone holds these entities
   TYPE_ZONE = 'playon'
 
-  def _refresh(self, resource, data=None):
+  def _refresh(self, *, data=None):
     if data is None:
       warning("no individual {self.__class__.__name__}._refresh method")
       return False
@@ -707,13 +707,12 @@ class PlayOn(Entities, Refreshable):
       index = Recording, index
     return super().__getitem__(index)
 
-  def _refresh(self, targets=None, *, data=None):
+  def _refresh(self, *, data=None):
     ''' Refresh the `PlayOn` as a whole.
         Presently this fetches the queue and the library (concurrently).
     '''
     assert data is None
-    if targets is None:
-      targets = (self.recordings, self.queue)
+    targets = (self.recordings, self.queue)
     for _ in pmap(lambda f: f(), targets):
       pass
     return True
