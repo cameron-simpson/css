@@ -20,7 +20,7 @@ from typing import Iterable, Optional
 from weakref import WeakValueDictionary
 
 from cs.context import contextif
-from cs.deco import OBSOLETE
+from cs.deco import attr, OBSOLETE
 from cs.gimmicks import warning
 from cs.seq import not_none
 
@@ -646,6 +646,7 @@ class Refreshable(ABC):
     '''
     return id(self)
 
+  @attr(_lock=Lock())
   def refresh(
       self,
       resource: Optional = None,
@@ -710,7 +711,7 @@ class Refreshable(ABC):
 
         Supposing you're refreshing a section topic in a news site;
         you might recursively refresh all the articles in the topic
-        and the authors of the articules. However you likely also
+        and the authors of the articles. However you likely also
         want to refresh other objects related to the topic, perhaps
         the table of topics and other things; recursing into those
         objects might refresh everything on the entire site.
@@ -727,18 +728,25 @@ class Refreshable(ABC):
         It is probably a mistake to call this with non-`None` `data`
         and `recurse` true. It will be accepts and the `data` applied
         to `self` and the recursion done without `data`.
+        (Now we raise `ValueError` for this.)
     '''
+    if recurse and data is not None:
+      raise ValueError(
+          f'{self.__class__.__name__}.refresh({recurse=},{data=}): recurse may not be true if data is not None'
+      )
     lifespan0 = lifespan
     ratelimit0 = ratelimit
-    lock = getattr(self, 'refresh_lock', None)
     key = self.refresh_key()
-    with contextif(lock):
+    with Refreshable.refresh._lock:
       if seen is None:
         seen = set()
       else:
         if key in seen:
           return False
       seen.add(key)
+    # we do not use the lock if there are data
+    lock = getattr(self, 'refresh_lock', None) if data is None else None
+    with contextif(lock):
       if ratelimit is None:
         # optional instance attribute
         ratelimit = getattr(
