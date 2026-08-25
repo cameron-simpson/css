@@ -56,7 +56,7 @@ from cs.seq import get0, ReIterable, unrepeated
 from cs.sqltags import SQLTags
 from cs.tagged import Entity, Entities, ScanData, uses_scandata
 from cs.tagset import BaseTagSets, TagSet, ZonedTypes
-from cs.threads import pmap, HasThreadState, ThreadState
+from cs.threads import pmap, HasThreadState, NRLock, ThreadState
 from cs.trace import Trace
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task
@@ -1078,6 +1078,10 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
       cls.url_re = (
           URL_RE if isinstance(URL_RE, re.Pattern) else re.compile(URL_RE)
       )
+
+  @cached_property
+  def refresh_lock(self):
+    return NRLock(self.name)
 
   @classmethod
   def default_class_sitemap(cls, zone=None) -> "SiteMap":
