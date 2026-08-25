@@ -119,6 +119,7 @@ class FeedCommon(ABC):
             sy="http://purl.org/rss/1.0/modules/syndication/",
             slash="http://purl.org/rss/1.0/modules/slash/",
             webfeeds="http://webfeeds.org/rss/1.0",
+            media="http://search.yahoo.com/mrss/",
         ),
     )
 
@@ -657,7 +658,13 @@ class FeedEntryMixin(FeedCommon, ABC):
                         image_height and E.height(str(image_height)),
                     )
                 ),
+                image_url and E.enclosure(
+                    type=image_content_type,
+                    url=image_url,
+                ),
                 description and E.description(description),
+                ## TODO namespaced tags? https://lxml.de/tutorial.html#namespaces
+                ## image_url and E('media:thumbnail', url=image_url),
             ),
         ),
     )
