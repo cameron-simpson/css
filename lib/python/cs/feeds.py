@@ -489,7 +489,6 @@ class FeedMixin(FeedCommon, ABC):
       self,
       *,
       build_timestamp=None,
-      image_size=None,
       refresh=False,
       **kw,
   ):
@@ -517,7 +516,7 @@ class FeedMixin(FeedCommon, ABC):
     )
     language = v('language')
     link = v('link')
-    title = v('title')
+    title = v('title') or repr(self)
     rss = E.rss(
         E.channel(
             E.title(title),
@@ -528,20 +527,34 @@ class FeedMixin(FeedCommon, ABC):
             E.docs('https://www.rssboard.org/rss-specification'),
             *not_none(
                 (
-                    language and E.language(language),
-                    *map(E.category, categories),
-                    image_url and E.image(
-                        *not_none(
-                            E.url(image_url),
-                            image_title and E.title(image_title),
-                            E.link(link),
-                            image_width and E.width(str(image_width)),
-                            image_height and E.height(str(image_height)),
+                    E.title(title),
+                    E.link(link),
+                    description and E.description(description),
+                    E.generator(v('generator')),
+                    E.lastBuildDate(self.rss_date_string(build_timestamp)),
+                    E.docs('https://www.rssboard.org/rss-specification'),
+                    *not_none(
+                        (
+                            language and E.language(language),
+                            *map(E.category, categories),
+                            image_url and E.image(
+                                *not_none(
+                                    E.url(image_url),
+                                    image_title and E.title(image_title),
+                                    E.link(link),
+                                    image_width and E.width(str(image_width)),
+                                    image_height
+                                    and E.height(str(image_height)),
+                                )
+                            ),
                         )
                     ),
+                    *(
+                        item.rss(feed=self, refresh=refresh)
+                        for item in v('entries')
+                    ),
                 )
-            ),
-            *(item.rss(feed=self, refresh=refresh) for item in v('entries')),
+            )
         ),
         version="2.0",
     )
@@ -587,10 +600,10 @@ class FeedEntryMixin(FeedCommon, ABC):
     atom = E.entry(
         *not_none(
             (
-                E.id(self.name, isPermaLink="false"),
-                E.title(v('title')),
+                feed_id and E.id(feed_id, isPermaLink="false"),
+                title and E.title(title),
                 author and author.for_atom('author', E=E),
-                E.link(v('link')),
+                link and E.link(link),
                 *map(E.category, categories),
                 pub_date and E.pubDate(self.atom_date_string(pub_date)),
                 image_url and E.image(
@@ -622,6 +635,8 @@ class FeedEntryMixin(FeedCommon, ABC):
         It can be converted to text with `ElementTree.tostring()`.
 
         Optional parameters:
+        * `feed`: optional `FeedMixin` requesting this entry RSS;
+          can be a source of fields this entry may lack
         * `refresh`: optiona flag, default `False`; if true call `self.refresh()`
         Other keyword parameters override the defaults for various RSS tags.
     '''
@@ -629,7 +644,7 @@ class FeedEntryMixin(FeedCommon, ABC):
       self.refresh()
     E = self.RSS_MAKER
     v = lambda field: self._feed_kwv(field, "rss", kw, refresh=refresh)
-    author = v('author') or feed.rss_author()
+    author = v('author') or (feed and feed.rss_author())
     categories = v('categories') or ()
     creator = v('creator')
     description = v('description')
@@ -657,11 +672,13 @@ class FeedEntryMixin(FeedCommon, ABC):
                 pub_date and E.pubDate(self.rss_date_string(pub_date)),
                 image_url and E.image(
                     *not_none(
-                        E.url(image_url),
-                        image_title and E.title(image_title),
-                        E.link(link),
-                        image_width and E.width(str(image_width)),
-                        image_height and E.height(str(image_height)),
+                        (
+                            E.url(image_url),
+                            image_title and E.title(image_title),
+                            E.link(link),
+                            image_width and E.width(str(image_width)),
+                            image_height and E.height(str(image_height)),
+                        )
                     )
                 ),
                 image_url and E.enclosure(
