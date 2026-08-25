@@ -1442,10 +1442,10 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
       url_s = self.urlto(url_s)
     return url_s
 
-  def refresh(self, resource: Optional = None, *, map=pmap, **refresh_kw):
+  def refresh(self, *, map=pmap, **refresh_kw):
     ''' We refresh related items in parallel by default.
     '''
-    return super().refresh(resource=resource, map=map, **refresh_kw)
+    return super().refresh(map=map, **refresh_kw)
 
   @property
   def refresh_resource(self):
@@ -1466,9 +1466,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
   @pfx_method
   @uses_runstate
   @uses_verbose
-  def _refresh(
-      self, url=None, *, data=None, runstate: RunState, verbose: bool
-  ):
+  def _refresh(self, *, data=None, runstate: RunState, verbose: bool):
     ''' The default `_refresh` method runs
         `self.scan_sitepage(self.sitepage_url)` and applies the resulting
         `ScanData` instance to the relevant (detected/recognised) entities.
@@ -1479,16 +1477,15 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     if data is not None:
       self.type_zone_update(data)
       return True
-    if url is None:
-      try:
-        url = self._url
-      except AttributeError:
-        url = getattr(self, 'sitepage_url', None)
-        if url is None:
-          warning(
-              f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
-          )
-          return False
+    try:
+      url = self._url
+    except AttributeError:
+      url = getattr(self, 'sitepage_url', None)
+      if url is None:
+        warning(
+            f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
+        )
+        return False
     if isinstance(url, URL):
       url = str(url)
     url = self.clean_url(url)
@@ -2397,10 +2394,12 @@ class SiteMap(Entities, Promotable):
         pass
       else:
         try:
-          entity.refresh(update_from)
+          scandata = entity.scan_sitepage(update_from)
         except Exception as e:
           warning("exception for update_from=%s: %s", r(update_from), s(e))
           raise  # debug
+        else:
+          scandata.apply(entity)
       yield entity
 
   @staticmethod
