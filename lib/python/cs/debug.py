@@ -78,6 +78,7 @@ from cs.py.stack import caller, frames
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.threads import HasThreadState, ThreadState
+from cs.trace import Trace
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
