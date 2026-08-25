@@ -16,12 +16,11 @@ from threading import Lock
 import time
 import traceback
 from types import SimpleNamespace
-from typing import Iterable, Optional
+from typing import Iterable
 from weakref import WeakValueDictionary
 
 from cs.context import contextif
 from cs.deco import attr, OBSOLETE
-from cs.gimmicks import warning
 from cs.seq import not_none
 
 __version__ = '20260610-post'
@@ -32,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context', 'cs.deco', 'cs.gimmicks', 'cs.seq'],
+    'install_requires': ['cs.context', 'cs.deco', 'cs.seq'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -572,10 +571,11 @@ class Sentinel:
 
 class Refreshable(ABC):
   ''' A mixin for refreshable objects.
-      The object must provide a `_refresh(resource)` method
-      which tries to refresh from `resource`.
+      The object must provide a `_refresh()` method, returning
+      `True` if the object was updated and false otherwise.
 
-      This mixin provides a `.refresh()` method which implements the refresh policy.
+      This mixin provides a `.refresh()` method which implements the refresh logic
+      and various related `refresh_*` methods/properties.
   '''
 
   # default refresh lifespan is, arbitrarily,  1 week
@@ -584,14 +584,9 @@ class Refreshable(ABC):
   REFRESH_RATELIMIT = 1.0
 
   @abstractmethod
-  def _refresh(self, resource=None, *, data=None) -> bool:
-    ''' Refresh the object from `resource`, typically an URL.
+  def _refresh(self, *, data=None) -> bool:
+    ''' Refresh the object.
         Return `True` if the object was updated, `False` otherwise.
-
-        If `resource` is not supplied to `refresh()` its default
-        value will be obtained from the `self.refresh_resource`
-        property, and supplied diectly here - there is no need to
-        compute a default from `self ` here.
 
         If `data` is not `None`, apply `data` to `self` and return `True`
         instead of making whatever API call or other action that would
@@ -649,7 +644,6 @@ class Refreshable(ABC):
   @attr(_lock=Lock())
   def refresh(
       self,
-      resource: Optional = None,
       *,
       data=None,
       force=False,
@@ -668,16 +662,11 @@ class Refreshable(ABC):
 
         The refresh policy is: if `force` or (the object's information
         is stale and the rate limit does not preclude a refresh),
-        call `self._refresh(resource)`.
+        call `self._refresh()`.
         This is measured by `self.refresh_needed()`.
 
         State about the refresh poll times is kept in
         `self.refresh_last_poll` and `self.refresh_last_update`.
-
-        Positional parameters:
-        * `resource`: optional reference resource, default from the
-          `self.refresh_resource` property, passed to `self._refresh()`
-          as its first argument
 
         Keyword parameters:
         * `data`: optional object providing the refresh data,
@@ -771,8 +760,7 @@ class Refreshable(ABC):
         if data is None:
           # the refresh will be doing a poll, whatever that means
           self.refresh_last_poll = now
-        resource = getattr(self, 'refresh_resource', None)
-        was_updated = self._refresh(resource, data=data, **_refresh_kw)
+        was_updated = self._refresh(data=data, **_refresh_kw)
         # catch accidental None, mostly
         assert isinstance(was_updated, bool), \
             f'{self._refresh=} -> not a bool: {type(was_updated)} {was_updated=}'
@@ -810,11 +798,11 @@ class Refreshable(ABC):
           pass
     return was_updated
 
-  def refreshed(self, resource: Optional = None, **refresh_kw):
+  def refreshed(self, **refresh_kw):
     ''' A variant on `refresh()` which returns `self` to support chaining.
         This isn't the default because that's not Pythonic.
     '''
-    self.refresh(resource, **refresh_kw)
+    self.refresh(**refresh_kw)
     return self
 
 def public_subclasses(cls, extras=()):
