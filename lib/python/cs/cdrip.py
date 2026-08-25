@@ -287,7 +287,7 @@ class _MBEntity(Entity):
   MB_QUERY_PREFIX_ = f'{MB_QUERY_PREFIX}.'
   MB_QUERY_RESULT_TAG_NAME = f'{MB_QUERY_PREFIX}.result'
 
-  def _refresh(self, resource=None, *, data=None):
+  def _refresh(self, *, data=None):
     if data is not None:
       self.type_zone_update(data, lc_=True)
       return True
