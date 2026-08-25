@@ -267,8 +267,8 @@ class Upd(SingletonMixin, MultiOpenMixin, HasThreadState):
           (e.code == 0 if isinstance(e.code, int) else e.code is None)
       )
       self.shutdown(preserve_display=preserve_display)
-    else:
-      self.shutdown(preserve_display=False)
+      raise
+    self.shutdown(preserve_display=False)
 
   def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
