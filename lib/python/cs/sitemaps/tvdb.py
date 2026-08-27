@@ -21,7 +21,7 @@ from cs.obj import Refreshable, SingletonMixin
 from cs.resources import RunState, uses_runstate
 from cs.service_api import HTTPServiceAPI
 from cs.sqltags import SQLTags
-from cs.tagset import Entities
+from cs.tagged import Entities
 from cs.threads import pmap
 
 from requests.exceptions import HTTPError
@@ -75,12 +75,6 @@ class TVDBEntity(SiteEntity, Promotable):
     if map is None:
       map = tvdb_api.pmap
     return super().refresh(*rfa, map=map, **rfkw)
-
-  @property
-  def refresh_resource(self):
-    ''' The refresh resource, which is the API endpoint.
-    '''
-    return self.format_as(self.API_ENTITY_SUBPATH_FORMAT)
 
   @uses_tvdb
   def _refresh(self, subpath=None, *, data=None, tvdb_api: "TheTVDBAPI"):
