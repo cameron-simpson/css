@@ -45,7 +45,6 @@ from cs.progress import progressbar
 from cs.tagset import TagSet, ZonedTypes
 from cs.trace import Trace
 
-from cs.debug import trace
 
 class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
   ''' A base class for classes which have a `.tags:TagSet` attribute
@@ -378,7 +377,6 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
   #################################################################
   # Attribute suffix resolvers.
 
-  @trace
   @require(lambda attr: attr.endswith('_ent'))
   def suffix_ent(self, attr) -> Self | None:
     ''' Resolve *subtype*`_ent` to `self[type_zone.`*subtype*`.id]`
