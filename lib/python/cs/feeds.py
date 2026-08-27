@@ -18,6 +18,7 @@ from lxml.builder import ElementMaker
 from lxml.etree import tostring as xml_tostring
 
 from cs.bs4utils import as_xml as bs4_as_xml
+from cs.dateutils import as_datetime
 from cs.fileutils import atomic_filename
 from cs.gimmicks import warning
 from cs.lex import html_escape
@@ -211,26 +212,7 @@ class FeedCommon(ABC):
         Atom date constructs: https://www.rfc-editor.org/info/rfc4287/#section-3.3
         RFC3339 Internet Date/Time Format: https://www.rfc-editor.org/info/rfc3339/#section-5.6
     '''
-    # turn dt into a UTC datetime
-    if isinstance(dt, datetime):
-      dt = dt.astimezone(tz=timezone.utc)
-    elif isinstance(dt, date):
-      # pretend the date is a UTC date
-      # TODO: I would to assume a localtime date (for no very good reason)
-      # but that seems... surprisingly hard to do.
-      dt = datetime(dt.year, dt.month, dt.day, tz=timezone.utc)
-    elif isinstance(dt, float):
-      dt = datetime.fromtimestamp(dt, tz=timezone.utc)
-    elif isinstance(dt, str):
-      try:
-        dt = datetime.fromisoformat(dt)
-      except ValueError:
-        dt = datetime.strptime("%a, %d %b %Y %H:%M:%S %z")
-      dt = dt.astimezone(tz=timezone.utc)
-    else:
-      raise TypeError(
-          f'cannot convert {type(dt).__name__}:{dt!r} to a datetime'
-      )
+    dt = as_datetime(dt)
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
   def feed_categories(self) -> Sequence[str]:
@@ -256,18 +238,7 @@ class FeedCommon(ABC):
         RSS dates and times: https://www.rssboard.org/rss-profile#data-types-datetime
         RFC822 date and time specification: https://datatracker.ietf.org/doc/html/rfc822#section-5
     '''
-    if not isinstance(dt, (date, datetime)):
-      if isinstance(dt, float):
-        dt = datetime.fromtimestamp(dt, tz=timezone.utc)
-      elif isinstance(dt, str):
-        try:
-          dt = datetime.fromisoformat(dt)
-        except ValueError:
-          dt = datetime.strptime("%a, %d %b %Y %H:%M:%S %z")
-      else:
-        raise TypeError(
-            f'cannot convert {type(dt).__name__}:{dt!r} to a datetime'
-        )
+    dt = as_datetime(dt)
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
   def rss_author(self):
