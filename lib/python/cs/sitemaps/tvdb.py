@@ -226,8 +226,16 @@ class Series(TVDBEntity):
             episode.refresh()
             epitable.append(
                 [
-                    f'{episode_number} {episode.name}',
-                    f'{episode.get("tvdb.name","no tvb.name")}\n{"\n".join(wrap(episode.get("tvdb.overview","No overview."),60))}'
+                    (
+                        f'{episode_number} {episode.name}' + (
+                            episode_title and
+                            ("\n" + f'{episode_number_pad} {episode_title}')
+                        ) + "\n" +
+                        f'{episode_number_pad} {episode.get("tvdb.aired","")}'
+                    ),
+                    "\n".join(
+                        wrap(episode.get("tvdb.overview", "No overview."), 60)
+                    ),
                 ]
             )
           seatable.append(tuple(epitable))
