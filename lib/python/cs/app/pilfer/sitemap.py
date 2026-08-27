@@ -1069,15 +1069,6 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
       TYPE_SUBNAME = cls.__dict__['TYPE_SUBNAME']
     except KeyError:
       cls.TYPE_SUBNAME = cls.__name__.lower()
-    # .url_re is the compiled form of .URL_RE if present and not an re.Pattern
-    try:
-      URL_RE = cls.URL_RE
-    except AttributeError:
-      pass
-    else:
-      cls.url_re = (
-          URL_RE if isinstance(URL_RE, re.Pattern) else re.compile(URL_RE)
-      )
 
   @cached_property
   def refresh_lock(self):
