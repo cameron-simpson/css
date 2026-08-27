@@ -81,10 +81,7 @@ class TVDBEntity(SiteEntity, Promotable):
     ''' Refresh this entity from the TVDB API.
     '''
     if data is None:
-      if subpath is None:
-        raise ValueError(
-            f'no data or subpath provided to {self.__class__.__name__}:{self.name}._refresh()'
-        )
+      subpath = self.format_as(self.API_ENTITY_SUBPATH_FORMAT)
       api_id = int(self.type_key)
       try:
         data = tvdb_api / subpath
