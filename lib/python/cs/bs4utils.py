@@ -35,35 +35,6 @@ def child_tags(tag, child_name: str = None) -> Iterable[BS4Tag]:
                                       or child.name == child_name):
       yield child
 
-def table_grid(table: BS4Tag) -> list[list]:
-  ''' Given a `<TABLE>` tag, return a `list[list]` representing
-      the text contents of the table in a grid.
-      This is pretty simple minded, with initial support for `colspan=`
-      but no support for `rowspan=`.
-      `colspan` is supported by associating the same datum with multiple cells.
-      `<TH>` and `<TR>` rows are supported but not differentiated.
-      Only `<TH>` and `<TR>` which are immediate children of the `<TABLE>` tag
-      are recognised.
-      Only `<TD>` which are immediate children of `<TH>` or `<TR>` are recognised.
-  '''
-  # TODO: rowspan=
-  # TODO: pad rows? optionally?
-  rows = []
-  for tx in child_tags(table):
-    if tx.name in ('th', 'tr'):
-      row = []
-      for td in child_tags(tx, 'td'):
-        datum = td.text.strip()
-        colspan = td.get("colspan", 1)
-        try:
-          colspan = int(colspan)
-        except ValueError:
-          colspan = 1
-        for _ in range(colspan):
-          row.append(datum)
-      rows.append(row)
-  return rows
-
 @typechecked
 def tabulate_soup(
     tag: BS4Tag | NavigableString
@@ -137,11 +108,40 @@ def printt_soup(tag: BS4Tag, **printt_kw):
   printt(*table, **printt_kw)
 
 def as_xml(tag: BS4Tag, *, E=None):
-  ''' Transfor `tag` into an `lxml` XML element.
+  ''' Transform `tag` into an `lxml` XML element.
   '''
   if E is None:
     E = ElementMaker()
   return E(tag.name, *map(as_xml, tag.children), **tag.attrs)
+
+def table_grid(table: BS4Tag) -> list[list]:
+  ''' Given a `<TABLE>` tag, return a `list[list]` representing
+      the text contents of the table in a grid.
+      This is pretty simple minded, with initial support for `colspan=`
+      but no support for `rowspan=`.
+      `colspan` is supported by associating the same datum with multiple cells.
+      `<TH>` and `<TR>` rows are supported but not differentiated.
+      Only `<TH>` and `<TR>` which are immediate children of the `<TABLE>` tag
+      are recognised.
+      Only `<TD>` which are immediate children of `<TH>` or `<TR>` are recognised.
+  '''
+  # TODO: rowspan=
+  # TODO: pad rows? optionally?
+  rows = []
+  for tx in child_tags(table):
+    if tx.name in ('th', 'tr'):
+      row = []
+      for td in child_tags(tx, 'td'):
+        datum = td.text.strip()
+        colspan = td.get("colspan", 1)
+        try:
+          colspan = int(colspan)
+        except ValueError:
+          colspan = 1
+        for _ in range(colspan):
+          row.append(datum)
+      rows.append(row)
+  return rows
 
 if __name__ == '__main__':
   for html in (
