@@ -3,13 +3,16 @@
 ''' Some little utility functions for working with the soup from `beautifulsoup4`.
 '''
 
-from typing import Iterable
+from functools import cached_property
+from typing import Iterable, Self
 
 from bs4 import BeautifulSoup, Tag as BS4Tag, NavigableString
+from icontract import require
 from lxml.builder import ElementMaker
 from typeguard import typechecked
 
 from cs.lex import cropped_repr, printt
+from cs.gimmicks import warning
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -114,34 +117,158 @@ def as_xml(tag: BS4Tag, *, E=None):
     E = ElementMaker()
   return E(tag.name, *map(as_xml, tag.children), **tag.attrs)
 
-def table_grid(table: BS4Tag) -> list[list]:
-  ''' Given a `<TABLE>` tag, return a `list[list]` representing
-      the text contents of the table in a grid.
-      This is pretty simple minded, with initial support for `colspan=`
-      but no support for `rowspan=`.
-      `colspan` is supported by associating the same datum with multiple cells.
-      `<TH>` and `<TR>` rows are supported but not differentiated.
-      Only `<TH>` and `<TR>` which are immediate children of the `<TABLE>` tag
-      are recognised.
-      Only `<TD>` which are immediate children of `<TH>` or `<TR>` are recognised.
+class Widget:
+  ''' Base class for various "widget" HTML constructs, such as TABLE.
   '''
-  # TODO: rowspan=
-  # TODO: pad rows? optionally?
-  rows = []
-  for tx in child_tags(table):
-    if tx.name in ('th', 'tr'):
-      row = []
-      for td in child_tags(tx, 'td'):
-        datum = td.text.strip()
-        colspan = td.get("colspan", 1)
-        try:
-          colspan = int(colspan)
-        except ValueError:
-          colspan = 1
-        for _ in range(colspan):
-          row.append(datum)
-      rows.append(row)
-  return rows
+
+  def __init__(self, tag: BS4Tag):
+    ''' Initialise this `Widget` by saving `tag` as `self.tag` and
+        then calling `self.scan()`.
+    '''
+    self.tag = tag
+
+  @classmethod
+  def find_all(cls, soup) -> list[BS4Tag]:
+    ''' The default `find_all` finds tags from `soup` whose name matches the class name.
+    '''
+    return soup.find_all(cls.__name__.lower())
+
+  @classmethod
+  def scan(cls, soup) -> list[Self]:
+    ''' Return a list of all `Widget`s of this type found in `soup`.
+    '''
+    return [cls(tag) for tag in cls.find_all(soup)]
+
+class Table(Widget):
+  ''' A `Widget` subclass representing an HTML TABLE tag.
+  '''
+
+  def __init__(self, tag):
+    ''' Scan the TABLE for the basic structures, used for the other properties etc later.
+
+        Note that if there was no TBODY, the immediate rows of the
+        TABLE are presented as though they were in a single TBODY.
+
+        This Defined
+    '''
+    super().__init__(tag)
+    self.caption = tag.find('caption')
+    self.colgroups = tag.find_all('colgroup', recursive=False)
+    self.thead = tag.find('thead')
+    self.tbodies = tag.find_all('tbody')
+    if not self.tbodies:
+      # fake up a single TBODY if there are none
+      tbody = BS4Tag(name='tbody')
+      for tr in tag.find_all('tr', recursive=False):
+        tbody.append(tr)
+      self.tbodies = [tbody]
+    self.tfoot = tag.find('tfoot')
+
+  @staticmethod
+  def cell_colspan(cell: BS4Tag) -> int:
+    colspan = cell.attrs.get("colspan", 1)
+    try:
+      colspan = int(colspan)
+    except ValueError as e:
+      warning(f'invalid {colspan=} ({e}), using 1: {cell}')
+      colspan = 1
+    return colspan
+
+  @classmethod
+  def row_cells(cls, tr: BS4Tag) -> list[BS4Tag]:
+    ''' Return a list of the cells (TD or TH) from a TR tag.
+        This is pretty simple minded, with initial support for `colspan=`
+        but no support for `rowspan=`.
+        `colspan` is supported by referencing the same cell multiple times.
+        Only TD and TH tags which are immediate children of the TR are recognised.
+    '''
+    cells = []
+    for cell in tr.find_all(lambda tag: tag.name in ('th', 'td'),
+                            recursive=False):
+      colspan = cls.cell_colspan(cell)
+      for _ in range(colspan):
+        cells.append(cell)
+    return cells
+
+  @classmethod
+  @require(lambda section: section.name in ('thead', 'tbody', 'tfoot'))
+  def section_rows(cls, section: BS4Tag | None) -> list[list[BS4Tag]]:
+    if section is None:
+      return []
+    return [
+        cls.row_cells(tr) for tr in section.find_all('tr', recursive=False)
+    ]
+
+  @cached_property
+  def head_rows(self) -> list[list[BS4Tag]]:
+    ''' The rows from the table THEAD, if any.
+    '''
+    return self.section_rows(self.thead)
+
+  @cached_property
+  def body_rows(self) -> list[list[BS4Tag]]:
+    ''' The rows from the table TBODY tags, if any.
+        Note that if there was no TBODY, the immediate rows of the
+        TABLE are presented as though they were in a single TBODY.
+    '''
+    rows = []
+    for body in self.tbodies:
+      rows.extend(self.section_rows(body))
+    return rows
+
+  @cached_property
+  def foot_rows(self) -> list[list[BS4Tag]]:
+    ''' The rows from the table TFOOT, if any.
+    '''
+    return self.section_rows(self.tfoot)
+
+  @cached_property
+  def all_rows(self) -> list[list[BS4Tag]]:
+    ''' Return all the rows from the header, bodies, and footer.
+    '''
+    rows = self.all_rows = []
+    rows.extend(self.head_rows)
+    rows.extend(self.body_rows)
+    rows.extend(self.foot_rows)
+    return rows
+
+  def printt(self):
+
+    def row_trow(row):
+      ''' Render a row of clls for the table.
+      '''
+      trow = []
+      for cell in row:
+        trow.append(cell.get_text())
+        for span in range(1, self.cell_colspan(cell)):
+          trow.append("")
+      return trow
+
+    table = []
+    table.append(
+        [
+            self.caption.get_text()
+            if self.caption else f'<{self.tag.name.upper()}>'
+        ]
+    )
+    if self.thead:
+      table.extend((
+          ['THEAD'],
+          (*map(row_trow, self.head_rows),),
+      ))
+    for tbody in self.tbodies:
+      table.extend((
+          ['TBODY'],
+          (*map(row_trow, self.section_rows(tbody)),),
+      ))
+    if self.tfoot:
+      table.extend((
+          ['TFOOT'],
+          (*map(row_trow, self.foot_rows),),
+      ))
+    ##print(self.tag.prettify())
+    ##pprint(table)
+    printt(*table)
 
 if __name__ == '__main__':
   for html in (
