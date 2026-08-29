@@ -27,7 +27,7 @@ DISTINFO = {
 }
 
 # TODO: find_all(...,recursive=False) does this? apparently not?
-def child_tags(tag, child_name: str = None) -> Iterable[BS4Tag]:
+def child_tags(tag, child_name: str | None = None) -> Iterable[BS4Tag]:
   ''' A generator yielding the immediate child tags of `child`
       whose tag name is `child_name`.
       If `child_name` is `None`, yield all the immediate child tags,
@@ -67,7 +67,8 @@ def tabulate_soup(
     except KeyError:
       pass
     else:
-      # I saw an amazon page embed an obscene amount of JSON in a name attribute :-(
+      # I saw an amazon page embed an obscene amount of JSON in a
+      # name attribute :-(
       label += f' name={cropped_repr(name_attr)}'
     children = list(
         child for child in tag.children if isinstance(child, NavigableString)
@@ -77,7 +78,6 @@ def tabulate_soup(
     nsubtags = sum(
         not isinstance(child, NavigableString) for child in children
     )
-    bigrows = []
     if not attrs and len(children) == 1 and isinstance(children[0],
                                                        NavigableString):
       # The super compact form:
@@ -166,6 +166,8 @@ class Table(Widget):
 
   @staticmethod
   def cell_colspan(cell: BS4Tag) -> int:
+    ''' Compute the `colspan` value for a table cell.
+    '''
     colspan = cell.attrs.get("colspan", 1)
     try:
       colspan = int(colspan)
@@ -193,6 +195,8 @@ class Table(Widget):
   @classmethod
   @require(lambda section: section.name in ('thead', 'tbody', 'tfoot'))
   def section_rows(cls, section: BS4Tag | None) -> list[list[BS4Tag]]:
+    ''' Return the rows from a table sections such as THEAD, TBODY, or TFOOT.
+    '''
     if section is None:
       return []
     return [
@@ -233,6 +237,8 @@ class Table(Widget):
     return rows
 
   def printt(self):
+    ''' Print the table text.
+    '''
 
     def row_trow(row):
       ''' Render a row of clls for the table.
@@ -240,7 +246,7 @@ class Table(Widget):
       trow = []
       for cell in row:
         trow.append(cell.get_text())
-        for span in range(1, self.cell_colspan(cell)):
+        for _ in range(1, self.cell_colspan(cell)):
           trow.append("")
       return trow
 
