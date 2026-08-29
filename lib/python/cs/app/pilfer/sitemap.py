@@ -648,6 +648,11 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     '''
     return URL(self.response.url)
 
+  def urlto(self, other: URL | str) -> URL:
+    ''' Retrn the `other` URL resolved against our own URL.
+    '''
+    return self.url.urlto(other)
+
   @cached_property
   def method(self) -> str:
     ''' The uppercase form of the request method.
