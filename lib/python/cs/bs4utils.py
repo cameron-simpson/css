@@ -176,6 +176,18 @@ class Table(Widget):
       colspan = 1
     return colspan
 
+  @staticmethod
+  def cell_rowspan(cell: BS4Tag) -> int:
+    ''' Compute the `rowspan` value for a table cell.
+    '''
+    rowspan = cell.attrs.get("rowspan", 1)
+    try:
+      rowspan = int(rowspan)
+    except ValueError as e:
+      warning(f'invalid {rowspan=} ({e}), using 1: {cell}')
+      rowspan = 1
+    return rowspan
+
   @classmethod
   def row_cells(cls, tr: BS4Tag) -> list[BS4Tag]:
     ''' Return a list of the cells (TD or TH) from a TR tag.
@@ -199,9 +211,38 @@ class Table(Widget):
     '''
     if section is None:
       return []
-    return [
-        cls.row_cells(tr) for tr in section.find_all('tr', recursive=False)
-    ]
+    trs = section.find_all('tr', recursive=False)
+    rows = [[] for _ in trs]
+    for row_index, row_cells in enumerate(cls.row_cells(tr) for tr in trs):
+      row = rows[row_index]
+      assert rows[row_index] is row
+      cell_pos = 0
+      for cell in row_cells:
+        while cell_pos < len(row) and row[cell_pos] is not None:
+          cell_pos += 1
+        if cell_pos < len(row):
+          assert row[cell_pos] is None
+          row[cell_pos] = cell
+        else:
+          assert cell_pos == len(row)
+          row.append(cell)
+        for offset in range(1, cls.cell_rowspan(cell)):
+          subindex = row_index + offset
+          if subindex == len(rows):
+            subrow = []
+            rows.append(subrow)
+          else:
+            assert subindex < len(rows)
+            subrow = rows[subindex]
+          while len(subrow) < cell_pos:
+            subrow.append(None)
+          if cell_pos < len(subrow):
+            subrow[cell_pos] = cell
+          else:
+            assert len(subrow) == cell_pos
+            subrow.append(cell)
+        cell_pos += 1
+    return rows
 
   @cached_property
   def head_rows(self) -> list[list[BS4Tag]]:
@@ -239,16 +280,26 @@ class Table(Widget):
   def printt(self):
     ''' Print the table text.
     '''
+    seen_ids = set()
 
     def row_trow(row):
-      ''' Render a row of clls for the table.
+      ''' Render a row of cells for the table.
+          The row should have come from `section_rows` i.e. the
+          `colspan` is already applied.
       '''
       trow = []
-      for cell in row:
-        trow.append(cell.get_text())
-        for _ in range(1, self.cell_colspan(cell)):
+      for i, cell in enumerate(row):
+        if id(cell) in seen_ids:
           trow.append("")
+        else:
+          seen_ids.add(id(cell))
+          trow.append(cell.get_text())
       return trow
+
+    def section_trows(rows):
+      ''' Render the rows of a section, each of whose rows should have come from `section_rows` i.e. the
+          `colspan` is already applied.
+      '''
 
     table = []
     table.append(
@@ -258,20 +309,11 @@ class Table(Widget):
         ]
     )
     if self.thead:
-      table.extend((
-          ['THEAD'],
-          (*map(row_trow, self.head_rows),),
-      ))
+      table.extend(((*map(row_trow, self.head_rows),),))
     for tbody in self.tbodies:
-      table.extend((
-          ['TBODY'],
-          (*map(row_trow, self.section_rows(tbody)),),
-      ))
+      table.extend(((*map(row_trow, self.section_rows(tbody)),),))
     if self.tfoot:
-      table.extend((
-          ['TFOOT'],
-          (*map(row_trow, self.foot_rows),),
-      ))
+      table.extend(((*map(row_trow, self.foot_rows),),))
     ##print(self.tag.prettify())
     ##pprint(table)
     printt(*table)
