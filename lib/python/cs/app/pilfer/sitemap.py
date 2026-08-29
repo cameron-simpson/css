@@ -1059,6 +1059,13 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
       The `SITEPAGE_URL_PATTERN` is a pattern for the canonical
       page for this entity and should contain enough information
       to `.refresh()` it.
+
+      Atom/RSS feeds:
+      The `SiteEntity` clas subclasses `FeedEntryMixin` so that any
+      entity may be an entry in web feed; for subclasses which may
+      also be feeds themselves, such as one for a television series,
+      they must subclass `FeedMixin` _ahead_ of the `SiteEntity`
+      superclass.
   '''
 
   # default staleness is 1 day
@@ -1903,11 +1910,12 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
   def feed_last_build_timestamp(self, *, refresh=False, **refresh_kw) -> float:
     ''' Return an updated timestamp for this feed based on the signatures of its entries.
     '''
+    entries = self.feed_entries()
     return self.update_timestamp(
         'feed_content',
         [
             entry.feed_entry_signature(refresh=refresh, **refresh_kw)
-            for entry in self.feed_entries()
+            for entry in entries
         ],
     )
 
@@ -2243,6 +2251,7 @@ class SiteMap(Entities, Promotable):
     '''
     return self.name.replace("/", "__")
 
+  @require(lambda suburl: '://' not in suburl)
   def urlto(self, suburl, domain=None, *, scheme='https'):
     ''' Return the full URL for `suburl`.
     '''
