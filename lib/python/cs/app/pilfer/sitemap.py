@@ -293,7 +293,6 @@ class URLPattern(Promotable):
     '''
     subpaths = []
     for part in self._parsed.parts:
-      ##print("url_path_for: part =", part)
       if isinstance(part, str):
         subpaths.append(part)
       else:
@@ -1630,41 +1629,9 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     # update the record of the flowstate's request
     for widget_cls in cls.widget_classes():
       vprint("scan soup for", widget_cls)
-      for widget in widget_cls.from_soup(soup, sitemap):
-        widget.scan(scandata=scandata)
+      for widget in widget_cls.scan(soup, sitemap):
+        widget.scan_soup(scandata=scandata)
     return scandata
-
-
-##  def _request(self, *, page="sitepage", method="GET"):
-##    ''' Return the dict which caches the HTTP Response from the last request for `page`.
-##        Note that just updating this dict does not reflect in the database.
-##        Instead the `._request_update(flowstate)` method should be called.
-##    '''
-##    _request = self.tags.get('_request') or {}
-##    _request.setdefault(page, {}).setdefault(method, {})
-##    self.tags['_request'] = _request
-##    return _request
-##
-##  def _request_update(
-##      self, flowstate: FlowState, *, page="sitepage", method="GET"
-##  ):
-##    ''' Update the cached HTTP response information for `page` from `flowstate`.
-##    '''
-##    _request = self._request(page="sitepage", method=flowstate.method)
-##    _request[page][method].update(
-##        url=flowstate.url.url_s,
-##        request={
-##            hdr.lower(): value
-##            for hdr, value in sorted(flowstate.request.headers.items())
-##            if hdr.lower() != 'authorization'
-##        },
-##        response={
-##            hdr.lower(): value
-##            for hdr, value in sorted(flowstate.response.headers.items())
-##        },
-##    )
-##    # update the database
-##    self.tags.set('_request', _request, force=True)
 
   @attr(tag_name='http.request')
   def rq(
@@ -3004,7 +2971,6 @@ class SiteMap(Entities, Promotable):
     return match.format_arg(extra=extra)
 
   @uses_pilfer
-  ##@typechecked # we don't import Pilfer (circular)
   def content_prefetch(
       self,
       match: SiteMapPatternMatch,
@@ -3263,8 +3229,7 @@ class SiteMap(Entities, Promotable):
       with Pfx("entity %r", ent_spec):
         ent_key = ent_spec.removeprefix(f'{self.TYPE_ZONE}.')
         ent = self[ent_key]
-        trace(ent.refresh
-              )(force=self.options.force, recurse=self.options.recurse)
+        ent.refresh(force=self.options.force, recurse=self.options.recurse)
         ent.printt()
 
   @popopts
