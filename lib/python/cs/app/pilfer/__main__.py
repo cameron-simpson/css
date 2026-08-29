@@ -18,7 +18,7 @@ from uuid import uuid4
 from bs4 import BeautifulSoup
 from typeguard import typechecked
 
-from cs.bs4utils import printt_soup
+from cs.bs4utils import printt_soup, Table
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
 from cs.deco import vv
@@ -988,5 +988,33 @@ class PilferCommand(BaseCommand):
             ["  key:", sitemap.url_key(url)],
         ))
     printt(*table)
+
+  def cmd_tables(self, argv):
+    ''' Usage: {cmd} URL
+          Scan URL for TABLE elements and print them out.
+    '''
+    P = self.options.pilfer
+    url, = argv
+    if url == '-':
+      text = sys.stdin.read()
+      soup = BeautifulSoup(text, BS4_PARSER_DEFAULT)
+      printt_soup(soup)
+      return 0
+    rsp = P.GET(
+        url,
+        ##headers=rqhdrs,
+        ##params=(None if not params or method == 'POST' else params),
+        ##data=(None if not params or method != 'POST' else params),
+        ##allow_redirects=not options.no_redirects,
+    )
+    if rsp.status_code != 200:
+      warning("%s %s -> status_code %r", url, rsp.status_code)
+    flowstate = FlowState(
+        url=url,
+        request=rsp.request,
+        response=rsp,
+    )
+    for table in Table.scan(flowstate.soup):
+      table.printt()
 
 sys.exit(main(sys.argv))
