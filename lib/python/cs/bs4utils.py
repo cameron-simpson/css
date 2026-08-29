@@ -118,7 +118,28 @@ def as_xml(tag: BS4Tag, *, E=None):
   return E(tag.name, *map(as_xml, tag.children), **tag.attrs)
 
 class Widget:
-  ''' Base class for various "widget" HTML constructs, such as TABLE.
+  ''' Base class for various "widget" HTML constructs, such as a
+      TABLE, or in principle anything else regular on a page.
+
+      A `Widgwt` supplies:
+      - `__init__(tag)` to record the target BS4 tag, typically the
+        top level tag encompassing the wudget
+      - `find_all(soup)`: returning a list of the top level tags
+        within the BS4 tag `soup`; the default method calls
+        `soup.find_all()` with the lower case version of the class
+        name via `soup.find_all()`
+      - `scan(soup)`: a factory method calling `cls(tag)` for every
+        tag found by `find_all(soup)`
+
+      Everything else in a subclass supports whatever needs doing
+      with the widget; the `Table` class is an exemplar:
+      - its `__init__` method passes the tag to `super().__init__()`
+        as normal, then find s a few top level things about the table
+        - the caption, header, bodies, footer
+      - the default `find_all` is used because the lass name matches
+        the HTML tag name
+      - everything else more complex is provided as methods or
+        `@cached_property` properties, computed on demand
   '''
 
   def __init__(self, tag: BS4Tag):
