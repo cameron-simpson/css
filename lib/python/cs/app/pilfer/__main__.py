@@ -37,6 +37,7 @@ import cs.logutils
 from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
+from cs.psutils import run
 from cs.py.modules import import_extra
 from cs.sqltags import SQLTagSet
 from cs.trace import Trace
@@ -253,6 +254,8 @@ class PilferCommand(BaseCommand):
       ),
       refresh='Refresh the required web pages even if not stale.',
       reparse='Reparse the generated feed file as a sanity check.',
+      sync='S3 sync to this endpoint.',
+      url_prefix_='URL prefix for the endpoint.',
       uuid='Allocate a feed.uuid to the entity for Atom or RSS purposes,\n'
       'and use it in the default output filename.',
       xmlv='Provide a leading xml version tag.',
@@ -268,6 +271,7 @@ class PilferCommand(BaseCommand):
           'cannot specify the output path with more than 1 entity.'
       )
     xit = 0
+    subpaths_by_ent = {}
     while argv:
       with Pfx(argv[0]):
         try:
@@ -294,6 +298,7 @@ class PilferCommand(BaseCommand):
                 f'{feed_uuid}.{synd}' if feed_uuid else
                 f'{entity.sitemap.URL_DOMAIN}--{entity.name}.{synd}'
             )
+            subpaths_by_ent[entity] = output_fspath
           if not isabspath(output_fspath):
             output_fspath = joinpath(options.dirpath or ".", output_fspath)
         getattr(entity, f'{synd}_save')(
@@ -315,6 +320,44 @@ class PilferCommand(BaseCommand):
             for item in parsed.channel.items:
               print(item.title)
               print(item.description[:50])
+    if options.sync:
+      aws_profile = os.environ['AWS_PROFILE']
+      aws_endpoint = os.environ['PILFER_FEED_AWS_ENDPOINT']
+      bucket = os.environ['PILFER_FEED_BUCKET']
+      bucket_subdir = os.environ['PILFER_FEED_BUCKET_SUBDIR']
+      bucket_url = os.environ['PILFER_FEED_BUCKET_URL']
+      srcdir = options.dirpath
+      dstdir = f's3://{bucket}/{bucket_subdir}'
+      table = []
+      for ent, subpath in sorted(subpaths_by_ent.items(),
+                                 key=lambda ent_subpath: ent_subpath[0].name):
+        table.extend(
+            (
+                [ent.name, output_fspath],
+                (
+                    [
+                        getattr(
+                            ent, 'title', getattr(ent, 'fullname', ent.name)
+                        ),
+                        f'{bucket_url}/{bucket_subdir}/{subpath}',
+                    ],
+                ),
+            )
+        )
+      printt(*table)
+      run(
+          [
+              'aws',
+              's3',
+              'sync',
+              srcdir,
+              dstdir,
+              ('--profile', aws_profile),
+              ('--endpoint', aws_endpoint),
+          ],
+          doit=options.doit,
+          quiet=options.quiet,
+      )
     return xit
 
   def cmd_atom(self, argv):
