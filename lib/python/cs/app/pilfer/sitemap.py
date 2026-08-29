@@ -1949,7 +1949,25 @@ paginated = SiteEntity.paginated
 
 @dataclass
 class SiteWidget(Widget, ABC):
-  ''' A base class for classes representing known widgets on a site web page.
+  ''' A base class for classes representing known widgets on a site
+      web page and how to apply them to a `SiteMap`.
+
+      This subclasses `cs.bs4utils.Widget` and provides:
+      - `.sitemap`: the `SiteMap` associated with the widget
+      - `.entity`: a cached property being the `Entity` for this widget
+      - `.check_tag(tag)`: check if a tag is actually intended for
+        this widget class; the default method just returns `True`
+      - `.find_all(soup)`: find all the tags representing this
+        widget class; the default method uses `cls.TAG_NAME` and
+        `cls.FIND_ALL_CRITERIA`, then further winnows matched tags
+        using `.check_tag`
+
+      Subclasses must implement:
+      - `.entity_key()`: a methdod to compute the zone subkey of the
+        entity associated with the widget
+      - `.scan_soup(soup[,scandata=ScanData])`: scan the widget and
+        record information in a `ScanData` for later application
+        to the `SiteMap`
   '''
 
   sitemap: "SiteMap"
@@ -1981,21 +1999,26 @@ class SiteWidget(Widget, ABC):
   def check_tag(cls, tag: BS4Tag) -> bool:
     ''' Test whether this tag is in fact an instance of the widget.
 
-        The default sweep by `scan_soup` uses `cls.TAG_NAME` and
+        The default sweep by `find_all` uses `cls.TAG_NAME` and
         `cls.FIND_ALL_CRITERIA`, then further winnows matched tags
         using this method.
     '''
     return True
 
+  def find_all(self, soup) -> list[BS4Tag]:
+    ''' Find all the BS4 tags in `soup` matching `cls.TAG_NAME` and
+        `cls.FIND_ALL_CRITERIA` where `cls.check_tag(tag)` is true.
+    '''
+    return [
+        tag for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA)
+        if cls.check_tag(tag)
+    ]
+
   @classmethod
   def scan(cls, soup, sitemap: "SiteMap") -> list[Self]:
     ''' Return a list of all `SiteWidget`s of this type found in `soup`.
     '''
-    return [
-        cls(sitemap=sitemap, tag=tag)
-        for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA)
-        if cls.check_tag(tag)
-    ]
+    return [cls(sitemap=sitemap, tag=tag) for tag in cls.find_all()]
 
   @abstractmethod
   @uses_scandata
