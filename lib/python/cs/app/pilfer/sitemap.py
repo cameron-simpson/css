@@ -29,7 +29,7 @@ import requests
 from typeguard import typechecked
 
 from cs.binary import bs
-from cs.bs4utils import printt_soup
+from cs.bs4utils import printt_soup, Widget
 from cs.cmdutils import BaseCommand, popopts, vprint, vvprint
 from cs.deco import (
     attr, decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
@@ -1935,7 +1935,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
 paginated = SiteEntity.paginated
 
 @dataclass
-class SiteWidget(ABC):
+class SiteWidget(Widget, ABC):
   ''' A base class for classes representing known widgets on a site web page.
   '''
 
@@ -1954,7 +1954,7 @@ class SiteWidget(ABC):
   @property
   @abstractmethod
   def entity_key(self):
-    ''' Return the `type_key` derived from `self.tag`.
+    ''' The `type_key` derived from `self.tag`.
     '''
     raise NotImplementedError
 
@@ -1975,16 +1975,18 @@ class SiteWidget(ABC):
     return True
 
   @classmethod
-  def from_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
-    ''' Scan some soup for this kind of widget, yield instances of `cls`.
+  def scan(cls, soup, sitemap: "SiteMap") -> list[Self]:
+    ''' Return a list of all `SiteWidget`s of this type found in `soup`.
     '''
-    for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
-      if cls.check_tag(tag):
-        yield cls(sitemap=sitemap, tag=tag)
+    return [
+        cls(sitemap=sitemap, tag=tag)
+        for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA)
+        if cls.check_tag(tag)
+    ]
 
   @abstractmethod
   @uses_scandata
-  def scan(self, *, scandata: ScanData) -> ScanData:
+  def scan_soup(self, *, scandata: ScanData) -> ScanData:
     ''' Scan `self.tag` and update `scandata[self.entity]`.
         Return `scandata` (because it may have been made with the call).
 
