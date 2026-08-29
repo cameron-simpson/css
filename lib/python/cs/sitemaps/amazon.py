@@ -8,15 +8,14 @@ import re
 from typeguard import typechecked
 
 from cs.app.pilfer.sitemap import (
-    FlowState, SiteEntity, SiteMap, SiteWidget, URLPattern,
-    uses_scandata
+    FlowState, SiteEntity, SiteMap, SiteWidget, URLPattern, uses_scandata
 )
 from cs.bs4utils import child_tags, printt_soup
 from cs.deco import promote
-from cs.bs4utils import child_tags, table_grid
+from cs.bs4utils import child_tags, Table
 from cs.lex import printt
 from cs.logutils import warning
-from cs.tagset import ScanData
+from cs.tagged import ScanData
 from cs.urlutils import URL
 
 from cs.debug import trace, r, pprint, printt
@@ -265,7 +264,7 @@ class SeriesInfoRow(SiteWidget, entity_class=AmazonSeries):
   @trace
   @uses_scandata
   @typechecked
-  def scan(self, *, scandata: ScanData) -> ScanData:
+  def scan_soup(self, *, scandata: ScanData) -> ScanData:
     ''' Scan the series info DIV.
         This extracts:
         - the series ASIN and title
@@ -424,7 +423,7 @@ class MusicTracks:  ## ABC ## (SiteWidget, entity_class=_AmazonEntity):
     soup = flowstate.soup
     music_tracks_div = soup.find('div', id='music-tracks')
     if music_tracks_div:
-      grid = trace(table_grid, retval=True)(music_tracks_div.find('table'))
+      table, = Table.scan(music_tracks_div)
       print("MUSIC TRACKS:")
-      printt(*grid)
+      table.printt()
       self["music_tracks"] = [track[1] for track in grid]
