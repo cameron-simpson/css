@@ -10,9 +10,8 @@ from typeguard import typechecked
 from cs.app.pilfer.sitemap import (
     FlowState, SiteEntity, SiteMap, SiteWidget, URLPattern, uses_scandata
 )
-from cs.bs4utils import child_tags, printt_soup
+from cs.bs4utils import child_tags, printt_soup, Table, Widget
 from cs.deco import promote
-from cs.bs4utils import child_tags, Table
 from cs.lex import printt
 from cs.logutils import warning
 from cs.tagged import ScanData
@@ -427,3 +426,66 @@ class MusicTracks:  ## ABC ## (SiteWidget, entity_class=_AmazonEntity):
       print("MUSIC TRACKS:")
       table.printt()
       self["music_tracks"] = [track[1] for track in grid]
+
+class _AmazonPrimeEntity(SiteEntity):
+  TYPE_ZONE = 'prime'
+
+class AmazonPrime(SiteMap):
+  EntityClass = _AmazonPrimeEntity
+
+class APCard(Widget):
+
+  @classmethod
+  def find_all(cls, soup):
+    ''' Find `article` tags with `data-testid="card"`.
+    '''
+    return soup.find_all('article', **{'data-testid': 'card'})
+
+  @cached_property
+  def title(self):
+    ''' The card title.
+    '''
+    return self.tag.attrs['data-card-title']
+
+  @cached_property
+  def type(self):
+    ''' The card type, eg "Movie".
+    '''
+    return self.tag.attrs['data-card-entity-type']
+
+  def entitlement(self):
+    ''' The entitlement.
+    '''
+    return self.tag.attrs['data-card-entitlement']
+
+  def image_url(self):
+    ''' The URL of the default card image.
+    '''
+    return self.tag.find('img', **{'data-testid': 'base-image'}).src
+
+class APCarousel(Widget):
+
+  @classmethod
+  def find_all(cls, soup):
+    ''' Find `section` tags with `data-testid="standard-carousel"`.
+    '''
+    return soup.find_all('section', **{'data-testid': 'standard-carousel'})
+
+  @cached_property
+  def title(self):
+    return self.tag.h2.get_text()
+
+  @cached_property
+  def entries(self) -> list[APCard]:
+    return APCard.scan(self.tag)
+
+  #####################################################################
+  # sequence methods
+  def __len__(self):
+    return len(self.entries)
+
+  def __iter__(self):
+    return iter(self.entries)
+
+  def __getitem__(self, index):
+    return self.entries[index]
