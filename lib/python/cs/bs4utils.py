@@ -380,12 +380,23 @@ class Table(Widget):
       '''
 
     table = []
-    table.append(
-        [
-            self.caption.get_text()
-            if self.caption else f'<{self.tag.name.upper()}>'
-        ]
-    )
+    if self.caption:
+      heading = self.caption.get_text()
+    else:
+      # retrieve the first nonepty heading
+      (h, _), = find_up(
+          self.tag,
+          lambda tag: (
+              tag.name and tag.name.startswith('h') and tag.name[1:].isdigit()
+              and tag.get_text().strip()
+          ),
+          first=True
+      )
+      if h:
+        heading = h.get_text().strip()
+      else:
+        heading = self.tag.name.upper()
+    table.append([heading])
     if self.thead:
       table.extend(((*map(row_trow, self.head_rows),),))
     for tbody in self.tbodies:
