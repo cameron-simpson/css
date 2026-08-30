@@ -4,7 +4,7 @@
 '''
 
 from functools import cached_property
-from typing import Iterable, Self
+from typing import Callable, Generator, Iterable, Self
 
 from bs4 import BeautifulSoup, Tag as BS4Tag, NavigableString
 from icontract import require
@@ -37,6 +37,63 @@ def child_tags(tag, child_name: str | None = None) -> Iterable[BS4Tag]:
     if isinstance(child, BS4Tag) and (child_name is None
                                       or child.name == child_name):
       yield child
+
+def find_up(
+    tag,
+    test: str | Callable[[BS4Tag], bool],
+    *,
+    first=False
+) -> Generator[tuple[BS4Tag, BS4Tag], tuple[None, None]]:
+  ''' A generator yielding `(found,ref)` 2-tuples obtained by
+      search the tag tree left and up from `tag` using `.previous_sibling`
+      and `.parent`, matching tags where `test(found)` is true.
+
+      The `test` may be a tag `.name` value (a string) or a callable
+      to evaluate a ound tag.
+
+      If `first` is true (default `False`) then the search stops
+      after the first match. If there are no matches the tuple
+      `(None,None)` is returned (this does not happen if `first`
+      is false).
+
+      A primary use case for this is to find the heading tag for `tag`.
+
+      In the tuple, `found` is the matched tag. `ref` is the reference
+      tag, the later sibling of `found` where the search started
+      for that level; if `found` is at the same level as `tag` then
+      `ref` will be `tag`.
+
+      For exampl, to locate the level 2 heading governing a tag:
+
+          (h2,_), *_ = find_up(tag,lambda found: found.name == 'h2')
+
+      or more concisely:
+
+          (h2,_), *_ = find_up(tag, 'h2')
+
+      or even:
+
+          (h2,_), = find_up(tag, 'h2',first=True)
+
+      Note that the first two will cause Python to raise an exception
+      if there are no matches, while the third will provide `h2`
+      as `None`.
+  '''
+  if isinstance(test, str):
+    tag_name = test
+    test = lambda tag: tag.name is not None and tag.name == tag_name
+  reftag = tag
+  while reftag is not None:
+    prev = reftag.previous_sibling
+    while prev is not None:
+      if tag.name is not None and test(prev):
+        yield prev, reftag
+        if first:
+          return
+      prev = prev.previous_sibling
+    reftag = reftag.parent
+  if first:
+    yield None, None
 
 @typechecked
 def tabulate_soup(
