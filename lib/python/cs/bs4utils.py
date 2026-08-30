@@ -345,15 +345,24 @@ class Table(Widget):
     '''
     return self.section_rows(self.tfoot)
 
+  def as_lists(self, *, omit_header=False, omit_footer=False):
+    ''' Return the table contents as a list-of-lists;
+        each inner list is a row.
+        The innermost elements are the TH or TD tags.
+    '''
+    rows = self.all_rows = []
+    if not omit_header:
+      rows.extend(self.head_rows)
+    rows.extend(self.body_rows)
+    if not omit_footer:
+      rows.extend(self.foot_rows)
+    return rows
+
   @cached_property
   def all_rows(self) -> list[list[BS4Tag]]:
     ''' Return all the rows from the header, bodies, and footer.
     '''
-    rows = self.all_rows = []
-    rows.extend(self.head_rows)
-    rows.extend(self.body_rows)
-    rows.extend(self.foot_rows)
-    return rows
+    return self.as_lists()
 
   def printt(self):
     ''' Print the table text.
