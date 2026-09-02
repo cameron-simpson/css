@@ -750,6 +750,9 @@ class _RailRoadMulti(RRBase):
         for box in self.content
     ]
 
+  def __getitem__(self, index):
+    return self.content[index]
+
   def append(self, box):
     self.content.append(self.from_str(box) if isinstance(box, str) else box)
 
