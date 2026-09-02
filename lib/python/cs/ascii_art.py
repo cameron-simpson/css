@@ -1068,6 +1068,14 @@ class RRSequence(_RailRoadMulti):
     '''
     return max(self.box_bottoms)
 
+  @property
+  def e(self):
+    return self.box_tops[-1] - self.boxes_top + self[-1].e
+
+  @property
+  def w(self):
+    return self.box_tops[0] - self.boxes_top + self[0].w
+
   @render(sep_len=2)
   def render_lines(self, *, attach_w, attach_e, sep_len, middle='', **_):
     ''' Render the `RRSequence` as a list of one line strings.
