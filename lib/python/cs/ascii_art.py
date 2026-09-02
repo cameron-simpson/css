@@ -527,7 +527,7 @@ class Terminal(Symbol):
     return self is other
 
   @render
-  def render_lines(self, heavy, attach_w, attach_e, **_):
+  def render_lines(self, heavy, *, ascii, attach_w, attach_e, **_):
     return [
         "".join(
             (
