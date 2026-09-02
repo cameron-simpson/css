@@ -1024,7 +1024,7 @@ class RRSequence(_RailRoadMulti):
     return max(box.height for box in self.content)
 
   @render(sep_len=2)
-  def render_lines(self, *, sep_len, middle='', **_):
+  def render_lines(self, *, attach_w, attach_e, sep_len, middle='', **_):
     ''' Render the `RRSequence` as a list of one line strings.
     '''
     boxes = self.content
@@ -1057,8 +1057,8 @@ class RRSequence(_RailRoadMulti):
           lines[row].append(pad)
           row += 1
       for li, box_line in enumerate(box.render_lines(
-          attach_w=bi > 0,
-          attach_e=bi < len(boxes) - 1,
+          attach_w=bi > 0 or attach_w,
+          attach_e=bi < len(boxes) - 1 or attach_e,
       )):
         if bi > 0:
           lines[row].append(sep_line if li == box.w else sep_spaces)
