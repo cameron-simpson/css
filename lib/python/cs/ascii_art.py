@@ -1026,9 +1026,10 @@ class RRSequence(_RailRoadMulti):
     '''
     return max(box.height for box in self.content)
 
-  @render(sep_len=2)
-  def render_lines(self, *, attach_w, attach_e, sep_len, middle='', **_):
-    ''' Render the `RRSequence` as a list of one line strings.
+  @cached_property
+  def _box_tops_bottoms(self):
+    ''' A 2-tuple of the upward and downward extends of the boxes
+        with respect to the leftmost attachment point.
     '''
     boxes = self.content
     # we start the nominal attach point of the leftmost box at 0
@@ -1041,17 +1042,45 @@ class RRSequence(_RailRoadMulti):
       box_tops.append(attach - box.w)
       box_bottoms.append(attach + box.height - box.w)
       attach += box.e - box.w
-    boxes_top = min(box_tops)
-    boxes_bottom = max(box_bottoms)
-    total_lines = boxes_bottom - boxes_top
+    return box_tops, box_bottoms
+
+  @property
+  def box_tops(self):
+    ''' The upward extend of the boxes with respect to the left attachment point.
+    '''
+    return self._box_tops_bottoms[0]
+
+  @property
+  def box_bottoms(self):
+    ''' The downward extend of the boxes with respect to the left attachment point.
+    '''
+    return self._box_tops_bottoms[1]
+
+  @cached_property
+  def boxes_top(self):
+    ''' The highest extend of the boxes with respect to the left attachment point.
+    '''
+    return min(self.box_tops)
+
+  @cached_property
+  def boxes_bottom(self):
+    ''' The lowest extend of the boxes with respect to the left attachment point.
+    '''
+    return max(self.box_bottoms)
+
+  @render(sep_len=2)
+  def render_lines(self, *, attach_w, attach_e, sep_len, middle='', **_):
+    ''' Render the `RRSequence` as a list of one line strings.
+    '''
+    boxes = self.content
+    total_lines = self.boxes_bottom - self.boxes_top
     lines = [[] for _ in range(total_lines)]
-    attach = 0
     sep_spaces = " " * sep_len
     sep_line = self.horiz(sep_len, middle=middle)
-    for bi, (box, box_top) in enumerate(zip(boxes, box_tops)):
+    for bi, (box, box_top) in enumerate(zip(boxes, self.box_tops)):
       pad = " " * box.width
       row = 0
-      pad_above = box_top - boxes_top
+      pad_above = box_top - self.boxes_top
       pad_below = total_lines - pad_above - box.height
       if pad_above > 0:
         for _ in range(pad_above):
@@ -1073,7 +1102,6 @@ class RRSequence(_RailRoadMulti):
             lines[row].append(sep_spaces)
           lines[row].append(pad)
           row += 1
-      attach += box.e - box.w
       assert row == len(lines), f'{row=} != {len(lines)=}'
     return ["".join(line_v) for line_v in lines]
 
@@ -1081,7 +1109,7 @@ def rrprint(*seq, sep=''):
   ''' Promote the arguments to `RRBase` instances, make into an
       `RRSequence` and print it.
   '''
-  seq = RRBase.promote(list(seq))  # *seq gets a tuple
+  seq = RRBase.promote(list(seq))  # seq is a tuple
   seq.print(middle=sep)
 
 def test_railroad():
