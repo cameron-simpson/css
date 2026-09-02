@@ -1120,6 +1120,26 @@ def rrprint(*seq, sep=''):
   seq = RRBase.promote(list(seq))  # seq is a tuple
   seq.print(middle=sep)
 
+# the Morse Code as a railroad diagram
+def _rr_morse():
+  oS = ['o S', ('o H', '- V')]
+  _U = ['- U', 'o F']
+  oR = ['o R', '- L']
+  _W = ['- W', ('o P', '- J')]
+  oD = ['o D', ('o B', '- X')]
+  _K = ['- K', ('o C', '- Y')]
+  oG = ['o G', ('o Z', '- Q')]
+  _O = '- O'
+  oI = ['o I', (oS, _U)]
+  _A = ['- A', (oR, _W)]
+  oN = ['o N', (oD, _K)]
+  _M = ['- M', (oG, _O)]
+  oE = ['o E', (oI, _A)]
+  _T = ['- T', (oN, _M)]
+  return RRBase.promote((oE, _T))
+
+rr_morse = _rr_morse()
+
 def test_railroad():
   ''' Exercise various boxes.
   '''
@@ -1207,3 +1227,4 @@ if __name__ == '__main__':
       ),
       RR_END,
   )
+  rrprint(RR_START, rr_morse, RR_END)
