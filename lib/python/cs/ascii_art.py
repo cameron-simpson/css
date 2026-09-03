@@ -1036,7 +1036,7 @@ class RRSequence(_RailRoadMulti):
 
   @property
   def height(self):
-    ''' The render height ofthe `RRSequence` in lines.
+    ''' The render height of the `RRSequence` in lines.
     '''
     return max(box.height for box in self.content)
 
