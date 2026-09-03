@@ -97,6 +97,7 @@ ignore = [
     "D415", # First line should end with a period, question mark, or exclamation point
     "D416", # Section name should end with a colon
     "E731",
+    "EXE001", # Shebang is present but file is not executable
     "I001", # Import block is un-sorted or un-formatted
     "Q000",
     "Q002",
