@@ -407,6 +407,20 @@ class RRBase(Promotable, ABC):
   # the default attachment points are at the midpoints of the box
 
   @property
+  @abstractmethod
+  def width(self):
+    ''' The width of this box.
+    '''
+    raise NotImplementedError
+
+  @property
+  @abstractmethod
+  def height(self):
+    ''' The height of this box.
+    '''
+    raise NotImplementedError
+
+  @property
   def n(self):
     return self.width // 2
 
