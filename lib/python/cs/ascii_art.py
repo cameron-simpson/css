@@ -61,7 +61,7 @@ from functools import cache, cached_property
 from pprint import pprint
 import sys
 from types import SimpleNamespace as NS  # noqa: N814
-from typing import Any, Optional, Union
+from typing import Any, Iterable, Optional, Union
 import unicodedata
 
 from cs.context import stackattrs
@@ -670,8 +670,7 @@ class _RailRoadAround(RRBase):
   middle: str = ''
 
   def __post_init__(self):
-    if isinstance(self.content, str):
-      self.content = self.from_str(self.content)
+    self.content = RRBase.promote(self.content)
 
   def __repr__(self):
     return f'{self.__class__.__name__}(",".join(repr(rr) for rr in self.content))'
@@ -755,12 +754,12 @@ class RROptional(_RailRoadAround):
 
 @dataclass
 class _RailRoadMulti(RRBase):
-  content: list[RRBase] = field(default_factory=list)
+  content: Iterable[str | RRBase] = field(default_factory=list)
 
   def __post_init__(self):
     # promote str to RRTextBox
     self.content = [
-        self.from_str(box) if isinstance(box, str) else box
+        RRBase.promote(box)
         for box in self.content
     ]
 
