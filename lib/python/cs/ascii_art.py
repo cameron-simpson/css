@@ -880,25 +880,15 @@ class RRChoice(RRStack):
   @render
   def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
     lines = []
+    ws = self.ws if attach_w else ()
+    es = self.es if attach_e else ()
     for li, inner_line in enumerate(super().render_lines()):
       lines.append(
           "".join(
               (
-                  self.conn_char(
-                      li,
-                      self.ws if attach_w else (),
-                      super().ws,
-                      arc=arc,
-                      heavy=heavy
-                  ),
+                  self.conn_char(li, ws, super().ws, arc=arc, heavy=heavy),
                   inner_line,
-                  self.conn_char(
-                      li,
-                      super().es,
-                      self.es if attach_e else (),
-                      arc=arc,
-                      heavy=heavy
-                  ),
+                  self.conn_char(li, super().es, es, arc=arc, heavy=heavy),
               )
           )
       )
