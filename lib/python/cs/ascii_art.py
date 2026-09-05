@@ -61,7 +61,7 @@ from functools import cache, cached_property
 from pprint import pprint
 import sys
 from types import SimpleNamespace as NS  # noqa: N814
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Iterable, Optional, Sequence, Union
 import unicodedata
 
 from cs.context import stackattrs
@@ -471,7 +471,12 @@ class RRBase(Promotable, ABC):
 
   @staticmethod
   def conn_char(
-      li, lefts: list[int], rights: list[int], arc=True, heavy=False
+      li,
+      lefts: Sequence[int],
+      rights: Sequence[int],
+      *,
+      arc=True,
+      heavy=False,
   ) -> str:
     ''' Compute the connective `box_char` for a column of connective characters.
     '''
@@ -754,7 +759,7 @@ class RROptional(_RailRoadAround):
 
 @dataclass
 class _RailRoadMulti(RRBase):
-  content: Iterable[str | RRBase] = field(default_factory=list)
+  content: list[RRBase] = field(default_factory=list)
 
   def __post_init__(self):
     # promote str to RRTextBox
