@@ -1,3 +1,8 @@
+cs.ascii_art: print(RRTextBox("
+
+
+
+")) is wrong
 jf media update subcommand, initially to mark some media as interlaced PVR recordings
 jellyfin JFDBEntity subclasses ORMEntity, and JFMediaItem subclasses JFDBEntity and maps specific jellyfin.* columns for write back
 tagset Entities: _not_ a db overlay in sqltags, instead an ORMEntity base class mapping specific fields to ORM columns
