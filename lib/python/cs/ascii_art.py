@@ -471,7 +471,7 @@ class RRBase(Promotable, ABC):
 
   @staticmethod
   def conn_char(
-      li,
+      index,
       lefts: Sequence[int],
       rights: Sequence[int],
       *,
@@ -498,10 +498,10 @@ class RRBase(Promotable, ABC):
     return box_char(
         arc=arc,
         heavy=heavy,
-        left=li in lefts,
-        right=li in rights,
-        up=(lefts or rights) and li > top and li <= bottom,
-        down=(lefts or rights) and li >= top and li < bottom,
+        left=index in lefts,
+        right=index in rights,
+        up=(lefts or rights) and index > top and index <= bottom,
+        down=(lefts or rights) and index >= top and index < bottom,
     )
 
   # this is last to avoid replacing @render
@@ -836,7 +836,7 @@ class RRStack(_RailRoadMulti):
       line_left = self.horiz(box_pad_left)
       spaces_right = " " * box_pad_right
       line_right = self.horiz(box_pad_right)
-      for li, box_line in enumerate(box.render_lines(
+      for line_index, box_line in enumerate(box.render_lines(
           heavy=heavy,
           attach_e=attach_e,
           attach_w=attach_w,
@@ -844,9 +844,15 @@ class RRStack(_RailRoadMulti):
         lines.append(
             "".join(
                 (
-                    (line_left if attach_w and li == box.w else spaces_left),
+                    (
+                        line_left
+                        if attach_w and line_index == box.w else spaces_left
+                    ),
                     box_line,
-                    (line_right if attach_e and li == box.e else spaces_right),
+                    (
+                        line_right
+                        if attach_e and line_index == box.e else spaces_right
+                    ),
                 )
             )
         )
@@ -886,13 +892,17 @@ class RRChoice(RRStack):
     lines = []
     ws = self.ws if attach_w else ()
     es = self.es if attach_e else ()
-    for li, inner_line in enumerate(super().render_lines()):
+    for line_index, inner_line in enumerate(super().render_lines()):
       lines.append(
           "".join(
               (
-                  self.conn_char(li, ws, super().ws, arc=arc, heavy=heavy),
+                  self.conn_char(
+                      line_index, ws, super().ws, arc=arc, heavy=heavy
+                  ),
                   inner_line,
-                  self.conn_char(li, super().es, es, arc=arc, heavy=heavy),
+                  self.conn_char(
+                      line_index, super().es, es, arc=arc, heavy=heavy
+                  ),
               )
           )
       )
@@ -938,12 +948,15 @@ class RRMerge(RRStack):
     '''
     lines = []
     es = self.es if attach_e else ()
-    for li, inner_line in enumerate(super().render_lines(attach_e=True)):
+    for line_index, inner_line in enumerate(super().render_lines(attach_e=True)
+                                            ):
       lines.append(
           "".join(
               (
                   inner_line,
-                  self.conn_char(li, super().es, es, arc=arc, heavy=heavy),
+                  self.conn_char(
+                      line_index, super().es, es, arc=arc, heavy=heavy
+                  ),
               )
           )
       )
@@ -986,11 +999,14 @@ class RRSplit(RRStack):
     '''
     lines = []
     ws = self.ws if attach_w else ()
-    for li, inner_line in enumerate(super().render_lines(attach_w=True)):
+    for line_index, inner_line in enumerate(super().render_lines(attach_w=True)
+                                            ):
       lines.append(
           "".join(
               (
-                  self.conn_char(li, ws, super().ws, arc=arc, heavy=heavy),
+                  self.conn_char(
+                      line_index, ws, super().ws, arc=arc, heavy=heavy
+                  ),
                   inner_line,
               )
           )
@@ -1088,28 +1104,28 @@ class RRSequence(_RailRoadMulti):
     lines = [[] for _ in range(total_lines)]
     sep_spaces = " " * sep_len
     sep_line = self.horiz(sep_len, middle=middle)
-    for bi, (box, box_top) in enumerate(zip(boxes, self.box_tops)):
+    for box_index, (box, box_top) in enumerate(zip(boxes, self.box_tops)):
       pad = " " * box.width
       row = 0
       pad_above = box_top - self.boxes_top
       pad_below = total_lines - pad_above - box.height
       if pad_above > 0:
         for _ in range(pad_above):
-          if bi > 0:
+          if box_index > 0:
             lines[row].append(sep_spaces)
           lines[row].append(pad)
           row += 1
-      for li, box_line in enumerate(box.render_lines(
-          attach_w=bi > 0 or attach_w,
-          attach_e=bi < len(boxes) - 1 or attach_e,
+      for line_index, box_line in enumerate(box.render_lines(
+          attach_w=box_index > 0 or attach_w,
+          attach_e=box_index < len(boxes) - 1 or attach_e,
       )):
-        if bi > 0:
-          lines[row].append(sep_line if li == box.w else sep_spaces)
+        if box_index > 0:
+          lines[row].append(sep_line if line_index == box.w else sep_spaces)
         lines[row].append(box_line)
         row += 1
       if pad_below > 0:
         for _ in range(pad_below):
-          if bi > 0:
+          if box_index > 0:
             lines[row].append(sep_spaces)
           lines[row].append(pad)
           row += 1
