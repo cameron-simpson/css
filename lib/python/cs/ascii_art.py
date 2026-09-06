@@ -763,11 +763,8 @@ class _RailRoadMulti(RRBase):
   content: list[RRBase] = field(default_factory=list)
 
   def __post_init__(self):
-    # promote str to RRTextBox
-    self.content = [
-        RRBase.promote(box)
-        for box in self.content
-    ]
+    # promote self.content to list[RRBase]
+    self.content = [RRBase.promote(box) for box in self.content]
 
   def __getitem__(self, index):
     return self.content[index]
