@@ -393,7 +393,7 @@ class RRBase(Promotable, ABC):
     return left_end + horiz_c * left_length + middle + horiz_c * right_length + right_end
 
   @abstractmethod
-  def render_lines(self, **render_kw):
+  def render_lines(self, **render_kw) -> list[str]:
     ''' Render the box as a list of single line strings.
     '''
     raise NotImplementedError
@@ -527,7 +527,7 @@ class Symbol(RRBase):
   def __eq__(self, other):
     return self is other
 
-  def render_lines(self, **_):
+  def render_lines(self, **_) -> list[str]:
     return [self.name]
 
   @property
@@ -546,7 +546,8 @@ class Terminal(Symbol):
     return self is other
 
   @render
-  def render_lines(self, heavy, *, ascii, attach_w, attach_e, **_):
+  def render_lines(self, heavy, *, ascii, attach_w, attach_e,
+                   **_) -> list[str]:
     return [
         "".join(
             (
@@ -586,7 +587,7 @@ class RRTextBox(RRBase):
     return f'{self.__class__.__name__}:{self.text.splitlines()[:1]!r}...'
 
   @render
-  def render_lines(self, *, heavy, attach_w, attach_e, **_):
+  def render_lines(self, *, heavy, attach_w, attach_e, **_) -> list[str]:
     ''' Render the text box as a list of single line strings.
     '''
     line_width = max(self.max_text_length, 1)
@@ -681,7 +682,7 @@ class _RailRoadAround(RRBase):
     return f'{self.__class__.__name__}(",".join(repr(rr) for rr in self.content))'
 
   @render
-  def render_lines(self, *, heavy, attach_e, attach_w, **_):
+  def render_lines(self, *, heavy, attach_e, attach_w, **_) -> list[str]:
     ie = self.content.e
     iw = self.content.w
     above = self.above
@@ -824,7 +825,8 @@ class RRStack(_RailRoadMulti):
     return tuple(es)
 
   @render(align='left')  # vs right and... anything else
-  def render_lines(self, *, align, heavy, attach_e, attach_w, **_):
+  def render_lines(self, *, align, heavy, attach_e, attach_w,
+                   **_) -> list[str]:
     lines = []
     for box in self.content:
       box_pad_length = self.inner_width - box.width
@@ -883,7 +885,7 @@ class RRChoice(RRStack):
     return super().width + 2
 
   @render
-  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
+  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_) -> list[str]:
     lines = []
     ws = self.ws if attach_w else ()
     es = self.es if attach_e else ()
@@ -934,7 +936,7 @@ class RRMerge(RRStack):
     return super().width + 1
 
   @render
-  def render_lines(self, *, arc, heavy, attach_e, **_):
+  def render_lines(self, *, arc, heavy, attach_e, **_) -> list[str]:
     ''' Render the `RRMerge` as a list of strings.
     '''
     lines = []
@@ -982,7 +984,7 @@ class RRSplit(RRStack):
     return super().width + 1
 
   @render
-  def render_lines(self, *, arc, heavy, attach_w, **_):
+  def render_lines(self, *, arc, heavy, attach_w, **_) -> list[str]:
     ''' Render the `RRSplit` as a list of strings.
     '''
     lines = []
@@ -1075,7 +1077,13 @@ class RRSequence(_RailRoadMulti):
     return self.box_tops[0] - self.boxes_top + self[0].w
 
   @render(sep_len=2)
-  def render_lines(self, *, attach_w, attach_e, sep_len, middle='', **_):
+  def render_lines(self,
+                   *,
+                   attach_w,
+                   attach_e,
+                   sep_len,
+                   middle='',
+                   **_) -> list[str]:
     ''' Render the `RRSequence` as a list of one line strings.
     '''
     boxes = self.content
