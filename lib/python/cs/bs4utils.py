@@ -95,6 +95,26 @@ def find_up(
   if first:
     yield None, None
 
+def find_heading(
+    tag,
+    filter: Callable[[BS4Tag],
+                     bool] = (lambda tag: len(tag.get_text().strip()) > 0),
+) -> BS4Tag | None:
+  ''' Find the nearest heading satisfying the test `filter(tag)`.
+      Return the tag or `None` is one is not found.
+      The default `filter` tests that the heading is not empty.
+      This uses `find_up` to locate the tag.
+  '''
+  (h, _), = find_up(
+      tag,
+      lambda tag: (
+          tag.name and tag.name.startswith('h') and tag.name[1:].isdigit() and
+          filter(tag)
+      ),
+      first=True,
+  )
+  return h
+
 @typechecked
 def tabulate_soup(
     tag: BS4Tag | NavigableString
