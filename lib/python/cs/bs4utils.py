@@ -342,6 +342,11 @@ class Table(Widget):
             assert len(subrow) == cell_pos
             subrow.append(cell)
         cell_pos += 1
+    # infill None cells with empty TD tags
+    for row in rows[1:]:
+      for i, cell in enumerate(row):
+        if cell is None:
+          row[i] = BS4Tag(name='td')
     return rows
 
   @cached_property
@@ -573,8 +578,8 @@ class Table(Widget):
       return trow
 
     def section_trows(rows):
-      ''' Render the rows of a section, each of whose rows should have come from `section_rows` i.e. the
-          `colspan` is already applied.
+      ''' Render the rows of a section, each of whose rows should
+          have come from `section_rows` i.e. the `colspan` is already applied.
       '''
 
     table = []
@@ -608,7 +613,8 @@ if __name__ == '__main__':
   <H1>H1 HEADING</H1>
   <TABLE>
     <THEAD><TR><TD>heaing 1<TD>heading 2
-    <TBODY><TR><TD>Label<TD>9.5
+    <TBODY><TR><TD>Label<TD ROWSPAN="2">9.5
+           <TR>
            <TR><TD>3<TD>4
     <TFOOT><TR><TD>foot1<TD>5
     </TABLE>
@@ -621,6 +627,9 @@ if __name__ == '__main__':
     for table in Table.scan(soup):
       print()
       table.printt()
+
+      for row in table.as_lists():
+        print(*map(type, row))
 
       def as_float(section_type, section_index, row_index, col_index, cell):
         text = cell.get_text().strip()
