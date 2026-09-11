@@ -384,6 +384,20 @@ class Table(Widget):
     '''
     return self.as_lists()
 
+  @cached_property
+  def title(self):
+    ''' The title of the table, from the caption or the nearest heading.
+    '''
+    if self.caption:
+      title = self.caption.get_text()
+    else:
+      h = find_heading(self.tag)
+      if h:
+        title = h.get_text().strip()
+      else:
+        title = None
+    return title
+
   def printt(self):
     ''' Print the table text.
     '''
@@ -409,22 +423,7 @@ class Table(Widget):
       '''
 
     table = []
-    if self.caption:
-      heading = self.caption.get_text()
-    else:
-      # retrieve the first nonepty heading
-      (h, _), = find_up(
-          self.tag,
-          lambda tag: (
-              tag.name and tag.name.startswith('h') and tag.name[1:].isdigit()
-              and tag.get_text().strip()
-          ),
-          first=True
-      )
-      if h:
-        heading = h.get_text().strip()
-      else:
-        heading = self.tag.name.upper()
+    heading = self.title or self.tag.name.upper()
     table.append([heading])
     if self.thead:
       table.extend(((*map(row_trow, self.head_rows),),))
