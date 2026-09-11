@@ -4,7 +4,7 @@
 '''
 
 from functools import cached_property
-from typing import Callable, Generator, Iterable, Self
+from typing import Any, Callable, Generator, Iterable, Self
 
 from bs4 import BeautifulSoup, Tag as BS4Tag, NavigableString
 from icontract import require
@@ -12,6 +12,7 @@ from lxml.builder import ElementMaker
 from typeguard import typechecked
 
 from cs.lex import cropped_repr, printt
+from cs.pfx import pfx
 from cs.gimmicks import warning
 
 DISTINFO = {
@@ -288,11 +289,9 @@ class Table(Widget):
 
   @classmethod
   def row_cells(cls, tr: BS4Tag) -> list[BS4Tag]:
-    ''' Return a list of the cells (TD or TH) from a TR tag.
-        This is pretty simple minded, with initial support for `colspan=`
-        but no support for `rowspan=`.
+    ''' Return a list of the cells (`TD` or `TH`) from a `TR` tag.
         `colspan` is supported by referencing the same cell multiple times.
-        Only TD and TH tags which are immediate children of the TR are recognised.
+        Only `TD` and `TH` tags which are immediate children of the `TR` are recognised.
     '''
     cells = []
     for cell in tr.find_all(lambda tag: tag.name in ('th', 'td'),
@@ -305,7 +304,8 @@ class Table(Widget):
   @classmethod
   @require(lambda section: section.name in ('thead', 'tbody', 'tfoot'))
   def section_rows(cls, section: BS4Tag | None) -> list[list[BS4Tag]]:
-    ''' Return the rows from a table sections such as THEAD, TBODY, or TFOOT.
+    ''' Return the rows from a table section such as `THEAD`, `TBODY`, or `TFOOT`.
+        `rowspan` is supported by referencing the same cell in lower rows.
     '''
     if section is None:
       return []
@@ -316,6 +316,7 @@ class Table(Widget):
       assert rows[row_index] is row
       cell_pos = 0
       for cell in row_cells:
+        # advance past any cells presupplied by a rowspan
         while cell_pos < len(row) and row[cell_pos] is not None:
           cell_pos += 1
         if cell_pos < len(row):
@@ -324,6 +325,7 @@ class Table(Widget):
         else:
           assert cell_pos == len(row)
           row.append(cell)
+        # propagate this cell to further rows for its rowspan
         for offset in range(1, cls.cell_rowspan(cell)):
           subindex = row_index + offset
           if subindex == len(rows):
@@ -365,10 +367,19 @@ class Table(Widget):
     '''
     return self.section_rows(self.tfoot)
 
-  def as_lists(self, *, omit_header=False, omit_footer=False):
-    ''' Return the table contents as a list-of-lists;
-        each inner list is a row.
+  def as_lists(self,
+               *,
+               omit_header=False,
+               omit_footer=False) -> list[list[BS4Tag]]:
+    ''' Return the table contents as a list-of-lists-of-tags;
+        each inner list is a row of tags.
         The innermost elements are the TH or TD tags.
+        Note that cells spanning multiple columns or rows via their
+        `colspan` or `rowspan` are the same reference.
+
+        Parameters:
+        * `omit_header`: do not include rows from the `THEAD` section
+        * `omit_footer`: do not include rows from the `TFOOT` section
     '''
     rows = self.all_rows = []
     if not omit_header:
@@ -376,6 +387,150 @@ class Table(Widget):
     rows.extend(self.body_rows)
     if not omit_footer:
       rows.extend(self.foot_rows)
+    return rows
+
+  # the type of a cell value entry
+  IndexedCellValueType = tuple[str, int, int, int, BS4Tag, Any]
+
+  # the type of a cell conversion function
+  IndexedCellConversionFunction = Callable[[str, int, int, int, BS4Tag], Any]
+
+  def as_indexed_values(
+      self,
+      *,
+      convert: IndexedCellConversionFunction | None = None,
+      convert_head_cell: IndexedCellConversionFunction | None = None,
+      convert_body_cell: IndexedCellConversionFunction | None = None,
+      convert_foot_cell: IndexedCellConversionFunction | None = None,
+      omit_header=False,
+      omit_footer=False,
+  ) -> list[list[IndexedCellValueType]]:
+    ''' Return the table contents as a list-of-lists of indexed cell values.
+        Each inner list contains the cell value records from a row.
+
+        this is an elaborate counterpart to the `as_lists` method.
+
+        Parameters:
+        * `convert`: the default cell conversion function
+        * `convert_head`: the header cell conversion function, default from `convert`
+        * `convert_body`: the body cell conversion function, default from `convert`
+        * `convert_foot`: the footer cell conversion function, default from `convert`
+        * `omit_header`: do not include rows from the `THEAD` section
+        * `omit_footer`: do not include rows from the `TFOOT` section
+
+        The conversion functions accept the following positional parameters:
+        * `section_type`: one of `"THEAD"`, `"TBODY"` or `"TFOOT"`
+        * `section_index`: the index of the section, 0 for the
+          header or footer but there may be multiple `TBODY` sections
+        * `row_index`: the index of the row within the section
+        * `col_index`: the index of the column within the row
+        * `cell`: the `TD` or `TH` tag for the cell
+        The function should return the converted value of `cell`.
+        The default conversion function returns `cell`.
+
+        The row and column indices supplied to the conversion unction
+        are of the _resolved_ cells, after expansion via the `colspan`
+        or `rowspan` values.
+        For example, a row with 3 cells whose second cell had a
+        `colspan=2` would be a list of 4 cells, with the second
+        original cell referenced in the second and third items of
+        the list; it _will_ be the same tag instance.
+
+        Each cell instance is converted only once; the same cell
+        spanning multiple columns or rows will have the same value
+        instance in the result record.
+
+        The resulting list-of-lists contains value records, a 6-tuple
+        of `(section_type,section_index,row_index,col_index,cell,value)`.
+        Note that the `row_index` and `col_index` are those of the
+        top left index where the `cell` was first encountered for
+        cells spanning multiple columns or rows.
+
+        Examples:
+
+        Convert every numeric cell to its `float` value, leave other cells as their text.
+
+            def as_float(section_type, section_index, row_index, column_index, cell):
+                text = cell.get_text.strip()
+                try:
+                    value = float(text)
+                except ValueError:
+                    value = text
+                return value
+
+            values = T.as_indexed_values(convert=as_float)
+
+        Convert only the body cells, keep the headers as tags, omit the footer:
+
+            values = T.as_indexed_values(convert_body_cell=as_float, omit_footer=True)
+    '''
+    if convert is None:
+      convert = (
+          lambda section_type, section_index, row_index, column_index, cell:
+          cell
+      )
+    if convert_head_cell is None:
+      convert_head_cell = convert
+    if convert_body_cell is None:
+      convert_body_cell = convert
+    if convert_foot_cell is None:
+      convert_foot_cell = convert
+    # cell_indicies={}
+    # mapping of id(tag) to (row_index,colum_index,converteed_value)
+    converted = {}
+
+    @pfx
+    def conv(
+        section_type, section_index, row_index, col_index, cell
+    ) -> self.IndexedCellValueType:
+      cell_id = id(cell)
+      try:
+        value_record = converted[cell_id]
+      except KeyError:
+        if section_type == 'THEAD':
+          value = convert_head_cell(
+              section_type, section_index, row_index, col_index, cell
+          )
+        elif section_type == 'TBODY':
+          value = convert_body_cell(
+              section_type, section_index, row_index, col_index, cell
+          )
+        elif section_type == 'TFOOT':
+          value = convert_foot_cell(
+              section_type, section_index, row_index, col_index, cell
+          )
+        else:
+          raise RuntimeError(f'unhandled {section_type=}')
+        value_record = converted[cell_id] = (
+            section_type, section_index, row_index, col_index, cell, value
+        )
+      return value_record
+
+    rows = self.all_rows = []
+    if not omit_header:
+      for row_index, row in enumerate(self.head_rows):
+        rows.append(
+            [
+                conv('THEAD', 0, row_index, col_index, cell)
+                for col_index, cell in enumerate(row)
+            ]
+        )
+    for body_index, body in enumerate(self.tbodies):
+      for row_index, row in enumerate(self.section_rows(body)):
+        rows.append(
+            [
+                conv('TBODY', body_index, row_index, col_index, cell)
+                for col_index, cell in enumerate(row)
+            ]
+        )
+    if not omit_footer:
+      for row_index, row in enumerate(self.foot_rows):
+        rows.append(
+            [
+                conv('TFOOT', 0, row_index, col_index, cell)
+                for col_index, cell in enumerate(row)
+            ]
+        )
     return rows
 
   @cached_property
@@ -436,10 +591,7 @@ class Table(Widget):
     printt(*table)
 
 if __name__ == '__main__':
-  for html in (
-      'foo',
-      '<h1>foo</h1>',
-      '''
+  for html in ('foo', '<h1>foo</h1>', '''
     <html>
       <head>
         <title>title here</title>
@@ -452,10 +604,34 @@ if __name__ == '__main__':
         third
       </body>
     </html>
-  ''',
-  ):
+  ''', '''
+  <H1>H1 HEADING</H1>
+  <TABLE>
+    <THEAD><TR><TD>heaing 1<TD>heading 2
+    <TBODY><TR><TD>Label<TD>9.5
+           <TR><TD>3<TD>4
+    <TFOOT><TR><TD>foot1<TD>5
+    </TABLE>
+  '''):
     print("======================================")
     print(html)
     print("--------------------------------------")
     soup = BeautifulSoup(html, features="lxml")
     printt_soup(soup)
+    for table in Table.scan(soup):
+      print()
+      table.printt()
+
+      def as_float(section_type, section_index, row_index, col_index, cell):
+        text = cell.get_text().strip()
+        try:
+          return float(text)
+        except (TypeError, ValueError):
+          return text
+
+      for row_index, row in enumerate(table.as_indexed_values(
+          convert_body_cell=as_float, omit_footer=True)):
+        for col_index, record in enumerate(row):
+          section_type = record[0]
+          value = record[-1]
+          print(row_index, col_index, section_type, type(value), value)
