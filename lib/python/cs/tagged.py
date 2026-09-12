@@ -863,23 +863,17 @@ class Entities:
     ]
 
 class ScanData:
-  ''' A class to manage data obtained about `Entity` instances,
+  ''' A class to manage data obtained about `SiteEntity` instances,
       for example from an API or scanning a web page.
-      This contains a `.entities` for the reference `Entities`
-      and a `.ent_data_map` for the mapping from `Entity`
-      instances to their scanned data `dict`.
 
-      The data for an `Entity` can be obtained by indexing the
-      `ScanData` instance with an `Entity` instance or a valid index
-      for the `entities` such as a `(Entity-subclass, key)` 2-tuple.
-      The (optional) supplied `entities` is only required for the
-      tuple indexing, in order to resolve the index to an `Entity`.
+      The data for an `SiteEntity` can be obtained by indexing the
+      `ScanData` instance with a `SiteEntity` instance or
+      a `(ent_cls,type_key)` 2-tuple
   '''
 
-  def __init__(self, entities: Entities | None = None, *, name: str = None):
+  def __init__(self, *, name: str = None):
     # mapping of Entity instances to a data dict
     self.name = name
-    self.entities = entities
     self.ent_data_map = defaultdict(dict)
 
   def __iter__(self):
@@ -893,22 +887,17 @@ class ScanData:
     ''' The data for the supplied `ent`.
     '''
     if isinstance(ent, tuple):
-      if self.entities is None:
-        print(f'NO ScanData.entities, tuple index {ent=}')
-        breakpoint()
-        raise KeyError(
-            f'self.entities is None, tuple indices cannot be resolved: {ent=}'
-        )
-      ent = self.entities[ent]
+      ent_cls, type_key = ent
+      entities = Entities.default(ent_cls.TYPE_ZONE)
+      ent = entities[ent_cls, type_key]
     return self.ent_data_map[ent]
 
   def keys(self):
     return self.ent_data_map.keys()
 
-  def update(self, ent: Union[tuple, "Entity"], **data_kw):
+  def update(self, ent: Union[tuple[type, int | str], "Entity"], **data_kw):
     ''' Update the data for `ent` from `data_kw`.
-          If `ent` is a tuple, use it to obtain a `Entity` from `self.entities`.
-      '''
+    '''
     self[ent].update(**data_kw)
 
   def conv(self, ent: Union[tuple, "Entity"], mapping, key, conv=None):
