@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Some little utility functions for working with the soup from `beautifulsoup4`.
+''' Various utility functions and classes for working with the HTML soup from `beautifulsoup4`.
 '''
 
 from functools import cached_property
@@ -64,7 +64,7 @@ def find_up(
       for that level; if `found` is at the same level as `tag` then
       `ref` will be `tag`.
 
-      For exampl, to locate the level 2 heading governing a tag:
+      For example, to locate the level 2 heading governing a tag:
 
           (h2,_), *_ = find_up(tag,lambda found: found.name == 'h2')
 
@@ -247,8 +247,6 @@ class Table(Widget):
 
         Note that if there was no TBODY, the immediate rows of the
         TABLE are presented as though they were in a single TBODY.
-
-        This Defined
     '''
     super().__init__(tag)
     self.caption = tag.find('caption')
