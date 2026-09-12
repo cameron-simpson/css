@@ -12,7 +12,7 @@
 from datetime import date, datetime, tzinfo, timedelta, timezone
 from time import localtime, mktime, strftime
 
-__version__ = '20260912'
+__version__ = '20260912-post'
 
 DISTINFO = {
     'keywords': ["date", "time", "datetime", "python", "python3"],
