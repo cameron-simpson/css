@@ -6,22 +6,6 @@
     with web sites, APIs, and third party databases.
 '''
 
-DISTINFO = {
-    'keywords': ["python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 3",
-    ],
-    'install_requires': [
-        'cs.deco',
-        'cs.lex',
-        'cs.obj',
-        'cs.tagset',
-    ],
-    'python_requires':
-    '>=3.9',  # for subscripting builtin types
-}
-
 from collections import defaultdict
 from collections.abc import Sequence
 from contextlib import contextmanager
@@ -45,6 +29,29 @@ from cs.progress import progressbar
 from cs.tagset import TagSet, ZonedTypes
 from cs.trace import Trace
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'icontract',
+        'typeguard',
+        'cs.cmdutils',
+        'cs.context',
+        'cs.deco',
+        'cs.lex',
+        'cs.logutils',
+        'cs.obj',
+        'cs.pfx',
+        'cs.progress',
+        'cs.tagset',
+        'cs.trace',
+    ],
+    'python_requires':
+    '>=3.9',  # for subscripting builtin types
+}
 
 class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
   ''' A base class for classes which have a `.tags:TagSet` attribute
