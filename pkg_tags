@@ -114,7 +114,7 @@ cs.threads ok_revision=fa1689394ee248e9a28a8b317eca7fd5a464af99 pypi.release="20
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.trace
-cs.tty ok_revision="557f78161673a7fed31bc3d25b111f53195c8d51"
+cs.tty ok_revision="557f78161673a7fed31bc3d25b111f53195c8d51" features={"20260912":["ttysizepx"]}
 cs.typeutils
 cs.typingutils ok_revision=f80b38e898d4b414dc6a51dc1658c49adbd19c7b features={"20230331":["subtype"],"20250428":["is_optional"],"20260525":["EQSortable","Sortable"]} pypi.release="20260525"
 cs.units ok_revision="37b0ea0c10088c737e8c0b881f7a6d631139a7f0" pypi.release="20260526"
