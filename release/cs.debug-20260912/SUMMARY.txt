@@ -1,0 +1,2 @@
+New tabulate_class and print_class.
+Get Trace from cs.trace.

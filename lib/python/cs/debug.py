@@ -82,7 +82,7 @@ from cs.trace import Trace
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20260602-post'
+__version__ = '20260912'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
