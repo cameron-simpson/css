@@ -50,6 +50,7 @@ DISTINFO = {
         'cs.deco',
         'cs.lex',
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.seq',
         'cs.sharedfile>=20211208',
