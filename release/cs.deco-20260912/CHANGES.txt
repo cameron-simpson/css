@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: handle classes with no .__firstlineno__
+lib/python/cs/deco.py: cs.deco: new @verbosity, @verbose and @v decorators to run functions at certain ambient verbosity levels

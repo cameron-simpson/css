@@ -1,0 +1,2 @@
+@OBSOLETE: handle classes with no .__firstlineno__.
+New @verbosity, @verbose and @v decorators to run functions at certain ambient verbosity levels.
