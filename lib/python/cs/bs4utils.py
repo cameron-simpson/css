@@ -23,7 +23,13 @@ DISTINFO = {
         "Topic :: Text Processing",
     ],
     'install_requires': [
+        'cs.lex',
+        'cs.pfx',
+        'cs.gimmicks',
         'beautifulsoup4',
+        'icontract',
+        'lxml',
+        'typguard',
     ],
 }
 
