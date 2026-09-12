@@ -179,6 +179,7 @@ DISTINFO = {
         'cs.resources',
         'cs.seq',
         'cs.tagset>=20211212',
+        'cs.tagged',
         'cs.threads',
         'cs.upd',
         'icontract',
