@@ -1,0 +1,5 @@
+lib/python/cs/lex.py: cs.lex: printt,tabulate: support mappings as top level items for easy printt(some_dict)
+lib/python/cs/lex.py: cs.lex: add a comment
+lib/python/cs/lex.py: cs.lex: flatten_table_rows: present mappings as a tuple of [key,value] lists; fix some comment typos
+lib/python/cs/lex.py: cs.lex: rename htmlify to html_escape
+lib/python/cs/lex.py: cs.lex: flatten_table_rows: indent a subrow if it isn't empty

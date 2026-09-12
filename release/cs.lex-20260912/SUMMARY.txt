@@ -1,0 +1,4 @@
+printt,tabulate: support mappings as top level items for easy printt(some_dict).
+flatten_table_rows: present mappings as a tuple of [key,value] lists.
+Rename htmlify to html_escape.
+A few minor fixes.
