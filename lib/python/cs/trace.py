@@ -11,6 +11,8 @@ from cs.lex import printt
 from cs.py.stack import caller
 from cs.threads import HasThreadState, ThreadState
 
+__version__ = '20260912'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
