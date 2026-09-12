@@ -104,6 +104,7 @@ DISTINFO = {
         'cs.py3',
         'cs.seq',
         'cs.threads',
+        'cs.trace',
         'cs.upd',
         'cs.x',
     ],
