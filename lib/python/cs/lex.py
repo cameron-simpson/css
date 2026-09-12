@@ -1653,7 +1653,8 @@ def flatten_table_rows(
         ) + (
             HORIZ if do_attach else " "
         )
-        subrow[0] = indent + subrow[0]
+        if subrow:
+          subrow[0] = indent + subrow[0]
         rows.append(subrow)
     else:
       raise TypeError(f'row type {type(trow)} is neither list nor tuple')
