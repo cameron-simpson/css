@@ -1,0 +1,11 @@
+TagSet.entity,entity_: new pseudo attrubte spaces for accessing related UsesTagSets entities.
+Tagset.entity: support +=entity and -=entity to record references to other entities.
+TagSetTyping: __getattr__ which tries attr and zone.attr before super().__getattr__.
+Drop the .deref methods, the .foo_ent attributes do this now.
+HasTags.__init__: make the tags_db optional, find it from UsesTagSets.by_type_zone if omitted.
+UsesTagSets: make both HasTagsClass and TYPE_ZONE optional (for example, FSTags doesn't use them) and autoregister the class and its instances.
+UsesTagSets: split out the bulk of __getitem__(index) as the entty(index[,zone]) method to allow accessing entites from other zones, support no .TYPE_ZONE.
+Rename HasTags to Entity, UsesTagSets to Entities, move to cs.tagged, put the .entity and .entity_ stuff in Entity.
+Entity: make hashing and comparable for use with sets and mappings; I have mixed feelings about `__eq__`.
+Entities: new __class_getitem__ to obtain an entity directly given its name.
+Many more small changes.

@@ -1,0 +1,52 @@
+lib/python/cs/tagset.py: cs.tagset: TagSet.entity: new pseudo attrubte space for accessing related UsesTagSets entities
+lib/python/cs/tagset.py: cs.tagset: TagSet.auto: now a cached property
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets: __init__: tagset no longer keyword only, catch multiple assignment to cls.by_type_zone, zone_entity: use the new id.zone=zone_subkey scheme
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets: new .for_zone() context manager to register this instances as the UsesTagSets handler for its type zone
+lib/python/cs/tagset.py: cs.tagset: HasTags.entity, proxy to HasTags.tags.entity
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets: add .items() mapping method
+lib/python/cs/tagset.py: cs.tagset: remove debug
+lib/python/cs/tagset.py: cs.tagset: Tagset.entity: support +=entity and -=entity to record references to other entities
+lib/python/cs/tagset.py: cs.tagset: HasTags: new .type_zone_update(mapping) to apply the mapping to self with a prefix of self.type_zone, for recoring the platonic ideal values, leaving room for overrie values in the unzoned tags
+lib/python/cs/tagset.py: cs.tagset: TagSetTyping: __getattr__ which tries attr and zone.attr before super().__getattr__; HasTags: drop __getattr__, covered by TagSetTyping.__getattr__
+lib/python/cs/tagset.py: cs.tagset: HasTags: __getattr__ supporting attrs like *_nt and *_ents via the .suffix_ent and .suffix_ents methods
+lib/python/cs/tagset.py: cs.tagset: new .entity_ attribute space like .entity but returning None instead of raising AttributeError
+lib/python/cs/tagset.py: cs.tagset: TagSet.entity_property, completing previous commit
+lib/python/cs/tagset.py: cs.tagset: use NoAttrs to remove the super().__getattr__ shuffle
+lib/python/cs/tagset.py: cs.tagset: TagSet.__getattr__: clean super getattr call
+lib/python/cs/tagset.py: cs.tagset: drop the .deref methods, the .foo_ent attributes do this now
+lib/python/cs/tagset.py: cs.tagset: update imports
+lib/python/cs/tagset.py: cs.tagset: optional default= parameter for the dropped .deref methods
+lib/python/cs/tagset.py: cs.tagset: HasTags.__init__: make the tags_db optional, find it from UsesTagSets.by_type_zone if omitted
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets: make both HasTagsClass and TYPE_ZONE optional (for example, FSTags doesn't use them) and autoregister the class and its instances
+lib/python/cs/tagset.py: cs.tagset: UsesTagSets: split out the bulk of __getitem__(index) as the entty(index[,zone]) method to allow accessing entites from other zones, support no .TYPE_ZONE
+lib/python/cs/tagset.py: cs.*: rename HasTags to Entity, UsesTagSets to Entities, TagSetTyping to ZonedTypes, etc, leaving compatibility names behind wrapped in @OBSOLETE
+lib/python/cs/tagset.py: cs.tagset: Entities: fix call to set_as_zone and fix logic error in as_zone
+lib/python/cs/tagset.py: cs.tagset: TagSet.printt, Entity.printt: simplify the printt() call
+lib/python/cs/tagset.py: cs.tagset: Entities: record each subclass in Entities.class_by_type_zone so that we can attempt a default instance in Entities.by_entity_id
+lib/python/cs/tagset.py: cs.tagset: TagSet._EntityMap.__getattr__: rename param attr to zone for clarity
+lib/python/cs/tagset.py: cs.tagset: Entity: make hashing and comparable for use with sets and mappings - i have mixed feelings about `__eq__`
+lib/python/cs/tagset.py: cs.tagset: ENtity.*_ent,*_ents: fixes, comments, remove debug
+lib/python/cs/tagset.py: cs.tagset: Entities: new .default(zone"str) class method to produce the default Entities instance for zone
+lib/python/cs/tagset.py: cs.tagset: Entities.entity_by_id: the tags_db now uses Entities.default()
+lib/python/cs/tagset.py: cs.tagset: Entities: new __class_getitem__ to obtain an entity directly given its name
+lib/python/cs/tagset.py: cs.tagset: TagSet.update,Entity.type_zone_update: new lc_=False parameter to enable turning Foo-Bar into foo_bar to aid attribute access
+lib/python/cs/tagset.py: cs.tagset,cs.app.pilfer.sitemap: move ScanData from cs.app.pilfer.sitemap to cs.tagset
+lib/python/cs/tagset.py: cs.tagset: Entity,Entities,ScanData: docstring text descirbing the zone.* design decisions, make Entities.default() fall back to cls.TYPE_ZONE if zone is not specified
+lib/python/cs/tagset.py: cs.tagset: new @uses_scandata decorator to provide a default scandata:ScanData argument
+lib/python/cs/tagset.py: cs.tagset: update imports, add comment
+lib/python/cs/tagset.py: cs.tagset: Entities: provide default TagsetsClass=None; cs.app.pilfer.sitemap: SiteMap: provide TagsetsClass=SQLTags
+lib/python/cs/tagset.py: cs.tagset: more rename of EntitiesClass to TagsetsClass
+lib/python/cs/tagset.py: cs.tagset: Entity.__getattr__: catch ValueError from *_suffix and raise an AttributeError
+lib/python/cs/tagset.py: cs.tagset: drop Entities.tagged() and Entities.deref()
+lib/python/cs/tagset.py: cs.tagset: Entity: more docstringage
+lib/python/cs/tagset.py: cs.tagset: Entity.__getattr__: try ZonedTypes.__getattr__ first, then suffix based attributes
+lib/python/cs/tagset.py: cs.tagset: ScanData: make the entities optional, raise explanatory exception if it is None and tuple indexing is tried
+lib/python/cs/tagset.py: cs.tagset: ScanData: new .printt() method to print out the scan data
+lib/python/cs/tagset.py: cs.tagset: Entities: warning about no .TYPE_ZONE only if verbose
+lib/python/cs/tagset.py: cs.tagset: Entity.__getattr__: avoid suffix handlers if the prefix is empty
+lib/python/cs/tagset.py: cs.tagset: require python>=3.11 for typing.Self
+lib/python/cs/tagset.py: cs.tagset: ZonedTypes: new type_search() static method to parse zone.subtyp:tag=value
+lib/python/cs/tagset.py: cs.tagset: Entities.__class_getitem__: support indexing by a zone to find the relevant subclass instance; various docstring updates and fixes
+lib/python/cs/tagset.py: cs.tagset: ZonedTypes: BREAKING: the zone and subname are the first 2 dotted components - the key may now include dots
+lib/python/cs/tagset.py: cs.tagset: moved Entity and Entities to cs.tagged, drop .entity and .entity_ support from TagSet, not in Entity directly
+lib/python/cs/tagset.py: cs.tagset: some formatting
