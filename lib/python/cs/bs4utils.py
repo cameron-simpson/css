@@ -15,6 +15,8 @@ from cs.lex import cropped_repr, printt
 from cs.pfx import pfx
 from cs.gimmicks import warning
 
+__version__ = '20260912'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
