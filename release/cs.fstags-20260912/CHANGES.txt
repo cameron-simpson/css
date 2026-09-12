@@ -1,0 +1,5 @@
+lib/python/cs/fstags.py: cs.*: rename HasTags to Entity, UsesTagSets to Entities, TagSetTyping to ZonedTypes, etc, leaving compatibility names behind wrapped in @OBSOLETE
+lib/python/cs/fstags.py: cs.fstags: @uses_fstags: also open/close the fstags around the function call, ensures a sync
+lib/python/cs/fstags.py: cs.fstags: require -vv for a tracing print
+lib/python/cs/fstags.py: cs.fstags: update import of Entities
+lib/python/cs/fstags.py: cs.fstags: update DISTINFO for cs.tagged
