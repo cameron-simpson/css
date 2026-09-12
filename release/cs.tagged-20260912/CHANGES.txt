@@ -1,0 +1,6 @@
+lib/python/cs/tagged.py: cs.tagged: Entity, Entities, ZonedTypes all moved here fro cs.tagset
+lib/python/cs/tagged.py: cs.tagged: move the .entity and .entity_ namespaces in from ZonedTypes
+lib/python/cs/tagged.py: cs.tagged: ScanData: add an optional name, add a progress bar during .apply()
+lib/python/cs/tagged.py: cs.tagged: remove some debug
+lib/python/cs/tagged.py: cs.tagged: move DISTINFO to below imports an update it
+lib/python/cs/tagged.py: cs.tagged: ScanData: remove ties to SiteEntity, we use Entity as a key now, remove the .entities attribute, other updates
