@@ -1,0 +1,5 @@
+New NoAttrs leaf mixin to allow classes to freely use super().__getattr__ and to issue a more informative AttributeError.
+Refreshable: new refresh_related1() method for related objects to be refreshed but not recursively.
+Refreshable: use self.refresh_lock as a mutex if present.
+Refreshable: pass the related() and related1() items through not_none to accomodate these meethods returning some Nones, which is often expedient.
+Refreshable.{refresh,_refresh}: drop the optional resource parameter, turned out to be unused.
