@@ -332,7 +332,7 @@ from cs.threads import locked_property
 
 from cs.excutils import unattributable
 
-__version__ = '20260912'
+__version__ = '20260912-post'
 
 DISTINFO = {
     'keywords': ["python3"],
