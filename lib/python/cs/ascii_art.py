@@ -43,7 +43,7 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
 
 '''
 
-__version__ = '20260403-post'
+__version__ = '20260912'
 
 DISTINFO = {
     'keywords': ["python3"],
