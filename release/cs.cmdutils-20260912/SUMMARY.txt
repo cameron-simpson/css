@@ -1,0 +1,4 @@
+BaseCommand.repl(): improve the local vars.
+New optional apply(opts,field,value) field for option specs.
+BaseCommandOptions: replace .quiet and .verbose with .verbosity and properties for the other names, make -q and -v accrue a count via their apply functions.
+New vvprint() to print if options.verbosity>=2; qvprint is now obsolete, use vprint, since verbose and quiet are no longer independant.
