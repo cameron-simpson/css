@@ -11,6 +11,20 @@ from cs.lex import printt
 from cs.py.stack import caller
 from cs.threads import HasThreadState, ThreadState
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.fs',
+        'cs.lex',
+        'cs.py.stack',
+        'cs.threads',
+    ],
+}
+
 class Trace(HasThreadState):
   ''' A class/decorator to trace control flow and decisions.
       This makes it possible to record function calls and their
