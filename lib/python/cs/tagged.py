@@ -29,7 +29,7 @@ from cs.progress import progressbar
 from cs.tagset import TagSet, ZonedTypes
 from cs.trace import Trace
 
-__version__ = '20260912'
+__version__ = '20260912-post'
 
 DISTINFO = {
     'keywords': ["python3"],
