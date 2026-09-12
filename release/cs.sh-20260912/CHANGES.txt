@@ -1,0 +1,3 @@
+lib/python/cs/sh.py: cs.sh: docstring update, autoformat
+lib/python/cs/sh.py: cs.sh: docstring typo fix
+lib/python/cs/sh.py: cs.sh: rename quotecmd to quoteargv

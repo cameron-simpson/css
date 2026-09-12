@@ -15,7 +15,7 @@ As of Python 3.8 the function `shlex.join()` does what `quoteargv()` does.
 import string
 import sys
 
-__version__ = '20210316-post'
+__version__ = '20260912'
 
 DISTINFO = {
     'description':
