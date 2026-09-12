@@ -61,7 +61,7 @@ from cs.py3 import StringTypes, ustr, unicode
 
 from cs.x import X
 
-__version__ = '20250914-post'
+__version__ = '20260912'
 
 DISTINFO = {
     'description':
