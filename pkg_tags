@@ -105,6 +105,7 @@ cs.splink ok_revision=d931f30ab0db0d1e1aef4df8295a1b20e364a4be pypi.release="202
 cs.sqlalchemy_utils ok_revision=a24881e9b395ffdf7b4d01f65bf3e2a05eded692 pypi.release="20260531" features={"20230612":["orchestrated_session"],"20260531":["ORM__dbshell"]}
 cs.sqlalchemyutils
 cs.sqltags ok_revision=ab0819255ce37f72b0285bcc4f1357c7aa10e0e5 pypi.release="20260531"
+cs.tagged
 cs.tagset ok_revision="688af4502ee071488834a94e61866132d5e78299" features={"20221228":["TagFile_prune"],"20230126":["TagSet_is_stale"],"20240422":["fix_Tag__str__bad_TypeError","jsonable"],"20240422.2":["jsonable__for_json"],"20250528":["Tag__parse"],"20260531":["HasTags","TagSetTyping","UsesTagSets"]} pypi.release="20260531"
 cs.tarutils ok_revision=f9f22335cc4694b6778b813dac31792fe508d95a pypi.release="20260531"
 cs.taskqueue ok_revision="879d12f2e8d786307b2bee942c38f08ff73d8633" features={"20221207":["BaseTask"]} pypi.release="20250120"
@@ -113,7 +114,7 @@ cs.threads ok_revision=fa1689394ee248e9a28a8b317eca7fd5a464af99 pypi.release="20
 cs.timeseries ok_revision="795e4c4be59054f58d2c7e32e8a24f652c51cfb8" pypi.release="20240316"
 cs.timeutils ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.trace
-cs.tty
+cs.tty ok_revision="557f78161673a7fed31bc3d25b111f53195c8d51"
 cs.typeutils
 cs.typingutils ok_revision=f80b38e898d4b414dc6a51dc1658c49adbd19c7b features={"20230331":["subtype"],"20250428":["is_optional"],"20260525":["EQSortable","Sortable"]} pypi.release="20260525"
 cs.units ok_revision="37b0ea0c10088c737e8c0b881f7a6d631139a7f0" pypi.release="20260526"
