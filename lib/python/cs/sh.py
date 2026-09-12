@@ -28,7 +28,9 @@ DISTINFO = {
     ],
     'install_requires': [],
     'entry_points': {
-        'console_scripts': ['shqstr = cs.sh:main_shqstr'],
+        'console_scripts': {
+            'shqstr': 'cs.sh:main_shqstr'
+        },
     },
 }
 
