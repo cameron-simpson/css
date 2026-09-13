@@ -57,7 +57,7 @@ class VCS_Hg(HasFSPath, VCS):
           self.repo,
           *(arg.encode('utf-8') for arg in vcscmd_args),
           **{
-              opt: value.encode('utf-8')
+              opt: value.encode('utf-8') if isinstance(value, str) else value
               for opt, value in hgcmd_options.items()
           },
       )
@@ -116,9 +116,11 @@ class VCS_Hg(HasFSPath, VCS):
         for commit log entries since `tag`
         involving `paths` (a list of `str`).
     '''
-    for lineno, line in enumerate(
-        self.logs(paths, rev=tag + ':tip - ' + tag,
-                  template='{files}\t{desc|firstline}\n'), 1):
+    for lineno, line in enumerate(self.logs(
+        paths,
+        rev=[f'{tag!r}::tip'.encode('utf-8')],
+        template='{files}\t{desc|firstline}\n',
+    ), 1):
       with Pfx("line %d", lineno):
         print(f'{line=}')
         files, firstline = line.split('\t', 1)
