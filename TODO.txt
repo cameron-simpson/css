@@ -1,3 +1,4 @@
+CornuCopyBuffer: fix up .seekable
 eval->ast->parse-tree->nested-listing
 cs.ascii_art: print(RRTextBox("
 
