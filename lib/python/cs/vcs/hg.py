@@ -96,6 +96,7 @@ class VCS_Hg(HasFSPath, VCS):
   def resolve_revision(self, rev_spec):
     ''' Resolve a revision specification to the commit hash (a `str`).
     '''
+    raise RuntimeError
     with self._pipefrom('-i', '-r', rev_spec) as f:
       rev_hash = f.readline().rstrip()
     return rev_hash
@@ -131,7 +132,6 @@ class VCS_Hg(HasFSPath, VCS):
         template='{files}\t{desc|firstline}\n',
     ), 1):
       with Pfx("line %d", lineno):
-        print(f'{line=}')
         files, firstline = line.split('\t', 1)
         files = files.split()
         firstline = firstline.strip()
@@ -148,8 +148,7 @@ class VCS_Hg(HasFSPath, VCS):
     '''
     path_map = {}
     for path in paths:
-      for line in self.logs([path],
-                            ['-l', '1', '--template', '{rev} {node}\n']):
+      for line in self.logs([path], limit='1', template='{rev} {node}\n'):
         rev, node = line.split()
         break
       else:
