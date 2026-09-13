@@ -9,6 +9,7 @@ import io
 import os
 from types import SimpleNamespace as NS
 
+from cs.buffer import CornuCopyBuffer
 from cs.cache import cachedmethod
 from cs.fs import HasFSPath
 from cs.pfx import Pfx, pfx_method
@@ -63,7 +64,17 @@ class VCS_Hg(HasFSPath, VCS):
       )
     finally:
       output = u.popbuffer()
-    yield io.StringIO(output.decode('utf-8'))
+    yield CornuCopyBuffer([output])
+
+  def _linesfrom(self, vcscmd, *vcscmd_args, **hgcmd_options):
+    ''' A generator yielding `str` lines from the output of a Mercurial command.
+    '''
+    with self._pipefrom(vcscmd, *vcscmd_args, **hgcmd_options) as f:
+      while True:
+        bline = f.readline()
+        if not bline:
+          break
+        yield bline.decode('utf-8')
 
   def hg_cmd(self, hgcmd, *argv, **hgcmd_options):
     ''' Make sure external users know they're calling a backend
@@ -93,8 +104,7 @@ class VCS_Hg(HasFSPath, VCS):
   def tags(self):
     ''' Return the list of tags.
     '''
-    with self._pipefrom('tags') as f:
-      return list(map(lambda line: line.split(None, 1)[0], f))
+    return [line.split(None, 1)[0] for line in self._linesfrom('tags')]
 
   def tag(self, tag_name, revision=None, message=None):
     ''' Tag a revision with the supplied `tag`, by default revision "tip".
@@ -107,9 +117,8 @@ class VCS_Hg(HasFSPath, VCS):
     ''' Generator yielding lines from an "hg log" incantation
         with trailing `\r` and `\n` stripped.
     '''
-    with self._pipefrom('log', *paths, **logcmd_options) as f:
-      for line in f:
-        yield line.rstrip('\r\n')
+    for line in self._linesfrom('log', *paths, **logcmd_options):
+      yield line.rstrip('\r\n')
 
   def log_since(self, tag, paths):
     ''' Generator yielding `(commit_files,commit_firstline)`
@@ -168,14 +177,13 @@ class VCS_Hg(HasFSPath, VCS):
     if paths:
       status_argv.extend(paths)
     paths = []
-    with self._pipefrom(*status_argv) as f:
-      for line in f:
-        line = line.rstrip()
-        if not line:
-          continue
-        s, path = line.split(' ', 1)
-        if s != '?':
-          paths.append(path)
+    for line in self._linesfrom(*status_argv):
+      line = line.rstrip()
+      if not line:
+        continue
+      s, path = line.split(' ', 1)
+      if s != '?':
+        paths.append(path)
     return paths
 
   @staticmethod
