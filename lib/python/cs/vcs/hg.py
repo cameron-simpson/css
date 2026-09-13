@@ -3,14 +3,19 @@
 ''' Mercurial support for the cs.vcs package.
 '''
 
+from contextlib import contextmanager
+from functools import cached_property
+import io
+import os
 from types import SimpleNamespace as NS
 
 from cs.cache import cachedmethod
+from cs.fs import HasFSPath
 from cs.pfx import Pfx, pfx_method
 
 from . import VCS, ReleaseLogEntry
 
-class VCS_Hg(VCS):
+class VCS_Hg(HasFSPath, VCS):
   ''' Mercurial implementation of `cs.vcs.VCS`.
   '''
 
@@ -18,11 +23,64 @@ class VCS_Hg(VCS):
 
   TOPDIR_MARKER_ENTRY = '.hg'
 
-  def hg_cmd(self, *argv):
+  def __init__(self, fspath='.'):
+    super().__init__(fspath)
+
+  @cached_property
+  def ui(self):
+    from mercurial.ui import ui
+    return ui()
+
+  @cached_property
+  def repo(self):
+    from mercurial.hg import LocalFactory
+    repopath = self.fspath
+    repo = LocalFactory.instance(
+        self.ui,
+        os.fsencode(repopath) if isinstance(repopath, str) else repopath,
+        create=False,
+    )
+    return repo
+
+  @contextmanager
+  def _pipefrom(self, vcscmd, *vcscmd_args, **hgcmd_options):
+    ''' Context manager yielding the output of a Mercurial command.
+    '''
+    import mercurial.commands
+    cmdfunc = getattr(mercurial.commands, vcscmd)
+
+    u = self.ui
+    u.pushbuffer()
+    try:
+      cmdfunc(
+          u,
+          self.repo,
+          *(arg.encode('utf-8') for arg in vcscmd_args),
+          **{
+              opt: value.encode('utf-8')
+              for opt, value in hgcmd_options.items()
+          },
+      )
+    finally:
+      output = u.popbuffer()
+    yield io.StringIO(output.decode('utf-8'))
+
+  def hg_cmd(self, hgcmd, *argv, **hgcmd_options):
     ''' Make sure external users know they're calling a backend
         specific command line.
     '''
-    return self._cmd(*argv)
+    import mercurial.commands
+    cmdfunc = getattr(mercurial.commands, hgcmd)
+    u = self.ui
+    return cmdfunc(
+        u,
+        self.repo,
+        *(arg.encode('utf-8') for arg in argv),
+        **{
+            opt: value.encode('utf-8')
+            for opt, value in hgcmd_options.items()
+        },
+    )
 
   def resolve_revision(self, rev_spec):
     ''' Resolve a revision specification to the commit hash (a `str`).
@@ -43,19 +101,13 @@ class VCS_Hg(VCS):
     '''
     if revision is None:
       revision = 'tip'
-    args = ['tag', '-r', revision]
-    if message is not None:
-      args.extend(['-m', message])
-    args.extend(['--', tag_name])
-    self.hg_cmd(*args)
+    self.hg_cmd('tag', tag_name, message=message, rev=revision)
 
-  def logs(self, paths, hglog_options=None):
+  def logs(self, paths, **logcmd_options):
     ''' Generator yielding lines from an "hg log" incantation
         with trailing `\r` and `\n` stripped.
     '''
-    if hglog_options is None:
-      hglog_options = []
-    with self._pipefrom('log', *hglog_options, '--', *paths) as f:
+    with self._pipefrom('log', *paths, **logcmd_options) as f:
       for line in f:
         yield line.rstrip('\r\n')
 
@@ -64,10 +116,11 @@ class VCS_Hg(VCS):
         for commit log entries since `tag`
         involving `paths` (a list of `str`).
     '''
-    for lineno, line in enumerate(self.logs(
-        paths, ['-r', tag + ':tip - ' + tag, '--template',
-                '{files}\t{desc|firstline}\n']), 1):
+    for lineno, line in enumerate(
+        self.logs(paths, rev=tag + ':tip - ' + tag,
+                  template='{files}\t{desc|firstline}\n'), 1):
       with Pfx("line %d", lineno):
+        print(f'{line=}')
         files, firstline = line.split('\t', 1)
         files = files.split()
         firstline = firstline.strip()
@@ -103,7 +156,7 @@ class VCS_Hg(VCS):
     '''
     if not paths:
       raise ValueError("no paths supplied for commit")
-    self.hg_cmd('commit', '-m', message, '--', *paths)
+    self.hg_cmd('commit', *paths, message=message)
 
   @cachedmethod
   def uncommitted(self, paths=None):
@@ -157,5 +210,10 @@ class VCS_Hg(VCS):
         reverse=True
     )
     for log in self.log_entries(*release_tags):
-      tag, = (logtag for logtag in log.tags if logtag.startswith(tag_prefix))
-      yield ReleaseLogEntry(tag, log.desc)
+      logtags = {
+          logtag
+          for logtag in log.tags
+          if logtag.startswith(tag_prefix)
+      }
+      for tag in logtags:
+        yield ReleaseLogEntry(tag, log.desc)
