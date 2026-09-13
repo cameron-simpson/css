@@ -28,6 +28,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.lex',
+        'cs.obj',
     ],
 }
 
