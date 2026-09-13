@@ -44,7 +44,7 @@ class VCS(ABC):
   TOPDIR_MARKER_ENTRY = None
 
   def _pipefrom(self, *vcscmd_args):
-    ''' Context manager return the stdout of a VCS command.
+    ''' Return a context manager yielding the stdout of a VCS command.
     '''
     return pipef(self.COMMAND_NAME, *vcscmd_args, quiet=True)
 
