@@ -12,6 +12,7 @@
 '''
 
 from contextlib import contextmanager
+import io
 import os
 from os import fstat, pread, SEEK_SET, SEEK_CUR, SEEK_END
 import mmap
@@ -45,7 +46,7 @@ DEFAULT_READSIZE = 131072
 MEMORYVIEW_THRESHOLD = DEFAULT_READSIZE  # tweak if this gets larger
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
-class CornuCopyBuffer(Promotable):
+class CornuCopyBuffer(Promotable, io.BufferedIOBase):
   ''' An automatically refilling buffer intended to support parsing
       of data streams.
 
@@ -200,22 +201,6 @@ class CornuCopyBuffer(Promotable):
     except IndexError:
       return b''
 
-  def close(self):
-    ''' Close the buffer.
-        This discards the internal buffer of "read but not consumed" data
-        and calls the `close` callable supplied when the buffer was
-        initialised, if any.
-    '''
-    self.bufs = None
-    if self._close:
-      self._close()
-      self._close = None
-
-  def __del__(self):
-    ''' Release resources when the object is deleted.
-    '''
-    self.close()
-
   @staticmethod
   def _stat_final_offset(f):
     ''' Return the `final_offset` value from a file descriptor or file,
@@ -259,13 +244,15 @@ class CornuCopyBuffer(Promotable):
       it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
     else:
       it = FDIterator(fd, readsize=readsize, offset=offset)
-    return cls(
+    self = cls(
         it,
         close=it.close,
         offset=it.offset,
         final_offset=final_offset,
         **kw,
     )
+    self.fd = fd
+    return self
 
   def as_fd(self, maxlength=Ellipsis):
     ''' Create a pipe and dispatch a `Thread` to copy
@@ -345,26 +332,13 @@ class CornuCopyBuffer(Promotable):
           offset
         Other keyword arguments are passed to the buffer constructor.
     '''
-    try:
-      ftell = f.tell
-    except AttributeError:
-      is_seekable = False
-      foffset = None
-    else:
-      try:
-        foffset = ftell()
-      except OSError:
-        is_seekable = False
-        foffset = None
-      else:
-        is_seekable = True
     if offset is None:
       offset = foffset
     if final_offset is None:
       final_offset = cls._stat_final_offset(f)
     it = (
         SeekableFileIterator(f, readsize=readsize, offset=offset)
-        if is_seekable else FileIterator(f, readsize=readsize, offset=offset)
+        if f.seekable() else FileIterator(f, readsize=readsize, offset=offset)
     )
     return cls(it, offset=it.offset, final_offset=final_offset, **kw)
 
@@ -690,34 +664,6 @@ class CornuCopyBuffer(Promotable):
       return bytes(taken[0])
     return b''.join(taken)
 
-  def readline(self):
-    r'''Return a binary "line" from `self`, where a line is defined by
-        its ending `b'\n'` delimiter.
-        The final line from a buffer might not have a trailing newline;
-        `b''` is returned at EOF.
-
-        Example:
-
-            >>> bfr = CornuCopyBuffer([b'abc', b'def\nhij'])
-            >>> bfr.readline()
-            b'abcdef\n'
-            >>> bfr.readline()
-            b'hij'
-            >>> bfr.readline()
-            b''
-            >>> bfr.readline()
-            b''
-    '''
-    pending = []
-    for bs in self:
-      nlpos = bs.find(b'\n')
-      if nlpos >= 0:
-        pending.append(bs[:nlpos + 1])
-        self.push(bs[nlpos + 1:])
-        break
-      pending.append(bs)
-    return b''.join(pending)
-
   def peek(self, size, short_ok=False):
     ''' Examine the leading bytes of the buffer without consuming them,
         a `take` followed by a `push`.
@@ -727,93 +673,11 @@ class CornuCopyBuffer(Promotable):
     self.push(bs)
     return bs
 
-  def read(self, size, one_fetch=False):
-    ''' Compatibility method to allow using the buffer like a file.
-
-        Parameters:
-        * `size`: the desired data size
-        * `one_fetch`: do a single data fetch, default `False`
-
-        In `one_fetch` mode the read behaves like a POSIX file read,
-        returning up to to `size` bytes from a single I/O operation.
-    '''
-    if size < 1:
-      raise ValueError(f'{size=} < 1')
-    if size <= self.buflen:
-      return self.take(size)
-    # size > self.buflen
-    if not one_fetch:
-      self.extend(size, short_ok=True)
-    taken = self.takev(min(size, self.buflen))
-    size -= sum(len(buf) for buf in taken)
-    if size > 0:
-      # want more data
-      if one_fetch:
-        try:
-          buf = next(self)
-        except StopIteration:
-          pass
-        else:
-          if size < len(buf):
-            # push back the tail of the buffer
-            self.push(buf[size:])
-            buf = buf[:size]
-          taken.append(buf)
-    if not taken:
-      return b''
-    if len(taken) == 1:
-      return taken[0]
-    return b''.join(taken)
-
-  def read1(self, size):
-    ''' Shorthand method for `self.read(size,one_fetch=True)`.
-    '''
-    return self.read(size, one_fetch=True)
-
   def byte0(self):
     ''' Consume the leading byte and return it as an `int` (`0`..`255`).
     '''
     byte0, = self.take(1)
     return byte0
-
-  def tell(self):
-    ''' Compatibility method to allow using the buffer like a file.
-    '''
-    return self.offset
-
-  def seek(self, offset, whence=None, short_ok=False):
-    ''' Compatibility method to allow using the buffer like a file.
-        This returns the resulting absolute offset.
-
-        Parameters are as for `io.seek` except as noted below:
-        * `whence`: (default `os.SEEK_SET`). This method only supports
-          `os.SEEK_SET` and `os.SEEK_CUR`, and does not support seeking to a
-          lower offset than the current buffer offset.
-        * `short_ok`: (default `False`). If true, the seek may not reach
-          the target if there are insufficent `input_data` - the
-          position will be the end of the `input_data`, and the
-          `input_data` will have been consumed; the caller must check
-          the returned offset to check that it is as expected. If
-          false, a `ValueError` will be raised; however, note that the
-          `input_data` will still have been consumed.
-    '''
-    if whence is None:
-      whence = SEEK_SET
-    elif whence == SEEK_SET:
-      pass
-    elif whence == SEEK_CUR:
-      offset += self.offset
-    else:
-      raise ValueError(
-          f'seek: unsupported {whence=}, must be os.SEEK_SET or os.SEEK_CUR'
-      )
-    if offset < self.offset:
-      raise ValueError(
-          f'seek: target {offset=} < {self.offset=}; may not seek backwards'
-      )
-    if offset > self.offset:
-      self.skipto(offset, short_ok=short_ok)
-    return self.offset
 
   def skipto(self, new_offset, copy_skip=None, short_ok=False):
     ''' Advance to position `new_offset`. Return the new offset.
@@ -1033,6 +897,234 @@ class CornuCopyBuffer(Promotable):
       # assume this iterates byteslike objects
       return cls(obj)
     raise TypeError(f'{cls}.promote: cannot promote {r(obj)}')
+
+  ##############################################################################
+  # BufferedIOBase methods
+  #
+
+  def detach(self):
+    ''' Supports `io.BufferedIOBase`.
+    '''
+    raise io.UnsupportedOperation('detach')
+
+  def read(self, size, one_fetch=False):
+    ''' Read bytes from the buffer.
+        Supports `io.BufferedIOBase`.
+
+        Parameters:
+        * `size`: the desired data size
+        * `one_fetch`: do a single data fetch, default `False`
+
+        In `one_fetch` mode the read behaves like a POSIX file read,
+        returning up to to `size` bytes from a single I/O operation.
+    '''
+    if size == -1:
+      size = ...
+    elif size < 1:
+      raise ValueError(f'{size=} < 1')
+    if size <= self.buflen:
+      return self.take(size)
+    # size > self.buflen
+    if not one_fetch:
+      self.extend(size, short_ok=True)
+    taken = self.takev(min(size, self.buflen))
+    size -= sum(len(buf) for buf in taken)
+    if size > 0:
+      # want more data
+      if one_fetch:
+        try:
+          buf = next(self)
+        except StopIteration:
+          pass
+        else:
+          if size < len(buf):
+            # push back the tail of the buffer
+            self.push(buf[size:])
+            buf = buf[:size]
+          taken.append(buf)
+    if not taken:
+      return b''
+    if len(taken) == 1:
+      return taken[0]
+    return b''.join(taken)
+
+  def read1(self, size):
+    ''' Shorthand method for `self.read(size,one_fetch=True)`.
+        Supports `io.BufferedIOBase`.
+    '''
+    return self.read(size, one_fetch=True)
+
+  def readall(self):
+    ''' Read all the bytes from the buffer.
+        Supports `io.BufferedIOBase`.
+    '''
+    return self.read(...)
+
+  def readinto(self, b):
+    ''' Read from the buffer and write into `b`.
+        Return the number of bytes read.
+        Supports `io.BufferedIOBase`.
+    '''
+    bs = self.read(len(b))
+    b[:len(bs)] = bs
+    return len(bs)
+
+  def readline(self, size=-1):
+    r'''Return a binary "line" from `self`, where a line is defined by
+        its ending `b'\n'` delimiter.
+        The final line from a buffer might not have a trailing newline;
+        `b''` is returned at EOF.
+
+        Example:
+
+            >>> bfr = CornuCopyBuffer([b'abc', b'def\nhij'])
+            >>> bfr.readline()
+            b'abcdef\n'
+            >>> bfr.readline()
+            b'hij'
+            >>> bfr.readline()
+            b''
+            >>> bfr.readline()
+            b''
+    '''
+    if size != -1:
+      raise ValueError(f'nondefault {size=} is not supported')
+    pending = []
+    for bs in self:
+      nlpos = bs.find(b'\n')
+      if nlpos >= 0:
+        pending.append(bs[:nlpos + 1])
+        self.push(bs[nlpos + 1:])
+        break
+      pending.append(bs)
+    return b''.join(pending)
+
+  def readlines(self, hint=-1):
+    ''' Read lines from the file.
+        Supports `io.BufferedIOBase`.
+    '''
+    if hint is not None and hint > 0:
+      raise ValueError(f'nondefault {hint=} is not supported')
+    lines = []
+    while True:
+      line = self.readline()
+      if not line:
+        break
+      lines.append(line)
+    return lines
+
+  def tell(self):
+    ''' Return the current buffer offset.
+        Supports `io.BufferedIOBase`.
+    '''
+    return self.offset
+
+  def seek(self, offset, whence=None, short_ok=False):
+    ''' Return the resulting absolute offset.
+        Supports `io.BufferedIOBase`.
+
+        Parameters are as for `io.seek` except as noted below:
+        * `whence`: (default `os.SEEK_SET`). This method only supports
+          `os.SEEK_SET` and `os.SEEK_CUR`, and does not support seeking to a
+          lower offset than the current buffer offset.
+        * `short_ok`: (default `False`). If true, the seek may not reach
+          the target if there are insufficent `input_data` - the
+          position will be the end of the `input_data`, and the
+          `input_data` will have been consumed; the caller must check
+          the returned offset to check that it is as expected. If
+          false, a `ValueError` will be raised; however, note that the
+          `input_data` will still have been consumed.
+    '''
+    if whence is None:
+      whence = SEEK_SET
+    elif whence == SEEK_SET:
+      pass
+    elif whence == SEEK_CUR:
+      offset += self.offset
+    else:
+      raise ValueError(
+          f'seek: unsupported {whence=}, must be os.SEEK_SET or os.SEEK_CUR'
+      )
+    if offset < self.offset:
+      raise ValueError(
+          f'seek: target {offset=} < {self.offset=}; may not seek backwards'
+      )
+    if offset > self.offset:
+      self.skipto(offset, short_ok=short_ok)
+    return self.offset
+
+  def seekable(self):
+    ''' `CornuCopyBuffer`s are seekable, but not backwards.
+        Supports `io.BufferedIOBase`.
+    '''
+    return True
+
+  def readable(self):
+    ''' `CornuCopyBuffer`s are readable.
+        Supports `io.BufferedIOBase`.
+    '''
+    return True
+
+  def writeable(self):
+    ''' `CornuCopyBuffer`s are not writable.
+        Supports `io.BufferedIOBase`.
+    '''
+    return False
+
+  def write(self, data):
+    ''' `CornuCopyBuffer`s are not writable.
+        Supports `io.BufferedIOBase`.
+    '''
+    raise io.UnsupportedOperation('write')
+
+  def writelines(self, lines):
+    ''' `CornuCopyBuffer`s are not writable.
+        Supports `io.BufferedIOBase`.
+    '''
+    raise io.UnsupportedOperation('writelines')
+
+  def close(self):
+    ''' Close the buffer.
+        This discards the internal buffer of "read but not consumed" data
+        and calls the `close` callable supplied when the buffer was
+        initialised, if any.
+        Supports `io.BufferedIOBase`.
+    '''
+    super().close()
+    self.bufs = None
+    if self._close:
+      self._close()
+      self._close = None
+
+  def fileno(self):
+    ''' Return the underlying file descriptor (an integer) of the stream if it exists.
+        Supports `io.BufferedIOBase`.
+    '''
+    try:
+      return self.fd
+    except AttributeError:
+      raise io.UnsupportedOperation('fileno')
+
+  def flush(self):
+    ''' Flush is a no-op.
+        Supports `io.BufferedIOBase`.
+    '''
+
+  def isatty(self):
+    ''' Return `True` if underlying file descriptor is a tty.
+        Supports `io.BufferedIOBase`.
+    '''
+    try:
+      fd = self.fd
+    except AttributeError:
+      return False
+    return os.isatty(fd)
+
+  def __del__(self):
+    ''' Release resources when the object is deleted.
+        Supports `io.BufferedIOBase`.
+    '''
+    self.close()
 
 class _BoundedBufferIterator:
   ''' An iterator over the data from a CornuCopyBuffer with an end
