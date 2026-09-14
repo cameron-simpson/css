@@ -907,7 +907,7 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
     '''
     raise io.UnsupportedOperation('detach')
 
-  def read(self, size, one_fetch=False):
+  def read(self, size=-1, one_fetch=False):
     ''' Read bytes from the buffer.
         Supports `io.BufferedIOBase`.
 
@@ -922,12 +922,14 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
       size = ...
     elif size < 1:
       raise ValueError(f'{size=} < 1')
-    if size <= self.buflen:
+    if size is not ... and size <= self.buflen:
       return self.take(size)
     # size > self.buflen
     if not one_fetch:
       self.extend(size, short_ok=True)
-    taken = self.takev(min(size, self.buflen))
+    if size is ...:
+      size = self.buflen
+    taken = self.takev(size)
     size -= sum(len(buf) for buf in taken)
     if size > 0:
       # want more data
