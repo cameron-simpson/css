@@ -85,7 +85,7 @@ cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release="20260531" ok_revision=ab0baf20e374652acbcf77c504a18570482150f5 features={"20250306":["content_length","content_type","default_headerregistry","header"],"20260531":["content_encodings"]}
 cs.semantics ok_revision=efc3bbb8a0e9059323f57e8b97c7d8b51093c6b7 features={"20250103":["ClosedError","not_closed"]} pypi.release="20250103"
 cs.seq pypi.release="20260912" ok_revision=b14e08b948ccdc76fe696b8beca439a30dd48c2a featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"],"20250724":["ClonedIterator"],"20251230":["not_none","unbound_range"],"20251231":["range__class_getitem"],"20251231.1":["range__genericalias"],"20260403":["with_neighbours"],"20260525":["Ordered"],"20260525.1":["order"],"20260622":["ReIterable","consume","consumed"]}
-cs.service_api ok_revision=efd8a2dc51a41cfd4869867383db8977aa83ffd2 pypi.release="20260531" features={"20260914":["LoginPasswordCredentials","LoginState","UsesCredentials"]}
+cs.service_api ok_revision=efd8a2dc51a41cfd4869867383db8977aa83ffd2 pypi.release="20260914" features={"20260914":["LoginPasswordCredentials","LoginState","UsesCredentials"]}
 cs.sh ok_revision=d665a49864def9be07aa73a68e60fb3baccf8dfc features={"20260912":["quoteargv"]} pypi.release="20260912.1"
 cs.sharedfile ok_revision="064c2afbc58e93bf74d0f0886b6e40ac2254a7da" pypi.release="20230212"
 cs.splink ok_revision=d931f30ab0db0d1e1aef4df8295a1b20e364a4be pypi.release="20240316"
@@ -107,5 +107,6 @@ cs.upd ok_revision="3ad1a5ebe519cd18bb236d0575435fba49ac146b" pypi.release="2026
 cs.urlutils ok_revision=b4ea3cf304216020d5a7f1f21b5aa18f9d3a3060 pypi.release="20260531"
 cs.x ok_revision="04993b7bcc25b66e2477a5efa3b3ae9f12c7dcd6" pypi.release="20240630" features={"20231129":["via_logger"]}
 icontract
+requests
 sqlalchemy
 typeguard
