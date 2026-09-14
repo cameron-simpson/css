@@ -11,6 +11,7 @@ from types import SimpleNamespace as NS
 
 from cs.buffer import CornuCopyBuffer
 from cs.cache import cachedmethod
+from cs.deco import uses_cmd_options
 from cs.fs import HasFSPath
 from cs.pfx import Pfx, pfx_method
 
@@ -44,9 +45,28 @@ class VCS_Hg(HasFSPath, VCS):
     return repo
 
   @contextmanager
-  def _pipefrom(self, vcscmd, *vcscmd_args, **hgcmd_options):
+  @uses_cmd_options(doit=True, verbose=False)
+  def _pipefrom(
+      self, vcscmd, *vcscmd_args, doit: bool, verbose: bool, **hgcmd_options
+  ):
     ''' Context manager yielding the output of a Mercurial command.
     '''
+    if verbose:
+      print(
+          '+ hg',
+          "\n    ".join(
+              (
+                  ' '.join((vcscmd, *map(repr, vcscmd_args))),
+                  *(
+                      f'{opt}={value!r}'
+                      for opt, value in hgcmd_options.items()
+                  ),
+              )
+          ),
+          '|',
+      )
+    if not doit:
+      return
     import mercurial.commands
     cmdfunc = getattr(mercurial.commands, vcscmd)
 
@@ -76,10 +96,26 @@ class VCS_Hg(HasFSPath, VCS):
           break
         yield bline.decode('utf-8')
 
-  def hg_cmd(self, hgcmd, *argv, **hgcmd_options):
+  @uses_cmd_options(doit=True, quiet=False)
+  def hg_cmd(self, hgcmd, *argv, doit: bool, quiet: bool, **hgcmd_options):
     ''' Make sure external users know they're calling a backend
         specific command line.
     '''
+    if not quiet:
+      print(
+          '+ hg',
+          "\n    ".join(
+              (
+                  ' '.join((hgcmd, *map(repr, argv))),
+                  *(
+                      f'{opt}={value!r}'
+                      for opt, value in hgcmd_options.items()
+                  ),
+              )
+          ),
+      )
+    if not doit:
+      return
     import mercurial.commands
     cmdfunc = getattr(mercurial.commands, hgcmd)
     u = self.ui
@@ -199,7 +235,6 @@ class VCS_Hg(HasFSPath, VCS):
       if s != '?':
         paths.append(path)
     return paths
-
 
   def log_entries(self, *revs):
     ''' Return the log entry for the specified revision `rev`.
