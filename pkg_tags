@@ -57,7 +57,7 @@ cs.lex pypi.release="20260912" ok_revision=f2db2b6135e8d41c0be3259ba2995f8827539
 cs.logutils pypi.release="20260912" ok_revision=c45480a620df644eda20c3eb37d02901a0725895 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"],"20240630":["LoggingState"],"20260912":["vvwarning","vwarning"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappings pypi.release="20260912" ok_revision="45dbae92b4fc7f7decee055ba6a5447fbb163158" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"],"20250306":["mapped_property","missingdict"],"20250528":["change_mapping"]}
-cs.mediainfo ok_revision="63c72c2dc9c92e815d07271413a494ed5af298a0" pypi.release="20260531"
+cs.mediainfo ok_revision="63c72c2dc9c92e815d07271413a494ed5af298a0" pypi.release="20260531" features={"20260914":["SeriesEpisodeInfo__from_Mapping"]}
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
 cs.mplutils ok_revision=c3516c78f9d056d621055c19e4ad3d2f597b5c23 pypi.release="20241122" features={"20220918":["FigureSize"]}
 cs.naysync ok_revision=bbdf2f52bcb16b068351c1ea8a3aab77dcd69dc5 features={"20241214":["afunc","agen"],"20241220":["amap","async_iter"],"20250103":["AnyIterable","AsyncPipeLine","StageMode","aqget","aqiter"],"20260415":["Lock","aqget__tpe","to_threadpool"],"20260530":["amap__with_exceptions"]} pypi.release="20260530"
