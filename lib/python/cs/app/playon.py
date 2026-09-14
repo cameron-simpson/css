@@ -843,7 +843,7 @@ class PlayOn(Entities, Refreshable):
           dl_id = int(arg)
         except ValueError:
           warning(
-              "unsupported word, expected one of all, available, downloaded, expired, pending, queues or a /search"
+              "unsupported word, expected one of all, available, downloaded, expired, pending, queued or a /search"
           )
         else:
           recordings.append(self[dl_id])
