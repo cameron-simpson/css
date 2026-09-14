@@ -47,7 +47,7 @@ MEMORYVIEW_THRESHOLD = DEFAULT_READSIZE  # tweak if this gets larger
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
 class CornuCopyBuffer(Promotable, io.BufferedIOBase):
-  ''' An automatically refilling buffer intended to support parsing
+  r'''An automatically refilling buffer intended to support parsing
       of data streams.
 
       Its primary purpose is to aid binary parsers
