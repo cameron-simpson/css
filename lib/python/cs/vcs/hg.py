@@ -93,6 +93,21 @@ class VCS_Hg(HasFSPath, VCS):
         },
     )
 
+  def hg_archive(
+      self,
+      dirpath,
+      vcs_revision,
+      paths,
+  ):
+    return self.hg_cmd(
+        'archive',
+        dirpath,
+        rev=vcs_revision,
+        prefix=b'',
+        exclude=[],
+        include=[path.encode('utf-8') for path in paths],
+    )
+
   def resolve_revision(self, rev_spec):
     ''' Resolve a revision specification to the commit hash (a `str`).
     '''
@@ -185,13 +200,6 @@ class VCS_Hg(HasFSPath, VCS):
         paths.append(path)
     return paths
 
-  @staticmethod
-  def hg_include(paths):
-    ''' Generator yielding hg(1) -I/-X option strings to include the `paths`.
-    '''
-    for subpath in paths:
-      yield '-I'
-      yield 'path:' + subpath
 
   def log_entries(self, *revs):
     ''' Return the log entry for the specified revision `rev`.

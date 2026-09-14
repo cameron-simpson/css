@@ -1418,13 +1418,7 @@ class Module:
     '''
     # mkdir omitted, done by @atomic_directory
     # unpack the source
-    vcs.hg_cmd(
-        'archive',
-        ('-r', vcs_revision),
-        *vcs.hg_include(self.paths()),
-        '--',
-        release_dirpath,
-    )
+    vcs.hg_archive(release_dirpath, vcs_revision, self.paths())
     # flit has src/ hardwired
     os.symlink(PYLIBTOP, joinpath(release_dirpath, 'src'))
     if bare:
