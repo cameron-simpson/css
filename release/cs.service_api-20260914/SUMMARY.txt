@@ -1,0 +1,5 @@
+New LoginPasswordCredentials class (uses netrc by default), UsesCredentials mixin (uses LoginPasswordCredentials by default).
+ServiceAPI now subclasses UsesCredentials.
+ServiceAPI: provide a concurrency Semaphore if desired.
+ServiceAPI: new concurrency parameter to control the concurrency of API requests, default from API_CONCURRENCY_LIMIT.
+New LoginState base class intended to track API login status.

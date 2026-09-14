@@ -1,0 +1,11 @@
+lib/python/cs/service_api.py: cs.service_api: new LoginPasswordCredentials (uses netrc by default), UsesCredentials mixin (uses LoginPasswordCredentials by default), ServiceAPI now subclasses UsesCredentials
+lib/python/cs/service_api.py: cs.service_api: ServiceAPI: provide a concurrency Semaphore if desired
+lib/python/cs/service_api.py: cs.service_api: ServiceAPI: new concurrency parameter to control the concurrency of API requests, default from API_CONCURRENCY_LIMIT
+lib/python/cs/service_api.py: cs.service_api: add missing import
+lib/python/cs/service_api.py: cs.service_api: HTTPServiceAPI.suburl: add Pfx context, make the run_task proxy on call, defer the ticker until the semaphore is obtained
+lib/python/cs/service_api.py: cs.service_api: shuffle assignment
+lib/python/cs/service_api.py: cs.service_api: rename UsesTagSets to Entities
+lib/python/cs/service_api.py: cs.service_api: check runstate after obtaining the semaphore
+lib/python/cs/service_api.py: cs.service_api: new LoginState base class intended to track API login status
+lib/python/cs/service_api.py: cs.service_api: update import of Entity and Entities
+lib/python/cs/service_api.py: cs.service_api: update DISTINFO

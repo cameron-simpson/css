@@ -39,7 +39,7 @@ from cs.tagged import Entity, Entities
 from cs.threads import pmap
 from cs.upd import run_task
 
-__version__ = '20260531-post'
+__version__ = '20260914'
 
 DISTINFO = {
     'keywords': ["python3"],
