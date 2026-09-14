@@ -117,6 +117,7 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.sqlalchemy_utils>=20210420',
+        'cs.tagged',
         'cs.tagset>=20211212',
         'cs.threads>=20201025',
         'cs.upd',
@@ -129,7 +130,7 @@ DISTINFO = {
 # regexp for "word[,word...]:", the leading prefix for categories
 # if not specified by the -c command line option
 CATEGORIES_PREFIX_re = re.compile(
-    r'(?P<categories>[a-z]\w*(,[a-z]\w*)*):\s*', re.I
+    r'(?P<categories>[a-z]\w*(,[a-z]\w*)*):\s*', re.IGNORECASE
 )
 
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
