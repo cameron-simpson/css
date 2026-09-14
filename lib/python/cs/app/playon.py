@@ -56,7 +56,7 @@ from cs.threads import pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
-__version__ = '20260914'
+__version__ = '20260914-post'
 
 DISTINFO = {
     'keywords': ["python3"],
