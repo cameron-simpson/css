@@ -1,0 +1,3 @@
+Rename HasTags to Entity, UsesTagSets to Entities, TagSetTyping to ZonedTypes, move into cs.tagged.
+SQLTags: add SQLTags.DB_URL_MEMORY='sqlite://', used as a default by Pilfer.
+A few other small changes.
