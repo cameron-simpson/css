@@ -61,12 +61,18 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
       sizes come from its `input_data` source, preceeded by any
       content in the internal buffer.
 
-      A `CornuCopyBuffer` also supports the file methods `.read`,
-      `.tell` and `.seek` supporting drop in use of the buffer in
-      many file contexts. Backward seeks are not supported. `.seek`
-      will take advantage of the `input_data`'s `.seek` method if it
-      has one, otherwise it will use consume the `input_data`
-      as required.
+      A `CornuCopyBuffer` also implements `io.BufferedIOBase` and
+      so supports file methods such as `.read`, `.tell` and `.seek`
+      supporting drop in use of the buffer in many file contexts.
+      Note that backward seeks are not supported. `.seek` will take
+      advantage of the `input_data`'s `.seek` method if it has one,
+      otherwise it will use consume the `input_data` as required.
+
+      It also supprts `.readline()` and `.readlines()` like a text
+      file, but the lines are `bytes` ending in `b'\n'`.
+      Note that as mentioned earlier, iteration yields the natural
+      `bytes` chunks from the underlying iterator, _and does not
+      yield "lines"_.
 
       Attributes:
       * `buf`: the first of any buffered leading chunks
@@ -913,7 +919,7 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
   #
 
   def detach(self):
-    ''' Supports `io.BufferedIOBase`.
+    ''' Supports `io.BufferedIOBase`; raises `io.UnsupportedOperation`.
     '''
     raise io.UnsupportedOperation('detach')
 
@@ -1084,13 +1090,13 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
     return False
 
   def write(self, data):
-    ''' `CornuCopyBuffer`s are not writable.
+    ''' `CornuCopyBuffer`s are not writable; raises `io.UnsupportedOperation`.
         Supports `io.BufferedIOBase`.
     '''
     raise io.UnsupportedOperation('write')
 
   def writelines(self, lines):
-    ''' `CornuCopyBuffer`s are not writable.
+    ''' `CornuCopyBuffer`s are not writable; raises `io.UnsupportedOperation`.
         Supports `io.BufferedIOBase`.
     '''
     raise io.UnsupportedOperation('writelines')
@@ -1109,7 +1115,8 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
       self._close = None
 
   def fileno(self):
-    ''' Return the underlying file descriptor (an integer) of the stream if it exists.
+    ''' Return the underlying file descriptor (an integer) of the stream if it exists,
+        otherwise raises `io.UnsupportedOperation`.
         Supports `io.BufferedIOBase`.
     '''
     try:
@@ -1123,7 +1130,8 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
     '''
 
   def isatty(self):
-    ''' Return `True` if underlying file descriptor is a tty.
+    ''' Return `True` if underlying file descriptor is a tty;
+        `False` is there is no underlying file descriptor.
         Supports `io.BufferedIOBase`.
     '''
     try:
