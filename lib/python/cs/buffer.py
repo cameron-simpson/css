@@ -22,7 +22,7 @@ from threading import Lock, Thread
 from typing import List
 
 from cs.deco import Promotable
-from cs.gimmicks import Buffer, r
+from cs.gimmicks import Buffer, r, warning
 
 __version__ = '20260914-post'
 
@@ -150,7 +150,7 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
           any object supporting `+=` is acceptable
         * `final_offset`: optional `int` specifying the largest
           offset expected to be reached, intended for uses such as
-          callers presenting a pregress indication; this is, for
+          callers presenting a progress indication; this is, for
           example, provided by `CornuCopyBuffer.from_fd` for regular
           files using the `stat.st_size` field
     '''
@@ -161,7 +161,7 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
       self.bufs.append(buf)
       self.buflen = len(buf)
     self.offset = offset
-    self.seekable = seekable
+    self._seekable_input = seekable
     input_data = iter(input_data)
     if copy_chunks is not None:
       input_data = CopyingIterator(input_data, copy_chunks)
@@ -237,11 +237,13 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
           start with this offset
         Other keyword arguments are passed to the buffer constructor.
     '''
+    seekable = None
     st = fstat(fd)
     if S_ISREG(st.st_mode):
       if final_offset is None:
         final_offset = st.st_size
       it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
+      seekable = True
     else:
       it = FDIterator(fd, readsize=readsize, offset=offset)
     self = cls(
@@ -249,6 +251,7 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
         close=it.close,
         offset=it.offset,
         final_offset=final_offset,
+        seekable=seekable,
         **kw,
     )
     self.fd = fd
@@ -332,15 +335,22 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
           offset
         Other keyword arguments are passed to the buffer constructor.
     '''
+    seekable = f.seekable()
     if offset is None:
       offset = foffset
     if final_offset is None:
       final_offset = cls._stat_final_offset(f)
     it = (
         SeekableFileIterator(f, readsize=readsize, offset=offset)
-        if f.seekable() else FileIterator(f, readsize=readsize, offset=offset)
+        if seekable else FileIterator(f, readsize=readsize, offset=offset)
     )
-    return cls(it, offset=it.offset, final_offset=final_offset, **kw)
+    return cls(
+        it,
+        offset=it.offset,
+        final_offset=final_offset,
+        seekable=seekable,
+        **kw
+    )
 
   @classmethod
   def from_filename(cls, filename: str, offset=None, final_offset=None, **kw):
@@ -724,19 +734,19 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
     assert not self.bufs
     assert self.buflen == 0
     # advance the rest of the way
-    seekable = False if copy_skip else self.seekable
+    seekable = False if copy_skip else self._seekable_input
     if seekable is None or seekable:
       # should we do a seek?
       try:
         input_seek = self.input_data.seek
       except AttributeError:
         if seekable is not None:
-          print(
-              f'{self}.skip: warning: {seekable=} but no input_data.seek method,'
+          warning(
+              f'{self}.skip: {seekable=} but no input_data.seek method,'
               " resetting seekable to False",
               file=sys.stderr,
           )
-        self.seekable = False
+        self._seekable_input = False
       else:
         # input_data has a seek method, try to use it
         new_offset = self.offset + toskip
@@ -744,12 +754,12 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
         try:
           input_seek(input_offset)
         except OSError as e:
-          print(
-              f'{self}.skip: warning: input_data.seek({input_offset}): {e}'
-              ', resetting self.seekable to False',
+          warning(
+              f'{self}.skip: input_data.seek({input_offset}): {e}'
+              ', resetting self._seekable_input to False',
               file=sys.stderr,
           )
-          self.seekable = False
+          self._seekable_input = False
         else:
           # successful seek, update offset and return
           self.offset = new_offset
@@ -1056,7 +1066,7 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
     return self.offset
 
   def seekable(self):
-    ''' `CornuCopyBuffer`s are seekable, but not backwards.
+    ''' `CornuCopyBuffer`s are seekable, although not backwards.
         Supports `io.BufferedIOBase`.
     '''
     return True
