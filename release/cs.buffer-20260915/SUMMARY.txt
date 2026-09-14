@@ -1,0 +1,2 @@
+Fix the internal seekable logic.
+Documentation updates.
