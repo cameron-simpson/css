@@ -1,0 +1,33 @@
+lib/python/cs/app/playon.py: cs.app.playon: move PlayOnCommand down the bottom
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: get the TaggedPath from the ambient FSTags
+lib/python/cs/app/playon.py: cs.app.playon: _PlayOnEntity._refresh: uses the new data= support here and in the batch entity update
+lib/python/cs/app/playon.py: cs.app.playon: new PlayOn(UsesTagSets) class, will be used to migrate some things out of the API
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: make a singleton based on the account name, honour $PLAYON_ACCOUNT for the default account name
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.login: split out the credentials lookup into its own private method
+lib/python/cs/app/playon.py: cs.app.playon: move the playon entities stuff to below the API
+lib/python/cs/app/playon.py: cs.app.playon: a heap of changes for moving thr entity based stuff out of the API into the PlayOn class
+lib/python/cs/app/playon.py: cs.app.playon: use the new UsesCredentials mixin to get the login credentials
+lib/python/cs/app/playon.py: cs.app.playon: LoginState: refresh_needed measures the token expiry, refresh-resource returns the login endpoint, _refresh fetches from playon_api.login_state which does a freh login if necessary
+lib/python/cs/app/playon.py: cs.app.playon: strip some debugging, drop @monitor, breaks properties and class methods
+lib/python/cs/app/playon.py: cs.app.playon: tidy imports
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI: drop tagset stuff, we will b removing that from service_api an the names are now defined in a different order anyway
+lib/python/cs/app/playon.py: cs.app.playon: the Feature entity type
+lib/python/cs/app/playon.py: cs.*: rename HasTags to Entity, UsesTagSets to Entities, TagSetTyping to ZonedTypes, etc, leaving compatibility names behind wrapped in @OBSOLETE
+lib/python/cs/app/playon.py: cs.app.playon: make PlayOn refreshable, loading the queue and library (recordings); PlayOnCommand.run_context: refresh the PlayOn
+lib/python/cs/app/playon.py: cs.app.playon: drop LoginState, might be a poor idea to leave the token in the database
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_refresh: drop the CLI arguments, run PlayOn.refresh()
+lib/python/cs/app/playon.py: cs.app.playon: tidyup, fix PlayOn.features
+lib/python/cs/app/playon.py: cs.app.playon: update imports
+lib/python/cs/app/playon.py: cs.app.playon: removing debug
+lib/python/cs/app/playon.py: cs.app.playon: Recording.ls: use strict=False with format_as - queued items do not yet have a HumanSize field
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnCommand.cmd_queue: now a shim for cmd_ls(queued)
+lib/python/cs/app/playon.py: cs.app.playon: Recording.download: attach the Recording to the download file fstags
+lib/python/cs/app/playon.py: cs.app.playon: PlayOnAPI.download: return (saved,data); PlayOn.download: bugfix the tagging of the saved file
+lib/python/cs/app/playon.py: cs.app.playon: new Recording.as_SeriesEpisodeInfo() to support use by SeriesEpisodeInfo.from_Mapping
+lib/python/cs/app/playon.py: cs.app.playon: drop PlayonSeriesEpisodeInfo, no longer needed - supplanted by Recording.as_SeriesEpisodeInfo
+lib/python/cs/app/playon.py: cs.app.playon: PlayOn._refresh: return True
+lib/python/cs/app/playon.py: cs.app.playon: cleaner _PlayOnEntity._refresh(); PlayOn: set TagsetsClass=PlayOnSQLTags, drop wrong EntitiesClass
+lib/python/cs/app/playon.py: cs.app.playon: new PlayOnLoginState to track the API login status
+lib/python/cs/app/playon.py: cs.app.playon: drop the Refreshable resource parameter, update imports
+lib/python/cs/app/playon.py: cs.app.playon: spelling fix
+lib/python/cs/app/playon.py: cs.app.playon: update DISTINFO, clean some lint
