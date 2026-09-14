@@ -49,7 +49,8 @@ from cs.lex import cutprefix, cutsuffix, get_prefix_n, get_suffix_part
 from cs.obj import Refreshable
 from cs.pfx import Pfx, pfx
 from cs.seq import consume
-from cs.tagset import Entities, Tag
+from cs.tagged import Entities
+from cs.tagset import Tag
 from cs.threads import pmap
 
 __version__ = '20260531-post'
@@ -123,7 +124,7 @@ class EpisodeDatumDefn(namedtuple('EpisodeDatumDefn', 'name prefix re')):
   '''
 
   def __new__(cls, name, prefix):
-    r = re.compile(prefix + r'(\d+)', re.I)
+    r = re.compile(prefix + r'(\d+)', re.IGNORECASE)
     return super(EpisodeDatumDefn, cls).__new__(cls, name, prefix, r)
 
   def parse(self, s, offset=0):
@@ -365,7 +366,7 @@ class SeriesEpisodeInfo(Promotable):
     if not series:
       # look for leading "series - sSSeEE"
       m = re.match(
-          r'(?P<series>\S.*\S)\s+(-\s+)?(?=s\d+e\d+\s)', episode_title, re.I
+          r'(?P<series>\S.*\S)\s+(-\s+)?(?=s\d+e\d+\s)', episode_title, re.IGNORECASE
       )
       if m:
         series = m.group('series')
