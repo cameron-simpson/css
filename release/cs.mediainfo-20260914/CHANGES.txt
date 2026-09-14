@@ -1,0 +1,4 @@
+lib/python/cs/mediainfo.py: cs.mediainfo: new SeriesEpisodeInfo.from_Mapping to compute from a mapping such as a TaggedPath - follows the id.* Entities references
+lib/python/cs/mediainfo.py: cs.mediainfo: tidy
+lib/python/cs/mediainfo.py: cs.mediainfo: lint, update imports
+lib/python/cs/mediainfo.py: cs.mediainfo: update DISTINFO

@@ -53,7 +53,7 @@ from cs.tagged import Entities
 from cs.tagset import Tag
 from cs.threads import pmap
 
-__version__ = '20260531-post'
+__version__ = '20260914'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
