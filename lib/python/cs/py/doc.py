@@ -15,6 +15,7 @@ from inspect import (
     signature,
 )
 from itertools import chain
+from pprint import pformat
 
 from cs.fsm import FSM
 from cs.gvutils import gvdataurl, GVDATAURL, gvsvg
@@ -73,7 +74,7 @@ def module_doc(
 
   def doc_item(anchor, header, obj_doc, nl="\n"):
     ## return f'\n\n## <a name="{anchor}"></a>`{header}`\n\n{obj_doc}'
-    list_item = f'{nl}- <a name="{anchor}"></a>`{str(header)}`: {stripped_dedent(obj_doc,sub_indent="  ")}'
+    list_item = f'{nl}- <a name="{anchor}"></a>`{header}`: {stripped_dedent(obj_doc,sub_indent="  ")}'
     return list_item
 
   full_docs.append('\n\nShort summary:')
@@ -98,7 +99,10 @@ def module_doc(
         line1 += '.'
       full_docs.append(f'\n* `{Mname}`: {line1}')
 
-  full_docs.append('\n\nModule contents:')
+  # partition the contents into classes, functions and other
+  classes = {}
+  functions = {}
+  others = {}
   for Mname, obj in sorted(module_attributes(module), key=sort_key):
     with Pfx(Mname):
       if ALL and Mname not in ALL:
@@ -110,111 +114,137 @@ def module_doc(
         # name imported from another module
         continue
       assert obj_module
-      obj_doc = obj_docstring(obj) if obj_module else ''
-      if not callable(obj):
-        if obj_doc:
-          full_docs.append(doc_item(Mname, f'{Mname} = {obj!r}', obj_doc))
-        continue
-      if not obj_doc:
-        continue
       if isfunction(obj):
-        sig = signature(obj)
-        full_docs.append(doc_item(Mname, f'{Mname}{sig}', obj_doc))
+        functions[Mname] = obj
       elif isclass(obj):
-        classname_etc = Mname
-        # compute the list of immediate superclass names
-        mro_names = []
-        mro_set = set(obj.__mro__)
-        for superclass in obj.__mro__:
-          if superclass not in mro_set:
-            continue
-          if (superclass is not object and superclass is not obj
-              and superclass is not abc.ABC):
-            supername = superclass.__name__
-            supermod = getmodule(superclass)
-            if supermod is not module:
-              supername = supermod.__name__ + '.' + supername
-            mro_names.append(supername)
-            mro_set.difference_update(superclass.__mro__)
-        if mro_names:
-          classname_etc += '(' + ', '.join(mro_names) + ')'
-        if issubclass(obj, FSM) and hasattr(obj, 'FSM_TRANSITIONS'):
-          # append an FSM state diagram
-          obj_doc += (
-              f'\n\nState diagram:\n![{Mname} State Diagram](' + gvdataurl(
-                  obj.fsm_state_diagram_as_dot(
-                      graph_name=f'{Mname} State Diagram',
-                      sep='',
-                  ),
-                  fmt='svg',
-                  dataurl_encoding='base64',
-              ) + f' "{Mname} State Diagram")\n'
-          )
-        if issubclass(obj, BaseCommand):
-          # extract the Usage: paragraph if present, append a full usage
-          doc_without_usage, usage_text = obj.extract_usage()
-          obj_doc += ''.join(
-              (
-                  doc_without_usage,
-                  "\n\nUsage summary:\n\n",
-                  indent("Usage: " + usage_text, "    "),
-              )
-          )
-        full_docs.append(doc_item(Mname, f'class {classname_etc}', obj_doc))
-        seen_names = set()
-        direct_attrs = dict(obj.__dict__)
-        # iterate over specified names or default names in order
-        for attr_name in method_names or chain(
-            # constructor and initialiser
-            (
-                '__init__',),
-            # "constants"
-            sorted(filter(lambda name: name and name[0].isupper(),
-                          direct_attrs)),
-            # dunder methods
-            sorted(filter(is_dunder, direct_attrs)),
-            # remaining attributes
-            sorted(filter(lambda name: name and not name.startswith('_'),
-                          direct_attrs)),
-        ):
-          # prevent repeats, as the automatic list is composed of
-          # overlapping components
-          if attr_name in seen_names:
-            continue
-          seen_names.add(attr_name)
-          if not method_names:
-            # prune some boring names
-            if attr_name in ('__abstractmethods__', '__doc__',
-                             '__getnewargs__', '__module__', '__new__',
-                             '__repr__', '__weakref__'):
-              continue
-            # prune private names which are not dunder names
-            if attr_name.startswith('_') and not is_dunder(attr_name):
-              continue
-          if attr_name not in direct_attrs:
-            ##print("  skip, not in direct_attrs", direct_attrs)
-            continue
-          attr = getattr(obj, attr_name)
-          attr_doc = obj_docstring(attr)
-          if not attr_doc:
-            continue
-          # Class.name is a function, not a method
-          if ismethod(attr) or isfunction(attr):
-            method_sig = signature(attr)
-            full_docs.append(
-                f'\n\n*`{Mname}.{attr_name}{method_sig}`*:\n{attr_doc}'
-            )
-          elif isdatadescriptor(attr):
-            full_docs.append(f'\n\n*`{Mname}.{attr_name}`*:\n{attr_doc}')
-          elif not callable(attr):
-            pass
-          elif isinstance(attr, property):
-            full_docs.append(f'\n\n*`{Mname}.{attr_name}`*:\n{attr_doc}')
-          else:
-            full_docs.append(f'\n\n*`{Mname}.{attr_name}`*')
+        classes[Mname] = obj
       else:
-        warning("UNHANDLED %r, neither function nor class", Mname)
-  return ''.join(full_docs)
+        others[Mname] = obj
+
+  if others:
+    full_docs.append('# Symbols')
+    full_docs.append('```')
+    for Mname, obj in sorted(others.items()):
+      other_doc = obj_docstring(obj)
+      if other_doc:
+        full_docs.append(f'```\n{other_doc}\n```\n')
+      full_docs.append(f'{Mname} = {obj!r}')
+    full_docs.append('```')
+
+  if functions:
+    full_docs.append('# Functions')
+    for Mname, func in sorted(functions.items()):
+      func_doc = obj_docstring(func)
+      sig = signature(func)
+      full_docs.append(f'## {Mname}{sig}')
+      full_docs.append(func_doc)
+
+  if classes:
+    full_docs.append('# Classes')
+    for Mname, cls in sorted(classes.items()):
+      cls_doc = obj_docstring(cls)
+      classname_etc = Mname
+      # compute the list of immediate superclass names
+      mro_names = []
+      mro_set = set(cls.__mro__)
+      for superclass in cls.__mro__:
+        if superclass not in mro_set:
+          continue
+        if (superclass is not object and superclass is not cls
+            and superclass is not abc.ABC):
+          supername = superclass.__name__
+          supermod = getmodule(superclass)
+          if supermod is not None and supermod is not module:
+            supername = supermod.__name__ + '.' + supername
+          mro_names.append(supername)
+          mro_set.difference_update(superclass.__mro__)
+      if mro_names:
+        classname_etc += '(' + ', '.join(mro_names) + ')'
+      if issubclass(cls, FSM) and hasattr(cls, 'FSM_TRANSITIONS'):
+        cls_doc += "\n\n" + "\n".join(
+            (
+                '<figure>',
+                '  ' + indent(
+                    gvsvg(
+                        cls.fsm_state_diagram_as_dot(
+                            graph_name=f'{Mname} State Diagram',
+                            sep='',
+                        )
+                    )
+                ),
+                f'  <figcaption>{Mname} State Diagram</figcaption>',
+                '</figure>',
+            )
+        ) + '\n'
+      if issubclass(cls, BaseCommand):
+        # extract the Usage: paragraph if present, append a full usage
+        doc_without_usage, usage_text = cls.extract_usage()
+        cls_doc += ''.join(
+            (
+                doc_without_usage,
+                "\n\nUsage summary:\n\n",
+                indent("Usage: " + usage_text, "    "),
+            )
+        )
+      full_docs.append(f'## class {classname_etc}')
+      full_docs.append(cls_doc)
+      seen_names = set()
+      direct_attrs = dict(cls.__dict__)
+      # iterate over specified names or default names in order
+      for attr_name in method_names or chain(
+          # constructor and initialiser
+          (
+              '__init__',),
+          # "constants"
+          sorted(filter(lambda name: name and name[0].isupper(), direct_attrs)
+                 ),
+          # dunder methods
+          sorted(filter(is_dunder, direct_attrs)),
+          # remaining attributes
+          sorted(filter(lambda name: name and not name.startswith('_'),
+                        direct_attrs)),
+      ):
+        # prevent repeats, as the automatic list is composed of
+        # overlapping components
+        if attr_name in seen_names:
+          continue
+        seen_names.add(attr_name)
+        if not method_names:
+          # prune some boring names
+          if attr_name in ('__abstractmethods__', '__annotations__',
+                           '__dataclass_fields__', '__dataclass_params__',
+                           '__dict__', '__doc__', '__firstlineno__',
+                           '__match_args__', '__getnewargs__', '__module__',
+                           '__new__', '__repr__', '__slots__',
+                           '__static_attributes__', '__weakref__'):
+            continue
+          # prune private names which are not dunder names
+          if attr_name.startswith('_') and not is_dunder(attr_name):
+            continue
+        if attr_name not in direct_attrs:
+          continue
+        attr = getattr(cls, attr_name)
+        try:
+          qualname = attr.__qualname__
+        except AttributeError:
+          pass
+        else:
+          if not qualname.startswith(f'{cls.__name__}.'):
+            continue
+        attr_doc = obj_docstring(attr)
+        if not attr_doc:
+          continue
+        # Class.name is a function, not a method
+        if callable(attr) or ismethod(attr) or isfunction(attr):
+          method_sig = signature(attr)
+          full_docs.append(f'### `{Mname}.{attr_name}{method_sig}`')
+          full_docs.append(attr_doc)
+        else:
+          full_docs.append(f'### `{Mname}.{attr_name}`')
+          full_docs.append(
+              indent(pformat(attr, indent=4, underscore_numbers=True), "    ")
+          )
+  return '\n\n'.join(full_docs)
 
 # TODO: use inspect.getdoc() initially, or maybe cleandoc() ?
 def obj_docstring(obj):
