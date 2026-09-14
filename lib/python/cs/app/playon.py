@@ -56,8 +56,6 @@ from cs.threads import pmap
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print, run_task  # pylint: disable=redefined-builtin
 
-from cs.debug import trace
-
 __version__ = '20260531-post'
 
 DISTINFO = {
@@ -83,13 +81,15 @@ DISTINFO = {
         'cs.lex',
         'cs.logutils',
         'cs.mediainfo',
+        'cs.obj',
         'cs.pfx>=pfx_call',
         'cs.progress',
         'cs.resources',
-        'cs.result',
+        'cs.rfc2616',
+        'cs.seq',
         'cs.service_api',
         'cs.sqltags',
-        'cs.tagset',
+        'cs.tagged',
         'cs.threads',
         'cs.units',
         'cs.upd',
@@ -475,7 +475,7 @@ class Recording(_PlayOnEntity):
     m = re.search(
         browse_re_s,
         browse_path,
-        re.I,
+        re.IGNORECASE,
     )
     browse_series = m and m.group('series_s')
     browse_season = m and int(m.group('season_s'))
@@ -831,7 +831,7 @@ class PlayOn(Entities, Refreshable):
         r_text = arg[1:]
         if r_text.endswith('/'):
           r_text = r_text[:-1]
-        r = pfx_call(re.compile, r_text, re.I)
+        r = pfx_call(re.compile, r_text, re.IGNORECASE)
         for recording in self:
           name = recording.get('playon.Name') or ''
           series = recording.get('playon.Series') or ''
