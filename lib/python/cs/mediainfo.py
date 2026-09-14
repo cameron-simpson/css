@@ -68,6 +68,7 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.seq',
+        'cs.tagged',
         'cs.tagset',
         'cs.threads',
     ],
@@ -366,7 +367,8 @@ class SeriesEpisodeInfo(Promotable):
     if not series:
       # look for leading "series - sSSeEE"
       m = re.match(
-          r'(?P<series>\S.*\S)\s+(-\s+)?(?=s\d+e\d+\s)', episode_title, re.IGNORECASE
+          r'(?P<series>\S.*\S)\s+(-\s+)?(?=s\d+e\d+\s)', episode_title,
+          re.IGNORECASE
       )
       if m:
         series = m.group('series')
