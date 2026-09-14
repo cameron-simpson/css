@@ -55,7 +55,6 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.resources',
-        'cs.tagset',
         'cs.sqltags',
         'cs.upd',
         'icontract',
