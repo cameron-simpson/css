@@ -206,12 +206,10 @@ class VCS_Hg(HasFSPath, VCS):
     '''
     with self._pipefrom(
         'log',
-        *(('-r', rev) for rev in revs),
-        '--template',
-        '{node}\n{tags}\n{desc}\a',
-        '--',
+        rev=",".join(revs),
+        template='{node}\n{tags}\n{desc}\a',
     ) as piped:
-      for entry_s in ''.join(piped).split('\a'):
+      for entry_s in piped.read().decode('utf-8').split('\a'):
         if not entry_s:
           continue
         node, tags, desc = entry_s.split('\n', 2)
