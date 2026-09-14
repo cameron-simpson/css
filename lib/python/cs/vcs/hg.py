@@ -88,7 +88,7 @@ class VCS_Hg(HasFSPath, VCS):
         self.repo,
         *(arg.encode('utf-8') for arg in argv),
         **{
-            opt: value.encode('utf-8')
+            opt: value.encode('utf-8') if isinstance(value, str) else value
             for opt, value in hgcmd_options.items()
         },
     )
