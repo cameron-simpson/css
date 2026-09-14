@@ -24,7 +24,7 @@ from typing import List
 from cs.deco import Promotable
 from cs.gimmicks import Buffer, r
 
-__version__ = '20260914'
+__version__ = '20260914-post'
 
 DISTINFO = {
     'keywords': ["python3"],
