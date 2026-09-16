@@ -3,6 +3,11 @@
 # Start firefox. - Cameron Simpson <cs@cskk.id.au>
 #
 
+[ $# = 0 ] || {
+  echo "$0: not arguments expects, got: $*" >&2
+  exit 2
+}
+
 set -uex
 
 ffexe=${FIREFOX_EXE:-firefox}   ## /Applications/Firefox.app/Contents/MacOS/firefox
