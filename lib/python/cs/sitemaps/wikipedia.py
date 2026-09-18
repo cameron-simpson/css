@@ -13,7 +13,6 @@ from cs.urlutils import URL
 from cs.debug import trace
 
 class _WikiEntity(SiteEntity):
-
   pass
 
 class WikiPage(_WikiEntity):
@@ -27,9 +26,7 @@ class MediaWiki(SiteMap):
   ''' The SiteMap for `wikipedia.org'.
   '''
 
-  # the archetypical site is, of course, wikipedia
-  TYPE_ZONE = 'wikipedia'
-  BASE_DOMAIN = 'wikipedia.org'
+  EntityClass = _WikiEntity
 
   ##URL_DOMAIN = f'www.{BASE_DOMAIN}'
 
@@ -58,6 +55,11 @@ class MediaWiki(SiteMap):
     rsp.raise_for_status()
     return rsp.json()
 
+class Wikipedia(MediaWiki):
+
+  TYPE_ZONE = 'wikipedia'
+  BASE_DOMAIN = 'wikipedia.org'
+
 class FandomEntity(_WikiEntity):
   pass
 
@@ -72,7 +74,7 @@ class TVSeries(_DCFandomEntity):
 
 class DCFandomSiteMap(FandomSiteMap):
   TYPE_ZONE = 'dcfandom'
-  HasTagsClass = _DCFandomEntity
+  EntityClass = _DCFandomEntity
   URL_DOMAIN = f'dc.{FandomSiteMap.BASE_DOMAIN}'
   API_ENDPOINT = '/en/api.php'
 
