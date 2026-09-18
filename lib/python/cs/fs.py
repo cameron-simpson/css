@@ -680,7 +680,9 @@ def is_valid_rpath(rpath, log=None) -> bool:
     return False
   return True
 
-def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
+def findup(
+    dirpath: str, criterion: Union[str, Callable[[str], Any]]
+) -> str | None:
   ''' Walk up the filesystem tree looking for a directory where
       `criterion(fspath)` is not `None`, where `fspath` starts at `dirpath`.
       Return the result of `criterion(fspath)`.
