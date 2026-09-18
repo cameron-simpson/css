@@ -141,7 +141,7 @@ class Article(_SMHWebPage, FeedEntryMixin):
 
   @property
   @unattributable
-  def mtime(self):
+  def mtime(self) -> float:
     '''The article modified_time as a UNIX timestamp.
     '''
     try:
@@ -167,7 +167,7 @@ class Article(_SMHWebPage, FeedEntryMixin):
     '''
     return self.refreshed().topic_ent
 
-  def rss_category(self):
+  def feed_category(self):
     print("RSS CATEGORY")
     self.printt()
     return self.topic_ent.type_key
@@ -179,7 +179,7 @@ class Article(_SMHWebPage, FeedEntryMixin):
         if fullname
     )
 
-  def rss_description(self):
+  def feed_description(self):
     self.refresh()
     try:
       meta = self['smh.html.meta']
@@ -203,7 +203,7 @@ class Article(_SMHWebPage, FeedEntryMixin):
       description_html = f'{by_line}<br/>{description_html}'
     return str(CData(description_html))
 
-  def rss_pubdate(self) -> None | str:
+  def feed_pubdate(self) -> None | float:
     ''' Return the publication date, or `None` if not available.
     '''
     return self.mtime
@@ -375,7 +375,7 @@ class TOC(_SMHWebPage):
 class SMHMap(SiteMap):
 
   TYPE_ZONE = 'smh'
-  HasTagsClass = _SMHEntity
+  EntityClass = _SMHEntity
   BASE_DOMAIN = 'smh.com.au'
   URL_DOMAIN = f'www.{BASE_DOMAIN}'
 
