@@ -928,8 +928,8 @@ class ScanData:
 
         If an entity `ent` is a member of `refresh_ents` then call
         `ent.refresh(data=data)` on the basis that the data are
-        complete enough to consider the entity refreshed, otherwise
-        call `ent.type_zone_update(data)`.
+        complete enough to consider the entity refreshed.
+        Otherwise call `ent.type_zone_update(data)`.
 
         The purpose of the call to `ent.refresh()` is to exercise
         the refresh machinery. On a `Refreshable` object `ent` this
