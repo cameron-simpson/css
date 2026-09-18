@@ -209,7 +209,7 @@ class Widget:
 
       A `Widgwt` supplies:
       - `__init__(tag)` to record the target BS4 tag, typically the
-        top level tag encompassing the wudget
+        top level tag encompassing the widget
       - `find_all(soup)`: returning a list of the top level tags
         within the BS4 tag `soup`; the default method calls
         `soup.find_all()` with the lower case version of the class
