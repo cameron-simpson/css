@@ -611,7 +611,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       return fs
 
     with P:
-      for flowstate in P.later.map(
+      for flowstate in pmap(
           get_iterable_fs,
           flowstates,
           concurrent=True,
@@ -621,7 +621,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
         runstate.raiseif()
 
   def clear(self, *attrs):
-    ''' Delete the named attrubtes `attrs`.
+    ''' Delete the named attributes `attrs`.
         We do this to clear derived attributes when we set an
         antecedant attribute.
     '''
@@ -1985,16 +1985,15 @@ class SiteWidget(Widget, ABC):
   def scan(cls, soup, sitemap: "SiteMap") -> list[Self]:
     ''' Return a list of all `SiteWidget`s of this type found in `soup`.
     '''
-    return [cls(sitemap=sitemap, tag=tag) for tag in cls.find_all()]
+    return [cls(sitemap=sitemap, tag=tag) for tag in cls.find_all(soup)]
 
   @abstractmethod
   @uses_scandata
   def scan_soup(self, *, scandata: ScanData) -> ScanData:
-    ''' Scan `self.tag` and update `scandata[self.entity]`.
-        Return `scandata` (because it may have been made with the call).
-
-        If the widget contains references to other entities
-        their information should also be saved into the `scanata`.
+    ''' Scan `self.tag` and update `scandata`, primarily about
+        `self.entity` but usually also about any other related entity
+        information.
+        Return `scandata` (because it may have been created with the call).
     '''
     raise NotImplementedError
 
@@ -2628,7 +2627,7 @@ class SiteMap(Entities, Promotable):
       **match_kw,
   ) -> Iterable[tuple[Callable, TagSet]]:
     ''' A generator yielding `(method,match)` 2-tuples for methods matched
-        by `flowstate` and `match_kw`, being the matching method
+        by `flowstate` and `match_kw`, being the matching bound method
         and a `TagSet` of values obtained during the match test.
 
         Parameters:
@@ -2642,7 +2641,7 @@ class SiteMap(Entities, Promotable):
         decorator to the method.
         A `(method,match)` 2-tuple is yielded for each matching conjunction.
 
-        Note that this means the same methods may be yielded multiple
+        *Note*: this means the same methods may be yielded multiple
         times if different conjunctions match (eg multiple matching
         `@on` decorators); this is because each condition may provide
         different `match` match results.
@@ -2771,7 +2770,7 @@ class SiteMap(Entities, Promotable):
     for method, match in self.on_matches(flowstate, methodglob, **match_kw):
       with Pfx("call %s", method.__qualname__):
         try:
-          scandata: ScanData = method(self, flowstate, match)
+          scandata: ScanData = method(flowstate, match)
           if not no_apply:
             scandata.apply(
                 # provie the entities whose sitepage patterns match the URL
@@ -2828,7 +2827,7 @@ class SiteMap(Entities, Promotable):
       with Pfx("call %s", method.__qualname__):
         try:
           if flowattr is None:
-            result = method(self, flowstate, match)
+            result = method(flowstate, match)
           else:
             attrvalue = pfx_call(getattr, flowstate, flowattr)
             result = method(self, flowstate, match, attrvalue)
