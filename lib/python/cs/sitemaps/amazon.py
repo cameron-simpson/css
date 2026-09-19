@@ -8,13 +8,14 @@ import re
 from typeguard import typechecked
 
 from cs.app.pilfer.sitemap import (
-    FlowState, SiteEntity, SiteMap, SiteWidget, URLPattern, uses_scandata
+    FlowState, SiteEntity, SiteMap, SiteWidget, URLPattern, on, uses_scandata
 )
 from cs.bs4utils import child_tags, printt_soup, Table, Widget
 from cs.deco import promote
 from cs.lex import printt
 from cs.logutils import warning
 from cs.tagged import ScanData
+from cs.tagset import TagSet
 from cs.urlutils import URL
 
 from cs.debug import trace, r, pprint, printt
@@ -58,7 +59,7 @@ def prune_book_title(title, series=None):
           >>> prune_book_title('A Right Shambles in York: A DI Adams mystery - magic, menace, & snark in a Yorkshire urban fantasy', series='A DI Adams Mystery')
           'A Right Shambles in York'
   '''
-  if m := re.search(r'\s+\(book \S+\)$', title, re.I):
+  if m := re.search(r'\s+\(book \S+\)$', title, re.IGNORECASE):
     title = title[:m.start()]
   if series is not None:
     if (offset := title.lower().find(f': {series.lower()}')) > 0:
@@ -394,7 +395,6 @@ class ProductDetails(SiteWidget, entity_class=AmazonBook):
       parsed[key] = value
     return parsed
 
-  @trace
   @uses_scandata
   @typechecked
   def scan(self, *, scandata: ScanData) -> ScanData:
@@ -434,6 +434,8 @@ class AmazonPrime(SiteMap):
   EntityClass = _AmazonPrimeEntity
 
 class APCard(Widget):
+  ''' A card from a carousel.
+  '''
 
   @classmethod
   def find_all(cls, soup):
@@ -449,7 +451,7 @@ class APCard(Widget):
 
   @cached_property
   def type(self):
-    ''' The card type, eg "Movie".
+    ''' The card type, eg "Movie" or "TV Show".
     '''
     return self.tag.attrs['data-card-entity-type']
 
@@ -464,6 +466,8 @@ class APCard(Widget):
     return self.tag.find('img', **{'data-testid': 'base-image'}).src
 
 class APCarousel(Widget):
+  ''' A carousel row.
+  '''
 
   @classmethod
   def find_all(cls, soup):
@@ -476,16 +480,18 @@ class APCarousel(Widget):
     return self.tag.h2.get_text()
 
   @cached_property
-  def entries(self) -> list[APCard]:
+  def cards(self) -> list[APCard]:
+    ''' The cards in the carousel.
+    '''
     return APCard.scan(self.tag)
 
   #####################################################################
   # sequence methods
   def __len__(self):
-    return len(self.entries)
+    return len(self.cards)
 
   def __iter__(self):
-    return iter(self.entries)
+    return iter(self.cards)
 
   def __getitem__(self, index):
-    return self.entries[index]
+    return self.cards[index]
