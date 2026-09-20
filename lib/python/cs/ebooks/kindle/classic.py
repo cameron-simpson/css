@@ -5,6 +5,7 @@
 
 from contextlib import contextmanager
 import filecmp
+from functools import cached_property
 import os
 from os.path import (
     dirname,
@@ -380,8 +381,7 @@ class KindleTree(AbstractEbooksTree):
       with self.db:
         yield
 
-  @property
-  @cachedmethod
+  @cached_property
   def db(self):
     ''' The associated `KindleBookAssetDB` ORM,
         instantiated on demand.
