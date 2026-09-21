@@ -697,53 +697,73 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return pipeline(self.later, pipe_funcs, name=name)
 
   @cached_property
-  @pfx_method
-  def sitemaps(self) -> List[Tuple[str, SiteMap]]:
-    ''' A list of `(pattern,SiteMap)` 2-tuples for matching URLs to `SiteMap`s.
-
-        The entries take the form:
-
-            host-pattern = name:module:class
-
-        The `host-pattern` is a glob style pattern as for `fnmatch`.
-        Site maps matching multiple hosts should generally include
-        the URL hostname in the URL key.
-        An additional pattern for the same `module:class` can just be `name`.
-
-        Example:
-
-            [sitemaps]
-            docs.python.org = docs:cs.app.pilfer.sitemap:DocSite
-            docs.mitmproxy.org = docs
-            *.readthedocs.io = docs
+  def _sitemap_pattern_specs(
+      self
+  ) -> tuple[dict[str, str], list[tuple[str, str]]]:
+    ''' Return a 2-tuple of `({name->map_spec},[(pattern,name)])`
+        being a mapping of SiteMap name to it's specification (a
+        "*module_name*:*class_name*" string) and a list of URL host
+        part patterns and an associated SiteMap name.
     '''
-    named = {}
-    map_list = []
-    for pattern, sitemap_spec in self.rc_map['sitemaps'].items():
-      with Pfx("%s = %s", pattern, sitemap_spec):
-        try:
-          map_name, map_spec = sitemap_spec.split(':', 1)
-        except ValueError:
-          # no colon - plain map name
+    with Pfx('[sitemaps]'):
+      named = {}
+      pattern_specs = []
+      for pattern, sitemap_spec in self.rc_map['sitemaps'].items():
+        with Pfx("%s = %s", pattern, sitemap_spec):
           try:
-            sitemap = named[sitemap_spec]
-          except KeyError:
-            warning("ignore unknown bare sitemap name: %r", sitemap_spec)
-            continue
-        else:
-          if map_name in named:
-            warning("ignore previously seen map name: %r", map_name)
-            continue
-          try:
-            map_class = import_name(map_spec)
-          except (ImportError, NameError, SyntaxError) as e:
-            warning(e._)
-            continue
-          sitemap = map_class(name=map_name)
-          named[map_name] = sitemap
-        # TODO: precompile glob style pattern to regexp?
-        map_list.append((pattern, sitemap))
-    return map_list
+            name, map_spec = sitemap_spec.split(':', 1)
+          except ValueError:
+            # no colon - plain map name
+            name = sitemap_spec
+            try:
+              map_spec = named[name]
+            except KeyError:
+              warning("ignore unknown bare sitemap name: %r", name)
+              continue
+          else:
+            # name:module.name:ClassName
+            if name in named:
+              warning(
+                  "ignore previously seen map name: %r -> %r", name, map_spec
+              )
+              continue
+            named[name] = map_spec
+          # TODO: precompile glob style pattern to regexp?
+          pattern_specs.append((pattern, name))
+    return named, pattern_specs
+
+  @property
+  def sitemap_names(self):
+    ''' An iterable of the `SiteMap` names.
+    '''
+    named, _ = self._sitemap_pattern_specs
+    return named.keys()
+
+  @mapped_property
+  def sitemap(self, name: str) -> SiteMap | None:
+    ''' A lazy mapping of sitemap `name` to its `SiteMap` instance,
+        or `None` if associated import fails.
+    '''
+    named, _ = self._sitemap_pattern_specs
+    map_spec = named[name]
+    try:
+      map_class = import_name(map_spec)
+    except (ImportError, NameError, SyntaxError) as e:
+      warning(f'sitemap[{name=}] -> {map_spec!r}: {e._}')
+      breakpoint()
+      raise
+      return None
+    sitemap = map_class(name=name)
+    return sitemap
+
+  @property
+  def sitemap_patterns(self) -> list[tuple[str, str]]:
+    ''' Return a list of `(pattern,sitemap_name)` 2-tuples
+        being a pattern from the pilferrc and the name of the sitemap
+        it matches.
+    '''
+    _, patterns = self._sitemap_pattern_specs
+    return patterns
 
   @promote
   def sitemaps_for_url_host(self, url: URL) -> Generator[SiteMap]:
