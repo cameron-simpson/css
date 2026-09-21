@@ -1101,6 +1101,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
         If one has not been set, obtain it from the `SiteMap.default()` class method
         for `self.TYPE_ZONE` and record the result.
     '''
+    # NB: not a cached property because we don't want to consume storage
     try:
       return self.__dict__['sitemap']
     except KeyError:
@@ -1136,7 +1137,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
   def from_URL(
       cls,
       url: URL,
-      sitemap: "SiteMap" = None,
+      sitemap: Optional["SiteMap"] = None,
       *,
       pattern_name=None,
   ) -> tuple[Self, dict]:
@@ -1146,7 +1147,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
         `cls.match_url(,url,pattern_name=pattern_name)`.
     '''
     if sitemap is None:
-      sitemap = cls.default_class_sitemap()
+      sitemap = Entities.default(cls.TYPE_ZONE)
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
       match, match_name = cls.match_url(url, pattern_name=pattern_name)
       if match is None:
@@ -1231,7 +1232,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
         superclasses.
     '''
     if sitemap is None:
-      sitemap = cls.default_class_sitemap()
+      sitemap = Entities.default(cls.TYPE_ZONE)
     pattern_map = {}
     for supercls in reversed(cls.__mro__):
       for clsattr, pattern_s in supercls.__dict__.items():
