@@ -431,65 +431,67 @@ def select_flow(hook_name, flow, *, P: Pilfer, **select_kw):
 )
 @uses_pilfer
 @typechecked
-def dump_flow(hook_name, flow, *, P: Pilfer):
+def dump_flow(hook_name, flow, *, P: Pilfer, lock=Lock()):
   ''' Dump request information: headers and query parameters.
   '''
   assert P is not None
-  PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
-  rq = flow.request
-  url = URL(rq.url)
-  rsp = flow.response
-  PR(rq)
-  if hook_name in ('requestheaders', 'responseheaders'):
-    sitemap = P.sitemap_for(url)
-    if sitemap is None:
-      PR("  no site map for URL")
-    else:
-      PR(
-          "  URL sitemap",
-          sitemap,
-      )
-    print("  Request Headers:")
-    printt(
-        *[(key, value) for key, value in sorted(rq.headers.items())],
-        indent="    ",
-    )
-    q = url.query_dict()
-    if q:
-      print("  URL query part:")
+  with lock:
+    PR = lambda *a: print('DUMP_FLOW', hook_name, flow.request, *a)
+    rq = flow.request
+    url = URL(rq.url)
+    rsp = flow.response
+    print("================================================================")
+    PR(rq)
+    if hook_name in ('requestheaders', 'responseheaders'):
+      sitemap = P.sitemap_for(url)
+      if sitemap is None:
+        PR("  no site map for URL")
+      else:
+        PR(
+            "  URL sitemap",
+            sitemap,
+        )
+      print("  Request Headers:")
       printt(
-          *[(param, repr(value)) for param, value in sorted(q.items())],
+          *([key, value] for key, value in sorted(rq.headers.items())),
           indent="    ",
       )
-    if rq.method == "POST":
-      if rq.urlencoded_form:
-        print("  POST query:")
+      q = url.query_dict()
+      if q:
+        print("  URL query part:")
         printt(
-            *[
-                (param, repr(value))
-                for param, value in sorted(rq.urlencoded_form.items())
-            ],
+            *([param, repr(value)] for param, value in sorted(q.items())),
             indent="    ",
         )
-  if hook_name == 'request':
-    PR("  Request Content:", len(flow.request.content))
-    ct = content_type(flow.request.headers)
-    if ct and ct.content_type == 'application/json':
-      pprint(flow.request.json())
-  if hook_name == 'responseheaders':
-    print("  Response Headers:")
-    printt(
-        *[(key, value) for key, value in sorted(rsp.headers.items())],
-        indent="    ",
-    )
-  if hook_name == 'response':
-    PR("  Response Content:", len(flow.response.content))
-    flowstate = FlowState.from_Flow(flow)
-    if rq.method == "POST":
-      if flowstate.content_type == 'application/json':
-        pprint(flow.response.json)
-      else:
-        print(flow.response.content)
+      if rq.method == "POST":
+        if rq.urlencoded_form:
+          print("  POST query:")
+          printt(
+              *[
+                  [param, repr(value)]
+                  for param, value in sorted(rq.urlencoded_form.items())
+              ],
+              indent="    ",
+          )
+    if hook_name == 'request':
+      PR("  Request Content:", len(flow.request.content))
+      ct = content_type(flow.request.headers)
+      if ct and ct.content_type == 'application/json':
+        pprint(flow.request.json())
+    if hook_name == 'responseheaders':
+      print("  Response Headers:")
+      printt(
+          *([key, value] for key, value in sorted(rsp.headers.items())),
+          indent="    ",
+      )
+    if hook_name == 'response':
+      PR("  Response Content:", len(flow.response.content))
+      flowstate = FlowState.from_Flow(flow)
+      if rq.method in ('GET', "POST"):
+        if flowstate.content_type == 'application/json':
+          pprint(flow.response.json)
+        else:
+          print(flow.response.content)
 
 @require(lambda flow: not flow.response.stream)
 @typechecked
