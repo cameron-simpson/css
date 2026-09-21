@@ -765,13 +765,17 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     _, patterns = self._sitemap_pattern_specs
     return patterns
 
+  @Trace
   @promote
-  def sitemaps_for_url_host(self, url: URL) -> Generator[SiteMap]:
+  def sitemaps_for_url_host(self, url: URL, *, T) -> Generator[SiteMap]:
     ''' Generator yielding sitemaps which match the `url` host part.
     '''
     hostname = url.hostname
-    for pattern, sitemap in self.sitemaps:
-      if fnmatch(hostname, pattern):
+    _, patterns = self._sitemap_pattern_specs
+    for pattern, map_name in patterns:
+      if T(f'fnmatch({hostname=},{pattern=})', fnmatch(hostname, pattern)):
+        sitemap = self.sitemap[map_name]
+        T("  matched", sitemap)
         yield sitemap
 
   def sitemap_for(self, url: str | URL) -> SiteMap | None:
