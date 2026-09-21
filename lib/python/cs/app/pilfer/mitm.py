@@ -13,7 +13,7 @@ import os
 from pprint import pprint
 from signal import SIGINT
 import sys
-from threading import Thread
+from threading import Lock, Thread
 from typing import Callable, Iterable, Optional, Tuple
 
 from icontract import require
@@ -100,7 +100,7 @@ class StreamChain:
       - a `bytes`, for a `bytes`->`bytes` filter
       - an iterable of `bytes`
       - `None`, for a filter which merely inspects its inputs;
-        (this last is an additional mode beyond the default `Flow` support, 
+        (this last is an additional mode beyond the default `Flow` support,
         and the initial `bytes` argument is passed through by this class)
       or a generator accepting an iterable of `bytes` and yielding `bytes`.
 
