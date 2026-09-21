@@ -2136,10 +2136,18 @@ class SiteMap(Entities, Promotable):
     return cls.by_type_zone[type_zone]
 
   @classmethod
-  def __class_getitem__(cls, type_zone: str):
-    ''' Indexing `SiteMap` returns `zone_sitemap(type_zone)`.
-    '''
+  def from_str(cls, type_zone: str):
     return cls.zone_sitemap(type_zone)
+
+  @classmethod
+  def from_tuple(cls, ent_key: tuple):
+    self = cls.default()
+    ent_type, key = ent_key
+    if isinstance(ent_type, str):
+      if '.' in ent_type:
+        raise ValueError(f'{ent_type=} should be a type subname, with no dots')
+      return self[f'{cls.TYPE_ZONE}.{ent_type}.{key}']
+    return self[ent_type, key]
 
   @classmethod
   def by_db_key(cls, db_key: str | tuple, *, site_zone=None) -> SiteEntity:
