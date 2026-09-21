@@ -75,6 +75,8 @@ DISTINFO = {
     'extras_requires': {
         'reparse': ['rss_parser'],
     },
+    'python_requires':
+    '>=3.10',  # for type|type notation
 }
 
 # parallelism of jobs
