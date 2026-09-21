@@ -85,7 +85,7 @@ if [ -n "$hostpart" ]
 then
   # update the latest tag
   if [ $set_latest ]
-  then  $trace fstags tag . "$fstags_latest=\"$target\""
+  then  $trace fstags tag . "$fstags_latest=\"$target\"" || : # alas
   fi
   qdir=$( shqstr "$dir" )
   [ -t 0 ] && sshopts="$sshopts -t"
