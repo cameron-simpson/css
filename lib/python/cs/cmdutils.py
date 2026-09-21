@@ -75,6 +75,7 @@ from cs.lex import (
     tabulate,
 )
 from cs.logutils import setup_logging, warning, error, exception
+from cs.mappings import mapped_property
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
@@ -106,6 +107,8 @@ DISTINFO = {
         'cs.upd',
         'typeguard',
     ],
+    'requires_python':
+    '>=3.10',  # for type1|type2 notiation
 }
 
 def docmd(dofunc):
@@ -471,27 +474,25 @@ class SubCommand:
   # a method or a subclass of BaseCommand
   method: Callable
   # the notional name of the command/subcommand
-  cmd: str = None
+  cmd: str | None = None
   # optional additional usage keyword mapping
   usage_mapping: Mapping[str, Any] = field(default_factory=dict)
+
+  def __post_init__(self):
+    if self.cmd is None:
+      method = self.method
+      if isclass(method):
+        self.cmd = cutsuffix(method.__name__, 'Command').lower()
+      else:
+        self.cmd = cutprefix(
+            method.__name__, self.command.SUBCOMMAND_METHOD_PREFIX
+        )
 
   @property
   def instance(self):
     ''' An instance of the class for `self.method`.
     '''
     return self.method(...) if isclass(self.method) else self.method.__self__
-
-  def get_cmd(self) -> str:
-    ''' Return the `cmd` string for this `SubCommand`,
-        derived from the subcommand's method name or class name
-        if `self.cmd` is not set.
-    '''
-    if self.cmd is None:
-      method = self.method
-      if isclass(method):
-        return cutsuffix(method.__name__, 'Command').lower()
-      return cutprefix(method.__name__, self.command.SUBCOMMAND_METHOD_PREFIX)
-    return self.cmd
 
   @typechecked
   def __call__(self, argv: List[str]):
@@ -504,7 +505,7 @@ class SubCommand:
     if isclass(method):
       # plumb self.command.options through to the subcommand
       updates = self.command.options.as_dict()
-      updates.update(cmd=self.get_cmd())
+      updates.update(cmd=self.cmd)
       return pfx_call(method, argv, **updates).run()
     return method(argv)
 
@@ -618,11 +619,11 @@ class SubCommand:
       *,
       cmd: Optional[str] = None,
       usage_mapping: Optional[Mapping] = None,
-  ) -> str:
+  ) -> Mapping[str, str]:
     ''' Return a mapping to be used when formatting the usage format string.
 
         This is an elaborate `ChainMap` of:
-        - the optional `cmd` or `self.get_cmd()`
+        - the optional `cmd` or `self.cmd`
         - the optional `usage_mapping` parameter
         - `self.usage_mapping`
         - `self.method.USAGE_KEYWORDS` if present
@@ -633,7 +634,7 @@ class SubCommand:
     # TODO maybe this should return the ChainMap used in usage_text
     # elaborate search path for symbols in the usage format string
     # TODO: should this _be_ get_usage_keywords? pretty verbose
-    format_cmd = cmd or self.get_cmd().replace('_', '-')
+    format_cmd = cmd or self.cmd.replace('_', '-')
     if self.command.options.COMMON_OPT_SPECS:
       format_cmd += ' [common-options...]'
     return ChainMap(
@@ -669,27 +670,35 @@ class SubCommand:
   def has_subcommands(self):
     ''' Whether this `SubCommand`'s `.method` has subcommands.
     '''
-    try:
-      has_subcommands = self.method.has_subcommands
-    except AttributeError:
-      # just inspect whatever subcommands the method has
-      return bool(self.get_subcommands())
-    # probaby a class - use its has_subcommands() test
-    return has_subcommands()
+    method = self.method
+    if isclass(method):
+      return method([]).has_subcommands()
+    return False
 
-  def get_subcmds(self):
-    ''' Return the names of `self.method`'s subcommands in lexical order.
+  # NB: this is _not_ a cached_property because potentially commands
+  # can be added at any time
+  @property
+  def subcommand_names(self) -> list[str]:
+    ''' A list of the subcommand names.
     '''
-    return sorted(self.get_subcommands().keys())
+    method = self.method
+    subcommand_names = list(
+        set(self.instance.subcommand_names)
+        if isclass(method) else getattr(self.instance, 'subcommand_names', ())
+    )
+    print(f'SubCOmmand.subcommand_names {method} -> {subcommand_names=}')
+    if method.__name__ == 'cmd_sitemap':
+      breakpoint()
+    return subcommand_names
 
   def subusage_table(self, subcmds: List[str], *, recurse=False, short=False):
     ''' Return rows for use with `cs.lex.tabulate`
         for the short subusage listing.
     '''
     rows = []
-    subcommands = self.get_subcommands()
-    for subcmd in subcmds:
-      subcommand = subcommands[subcmd]
+    instance = self.instance
+    for subcmd in sorted(self.subcommand_names):
+      subcommand = instance.subcommand[subcmd]
       rows.append(
           [
               subcmd.replace('_', '-'),
@@ -704,7 +713,7 @@ class SubCommand:
         rows.extend(
             [indent(subc), indent(subd)]
             for subc, subd in subcommand.subusage_table(
-                sorted(subcommand.get_subcommands().keys()),
+                sorted(subcommand.subcommand_names),
                 recurse=recurse,
                 short=short,
             )
@@ -725,34 +734,30 @@ class SubCommand:
       short: bool,
       recurse: bool = False,
       show_common: bool = False,
-      show_subcmds: Optional[Union[bool, str, List[str]]] = None,
+      show_subcmds: bool | str | Iterable[str] | None = None,
       usage_mapping: Optional[Mapping] = None,
-      seen_subcommands: Optional[Mapping] = None,
+      seen_subcmds: Iterable[str] = (),
   ) -> str:
     ''' Return the filled out usage text for this subcommand.
     '''
-    if show_subcmds is None:
-      show_subcmds = True
-    if seen_subcommands is None:
-      seen_subcommands = {}
-    subcommands = self.get_subcommands()
+    subcmds = set(self.subcommand_names)
+    print(f'{subcmds=}')
+    # promote show_subcmds to a collection of strings
+    if show_subcmds is None or show_subcmds is True:
+      show_subcmds = subcmds
+    elif show_subcmds is False:
+      show_subcmds = []
+    elif isinstance(show_subcmds, str):
+      show_subcmds = show_subcmds,
+    else:
+      show_subcmds = tuple(show_subcmds)
     if show_subcmds:
       # compute those already seen and those new
-      common_subcmds = subcommands.keys() & seen_subcommands.keys()
-      additional_subcommands = subcommands.keys() - common_subcmds
+      common_subcmds = subcmds & set(seen_subcmds)
+      additional_subcommands = subcmds - common_subcmds
       # turn show_subcmds into the list of subcommand names to show in the usage
-      if isinstance(show_subcmds, bool):
-        # all the subcommands winnowed by the sub_seen_subcommands
-        assert show_subcmds is True
-        show_subcmds = sorted(additional_subcommands)
-      elif isinstance(show_subcmds, str):
-        # show a single subcommand
-        show_subcmds = [show_subcmds]
-      # the seen_subcommands for our subcommands
-      sub_seen_subcommands = dict(seen_subcommands)
-      sub_seen_subcommands.update(subcommands)
     # normalise the subcommand names to match the subcommands mapping
-    show_subcmds = [subcmd.replace('-', '_') for subcmd in show_subcmds]
+    show_subcmds = sorted(subcmd.replace('-', '_') for subcmd in show_subcmds)
     if short:
       usage_line, desc1, _ = self.usage_format_parts
       usage_format = usage_line
@@ -769,7 +774,7 @@ class SubCommand:
     with Pfx("format %r using %r", usage_format, mapping):
       usage = usage_format.format_map(mapping)
     subusage_listing = []
-    if self.has_subcommands():
+    if subcmds:
       if short:
         # the terse one subcommand-per-line listing
         subusages = self.short_subusages(
@@ -780,24 +785,24 @@ class SubCommand:
         subusages = []
         for subcmd in show_subcmds:
           try:
-            subcommand = subcommands[subcmd]
+            subcommand = self.instance.subcommand[subcmd]
           except KeyError:
             warning("unknown subcommand %r", subcmd)
+            breakpoint()
           else:
             # recursive long listing
             subusages.append(
                 subcommand.usage_text(
                     short=short,
                     recurse=recurse,
-                    seen_subcommands=sub_seen_subcommands,
+                    seen_subcmds=seen_subcmds,
                 )
             )
       if common_subcmds:
         common_subcmds_line = f'Common subcommands: {", ".join(sorted(common_subcmds))}.'
       if subusages:
         subcmds_header = (
-            'Subcommands'
-            if show_subcmds is None or len(show_subcmds) > 1 else 'Subcommand'
+            'Subcommands' if len(show_subcmds) > 1 else 'Subcommand'
         )
         subusage_listing.append(f'{subcmds_header}:')
         if common_subcmds:
@@ -1464,7 +1469,7 @@ class BaseCommand:
   def _prerun_setup(self):
     argv = self._argv
     options = self.options
-    subcmds = self.subcommands()
+    subcmd_names = self.subcommand_names
     has_subcmds = self.has_subcommands()
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd=self.cmd, level=log_level)
@@ -1516,7 +1521,7 @@ class BaseCommand:
             # no, emit the short help
             warning(
                 "missing subcommand, expected one of: %s",
-                ', '.join(sorted(subcmds.keys()))
+                ', '.join(sorted(subcmd_names))
             )
             argv = ['help', '-s']
           else:
@@ -1526,14 +1531,14 @@ class BaseCommand:
             argv = [*default_argv, *argv]
         subcmd = argv.pop(0)
         try:
-          subcommand = self.subcommand(subcmd)
+          subcommand = self.subcommand[subcmd]
         except KeyError:
           # pylint: disable=raise-missing-from
           bad_subcmd = subcmd
           subcmd = None
           raise GetoptError(
               f'unrecognised subcommand {bad_subcmd!r}, expected one of:'
-              f' {", ".join(sorted(subcmds.keys()))}'
+              f' {", ".join(sorted(subcmd_names))}'
           )
 
         def _run(argv):
@@ -1561,52 +1566,49 @@ class BaseCommand:
     '''
     return cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
 
-  @cache
-  def subcommands(self):
-    ''' Return a mapping of subcommand names to subcommand specifications
-        for class attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
-        by default `'cmd_'`.
+  # NB: this is _not_ a cached_property because potentially commands
+  # can be added at any time
+  @property
+  def subcommand_names(self) -> list[str]:
+    ''' A list of the subcommand names.
     '''
     cls = type(self)
     prefix = cls.SUBCOMMAND_METHOD_PREFIX
-    usage_mapping = getattr(cls, 'USAGE_KEYWORDS', {})
-    mapping = {}
-    for method_name in dir(cls):
-      if method_name.startswith(prefix):
-        subcmd = self.method_cmdname(method_name)
-        method = getattr(self, method_name)
-        subusage_mapping = dict(usage_mapping)
-        method_keywords = getattr(method, 'USAGE_KEYWORDS', {})
-        subusage_mapping.update(method_keywords)
-        subusage_mapping.update(cmd=subcmd)
-        mapping[subcmd] = self.SubCommandClass(
-            self,
-            method,
-            cmd=subcmd,
-            usage_mapping=subusage_mapping,
-        )
-    return mapping
+    return [
+        method_name.removeprefix(prefix)
+        for method_name in dir(cls)
+        if method_name.startswith(prefix)
+    ]
 
-  @classmethod
-  def has_subcommands(cls):
+  @mapped_property
+  def subcommand(self, subcmd: str) -> SubCommand:
+    ''' A mapping of subcommand names to subcommand specifications
+        for class attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
+        normally `'cmd_'`.
+    '''
+    cls = type(self)
+    prefix = cls.SUBCOMMAND_METHOD_PREFIX
+    method_name = prefix + subcmd.replace('-', '_').replace('.', '_')
+    usage_mapping = getattr(cls, 'USAGE_KEYWORDS', {})
+    try:
+      method = getattr(self, method_name)
+    except AttributeError as e:
+      raise KeyError(f'{self}.subcommand[{subcmd=}]') from e
+    subusage_mapping = dict(usage_mapping)
+    method_keywords = getattr(method, 'USAGE_KEYWORDS', {})
+    subusage_mapping.update(method_keywords)
+    subusage_mapping.update(cmd=subcmd)
+    return self.SubCommandClass(
+        self,
+        method,
+        cmd=subcmd,
+        usage_mapping=subusage_mapping,
+    )
+
+  def has_subcommands(self):
     ''' Test whether the class defines additional subcommands.
     '''
-    prefix = cls.SUBCOMMAND_METHOD_PREFIX
-    for method_name in dir(cls):
-      if not method_name.startswith(prefix):
-        continue
-      if getattr(cls, method_name) is getattr(BaseCommand, method_name, None):
-        continue
-      return True
-    return False
-
-  @cache
-  def subcommand(self, subcmd: str):
-    ''' Return the `SubCommand` associated with `subcmd`.
-    '''
-    subcmd_ = subcmd.replace('-', '_').replace('.', '_')
-    subcommands = self.subcommands()
-    return subcommands[subcmd_]
+    return len(self.subcommand_names) > 0
 
   def usage_text(
       self,
@@ -1624,7 +1626,7 @@ class BaseCommand:
   ):
     ''' Return the usage text for a subcommand.
     '''
-    method = self.subcommands()[subcmd].method
+    method = self.subcommands[subcmd].method
     subusage = None
     # support (method, get_suboptions)
     try:
@@ -2019,8 +2021,7 @@ class BaseCommand:
       options.short = not argv
     recurse = options.recurse
     short = options.short
-    all_subcmds = self.subcommands()
-    subcmds = argv or sorted(all_subcmds)
+    subcmds = argv or sorted(self.subcommand_names)
     unknown = False
     show_subcmds = []
     for subcmd in subcmds:
@@ -2030,7 +2031,7 @@ class BaseCommand:
         warning("unknown subcommand %r", subcmd)
         unknown = True
     if unknown:
-      warning("I know: %s", ', '.join(sorted(all_subcmds)))
+      warning("I know: %s", ', '.join(sorted(self.subcommand_names)))
     if short:
       print("Longer help with the -l option.")
     if not recurse:
