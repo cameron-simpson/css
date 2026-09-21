@@ -1234,7 +1234,23 @@ def promote(func, params=None, types=None):
 class Promotable:
   ''' A mixin class which supports the `@promote` decorator
       by providing a default `.promote(cls,obj)` class method.
+
+      `Promotable` classes also present the `.promote(obj)` method
+      via `__class_getitem__`, allowing `MyClass[promotable_value]`.
   '''
+
+  @classmethod
+  def __class_getitem__(cls, index):
+    ''' Indexing a `Promotable` class uses the `.promote()` method to obtain an instance.
+    '''
+    # preserve the class[type] syntax
+    if isinstance(index, type):
+      return super().__class_getitem__(index)
+    # transmute ValueError to KeyError
+    try:
+      obj = cls.promote(index)
+    except ValueError as e:
+      raise KeyError(f'{index!r}: {e}') from e
 
   @classmethod
   def promote(cls, obj, **from_t_kw):
