@@ -1986,8 +1986,10 @@ class SiteWidget(Widget, ABC):
     '''
     return True
 
-  def find_all(self, soup) -> list[BS4Tag]:
-    ''' Find all the BS4 tags in `soup` matching `cls.TAG_NAME` and
+  @classmethod
+  def find_all(cls, soup) -> list[BS4Tag]:
+    ''' The default `SiteWidget.find_all`, which Finds all the BS4
+        tags in `soup` matching `cls.TAG_NAME` and
         `cls.FIND_ALL_CRITERIA` where `cls.check_tag(tag)` is true.
     '''
     return [
