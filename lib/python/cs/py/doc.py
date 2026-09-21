@@ -178,7 +178,8 @@ def module_doc(
         ) + '\n'
       if issubclass(cls, BaseCommand):
         # extract the Usage: paragraph if present, append a full usage
-        doc_without_usage, usage_text = cls.extract_usage()
+        command = cls(...)
+        doc_without_usage, usage_text = command.extract_usage()
         cls_doc += ''.join(
             (
                 doc_without_usage,
