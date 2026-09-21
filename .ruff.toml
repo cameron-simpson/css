@@ -98,6 +98,7 @@ ignore = [
     "D416", # Section name should end with a colon
     "E731",
     "EXE001", # Shebang is present but file is not executable
+    "FURB122", # Use of `f.write` in a for loop
     "I001", # Import block is un-sorted or un-formatted
     "Q000",
     "Q002",
