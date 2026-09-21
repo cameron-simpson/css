@@ -234,6 +234,10 @@ class PilferCommand(BaseCommand):
         x=('trace', 'Trace action execution.'),
     )
 
+  def run(self, **kw_options):
+    with self.options.pilfer:
+      return super().run(**kw_options)
+
   @contextmanager
   def run_context(self):
     ''' Apply the `options.runstate` to the main `Pilfer`.
