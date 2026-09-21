@@ -101,6 +101,82 @@ def urls(url, stdin=None, cmd=None) -> Iterable[str]:
             continue
           yield url
 
+class BaseSiteMapCommand(BaseCommand):
+
+  def cmd_config(self, argv):
+    ''' Usage: {cmd} [sitemap|domain {{sitecmd [args...] | [URL...]}}]
+          List or query the site maps from the config.
+          With no arguments, list the sitemaps.
+          With a sitemap name (eg "docs") and no further arguments, list the sitemap.
+          If a word follows the sitemap name, treat it as a subcommand of the sitemap.
+          Otherwise assume all remaining arguments are URLs and print the the key for
+          each URL.
+    '''
+    options = self.options
+    P = options.pilfer
+    if not argv:
+      # list site maps
+      if not P.sitemap_names:
+        warning("no sitemaps defined in %s", ", ".join(P.rcpaths))
+        return 0
+      maps = defaultdict(list)
+      for pattern, sitemap_name in P.sitemap_patterns:
+        maps[sitemap_name].append(pattern)
+      printt(
+          *(
+              [name, "\n".join(patterns)]
+              for name, patterns in sorted(maps.items())
+          )
+      )
+      return 0
+    # use a particular sitemap
+    map_name = argv.pop(0)
+    sitemap = P.sitemap[map_name]
+    if not argv:
+      # no URLs: recite the site map patterns
+      for pattern in sitemap.URL_KEY_PATTERNS:
+        (domain_glob, path_re_s), format_s = pattern
+        printt(
+            ['Domain:', '*' if domain_glob is None else domain_glob],
+            ['  Path RE:', path_re_s],
+            ['  Format:', format_s],
+        )
+      return 0
+    # a subcommand?
+    argv0_ = argv[0].replace('-', '_')
+    if is_identifier(argv0_):
+      sitecmd = argv0_
+      argv.pop(0)
+      with Pfx(sitecmd):
+        try:
+          cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
+        except AttributeError:
+          cmds = sorted(
+              name.removeprefix('cmd_')
+              for name in dir(sitemap)
+              if name.startswith('cmd_')
+          )
+          raise GetoptError(
+              f'unknown sitemap command, expected one of {", ".join(cmds)}'
+          )
+        with stackattrs(
+            sitemap,
+            cmd=f'{options.cmd} {sitecmd}',
+            options=self.options,
+            subcmd=sitecmd,
+        ):
+          return cmdmethod(argv)
+    # match URLs against the sitemap
+    table = []
+    for url in argv:
+      with Pfx(url):
+        U = URL(url)
+        table.extend((
+            ["URL:", url],
+            ["  key:", sitemap.url_key(url)],
+        ))
+    printt(*table)
+
 class PilferCommand(BaseCommand):
 
   @dataclass
@@ -913,81 +989,28 @@ class PilferCommand(BaseCommand):
           table.append([f'      {k}', v])
     printt(*table)
 
-  def cmd_sitemap(self, argv):
-    ''' Usage: {cmd} [sitemap|domain {{sitecmd [args...] | [URL...]}}]
-          List or query the site maps from the config.
-          With no arguments, list the sitemaps.
-          With a sitemap name (eg "docs") and no further arguments, list the sitemap.
-          If a word follows the sitemap name, treat it as a subcommand of the sitemap.
-          Otherwise assume all remaining arguments are URLs and print the the key for
-          each URL.
-    '''
-    options = self.options
-    P = options.pilfer
-    xit = 0
-    if not argv:
-      # list site maps
-      sitemaps = P.sitemaps
-      if not sitemaps:
-        warning("no sitemaps defined in %s", ", ".join(P.rcpaths))
-        return 0
-      maps = defaultdict(list)
-      for pattern, sitemap in sitemaps:
-        maps[sitemap.name].append(pattern)
-      printt({name: "\n".join(patterns) for name, patterns in maps.items()})
-      return 0
-    # use a particular sitemap
-    map_name = argv.pop(0)
-    for domain_glob, sitemap in P.sitemaps:
-      if map_name == sitemap.name:
-        break
-    else:
-      warning("no sitemap named %r", map_name)
-      return 1
-    if not argv:
-      # no URLs: recite the site map patterns
-      for pattern in sitemap.URL_KEY_PATTERNS:
-        (domain_glob, path_re_s), format_s = pattern
-        printt(
-            ['Domain:', '*' if domain_glob is None else domain_glob],
-            ['  Path RE:', path_re_s],
-            ['  Format:', format_s],
-        )
-      return 0
-    # a subcommand?
-    argv0_ = argv[0].replace('-', '_')
-    if is_identifier(argv0_):
-      sitecmd = argv0_
-      argv.pop(0)
-      with Pfx(sitecmd):
-        try:
-          cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
-        except AttributeError:
-          cmds = sorted(
-              name.removeprefix('cmd_')
-              for name in dir(sitemap)
-              if name.startswith('cmd_')
-          )
-          raise GetoptError(
-              f'unknown sitemap command, expected one of {", ".join(cmds)}'
-          )
-        with stackattrs(
-            sitemap,
-            cmd=f'{options.cmd} {sitecmd}',
-            options=self.options,
-            subcmd=sitecmd,
-        ):
-          return cmdmethod(argv)
-    # match URLs against the sitemap
-    table = []
-    for url in argv:
-      with Pfx(url):
-        U = URL(url)
-        table.extend((
-            ["URL:", url],
-            ["  key:", sitemap.url_key(url)],
-        ))
-    printt(*table)
+  @cached_property
+  def cmd_sitemap(self):
+
+    class SiteMapCommand(BaseSiteMapCommand):
+      ''' A `BaseSiteMapCommand` subclass for this `PilferCommand` instance.
+      '''
+
+      @property
+      def subcommand_names(self):
+        return super().subcommand_names
+
+    P = self.options.pilfer
+    for sitemap_name in P.sitemap_names:
+      sitemap = P.sitemap[sitemap_name]
+      try:
+        sitemap_command = sitemap.CommandClass
+      except AttributeError:
+        pass
+      else:
+        method_name = f'{SiteMapCommand.SUBCOMMAND_METHOD_PREFIX}{sitemap.name}'
+        setattr(SiteMapCommand, method_name, sitemap_command)
+    return SiteMapCommand
 
   def cmd_tables(self, argv):
     ''' Usage: {cmd} URL
