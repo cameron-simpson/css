@@ -1166,6 +1166,19 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
       return ent, match
 
   @classmethod
+  def type_key_from_href(cls, href: str, **from_URL_kw) -> str | None:
+    ''' A convenience class method to return the `type_key` from
+        an `href` URL for this type of entity, or `None` if it does
+        not match.
+    '''
+    try:
+      self, _ = cls.from_URL(href, **from_URL_kw)
+    except URLPatternMatchError as e:
+      warning(f'{cls.__name__}.type_key_from_href({href=}): {e}')
+      return None
+    return self.type_key
+
+  @classmethod
   @uses_runstate
   def from_soup_hrefs(cls, soup, *, base_url: str,
                       runstate: RunState) -> set["SiteEntity"]:
