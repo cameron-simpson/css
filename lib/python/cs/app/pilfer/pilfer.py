@@ -28,7 +28,7 @@ import shutil
 import sys
 from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Generator, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Tuple
 from types import SimpleNamespace as NS
 
 import requests
@@ -37,7 +37,7 @@ from requests.adapters import HTTPAdapter
 from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
-from cs.cmdutils import vprint
+from cs.cmdutils import vprint, vvprint
 from cs.context import contextif, stackattrs
 from cs.deco import decorator, default_params, promote, uses_verbose
 from cs.env import envsub
@@ -54,10 +54,11 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
 from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
-from cs.seq import get0, seq
+from cs.seq import get0, Seq
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet, ZonedTypes
 from cs.threads import locked, HasThreadState, ThreadState
+from cs.trace import Trace
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
@@ -257,17 +258,19 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       * `user_vars`: mapping of user variables for arbitrary use.
   '''
 
+  _seq = Seq()
+
   # class attribute holding the per-thread state stack
   perthread_state = ThreadState()
 
-  name: str = field(default_factory=lambda: f'Pilfer-{seq()}')
+  name: str = field(default_factory=lambda: f'Pilfer-{Pilfer._seq()}')
   user_vars: Mapping[str, Any] = field(
       default_factory=lambda: dict(_=None, save_dir='.')
   )
   flush_print: bool = False
   do_trace: bool = False
   flags: Mapping = field(default_factory=PolledFlags)
-  fspath: str = None
+  fspath: str | None = None
   # the default is '', which uses the common SQLTags; set to None for no .sqltags
   sqltags: SQLTags | str | type(Ellipsis) | None = None
   user_agent: str = 'Pilfer'
@@ -285,9 +288,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           unseen=(unseen_sfunc, StageMode.STREAM),
       )
   )
-  content_cache: ContentCache = None
+  content_cache: ContentCache | None = None
   # a session for storing cookies etc
-  session: str | PilferSession = None
+  session: str | PilferSession | None = None
   # for optional extra things hung on the Pilfer object
   state: NS = field(default_factory=NS)
   _diversion_tasks: dict = field(default_factory=dict)
