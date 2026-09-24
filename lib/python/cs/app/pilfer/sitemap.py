@@ -2854,7 +2854,7 @@ class SiteMap(Entities, Promotable):
             result = method(flowstate, match)
           else:
             attrvalue = pfx_call(getattr, flowstate, flowattr)
-            result = method(self, flowstate, match, attrvalue)
+            result = method(flowstate, match, attrvalue)
         except Exception as e:
           warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
           raise
