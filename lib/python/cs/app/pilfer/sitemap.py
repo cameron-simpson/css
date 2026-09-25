@@ -2035,6 +2035,114 @@ class SiteMapPatternMatch(namedtuple(
     '''
     return self.pattern_arg.format_map(ChainMap(self.mapping, extra or {}))
 
+class BaseSiteMapCommand(BaseCommand):
+
+  def pop_entity(self, argv: list[str]) -> SiteEntity:
+    sitemap = self.options.sitemap
+    try:
+      ent_spec = argv.pop(0)
+    except IndexError:
+      raise GetoptError('missing entity')
+    ent_key = ent_spec.removeprefix(f'{sitemap.TYPE_ZONE}.')
+    ent = sitemap[ent_key]
+    return ent
+
+  def cmd_ent(self, argv):
+    ''' Usage: {cmd} entity
+          Set entity and provide a REPL.
+    '''
+    options = self.options
+    printt(f'{self}.cmd_ent:', options.as_dict())
+    breakpoint()
+    if not argv:
+      raise GetoptError('missing entity')
+    ent = self.pop_entity(argv)
+    BaseCommand.repl(self, local=dict(ent=ent))
+
+  @popopts(
+      f=('force', 'Force refresh of entities even if not stale.'),
+      l=('long_mode', 'Long Mode.'),
+      r=('recurse', 'Recurse into related entities.'),
+  )
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} subname [type [key...]]
+          List entities for this SiteMap.
+    '''
+    options = self.options
+    force = options.force
+    long_mode = options.long_mode
+    recurse = options.recurse
+    runstate = options.runstate
+    if not argv:
+      # list subnames - entity types
+      for subname in sorted(set(subname for subname, type_key in self.keys())):
+        print(subname)
+        if long_mode:
+          printt(
+              *(
+                  [
+                      entity.type_key,
+                      entity.get('fullname') or entity.get('title', ''),
+                  ] for entity in map(
+                      lambda key: self[key],
+                      sorted(self.keys(subname=subname))
+                  )
+              ),
+              indent='  '
+          )
+      return 0
+    subname = argv.pop(0)
+    if argv:
+      ok = True
+      for type_key in argv:
+        if '.' in type_key:
+          warning("invalid dot in type_key %r", type_key)
+          ok = False
+      if not ok:
+        raise GetoptError('invalid type keys')
+      keys = [(subname, key) for key in argv]
+    else:
+      # list all entities of this type
+      keys = sorted(self.keys(subname=subname))
+      print("self.keys ->", *map(r, keys))
+    Q = ListQueue((self[key] for key in keys), unique=lambda ent: ent.name)
+    for ent in self.updated_entities(Q, force=force):
+      runstate.raiseif()
+      print(ent.name)
+      if long_mode:
+        printt(*sorted(ent.items()), indent='  ')
+      if recurse:
+        for (attr, subents) in ent.related():
+          print(attr, '->', [subent.name for subent in subents])
+
+  @popopts(
+      f=('force', 'Force refresh of entities even if not stale.'),
+      r=('recurse', 'Recursively refresh related entities.'),
+  )
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} entity...
+          Refresh the specified entities by fetching and grokking their site pages.
+    '''
+    if not argv:
+      raise GetoptError("missing entities")
+    for ent_spec in argv:
+      with Pfx("entity %r", ent_spec):
+        ent_key = ent_spec.removeprefix(f'{self.TYPE_ZONE}.')
+        ent = self[ent_key]
+        ent.refresh(force=self.options.force, recurse=self.options.recurse)
+        ent.printt()
+
+  @popopts
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} URLs...
+          Scan the suppplied URLs, update entities accordingly.
+    '''
+    if not argv:
+      raise GetoptError('missing URLs')
+    for url in argv:
+      print("scan", url)
+      self.scan_matches(url, no_apply=self.options.dry_run)
+
 @dataclass
 class SiteMap(Entities, Promotable):
   ''' A base dataclass for site maps.
@@ -2089,6 +2197,7 @@ class SiteMap(Entities, Promotable):
 
   DEFAULT_CONCURRENCY = 3
 
+  CommandClass = BaseSiteMapCommand
   EntityClass = SiteEntity
   TagsetsClass = SQLTags
 
@@ -2164,6 +2273,20 @@ class SiteMap(Entities, Promotable):
     except KeyError as e:
       raise KeyError(f'{db_key=}: no SiteMap registered for {zone=}') from e
     return sitemap[subname, key]
+
+  @cached_property
+  def SiteMapCommand(self):
+
+    class SiteMapCommand(self.CommandClass):
+      sitemap = self
+
+      def run(self, **run_kw):
+        run_kw.setdefault('sitemap', self.sitemap)
+        return super().run(**run_kw)
+
+    if not SiteMapCommand.__doc__:
+      SiteMapCommand.__doc__ = f'Subcommand for working with the {self.name} SiteMap.'
+    return SiteMapCommand
 
   def entities_for(self,
                    spec,
@@ -3163,108 +3286,6 @@ class SiteMap(Entities, Promotable):
         else criterion for criterion in criteria
     ]
     return super().find(*criteria, **crit_kw)
-
-  def pop_entity(self, argv):
-    try:
-      ent_spec = argv.pop(0)
-    except IndexError:
-      raise GetoptError('missing entity')
-    ent_key = ent_spec.removeprefix(f'{self.TYPE_ZONE}.')
-    ent = self[ent_key]
-    return ent
-
-  def cmd_ent(self, argv):
-    ''' Usage: {cmd} entity
-          Set entity and provide a REPL.
-    '''
-    if not argv:
-      raise GetoptError('missing entity')
-    ent = self.pop_entity(argv)
-    BaseCommand.repl(self, local=dict(ent=ent))
-
-  @popopts(
-      f=('force', 'Force refresh of entities even if not stale.'),
-      l=('long_mode', 'Long Mode.'),
-      r=('recurse', 'Recurse into related entities.'),
-  )
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} subname [type [key...]]
-          List entities for this SiteMap.
-    '''
-    options = self.options
-    force = options.force
-    long_mode = options.long_mode
-    recurse = options.recurse
-    runstate = options.runstate
-    if not argv:
-      # list subnames - entity types
-      for subname in sorted(set(subname for subname, type_key in self.keys())):
-        print(subname)
-        if long_mode:
-          printt(
-              *(
-                  [
-                      entity.type_key,
-                      entity.get('fullname') or entity.get('title', ''),
-                  ] for entity in map(
-                      lambda key: self[key],
-                      sorted(self.keys(subname=subname))
-                  )
-              ),
-              indent='  '
-          )
-      return 0
-    subname = argv.pop(0)
-    if argv:
-      ok = True
-      for type_key in argv:
-        if '.' in type_key:
-          warning("invalid dot in type_key %r", type_key)
-          ok = False
-      if not ok:
-        raise GetoptError('invalid type keys')
-      keys = [(subname, key) for key in argv]
-    else:
-      # list all entities of this type
-      keys = sorted(self.keys(subname=subname))
-      print("self.keys ->", *map(r, keys))
-    Q = ListQueue((self[key] for key in keys), unique=lambda ent: ent.name)
-    for ent in self.updated_entities(Q, force=force):
-      runstate.raiseif()
-      print(ent.name)
-      if long_mode:
-        printt(*sorted(ent.items()), indent='  ')
-      if recurse:
-        for (attr, subents) in ent.related():
-          print(attr, '->', [subent.name for subent in subents])
-
-  @popopts(
-      f=('force', 'Force refresh of entities even if not stale.'),
-      r=('recurse', 'Recursively refresh related entities.'),
-  )
-  def cmd_refresh(self, argv):
-    ''' Usage: {cmd} entity...
-          Refresh the specified entities by fetching and grokking their site pages.
-    '''
-    if not argv:
-      raise GetoptError("missing entities")
-    for ent_spec in argv:
-      with Pfx("entity %r", ent_spec):
-        ent_key = ent_spec.removeprefix(f'{self.TYPE_ZONE}.')
-        ent = self[ent_key]
-        ent.refresh(force=self.options.force, recurse=self.options.recurse)
-        ent.printt()
-
-  @popopts
-  def cmd_scan(self, argv):
-    ''' Usage: {cmd} URLs...
-          Scan the suppplied URLs, update entities accordingly.
-    '''
-    if not argv:
-      raise GetoptError('missing URLs')
-    for url in argv:
-      print("scan", url)
-      self.scan_matches(url, no_apply=self.options.dry_run)
 
 # expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on
