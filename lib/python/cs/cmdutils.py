@@ -683,12 +683,8 @@ class SubCommand:
     '''
     method = self.method
     subcommand_names = list(
-        set(self.instance.subcommand_names)
-        if isclass(method) else getattr(self.instance, 'subcommand_names', ())
+        set(self.instance.subcommand_names) if isclass(method) else ()
     )
-    print(f'SubCOmmand.subcommand_names {method} -> {subcommand_names=}')
-    if method.__name__ == 'cmd_sitemap':
-      breakpoint()
     return subcommand_names
 
   def subusage_table(self, subcmds: List[str], *, recurse=False, short=False):
