@@ -394,6 +394,15 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
   #################################################################
   # Attribute suffix resolvers.
 
+  def field_ref_type(self, field_name: str) -> str:
+    ''' Map a field name to its associated subtype.
+        This default method  returns the field name unchanged.
+
+        This is used by methods such as `.suffix_ents()` to map its reference field name
+        (the attribute name before `_ents`) via this method to the zone subtype.
+    '''
+    return field_name
+
   @require(lambda attr: attr.endswith('_ent'))
   def suffix_ent(self, attr) -> Self | None:
     ''' Resolve *subtype*`_ent` to `self[type_zone.`*subtype*`.id]`
@@ -418,8 +427,9 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
     ''' Resolve *subtype*`_ents` to [self[type_zone.`*subtype*`.id]]`
         or `()` if no `self[`*subtype*`_id]]`.
     '''
-    ref_subtype = attr.removesuffix('_ents')
-    ref_key = f'{ref_subtype}_id'
+    ref_field_name = attr.removesuffix('_ents')
+    ref_subtype = self.field_ref_type(ref_field_name)
+    ref_key = f'{ref_field_name}_id'
     idvalues = getattr(self, ref_key, None)
     if idvalues is None:
       return ()
