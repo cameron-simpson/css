@@ -31,17 +31,29 @@ from cs.debug import trace, r, pprint, printt
 # Unicode points found in Amazon whitespace areas
 AMAZON_WS = ' \t\r\n\N{LEFT-TO-RIGHT MARK}\N{RIGHT-TO-LEFT MARK}'
 
+ASIN_re = re.compile(r'[\dA-Z]{10}')
+
+def is_valid_asin(asin: str):
+  ''' Test is a string is a valid ASIN.
+      Amazon's own dowcs are a bit vague.
+  '''
+  m = ASIN_re.match(asin)
+  return m and m.end() == len(asin)
+
 def asin_from_href(href, marker='/dp/'):
   ''' Return the ASIN from an `href` like ....`/dp/`*ASIN*...
       The `/dp/` (digital product) marker may be overridden by
       the `marker` parameter.
       Raises `valueError` if the `href` is not matched.
   '''
-  assert marker.endswith('/'), f'expected {marker=} to end with a slash'
-  regexp_s = marker + r'([^/?]+)'
-  if m := re.search(regexp_s, href):
-    return m.group(1)
-  raise ValueError(f'{href=} does not look like {marker=}ASIN')
+  for m in ASIN_re.finditer(href):
+    start = m.start()
+    if start == 0 or start >= len(
+        marker) and href[start - len(marker):start] == marker:
+      end = m.end()
+      if end == len(href) or href[end] in '/?#':
+        return m.group(0)
+  raise ValueError('no ASIN found')
 
 def date_from_pubdate(pubdate: str) -> date:
   ''' Parse an Amazon publication date text into a `datetime.date`.
