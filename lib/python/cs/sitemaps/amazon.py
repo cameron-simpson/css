@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
-from functools import cached_property
+from functools import cached_property, partial
+from getopt import GetoptError
+import json
 import re
 
 from typeguard import typechecked
@@ -10,10 +13,12 @@ from typeguard import typechecked
 from cs.app.pilfer.sitemap import (
     FlowState, SiteEntity, SiteMap, SiteWidget, URLPattern, on, uses_scandata
 )
-from cs.bs4utils import child_tags, printt_soup, Table, Widget
-from cs.deco import promote
+from cs.bs4utils import child_tags, printt_soup, Table, BS4Tag, Widget
+from cs.cmdutils import popopts
+from cs.deco import methodif, promote
 from cs.lex import printt
 from cs.logutils import warning
+from cs.pfx import Pfx
 from cs.tagged import ScanData
 from cs.tagset import TagSet
 from cs.urlutils import URL
