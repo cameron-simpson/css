@@ -61,7 +61,7 @@ def date_from_pubdate(pubdate: str) -> date:
   # date.strptime only arrived in 3.14
   return datetime.strptime(pubdate.strip(), '%d %B %Y').date()
 
-def prune_book_title(title, series=None):
+def prune_book_title(title, series: str | None = None):
   ''' Strip cruft from a book title as cited in Amazon,
       which often includes the series title and other junk.
 
@@ -141,8 +141,8 @@ class _AmazonEntity(SiteEntity):
     print("GROK GENERIC")
     printt(*map(list, sorted(self.items())), indent="  ")
 
-class _AmazonASIN(_AmazonEntity):
-  ''' Superclass for Amazon eneities with an ASIN.
+class ASIN(_AmazonEntity):
+  ''' A class for Amazon entities with an ASIN.
       We always set the `'asin'` key to be the `type_key i.e. the ASIN.
 
       This sophistry is because you can't recognise an Amazon URL
@@ -154,22 +154,142 @@ class _AmazonASIN(_AmazonEntity):
       entities by ASIN, not by `.name`.
   '''
 
+  TYPE_SUBNAME = 'asin'
   SITEPAGE_URL_PATTERN = '<*:pretext>/dp/<type_key><*:tracking>'
 
   def __init__(self, *a, **kw):
     super().__init__(*a, **kw)
-    self['asin'] = self.type_key
+    # TODO: sanity check the ASIN string per Amazon docs
+    asin = self.type_key
+    if not is_valid_asin(asin):
+      raise ValueError(f'{self.type_key=} is not a valid ASIN')
+    if (stored_asin := self.get('asin')) != asin:
+      if stored_asin is not None:
+        warning(
+            f'{self.name}: chnage ["asin"] from {asin=} -> {self.type_key=}'
+        )
+        raise RuntimeError
+      self['asin'] = asin
+
+  def field_ref_type(self, field_name: str) -> str:
+    ''' All the entity subtypes at amazon are `asin`.
+    '''
+    return self.TYPE_SUBNAME
 
 class AmazonAuthor(_AmazonASIN):
   ''' An author.
   '''
   TYPE_SUBNAME = 'author'
   SITEPAGE_URL_PATTERN = '.*/author/<type_key>'
+  @uses_scandata
+  @promote
+  @typechecked
+  def scan_sitepage(
+      self, flowstate: FlowState, scandata: ScanData
+  ) -> ScanData:
+    with Pfx(f'{self.name}.scan_sitepage({flowstate.url.short})'):
+      warning('exciting new ASIN page scan unimplmeneted')
+      super().scan_sitepage(flowstate, scandata=scandata)
+      data = scandata[self]
+      asin_type = None
+      try:
+        title = data['title']
+      except KeyError as e:
+        warning(f'no title: {e}')
+        breakpoint()
+      else:
+        try:
+          asin_type = self.title_asin_type(title)
+        except ValueError as e:
+          print(f'no asin_type from {title=}: {e}')
+          breakpoint()
+        print(f'{asin_type=}')
+      if asin_type is not None:
+        data['asin_type'] = asin_type
+        subscan_name = f'scan_{asin_type.replace("-","_")}'
+        try:
+          subscan = getattr(self, subscan_name)
+        except AttributeError as e:
+          warning('no self.{subscan_name} method for {asin_type=}: {e}')
+        else:
+          trace(subscan)(flowstate, scandata=scandata)
+      ##scandata.printt()
+      ##breakpoint()
+      return scandata
 
 class AmazonBook(_AmazonASIN):
   ''' An author.
   '''
   TYPE_SUBNAME = 'book'
+  @uses_scandata
+  def scan_book_series(
+      self, flowstate: FlowState, *, scandata: ScanData
+  ) -> ScanData:
+    data = scandata[self]
+    soup = flowstate.soup
+    header = soup.find('div', id='collectionHeaderContainer')
+    if header is None:
+      warning("no DIV #collectionHeaderContainer")
+      series_title = None
+    else:
+      data['title'] = series_title = header.find(
+          'span', id='title'
+      ).get_text().strip()
+      data['format'] = header.find('bds-book-format').attrs['format']
+    by_lines = defaultdict(list)
+    auth_div = soup.find('span', id='bylineContainer').parent
+    assert auth_div.name == 'div'
+    for link in auth_div.find_all('bds-link'):
+      href = link.attrs.get('href', '')
+      label = link.attrs.get('label', '')
+      if not href:
+        warning('no href in {link}')
+        continue
+      if m := re.search(r'\s*\(([^)]+)\)$', label):
+        role = m.group(1).lower()
+        label = label[:m.start()]
+      else:
+        warning(f'no "(role)" in {label=}, pretending author')
+        role = 'author'
+      by_asin = asin_from_href(href, marker='/')
+      by_lines[role].append((by_asin, label.strip()))
+    for role, members in by_lines.items():
+      data[f'{role}_id'] = [member[0] for member in members]
+      for asin, fullname in members:
+        ent = self.sitemap[ASIN, asin]
+        scandata[ent]['fullname'] = fullname
+    # series items
+    data['book_id'] = item_ids = []
+    for item_number, item_div in enumerate(soup.find_all(
+        lambda tag: (tag.name == "div" and tag.attrs.get("id", '').startswith(
+            'series-childAsin-item_')),), 1):
+      item_title_anchor = item_div.find('a', class_='itemBookTitle')
+      item_title = prune_book_title(
+          item_title_anchor.get_text().strip(), series_title
+      )
+      href = item_title_anchor.attrs['href']
+      item_asin = asin_from_href(href, '/')
+      item_ids.append(item_asin)
+      item_ent = self.sitemap[ASIN, item_asin]
+      item_data = scandata[item_ent]
+      item_data['sitepage_url'] = href.split('?', 1)[0]
+      item_data['title'] = item_title
+      item_data['author_id'] = data['author_id']
+      item_data['series_id'] = self.asin
+      item_data['series_number'] = item_number
+      expander_div = item_div.find(
+          lambda tag: tag.name == 'div' and tag.attrs.
+          get('data-a-expander-name', '').startswith('itemDescripton_')
+      )
+      if expander_div is None:
+        warning("no expander_div")
+      else:
+        desc_div = expander_div.find('div', class_='collectionDescription')
+        if desc_div is None:
+          warning(f'no div#collectionDescription in {expander_div}')
+        else:
+          item_data['description_html'] = str(desc_div)
+    return scandata
 
   def grok_sitepage(self, flowstate: FlowState):
     self.generic_grok_amazon_page(flowstate)
@@ -177,11 +297,49 @@ class AmazonMusic(_AmazonASIN):
   ''' An music volume.
   '''
   TYPE_SUBNAME = 'music'
+  @staticmethod
+  def title_asin_type(title: str):
+    ''' The product type as derived from a product page title.
+        Expecting one of `'book-series'` or `'ebook'` or `'music'`.
+        Returns `None` if the product type cannot be recognised.
+    '''
+    print(f'{title=}')
+    asin_type = None
+    try:
+      core_title, domain, asin_type = title.rsplit(': ', 2)
+    except ValueError:
+      warning(f'cannot split {title=} into core_title, domain, asin_type')
+      if title.endswith(' book series) Kindle Edition'):
+        asin_type = 'book-series'
+    else:
+      # main title: amazon.com.au: Music
+      assert domain.lower().startswith('amazon.')
+      asin_type = asin_type.lower()
+      print(f'{asin_type=}')
+      if asin_type not in ('ebook', 'music'):
+        warning(f'{title=}: {asin_type=} not book or music')
+        breakpoint()
+    return asin_type
+
+  def refresh_related(self):
+    asin_type = getattr(self, 'asin_type', None)
+    if asin_type == 'book-series':
+      books = self.book_ents
+      print(*map(lambda ent: ent.name, books))
+      breakpoint()
+      yield from self.book_ents
 
 class AmazonSeries(_AmazonASIN):
   ''' A book series.
   '''
   TYPE_SUBNAME = 'series'
+  def refresh_related1(self):
+    asin_type = self.asin_type
+    if asin_type == 'book-series':
+      yield from self.author_ents
+    elif asin_type == 'ebook':
+      yield from self.author_ents
+
 
 class AmazonGeneralProduct(_AmazonEntity):
   ''' A single Amazon product.
