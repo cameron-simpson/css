@@ -176,11 +176,6 @@ class ASIN(_AmazonEntity):
     '''
     return self.TYPE_SUBNAME
 
-class AmazonAuthor(_AmazonASIN):
-  ''' An author.
-  '''
-  TYPE_SUBNAME = 'author'
-  SITEPAGE_URL_PATTERN = '.*/author/<type_key>'
   @uses_scandata
   @promote
   @typechecked
@@ -188,7 +183,6 @@ class AmazonAuthor(_AmazonASIN):
       self, flowstate: FlowState, scandata: ScanData
   ) -> ScanData:
     with Pfx(f'{self.name}.scan_sitepage({flowstate.url.short})'):
-      warning('exciting new ASIN page scan unimplmeneted')
       super().scan_sitepage(flowstate, scandata=scandata)
       data = scandata[self]
       asin_type = None
@@ -210,17 +204,13 @@ class AmazonAuthor(_AmazonASIN):
         try:
           subscan = getattr(self, subscan_name)
         except AttributeError as e:
-          warning('no self.{subscan_name} method for {asin_type=}: {e}')
+          warning(f'no self.{subscan_name} method for {asin_type=}: {e}')
         else:
           trace(subscan)(flowstate, scandata=scandata)
       ##scandata.printt()
       ##breakpoint()
       return scandata
 
-class AmazonBook(_AmazonASIN):
-  ''' An author.
-  '''
-  TYPE_SUBNAME = 'book'
   @uses_scandata
   def scan_book_series(
       self, flowstate: FlowState, *, scandata: ScanData
@@ -291,14 +281,6 @@ class AmazonBook(_AmazonASIN):
           item_data['description_html'] = str(desc_div)
     return scandata
 
-  def grok_sitepage(self, flowstate: FlowState):
-    self.generic_grok_amazon_page(flowstate)
-class AmazonMusic(_AmazonASIN):
-  ''' An music volume.
-  '''
-  TYPE_SUBNAME = 'music'
-  @staticmethod
-  def title_asin_type(title: str):
     ''' The product type as derived from a product page title.
         Expecting one of `'book-series'` or `'ebook'` or `'music'`.
         Returns `None` if the product type cannot be recognised.
@@ -329,10 +311,6 @@ class AmazonMusic(_AmazonASIN):
       breakpoint()
       yield from self.book_ents
 
-class AmazonSeries(_AmazonASIN):
-  ''' A book series.
-  '''
-  TYPE_SUBNAME = 'series'
   def refresh_related1(self):
     asin_type = self.asin_type
     if asin_type == 'book-series':
@@ -341,11 +319,6 @@ class AmazonSeries(_AmazonASIN):
       yield from self.author_ents
 
 
-class AmazonGeneralProduct(_AmazonEntity):
-  ''' A single Amazon product.
-  '''
-  TYPE_SUBNAME = 'product'
-  SITEPAGE_URL_PATTERN = '<*:pretext>/gp/product/<type_key><*:tracking>'
 
 @dataclass
 class AmazonMap(SiteMap):
