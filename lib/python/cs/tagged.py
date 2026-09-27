@@ -240,10 +240,18 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
   def json(self):
     return self.tags.json()
 
-  def printt(self, label=None, **printt_kw):
+  def tabulate(self, label=None, *, recurse=False):
     if label is None:
       label = str(self)
-    return printt([label], self.as_dict(), **printt_kw)
+    table = [[label], self.as_dict()]
+    if recurse:
+      for subent in self.refresh_related():
+        table.extend(subent.tabulate(subent.name, recurse=True))
+    return table
+
+  def printt(self, label=None, *, recurse=False, **printt_kw):
+    table = self.tabulate(label, recurse=recurse)
+    return printt(*table, **printt_kw)
 
   def print(self):
     ''' The default `print()` runs `self.printt()`.
@@ -391,8 +399,9 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
     ''' Resolve *subtype*`_ent` to `self[type_zone.`*subtype*`.id]`
         or `None` if no `self[`*subtype*`_id]`
     '''
-    ref_subtype = attr.removesuffix('_ent')
-    ref_key = f'{ref_subtype}_id'
+    ref_field_name = attr.removesuffix('_ent')
+    ref_subtype = self.field_ref_type(ref_field_name)
+    ref_key = f'{ref_field_name}_id'
     idvalue = getattr(self, ref_key, None)
     if idvalue is None:
       return None
