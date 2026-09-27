@@ -76,7 +76,7 @@ def prune_book_title(title, series: str | None = None):
           >>> prune_book_title('A Right Shambles in York: A DI Adams mystery - magic, menace, & snark in a Yorkshire urban fantasy', series='A DI Adams Mystery')
           'A Right Shambles in York'
   '''
-  if m := re.search(r'\s+\(book \S+\)$', title, re.IGNORECASE):
+  if m := re.search(r'\s+\(book \S+\)', title, re.IGNORECASE):
     title = title[:m.start()]
   if series is not None:
     if (offset := title.lower().find(f': {series.lower()}')) > 0:
