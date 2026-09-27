@@ -156,6 +156,12 @@ class ASIN(_AmazonEntity):
 
   TYPE_SUBNAME = 'asin'
   SITEPAGE_URL_PATTERN = '<*:pretext>/dp/<type_key><*:tracking>'
+  ASIN_TYPES = (
+      'author',
+      'book',
+      'book-series',
+      'music',
+  )
 
   def __init__(self, *a, **kw):
     super().__init__(*a, **kw)
@@ -281,8 +287,10 @@ class ASIN(_AmazonEntity):
           item_data['description_html'] = str(desc_div)
     return scandata
 
+  @classmethod
+  def title_asin_type(cls, title: str):
     ''' The product type as derived from a product page title.
-        Expecting one of `'book-series'` or `'ebook'` or `'music'`.
+        Expecting to produce one of `'book-series'` or `'ebook'` or `'music'`.
         Returns `None` if the product type cannot be recognised.
     '''
     print(f'{title=}')
@@ -296,27 +304,33 @@ class ASIN(_AmazonEntity):
     else:
       # main title: amazon.com.au: Music
       assert domain.lower().startswith('amazon.')
+    # normalise the asin_type
+    if asin_type is None:
+      warning(f'no asin_type inferred from {title=}')
+    else:
       asin_type = asin_type.lower()
+      asin_type = {'books': 'book'}.get(asin_type, asin_type)
       print(f'{asin_type=}')
-      if asin_type not in ('ebook', 'music'):
-        warning(f'{title=}: {asin_type=} not book or music')
+      if asin_type not in cls.ASIN_TYPES:
+        warning(f'{title=}: {asin_type=} not in {cls.ASIN_TYPES=}')
         breakpoint()
     return asin_type
 
   def refresh_related(self):
     asin_type = getattr(self, 'asin_type', None)
-    if asin_type == 'book-series':
-      books = self.book_ents
-      print(*map(lambda ent: ent.name, books))
-      breakpoint()
+    if asin_type == 'author':
+      yield from self.book_ents
+      yield from self.series_ents
+    elif asin_type == 'book-series':
       yield from self.book_ents
 
   def refresh_related1(self):
-    asin_type = self.asin_type
+    asin_type = getattr(self, 'asin_type', None)
     if asin_type == 'book-series':
       yield from self.author_ents
     elif asin_type == 'ebook':
       yield from self.author_ents
+      yield from self.series_ents
 
 
 
