@@ -7,7 +7,7 @@
 '''
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from functools import cached_property
 from types import GenericAlias
@@ -55,7 +55,8 @@ DISTINFO = {
     '>=3.9',  # for subscripting builtin types
 }
 
-class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
+class Entity(Mapping, ZonedTypes, Refreshable, Promotable, FormatableMixin,
+             NoAttrs):
   ''' A base class for classes which have a `.tags:TagSet` attribute
       and a `.tags_db:BaseTagSets` containing other `Tagset`s.
 
@@ -67,7 +68,7 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
       `self.tags_db[self.tags_entity_key]`.
       (`self.tags_entity_key` is `self.tags.name` by default.)
 
-      Note that this mixin brings its own `__new__` method which
+      Note that this class brings its own `__new__` method which
       can choose a subclass based on the subclass' `.TYPE_SUBNAME`
       attribute. See the `__new__` docstring.
 
@@ -275,6 +276,11 @@ class Entity(ZonedTypes, Refreshable, Promotable, FormatableMixin, NoAttrs):
           f'{self.__class__.__name__}:HasSQLTags.tags_entity_key: no .tags attribute!'
       )
     return self.tags.name
+
+  ######################################################################
+  # Mapping Methods, proxies to self.tags.
+  def __len__(self):
+    return len(self.tags)
 
   def __contains__(self, key):
     return key in self.tags
