@@ -902,7 +902,6 @@ class ScanData:
     '''
     return iter(self.ent_data_map.items())
 
-  ##@trace
   @typechecked
   def __getitem__(self, ent: Union[tuple, "Entity"]):
     ''' The data for the supplied `ent`.
