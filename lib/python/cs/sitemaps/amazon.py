@@ -190,19 +190,19 @@ class ASIN(_AmazonEntity):
     with Pfx(f'{self.name}.scan_sitepage({flowstate.url.short})'):
       super().scan_sitepage(flowstate, scandata=scandata)
       data = scandata[self]
-      asin_type = None
+      title = data['title']
+      title_data = self.parse_page_title(title)
+      data.update(title_data)
       try:
-        title = data['title']
-      except KeyError as e:
-        warning(f'no title: {e}')
-        breakpoint()
-      else:
-        try:
-          asin_type = self.title_asin_type(title)
-        except ValueError as e:
-          print(f'no asin_type from {title=}: {e}')
-          breakpoint()
-        print(f'{asin_type=}')
+        asin_type = self.asin_type
+      except AttributeError:
+        asin_type = None
+        if ('print_length' in data
+            or '-ebook/dp/' in data.get('sitepage_url', '')):
+          asin_type = 'book'
+        else:
+          # try to guess from the page title
+          asin_type = title_data.get('asin_type')
       if asin_type is not None:
         data['asin_type'] = asin_type
         subscan_name = f'scan_{asin_type.replace("-","_")}'
@@ -212,24 +212,130 @@ class ASIN(_AmazonEntity):
           warning(f'no self.{subscan_name} method for {asin_type=}: {e}')
         else:
           trace(subscan)(flowstate, scandata=scandata)
-      ##scandata.printt()
       ##breakpoint()
       return scandata
+
+  @uses_scandata
+  def scan_author(
+      self, flowstate: FlowState, *, scandata: ScanData
+  ) -> ScanData:
+    data = scandata[self]
+    soup = flowstate.soup
+    bio_div = soup.find(
+        lambda tag: tag.name == 'div' and tag.attrs.get('id', '').
+        startswith('author-biotile-')
+    )
+    if bio_div:
+      data['bio'] = bio_div.get_text().strip()
+    else:
+      warning('did not find bio DIV with id #author-biotile-*')
+    return scandata
+
+  @uses_scandata
+  def scan_book(self, flowstate: FlowState, *, scandata: ScanData) -> ScanData:
+    data = scandata[self]
+    soup = flowstate.soup
+    landing_img = soup.find('img', id='landingImage')
+    if not landing_img:
+      warning("no IMG #landingImage")
+    else:
+      alt = landing_img.attrs.get('alt', str(landing_img))
+      hires_url = landing_img.attrs.get('data-old-hires', '')
+      if not hires_url:
+        warning(f'{alt=}: no landing IMG data-old-hires')
+      else:
+        data['cover_url'] = hires_url
+    byline_div = soup.find('div', id='bylineInfo')
+    if byline_div is None:
+      warning('no DIV #bylineInfo')
+    else:
+      data['author_id'] = author_ids = []
+      for author_span in byline_div.find_all('span', class_='author'):
+        fullname = author_span.get_text().strip()
+        anchor = author_span.a
+        href = anchor.attrs.get('href')
+        if not href:
+          warning(f'{fullname=}: no href')
+        else:
+          try:
+            author_asin = asin_from_href(href, '/')
+          except ValueError:
+            warning(f'{fullname=}: {href=}: no ASIN')
+            continue
+          author_ids.append(author_asin)
+          author_data = scandata[ASIN, author_asin]
+          author_data['asin_type'] = 'author'
+          author_data['fullname'] = fullname
+          author_data['sitepage_url'] = href.split('?', 1)[0]
+    desc_div = soup.find('div', id='bookDescription_feature_div')
+    if desc_div is None:
+      warning('no DIV #bookDescription_feature_div')
+    else:
+      content_div = desc_div.find(class_='a-expander-content')
+      data['description'] = content_div.get_text().strip()
+      data['description_html'] = str(content_div)
+    series_info_div = soup.find('div', i='seriesInfoRow')
+    if series_info_div is None:
+      warning('no DIV #seriesInfoRow')
+    else:
+      series_image_div = series_info_div.find('div', id='seriesImageContainer')
+      if series_image_div is None:
+        warning('no DIV #seriesImageContainer')
+      else:
+        anchor = series_image_div.find('a')
+        series_title = anchor.get_text().strip()
+        href = anchor.attrs.get('href', '')
+        if not href:
+          warning(f'{series_title}: no href')
+        else:
+          try:
+            series_asin = asin_from_href(href, '/')
+          except ValueError:
+            warning(f'{series_title=}: {href=}: no ASIN')
+          else:
+            data['series_id'] = series_asin
+            series_data = scandata[ASIN, series_asin]
+            series_data['asin_type'] = 'book-series'
+            series_data['title'] = series_title
+            series_data['sitepage_url'] = href.split('?', 1)[0]
+        books_ol = series_info_div.find('ol')
+        if books_ol:
+          warning(f'{series_title}: no books OL')
+        else:
+          series_data['book_id'] = book_ids = []
+          for book_n, book_li in enumerate(child_tags(books_ol, 'li'), 1):
+            anchor = book_li.find('a', class_='a-link-child')
+            subbook_title = anchor.get_text().strip()
+            href = anchor.attrs.get('href')
+            if not href:
+              warning(f'{subbook_title=}: no href')
+            else:
+              try:
+                subbook_asin = asin_from_href(href, '/')
+              except ValueError:
+                warning(f'{subbook_title=}: {href=}: no ASIN')
+                continue
+              book_ids.append(author_asin)
+              subbook_data = scandata[ASIN, subbook_asin]
+              subbook_data['asin_type'] = 'book'
+              subbook_data['title'] = subbook_title
+              subbook_data['series_id'] = series_asin
+              subbook_data['series_number'] = book_n
+              subbook_data['sitepage_url'] = href.split('?', 1)[0]
+    return scandata
 
   @uses_scandata
   def scan_book_series(
       self, flowstate: FlowState, *, scandata: ScanData
   ) -> ScanData:
     data = scandata[self]
+    series_title = data['title']
     soup = flowstate.soup
     header = soup.find('div', id='collectionHeaderContainer')
     if header is None:
       warning("no DIV #collectionHeaderContainer")
       series_title = None
     else:
-      data['title'] = series_title = header.find(
-          'span', id='title'
-      ).get_text().strip()
       data['format'] = header.find('bds-book-format').attrs['format']
     by_lines = defaultdict(list)
     auth_div = soup.find('span', id='bylineContainer').parent
@@ -240,19 +346,25 @@ class ASIN(_AmazonEntity):
       if not href:
         warning('no href in {link}')
         continue
+      try:
+        by_asin = asin_from_href(href, marker='/')
+      except ValueError:
+        warning(f'no ASIN found for bds-link with {href=}')
+        continue
       if m := re.search(r'\s*\(([^)]+)\)$', label):
         role = m.group(1).lower()
         label = label[:m.start()]
       else:
         warning(f'no "(role)" in {label=}, pretending author')
         role = 'author'
-      by_asin = asin_from_href(href, marker='/')
-      by_lines[role].append((by_asin, label.strip()))
+      by_lines[role].append((by_asin, label.strip(), href))
     for role, members in by_lines.items():
       data[f'{role}_id'] = [member[0] for member in members]
-      for asin, fullname in members:
+      for asin, fullname, href in members:
         ent = self.sitemap[ASIN, asin]
+        scandata[ent]['asin_type'] = role
         scandata[ent]['fullname'] = fullname
+        scandata[ent]['sitepage_url'] = href.split('?', 1)[0]
     # series items
     data['book_id'] = item_ids = []
     for item_number, item_div in enumerate(soup.find_all(
@@ -267,6 +379,7 @@ class ASIN(_AmazonEntity):
       item_ids.append(item_asin)
       item_ent = self.sitemap[ASIN, item_asin]
       item_data = scandata[item_ent]
+      item_data['asin_type'] = 'book'
       item_data['sitepage_url'] = href.split('?', 1)[0]
       item_data['title'] = item_title
       item_data['author_id'] = data['author_id']
@@ -287,49 +400,74 @@ class ASIN(_AmazonEntity):
     return scandata
 
   @classmethod
-  def title_asin_type(cls, title: str):
-    ''' The product type as derived from a product page title.
-        Expecting to produce one of `'book-series'` or `'ebook'` or `'music'`.
-        Returns `None` if the product type cannot be recognised.
+  def parse_page_title(cls, title: str) -> dict:
+    ''' Parse information from an Amazon page title.
+        The returned `dict`, if not empty, should usually have an
+        `"asin_type"` entry and other associated data.
     '''
+    data = {}
     print(f'{title=}')
-    asin_type = None
-    try:
-      core_title, domain, asin_type = title.rsplit(': ', 2)
-    except ValueError:
-      warning(f'cannot split {title=} into core_title, domain, asin_type')
-      if title.endswith(' book series) Kindle Edition'):
-        asin_type = 'book-series'
+    # Series Name (n book series) Kindle Eition
+    elif m := re.match(r'\s*(.*\S)\s+\((\d+) book series\) Kindle Edition',
+                       title):
+      data['asin_type'] = 'book-series'
+      data['title'] = m.group(1)
+      data['series_length'] = int(m.group(2))
+    # book title (series name N)
+    elif m := re.match(r'\s*(\S.*\S)\s+\((\S.*\S)\s+(\d+)\)', title):
+      data['asin_type'] = 'book'
+      data['title'] = m.group(1)
+      data['series_name'] = m.group(2)
+      data['series_number'] = int(m.group(3))
     else:
-      # main title: amazon.com.au: Music
-      assert domain.lower().startswith('amazon.')
-    # normalise the asin_type
-    if asin_type is None:
-      warning(f'no asin_type inferred from {title=}')
-    else:
-      asin_type = asin_type.lower()
-      asin_type = {'books': 'book'}.get(asin_type, asin_type)
-      print(f'{asin_type=}')
-      if asin_type not in cls.ASIN_TYPES:
-        warning(f'{title=}: {asin_type=} not in {cls.ASIN_TYPES=}')
+      parts = title.rsplit(': ', 2)
+      # Amazon.com.au: Author Name: books, biography, latest update
+      if parts[-1].startswith('books, biography'):
+        if not parts[0].lower().startswith('amazon.'):
+          warning(f'{title=}: {parts=}: parts[0] is not amazon.*')
+        data['asin_type'] = 'author'
+        data['fullname'] = parts[1].strip()
+      # "book-title: amazon: books"
+      elif parts[-1].lower() == "books":
+        if not parts[1].lower().startswith('amazon.'):
+          warning(f'{title=}: {parts=}: parts[1] is not amazon.*')
+        data['asin_type'] = 'book'
+        data['title'] = prune_book_title(parts[0])
+      else:
+        warning(f'unhandled title: {parts=}')
         breakpoint()
-    return asin_type
+      # normalise the asin_type
+      if not data:
+        warning(f'no asin_type inferred from {title=}')
+      else:
+        asin_type = data['asin_type'].lower()
+        asin_type = {'books': 'book'}.get(asin_type, asin_type)
+        data['asin_type'] = asin_type
+    return data
 
   def refresh_related(self):
     asin_type = getattr(self, 'asin_type', None)
     if asin_type == 'author':
       yield from self.book_ents
       yield from self.series_ents
+    elif asin_type == 'book':
+      pass
     elif asin_type == 'book-series':
       yield from self.book_ents
+    else:
+      warning(f'{self.name}.refresh_related: unhandled {asin_type=}')
 
   def refresh_related1(self):
     asin_type = getattr(self, 'asin_type', None)
-    if asin_type == 'book-series':
-      yield from self.author_ents
-    elif asin_type == 'ebook':
+    if asin_type == 'author':
+      pass
+    elif asin_type == 'book':
       yield from self.author_ents
       yield from self.series_ents
+    elif asin_type == 'book-series':
+      yield from self.author_ents
+    else:
+      warning(f'{self.name}.refresh_related: unhandled {asin_type=}')
 
 
 
