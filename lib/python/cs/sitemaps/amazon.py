@@ -23,7 +23,6 @@ from cs.tagged import ScanData
 from cs.tagset import TagSet
 from cs.urlutils import URL
 
-from cs.debug import trace, r, pprint, printt
 
 # worth parsing:
 # https://www.amazon.com.au/SANNO-Stainless-Organizer-Freezers-Adjustable/dp/B0DBZMGRYR?th=1
