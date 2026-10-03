@@ -17,9 +17,10 @@ from PIL import Image
 
 from cs.cache import ConvCache, convof
 from cs.deco import ALL
+from cs.gimmicks import warning
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import run
-from cs.gimmicks import warning
+from cs.tty import ttysizepx, WinSizePX
 
 __all__ = []
 
@@ -153,7 +154,7 @@ def sixel_from_image_bytes(image_bs: bytes) -> str:
 def as_sixel_bytes(img: Image) -> Generator[bytes]:
   ''' A generator yielding `img` as SIXEL format `bytes` chunks.
 
-      This tries to use `libsixel` but falls back to th external
+      This tries to use `libsixel` but falls back to the external
       executable `img2sixel` if that is not available.
   '''
   try:
@@ -212,7 +213,7 @@ def as_sixel_bytes(img: Image) -> Generator[bytes]:
         dither = sixel_dither_get(SIXEL_BUILTIN_G1)
         sixel_dither_set_pixelformat(dither, SIXEL_PIXELFORMAT_G1)
       else:
-        raise RuntimeError(f'unexpected img mode {img.mode=}')
+        raise RuntimeError(f'unexpected Image mode {img.mode=}')
       try:
 
         def six_encode():
@@ -232,28 +233,57 @@ def as_sixel_bytes(img: Image) -> Generator[bytes]:
     finally:
       sixel_output_unref(sixout)
 
-if __name__ == '__main__':
-  import os
-  from cs.tty import ttysizepx
-  ttysize = ttysizepx(1)
-  print('tty size ', ttysize.columns, 'cols x', ttysize.rows, 'rows')
-  print('         ', ttysize.widthpx, 'px wide x', ttysize.heightpx, 'high')
+def sized_sixel_bytes(img: Image,
+                      tty=1) -> tuple[list[bytes], int, int, WinSizePX]:
+  ''' Wrapper for `as_sixel_bytes()` which returns a 4 tuple of
+      `(list[bytes],char_width,char_height,tty_size_info)` being:
+      - a list of the `bytes` chunks yields from `as_sixel_bytes()`
+      - the width of the SIXEL image in characters
+      - the height of the SIXEL image in characters
+      - the tty information used to calculate the result as a `WinSizePX`
+
+      Parameters:
+      - `img`: a Pillow `Image`
+      - `tty`: an optional file or file descriptor for the tty whose
+        size will be measured; the default is `1` for the standard output
+
+      Writing the SIXEL data will occupy a rectangle `char_width`
+      wide by `char_high`high and move the cursor down `char_high`
+      rows in the original column.
+  '''
+  if isinstance(tty, int):
+    tty_fd = tty
+  else:
+    tty_fd = tty.fileno()
+  ttysize = ttysizepx(tty_fd)
+  #print('tty size ', ttysize.columns, 'cols x', ttysize.rows, 'rows')
+  #print('         ', ttysize.widthpx, 'px wide x', ttysize.heightpx, 'high')
   char_wide = ttysize.widthpx / ttysize.columns
   char_high = ttysize.heightpx / ttysize.rows
-  print('char cell', char_wide, 'px wide x ', char_high, 'high')
+  #print('char cell', char_wide, 'px wide x ', char_high, 'high')
   assert char_wide == int(char_wide)
   assert char_high == int(char_high)
   char_wide = int(char_wide)
   char_high = int(char_high)
+  width, height = img.size
+  #print(width, 'x', height, 'pixels')
+  char_wide = (width + char_wide - 1) // char_wide
+  char_high = (height + char_high - 1) // char_high
+  #print(chars_wide, 'chars wide x', chars_high, 'high')
+  bss = list(as_sixel_bytes(img))
+  return bss, char_wide, char_high, ttysize
+
+if __name__ == '__main__':
+  import os
   img = Image.open('/Users/cameron/im/them/me/gravatar-crack-128.png')
+  sixel_bss, char_wide, char_high, ttysize = sized_sixel_bytes(img)
+  print('tty size ', ttysize.columns, 'cols x', ttysize.rows, 'rows')
+  print('         ', ttysize.widthpx, 'px wide x', ttysize.heightpx, 'high')
+  print('char cell', char_wide, 'px wide x ', char_high, 'high')
   width, height = img.size
   print(width, 'x', height, 'pixels')
-  chars_wide = (width + char_wide - 1) // char_wide
-  chars_high = (height + char_high - 1) // char_high
-  print(chars_wide, 'chars wide x', chars_high, 'high')
-  bss = []
+  print(char_wide, 'chars wide x', char_high, 'high')
   print('    ', end='', flush=True)
-  for bs in as_sixel_bytes(img):
+  for bs in sixel_bss:
     os.write(1, bs)
-    bss.append(bs)
-  print(len(bss), 'chunks', sum(map(len, bss)), 'bytes total')
+  print(len(sixel_bss), 'chunks', sum(map(len, sixel_bss)), 'bytes total')
