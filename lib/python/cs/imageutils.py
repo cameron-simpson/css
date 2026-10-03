@@ -248,7 +248,7 @@ def sized_sixel_bytes(img: Image.Image,
         size will be measured; the default is `1` for the standard output
 
       Writing the SIXEL data will occupy a rectangle `char_width`
-      wide by `char_high` high and move the cursor down `char_high`
+      wide by `char_high` high and move the cursor down `char_high-1`
       rows in the original column.
   '''
   if isinstance(tty, int):
@@ -258,13 +258,9 @@ def sized_sixel_bytes(img: Image.Image,
   ttysize = ttysizepx(tty_fd)
   #print('tty size ', ttysize.columns, 'cols x', ttysize.rows, 'rows')
   #print('         ', ttysize.widthpx, 'px wide x', ttysize.heightpx, 'high')
-  char_wide = ttysize.widthpx / ttysize.columns
-  char_high = ttysize.heightpx / ttysize.rows
+  char_wide = ttysize.char_width
+  char_high = ttysize.char_height
   #print('char cell', char_wide, 'px wide x ', char_high, 'high')
-  assert char_wide == int(char_wide)
-  assert char_high == int(char_high)
-  char_wide = int(char_wide)
-  char_high = int(char_high)
   width, height = img.size
   #print(width, 'x', height, 'pixels')
   char_wide = (width + char_wide - 1) // char_wide
