@@ -66,7 +66,21 @@ def ttysize(fd):
       rows, columns = None, None
   return WinSize(rows, columns)
 
-WinSizePX = namedtuple('WinSizePX', 'rows columns widthpx heightpx')
+class WinSizePX(namedtuple('WinSizePX', 'rows columns widthpx heightpx')):
+  ''' Size information about a terminal including its pixel size.
+  '''
+
+  @property
+  def char_width(self):
+    ''' The width of a character cell in pixels.
+    '''
+    return self.widthpx // self.columns
+
+  @property
+  def char_height(self):
+    ''' The height of a character cell in pixels.
+    '''
+    return self.heightpx // self.rows
 
 def ttysizepx(fd):
   ''' Return a `(rows,columns,widthpx,heightpx)` tuple for the
