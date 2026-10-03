@@ -237,7 +237,7 @@ def sized_sixel_bytes(img: Image,
                       tty=1) -> tuple[list[bytes], int, int, WinSizePX]:
   ''' Wrapper for `as_sixel_bytes()` which returns a 4 tuple of
       `(list[bytes],char_width,char_height,tty_size_info)` being:
-      - a list of the `bytes` chunks yields from `as_sixel_bytes()`
+      - a list of the `bytes` chunks yielded from `as_sixel_bytes()`
       - the width of the SIXEL image in characters
       - the height of the SIXEL image in characters
       - the tty information used to calculate the result as a `WinSizePX`
