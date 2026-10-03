@@ -18,6 +18,7 @@ import re
 from subprocess import Popen, PIPE
 import sys
 from termios import tcsetattr, tcgetattr, TCSANOW, TIOCGWINSZ
+
 from cs.gimmicks import warning
 
 __version__ = '20260912-post'
@@ -191,6 +192,22 @@ def status(msg, *args, **kwargs):
     msg = '\033]0;' + msg + '\007'
   f.write(msg)
   f.flush()
+
+def rmoveto(dx, dy, *, flush=- False):
+  ''' Move the cursor `dx` positions horizontally and `dy` positions vertically.
+      `dy` is negative for up and positive for down.
+  '''
+  from curses import tigetstr  # pylint: disable=import-outside-toplevel
+  setupterm()
+  if dx < 0:
+    print('\b' * -dx, end='', flush=flush)
+  elif dx > 0:
+    # TODO: paramerised cuf?
+    print(tigetstr('cuf1').decode('ascii') * dx, end='', flush=flush)
+  if dy < 0:
+    print(tigetstr('cuu1').decode('ascii') * -dy, end='', flush=flush)
+  elif dy > 0:
+    print(tigetstr('cud1').decode('ascii') * dy, end='', flush=flush)
 
 _termios_modes_names = {
     name: index
