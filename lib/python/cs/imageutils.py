@@ -151,7 +151,7 @@ def sixel_from_image_bytes(image_bs: bytes) -> str:
     T.flush()
     return sixel(T.name)
 
-def as_sixel_bytes(img: Image) -> Generator[bytes]:
+def as_sixel_bytes(img: Image.Image) -> Generator[bytes]:
   ''' A generator yielding `img` as SIXEL format `bytes` chunks.
 
       This tries to use `libsixel` but falls back to the external
@@ -233,7 +233,7 @@ def as_sixel_bytes(img: Image) -> Generator[bytes]:
     finally:
       sixel_output_unref(sixout)
 
-def sized_sixel_bytes(img: Image,
+def sized_sixel_bytes(img: Image.Image,
                       tty=1) -> tuple[list[bytes], int, int, WinSizePX]:
   ''' Wrapper for `as_sixel_bytes()` which returns a 4 tuple of
       `(list[bytes],char_width,char_height,tty_size_info)` being:
@@ -248,7 +248,7 @@ def sized_sixel_bytes(img: Image,
         size will be measured; the default is `1` for the standard output
 
       Writing the SIXEL data will occupy a rectangle `char_width`
-      wide by `char_high`high and move the cursor down `char_high`
+      wide by `char_high` high and move the cursor down `char_high`
       rows in the original column.
   '''
   if isinstance(tty, int):
