@@ -6,8 +6,12 @@
 
 from functools import partial
 from os.path import basename, splitext
+from queue import Queue
 import shutil
+from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
+from threading import Thread
+from typing import Generator
 
 from PIL import Image
 
@@ -15,6 +19,7 @@ from cs.cache import ConvCache, convof
 from cs.deco import ALL
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import run
+from cs.gimmicks import warning
 
 __all__ = []
 
@@ -32,6 +37,7 @@ DISTINFO = {
     'install_requires': [
         'cs.cache',
         'cs.deco',
+        'cs.gimmicks',
         'cs.pfx',
         'cs.psutils',
         'Pillow',
@@ -143,3 +149,111 @@ def sixel_from_image_bytes(image_bs: bytes) -> str:
     T.write(image_bs)
     T.flush()
     return sixel(T.name)
+
+def as_sixel_bytes(img: Image) -> Generator[bytes]:
+  ''' A generator yielding `img` as SIXEL format `bytes` chunks.
+
+      This tries to use `libsixel` but falls back to th external
+      executable `img2sixel` if that is not available.
+  '''
+  try:
+    from libsixel import (
+        sixel_output_new, sixel_output_unref, sixel_dither_new,
+        sixel_dither_unref, sixel_dither_initialize, sixel_encode,
+        sixel_dither_get, sixel_dither_set_palette,
+        sixel_dither_set_pixelformat, SIXEL_PIXELFORMAT_RGBA8888,
+        SIXEL_PIXELFORMAT_RGB888, SIXEL_PIXELFORMAT_PAL8, SIXEL_BUILTIN_G8,
+        SIXEL_PIXELFORMAT_G8, SIXEL_BUILTIN_G1, SIXEL_PIXELFORMAT_G1
+    )
+  except ImportError as e:
+    # use the external img2sixel command
+    warning(f'could not import libsixel, falling back to img2sixel: {e}')
+    with NamedTemporaryFile(suffix='.png') as imgT:
+      img.save(imgT.name)
+      with open(imgT.name, 'rb') as imgf:
+        P = Popen(['img2sixel'], stdin=imgf, stdout=PIPE, buf=0)
+        buf = bytearray(128 * 1024)
+        while True:
+          nread = P.stdout.readinto1(buf)
+          if nread == 0:
+            break
+          yield buf[:nread]
+        returncode = P.wait()
+        if returncode != 0:
+          warning(f'nonzero exit from img2sixel: {returncode}')
+  else:
+    # use libsixel directly
+    # code adapted shamelessly from the libsixel example at:
+    # https://github.com/saitoha/libsixel/blob/a0151d940af8bb0733dac77248bd55ae86949e56/examples/python/converter.py
+    width, height = img.size
+    image_bs = img.tobytes()
+    outq = Queue(1)
+    sixout = sixel_output_new(lambda bs, q: q.put(bs), outq)
+    try:
+      if img.mode == 'RGBA':
+        dither = sixel_dither_new(256)
+        sixel_dither_initialize(
+            dither, image_bs, width, height, SIXEL_PIXELFORMAT_RGBA8888
+        )
+      elif img.mode == 'RGB':
+        dither = sixel_dither_new(256)
+        sixel_dither_initialize(
+            dither, image_bs, width, height, SIXEL_PIXELFORMAT_RGB888
+        )
+      elif img.mode == 'P':
+        palette = img.getpalette()
+        dither = sixel_dither_new(256)
+        sixel_dither_set_palette(dither, palette)
+        sixel_dither_set_pixelformat(dither, SIXEL_PIXELFORMAT_PAL8)
+      elif img.mode == 'L':
+        dither = sixel_dither_get(SIXEL_BUILTIN_G8)
+        sixel_dither_set_pixelformat(dither, SIXEL_PIXELFORMAT_G8)
+      elif img.mode == '1':
+        dither = sixel_dither_get(SIXEL_BUILTIN_G1)
+        sixel_dither_set_pixelformat(dither, SIXEL_PIXELFORMAT_G1)
+      else:
+        raise RuntimeError(f'unexpected img mode {img.mode=}')
+      try:
+
+        def six_encode():
+          sixel_encode(image_bs, width, height, 1, dither, sixout)
+          outq.put(None)
+
+        T = Thread(target=six_encode)
+        T.start()
+        while True:
+          bs = outq.get()
+          if bs is None:
+            break
+          yield bs
+        T.join()
+      finally:
+        sixel_dither_unref(dither)
+    finally:
+      sixel_output_unref(sixout)
+
+if __name__ == '__main__':
+  import os
+  from cs.tty import ttysizepx
+  ttysize = ttysizepx(1)
+  print('tty size ', ttysize.columns, 'cols x', ttysize.rows, 'rows')
+  print('         ', ttysize.widthpx, 'px wide x', ttysize.heightpx, 'high')
+  char_wide = ttysize.widthpx / ttysize.columns
+  char_high = ttysize.heightpx / ttysize.rows
+  print('char cell', char_wide, 'px wide x ', char_high, 'high')
+  assert char_wide == int(char_wide)
+  assert char_high == int(char_high)
+  char_wide = int(char_wide)
+  char_high = int(char_high)
+  img = Image.open('/Users/cameron/im/them/me/gravatar-crack-128.png')
+  width, height = img.size
+  print(width, 'x', height, 'pixels')
+  chars_wide = (width + char_wide - 1) // char_wide
+  chars_high = (height + char_high - 1) // char_high
+  print(chars_wide, 'chars wide x', chars_high, 'high')
+  bss = []
+  print('    ', end='', flush=True)
+  for bs in as_sixel_bytes(img):
+    os.write(1, bs)
+    bss.append(bs)
+  print(len(bss), 'chunks', sum(map(len, bss)), 'bytes total')
