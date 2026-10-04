@@ -1682,8 +1682,6 @@ def tabulate_as_str(
   try:
     from cs.imageutils import Image, SixelImageString
   except ImportError as e:
-    ##warning(f'cs.imageutils import error: {e}')
-    ##breakpoint()
     # this happens very ealy for cs.cmdutils
     pass
   else:
