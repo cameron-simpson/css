@@ -220,7 +220,7 @@ class Widget:
       Everything else in a subclass supports whatever needs doing
       with the widget; the `Table` class is an exemplar:
       - its `__init__` method passes the tag to `super().__init__()`
-        as normal, then find s a few top level things about the table
+        as normal, then finds a few top level things about the table
         - the caption, header, bodies, footer
       - the default `find_all` is used because the lass name matches
         the HTML tag name
