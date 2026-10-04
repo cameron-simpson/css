@@ -22,7 +22,7 @@ from functools import partial
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from pprint import PrettyPrinter
+from pprint import PrettyPrinter, pformat
 import re
 from string import (
     ascii_letters,
@@ -1523,6 +1523,8 @@ def row_cells(
 ) -> List[List[str]]:
   r'''Turn a row of items into a grid.
 
+      This is a helper function for `flatten_table_rows()`.
+
       Process:
       - convert each non-`str` item into a string using `as_str`
       - break each string into lines
@@ -1565,11 +1567,14 @@ def flatten_table_rows(
 ) -> tuple[list[list[str]], list[int]]:
   ''' Flatten a list of table rows or tuples-of-table-rows into a
       `(flat_rows,attach)` 2 -tuple where `flat_rows` is a list lof
-      list-of-str rows and attach is a list of indices into `flat_rows`
+      list-of-str rows and `attach` is a list of indices into `flat_rows`
       which are attachment points.
       Nested subtables are connected with lines.
 
       The default `as_str` comes from `tabulate.as_str`.
+
+      This is a helper function for `tabulate()`, itself a helper
+      function for `printt()`.
   '''
   if as_str is None:
     as_str = tabulate.default_as_str
@@ -1610,9 +1615,9 @@ def flatten_table_rows(
     if isinstance(trow, list):
       attach_below = bool(
           isinstance(next_trow, tuple) and next_trow
-          and is_attachable_cell_grid(row_cells(next_trow[0]))
+          and is_attachable_cell_grid(row_cells(next_trow[0], as_str=as_str))
       )
-      cells = row_cells(trow)
+      cells = row_cells(trow, as_str=as_str)
       attachable = is_attachable_cell_grid(cells)
       if attachable:
         attach.append(len(rows))
@@ -1660,7 +1665,35 @@ def flatten_table_rows(
       raise TypeError(f'row type {type(trow)} is neither list nor tuple')
   return rows, attach
 
-@attr(default_as_str=TabulatePrettyPrinter().pformat)
+def tabulate_as_str(
+    obj, *, compact=True, sort_dicts=True, **pformat_kw
+) -> str:
+  ''' The default function to return the printable form of an object `obj`
+      for use in a table in `tabulate()`.
+
+      This function calls `pprint.pformat()` except for certain specially handled types:
+      - `date` and `datetime`: their ISO8601 format
+      - `PIL.Image.Image`: is cs.imageutils is available, a SIXEL presentation
+  '''
+  if isinstance(obj, date):
+    return obj.isoformat()
+  if isinstance(obj, datetime):
+    return obj.isoformat(' ')
+  try:
+    from cs.imageutils import Image, SixelImageString
+  except ImportError as e:
+    ##warning(f'cs.imageutils import error: {e}')
+    ##breakpoint()
+    # this happens very ealy for cs.cmdutils
+    pass
+  else:
+    if isinstance(obj, Image.Image):
+      return SixelImageString(obj)
+    if isinstance(obj, SixelImageString):
+      return obj
+  return pformat(obj, compact=compact, sort_dicts=sort_dicts, **pformat_kw)
+
+@attr(default_as_str=tabulate_as_str)
 def tabulate(
     *rows,
     sep='  ',
