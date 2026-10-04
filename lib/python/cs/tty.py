@@ -207,21 +207,42 @@ def status(msg, *args, **kwargs):
   f.write(msg)
   f.flush()
 
-def rmoveto(dx, dy, *, flush=- False):
-  ''' Move the cursor `dx` positions horizontally and `dy` positions vertically.
+def rmoveto_bs(dx, dy, *, flush=False) -> bytes:
+  ''' Return the control bytes needed to move the cursor `dx`
+      positions horizontally and `dy` positions vertically.
       `dy` is negative for up and positive for down.
   '''
   from curses import tigetstr  # pylint: disable=import-outside-toplevel
   setupterm()
+  bss = []
   if dx < 0:
-    print('\b' * -dx, end='', flush=flush)
+    bss.append(b'\b' * -dx)
   elif dx > 0:
     # TODO: paramerised cuf?
-    print(tigetstr('cuf1').decode('ascii') * dx, end='', flush=flush)
+    bss.append(tigetstr('cuf1') * dx)
   if dy < 0:
-    print(tigetstr('cuu1').decode('ascii') * -dy, end='', flush=flush)
+    bss.append(tigetstr('cuu1') * -dy)
   elif dy > 0:
-    print(tigetstr('cud1').decode('ascii') * dy, end='', flush=flush)
+    bss.append(tigetstr('cud1') * dy)
+  return b''.join(bss)
+
+def rmoveto(dx, dy, *, file=None, flush=False):
+  ''' Move the cursor `dx` positions horizontally and `dy` positions vertically.
+      `dy` is negative for up and positive for down.
+
+      Parameters:
+      * `dx`: the number of horizontal positions to move,
+        negative is left, positive is right
+      * `dy`: the number of vertical positions to move,
+        negative is up, positive is down
+      * `file`: the file object to write to, default `sys.stdout`
+      * `flush`: whether to flush `file` after the write, default `False`
+  '''
+  if file is None:
+    file = sys.stdout
+  file.write(rmoveto_bs(dx, dy).decode('ascii'))
+  if flush:
+    file.flush()
 
 _termios_modes_names = {
     name: index
