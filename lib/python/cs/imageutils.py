@@ -4,7 +4,7 @@
 ''' Various ad hoc image related utility functions and classes.
 '''
 
-from functools import partial
+from functools import cached_property, partial
 from os.path import basename, splitext
 from queue import Queue
 import shutil
@@ -15,12 +15,13 @@ from typing import Generator
 
 from PIL import Image
 
+from cs.ascii_art import box_char
 from cs.cache import ConvCache, convof
 from cs.deco import ALL
 from cs.gimmicks import warning
 from cs.pfx import pfx_call, pfx_method
 from cs.psutils import run
-from cs.tty import ttysizepx, WinSizePX
+from cs.tty import ttysizepx, WinSizePX, rmoveto_bs
 
 __all__ = []
 
@@ -269,17 +270,91 @@ def sized_sixel_bytes(img: Image.Image,
   bss = list(as_sixel_bytes(img))
   return bss, char_wide, char_high, ttysize
 
-if __name__ == '__main__':
-  import os
-  img = Image.open('/Users/cameron/im/them/me/gravatar-crack-128.png')
-  sixel_bss, char_wide, char_high, ttysize = sized_sixel_bytes(img)
-  print('tty size ', ttysize.columns, 'cols x', ttysize.rows, 'rows')
-  print('         ', ttysize.widthpx, 'px wide x', ttysize.heightpx, 'high')
-  print('char cell', char_wide, 'px wide x ', char_high, 'high')
-  width, height = img.size
-  print(width, 'x', height, 'pixels')
-  print(char_wide, 'chars wide x', char_high, 'high')
-  print('    ', end='', flush=True)
-  for bs in sixel_bss:
-    os.write(1, bs)
-  print(len(sixel_bss), 'chunks', sum(map(len, sixel_bss)), 'bytes total')
+class SixelImageString(str):
+  ''' A `str` subclass for printing a Pillow `Image`.
+  '''
+
+  def __init__(self, img: Image.Image):
+    super().__init__()
+    self.img = img
+    self.img_bss, self.width, self.height, _ = sized_sixel_bytes(img)
+
+  def copy(self, **updates):
+    ''' Return a copy of this mage string, with modifications.
+    '''
+    copy = type(self)(self.img)
+    copy.__dict__.update(updates)
+    return copy
+
+  @cached_property
+  def grid(self):
+    return tuple(
+        "".join(
+            box_char(
+                arc=True,
+                up=y > 0 and (x == 0 or x == self.width - 1),
+                down=y < self.height - 1 and (x == 0 or x == self.width - 1),
+                left=x > 0 and (y == 0 or y == self.height - 1),
+                right=x < self.width - 1 and (y == 0 or y == self.height - 1),
+            ) for x in range(self.width)
+        ) for y in range(self.height)
+    )
+
+  @cached_property
+  def _grid_str(self) -> str:
+    return "\n".join(self.grid)
+
+  @cached_property
+  def _post_str(self) -> str:
+    return b''.join(
+        (
+            rmoveto_bs(-self.width, 1 - self.height),
+            b''.join(self.img_bss),
+            rmoveto_bs(self.width, 0),
+        )
+    ).decode('ascii')
+
+  @cached_property
+  def _full_str(self) -> str:
+    return self._grid_str + self._post_str
+
+  def __str__(self):
+    return self._full_str
+
+  def __repr__(self):
+    return repr(self._grid_str)
+
+  def __format__(self, spec):
+    return format(self._grid_str, spec) + self._post_str
+
+  def __len__(self):
+    return len(self._grid_str)
+
+  def __getitem__(self, index):
+    return self._grid_str[index]
+
+  def __contains__(self, substr):
+    return substr in self._grid_str
+
+  def split(self, *a, **kw):
+    ''' Splitting an image string returns an image string for the
+        final component.
+
+        This is a bit of a bodge, but should work with stuff like `printt()`.
+    '''
+    parts = self._grid_str.split(*a, **kw)
+    if not parts:
+      return parts
+    *strs, last_part = parts
+    # bodge up an image string for the final row
+    img_s = self.copy(grid=(last_part,))
+    return [*strs, img_s]
+
+  def splitlines(self):
+    return self.split("\n")
+
+  def rstrip(self):
+    stripped = self._grid_str.rstrip()
+    grid = stripped.split("\n")
+    copy = self.copy(grid=grid)  ## , height=len(grid))
+    return copy
