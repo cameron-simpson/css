@@ -274,21 +274,23 @@ class SixelImageString(str):
   ''' A `str` subclass for printing a Pillow `Image`.
   '''
 
-  def __new__(cls, img: Image.Image, tty=1):
-    return super().__new__(cls, img)
+  def __new__(cls, image: Image.Image, tty=1):
+    return super().__new__(cls, image)
 
-  def __init__(self, img: Image.Image, tty=1):
+  def __init__(self, image: Image.Image, tty=1):
     super().__init__()
     self.tty = tty
-    self.img = img
-    self.img_bss, self.width, self.height, _ = sized_sixel_bytes(img, tty=tty)
+    self.image = image
+    self.image_bss, self.width, self.height, _ = sized_sixel_bytes(
+        image, tty=tty
+    )
 
-  def copy(self, img=None, **updates):
+  def copy(self, image=None, **updates):
     ''' Return a copy of this mage string, with modifications.
     '''
-    if img is None:
-      img = self.img
-    copy = type(self)(img)
+    if image is None:
+      image = self.image
+    copy = type(self)(image)
     copy.__dict__.update(updates)
     return copy
 
@@ -315,7 +317,7 @@ class SixelImageString(str):
     return b''.join(
         (
             rmoveto_bs(-self.width, 1 - self.height),
-            b''.join(self.img_bss),
+            b''.join(self.image_bss),
             rmoveto_bs(self.width, 0),
         )
     ).decode('ascii')
@@ -390,7 +392,7 @@ class SixelImageString(str):
     tsize = ttysizepx(tty_fd)
     img_max_width = new_width * tsize.char_width
     img_max_height = new_height * tsize.char_height
-    image = self.img
+    image = self.image
     # if image too big or size_up and image too small
     if (image.width > img_max_width or image.height > img_max_height
         or (size_up and self.width < new_width and self.height < new_height)):
