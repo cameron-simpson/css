@@ -5,7 +5,6 @@
 
 from abc import ABC, abstractmethod
 from collections import ChainMap, defaultdict, namedtuple
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from fnmatch import fnmatch
@@ -914,7 +913,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       soup = BeautifulSoup(self.text, 'xml')
       self.url.soup = soup
     else:
-      warning(
+      vvwarning(
           f'{self.__class__.__name__}.soup: unsupported content type {self.content_type=}'
       )
       soup = None
@@ -1576,6 +1575,9 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
         no_save=True,
     )
     soup = flowstate.soup
+    if soup is None:
+      warning('no flowstate.soup')
+      return scanadata
     # <head><title>
     title = soup.head.title or soup.body.title
     if title:
@@ -1996,7 +1998,9 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
       rel_ents = list(unrepeated(self.refresh_related()))
     else:
       rel_ents = ()
-    Refreshable.refresh_bulk(rel_ents1 + rel_ents, concurrent=True)
+    Refreshable.refresh_bulk(
+        tuple(rel_ents1) + tuple(rel_ents), concurrent=True
+    )
     table = [[self.name, self.feed_title()]]
     try:
       sitepage_url = self.sitepage_url
@@ -2042,7 +2046,7 @@ class SiteWidget(Widget, ABC):
 
       This subclasses `cs.bs4utils.Widget` and provides:
       - `.sitemap`: the `SiteMap` associated with the widget
-      - `.entity`: a cached property being the `Entity` for this widget
+      - `.entity`: a cached property being the primary `Entity` for this widget
       - `.check_tag(tag)`: check if a tag is actually intended for
         this widget class; the default method just returns `True`
       - `.find_all(soup)`: find all the tags representing this
@@ -2053,9 +2057,7 @@ class SiteWidget(Widget, ABC):
       Subclasses must implement:
       - `.entity_key()`: a methdod to compute the zone subkey of the
         entity associated with the widget
-      - `.scan_soup(soup[,scandata=ScanData])`: scan the widget and
-        record information in a `ScanData` for later application
-        to the `SiteMap`
+      - `.scan_soup()`: a method to obtain data from `self.tag` and return a `ScanData`
   '''
 
   sitemap: "SiteMap"
@@ -2868,12 +2870,11 @@ class SiteMap(Entities, Promotable):
     cond_attr.append((conditions, tags_kw))
     return method
 
-  @classmethod
   @pfx_method
   @uses_verbose
   @promote
   def on_matches(
-      cls,
+      self,
       flowstate: FlowState,
       methodglob: str | None = None,
       *,
@@ -2900,11 +2901,12 @@ class SiteMap(Entities, Promotable):
         `@on` decorators); this is because each condition may provide
         different `match` match results.
     '''
+    cls = self.__class__
     for method_name in dir(cls):
       if methodglob is not None and not fnmatch(method_name, methodglob):
         continue
       try:
-        method = getattr(cls, method_name)
+        method = getattr(self, method_name)
       except AttributeError:
         continue
       try:
