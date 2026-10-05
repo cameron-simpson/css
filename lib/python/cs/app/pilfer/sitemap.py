@@ -1283,7 +1283,10 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
           else:
             pattern_map[clsattr] = pattern_s
     return {
-        pattern_name: URLPattern(pattern_s, sitemap.URL_DOMAIN)
+        pattern_name:
+        URLPattern(
+            pattern_s, getattr(sitemap, 'URL_DOMAINS', sitemap.URL_DOMAIN)
+        )
         for pattern_name, pattern_s in pattern_map.items()
     }
 
