@@ -336,6 +336,11 @@ class SixelImageString(str):
   def __contains__(self, substr):
     return substr in self._grid_str
 
+  def indent(self, line_indent="  "):
+    return self.copy(
+        grid=tuple(line_indent + grid_row for grid_row in self.grid)
+    )
+
   def split(self, *a, **kw):
     ''' Splitting an image string returns an image string for the
         final component.
