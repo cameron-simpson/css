@@ -542,11 +542,13 @@ class FeedEntryMixin(FeedCommon, ABC):
                 pub_date and E.pubDate(self.atom_date_string(pub_date)),
                 image_url and E.image(
                     *not_none(
-                        E.url(image_url),
-                        image_title and E.title(image_title),
-                        E.link(link),
-                        image_width and E.width(str(image_width)),
-                        image_height and E.height(str(image_height)),
+                        (
+                            E.url(image_url),
+                            image_title and E.title(image_title),
+                            E.link(link),
+                            image_width and E.width(str(image_width)),
+                            image_height and E.height(str(image_height)),
+                        ),
                     )
                 ),
                 description and E.description(description),
