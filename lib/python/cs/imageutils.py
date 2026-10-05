@@ -274,15 +274,18 @@ class SixelImageString(str):
   ''' A `str` subclass for printing a Pillow `Image`.
   '''
 
-  def __init__(self, img: Image.Image):
+  def __init__(self, img: Image.Image, tty=1):
     super().__init__()
+    self.tty = tty
     self.img = img
-    self.img_bss, self.width, self.height, _ = sized_sixel_bytes(img)
+    self.img_bss, self.width, self.height, _ = sized_sixel_bytes(img, tty=tty)
 
-  def copy(self, **updates):
+  def copy(self, img=None, **updates):
     ''' Return a copy of this mage string, with modifications.
     '''
-    copy = type(self)(self.img)
+    if img is None:
+      img = self.img
+    copy = type(self)(img)
     copy.__dict__.update(updates)
     return copy
 
@@ -363,3 +366,41 @@ class SixelImageString(str):
     grid = stripped.split("\n")
     copy = self.copy(grid=grid)  ## , height=len(grid))
     return copy
+
+  def resized_within(
+      self,
+      new_width: int,
+      new_height: int,
+      *,
+      size_up=False,
+      tty=None,
+      warp_aspect=False,
+  ):
+    ''' Resize the image to fit within `new_width` x `new_height` characters.
+    '''
+    if tty is None:
+      tty = self.tty
+    if isinstance(tty, int):
+      tty_fd = tty
+    else:
+      tty_fd = tty.fileno()
+    tsize = ttysizepx(tty_fd)
+    img_max_width = new_width * tsize.char_width
+    img_max_height = new_height * tsize.char_height
+    image = self.img
+    # if image too big or size_up and image too small
+    if (image.width > img_max_width or image.height > img_max_height
+        or (size_up and self.width < new_width and self.height < new_height)):
+      # return a new image string with the resized image
+      xscale = img_max_width / image.width
+      yscale = img_max_height / image.height
+      if not warp_aspect:
+        xscale = yscale = min(xscale, yscale)
+      return type(self)(
+          image.resize(
+              (int(image.width * xscale), int(image.height * yscale))
+          ),
+          tty=tty
+      )
+    # otherwise return the original image string
+    return self
