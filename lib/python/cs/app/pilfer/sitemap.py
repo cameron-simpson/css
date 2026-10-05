@@ -1102,6 +1102,12 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     except KeyError:
       cls.TYPE_SUBNAME = cls.__name__.lower()
 
+  @property
+  def name__(self):
+    ''' The `SiteEntity.name` with slashes replaced by double underscores.
+    '''
+    return self.name.replace("/", "__")
+
   @cached_property
   def refresh_lock(self):
     return NRLock(self.name)
