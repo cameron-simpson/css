@@ -40,6 +40,7 @@ from cs.deco import (
 )
 from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedEntryMixin, FeedPerson
 from cs.fileutils import atomic_filename
+from cs.imageutils import SixelImageString
 from cs.lex import (
     cutprefix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s,
     skipwhite
@@ -1881,6 +1882,31 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     self.add('downloaded')
     return save_filename
 
+  @uses_pilfer
+  def image(self, *, P: "Pilfer"):
+    ''' Return Pillow `PIL.Image.Image`, or `None`.
+    '''
+    try:
+      from PIL import Image
+    except ImportError:
+      # no Pillow, so no Image
+      return None
+    try:
+      image_url = self.image_url
+    except AttributeError:
+      return None
+    if not image_url:
+      return None
+    url = URL(image_url)
+    ext = url.ext
+    with NamedTemporaryFile(prefix=f'.{self.name__}-image-', suffix=ext,
+                            mode='wb') as T:
+      flowstate = FlowState.from_URL(url)
+      for bs in flowstate.iterable_content:
+        T.write(bs)
+      T.flush()
+      return Image.open(T.name)
+
   ########################################################################
   # FeedEntryMixin methods
 
@@ -1961,9 +1987,8 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     '''
     if file is None:
       file = sys.stdout
-    tsize = ttysizepx(file)
-    img_max_width = 48 * tsize.char_width
-    img_max_height = 16 * tsize.char_height
+    img_max_width = 48
+    img_max_height = 16
     wrap_width = 50
     self.refresh()
     rel_ents1 = list(unrepeated(not_none(self.refresh_related1())))
@@ -1988,14 +2013,9 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     description = self.feed_description() or ''
     if image or description:
       if image:
-        if image.width > img_max_width or image.height > img_max_height:
-          scale = min(
-              img_max_width / image.width,
-              img_max_height / image.height,
-          )
-          image = image.resize(
-              (int(image.width * scale), int(image.height * scale))
-          )
+        image = SixelImageString(image).resized_within(
+            img_max_width, img_max_height
+        )
       description = textwrap.fill(description, wrap_width)
       table.append([image, description])
       if recurse:
