@@ -1956,6 +1956,63 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
         href=self.sitepage_url,
     )
 
+  def tabulate_summary(self, *, recurse=False, file=None):
+    ''' Print a summary of this `SteEntity`.
+    '''
+    if file is None:
+      file = sys.stdout
+    tsize = ttysizepx(file)
+    img_max_width = 48 * tsize.char_width
+    img_max_height = 16 * tsize.char_height
+    wrap_width = 50
+    self.refresh()
+    rel_ents1 = list(unrepeated(not_none(self.refresh_related1())))
+    if recurse:
+      rel_ents = list(unrepeated(self.refresh_related()))
+    else:
+      rel_ents = ()
+    Refreshable.refresh_bulk(rel_ents1 + rel_ents, concurrent=True)
+    table = [[self.name, self.feed_title()]]
+    try:
+      sitepage_url = self.sitepage_url
+    except AttributeError as e:
+      warning(f'{self.name}: no .sitepage_url: {e}')
+    else:
+      table.append(['url', sitepage_url])
+    rel_ents1 = list(unrepeated(not_none(self.refresh_related1())))
+    if rel_ents1:
+      table.append(
+          tuple([subent.name, subent.feed_title()] for subent in rel_ents1)
+      )
+    image = self.image() or ''
+    description = self.feed_description() or ''
+    if image or description:
+      if image:
+        if image.width > img_max_width or image.height > img_max_height:
+          scale = min(
+              img_max_width / image.width,
+              img_max_height / image.height,
+          )
+          image = image.resize(
+              (int(image.width * scale), int(image.height * scale))
+          )
+      description = textwrap.fill(description, wrap_width)
+      table.append([image, description])
+      if recurse:
+        rel_ents = list(unrepeated(self.refresh_related()))
+        if rel_ents:
+          subtables = []
+          for subent in rel_ents:
+            subtables.append(
+                tuple(subent.tabulate_summary(recurse=True, file=file))
+            )
+          table.extend(subtables)
+    return table
+
+  def printt_summary(self, *, recurse=False, file=None, **printt_kw):
+    table = self.tabulate_summary(recurse=recurse, file=file, **printt_kw)
+    printt(*table, file=file, **printt_kw)
+
 paginated = SiteEntity.paginated
 
 @dataclass
