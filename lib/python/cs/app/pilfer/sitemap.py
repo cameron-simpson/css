@@ -178,6 +178,8 @@ class URLPattern(Promotable):
       '':
       Converter(r'[^/?&]+', str, str),
       '*':
+      Converter(r'[^/?&]*', str, str),
+      '**':
       Converter(r'.*', str, str),
       # a nonnegative integer
       'int':
@@ -299,7 +301,7 @@ class URLPattern(Promotable):
         name, converter = part
         value = fields.get(name)
         if value is None:
-          value = getattr(fields, name, f'no-{name}')
+          value = getattr(fields, name, '')
         value_s = converter.to_str(value)
         try:
           vaule2 = converter.from_str(value_s)
