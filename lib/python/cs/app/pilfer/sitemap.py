@@ -155,7 +155,7 @@ class URLPattern(Promotable):
   '''
 
   path_pattern: str
-  hostname_fnmatch: str | None = None
+  hostname_fnmatch: Sequence[str] | str | None = None
 
   class Converter:
 
@@ -316,23 +316,34 @@ class URLPattern(Promotable):
         subpaths.append(value_s)
     return ''.join(subpaths)
 
+  @Trace
   @promote
   def match(
       self,
       url: URL,
       extra: Mapping | None = None,
+      *,
+      T: Trace,
   ) -> dict | None:
     ''' Compare `url` against this pattern.
         Return `None` on no match.
         Return the regexp `groupdict()` on a match.
     '''
+    T(f'URLPattern.natch url={url.short}')
     PR = lambda *a: vvprint(f'match {url.short} vs {self}:', *a)
-    if url.hostname is not None and self.hostname_fnmatch is not None and (
-        not isinstance(url.hostname, str)
-        or not fnmatch(url.hostname, self.hostname_fnmatch)):
-      # hostname mismatch
-      PR(f'REJECT on {self.hostname_fnmatch=} vs {url.hostname=}')
-      return None
+    if url.hostname is not None and self.hostname_fnmatch is not None:
+      fnmatches = (
+          (self.hostname_fnmatch,)
+          if isinstance(self.hostname_fnmatch, str) else self.hostname_fnmatch
+      )
+      for fnm in fnmatches:
+        if fnmatch(url.hostname, fnm):
+          break
+      else:
+        # hostname mismatch
+        PR(f'REJECT on {self.hostname_fnmatch=} vs {url.hostname=}')
+        T(f'FAILED {url.hostname=} match against {fnmatches=}')
+        return None
     if self.path_pattern is None:
       # no pattern, accept and return empty match dict
       PR('MATCH, no path_pattern')
@@ -342,19 +353,24 @@ class URLPattern(Promotable):
       qpath = f'{qpath}?{url.query}'
     # first try /path?query
     PR(f'TRY {self.pattern_re=} vs {qpath=}')
+    T('TRY {qpath=} .match {self.pattern_re=}')
     m = self.pattern_re.match(qpath)
     if m is None and qpath != url.path:
       # otherwise try /path
       PR(f'TRY {self.pattern_re=} vs {url.path=}')
+      T('TRY {url.path=} .match {self.pattern_re=}')
       m = self.pattern_re.match(url.path)
     if m is None:
       PR("REJECT, neither matches")
+      T("FAILED pattern_re match")
       return None
     if m.end() < len(url.path):
       PR(f'REJECT, {m.end()=} < {len(url.path)=}')
+      T(f'FAILED, {m.end()=} < {len(url.path)=}')
       return None
     # return the public named matches (excludes _* names)
     PR('MATCH, return groupdict')
+    T(f'MATCHED {m.groupdict()=}')
     return {k: v for k, v in m.groupdict().items() if not k.startswith('_')}
 
   @classmethod
