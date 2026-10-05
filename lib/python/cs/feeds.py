@@ -390,6 +390,9 @@ class FeedMixin(FeedCommon, ABC):
     authors = self.atom_authors(refresh=refresh)
     title = v('title')
     link = v('link')
+    entries = v('entries')
+    if refresh:
+      Refreshable.refresh_bulk(entries)
     atom = E.feed(
         *not_none(
             (
@@ -405,10 +408,7 @@ class FeedMixin(FeedCommon, ABC):
                 # icon - from the favicon
                 # logo
                 # rights
-                *(
-                    entry.atom(feed=self, refresh=refresh)
-                    for entry in v('entries')
-                ),
+                *(entry.atom(feed=self, refresh=refresh) for entry in entries),
                 # extensionElement
             )
         ),
