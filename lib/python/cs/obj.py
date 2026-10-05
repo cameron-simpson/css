@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 import builtins
 from collections import defaultdict
 from copy import copy as copy0
+from functools import partial
 import sys
 from threading import Lock
 import time
@@ -21,7 +22,7 @@ from weakref import WeakValueDictionary
 
 from cs.context import contextif
 from cs.deco import attr, OBSOLETE
-from cs.seq import not_none
+from cs.seq import consume, not_none
 
 __version__ = '20260912-post'
 
@@ -648,7 +649,8 @@ class Refreshable(ABC):
       data=None,
       force=False,
       lifespan: float | None = None,
-      map=builtins.map,
+      map=None,
+      concurrent=False,
       ratelimit: float | None = None,
       recurse=False,
       seen=None,
@@ -719,6 +721,16 @@ class Refreshable(ABC):
         to `self` and the recursion done without `data`.
         (Now we raise `ValueError` for this.)
     '''
+    if map is None:
+      if concurrent is not False:
+        try:
+          from cs.threads import pmap
+        except ImportError:
+          map = builtins.map
+        else:
+          map = partial(pmap, concurrent=concurrent)
+      else:
+        map = builtins.map
     if recurse and data is not None:
       raise ValueError(
           f'{self.__class__.__name__}.refresh({recurse=},{data=}): recurse may not be true if data is not None'
@@ -769,33 +781,27 @@ class Refreshable(ABC):
           self.refresh_last_update = now
       if recurse:
         # refresh some objects nonrecursively
-        for _ in map(
-            lambda obj: obj.refresh(
-                recurse=False,
-                map=map,
-                force=force,
-                lifespan=lifespan0,
-                ratelimit=ratelimit0,
-                seen=seen,
-                **_refresh_kw,
-            ),
+        self.refresh_bulk(
             not_none(self.refresh_related1()),
-        ):
-          pass
+            refresh=False,
+            map=map,
+            force=force,
+            lifespan=lifespan0,
+            ratelimit=ratelimit0,
+            seen=seen,
+            **_refresh_kw,
+        )
         # refresh other related objects recursively
-        for _ in map(
-            lambda obj: obj.refresh(
-                recurse=True,
-                map=map,
-                force=force,
-                lifespan=lifespan0,
-                ratelimit=ratelimit0,
-                seen=seen,
-                **_refresh_kw,
-            ),
+        self.refresh_bulk(
             not_none(self.refresh_related()),
-        ):
-          pass
+            recurse=True,
+            map=map,
+            force=force,
+            lifespan=lifespan0,
+            ratelimit=ratelimit0,
+            seen=seen,
+            **_refresh_kw,
+        )
     return was_updated
 
   def refreshed(self, **refresh_kw):
@@ -804,6 +810,30 @@ class Refreshable(ABC):
     '''
     self.refresh(**refresh_kw)
     return self
+
+  @staticmethod
+  def refresh_bulk(
+      objs: Iterable["Refreshable"],
+      *,
+      concurrent=False,
+      map=None,
+      **refresh_kw,
+  ):
+    ''' Refresh multiple `Refreshable` objects, concurrently if `concurrent` is not `False`.
+    '''
+    if map is None:
+      if concurrent is not False:
+        try:
+          from cs.threads import pmap
+        except ImportError:
+          map = builtins.map
+        else:
+          map = partial(pmap, concurrent=concurrent)
+      else:
+        map = builtins.map
+    consume(
+        map(lambda obj: obj.refresh(map=map, **refresh_kw), not_none(objs))
+    )
 
 def public_subclasses(cls, extras=()):
   ''' Return a set of the subclasses of `cls` which have public names.
