@@ -1910,6 +1910,22 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
       return Image.open(T.name)
 
   ########################################################################
+  # FeedCommonMixin methods
+  def feed_title(self, refresh=False):
+    ''' Return the feed title from `self.title` or `self.fullname` or `self.name`.
+    '''
+    if refresh:
+      self.refresh()
+    try:
+      title = self.title
+    except AttributeError:
+      try:
+        title = self.fullname
+      except AttributeError:
+        title = self.name
+    return title
+
+  ########################################################################
   # FeedEntryMixin methods
 
   def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
