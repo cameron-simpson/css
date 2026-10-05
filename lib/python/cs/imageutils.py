@@ -274,6 +274,9 @@ class SixelImageString(str):
   ''' A `str` subclass for printing a Pillow `Image`.
   '''
 
+  def __new__(cls, img: Image.Image, tty=1):
+    return super().__new__(cls, img)
+
   def __init__(self, img: Image.Image, tty=1):
     super().__init__()
     self.tty = tty
