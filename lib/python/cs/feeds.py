@@ -31,7 +31,7 @@ RSS_CONTENT_TYPE = 'application/rss+xml'
 
 class FeedPerson:
   ''' A class to represent a person, modelled on an Atom person
-      construct which has a `.name`, a `.email` (may be `None`
+      construct which has a `.name`, a `.email` (may be `None`)
       and a `.uri` (may be `None`).
   '''
 
@@ -248,6 +248,8 @@ class FeedCommon(ABC):
     return None if author is None else getattr(author, 'email', None)
 
   def feed_image_title(self):
+    ''' The default image title is the `feed_title()`.
+    '''
     return self.feed_title()
 
   def feed_language(self):
@@ -373,6 +375,7 @@ class FeedMixin(FeedCommon, ABC):
   def atom(
       self,
       *,
+      limit=None,
       refresh=False,
       **kw,
   ):
@@ -393,6 +396,8 @@ class FeedMixin(FeedCommon, ABC):
     entries = v('entries')
     if refresh:
       Refreshable.refresh_bulk(entries)
+    if limit is not None:
+      entries = sorted(entries, reverse=True)[:limit]
     atom = E.feed(
         *not_none(
             (
