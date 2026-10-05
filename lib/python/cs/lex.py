@@ -1607,6 +1607,17 @@ def flatten_table_rows(
   # promote rows to lists or AttachedLines
   rows: list[list[str]] = []
   attach: list[int] = []
+
+  def indent_cell(cell, line_indent: str):
+    try:
+      indent_method = cell.indent
+    except AttributeError:
+      pass
+    else:
+      if callable(indent_method):
+        return indent_method(line_indent)
+    return indent(cell, line_indent)
+
   for prev_trow, trow, next_trow in with_neighbours(
       into_lists_and_tuples(table_rows)):
     # FIXME: this calls row_cells twice on each row
@@ -1624,13 +1635,13 @@ def flatten_table_rows(
       # append the cell rows, possibly indented and attached
       for ci, cell_row in enumerate(cells):
         if ci > 0 and attach_below:
-          indent = box_char(
+          line_indent = box_char(
               arc=True,
               up=True,
               down=attach_below,
               right=attachable and ci == 0,
           )
-          cell_row[0] = indent + cell_row[0]
+          cell_row[0] = indent_cell(cell_row[0], line_indent)
         rows.append(cell_row)
     elif isinstance(trow, tuple):
       # an indented subscetion
@@ -1652,14 +1663,14 @@ def flatten_table_rows(
         up = attach_above  ## do_attach or sub_attach_below,
         down = sub_attach_below
         right = do_attach
-        indent = (
+        line_indent = (
             LARGE_CIRCLE if right and not up and not down else
             box_char(arc=True, up=up, down=down, right=right)
         ) + (
             HORIZ if do_attach else " "
         )
         if subrow:
-          subrow[0] = indent + subrow[0]
+          subrow[0] = indent_cell(subrow[0], line_indent)
         rows.append(subrow)
     else:
       raise TypeError(f'row type {type(trow)} is neither list nor tuple')
