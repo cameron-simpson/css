@@ -1431,7 +1431,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
               f'format {cls.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
           ) from e
         else:
-          # for attributes ending in _url, such as .sitepage_url_url
+          # for attributes ending in _url, such as .sitepage_url
           # if the result commences with a / we consider it a subpath
           # of the site domain
           # TODO: maybe test for :// ?
@@ -1576,7 +1576,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     )
     soup = flowstate.soup
     # <head><title>
-    title = soup.head.title
+    title = soup.head.title or soup.body.title
     if title:
       title = title.get_text().strip()
       if title:
