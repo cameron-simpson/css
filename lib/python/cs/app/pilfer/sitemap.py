@@ -5,6 +5,7 @@
 
 from abc import ABC, abstractmethod
 from collections import ChainMap, defaultdict, namedtuple
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from fnmatch import fnmatch
@@ -15,6 +16,8 @@ import json
 from os.path import abspath
 import re
 import sys
+from tempfile import NamedTemporaryFile
+import textwrap
 from threading import Semaphore, Thread
 import time
 from types import SimpleNamespace as NS
@@ -41,9 +44,9 @@ from cs.lex import (
     cutprefix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s,
     skipwhite
 )
-from cs.logutils import warning
+from cs.logutils import warning, vvwarning
 from cs.mappings import mapped_property
-from cs.obj import NoAttrs, public_subclasses
+from cs.obj import NoAttrs, public_subclasses, Refreshable
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py.func import funccite
 from cs.progress import progressbar
@@ -52,7 +55,7 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import (
     content_encodings, content_length, content_type, datetime_from_http_date
 )
-from cs.seq import get0, ReIterable, unrepeated
+from cs.seq import get0, not_none, ReIterable, unrepeated
 from cs.sqltags import SQLTags
 from cs.tagged import Entity, Entities, ScanData, uses_scandata
 from cs.tagset import BaseTagSets, TagSet, ZonedTypes
