@@ -136,7 +136,7 @@ class PilferCommand(BaseCommand):
           later=self.later,
           rcpaths=self.configpaths,
           sqltags=self.db_url,
-          verify=not self.no_check_certificates,
+          verify=not getattr(self, 'no_check_certificates', False),
       )
 
     COMMON_OPT_SPECS = dict(
