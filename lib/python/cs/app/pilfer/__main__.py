@@ -184,7 +184,6 @@ class PilferCommand(BaseCommand):
       with options.later:
         pilfer = options.pilfer
         with pilfer:
-          pilfer.sitemaps  # preloads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
               sqltags=pilfer.sqltags,
