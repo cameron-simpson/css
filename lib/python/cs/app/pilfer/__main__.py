@@ -40,6 +40,7 @@ from cs.pfx import Pfx, pfx_call
 from cs.psutils import run
 from cs.py.modules import import_extra
 from cs.trace import Trace
+from cs.tty import ttysizepx
 from cs.urlutils import URL
 
 from . import (
@@ -652,7 +653,8 @@ class PilferCommand(BaseCommand):
     )
     soup = flowstate.soup
     if soup is None:
-      print("no soup for content_type", flowstate.content_type)
+      if not flowstate.content_type.startswith('image/'):
+        print("no soup for content_type", flowstate.content_type)
     else:
       table = []
       title = soup.head and soup.head.title
@@ -736,6 +738,29 @@ class PilferCommand(BaseCommand):
             )
         else:
           pprint(jdata)
+      elif flowstate.content_type.startswith('image/'):
+        try:
+          from PIL import Image
+          from cs.imageutils import SixelImageString
+        except ImportError as e:
+          warning(f'missing PIL or cs.imageutils: {e}')
+        else:
+          with NamedTemporaryFile(
+              suffix=f'.{flowstate.content_type.split("/",1)[-1]}',
+              mode='wb') as T:
+            for bs in flowstate.iterable_content:
+              T.write(bs)
+            T.flush()
+            image = Image.open(T.name)
+          print(
+              f'{image.format} ({image.format_description}), {image.mode}, {image.size[0]}x{image.size[1]}'
+          )
+          exif = image.getexif()
+          if exif:
+            printt("EXIF:", exif)
+          tsize = ttysizepx(sys.stdout)
+          siximage = SixelImageString(image).resized_within(tsize.columns, 32)
+          print(siximage)
       else:
         warning("No content dump for %s.", flowstate.content_type)
 
