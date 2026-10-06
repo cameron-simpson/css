@@ -2328,10 +2328,10 @@ class SiteMap(Entities, Promotable):
         See the `SiteMap.content_prefetch` method.
   '''
 
-  name: str = None
+  name: str | None = None
   pilfer: object = None
-  tagsets: BaseTagSets = None
-  request_semaphore: Semaphore = None
+  tagsets: BaseTagSets | None = None
+  request_semaphore: Semaphore | None = None
 
   DEFAULT_CONCURRENCY = 3
 
@@ -2383,7 +2383,24 @@ class SiteMap(Entities, Promotable):
     return cls.by_type_zone[type_zone]
 
   @classmethod
-  def from_str(cls, type_zone: str):
+  @uses_pilfer
+  def from_str(
+      cls,
+      sitemap_name: str,
+      *,
+      P: "Pilfer",
+  ) -> "SiteMap":
+    ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
+    '''
+    for name, sitemap in P.sitemaps:
+      if name == sitemap_name:
+        return sitemap
+    raise ValueError(
+        f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
+    )
+
+  @classmethod
+  def from_zone(cls, type_zone: str):
     return cls.zone_sitemap(type_zone)
 
   @classmethod
@@ -2501,23 +2518,6 @@ class SiteMap(Entities, Promotable):
     ''' Return the first entity from `self.entities_for(spec)` or `None`.
     '''
     return get0(self.entities_for(spec, pattern_name=pattern_name))
-
-  @classmethod
-  @uses_pilfer
-  def from_str(
-      cls,
-      sitemap_name: str,
-      *,
-      P: "Pilfer",
-  ) -> "SiteMap":
-    ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
-    '''
-    for name, sitemap in P.sitemaps:
-      if name == sitemap_name:
-        return sitemap
-    raise ValueError(
-        f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
-    )
 
   @property
   def name__(self):
