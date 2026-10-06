@@ -12,6 +12,7 @@ from getopt import GetoptError
 from pprint import pformat, pprint
 import re
 import sys
+from tempfile import NamedTemporaryFile
 from typing import Iterable, Literal
 from uuid import uuid4
 
@@ -21,7 +22,7 @@ from typeguard import typechecked
 from cs.bs4utils import printt_soup, Table
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.deco import vv
+from cs.deco import promote, vv
 from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedMixin
 from cs.later import Later
 from cs.lex import (
@@ -30,7 +31,6 @@ from cs.lex import (
     get_identifier,
     is_identifier,
     printt,
-    s,
     skipwhite,
 )
 import cs.logutils
@@ -39,7 +39,6 @@ import cs.pfx
 from cs.pfx import Pfx, pfx_call
 from cs.psutils import run
 from cs.py.modules import import_extra
-from cs.sqltags import SQLTagSet
 from cs.trace import Trace
 from cs.urlutils import URL
 
@@ -110,8 +109,10 @@ class PilferCommand(BaseCommand):
         expanduser('~/.pilferrc')
     )
     jobs: int = DEFAULT_JOBS
-    flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
-    db_url: str = None
+    flagnames: tuple[str] = tuple(
+        DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split()
+    )
+    db_url: str | None = None
     dl_output_format: str = '{basename}'
 
     @property
@@ -150,7 +151,7 @@ class PilferCommand(BaseCommand):
         F_=(
             'flagnames',
             'Flags which must be true for operation to continue.',
-            lambda s: s.replace(',', ' ').split(),
+            lambda flags: flags.replace(',', ' ').split(),
         ),
         load_cookies='Load the browser cookie state into the Pilfer session.',
         no_check_certificates='Do not verify SSL certificates.',
