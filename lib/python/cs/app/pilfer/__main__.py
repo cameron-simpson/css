@@ -945,6 +945,23 @@ class PilferCommand(BaseCommand):
     print(flowstate.soup)
 
   @popopts(
+      l=('long', 'Do a full printt() instread of the shorter report style.'),
+      r=('recurse', 'Recursively list the related subentities.'),
+  )
+  def cmd_print(self, argv):
+    ''' Usage: {cmd} ent-spec...
+          Print information about each ent-spec.
+    '''
+    if not argv:
+      raise GetoptError('missing ent-specs')
+    while argv:
+      ent = self.popentity(argv)
+      if self.options.long:
+        ent.printt()
+      else:
+        ent.printt_summary(recurse=self.options.recurse)
+
+  @popopts(
       f=('force', 'Force: refresh the entity even if it is not stale.'),
       r=('recurse', 'Recursively refresh the related subentities.'),
   )
