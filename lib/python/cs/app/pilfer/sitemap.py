@@ -2076,20 +2076,33 @@ class SiteWidget(Widget, ABC):
       - `.scan_soup()`: a method to obtain data from `self.tag` and return a `ScanData`
   '''
 
-  sitemap: "SiteMap"
-  tag: BS4Tag
-
-  def __init_subclass__(cls, *, entity_class, **kw):
+  def __init_subclass__(cls, *, entity_class=None, **kw):
     ''' Record this widget class against its entity type.
     '''
     super().__init_subclass__(**kw)
-    entity_class.WIDGET_CLASSES.append(cls)
+    if entity_class is None:
+      entity_class = getattr(cls, 'ENTITY_CLASS', None)
+    if entity_class is None:
+      vvwarning(f'no ENTITY_CLASS for {cls}')
+    else:
+      entity_class.WIDGET_CLASSES.append(cls)
+
+  def __init__(
+      self,
+      tag: BS4Tag,
+      sitemap: "SiteMap",
+      entity: SiteEntity | None = None,
+  ):
+    self.tag = tag
+    self.sitemap = sitemap
+    if entity is not None:
+      self.entity = entity
+      self.entity_key = entity.type_key
 
   # most site widgets are DIVs
   TAG_NAME = 'div'
 
-  @property
-  @abstractmethod
+  @cached_property
   def entity_key(self):
     ''' The `type_key` derived from `self.tag`.
     '''
