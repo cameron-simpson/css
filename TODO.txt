@@ -1,3 +1,4 @@
+HasThreadState to use Context vars? maybe there should be a dedicated threading.local in the context? only workable from 3.14+ anyway
 CornuCopyBuffer: fix up .seekable
 eval->ast->parse-tree->nested-listing
 cs.ascii_art: print(RRTextBox("
