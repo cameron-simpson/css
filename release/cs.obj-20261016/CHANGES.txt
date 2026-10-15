@@ -1,0 +1,1 @@
+lib/python/cs/obj.py: cs.obj: new Refreshable.refresh_bulk() method to do concurrent multiobject resfreshes
