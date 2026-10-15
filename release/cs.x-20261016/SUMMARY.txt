@@ -1,0 +1,1 @@
+Formally python 3 only, might have been effectively python 3 only for some releases previous :-(
