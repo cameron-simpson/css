@@ -53,7 +53,7 @@ cs.imageutils ok_revision="4192f7323931a73405a1752b34be32a935f36399" features={"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.iso14496 pypi.release="20260531" ok_revision="391216eb6f50b71feb4c76c7160cd7960b85dc0f"
 cs.later pypi.release="20240630" ok_revision="819a6782e492719c8ec508be77bebd84117e8cfc" features={"20240305":["Later__thread_states"]}
-cs.lex pypi.release="20260912" ok_revision=c6f1acf8e032ff2f72ac467851b0d0a5d0b801bc features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"],"20241109":["tabulate"],"20241119":["stripped_dedent__sub_indent"],"20241207":["tabulate__newlines"],"20250103":["BaseToken__token_classes","Identifier","NumericValue","QuotedString"],"20250323":["printt"],"20250914":["FormatMapping","single_space"],"20260403":["TabulatePrettyPrinter","flatten_table_rows","row_cells","without_prefix"],"20260912":["html_escape"]}
+cs.lex pypi.release="20261016" ok_revision=c6f1acf8e032ff2f72ac467851b0d0a5d0b801bc features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"],"20230210":["FFloat","FInt","FNumericMixin","has_format_attributes_inherit"],"20230217":["get_prefix_n"],"20231018":["is_uc_identifier"],"20240211":["split_remote_path"],"20240519":["get_suffix_part"],"20240630":["indent"],"20241109":["tabulate"],"20241119":["stripped_dedent__sub_indent"],"20241207":["tabulate__newlines"],"20250103":["BaseToken__token_classes","Identifier","NumericValue","QuotedString"],"20250323":["printt"],"20250914":["FormatMapping","single_space"],"20260403":["TabulatePrettyPrinter","flatten_table_rows","row_cells","without_prefix"],"20260912":["html_escape"]}
 cs.logutils pypi.release="20260912" ok_revision=c45480a620df644eda20c3eb37d02901a0725895 features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"],"20220530":["QUIET"],"20240630":["LoggingState"],"20260912":["vvwarning","vwarning"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappings pypi.release="20260912" ok_revision="45dbae92b4fc7f7decee055ba6a5447fbb163158" features={"20210906":["RemappedMappingProxy"],"20220912":["TypedKeyMixin"],"20220912.3":["StrKeyedDefaultDict","TypedKeyClass","UUIDKeyedDefaultDict"],"20250306":["mapped_property","missingdict"],"20250528":["change_mapping"]}
@@ -108,6 +108,7 @@ cs.upd ok_revision="3ad1a5ebe519cd18bb236d0575435fba49ac146b" pypi.release="2026
 cs.urlutils ok_revision=b4ea3cf304216020d5a7f1f21b5aa18f9d3a3060 pypi.release="20260531"
 cs.x ok_revision=f1f143276ba20204ddcac179ff6662557c4d3187 pypi.release="20261016" features={"20231129":["via_logger"]}
 icontract
+"python-dateutil"
 requests
 sqlalchemy
 typeguard
