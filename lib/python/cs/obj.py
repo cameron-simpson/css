@@ -24,7 +24,7 @@ from cs.context import contextif
 from cs.deco import attr, OBSOLETE
 from cs.seq import consume, not_none
 
-__version__ = '20261016'
+__version__ = '20261016-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
