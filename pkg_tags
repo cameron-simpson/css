@@ -106,7 +106,7 @@ cs.typingutils ok_revision=f80b38e898d4b414dc6a51dc1658c49adbd19c7b features={"2
 cs.units ok_revision="37b0ea0c10088c737e8c0b881f7a6d631139a7f0" pypi.release="20260526"
 cs.upd ok_revision="3ad1a5ebe519cd18bb236d0575435fba49ac146b" pypi.release="20260912" features={"20230212":["with_upd_proxy"],"20230217":["Upd_MultiOpenMixin"],"20240216":["without"],"20240412":["without"]}
 cs.urlutils ok_revision=b4ea3cf304216020d5a7f1f21b5aa18f9d3a3060 pypi.release="20260531"
-cs.x ok_revision=f1f143276ba20204ddcac179ff6662557c4d3187 pypi.release="20240630" features={"20231129":["via_logger"]}
+cs.x ok_revision=f1f143276ba20204ddcac179ff6662557c4d3187 pypi.release="20261016" features={"20231129":["via_logger"]}
 icontract
 requests
 sqlalchemy
