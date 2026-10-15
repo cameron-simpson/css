@@ -56,7 +56,6 @@ DISTINFO = {
         "Topic :: Text Processing",
     ],
     'install_requires': [
-        'cs.ascii_art>=LARGE_CIRCLE',
         'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
