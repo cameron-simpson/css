@@ -427,9 +427,13 @@ def skipwhite(s: str, offset: int = 0) -> int:
 def indent(paragraph: str, line_indent: str = "  ") -> str:
   ''' Return the `paragraph` indented by `line_indent` (default `"  "`).
   '''
-  return "\n".join(
-      line and line_indent + line for line in paragraph.split("\n")
-  )
+  if not line_indent.strip():
+    # do not indent empty lines when the indent is whitespace
+    return "\n".join(
+        line and line_indent + line for line in paragraph.split("\n")
+    )
+  # otherwise we indent every line
+  return "\n".join(line_indent + line for line in paragraph.split("\n"))
 
 # TODO: add an optional detab=n parameter?
 def stripped_dedent(
