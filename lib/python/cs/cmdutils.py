@@ -69,14 +69,13 @@ from cs.lex import (
     cutsuffix,
     indent,
     is_identifier,
-    printt,
     r,
     stripped_dedent,
-    tabulate,
 )
 from cs.logutils import setup_logging, warning, error, exception
 from cs.mappings import mapped_property
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.printt import printt, tabulate
 from cs.py.doc import obj_docstring
 from cs.resources import RunState, uses_runstate
 from cs.result import CancellationError
