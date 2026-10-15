@@ -70,7 +70,7 @@ cs.pfx pypi.release="20260912" ok_revision="50fb8d38ef91a214c2138135c14bc5617caa
 cs.pipeline pypi.release="20191007.1" ok_revision="2a26b6f06610394b6c7e6fb6f9a5228e50367db9"
 cs.pop3 ok_revision=a1e951d97623d60f0f527322a18389df5bd86b9d pypi.release="20260531"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
-cs.printt ok_revision="6aea1190840327d3bb7d7a892f42a13eb660d924"
+cs.printt ok_revision="6aea1190840327d3bb7d7a892f42a13eb660d924" pypi.release="20261016"
 cs.progress pypi.release="20260531" ok_revision="85c336f7b2cadc71f8d0dca871c8e01c26a924c3" features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"],"20250306":["Progress__qbar"],"20250412":["fix_progressbar_no_tty"]}
 cs.psutils pypi.release="20260531" ok_revision="3e962a3811960940f03453ed4783b86926cccc8f" features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"],"20241206":["run__remote"],"20250108":["run__fold"],"20250513":["print_argv__as_str"]}
 cs.py.doc pypi.release="20260531" ok_revision="29b45a704983fcb90a6a6062939532adfd44ca65"
