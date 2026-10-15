@@ -2400,6 +2400,13 @@ class QuotedString(_LiteralValue, BaseToken):
         quote=q,
     )
 
+@OBSOLETE('cs.printt.tabulate')
+def tabulate(*a, **kw):
+  ''' Compatibility shim for `cs.printt.tabulate()`, which was formerly here.
+  '''
+  from cs.printt import tabulate
+  return tabulate(*a, **kw)
+
 @OBSOLETE('cs.printt.printt')
 def printt(*a, **kw):
   ''' Compatibility shim for `cs.printt.printt()`, which was formerly here.
