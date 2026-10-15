@@ -14,6 +14,8 @@ from cs.deco import attr
 from cs.lex import indent
 from cs.seq import with_neighbours
 
+__version__ = '20261016'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
