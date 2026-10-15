@@ -11,8 +11,8 @@ from typing import Iterable, Mapping, Optional
 
 from cs.cmdutils import BaseCommand
 from cs.fs import FSPathBasedSingleton
-from cs.lex import printt
 from cs.logutils import warning
+from cs.printt import printt
 from cs.resources import MultiOpenMixin
 
 @dataclass

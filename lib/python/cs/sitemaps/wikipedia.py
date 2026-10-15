@@ -5,9 +5,9 @@ from getopt import GetoptError
 
 from cs.app.pilfer.sitemap import SiteMap, SiteEntity
 from cs.deco import promote
-from cs.lex import printt
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
+from cs.printt import printt
 from cs.urlutils import URL
 
 from cs.debug import trace

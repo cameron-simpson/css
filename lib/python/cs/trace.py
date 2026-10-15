@@ -7,7 +7,7 @@ import builtins
 from os.path import relpath
 
 from cs.fs import shortpath
-from cs.lex import printt
+from cs.printt import printt
 from cs.py.stack import caller
 from cs.threads import HasThreadState, ThreadState
 

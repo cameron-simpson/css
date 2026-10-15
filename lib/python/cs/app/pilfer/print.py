@@ -8,7 +8,7 @@ from typeguard import typechecked
 from cs.ascii_art import box_char
 from cs.bs4utils import printt_soup
 from cs.deco import OBSOLETE
-from cs.lex import printt
+from cs.printt import printt
 
 dump_soup = OBSOLETE(printt_soup)
 

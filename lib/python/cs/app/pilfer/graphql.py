@@ -5,8 +5,8 @@
 
 from functools import cached_property
 
-from cs.lex import printt
 from cs.logutils import warning
+from cs.printt import printt
 
 class GraphQLDataMixin:
   ''' A mixin for dealing with the data from a GraphQL response.

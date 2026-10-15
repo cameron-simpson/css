@@ -28,8 +28,8 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.delta import monitor
 from cs.fs import shortpath
-from cs.lex import printt
 from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.printt import printt
 
 from .misc import macos_version
 from .objc import apple, cg

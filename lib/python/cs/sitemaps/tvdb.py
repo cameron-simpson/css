@@ -15,9 +15,9 @@ from cs.app.pilfer.sitemap import SiteEntity
 from cs.cmdutils import BaseCommand, GetoptError, popopts
 from cs.context import stackattrs
 from cs.deco import default_params, Promotable
-from cs.lex import printt
 from cs.logutils import warning
 from cs.obj import Refreshable, SingletonMixin
+from cs.printt import printt
 from cs.resources import RunState, uses_runstate
 from cs.service_api import HTTPServiceAPI
 from cs.sqltags import SQLTags

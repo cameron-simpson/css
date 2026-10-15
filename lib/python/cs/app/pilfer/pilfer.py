@@ -45,13 +45,13 @@ from cs.excutils import logexc, LogExceptions
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, needdir, validate_rpath
 from cs.later import Later, uses_later
-from cs.lex import printt
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
 from cs.ndjson import dump_ndjson, scan_ndjson
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
+from cs.printt import printt
 from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import get0, Seq
