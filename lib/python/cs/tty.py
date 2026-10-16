@@ -21,7 +21,7 @@ from termios import tcsetattr, tcgetattr, TCSANOW, TIOCGWINSZ
 
 from cs.gimmicks import warning
 
-__version__ = '20261016'
+__version__ = '20261016-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
