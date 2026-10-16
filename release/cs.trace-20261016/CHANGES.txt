@@ -1,0 +1,2 @@
+lib/python/cs/trace.py: cs.*: printt() has moved from cs.lex to cs.printt
+lib/python/cs/trace.py: cs.trace: update DISTINFO
