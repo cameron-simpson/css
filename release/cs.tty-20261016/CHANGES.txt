@@ -1,0 +1,3 @@
+lib/python/cs/tty.py: cs.tty: new rmoveto(dx,dy) cursor motion function
+lib/python/cs/tty.py: cs.tty: WinSizePX: provide .char_width and .char_height properties
+lib/python/cs/tty.py: cs.tty: removeto: expose the motions themselves via new rmoveto_bs() function
