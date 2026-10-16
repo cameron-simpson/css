@@ -21,7 +21,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.fs',
-        'cs.lex',
+        'cs.printt',
         'cs.py.stack',
         'cs.threads',
     ],
