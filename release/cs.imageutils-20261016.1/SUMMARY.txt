@@ -1,0 +1,1 @@
+Expose the new sixel stuff in the docs.
