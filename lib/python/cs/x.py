@@ -63,7 +63,7 @@ DISTINFO = {
         'cs.ansi_colour',
         'cs.gimmicks',
     ],
-    'python_requires':
+    'requires_python':
     '>=3',
 }
 
