@@ -22,7 +22,7 @@ from cs.cmdutils import vprint
 from cs.context import stackkeys
 from cs.deco import default_params, Promotable, uses_verbose
 from cs.lex import format_attribute, FormatMapping, FormatableMixin, printt, r
-from cs.logutils import warning, vwarning, vvwarning
+from cs.logutils import warning, vvwarning
 from cs.obj import public_subclasses, Refreshable, NoAttrs
 from cs.pfx import pfx_call, pfx_method
 from cs.progress import progressbar
@@ -51,7 +51,7 @@ DISTINFO = {
         'cs.tagset',
         'cs.trace',
     ],
-    'python_requires':
+    'requires_python':
     '>=3.9',  # for subscripting builtin types
 }
 
@@ -592,7 +592,7 @@ class Entities:
     if zone is None:
       zone = getattr(cls.EntityClass, 'TYPE_ZONE', None)
     if zone is None:
-      vwarning(
+      vvwarning(
           f'new subclass {cls.__name__}, no cls.TYPE_ZONE or {cls.EntityClass.__name__}.TYPE_ZONE'
       )
     else:
