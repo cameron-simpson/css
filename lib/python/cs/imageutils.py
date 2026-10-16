@@ -37,11 +37,13 @@ DISTINFO = {
         'Topic :: Multimedia :: Graphics :: Graphics Conversion',
     ],
     'install_requires': [
+        'cs.ascii_art',
         'cs.cache',
         'cs.deco',
         'cs.gimmicks',
         'cs.pfx',
         'cs.psutils',
+        'cs.tty',
         'Pillow',
     ],
 }
