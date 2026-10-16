@@ -155,6 +155,7 @@ def sixel_from_image_bytes(image_bs: bytes) -> str:
     T.flush()
     return sixel(T.name)
 
+@ALL
 def as_sixel_bytes(img: Image.Image) -> Generator[bytes]:
   ''' A generator yielding `img` as SIXEL format `bytes` chunks.
 
@@ -237,6 +238,7 @@ def as_sixel_bytes(img: Image.Image) -> Generator[bytes]:
     finally:
       sixel_output_unref(sixout)
 
+@ALL
 def sized_sixel_bytes(img: Image.Image,
                       tty=1) -> tuple[list[bytes], int, int, WinSizePX]:
   ''' Wrapper for `as_sixel_bytes()` which returns a 4 tuple of
@@ -273,6 +275,7 @@ def sized_sixel_bytes(img: Image.Image,
   bss = list(as_sixel_bytes(img))
   return bss, char_wide, char_high, ttysize
 
+@ALL
 class SixelImageString(str):
   ''' A `str` subclass for printing a Pillow `Image`.
   '''
