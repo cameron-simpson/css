@@ -1,0 +1,3 @@
+New as_sixel_bytes(Image) generator yielding SIXEL encoded data to draw the image.
+New sized_sixel_bytes(Image) to present the image character size along with the SIXEL data.
+New SixelImageString(str) class to behave as a string in cs.printt.printt() tables.
