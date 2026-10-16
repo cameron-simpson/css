@@ -31,7 +31,7 @@ DISTINFO = {
         'beautifulsoup4',
         'icontract',
         'lxml',
-        'typguard',
+        'typeguard',
     ],
 }
 
