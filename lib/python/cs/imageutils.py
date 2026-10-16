@@ -26,7 +26,7 @@ from cs.tty import ttysizepx, WinSizePX, rmoveto_bs
 
 __all__ = []
 
-__version__ = '20261016.1'
+__version__ = '20261016.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
