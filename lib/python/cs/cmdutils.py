@@ -738,7 +738,6 @@ class SubCommand:
     ''' Return the filled out usage text for this subcommand.
     '''
     subcmds = set(self.subcommand_names)
-    print(f'{subcmds=}')
     # promote show_subcmds to a collection of strings
     if show_subcmds is None or show_subcmds is True:
       show_subcmds = subcmds
