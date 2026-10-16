@@ -1,0 +1,2 @@
+lib/python/cs/py/doc.py: cs.py.doc: a heap of formatting changes, particularly paetitioning docs by functions, classes etc
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: BaseCOmmand subclasses now need an instance to produce their usage text
