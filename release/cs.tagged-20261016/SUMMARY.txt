@@ -1,0 +1,3 @@
+Entity: new .tabulate() pulled out of .printt() in order to implement recurse=True.
+Entity: new .field_ref_type(field_name) mapping method to provide the subtype for a field, default is the field name - this supports .suffix_ents and .suffix_ent.
+Entity: now implements Mapping (proxied to self.tags).

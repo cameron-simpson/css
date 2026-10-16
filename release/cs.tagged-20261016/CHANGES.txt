@@ -1,0 +1,6 @@
+lib/python/cs/tagged.py: cs.tagged: docstring tweak
+lib/python/cs/tagged.py: cs.tagged: ntity: new .tabulate() pulled out of .printt(0 in order to implement recurse=True
+lib/python/cs/tagged.py: cs.tagged: new .field_ref_type(field_name) mapping method to provide the subtype for a field, default it the field name; supports .suffix_ents and .suffix_ent
+lib/python/cs/tagged.py: cs.tagged: drop debugging
+lib/python/cs/tagged.py: cs.tagged: Entity: implements Mapping (proxied to self.tags)
+lib/python/cs/tagged.py: cs.tagged: update a warning, imports and DISTINFO
