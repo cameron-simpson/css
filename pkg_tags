@@ -84,7 +84,7 @@ cs.resources pypi.release="20250915" ok_revision="77a59c8722b9566060358291c81b5c
 cs.result pypi.release="20250306" ok_revision=aeacc5f3862e4354d902beb99a402a6f99d7bfda features={"20220311":["tasks"],"20220805":["FSM"],"20221118":["in_thread"],"20221207":["CancellationError_keywords"],"20230212":["Result_post_notify"],"20250103":["not_cancelled"]}
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release="20260531" ok_revision=ab0baf20e374652acbcf77c504a18570482150f5 features={"20250306":["content_length","content_type","default_headerregistry","header"],"20260531":["content_encodings"]}
-cs.semantics ok_revision=afb1e2f72db1fb62c285cac80b58839fb05c2417 features={"20250103":["ClosedError","not_closed"]} pypi.release="20250103"
+cs.semantics ok_revision=afb1e2f72db1fb62c285cac80b58839fb05c2417 features={"20250103":["ClosedError","not_closed"]} pypi.release="20261016"
 cs.seq pypi.release="20260912" ok_revision=b14e08b948ccdc76fe696b8beca439a30dd48c2a featu features={"20250103":["skip_map"],"20250306":["infill","infill_from_batches"],"20250724":["ClonedIterator"],"20251230":["not_none","unbound_range"],"20251231":["range__class_getitem"],"20251231.1":["range__genericalias"],"20260403":["with_neighbours"],"20260525":["Ordered"],"20260525.1":["order"],"20260622":["ReIterable","consume","consumed"]}
 cs.service_api ok_revision=efd8a2dc51a41cfd4869867383db8977aa83ffd2 pypi.release="20260914" features={"20260914":["LoginPasswordCredentials","LoginState","UsesCredentials"]}
 cs.sh ok_revision=d665a49864def9be07aa73a68e60fb3baccf8dfc features={"20260912":["quoteargv"]} pypi.release="20260912.1"
