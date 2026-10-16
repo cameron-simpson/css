@@ -11,7 +11,7 @@ from cs.printt import printt
 from cs.py.stack import caller
 from cs.threads import HasThreadState, ThreadState
 
-__version__ = '20261016'
+__version__ = '20261016-post'
 
 DISTINFO = {
     'keywords': ["python3"],
