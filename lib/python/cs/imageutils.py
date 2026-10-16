@@ -2,6 +2,7 @@
 #
 
 ''' Various ad hoc image related utility functions and classes.
+    If you're using the SIXEL support (images in the terminal) I recommand also installing `libsixel`.
 '''
 
 from functools import cached_property, partial
