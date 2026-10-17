@@ -1096,7 +1096,6 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     ''' `SiteEntity` subclass init - set `cls.url_re` from `cls.URL_RE` if present.
     '''
     super().__init_subclass__(**kw)
-    cls.WIDGET_CLASSES = []
     # default TYPE_SUBNAME derived from the class name
     try:
       TYPE_SUBNAME = cls.__dict__['TYPE_SUBNAME']
@@ -1139,25 +1138,6 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
   @sitemap.setter
   def sitemap(self, new_sitemap: "SiteMap"):
     self.__dict__['sitemap'] = new_sitemap
-
-  @classmethod
-  def widget_classes(cls) -> list[type]:
-    ''' Return a list of the applicable `SiteWidget` subclasses for `cls`.
-        This is the `SiteWidget` subclasses listed in the
-        `WIDGET_CLASSES` class attribute of each class in `cls.__mro__`.
-
-        Typically a `SiteMap`'s root `SiteEntity` subclass would
-        have a list of widgets which might appear on any site page,
-        and specific `iteEntity` subclasses might have widgets which
-        appear only on their primary site web page.
-    '''
-    return list(
-        unrepeated(
-            chain(
-                *(getattr(wcls, 'WIDGET_CLASSES', ()) for wcls in cls.__mro__)
-            )
-        )
-    )
 
   @classmethod
   @pfx
