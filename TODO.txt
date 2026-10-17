@@ -1,3 +1,4 @@
+PR for hg-git to work with mercurial 7.2 - it works with mercurial 7.1
 HasThreadState to use Context vars? maybe there should be a dedicated threading.local in the context? only workable from 3.14+ anyway
 CornuCopyBuffer: fix up .seekable
 eval->ast->parse-tree->nested-listing
