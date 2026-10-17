@@ -30,7 +30,7 @@ DISTINFO = {
         "Topic :: Internet :: Proxy Servers",
         "Topic :: Utilities",
     ],
-    'python_requires':
+    'requires_python':
     '>=3.13',  # for configparser.UNNAMED_SECTION
     'entry_points': {
         'console_scripts': {
@@ -75,8 +75,6 @@ DISTINFO = {
     'extras_requires': {
         'reparse': ['rss_parser'],
     },
-    'python_requires':
-    '>=3.10',  # for type|type notation
 }
 
 # parallelism of jobs
