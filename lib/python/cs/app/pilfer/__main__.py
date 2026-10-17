@@ -253,6 +253,7 @@ class PilferCommand(BaseCommand):
   @popopts(
       d_=('dirpath', 'Output directory for output_fspath, default ".".'),
       f=('force', 'Force overwrite of the feed file if it already exists.'),
+      limit=('Limit the number of entries in the feed, default 20.', int),
       o_=(
           'output_fspath',
           'Output the feed to the file output_fspath; "-" means the standard output.'
@@ -270,6 +271,7 @@ class PilferCommand(BaseCommand):
     pilfer = options.pilfer
     if not argv:
       raise GetoptError('missing entity or URL')
+    limit = options.limit or 20
     # TODO: treat the output_fspath as a format?
     if options.output_fspath and len(argv) > 1:
       raise GetoptError(
@@ -311,6 +313,7 @@ class PilferCommand(BaseCommand):
             exists_ok=options.force,
             refresh=options.refresh,
             xmlv=options.xmlv,
+            limit=limit,
         )
         if output_fspath != '-':
           print(entity.name, output_fspath)
