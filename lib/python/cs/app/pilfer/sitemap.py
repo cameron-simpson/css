@@ -2026,6 +2026,17 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     href = self.urlto(href)
     return self.bs4('a', text, href=href)
 
+  @property
+  def summary_title(self):
+    title = self.feed_title()
+    try:
+      sitepage_url = self.sitepage_url
+    except AttributeError as e:
+      warning(f'{self.name}: no .sitepage_url: {e}')
+    else:
+      title += "\n" + sitepage_url
+    return title
+
   def tabulate_summary(self, *, recurse=False, file=None):
     ''' Print a summary of this `SteEntity`.
     '''
@@ -2043,17 +2054,11 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     Refreshable.refresh_bulk(
         tuple(rel_ents1) + tuple(rel_ents), concurrent=True
     )
-    table = [[self.name, self.feed_title()]]
-    try:
-      sitepage_url = self.sitepage_url
-    except AttributeError as e:
-      warning(f'{self.name}: no .sitepage_url: {e}')
-    else:
-      table.append(['url', sitepage_url])
+    table = [[self.name, self.summary_title]]
     rel_ents1 = list(unrepeated(not_none(self.refresh_related1())))
     if rel_ents1:
       table.append(
-          tuple([subent.name, subent.feed_title()] for subent in rel_ents1)
+          tuple([subent.name, subent.summary_title] for subent in rel_ents1)
       )
     image = self.image() or ''
     description = self.feed_description() or ''
