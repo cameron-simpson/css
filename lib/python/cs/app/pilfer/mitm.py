@@ -40,6 +40,7 @@ from cs.py.func import funccite, func_a_kw
 from cs.queues import IterableQueue, WorkerQueue
 from cs.resources import RunState, uses_runstate
 from cs.rfc2616 import content_encodings, content_length, content_type
+from cs.seq import consume
 from cs.upd import print as upd_print
 from cs.urlutils import URL
 
@@ -657,8 +658,7 @@ def grok_flow(hook_name, flow, *, P: Pilfer = None):
     '''
     content_bs = b''.join(bss)
     flowstate.content = content_bs
-    for _ in P.grok(flowstate):
-      pass
+    consume(P.grok())
 
   flow.response.stream = consume_stream(
       grok_stream, gen_attrs=dict(desc='grok')
