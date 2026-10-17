@@ -655,7 +655,7 @@ class MBDB(Entities, MultiOpenMixin, RunStateMixin):
   '''
 
   EntityClass = _MBEntity
-  EntitiesClass = MBSQLTags
+  TagsetsClass = MBSQLTags
 
   # Mapping of MusicbrainzNG tag names whose type is not themselves.
   TYPE_NAME_REMAP = {
@@ -723,7 +723,7 @@ class MBDB(Entities, MultiOpenMixin, RunStateMixin):
           pass
         else:
           raise RuntimeError(
-              f'{self.__class__.__getitem__[{index=}]: {mbtype=},{key=}: disc keys should not be UUIDs'
+              f'{self.__class__.__name__}.__getitem__[{index=}]: {mbtype=},{key=}: disc keys should not be UUIDs'
           )
       index = (mbtype, key)
     return super().__getitem__(index)
@@ -1333,15 +1333,8 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     pprint(result)
     assert 'medium-list' in result
     mbe = mbdb[qtype, qid]
-    mbdb.apply_dict(mbe, result)
-    printt(
-        ["Final MBE", mbe.name],
-        *(
-            [f'  {tag_name}', tag_value]
-            for tag_name, tag_value in sorted(mbe.items())
-            if not tag_name.startswith('musicbrainzngs.api.query.')
-        ),
-    )
+    mbe.printt()
+    mbe.refresh()
 
   @popopts
   def cmd_probe(self, argv):
