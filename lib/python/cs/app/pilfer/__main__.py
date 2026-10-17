@@ -1031,36 +1031,41 @@ class PilferCommand(BaseCommand):
   @popopts(apply='Apply the scanned information.')
   def cmd_scan(self, argv):
     ''' Usage: {cmd} URL
-          Call every matching @on grok_* method for sitemaps matching URL.
+          Call every matching @on scan_* method for sitemaps matching URL.
     '''
     if not argv:
       raise GetoptError("missing URL")
-    url = argv.pop(0)
+    url = URL(argv.pop(0))
+    print(url)
     if argv:
       raise GetoptError(f'extra arguments after URL: {argv!r}')
     options = self.options
     P = options.pilfer
-    print(url)
-    table = []
-    for method, match_tags, grokked in P.grok(url):
-      table.append(
-          [
-              f'  {method.__qualname__}',
-              "\n".join(map(str, sorted(match_tags)))
-          ]
+    flowstate = FlowState.from_URL(url)
+    if not options.force and not (200 <= flowstate.response.status_code < 300):
+      warning(
+          f'{flowstate.url.short} {flowstate.response.status_code=} != 2xx, not scanning'
       )
-      if grokked is None:
-        table.append(['    grokked =>', 'None'])
-      else:
-        if isinstance(grokked, SQLTagSet):
-          table.append(
-              ['    grokked =>', f'{grokked.sqltags}[{grokked.name}]']
-          )
-        else:
-          table.append(['    grokked =>', s(grokked)])
-        for k, v in grokked.items():
-          table.append([f'      {k}', v])
-    printt(*table)
+      return 1
+    table = []
+    with Trace("scan sitemaps") as T:
+      for sitemap in P.sitemaps_for_url_host(url):
+        with Trace(f'matched {sitemap}') as T2:
+          print(f'P.sitemaps_for_url_host({url=})\n  -> {sitemap}')
+          print("    look for matched scan_* methods via @on")
+          for method, match in sitemap.on_matches(flowstate, 'scan_*'):
+            T2(f'matched method {method}', match)
+            print(f'      {method=}')
+            scandata = method(flowstate, match)
+            scandata.printt(f'{method}({flowstate.url.short},{match=})')
+            breakpoint()
+          print("    look via entities_for ...")
+          for ent in sitemap.entities_for(url):
+            print(f'      matched {ent.name}')
+            scandata = trace(ent.scan_sitepage)(flowstate)
+            scandata.printt()
+    breakpoint()
+    return 0
 
   @cached_property
   def cmd_sitemap(self):
@@ -1104,6 +1109,7 @@ class PilferCommand(BaseCommand):
         response=rsp,
     )
     for table in Table.scan(flowstate.soup):
+      print()
       table.printt()
 
 sys.exit(main(sys.argv))
