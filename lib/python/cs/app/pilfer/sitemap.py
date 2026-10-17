@@ -2348,6 +2348,8 @@ class SiteMap(Entities, Promotable):
   tagsets: BaseTagSets | None = None
   request_semaphore: Semaphore | None = None
 
+  URL_SCHEME = 'https://'
+
   DEFAULT_CONCURRENCY = 3
 
   CommandClass = BaseSiteMapCommand
@@ -2635,7 +2637,6 @@ class SiteMap(Entities, Promotable):
             # no sitepage, do not update
             ent_fsQ.put((entity, None))
             continue
-          # send the entity and sitepage to the prefetcher
           ent_spQ.put((entity, sitepage_url))
       finally:
         # close the (entity,sitepage) processor
