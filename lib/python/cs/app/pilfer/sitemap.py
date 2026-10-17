@@ -20,7 +20,7 @@ import textwrap
 from threading import Semaphore, Thread
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Self, Sequence
+from typing import Any, Callable, Collection, Generator, Iterable, Mapping, Optional, Self, Sequence
 from uuid import UUID
 
 from bs4 import BeautifulSoup
@@ -29,6 +29,7 @@ from icontract import require
 from mitmproxy.flow import Flow
 import requests
 from typeguard import typechecked
+from urllib.parse import urljoin
 
 from cs.binary import bs
 from cs.bs4utils import printt_soup, Widget
@@ -1314,9 +1315,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     ''' A mapping of `pattern_name` to its pattern derived URL.
     '''
     url_s = self.url_paths[pattern_name]
-    if '://' not in url_s:
-      # just a URL path, resolve it
-      url_s = self.urlto(url_s)
+    url_s = self.urlto(url_s)
     return url_s
 
   @classmethod
@@ -1409,11 +1408,9 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
         else:
           pattern = self.patterns[attr]
           url_s = pattern.url_path_for(self)
-          # something of a hack to turn the URL path into a full URL
-          # TODO: scheme etc from the sitemap eg as .url_preifx?
-          if attr.endswith('_url') and '://' not in url_s:
-            s0 = url_s
-            url_s = f'https://{self.sitemap.URL_DOMAIN}/{url_s.lstrip("/")}'
+          # resolve *_url attributes
+          if attr.endswith('_url'):
+            url_s = self.urlto(url_s)
           return url_s
       # *_FORMAT derived attributes
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
@@ -1434,8 +1431,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
           # for attributes ending in _url, such as .sitepage_url
           # if the result commences with a / we consider it a subpath
           # of the site domain
-          # TODO: maybe test for :// ?
-          if attr.endswith('_url') and formatted.startswith('/'):
+          if attr.endswith('_url'):
             formatted = self.urlto(formatted)
           return formatted
       # no superclass attribute, try the opengraph property
@@ -1484,9 +1480,40 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
         url_s = og[ogname]
       except KeyError as e:
         raise ValueError(f'no opengraph[{ogname=}] tag') from e
-    if '://' not in url_s:
-      url_s = self.urlto(url_s)
+    url_s = self.urlto(url_s)
     return url_s
+
+  @trace
+  @require(lambda attr: attr.endswith('_urls'))
+  def suffix_urls(self, attr) -> Collection[tuple[int, str]]:
+    ''' The handler for attribute names ending in `"_urls"`.
+        This returns a collection of `(pagenum,url)` 2-tuples for
+        a multipage base URL.
+
+        For example, `.sitepage_urls` is a tuple of `(pagenum,url)` 2-tuples.
+
+        If the entity has no `sitepage_pagenum_high` attribute,
+        this tuple only contains `(1,self.sitepage_url`).
+
+        However, if there is a `sitepage_pagenum_high` then a tuple
+        of `(pagenum,url)` 2-tuples is returned counting from
+        `.sitepage_pagenum_low` (which defaults to 1) through to
+        `sitepage_pagenum_high`, computed by
+        `self.page_url(self.sitepage_url,pagenum)`.
+
+        `SiteEntty` subclasses must provide a suitable `.page_url` method.
+    '''
+    base = attr.removesuffix('_urls')
+    base_url: str = getattr(self, f'{base}_url')
+    pagenum_high = getattr(self, f'{base}_pagenum_high', None)
+    if pagenum_high is None:
+      # return a 1-tuple of just the basic page url
+      return (1, base_url),
+    pagenum_low = getattr(self, f'{base}_pagenum_low', 1)
+    return tuple(
+        (pagenum, self.page_url(base_url, pagenum))
+        for pagenum in range(pagenum_low, pagenum_high + 1)
+    )
 
   def refresh(self, *, map=pmap, **refresh_kw):
     ''' We refresh related items in parallel by default.
@@ -1535,6 +1562,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     if isinstance(url, URL):
       url = str(url)
     url = self.clean_url(url)
+    url = self.urlto(url)
     vprint(f'{self} refresh from {url}')
     with run_task(
         f'{self.__class__.__name__}[{self.name}].scan_sitepage({URL(url).short})',
@@ -1562,7 +1590,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
         - `http.request`: a record of the request and response headers from the `flowstate`
         - `html.meta`: the `flowstate.meta` tags
         - `html.properties`: the `flowstate.meta.properties`
-        - `opengraph`: the flowstate.opengraph_tags`
+        - `opengraph`: the `flowstate.opengraph_tags`
 
         A subclass' `scan_sitepage` method should call this base
         method to get the initial `ScanData` and then further update
@@ -1994,11 +2022,9 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     '''
     if text is None:
       text = self.title
-    return self.bs4(
-        'a',
-        text,
-        href=self.sitepage_url,
-    )
+    href = self.sitepage_url
+    href = self.urlto(href)
+    return self.bs4('a', text, href=href)
 
   def tabulate_summary(self, *, recurse=False, file=None):
     ''' Print a summary of this `SteEntity`.
@@ -2007,7 +2033,7 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
       file = sys.stdout
     img_max_width = 48
     img_max_height = 16
-    wrap_width = 50
+    wrap_width = 70
     self.refresh()
     rel_ents1 = list(unrepeated(not_none(self.refresh_related1())))
     if recurse:
@@ -2525,11 +2551,14 @@ class SiteMap(Entities, Promotable):
     '''
     return self.name.replace("/", "__")
 
-  @require(lambda suburl: '://' not in suburl)
   def urlto(self, suburl, domain=None, *, scheme='https'):
     ''' Return the full URL for `suburl`.
+        This is based on `urllib.parse.urljoin`.
     '''
-    return f'{scheme}://{domain or self.URL_DOMAIN}/{suburl.lstrip("/")}'
+    return urljoin(
+        f'{scheme or self.URL_SCHEME}://{domain or self.URL_DOMAIN}',
+        suburl,
+    )
 
   @cached_property
   def url_root(self) -> str:
