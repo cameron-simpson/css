@@ -913,6 +913,9 @@ class PilferCommand(BaseCommand):
     # make a MITMAddon and attach the CLI hooks
     mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
     while argv:
+      # end the filter specifications
+      if argv[0] == '-' or argv[0].startswith(('http://', 'https://')):
+        break
       try:
         action, hook_names, criteria = self.pop_mitm_action(argv)
       except GetoptError as e:
