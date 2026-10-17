@@ -1630,6 +1630,11 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     self.scan_soup(flowstate.soup, self.sitemap, scandata=scandata)
     return scandata
 
+  @uses_scandata
+  def scan_soup(self, soup, sitemap, *, scandata: ScanData) -> ScanData:
+    return scandata
+
+  @promote
   def grok_sitepage(self, flowstate: FlowState, match=None):
     ''' Call `self.scan_sitepage()` and then apply it to `self`.
     '''
@@ -1668,25 +1673,6 @@ class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
     ''' Proxy to `self.sitemap.urlto()`.
     '''
     return self.sitemap.urlto(path)
-
-  @classmethod
-  @uses_scandata
-  def scan_soup(
-      cls,
-      soup,
-      sitemap: "SiteMap",
-      *,
-      scandata: ScanData,
-  ) -> ScanData:
-    ''' Scan the `soup` for the widgets associated with this `SiteEntity` type.
-        Return `scandata` (because it may have been made by the call).
-    '''
-    # update the record of the flowstate's request
-    for widget_cls in cls.widget_classes():
-      vprint("scan soup for", widget_cls)
-      for widget in widget_cls.scan(soup, sitemap):
-        widget.scan_soup(scandata=scandata)
-    return scandata
 
   @attr(tag_name='http.request')
   def rq(
@@ -2087,17 +2073,6 @@ class SiteWidget(Widget, ABC):
       - `.scan_soup()`: a method to obtain data from `self.tag` and return a `ScanData`
   '''
 
-  def __init_subclass__(cls, *, entity_class=None, **kw):
-    ''' Record this widget class against its entity type.
-    '''
-    super().__init_subclass__(**kw)
-    if entity_class is None:
-      entity_class = getattr(cls, 'ENTITY_CLASS', None)
-    if entity_class is None:
-      vvwarning(f'no ENTITY_CLASS for {cls}')
-    else:
-      entity_class.WIDGET_CLASSES.append(cls)
-
   def __init__(
       self,
       tag: BS4Tag,
@@ -2151,6 +2126,35 @@ class SiteWidget(Widget, ABC):
     ''' Return a list of all `SiteWidget`s of this type found in `soup`.
     '''
     return [cls(sitemap=sitemap, tag=tag) for tag in cls.find_all(soup)]
+
+  @classmethod
+  @uses_scandata
+  def scan_all(
+      cls,
+      soup,
+      *,
+      scandata: ScanData,
+      update: dict | None = None,
+  ) -> tuple[list[Self], ScanData]:
+    ''' Scan `soup` for all instances of this `SiteWidget` and run
+        each widget's `scan_soup()` method, applying the results to
+        `scandata`.
+        If `update` is provided, prefill each widget's scandata from `update`.
+        Return a `(widgets,scandata)` 2-tuple of the widgets found
+        and the `scandata`, which may have been created by the call.
+    '''
+    if getattr(cls, 'ENTITY_CLASS', None) is None:
+      # typical widget use here expected widgets to be associated
+      # with a primary `SiteEntity` though it's not inherently bad
+      # to not have that
+      warning(f'scan_all(soup,..,scandata) with no {cls=}.ENTITY_CLASS')
+    widgets = list(cls.scan(soup))
+    for widget in progressbar(widgets, f'scan for {cls.__name__}'):
+      if update:
+        data = scandata[widget.entity]
+        data.update(update)
+      widget.scan_soup(scandata=scandata)
+    return widgets, scandata
 
   @abstractmethod
   @uses_scandata
