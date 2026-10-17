@@ -117,7 +117,7 @@ def as_datetime(
     # pretend the date is a UTC date
     # TODO: I would to assume a localtime date (for no very good reason)
     # but that seems... surprisingly hard to do.
-    dt = datetime(dt.year, dt.month, dt.day, tz=tz)
+    dt = datetime(dt.year, dt.month, dt.day, tzinfo=tz)
   elif isinstance(dt, float):
     dt = datetime.fromtimestamp(dt, tz=tz)
   elif isinstance(dt, str):
