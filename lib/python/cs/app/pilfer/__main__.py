@@ -921,14 +921,37 @@ class PilferCommand(BaseCommand):
       pfx_call(mitm_addon.add_action, action, hook_names, criteria or None)
     if bad_actions:
       raise GetoptError("invalid action specifications")
-    asyncio.run(
-        run_proxy(
-            listen_host,
-            listen_port,
-            addon=mitm_addon,
-            upstream_proxy_url=self.options.proxy,
-        )
-    )
+    if not argv:
+      asyncio.run(
+          run_proxy(
+              listen_host,
+              listen_port,
+              addon=mitm_addon,
+              upstream_proxy_url=self.options.proxy,
+          )
+      )
+      return 0
+
+    @promote
+    def run_url(mitm_addon, flow: FlowState):
+      flow.response  # for the side effect - does a GET
+      pfx_call(mitm_addon.call_hooks_for, 'response', flow)
+
+    for arg in argv:
+      with Pfx("%r", arg):
+        if arg == '-':
+          if sys.stdin.isatty():
+            while True:
+              url_s = input(f'{self.options.cmd} URL> ')
+              if url_s:
+                run_url(mitm_addon, url_s)
+          else:
+            for url_s in sys.stdin:
+              run_url(mitm_addon, url_s)
+        else:
+          url_s = arg
+          run_url(mitm_addon, url_s)
+    return 0
 
   def cmd_patch(self, argv):
     ''' Usage: {cmd} URL
