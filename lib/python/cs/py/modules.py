@@ -356,11 +356,13 @@ class ModuleReloader(Refreshable):
     return True
 
 @attr(module_state={}, lock=threading.Lock())
-def reloadif(module_name: str, *, auto_import=False):
+def reloadif(module_name: str, *, auto_import=False) -> bool:
   ''' Reload a module if it has been modified the last call to
       `reloadif(module_name)`.
       If `auto_reload` is true (default `False`) then import the
       module if it is not yet imported.
+      Return the value from the `ModuleReloader.refresh()` call
+      (true if the module was reloaded, false otherwise).
 
       This is built around a registry of `ModuleReloader` instances.
 
@@ -378,7 +380,7 @@ def reloadif(module_name: str, *, auto_import=False):
     else:
       if auto_import and MR.module is None:
         importlib.import_module(module_name)
-    MR.refresh()
+    return MR.refresh()
 
 if __name__ == '__main__':
   import sys, time
