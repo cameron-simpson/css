@@ -97,7 +97,7 @@ DISTINFO = {
         'cs.deco>=decorator__attrs',
         'cs.lex',
         'cs.logutils',
-        'cs.mapping',
+        'cs.mappings',
         'cs.pfx',
         'cs.printt',
         'cs.py.doc',
