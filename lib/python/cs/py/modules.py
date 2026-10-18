@@ -4,6 +4,7 @@
 ''' Convenience functions related to modules, packages and importing.
 '''
 
+from collections import namedtuple
 import importlib
 from importlib.machinery import SourceFileLoader
 from importlib.util import spec_from_loader, module_from_spec
