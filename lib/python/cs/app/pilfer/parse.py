@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+from collections import namedtuple
+from dataclasses import dataclass
 import re
 from string import whitespace
-from typing import Iterable, Tuple
+from typing import Any, Iterable, Tuple
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -21,7 +23,7 @@ from cs.lex import (
 from cs.logutils import (debug, error, exception)
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.pipeline import StageType
-from cs.py.modules import import_module_name
+from cs.py.modules import import_module_name, reloadif
 from cs.urlutils import URL
 
 from .format import FormatMapping
@@ -690,18 +692,25 @@ def get_name_and_args(
     kwargs = {}
   return name, args, kwargs, offset
 
-@pfx
-def import_name(module_subname: str):
-  ''' Parse a reference to an object from a module, return the object.
-      Raise `ImportError` for a module which does not import.
-      Raise `NameError` for a name which does not resolve.
+@dataclass
+class ModuleObjSpec:
+  module_name: str
+  subname: str
+  _obj: Any = None
 
-      `module_subname` takes the form `*dotted_identifier:dotted_identifier`,
-      being the module name and the name within the module respectively.
-  '''
-  module_name, sub_name = module_subname.split(':', 1)
-  name, *sub_names = sub_name.split('.')
-  obj = import_module_name(module_name, name)
-  for attr in sub_names:
-    obj = getattr(obj, attr)
-  return obj
+  @classmethod
+  def from_str(cls, spec):
+    ''' Construct a `ModuleObjSpec` from a module_name:subname string.
+    '''
+    module_name, subname = spec.split(':', 1)
+    return cls(module_name=module_name, subname=subname)
+
+  @property
+  def object(self):
+    ''' The object resolved by `module_name`.`subname`.
+    '''
+    if reloadif(self.module_name):
+      self._obj = None
+    if self._obj is None:
+      self._obj = import_module_name(self.module_name, self.subname)
+    return self._obj
