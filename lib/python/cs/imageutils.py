@@ -156,7 +156,7 @@ def sixel_from_image_bytes(image_bs: bytes) -> str:
     return sixel(T.name)
 
 @ALL
-def as_sixel_bytes(img: Image.Image) -> Generator[bytes]:
+def as_sixel_bytes(img: Image.Image) -> Generator[bytes, None, None]:
   ''' A generator yielding `img` as SIXEL format `bytes` chunks.
 
       This tries to use `libsixel` but falls back to the external
