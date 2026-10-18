@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Generate RSS feeds from entities of interest.
+# - Cameron Simpson <cs@cskk.id.au> 20jul2026
+#
+
+set -ue
+
+pilf_opts=
+rss_dir=${RSS_DIRECTORY:-rss}
+
+[ ! -t 2 ] || {
+  pilf_opts="$pilf_opts -v"
+  set -x
+}
+
+[ -d "$rss_dir" ] || mkdir "$rss_dir"
+exec python3.13 -m cs.app.pilfer $pilf_opts --load-cookies rss -f -d "$rss_dir" --uuid ${1+"$@"}

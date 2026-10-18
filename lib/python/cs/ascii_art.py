@@ -43,7 +43,7 @@ r'''Utilities to assist with ASCII art such as railroad diagrams;
 
 '''
 
-__version__ = '20260403-post'
+__version__ = '20260912-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -61,7 +61,7 @@ from functools import cache, cached_property
 from pprint import pprint
 import sys
 from types import SimpleNamespace as NS  # noqa: N814
-from typing import Any, Optional, Union
+from typing import Any, Iterable, Optional, Sequence, Union
 import unicodedata
 
 from cs.context import stackattrs
@@ -393,7 +393,7 @@ class RRBase(Promotable, ABC):
     return left_end + horiz_c * left_length + middle + horiz_c * right_length + right_end
 
   @abstractmethod
-  def render_lines(self, **render_kw):
+  def render_lines(self, **render_kw) -> list[str]:
     ''' Render the box as a list of single line strings.
     '''
     raise NotImplementedError
@@ -405,6 +405,20 @@ class RRBase(Promotable, ABC):
     print(self.render(**render_kw), file=file)
 
   # the default attachment points are at the midpoints of the box
+
+  @property
+  @abstractmethod
+  def width(self):
+    ''' The width of this box.
+    '''
+    raise NotImplementedError
+
+  @property
+  @abstractmethod
+  def height(self):
+    ''' The height of this box.
+    '''
+    raise NotImplementedError
 
   @property
   def n(self):
@@ -457,7 +471,12 @@ class RRBase(Promotable, ABC):
 
   @staticmethod
   def conn_char(
-      li, lefts: list[int], rights: list[int], arc=True, heavy=False
+      index,
+      lefts: Sequence[int],
+      rights: Sequence[int],
+      *,
+      arc=True,
+      heavy=False,
   ) -> str:
     ''' Compute the connective `box_char` for a column of connective characters.
     '''
@@ -479,10 +498,10 @@ class RRBase(Promotable, ABC):
     return box_char(
         arc=arc,
         heavy=heavy,
-        left=li in lefts,
-        right=li in rights,
-        up=(lefts or rights) and li > top and li <= bottom,
-        down=(lefts or rights) and li >= top and li < bottom,
+        left=index in lefts,
+        right=index in rights,
+        up=(lefts or rights) and index > top and index <= bottom,
+        down=(lefts or rights) and index >= top and index < bottom,
     )
 
   # this is last to avoid replacing @render
@@ -508,7 +527,7 @@ class Symbol(RRBase):
   def __eq__(self, other):
     return self is other
 
-  def render_lines(self, **_):
+  def render_lines(self, **_) -> list[str]:
     return [self.name]
 
   @property
@@ -527,7 +546,8 @@ class Terminal(Symbol):
     return self is other
 
   @render
-  def render_lines(self, heavy, attach_w, attach_e, **_):
+  def render_lines(self, heavy, *, ascii, attach_w, attach_e,
+                   **_) -> list[str]:
     return [
         "".join(
             (
@@ -567,7 +587,7 @@ class RRTextBox(RRBase):
     return f'{self.__class__.__name__}:{self.text.splitlines()[:1]!r}...'
 
   @render
-  def render_lines(self, *, heavy, attach_w, attach_e, **_):
+  def render_lines(self, *, heavy, attach_w, attach_e, **_) -> list[str]:
     ''' Render the text box as a list of single line strings.
     '''
     line_width = max(self.max_text_length, 1)
@@ -656,14 +676,13 @@ class _RailRoadAround(RRBase):
   middle: str = ''
 
   def __post_init__(self):
-    if isinstance(self.content, str):
-      self.content = self.from_str(self.content)
+    self.content = RRBase.promote(self.content)
 
   def __repr__(self):
     return f'{self.__class__.__name__}(",".join(repr(rr) for rr in self.content))'
 
   @render
-  def render_lines(self, *, heavy, attach_e, attach_w, **_):
+  def render_lines(self, *, heavy, attach_e, attach_w, **_) -> list[str]:
     ie = self.content.e
     iw = self.content.w
     above = self.above
@@ -744,11 +763,11 @@ class _RailRoadMulti(RRBase):
   content: list[RRBase] = field(default_factory=list)
 
   def __post_init__(self):
-    # promote str to RRTextBox
-    self.content = [
-        self.from_str(box) if isinstance(box, str) else box
-        for box in self.content
-    ]
+    # promote self.content to list[RRBase]
+    self.content = [RRBase.promote(box) for box in self.content]
+
+  def __getitem__(self, index):
+    return self.content[index]
 
   def append(self, box):
     self.content.append(self.from_str(box) if isinstance(box, str) else box)
@@ -803,7 +822,8 @@ class RRStack(_RailRoadMulti):
     return tuple(es)
 
   @render(align='left')  # vs right and... anything else
-  def render_lines(self, *, align, heavy, attach_e, attach_w, **_):
+  def render_lines(self, *, align, heavy, attach_e, attach_w,
+                   **_) -> list[str]:
     lines = []
     for box in self.content:
       box_pad_length = self.inner_width - box.width
@@ -816,7 +836,7 @@ class RRStack(_RailRoadMulti):
       line_left = self.horiz(box_pad_left)
       spaces_right = " " * box_pad_right
       line_right = self.horiz(box_pad_right)
-      for li, box_line in enumerate(box.render_lines(
+      for line_index, box_line in enumerate(box.render_lines(
           heavy=heavy,
           attach_e=attach_e,
           attach_w=attach_w,
@@ -824,9 +844,15 @@ class RRStack(_RailRoadMulti):
         lines.append(
             "".join(
                 (
-                    (line_left if attach_w and li == box.w else spaces_left),
+                    (
+                        line_left
+                        if attach_w and line_index == box.w else spaces_left
+                    ),
                     box_line,
-                    (line_right if attach_e and li == box.e else spaces_right),
+                    (
+                        line_right
+                        if attach_e and line_index == box.e else spaces_right
+                    ),
                 )
             )
         )
@@ -862,26 +888,20 @@ class RRChoice(RRStack):
     return super().width + 2
 
   @render
-  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_):
+  def render_lines(self, *, arc, heavy, attach_e, attach_w, **_) -> list[str]:
     lines = []
-    for li, inner_line in enumerate(super().render_lines()):
+    ws = self.ws if attach_w else ()
+    es = self.es if attach_e else ()
+    for line_index, inner_line in enumerate(super().render_lines()):
       lines.append(
           "".join(
               (
                   self.conn_char(
-                      li,
-                      self.ws if attach_w else (),
-                      super().ws,
-                      arc=arc,
-                      heavy=heavy
+                      line_index, ws, super().ws, arc=arc, heavy=heavy
                   ),
                   inner_line,
                   self.conn_char(
-                      li,
-                      super().es,
-                      self.es if attach_e else (),
-                      arc=arc,
-                      heavy=heavy
+                      line_index, super().es, es, arc=arc, heavy=heavy
                   ),
               )
           )
@@ -923,21 +943,19 @@ class RRMerge(RRStack):
     return super().width + 1
 
   @render
-  def render_lines(self, *, arc, heavy, attach_e, **_):
+  def render_lines(self, *, arc, heavy, attach_e, **_) -> list[str]:
     ''' Render the `RRMerge` as a list of strings.
     '''
     lines = []
-    for li, inner_line in enumerate(super().render_lines(attach_e=True)):
+    es = self.es if attach_e else ()
+    for line_index, inner_line in enumerate(super().render_lines(attach_e=True)
+                                            ):
       lines.append(
           "".join(
               (
                   inner_line,
                   self.conn_char(
-                      li,
-                      super().es,
-                      self.es if attach_e else (),
-                      arc=arc,
-                      heavy=heavy
+                      line_index, super().es, es, arc=arc, heavy=heavy
                   ),
               )
           )
@@ -976,20 +994,18 @@ class RRSplit(RRStack):
     return super().width + 1
 
   @render
-  def render_lines(self, *, arc, heavy, attach_w, **_):
+  def render_lines(self, *, arc, heavy, attach_w, **_) -> list[str]:
     ''' Render the `RRSplit` as a list of strings.
     '''
     lines = []
-    for li, inner_line in enumerate(super().render_lines(attach_w=True)):
+    ws = self.ws if attach_w else ()
+    for line_index, inner_line in enumerate(super().render_lines(attach_w=True)
+                                            ):
       lines.append(
           "".join(
               (
                   self.conn_char(
-                      li,
-                      self.ws if attach_w else (),
-                      super().ws,
-                      arc=arc,
-                      heavy=heavy
+                      line_index, ws, super().ws, arc=arc, heavy=heavy
                   ),
                   inner_line,
               )
@@ -1019,13 +1035,14 @@ class RRSequence(_RailRoadMulti):
 
   @property
   def height(self):
-    ''' The render height ofthe `RRSequence` in lines.
+    ''' The render height of the `RRSequence` in lines.
     '''
     return max(box.height for box in self.content)
 
-  @render(sep_len=2)
-  def render_lines(self, *, sep_len, middle='', **_):
-    ''' Render the `RRSequence` as a list of one line strings.
+  @cached_property
+  def _box_tops_bottoms(self):
+    ''' A 2-tuple of the upward and downward extends of the boxes
+        with respect to the leftmost attachment point.
     '''
     boxes = self.content
     # we start the nominal attach point of the leftmost box at 0
@@ -1038,39 +1055,80 @@ class RRSequence(_RailRoadMulti):
       box_tops.append(attach - box.w)
       box_bottoms.append(attach + box.height - box.w)
       attach += box.e - box.w
-    boxes_top = min(box_tops)
-    boxes_bottom = max(box_bottoms)
-    total_lines = boxes_bottom - boxes_top
+    return box_tops, box_bottoms
+
+  @property
+  def box_tops(self):
+    ''' The upward extend of the boxes with respect to the left attachment point.
+    '''
+    return self._box_tops_bottoms[0]
+
+  @property
+  def box_bottoms(self):
+    ''' The downward extend of the boxes with respect to the left attachment point.
+    '''
+    return self._box_tops_bottoms[1]
+
+  @cached_property
+  def boxes_top(self):
+    ''' The highest extend of the boxes with respect to the left attachment point.
+    '''
+    return min(self.box_tops)
+
+  @cached_property
+  def boxes_bottom(self):
+    ''' The lowest extend of the boxes with respect to the left attachment point.
+    '''
+    return max(self.box_bottoms)
+
+  @property
+  def e(self):
+    return self.box_tops[-1] - self.boxes_top + self[-1].e
+
+  @property
+  def w(self):
+    return self.box_tops[0] - self.boxes_top + self[0].w
+
+  @render(sep_len=2)
+  def render_lines(self,
+                   *,
+                   attach_w,
+                   attach_e,
+                   sep_len,
+                   middle='',
+                   **_) -> list[str]:
+    ''' Render the `RRSequence` as a list of one line strings.
+    '''
+    boxes = self.content
+    total_lines = self.boxes_bottom - self.boxes_top
     lines = [[] for _ in range(total_lines)]
-    attach = 0
     sep_spaces = " " * sep_len
     sep_line = self.horiz(sep_len, middle=middle)
-    for bi, (box, box_top) in enumerate(zip(boxes, box_tops)):
+    for box_index, (box, box_top) in enumerate(zip(boxes, self.box_tops)):
       pad = " " * box.width
       row = 0
-      pad_above = box_top - boxes_top
+      pad_above = box_top - self.boxes_top
       pad_below = total_lines - pad_above - box.height
       if pad_above > 0:
         for _ in range(pad_above):
-          if bi > 0:
+          if box_index > 0:
             lines[row].append(sep_spaces)
           lines[row].append(pad)
           row += 1
-      for li, box_line in enumerate(box.render_lines(
-          attach_w=bi > 0,
-          attach_e=bi < len(boxes) - 1,
+      for line_index, box_line in enumerate(box.render_lines(
+          attach_w=box_index > 0 or attach_w,
+          attach_e=box_index < len(boxes) - 1 or attach_e,
       )):
-        if bi > 0:
-          lines[row].append(sep_line if li == box.w else sep_spaces)
+        if box_index > 0:
+          lines[row].append(sep_line if line_index == box.w else sep_spaces)
         lines[row].append(box_line)
         row += 1
       if pad_below > 0:
         for _ in range(pad_below):
-          if bi > 0:
+          if box_index > 0:
             lines[row].append(sep_spaces)
           lines[row].append(pad)
           row += 1
-      attach += box.e - box.w
       assert row == len(lines), f'{row=} != {len(lines)=}'
     return ["".join(line_v) for line_v in lines]
 
@@ -1078,8 +1136,28 @@ def rrprint(*seq, sep=''):
   ''' Promote the arguments to `RRBase` instances, make into an
       `RRSequence` and print it.
   '''
-  seq = RRBase.promote(list(seq))  # *seq gets a tuple
+  seq = RRBase.promote(list(seq))  # seq is a tuple
   seq.print(middle=sep)
+
+# the Morse Code as a railroad diagram
+def _rr_morse():
+  oS = ['o S', ('o H', '- V')]
+  _U = ['- U', 'o F']
+  oR = ['o R', '- L']
+  _W = ['- W', ('o P', '- J')]
+  oD = ['o D', ('o B', '- X')]
+  _K = ['- K', ('o C', '- Y')]
+  oG = ['o G', ('o Z', '- Q')]
+  _O = '- O'
+  oI = ['o I', (oS, _U)]
+  _A = ['- A', (oR, _W)]
+  oN = ['o N', (oD, _K)]
+  _M = ['- M', (oG, _O)]
+  oE = ['o E', (oI, _A)]
+  _T = ['- T', (oN, _M)]
+  return RRBase.promote((oE, _T))
+
+rr_morse = _rr_morse()
 
 def test_railroad():
   ''' Exercise various boxes.
@@ -1168,3 +1246,4 @@ if __name__ == '__main__':
       ),
       RR_END,
   )
+  rrprint(RR_START, rr_morse, RR_END)

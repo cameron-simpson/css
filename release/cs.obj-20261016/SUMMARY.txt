@@ -1,0 +1,1 @@
+Refreshable: new refresh_bulk() method to do concurrent multiobject resfreshes.

@@ -8,17 +8,20 @@
 '''
 
 from __future__ import print_function
+import array
 from collections import namedtuple
 from contextlib import contextmanager
 import errno
+import fcntl
 import os
 import re
 from subprocess import Popen, PIPE
 import sys
-from termios import tcsetattr, tcgetattr, TCSANOW
+from termios import tcsetattr, tcgetattr, TCSANOW, TIOCGWINSZ
+
 from cs.gimmicks import warning
 
-__version__ = '20210316-post'
+__version__ = '20261016-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -62,6 +65,35 @@ def ttysize(fd):
     else:
       rows, columns = None, None
   return WinSize(rows, columns)
+
+class WinSizePX(namedtuple('WinSizePX', 'rows columns widthpx heightpx')):
+  ''' Size information about a terminal including its pixel size.
+  '''
+
+  @property
+  def char_width(self):
+    ''' The width of a character cell in pixels.
+    '''
+    return self.widthpx // self.columns
+
+  @property
+  def char_height(self):
+    ''' The height of a character cell in pixels.
+    '''
+    return self.heightpx // self.rows
+
+def ttysizepx(fd):
+  ''' Return a `(rows,columns,widthpx,heightpx)` tuple for the
+      specified file descriptor being the terminal character rows
+      and columns and pixel width and height respectively.
+
+      This function relies on the `fcntl.ioctl` using `termios.TIOCGWINSZ`.
+  '''
+  if not isinstance(fd, int):
+    fd = fd.fileno()
+  buf = array.array('H', [0, 0, 0, 0])
+  fcntl.ioctl(fd, TIOCGWINSZ, buf)
+  return WinSizePX(*buf)
 
 _ti_setup = False
 
@@ -174,6 +206,43 @@ def status(msg, *args, **kwargs):
     msg = '\033]0;' + msg + '\007'
   f.write(msg)
   f.flush()
+
+def rmoveto_bs(dx, dy, *, flush=False) -> bytes:
+  ''' Return the control bytes needed to move the cursor `dx`
+      positions horizontally and `dy` positions vertically.
+      `dy` is negative for up and positive for down.
+  '''
+  from curses import tigetstr  # pylint: disable=import-outside-toplevel
+  setupterm()
+  bss = []
+  if dx < 0:
+    bss.append(b'\b' * -dx)
+  elif dx > 0:
+    # TODO: paramerised cuf?
+    bss.append(tigetstr('cuf1') * dx)
+  if dy < 0:
+    bss.append(tigetstr('cuu1') * -dy)
+  elif dy > 0:
+    bss.append(tigetstr('cud1') * dy)
+  return b''.join(bss)
+
+def rmoveto(dx, dy, *, file=None, flush=False):
+  ''' Move the cursor `dx` positions horizontally and `dy` positions vertically.
+      `dy` is negative for up and positive for down.
+
+      Parameters:
+      * `dx`: the number of horizontal positions to move,
+        negative is left, positive is right
+      * `dy`: the number of vertical positions to move,
+        negative is up, positive is down
+      * `file`: the file object to write to, default `sys.stdout`
+      * `flush`: whether to flush `file` after the write, default `False`
+  '''
+  if file is None:
+    file = sys.stdout
+  file.write(rmoveto_bs(dx, dy).decode('ascii'))
+  if flush:
+    file.flush()
 
 _termios_modes_names = {
     name: index

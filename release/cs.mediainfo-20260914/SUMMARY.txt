@@ -1,0 +1,1 @@
+New SeriesEpisodeInfo.from_Mapping to compute from a mapping such as a TaggedPath - follows the id.* Entities references.

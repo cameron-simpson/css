@@ -1,0 +1,1 @@
+Refactor the entire usage stuff to work from a live instance so that we can report on dynamicly added subcommands.

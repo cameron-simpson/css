@@ -16,8 +16,9 @@ from typing import Any, Mapping, Optional, Tuple
 from urllib.parse import quote as urlquote
 
 from cs.lex import cutprefix, cutsuffix, indent as indent_text, r
+from cs.obj import NoAttrs
 
-__version__ = '20260531-post'
+__version__ = '20260914-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -27,6 +28,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.lex',
+        'cs.obj',
     ],
 }
 
@@ -229,7 +231,7 @@ def gvsvg(dot_s, **gvdata_kw):
   svg = svg[svg.find('<svg'):].rstrip()  # trim header and tail
   return svg
 
-class DOTNodeMixin:
+class DOTNodeMixin(NoAttrs):
   ''' A mixin providing methods for things which can be drawn as
       nodes in a DOT graph description.
   '''
@@ -260,13 +262,7 @@ class DOTNodeMixin:
           except KeyError:
             colour = palette.get(None)
           return colour
-    try:
-      sga = super().__getattr__
-    except AttributeError as e:
-      raise AttributeError(
-          "no %s.%s attribute" % (self.__class__.__name__, attr)
-      ) from e
-    return sga(attr)
+    return super().__getattr__(attr)
 
   @property
   def dot_node_id(self):

@@ -5,6 +5,7 @@
 '''
 
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import cached_property
 from getopt import GetoptError
@@ -51,7 +52,7 @@ from cs.sqltags import (
     SQLTagsCommandsMixin,
     FIND_OUTPUT_FORMAT_DEFAULT,
 )
-from cs.tagset import HasTags, TagSet, UsesTagSets
+from cs.tagset import Entities, ScanData, Entity, TagSet
 from cs.upd import run_task, print
 
 __version__ = '20201004-dev'
@@ -271,8 +272,8 @@ def rip_to_wav(device, tracknum, wav_filename, no_action=False):
   return argv
 
 # pylint: disable=too-many-ancestors
-class _MBEntity(HasTags):
-  ''' A `HasTags` subclass for MB entities.
+class _MBEntity(Entity):
+  ''' A `Entity` subclass for MB entities.
       This exists as a search root for the subclass `.TYPE_SUBNAME` attribute.
 
       All the state is proxied through the `.tags`, which is an `SQLTagSet`.
@@ -280,40 +281,49 @@ class _MBEntity(HasTags):
       which also sets the `.mbdb` and `.tags_db` on the instance.
   '''
 
+  TYPE_ZONE = 'mbdb'
+
   MB_QUERY_PREFIX = 'musicbrainzngs.api.query'
   MB_QUERY_PREFIX_ = f'{MB_QUERY_PREFIX}.'
   MB_QUERY_RESULT_TAG_NAME = f'{MB_QUERY_PREFIX}.result'
-  MB_QUERY_TIME_TAG_NAME = f'{MB_QUERY_PREFIX}.time'
+
+  def _refresh(self, *, data=None):
+    if data is not None:
+      self.type_zone_update(data, lc_=True)
+      return True
+    mbdb = self.mbdb
+    mbtype = self.mbtype
+    mbkey = self.mbkey
+    if mbtype in ('cdstub',):
+      warning("no refresh for mbtype=%r", mbtype)
+      return False
+    query_get_type = mbtype
+    id_name = 'id'
+    record_key = None
+    if mbtype == 'disc':
+      # we use get_releases_by_discid() for discs
+      query_get_type = 'releases'
+      id_name = 'discid'
+      record_key = 'disc'
+    try:
+      A = self.mbdb.query(
+          query_get_type, mbkey, id_name, record_key=record_key
+      )
+    except (musicbrainzngs.musicbrainz.MusicBrainzError,
+            musicbrainzngs.musicbrainz.ResponseError) as e:
+      warning("%s: not refreshed: %s", type(e).__name__, e)
+      return False
+    self[self.MB_QUERY_RESULT_TAG_NAME] = A
+    scanned = mbdb.scan_mb_response(mbtype, A)
+    scanned.apply(self)
+    return True
 
   @property
   def query_result(self):
-    ''' The Musicbrainz query result, fetching it if necessary.
+    ''' The Musicbrainz query result, fetching it if stale.
     '''
-    mb_result = self.get(self.MB_QUERY_RESULT_TAG_NAME)
-    if not mb_result:
-      self.refresh(refetch=True)
-      try:
-        mb_result = self[self.MB_QUERY_RESULT_TAG_NAME]
-      except KeyError as e:
-        raise AttributeError(f'no {self.MB_QUERY_RESULT_TAG_NAME}: {e}') from e
-    typename, db_id = self.name.split('.', 1)
-    self.mbdb.apply_dict(self, mb_result)
-    return mb_result
-
-  def dump(self, keys=None, **kw):
-    if keys is None:
-      keys = sorted(
-          k for k in self.keys() if (
-              not k.startswith(self.MB_QUERY_PREFIX_)
-              and not k.endswith('_relation')
-          )
-      )
-    return super().dump(keys=keys, **kw)
-
-  def refresh(self, **mbdb_refresh_kw):
-    ''' Refresh the MBDB entry for this `TagSet`.
-    '''
-    return self.mbdb.refresh(self, **mbdb_refresh_kw)
+    self.refresh()
+    return self.get(self.MB_QUERY_RESULT_TAG_NAME)
 
   @property
   def mbdb(self):
@@ -334,36 +344,24 @@ class _MBEntity(HasTags):
     return self.tags.type_subname
 
   @property
-  def mbtime(self):
-    ''' The timestamp of the most recent .refresh() API call, or `None`.
-    '''
-    return self.tags.get(self.MB_QUERY_TIME_TAG_NAME)
-
-  @property
   def ontology(self):
     ''' The `TagsOntology` for this entity.
     '''
     return self.mbdb.ontology
 
-  @require(lambda type_name: is_identifier(type_name))  # pylint: disable=unnecessary-lambda
-  @typechecked
-  def resolve_id(
-      self,
-      type_name: str,
-      id: Union[str, dict],  # pylint: disable=redefined-builtin
-  ) -> '_MBEntity':
-    ''' Fetch the object `{type_name}.{id}`.
+  @property
+  def artist_id(self):
+    ''' A list of the `Artist` ids from `self.artist_credit`.
     '''
-    if type_name == 'disc':
-      try:
-        UUID(id)
-      except ValueError:
-        pass
-      else:
-        raise RuntimeError("type_name=%r, id=%r is UUID" % (type_name, id))
-    if isinstance(id, dict):
-      id = id["id"]
-    return self.mbdb[type_name, id]
+    artist_credit = self.artist_credit
+    print(f'{artist_credit=}')
+    return [ad['artist'] for ad in artist_credit if isinstance(ad, dict)]
+
+  @property
+  def artists(self):
+    ''' A list of the `Artist` instances for this entty.
+    '''
+    return self.artist_ents
 
   @cached_property
   def artist_credit_v(self):
@@ -389,23 +387,14 @@ class _MBEntity(HasTags):
         artists.append(self.mbdb['artist', artist_info])
     return artists
 
-  @property
-  def artists(self):
-    ''' A list of the `MBArtist`s from `self.tags.artist_credit`.
-    '''
-    return [
-        artist for artist in self.artist_credit_v
-        if not isinstance(artist, str)
-    ]
-
   def artist_names(self):
     ''' A list of the artist names from `self.tags.artist_credit`.
     '''
     return [artist.fullname for artist in self.artists]
 
   @property
-  def artist_credit(self) -> str:
-    '''A credit string computed from `self.tags.artist_credit`.
+  def artist_credit_s(self) -> str:
+    '''A credit string computed from `self.artist_credit_v`.
     '''
     strs = []
     sep = ''
@@ -468,9 +457,9 @@ class MBDisc(_MBEntity):
       for medium in release_entry['medium-list']:
         for disc_entry in medium['disc-list']:
           if disc_entry['id'] == discid:
-            release = self.resolve_id('release', release_entry['id'])
+            release = self.mbdb['release', release_entry['id']]
             if release is None:
-              warning("no release found for id %r", release)
+              warning("no release found for discid %r", release)
             else:
               releases.append(release)
     return releases
@@ -491,7 +480,7 @@ class MBDisc(_MBEntity):
       if not all_releases:
         warning("%s: no nonmatching relases", self.name)
         return None
-      return self.resolve_id('release', all_releases[0]['id'])
+      return self.mbdb['release', all_releases[0]['id']]
     return releases[0]
 
   @property
@@ -562,7 +551,7 @@ class MBDisc(_MBEntity):
     '''
     recordings = []
     for track_rec in self.medium['track-list']:
-      recording = self.resolve_id('recording', track_rec['recording']['id'])
+      recording = self.mbdb['recording', track_rec['recording']['id']]
       recordings.append(recording)
     return recordings
 
@@ -591,7 +580,7 @@ class MBDisc(_MBEntity):
     release = self.release
     return TagSet(
         disc_id=self.mbkey,
-        disc_artist_credit='' if release is None else release.artist_credit,
+        disc_artist_credit='' if release is None else release.artist_credit_s,
         disc_title=self.title,
         disc_number=self.medium_position,
         disc_total=self.medium_count,
@@ -609,7 +598,7 @@ class MBDisc(_MBEntity):
     return TagSet(
         track_number=track_index + 1,
         track_total=int(self.medium['track-count']),
-        track_artist_credit=recording.artist_credit,
+        track_artist_credit=recording.artist_credit_s,
         track_title=recording.title,
     )
 
@@ -639,7 +628,7 @@ class MBTrack(_MBEntity):
   TYPE_SUBNAME = 'track'
 
 class MBRelease(_MBEntity):
-  ''' A Musicbrainz recording entry, a single track.
+  ''' A Musicbrainz release.
   '''
 
   TYPE_SUBNAME = 'release'
@@ -661,13 +650,12 @@ class MBSQLTags(SQLTags):
   DBURL_ENVVAR = MBDB_PATH_ENVVAR
   DBURL_DEFAULT = MBDB_PATH_DEFAULT
 
-class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
+class MBDB(Entities, MultiOpenMixin, RunStateMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
   '''
 
-  TYPE_ZONE = 'mbdb'
-  HasTagsClass = _MBEntity
-  TagSetsClass = MBSQLTags
+  EntityClass = _MBEntity
+  TagsetsClass = MBSQLTags
 
   # Mapping of MusicbrainzNG tag names whose type is not themselves.
   TYPE_NAME_REMAP = {
@@ -694,7 +682,7 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
   QUERY_INCLUDES_NEED_LOGIN = ['user-tags', 'user-ratings']
 
   def __init__(self, mbdb_path=None):
-    UsesTagSets.__init__(self, tagsets=MBSQLTags(mbdb_path))
+    Entities.__init__(self, tagsets=MBSQLTags(mbdb_path))
     RunStateMixin.__init__(self)
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
@@ -724,10 +712,20 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
       # discid stuff:
       # https://github.com/metabrainz/libdiscid/blob/192edd70f17661f1a13ac3b349a2a2d96f5f0351/src/base64.c#L85
       # this is amazingly ill specified AFAICT
-      index = (
-          mbtype.replace('-', '_') if isinstance(mbtype, str) else mbtype,
-          key.replace('.', '+'),
-      )
+      if isinstance(mbtype, str):
+        mbtype = mbtype.replace('-', '_')
+      key = key.replace('.', '+')
+      if mbtype == 'disc' or mbtype is MBDisc:
+        # discids are not valid UUIDs
+        try:
+          UUID(key)
+        except ValueError:
+          pass
+        else:
+          raise RuntimeError(
+              f'{self.__class__.__name__}.__getitem__[{index=}]: {mbtype=},{key=}: disc keys should not be UUIDs'
+          )
+      index = (mbtype, key)
     return super().__getitem__(index)
 
   # pylint: disable=too-many-arguments
@@ -831,107 +829,18 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
       )
     return mb_info
 
-  def stale(self, te):
-    ''' Make this entry stale by scrubbing the query time attribute.
-    '''
-    if te.MB_QUERY_TIME_TAG_NAME in te:
-      del te[te.MB_QUERY_TIME_TAG_NAME]
-
-  # pylint: disable=too-many-branches,too-many-statements
-  @require(lambda mbe: '.' in mbe.tags.name)
-  @typechecked
-  def refresh(
-      self,
-      mbe: _MBEntity,
-      refetch: bool = True,  ##False,
-      recurse: Union[bool, int] = False,
-      no_apply=False,
-  ) -> dict:
-    ''' Query MusicBrainz about the entity `mbe`, fill recursively.
-        Return the query result of `mbe`.
-
-        Parameters:
-        * `mbe`: the MuscBrainzNG entity to refresh
-        * `refetch`: query MuscBrainzNG even if not stale
-        * `recurse`: limit recursive refresh of related entities;
-          if `True`, refresh all related entities,
-          if `False`, refresh no related entities,
-          if an `int`, refresh up to this many related entities
-        * `no_apply`: if true (default `False`) do not apply query results to the database
-    '''
-    mbe0 = mbe
-    with run_task("refresh %s" % mbe0.name) as proxy:
-      q = ListQueue([mbe0])
-      for mbe in unrepeated(q, signature=lambda mbe: mbe.name):
-        with Pfx("refresh mbe %r", mbe.name):
-          if self.runstate.cancelled:
-            break
-          with proxy.extend_prefix(": " + mbe.name):
-            if '.' not in mbe.name:
-              warning("refresh: skip %r, not dotted", mbe.name)
-              continue
-            mbtype = mbe.mbtype
-            mbkey = mbe.mbkey
-            if mbtype in ('cdstub',):
-              warning("no refresh for mbtype=%r", mbtype)
-              continue
-            if (refetch or mbe.MB_QUERY_RESULT_TAG_NAME not in mbe
-                or mbe.MB_QUERY_TIME_TAG_NAME not in mbe
-                or not mbe[mbe.MB_QUERY_RESULT_TAG_NAME]):
-              # refresh or missing or stale
-              query_get_type = mbtype
-              id_name = 'id'
-              record_key = None
-              if mbtype == 'disc':
-                # we use get_releases_by_discid() for discs
-                query_get_type = 'releases'
-                id_name = 'discid'
-                record_key = 'disc'
-              with stackattrs(
-                  proxy,
-                  text=f'query({query_get_type!r},{mbkey!r},...)',
-              ):
-                try:
-                  A = self.query(
-                      query_get_type, mbkey, id_name, record_key=record_key
-                  )
-                except (musicbrainzngs.musicbrainz.MusicBrainzError,
-                        musicbrainzngs.musicbrainz.ResponseError) as e:
-                  warning("%s: not refreshed: %s", type(e).__name__, e)
-                  raise
-                  ##A = mbe.get(mbe.MB_QUERY_RESULT_TAG_NAME, {})
-                else:
-                  # record the full response data for forensics
-                  mbe[f'{mbe.MB_QUERY_PREFIX}.get_type'] = query_get_type
-                  ##mbe[f'{mbe.MB_QUERY_PREFIX.includes'] = includes
-                  mbe[mbe.MB_QUERY_RESULT_TAG_NAME] = A
-                  mbe[mbe.MB_QUERY_TIME_TAG_NAME] = time.time()
-                  if not no_apply:
-                    self.apply_dict(mbe, A)
-            else:
-              # use the caches result from the database
-              A = mbe[mbe.MB_QUERY_PREFIX + 'result']
-            # cap recursion
-            if isinstance(recurse, bool):
-              if not recurse:
-                break
-            elif isinstance(recurse, int):
-              recurse -= 1
-              if recurse < 1:
-                break
-            else:
-              raise TypeError(f'wrong type for recurse {r(recurse)}')
-      return mbe0.get(mbe0.MB_QUERY_RESULT_TAG_NAME, {})
-
   @classmethod
-  def key_type_name(cls, k):
+  def key_type_name(cls, k: str) -> tuple[str, str | None]:
     ''' Derive a type name from a MusicBrainzng key name.
         Return `(type_name,suffix)`.
 
         A key such as `'disc-list'` will return `('disc','list')`.
         A key such as `'recording'` will return `('recording',None)`.
+
+        Some type names are remapped through the `cls.TYPE_NAME_REMAP`
+        mapping, for example mapping `"artist-credit"` to `"artist"`.
     '''
-    # NB: ordering matters
+    # NB: the suffix ordering matters
     for suffix in 'relation-list', 'count', 'list', 'relation':
       _suffix = '-' + suffix
       type_name = cutsuffix(k, _suffix)
@@ -1043,6 +952,67 @@ class MBDB(UsesTagSets, MultiOpenMixin, RunStateMixin):
       with Pfx("counts[%r]=%d", k, c):
         if k in mbe:
           assert len(mbe[k]) == c
+
+  @typechecked
+  def scan_mb_response(
+      self,
+      mbtype: str,
+      d: dict,
+  ) -> ScanData:
+    ''' Scan a MusicBrainzNG response into a `ScanData` instance.
+
+        Parameters:
+        * `mbtype`: the MuscBrainzNG entity type, eg `'disc'`
+        * `d`: the response `dict` to scan
+    '''
+    assert 'id' in d
+    # we will be modifying the scan data in place, so work on a copy
+    d = deepcopy(d)
+    scanned = ScanData(self)
+
+    def flatten(obj, mbtype=None):
+      ''' Flatten obj and its contents in place.
+      '''
+      flattened = obj
+      if isinstance(obj, dict):
+        if 'id' in obj:
+          # dicts with an id:
+          # apply to the entity data
+          # arrange to return the key
+          assert mbtype is not None
+          mbkey = obj.pop('id')
+          data = scanned[mbtype, mbkey]
+          data.update(obj)
+          flattened = mbkey
+        # flatten the dict contents in place
+        counts = {}
+        for k, v in sorted(obj.items()):
+          k_type_name, suffix = self.key_type_name(k)
+          # note expected counts
+          if suffix == 'count':
+            # record counts for sanity check later
+            assert isinstance(v, int)
+            assert k_type_name not in counts
+            counts[k_type_name] = v
+            continue
+          elif suffix == 'list':
+            # this is a list of this type
+            assert isinstance(v, list)
+            if k_type_name not in counts:
+              warning("list with no preceeding count")
+            else:
+              assert counts[k_type_name] == len(v)
+            for i, entry in enumerate(v):
+              v[i] = flatten(entry, k_type_name)
+          else:
+            obj[k] = flatten(v, k_type_name)
+      elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+          obj[i] = flatten(v, mbtype)
+      return flattened
+
+    flatten(d, mbtype)
+    return scanned
 
   @typechecked
   def _fold_value(
@@ -1363,15 +1333,8 @@ class CDRipCommand(BaseCommand, SQLTagsCommandsMixin):
     pprint(result)
     assert 'medium-list' in result
     mbe = mbdb[qtype, qid]
-    mbdb.apply_dict(mbe, result)
-    printt(
-        ["Final MBE", mbe.name],
-        *(
-            [f'  {tag_name}', tag_value]
-            for tag_name, tag_value in sorted(mbe.items())
-            if not tag_name.startswith('musicbrainzngs.api.query.')
-        ),
-    )
+    mbe.printt()
+    mbe.refresh()
 
   @popopts
   def cmd_probe(self, argv):

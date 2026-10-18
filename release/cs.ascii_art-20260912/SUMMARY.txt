@@ -1,0 +1,4 @@
+_RailRoadMulti and subclasses: present the interior contents via __getitem__.
+Define the Morse Code diagram and add it to the demo.
+_RailRoadAround, _RailRoadMulti and subclasses: automatically promote self.content via RRBase.promote.
+Various small fixes.

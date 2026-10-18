@@ -1,0 +1,1 @@
+OBSOLETE: also mark the obsolete function as deprecated, accomodate classes as well as functions.

@@ -1,0 +1,7 @@
+PlayOnAPI.download: get the TaggedPath from the ambient FSTags.
+New PlayOn(UsesTagSets) class, will be used to migrate some things out of the API.
+use the new UsesCredentials mixin to get the login credentials.
+LoginState: use the Refreshable stuff.
+Recording.download: attach the Recording to the download file fstags.
+PlayonSeriesEpisodeInfo, no longer needed - supplanted by Recording.as_SeriesEpisodeInfo.
+Assorted other internal changes.

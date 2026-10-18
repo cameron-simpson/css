@@ -1,0 +1,3 @@
+rearrange: skip empty files unless do0 is true (default False); so many false positivies.
+hashindex rearrange" now takes the reference directory via --refdir, default ".", making for saner usage.
+remote_rearrange: accomodate the new command usage.

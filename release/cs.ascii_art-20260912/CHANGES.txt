@@ -1,0 +1,15 @@
+lib/python/cs/ascii_art.py: cs.ascii_art: Terminal: ascii comes from @render, was misusing the builtin function as this flag (always truthy)
+lib/python/cs/ascii_art.py: cs.ascii_art: RRSequence: bugfix start and end attachedness
+lib/python/cs/ascii_art.py: cs.ascii_art: _RailRoadMulti: present the interior contents via __getitem__
+lib/python/cs/ascii_art.py: cs.ascii_art: RRSequence: extract the box up and down extend computations into some cached properties
+lib/python/cs/ascii_art.py: cs.ascii_art: RRSequence: provide correct computations of the .e and .w attachment points
+lib/python/cs/ascii_art.py: cs.ascii_art: define the Morse Code diagram and add it to the demo
+lib/python/cs/ascii_art.py: cs.ascii_art: RRBase: abstract .width and .height properties, happies linters
+lib/python/cs/ascii_art.py: cs.ascii_art: ix docstring typo
+lib/python/cs/ascii_art.py: cs.ascii_art: _RailRoadAround, _RailRoadMulti: automatically promote self.content via RRBase.promote
+lib/python/cs/ascii_art.py: cs.ascii_art: RRChoice.render_lines: compute the west and east attachment points just once
+lib/python/cs/ascii_art.py: cs.ascii_art: {RRMerge,RRSplt}.render_lines: compute the attachment poits just once
+lib/python/cs/ascii_art.py: cs.ascii_art: type annotations to happy the linters
+lib/python/cs/ascii_art.py: cs.ascii_art: annotate the return type of the render_lines() method
+lib/python/cs/ascii_art.py: cs.ascii_art: comment and format
+lib/python/cs/ascii_art.py: cs.ascii_art: rename some loop indices for readability

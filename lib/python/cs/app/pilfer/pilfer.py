@@ -28,7 +28,7 @@ import shutil
 import sys
 from threading import RLock
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-from typing import Any, Callable, Generator, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Generator, Iterable, Mapping, Optional, Tuple
 from types import SimpleNamespace as NS
 
 import requests
@@ -37,7 +37,7 @@ from requests.adapters import HTTPAdapter
 from typeguard import typechecked
 
 from cs.app.flag import PolledFlags
-from cs.cmdutils import vprint
+from cs.cmdutils import vprint, vvprint
 from cs.context import contextif, stackattrs
 from cs.deco import decorator, default_params, promote, uses_verbose
 from cs.env import envsub
@@ -45,27 +45,28 @@ from cs.excutils import logexc, LogExceptions
 from cs.fileutils import atomic_filename
 from cs.fs import HasFSPath, needdir, validate_rpath
 from cs.later import Later, uses_later
-from cs.lex import printt
 from cs.logutils import (debug, error, warning, exception)
 from cs.mappings import mapped_property, SeenSet
 from cs.naysync import agen, amap, async_iter, StageMode
 from cs.ndjson import dump_ndjson, scan_ndjson
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.pipeline import pipeline
+from cs.printt import printt
 from cs.py.modules import import_module_name
 from cs.resources import MultiOpenMixin, RunStateMixin
-from cs.seq import seq
+from cs.seq import get0, Seq
 from cs.sqltags import SQLTags
-from cs.tagset import TagSet
+from cs.tagset import TagSet, ZonedTypes
 from cs.threads import locked, HasThreadState, ThreadState
+from cs.trace import Trace
 from cs.upd import print
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 
 from .cache import ContentCache
 from .cookies import morsel, read_firefox_cookies
 from .format import FormatMapping
-from .parse import import_name
-from .sitemap import FlowState, SiteMap
+from .parse import ModuleObjSpec
+from .sitemap import FlowState, SiteEntity, SiteMap
 from .urls import hrefs, srcs
 
 @decorator
@@ -250,22 +251,28 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
 
       Notable attributes include:
       * `flush_print`: flush output after print(), default `False`.
+      * `sqltags`: an `SQLTags` instance or the URL for the
+        `.sqltags:SQLTags` instance or `None` for the default or `...`
+        for an in-memory SQLTags instance
       * `user_agent`: specify user-agent string, default `None`.
       * `user_vars`: mapping of user variables for arbitrary use.
   '''
 
+  _seq = Seq()
+
   # class attribute holding the per-thread state stack
   perthread_state = ThreadState()
 
-  name: str = field(default_factory=lambda: f'Pilfer-{seq()}')
+  name: str = field(default_factory=lambda: f'Pilfer-{Pilfer._seq()}')
   user_vars: Mapping[str, Any] = field(
       default_factory=lambda: dict(_=None, save_dir='.')
   )
   flush_print: bool = False
   do_trace: bool = False
   flags: Mapping = field(default_factory=PolledFlags)
-  fspath: str = None
-  sqltags_db_url: str = None
+  fspath: str | None = None
+  # the default is '', which uses the common SQLTags; set to None for no .sqltags
+  sqltags: SQLTags | str | type(Ellipsis) | None = None
   user_agent: str = 'Pilfer'
   # verify SSL certificates by default
   verify: bool = True
@@ -281,9 +288,9 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           unseen=(unseen_sfunc, StageMode.STREAM),
       )
   )
-  content_cache: ContentCache = None
+  content_cache: ContentCache | None = None
   # a session for storing cookies etc
-  session: str | PilferSession = None
+  session: str | PilferSession | None = None
   # for optional extra things hung on the Pilfer object
   state: NS = field(default_factory=NS)
   _diversion_tasks: dict = field(default_factory=dict)
@@ -296,7 +303,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         * a `NetrcHTTPPasswordMgr` is supplied as an `HTTPBasicAuthHandler`
         * `.fspath`: `$PILFERDIR` or the `var` defaults setting or `~/var/pilfer`
         * `.content_cache`: the `cache` defaults setting or the `cache` subdirectory
-        * `.sqltags_db_url`: `$PILFER_SQLTAGS` or the `sqltags` defaults setting
+        * `.sqltags`: `$PILFER_SQLTAGS` or the `sqltags` defaults setting
     '''
     self.url_opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     # TODO: should this be in the PilferSession? find out how it is used
@@ -311,16 +318,22 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       self.content_cache = ContentCache(
           expanduser(self.defaults['cache'] or self.pathto('cache'))
       )
-    if self.sqltags_db_url is None:
-      sqltags_db_url = os.environ.get('PILFER_SQLTAGS') or None
-      if sqltags_db_url is None:
-        sqltags_db_url = self.defaults['sqltags'] or None
-        if sqltags_db_url is not None:
-          if sqltags_db_url.startswith('~/'):
-            sqltags_db_url = expanduser(sqltags_db_url)
-          elif not sqltags_db_url.startswith(('/', 'file://', 'memory:')):
-            sqltags_db_url = self.pathto(sqltags_db_url)
-      self.sqltags_db_url = sqltags_db_url
+    if not isinstance(self.sqltags, SQLTags):
+      db_url = self.sqltags
+      if db_url is ...:
+        db_url = SQLTags.DB_URL_MEMORY
+      else:
+        if db_url is None:
+          db_url = (
+              os.environ.get('PILFER_SQLTAGS') or self.defaults['sqltags']
+              or None
+          )
+        if db_url is not None and '://' not in db_url:
+          if db_url.startswith('~'):
+            db_url = expanduser(db_url)
+          elif not db_url.startswith('/'):
+            db_url = abspath(db_url)
+      self.sqltags = SQLTags.promote(db_url)
     # default session named '_'
     if self.session is None:
       self.session = '_'
@@ -361,6 +374,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     '''
     return self.rc_map[None]
 
+  # TODO: should this be off in some PipeLineStageState instead of the Pilfer?
   @property
   def _(self):
     ''' Shortcut to this `Pilfer`'s `user_vars['_']` entry - the current item value.
@@ -370,13 +384,6 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   @_.setter
   def _(self, value):
     self.user_vars['_'] = value
-
-  @cached_property
-  def sqltags(self):
-    ''' A reference to the `SQLTags` knowledge base
-        if `self.sqltags_db_url` is not `None`.
-    '''
-    return SQLTags(self.sqltags_db_url) if self.sqltags_db_url else None
 
   def dbshell(self):
     ''' Run an interactive database prompt for `self.sqltags`.
@@ -430,7 +437,7 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
           default from `self.verify` (itself default `True`)
         Other keyword arguments are passed to the `session` request method.
     '''
-    vprint(f'{self.__class__.__name__}: {method} {url}')
+    vprint(f'{self.__class__.__name__}.request: {method} {url}')
     if session is None:
       session = self.session
     if verify is None:
@@ -440,8 +447,10 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     if headers is not None:
       hdrs.update(headers)
     if verbose:
-      print(f'{method.upper()} request headers:')
-      printt(*[[hdr, body] for hdr, body in sorted(hdrs.items())], indent=2)
+      printt(
+          f'{method.upper()} request headers:',
+          tuple([hdr, body] for hdr, body in sorted(hdrs.items())),
+      )
     return pfx_call(
         getattr(session, method.lower()),
         str(url),
@@ -513,8 +522,13 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
         warning("ConfigParser.read(%r): %s", rcpath, e)
         continue
       msection = mapping[None]
-      for field_name, value in cfg[UNNAMED_SECTION].items():
-        msection[field_name] = value
+      try:
+        UNNAMED = cfg[UNNAMED_SECTION]
+      except KeyError as e:
+        warning("%s.rc_map: %s: no %r: %s", self, rcpath, UNNAMED_SECTION, e)
+      else:
+        for field_name, value in UNNAMED.items():
+          msection[field_name] = value
       for section_name, section in cfg.items():
         msection = mapping[section_name]
         for field_name, value in section.items():
@@ -683,69 +697,145 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return pipeline(self.later, pipe_funcs, name=name)
 
   @cached_property
-  @pfx_method
-  def sitemaps(self) -> List[Tuple[str, SiteMap]]:
-    ''' A list of `(pattern,SiteMap)` 2-tuples for matching URLs to `SiteMap`s.
-
-        The entries take the form:
-
-            host-pattern = name:module:class
-
-        The `host-pattern` is a glob style pattern as for `fnmatch`.
-        Site maps matching multiple hosts should generally include
-        the URL hostname in the URL key.
-        An additional pattern for the same `module:class` can just be `name`.
-
-        Example:
-
-            [sitemaps]
-            docs.python.org = docs:cs.app.pilfer.sitemap:DocSite
-            docs.mitmproxy.org = docs
-            *.readthedocs.io = docs
+  def _sitemap_pattern_specs(
+      self
+  ) -> tuple[dict[str, str], list[tuple[str, str]]]:
+    ''' Return a 2-tuple of `({name->map_spec},[(pattern,name)])`
+        being a mapping of SiteMap name to it's specification (a
+        "*module_name*:*class_name*" string) and a list of URL host
+        part patterns and an associated SiteMap name.
     '''
-    named = {}
-    map_list = []
-    for pattern, sitemap_spec in self.rc_map['sitemaps'].items():
-      with Pfx("%s = %s", pattern, sitemap_spec):
-        try:
-          map_name, map_spec = sitemap_spec.split(':', 1)
-        except ValueError:
-          # no colon - plain map name
+    with Pfx('[sitemaps]'):
+      named = {}
+      pattern_specs = []
+      for pattern, sitemap_spec in self.rc_map['sitemaps'].items():
+        with Pfx("%s = %s", pattern, sitemap_spec):
           try:
-            sitemap = named[sitemap_spec]
-          except KeyError:
-            warning("ignore unknown bare sitemap name: %r", sitemap_spec)
-            continue
-        else:
-          if map_name in named:
-            warning("ignore previously seen map name: %r", map_name)
-            continue
-          try:
-            map_class = import_name(map_spec)
-          except (ImportError, NameError, SyntaxError) as e:
-            warning(e._)
-            continue
-          sitemap = map_class(name=map_name)
-          named[map_name] = sitemap
-        # TODO: precompile glob style pattern to regexp?
-        map_list.append((pattern, sitemap))
-    return map_list
+            name, map_spec = sitemap_spec.split(':', 1)
+          except ValueError:
+            # no colon - plain map name
+            name = sitemap_spec
+            try:
+              map_spec = named[name]
+            except KeyError:
+              warning("ignore unknown bare sitemap name: %r", name)
+              continue
+          else:
+            # name:module.name:ClassName
+            if name in named:
+              warning(
+                  "ignore previously seen map name: %r -> %r", name, map_spec
+              )
+              continue
+            named[name] = map_spec
+          # TODO: precompile glob style pattern to regexp?
+          pattern_specs.append((pattern, name))
+    return named, pattern_specs
 
+  @property
+  def sitemap_names(self):
+    ''' An iterable of the `SiteMap` names.
+    '''
+    named, _ = self._sitemap_pattern_specs
+    return named.keys()
+
+  @mapped_property
+  def sitemap_specs(self, name: str) -> ModuleObjSpec:
+    ''' A lazy mapping of sitemap `name` to its `ModuleObjSpec` instance.
+    '''
+    named, _ = self._sitemap_pattern_specs
+    map_spec = named[name]
+    module_name, subname = map_spec.split(':', 1)
+    return ModuleObjSpec(module_name=module_name, subname=subname)
+
+  # we don't cache this mapping because we want to evaluate
+  # ModuleObjSpec.sitemap every time
+  @mapped_property(cached=False)
+  def sitemap(self, name: str) -> SiteMap | None:
+    ''' A lazy mapping of sitemap `name` to its `SiteMap` instance,
+        or `None` if associated import fails.
+    '''
+    sitemap_spec = self.sitemap_specs[name]
+    try:
+      sitemap_cls = sitemap_spec.object
+    except Exception as e:
+      warning(f'sitemap[{name=}]: {sitemap_spec}: {e}')
+      breakpoint()
+      return None
+    return sitemap_cls(name=name)
+
+  @property
+  def sitemap_patterns(self) -> list[tuple[str, str]]:
+    ''' Return a list of `(pattern,sitemap_name)` 2-tuples
+        being a pattern from the pilferrc and the name of the sitemap
+        it matches.
+    '''
+    _, patterns = self._sitemap_pattern_specs
+    return patterns
+
+  @Trace
   @promote
-  def sitemaps_for_url_host(self, url: URL) -> Generator[SiteMap]:
+  def sitemaps_for_url_host(self, url: URL, *, T) -> Generator[SiteMap]:
     ''' Generator yielding sitemaps which match the `url` host part.
     '''
     hostname = url.hostname
-    for pattern, sitemap in self.sitemaps:
-      if fnmatch(hostname, pattern):
+    _, patterns = self._sitemap_pattern_specs
+    for pattern, map_name in patterns:
+      if T(f'fnmatch({hostname=},{pattern=})', fnmatch(hostname, pattern)):
+        sitemap = self.sitemap[map_name]
+        T("  matched", sitemap)
         yield sitemap
 
   def sitemap_for(self, url: str | URL) -> SiteMap | None:
-    ''' Return the first sitemap which matches the `url`, or `None`.
+    ''' Return the first sitemap which matches the `url` host, or `None`.
     '''
-    for sitemap in self.sitemaps_for_url_host(url):
-      return sitemap
-    return None
+    return get0(self.sitemaps_for_url_host(url))
+
+  def entities_for(self, spec: str | URL) -> Iterable[SiteEntity]:
+    ''' Produce the `SiteEntity` instances for `spec`.
+
+        `spec` may be:
+        - a URL matched by a `SiteMap.entities_for(url)` method
+        - a *zone*`.`*subtype*`:`*field*`=`*value* search string
+        - a *zone*`.`*subtype*`.`*key* string
+
+        Examples:
+
+            http://example.com/section/article.html
+            tvdb.actor:fullname=Joe Bloggs
+            tvdb.actor.1234
+
+        URLs are passed to `sitemap.entities_for()` for each `SiteMap`
+        registered for that URL in the `pilferrc`.
+
+        `zone.subtype:field=value` searches are pass to
+        `SiteMap[zone].entities_for()`.
+
+        Plain `zone.subtype.name` is passed to `SiteMap.by_db_key()`.
+    '''
+    if isinstance(spec, URL) or '://' in spec:
+      # match a URL to an entity
+      url = URL.promote(spec)
+      for sitemap in self.sitemaps_for_url_host(url):
+        yield from sitemap.entities_for(url)
+      return
+    # tvdb.actor:fullname="Job Bloggs"
+    try:
+      zone, subtype, field, value = ZonedTypes.type_search(spec)
+    except ValueError:
+      pass
+    else:
+      sitemap = SiteMap[zone]
+      yield from sitemap.entities_for(spec)
+      return
+    # straight up db key zone.subtype.id
+    ent = SiteMap.by_db_key(spec)
+    yield ent
+
+  def entity_for(self, spec) -> SiteEntity | None:
+    ''' Return the first entity from `self.entities_for(spec)` or `None`.
+    '''
+    return get0(self.entities_for(spec))
 
   @promote
   @typechecked
@@ -797,14 +887,6 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
       patterns = getattr(sitemap, f'{pattern_type}_PATTERNS', None)
       if patterns:
         yield from sitemap.matches(url, patterns, extra=extra)
-
-  @promote
-  def url_entity(self, url: URL, *, methodglob='grok_*', **match_kw):
-    for sitemap in self.sitemaps_for_url_host(url):
-      entity = sitemap.url_entity(url)
-      if entity is not None:
-        return entity
-    return None
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)

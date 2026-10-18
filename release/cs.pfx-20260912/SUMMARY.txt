@@ -1,0 +1,1 @@
+Pfx.prefixify: return the original string unchanged on MemoryError or RecursionError.

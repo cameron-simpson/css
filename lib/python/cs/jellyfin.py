@@ -182,6 +182,8 @@ def nfo_movie(tags: TagSet):
   ''' NFO `<movie>` XML tag with fields as described at:
       https://jellyfin.org/docs/general/server/metadata/nfo/
   '''
+  imdb_ent = tags.entity_.imdb
+  tvdb_ent = tags.entity_.tvdb
   E = ElementMaker()  ## version="1.0", encoding="UTF-8", standalone="yes")
   return E.movie(
       *[
@@ -201,13 +203,13 @@ def nfo_movie(tags: TagSet):
               # dateadded - in UTC
               # collectionnumber - TMDb collection id
               # set - collection name, only for movies
-              imdbid=tags.get('id.imdb.movie'),
+              imdbid=tvdb_ent and tvdb_ent.type_key,
               # imdbid - for all other media types
               # tvdbid
               # tmdbid
               # language
               title=tags.get('title'),
-              tvdbid=tags.get('id.tvdb.movie'),
+              tvdbid=tvdb_ent and tvdb_ent.type_key,
           ).items() if value is not None and value != ''
       ],
       *(E.director(director) for director in tags.get('director', ())),
@@ -220,6 +222,7 @@ def nfo_tv(tags: TagSet):
   ''' NFO `<tvshow>` XML tag with fields as described at:
       https://jellyfin.org/docs/general/server/metadata/nfo/
   '''
+  tvdb_ent = tags.entity_.tvdb
   E = ElementMaker()  ## version="1.0", encoding="UTF-8", standalone="yes")
   return E.tvshow(
       *[
@@ -243,13 +246,13 @@ def nfo_tv(tags: TagSet):
               # dateadded - in UTC
               # collectionnumber - TMDb collection id
               # set - collection name, only for movies
-              imdb_id=tags.get('id.imdb.tvseries'),
+              imdbid=tvdb_ent and tvdb_ent.type_key,
               # imdbid - for all other media types
               # tvdbid
               # tmdbid
               # language
               title=tags.get('title'),
-              tvdbid=tags.get('id.tvdb.show'),
+              tvdbid=tvdb_ent and tvdb_ent.type_key,
           ).items() if value is not None and value != ''
       ],
       *(E.director(director) for director in tags.get('director', ())),

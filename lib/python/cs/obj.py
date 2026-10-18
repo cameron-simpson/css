@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Random stuff for "objects". - Cameron Simpson <cs@cskk.id.au>
 #
@@ -8,19 +8,23 @@ Convenience facilities for objects.
 '''
 
 from abc import ABC, abstractmethod
+import builtins
 from collections import defaultdict
 from copy import copy as copy0
+from functools import partial
 import sys
 from threading import Lock
 import time
 import traceback
 from types import SimpleNamespace
-from typing import Optional
+from typing import Iterable
 from weakref import WeakValueDictionary
 
-from cs.deco import OBSOLETE
+from cs.context import contextif
+from cs.deco import attr, OBSOLETE
+from cs.seq import consume, not_none
 
-__version__ = '20260526-post'
+__version__ = '20261016-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,7 +32,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco'],
+    'install_requires': ['cs.context', 'cs.deco', 'cs.seq'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -210,7 +214,7 @@ def obj_as_dict(o, **kw):
   '''
   raise RuntimeError("please use cs.obj.as_dict")
 
-class Proxy(object):
+class Proxy:
   ''' An extremely simple proxy object
       that passes all unmatched attribute accesses to the proxied object.
 
@@ -232,7 +236,49 @@ class Proxy(object):
     _proxied = object.__getattribute__(self, '_proxied')
     return len(_proxied)
 
-class TrackedClassMixin(object):
+class NoAttrs:
+  ''' A stub class whose `__getattr__` raises `AttributeError`.
+      This exists to be put at the end of the subclasses for concrete
+      nonmixin classes which have multiple `__getattr__` methods
+      in their MRO, so that they can always call `super().__getattr__`.
+
+      This exists because `object` has no `__getattr__`, necessitating
+      this ugly shuffle in mixin `__getattr__` methods:
+
+          def __getattr__(self, attr):
+              ... return the mixin's special attr ...
+              try:
+                  gsa = super().__getattr__
+              except AttributeError:
+                  raise AttributeError(f'{self.__class__.__name__}.{attr}')
+              else:
+                  return gsa(attr)
+
+      With `NoAttrs` at the end of the MRO every mixin's `__geattr__` can be:
+
+          def __getattr__(self, attr):
+              ... return the mixin's special attr ...
+              return super().__getattr__(attr)
+
+      A concrete class is then defined as:
+
+          class C(AMixin,BMixin,NoAttrs):
+
+      Because of Python's MRO construction rules, a subclass like:
+
+          class D(C,DMixin,NoAttrs):
+
+      still places `NoAttrs` at the end of the MRO, producing correct behaviour.
+
+      `NoAttrs.__getattr__` issues a warning if `super().__getattr__` actually exists.
+  '''
+
+  def __getattr__(self, attr):
+    ''' Just raise `AttributeError` with a nice mesage.
+    '''
+    raise AttributeError("%s.%s" % (self.__class__.__name__, attr))
+
+class TrackedClassMixin:
   ''' A mixin to track all instances of a particular class.
 
       This is aimed at checking the global state of objects of a
@@ -526,10 +572,11 @@ class Sentinel:
 
 class Refreshable(ABC):
   ''' A mixin for refreshable objects.
-      The object must provide a `_refresh(resource)` method
-      which tries to refresh from `resource`.
+      The object must provide a `_refresh()` method, returning
+      `True` if the object was updated and false otherwise.
 
-      This mixin provides a `.refresh()` method which implements the refresh policy.
+      This mixin provides a `.refresh()` method which implements the refresh logic
+      and various related `refresh_*` methods/properties.
   '''
 
   # default refresh lifespan is, arbitrarily,  1 week
@@ -538,24 +585,29 @@ class Refreshable(ABC):
   REFRESH_RATELIMIT = 1.0
 
   @abstractmethod
-  def _refresh(self, resource) -> bool:
-    ''' Refresh the object from `resource`, typically an URL.
+  def _refresh(self, *, data=None) -> bool:
+    ''' Refresh the object.
         Return `True` if the object was updated, `False` otherwise.
+
+        If `data` is not `None`, apply `data` to `self` and return `True`
+        instead of making whatever API call or other action that would
+        normally be performed.
+
+        A typical example looks like this:
+
+            def _refresh(self, api_subpath=None, data=None):
+              if data is None:
+                data = data_from_api(api_subpath)
+              self.tags.update(data, prefix=self.type_zone)
+              return True
     '''
     raise NotImplementedError
-
-  def refreshed(self, now: float = None):
-    ''' Mark `self` as refreshed as of `now`, default `time.time()`.
-    '''
-    if now is None:
-      now = time.time()
-    self.refresh_last_update = now
 
   def refresh_needed(
       self,
       *,
-      lifespan: float = None,
-      now: float = None,
+      lifespan: float | None = None,
+      now: float | None = None,
   ) -> bool:
     ''' Test whether `self` is considered stale.
 
@@ -572,25 +624,34 @@ class Refreshable(ABC):
     last_update = getattr(self, 'refresh_last_update', 0.0)
     return last_update + lifespan < now
 
-  def refresh_related(self):
+  def refresh_related(self) -> Iterable:
     ''' Return the related objects which should also be refreshed in recursive refreshes.
+    '''
+    return ()
+
+  def refresh_related1(self) -> Iterable:
+    ''' Return the related objects which should also be refreshed
+        in recursive refreshes, but nonrecursively.
     '''
     return ()
 
   def refresh_key(self):
     ''' Return the key value for the `seen` set used in a recursive refresh.
-        This default returns `id(self)`; classes like `HasTags`
+        This default returns `id(self)`; classes like `Entity`
         would use a characteristic value like `self.name`.
     '''
     return id(self)
 
+  @attr(_lock=Lock())
   def refresh(
       self,
-      resource: Optional = None,
       *,
+      data=None,
       force=False,
-      lifespan: float = None,
-      ratelimit: float = None,
+      lifespan: float | None = None,
+      map=None,
+      concurrent=False,
+      ratelimit: float | None = None,
       recurse=False,
       seen=None,
       **_refresh_kw,  # passed to self._refresh()
@@ -598,70 +659,181 @@ class Refreshable(ABC):
     ''' Refresh this object; if it is stale attempt to refresh via `self._refresh()`.
         Return `True` if the object was updated, `False` otherwise.
 
+        Note that this returns `False` if the object was considered
+        still current; `False` is not an error.
+
         The refresh policy is: if `force` or (the object's information
         is stale and the rate limit does not preclude a refresh),
-        call `self._refresh(resource)`.
+        call `self._refresh()`.
         This is measured by `self.refresh_needed()`.
 
         State about the refresh poll times is kept in
         `self.refresh_last_poll` and `self.refresh_last_update`.
 
-        Parameters:
-        * `resource`: the reference resource, default from `self.refresh_resource`
+        Keyword parameters:
+        * `data`: optional object providing the refresh data,
+          passed to `self._refresh()` as the `data` keyword argument;
+          if not `None` then `_refresh` is always called and should
+          apply it instead of making whatever API call or other
+          action it would perform passed to `self._refresh()
         * `force`: optional flag, default `False`; if true attempt
           a refresh regardless of staleness or the rate limit
         * `lifespan`: how many seconds before updated information
           is considered no stale, default from `self.refresh_lifespan`,
           or `type(self).REFRESH_RATELIMIT`
+        * `map`: optional `map()`-like function to call
+          refresh on the related objects; this hook exists to allow
+          for example APIs to pass in a curried `pmap()` call to
+          refresh some objects in parallel; the default map function is `map()`
         * `ratelimit`: how many seconds should elapsed before
           attempting a refresh, default from `self.refresh_ratelimit`
           or `type(self).REFRESH_RATELIMIT`
-        * `recurse`: optional flag, default `False`; if true the
-          recursively refresh the objects from `self.refresh_related()`
+        * `recurse`: optional flag, default `False`; if true then
+          refresh the objects from `self.refresh_related1()` nonrecursively
+          and recursively refresh the objects from `self.refresh_related()`
         * `seen`: optional set of keys to prevent unbound recursion
+
         Other keyword parameters are passed to `self._refresh()` if it is called.
+
+        Note the two related-object methods, `refresh_related()`
+        and `refresh_related1()`.  These exist to allow a recursive
+        refresh to refresh "descendant" objects recursively and
+        other related "adjacent" or "superior" objects nonrecursively.
+
+        Supposing you're refreshing a section topic in a news site;
+        you might recursively refresh all the articles in the topic
+        and the authors of the articles. However you likely also
+        want to refresh other objects related to the topic, perhaps
+        the table of topics and other things; recursing into those
+        objects might refresh everything on the entire site.
+        Accordingly the descendant objects would be enumerated by
+        `refresh_related()` and the adjacent/superior objects by
+        `refresh_related1()`.
+
+        Note that because a `recurse=True` call descends a potentially
+        arbitrary tree of related objects, if `map` is supplied as,
+        for example, `pmap`, that should be a curried call with a
+        shared `Semaphore` to control the concurrency, such as
+        `partial(pmap,concurrent=Semaphore(4))`.
+
+        It is probably a mistake to call this with non-`None` `data`
+        and `recurse` true. It will be accepts and the `data` applied
+        to `self` and the recursion done without `data`.
+        (Now we raise `ValueError` for this.)
     '''
+    if map is None:
+      if concurrent is not False:
+        try:
+          from cs.threads import pmap
+        except ImportError:
+          map = builtins.map
+        else:
+          map = partial(pmap, concurrent=concurrent)
+      else:
+        map = builtins.map
+    if recurse and data is not None:
+      raise ValueError(
+          f'{self.__class__.__name__}.refresh({recurse=},{data=}): recurse may not be true if data is not None'
+      )
     lifespan0 = lifespan
     ratelimit0 = ratelimit
     key = self.refresh_key()
-    if seen is None:
-      seen = set()
-    else:
-      if key in seen:
-        return
-    seen.add(key)
-    now = time.time()
-    if not force:
-      if not self.refresh_needed(lifespan=lifespan, now=now):
-        return False
-      last_poll = getattr(self, 'refresh_last_poll', 0.0)
+    with Refreshable.refresh._lock:
+      if seen is None:
+        seen = set()
+      else:
+        if key in seen:
+          return False
+      seen.add(key)
+    # we do not use the lock if there are data
+    lock = getattr(self, 'refresh_lock', None) if data is None else None
+    with contextif(lock):
       if ratelimit is None:
         # optional instance attribute
         ratelimit = getattr(
             self, 'refresh_ratelimit',
             type(self).REFRESH_RATELIMIT
         )
-      if now - last_poll < ratelimit:
-        # too early to repoll
-        return False
-    # the object is stale (or force is true)
-    if resource is None:
-      resource = getattr(self, 'refresh_resource', None)
-    self.refresh_last_poll = now
-    refreshed = self._refresh(resource, **_refresh_kw)
-    if refreshed:
-      self.refresh_last_update = now
-    if recurse:
-      for obj in self.refresh_related():
-        obj.refresh(
-            recurse=True,
+      now = time.time()
+      do_refresh = True
+      was_updated = False
+      if data is None:
+        if not force:
+          if not self.refresh_needed(lifespan=lifespan, now=now):
+            # not stale
+            do_refresh = False
+          elif ratelimit is not None:
+            # rate limit on polls
+            last_poll = getattr(self, 'refresh_last_poll', None)
+            if last_poll is not None and now - last_poll < ratelimit:
+              # too soon
+              do_refresh = False
+      if do_refresh:
+        if data is None:
+          # the refresh will be doing a poll, whatever that means
+          self.refresh_last_poll = now
+        was_updated = self._refresh(data=data, **_refresh_kw)
+        # catch accidental None, mostly
+        assert isinstance(was_updated, bool), \
+            f'{self._refresh=} -> not a bool: {type(was_updated)} {was_updated=}'
+        if was_updated:
+          # good poll and data updated
+          self.refresh_last_update = now
+      if recurse:
+        # refresh some objects nonrecursively
+        self.refresh_bulk(
+            not_none(self.refresh_related1()),
+            refresh=False,
+            map=map,
             force=force,
             lifespan=lifespan0,
             ratelimit=ratelimit0,
             seen=seen,
-            **_refresh_kw
+            **_refresh_kw,
         )
-    return refreshed
+        # refresh other related objects recursively
+        self.refresh_bulk(
+            not_none(self.refresh_related()),
+            recurse=True,
+            map=map,
+            force=force,
+            lifespan=lifespan0,
+            ratelimit=ratelimit0,
+            seen=seen,
+            **_refresh_kw,
+        )
+    return was_updated
+
+  def refreshed(self, **refresh_kw):
+    ''' A variant on `refresh()` which returns `self` to support chaining.
+        This isn't the default because that's not Pythonic.
+    '''
+    self.refresh(**refresh_kw)
+    return self
+
+  @staticmethod
+  def refresh_bulk(
+      objs: Iterable["Refreshable"],
+      *,
+      concurrent=False,
+      map=None,
+      **refresh_kw,
+  ):
+    ''' Refresh multiple `Refreshable` objects, concurrently if `concurrent` is not `False`.
+    '''
+    if map is None:
+      if concurrent is not False:
+        try:
+          from cs.threads import pmap
+        except ImportError:
+          map = builtins.map
+        else:
+          map = partial(pmap, concurrent=concurrent)
+      else:
+        map = builtins.map
+    consume(
+        map(lambda obj: obj.refresh(map=map, **refresh_kw), not_none(objs))
+    )
 
 def public_subclasses(cls, extras=()):
   ''' Return a set of the subclasses of `cls` which have public names.

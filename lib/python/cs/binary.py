@@ -290,7 +290,7 @@ DISTINFO = {
         'cs.seq',
         'typeguard',
     ],
-    'python_requires':
+    'requires_python':
     '>=3.6',
 }
 

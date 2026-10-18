@@ -884,14 +884,12 @@ class Module:
     )
     python_version = dinfo.pop('requires_python', None)
     if python_version is not None:
-      projspec['requires_python'] = python_version
+      projspec['requires-python'] = python_version
     version = dinfo.pop('version', None)
     if version:
       projspec['version'] = version
     if 'extra_requires' in dinfo:
       projspec['optional-dependencies'] = dinfo.pop('extra_requires')
-    if 'python_requires' in dinfo:
-      projspec['requires-python'] = dinfo.pop('python_requires')
     package_dir = dinfo.pop('package_dir')
     dinfo_entry_points = dinfo.pop('entry_points', {})
     if dinfo_entry_points:
@@ -939,7 +937,7 @@ class Module:
         "content-type": "text/markdown",
     }
     # check that everything was covered off
-    if dinfo:
+    if dinfo and dinfo != {'py_modules': [self.name]}:
       warning("dinfo not emptied: %r", dinfo)
     return pyproject
 
@@ -1418,13 +1416,7 @@ class Module:
     '''
     # mkdir omitted, done by @atomic_directory
     # unpack the source
-    vcs.hg_cmd(
-        'archive',
-        ('-r', vcs_revision),
-        *vcs.hg_include(self.paths()),
-        '--',
-        release_dirpath,
-    )
+    vcs.hg_archive(release_dirpath, vcs_revision, self.paths())
     # flit has src/ hardwired
     os.symlink(PYLIBTOP, joinpath(release_dirpath, 'src'))
     if bare:
@@ -1848,10 +1840,10 @@ class CSReleaseCommand(BaseCommand):
     sys.stdout.write(tomli_w.dumps(pyproject, multiline_strings=True))
 
   @popopts(
-      a=(
-          'all_class_names',
-          '''' Document all public class members (default is just
-               __new__ and __init__ for the PyPI README.md file).''',
+      terse=(
+          ''' Document only __new__ and __init__ for the PyPI
+              README.md file instead of all public class members.
+          '''
       ),
       raw='Do not format output with glow(1) on a tty.',
   )
@@ -1860,7 +1852,6 @@ class CSReleaseCommand(BaseCommand):
           Print out the package long_description.
     '''
     options = self.options
-    all_class_names = options.all_class_names
     raw_mode = options.raw
     if not argv:
       raise GetoptError("missing package name")
@@ -1869,7 +1860,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError(f'extra arguments: {argv!r}')
     options = self.options
     pkg = options.modules[pkg_name]
-    docs = pkg.compute_doc(all_class_names=all_class_names)
+    docs = pkg.compute_doc(all_class_names=not options.terse)
     if not raw_mode and sys.stdout.isatty():
       with ps_pipeto(['glow', '-', '-p']) as P:
         print(docs.long_description, file=P.stdin)

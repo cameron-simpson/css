@@ -1,0 +1,2 @@
+New rmoveto(dx,dy) cursor motion function and associated rmoveto_bs().
+WinSizePX: provide .char_width and .char_height properties.

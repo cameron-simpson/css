@@ -1,3 +1,39 @@
+PR for hg-git to work with mercurial 7.2 - it works with mercurial 7.1
+HasThreadState to use Context vars? maybe there should be a dedicated threading.local in the context? only workable from 3.14+ anyway
+CornuCopyBuffer: fix up .seekable
+eval->ast->parse-tree->nested-listing
+cs.ascii_art: print(RRTextBox("
+
+
+
+")) is wrong
+jf media update subcommand, initially to mark some media as interlaced PVR recordings
+jellyfin JFDBEntity subclasses ORMEntity, and JFMediaItem subclasses JFDBEntity and maps specific jellyfin.* columns for write back
+tagset Entities: _not_ a db overlay in sqltags, instead an ORMEntity base class mapping specific fields to ORM columns
+jellyfin diret db support, as SQLTags Entities mirroring db fields, with backfill for specific fields
+rename HasThreadState to Ambient, add registry of Ambients, the .ambience ? overlap with contextvars somehow
+printt: easy way to add heading+mapping/kv-pairs - .name and .kvs object for the table?
+cs.timeseries: array typecodes may vary in size from cpu to cpu and os to os, struct_format etc may need measuring using array.itemsize
+cs.imageutils: try importing libsixel, fall back to img2sixel if not available
+replace all qvprint with vprint since verbose and quiet are no longer independant
+refresh: allow recursion depth as a recurse= value
+cs.tagset: ENtity: prefix_ents: map .ents_subtype[_field] to the Entity whose .field_id is our key, field defaults to our subtype; likewise .ent_*
+cs.cmdutils: bad usage from subcommand should preempt the run-context call
+ChainedHashCode to produce a progressive and computable-from-midway style hash based checksum of a data stream
+ffmpegutils: mark video as interlaced
+printt: colspan
+Entity[zone_type_key] gets an entity?
+SiteMap.__iter__: provide the top level items?
+default_params: a mode to use with with some params eg uses_fstags
+rework cs.logutils to shim loguru
+hashindex rearrange: refdir to be optional, default . ?
+pmap dispatcher: put the exception onto the resultQ?
+cs.ffmpegutils.convert: deinterlace, copy mode only if no filters or codec _change_
+amap: redo the docstring to be more like pmap
+amap: accept async sem for concurrency, restructure like pmap with a dispatcher task and run_func etc
+amap: add fast_iter to pass to async_iter
+amap,pmap: rename concurrent to concurrency
+ReIterable: sometimes we need to continue iteration, which iter() would normally do, eg for item in reit:
 move cs.py.doc.obj_docstring to cs.obj? or will inspect.cleandoc do the same thing?
 pmap: mode to terminate other tasks on exception or not, currently inferred from with_exceptions
 cs.dockerutils: drop caps and add, default no caps

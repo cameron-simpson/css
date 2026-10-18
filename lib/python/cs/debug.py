@@ -77,11 +77,12 @@ from cs.py.func import funccite, funcname, func_a_kw_fmt
 from cs.py.stack import caller, frames
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
-from cs.threads import ThreadState
+from cs.threads import HasThreadState, ThreadState
+from cs.trace import Trace
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import X
 
-__version__ = '20260526-post'
+__version__ = '20260912-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -103,6 +104,7 @@ DISTINFO = {
         'cs.py3',
         'cs.seq',
         'cs.threads',
+        'cs.trace',
         'cs.upd',
         'cs.x',
     ],
@@ -1010,6 +1012,41 @@ def print_obj(obj, label=None):
   ##pprint(table, indent=2)
   return printt(*table)
 
+@ALL
+def tabulate_class(cls):
+  ''' Construct a table reporting about `cls` and its subclasses.
+  '''
+  table = [
+      [cls.__name__, f'{cls.__module__}'],
+  ]
+  if cls.__annotations__:
+    table.append('.__annotations__')
+    table.append(
+        tuple(
+            [f'.{name}', annotation]
+            for name, annotation in cls.__annotations__.items()
+        ),
+    )
+  subclasses = cls.__subclasses__()
+  if subclasses:
+    table.append('Subclasses:')
+    subtable = []
+    for subclass in subclasses:
+      subclstable = tabulate_class(subclass)
+      subtable.append(subclstable.pop(0))
+      if subclstable:
+        subtable.append(tuple(subclstable))
+    table.append(tuple(subtable))
+  ##pprint(table, width=50)
+  ##breakpoint()
+  return table
+
+@ALL
+def print_class(cls):
+  ''' Call `tabulate_class(cls)` and pass to `cs.lex.printt()`.
+  '''
+  printt(*tabulate_class(cls))
+
 def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
   '''
@@ -1029,7 +1066,6 @@ trace_DEBUG()
 
 # insert names into builtins
 builtin_names_s = os.environ.get(CS_DEBUG_BUILTINS_ENVVAR, '')
-print('$CS_DEBUG_BUILTINS ->', repr(builtin_names_s))
 if builtin_names_s:
   try:
     import builtins  # pylint: disable=unused-import

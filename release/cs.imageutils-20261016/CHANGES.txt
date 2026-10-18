@@ -1,0 +1,12 @@
+lib/python/cs/imageutils.py: cs.imagutils: new as_sixel_bytes(Image) generator yielding SIXEL encoded data to draw the image; demo/debug in the __main__ boilerplate
+lib/python/cs/imageutils.py: cs.imageutils: present the character size computation via new sized_sixel_bytes(Image) which returns the SIXEL data and the expcted size in characters
+lib/python/cs/imageutils.py: cs.imageutils: fix docstring typo
+lib/python/cs/imageutils.py: cs.imageutils: fix type annoations, fix docstring typo
+lib/python/cs/imageutils.py: cs.imageutils: use the new WinSizePX .char_width and .char_height properties, correct a docstring
+lib/python/cs/imageutils.py: cs.imageutils: new SixelImageString(str) class to behave as a string in cs.lex.printt() tables
+lib/python/cs/imageutils.py: cs.imageutils: SixelImageString: new .indent() method to support cs.lex.printt()
+lib/python/cs/imageutils.py: cs.imageutils: SixelImageString: new tty parameter (default fd 1), .copy() accepts an optional new image, new resized_within() method to resize to fit in a constrained rectangle
+lib/python/cs/imageutils.py: cs.imageutils: SixelImageString: provide __new__ to accomodate the tty parameter
+lib/python/cs/imageutils.py: cs.imageutils: SixelImageString: make public attribute use "image" instead of "img"
+lib/python/cs/imageutils.py: cs.imageutils: update DISTINFO
+lib/python/cs/imageutils.py: cs.imageutils: update module docstring

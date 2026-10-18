@@ -149,7 +149,7 @@ do
                   -vf "scale=$scale" -c:v "$vcodec" -bufsize 1M -maxrate:v "$bitrate" \
                   "$outfile" </dev/null
     then  [ $keep ] || $trace rm -- "$md" || xit=1
-    else  $trace rm -f -- "$outfile"
+    else  xit=1; $trace rm -f -- "$outfile"
     fi
   fi
 done

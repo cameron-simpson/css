@@ -1,0 +1,4 @@
+lib/python/cs/seq.py: cs.seq,cs.app.pilfer.sitemap: rename ClonedIteraor to ReIterable, sugestion by λambda @ python.discord
+lib/python/cs/seq.py: cs.seq: new consume(Iterable) function to "run" an iterable without storing the results
+lib/python/cs/seq.py: cs.seq: consume: tweak docstring
+lib/python/cs/seq.py: cs.seq: new consumed(Iterator) returning an Iterator with the last consumed item and the tail of the original iterator

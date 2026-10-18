@@ -1,0 +1,5 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.repl(): improve the local vars
+lib/python/cs/cmdutils.py: cs.cmdutils: new optional apply(opts,field,value) field for option specs; BaseCommandOptions: replace .quiet and .verbose with .verbosity and properties for the other names, make -q and -v accrue a count via their apply functions
+lib/python/cs/cmdutils.py: cs.cmdutils: new vvprint() to print if options.verbosity>=2
+lib/python/cs/cmdutils.py: cs.cmdutils: bugfix apply_quiet and apply_verbose, add missing import, fix typo
+lib/python/cs/cmdutils.py: cs.cmdutils: qvprint is now obsolete, use vprint, since verbose and quiet are no longer independant

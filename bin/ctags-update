@@ -29,6 +29,8 @@ do
   shift
 done
 
+[ $# -gt 0 ] || set -- ${TAGS_PATHS:-''}
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ -n "$tags" ] || tags=$( findup tags ) || {

@@ -10,10 +10,12 @@
     - downloads, if that is a thing, with `FSTags` for file annotations
 '''
 
+from collections import namedtuple
 from contextlib import contextmanager
-from functools import cached_property
+from functools import cached_property, partial
 from json import JSONDecodeError
-from threading import RLock
+from netrc import netrc
+from threading import Lock, RLock, Semaphore
 import time
 from typing import Mapping, Set, Union
 
@@ -25,16 +27,19 @@ try:
 except ImportError:
   RequestsJSONDecodeError = JSONDecodeError
 
+from cs.context import contextif
 from cs.deco import uses_verbose
 from cs.fstags import FSTags, uses_fstags
 from cs.logutils import warning
-from cs.pfx import pfx_call
+from cs.obj import Refreshable
+from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
-from cs.tagset import HasTags, UsesTagSets
 from cs.sqltags import SQLTagSet, UsesSQLTags
+from cs.tagged import Entity, Entities
+from cs.threads import pmap
 from cs.upd import run_task
 
-__version__ = '20260531-post'
+__version__ = '20260914-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -47,9 +52,9 @@ DISTINFO = {
         'cs.deco',
         'cs.fstags',
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.resources',
-        'cs.tagset',
         'cs.sqltags',
         'cs.upd',
         'icontract',
@@ -57,29 +62,105 @@ DISTINFO = {
     ],
 }
 
-class ServiceAPI(MultiOpenMixin, UsesSQLTags):
+class LoginPasswordCredentials(namedtuple('LoginPasswordCredentials',
+                                          'login password')):
+  ''' A credentials class for login/password authentication.
+
+      Its default `from_str(credname)` factory accesses the netrc(5) file.
+  '''
+
+  @classmethod
+  def from_netrc(cls, host, netrc_path=None):
+    ''' Create an instance from a netrc(5) `host`.
+        Raise `KeyError` if `host` is unknown.
+    '''
+    N = netrc(netrc_path)
+    login_account_password = N.authenticators(host)
+    if login_account_password is None:
+      raise KeyError(f'no entry for {host=}')
+    return cls(
+        login=login_account_password[0], password=login_account_password[2]
+    )
+
+  @classmethod
+  def from_str(self, credname):
+    return self.from_netrc(credname)
+
+class UsesCredentials:
+  ''' A mixin for accessing credentials.
+  '''
+  CREDENTIALS_CLASS = LoginPasswordCredentials
+
+  def credentials(self, credname):
+    ''' Return the credentials for `credname`.
+    '''
+    return self.CREDENTIALS_CLASS.from_str(credname)
+
+  @classmethod
+  def default_credentials(cls):
+    ''' Return the default credentials for `cls.API_HOSTNAME`.
+    '''
+    return cls.CREDENTIALS_CLASS.from_str(cls.API_HOSTNAME)
+
+class LoginState(Refreshable):
+
+  def __init__(self, api, credentials=None):
+    self.refresh_lock = Lock()
+    self.api = api
+    self.credentials = credentials
+
+class ServiceAPI(MultiOpenMixin, UsesCredentials, UsesSQLTags):
   ''' `SewrviceAPI` base class for other APIs talking to services.
   '''
 
   API_AUTH_GRACETIME = None
   API_RETRY_COUNT = 3  # number of request attempts
   API_RETRY_DELAY = 5  # interval between request retries
+  API_CONCURRENCY_LIMIT = None
 
   @uses_fstags
   def __init__(
       self,
       *,
       fstags: FSTags,
-      tagsets: UsesTagSets = None,
+      concurrency=None,
+      tagsets: Entities = None,
   ):
+    ''' Initialise a `ServiceAPI` instance.
+
+        The `concurrency` parameter may take the following values:
+        * `None`: API calls are serialised, setting `.concurrency_sem=None`
+          and `.pmap=partial(pmap,concurrent=1)`
+        * an `int`: API calls are constrained by `.concurrency_sem`,
+          set to a `Semaphore` with this initial value, and `.pmap=pmap`
+        * a `Semaphore`: API calls are constrained by `.concurrency_sem`,
+          set to this `Semaphore`, and `.pmap=pmap`
+    '''
+    if concurrency is None:
+      concurrency = self.API_CONCURRENCY_LIMIT
+    if concurrency is None:
+      concurrency_sem = Semaphore(1)
+      _pmap = partial(pmap, concurrent=1)
+    elif isinstance(concurrency, int):
+      concurrency_sem = Semaphore(concurrency)
+      if concurrency == 1:
+        _pmap = pmap
+      else:
+        _pmap = pmap
+    else:
+      concurrency_sem = concurrency
+      _pmap = pmap
+    self.concurrency = concurrency
+    self.concurrency_sem = concurrency_sem
+    self.pmap = _pmap
     super().__init__(tagsets=tagsets)
-    self.fstags = fstags
     self._lock = RLock()
     self.login_state_mapping = None
+    self.fstags = fstags
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Open/close the `FSTags` and `UsesTagSets`.
+    ''' Open/close the `FSTags` and `Entities`.
     '''
     with self.tagsets:
       with self.fstags:
@@ -100,8 +181,8 @@ class ServiceAPI(MultiOpenMixin, UsesSQLTags):
     '''
     return None
 
-  def get_login_state(self, do_refresh=False) -> HasTags:
-    ''' The login state, a `HasTags`, stored as `login.state.`*login_userid*.
+  def get_login_state(self, do_refresh=False) -> Entity:
+    ''' The login state, a `Entity`, stored as `login.state.`*login_userid*.
         This performs a login if necessary or if `do_refresh` is true
         (default `False`).
     '''
@@ -115,7 +196,7 @@ class ServiceAPI(MultiOpenMixin, UsesSQLTags):
     return state
 
   @cached_property
-  def login_state(self) -> HasTags:
+  def login_state(self) -> Entity:
     ''' The login state, a mapping. Performs a login if necessary.
     '''
     return self.get_login_state()
@@ -142,7 +223,7 @@ class HTTPServiceAPI(ServiceAPI):
       default_headers=None,
       mode='response',
       check_json=None,
-      **service_api_kw
+      **service_api_kw,
   ):
     if api_hostname is None:
       api_hostname = type(self).API_HOSTNAME
@@ -228,41 +309,52 @@ class HTTPServiceAPI(ServiceAPI):
     if mode is None:
       mode = self.mode
     url = base_url + suburl
-    rq_headers = {}
-    rq_headers.update(self.default_headers)
-    if headers is not None:
-      rq_headers.update(headers)
-    with run_task(f'{method} {url}', report_print=verbose):
-      for retry in range(self.API_RETRY_COUNT, 0, -1):
-        runstate.raiseif()
-        try:
-          rsp = pfx_call(
-              rqm,
-              url,
-              cookies=cookies,
-              headers=rq_headers,
-              **rqkw,
-          )
-          break
-        except requests.ConnectionError as e:
-          if retry <= 1:
-            # last retry
-            raise
-          warning("%s: %s, retrying in %ds", url, e, self.API_RETRY_DELAY)
-          runstate.sleep(self.API_RETRY_DELAY)
-    if check:
-      rsp.raise_for_status()
-    if callable(mode):
-      return mode(rsp)
-    if mode == 'response':
-      return rsp
-    if mode == 'json':
-      return self.response_as_json(rsp)
-    if mode == 'data':
-      return self.response_as_json_data(rsp)
-    raise ValueError(
-        f'unsupported {mode=}, expected "data", "json", "response" or a callable'
-    )
+    with Pfx('%s %s', method, url):
+      rq_headers = {}
+      rq_headers.update(self.default_headers)
+      if headers is not None:
+        rq_headers.update(headers)
+      with run_task(
+          f'{method} {url}',
+          report_print=verbose,
+          tick_deferred=True,
+      ) as proxy:
+        for retry in range(self.API_RETRY_COUNT, 0, -1):
+          runstate.raiseif()
+          with contextif(self.concurrency_sem):
+            runstate.raiseif()
+            try:
+              with proxy.ticker():
+                rsp = pfx_call(
+                    rqm,
+                    url,
+                    cookies=cookies,
+                    headers=rq_headers,
+                    **rqkw,
+                )
+                break
+            except requests.ConnectionError as e:
+              if retry <= 1:
+                # last retry
+                raise
+              warning("%s, retrying in %ds", e, self.API_RETRY_DELAY)
+              runstate.sleep(self.API_RETRY_DELAY)
+      if check:
+        if rsp.status_code != 200:
+          print(dir(rsp))
+          warning(f'{rsp.status_code} {rsp.reason}')
+        rsp.raise_for_status()
+      if callable(mode):
+        return mode(rsp)
+      if mode == 'response':
+        return rsp
+      if mode == 'json':
+        return self.response_as_json(rsp)
+      if mode == 'data':
+        return self.response_as_json_data(rsp)
+      raise ValueError(
+          f'unsupported {mode=}, expected "data", "json", "response" or a callable'
+      )
 
   def get(self, suburl, **kw) -> Response:
     ''' Call `slef.suburl` with `method="GET"`.

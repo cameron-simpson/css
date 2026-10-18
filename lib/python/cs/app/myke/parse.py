@@ -1030,8 +1030,7 @@ def parseMacro(context, text=None, offset=0):
     if mpermute:
       if offset >= len(text) or text[offset] != mmark2:
         raise ParseError(context, offset, 'incomplete macro closing brackets')
-      else:
-        offset += 1
+      offset += 1
 
     M = MacroTerm(
         context,

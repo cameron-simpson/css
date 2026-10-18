@@ -1,0 +1,2 @@
+Rename HasTags to Entity, UsesTagSets to Entities, TagSetTyping to ZonedTypes, etc.
+@uses_fstags: also open/close the fstags around the function call, ensures a sync.

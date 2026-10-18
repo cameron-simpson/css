@@ -106,7 +106,7 @@ from cs.logutils import warning, error
 from cs.pfx import Pfx, pfx
 from cs.sh import quoteargv
 
-__version__ = '20211031-post'
+__version__ = '20260912.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -116,9 +116,9 @@ DISTINFO = {
     ],
     'install_requires': ['cs.logutils', 'cs.pfx', 'cs.sh'],
     'entry_points': {
-        'console_scripts': [
-            'mcli = cs.app.megacli:main',
-        ],
+        'console_scripts': {
+            'mcli': 'cs.app.megacli:main',
+        },
     },
 }
 
@@ -370,7 +370,6 @@ class MegaRAID(NS):
 
   def _parse(self, fp, mode):
     ''' Generic parser for megacli output.
-        Update 
     '''
     M = NS(adapters={})
     A = None

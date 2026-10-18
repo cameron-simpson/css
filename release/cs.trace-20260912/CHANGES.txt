@@ -1,0 +1,5 @@
+lib/python/cs/trace.py: cs.debug,trace: move the Trace class to cs.trace from cs.debug
+lib/python/cs/trace.py: cs.trace: Trace: @Trace passes the Trace instance through to the function, new print=False,True,print-like optional parameter for the decorator and the call
+lib/python/cs/trace.py: cs.debug: Trace: docstring updates
+lib/python/cs/trace.py: cs.trace: Trace: better short filename paths, and things are easier to read with a leading space
+lib/python/cs/trace.py: cs.trace: DISTINFO for initial release

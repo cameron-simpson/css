@@ -6,34 +6,48 @@
 from abc import ABC, abstractmethod
 from collections import ChainMap, defaultdict, namedtuple
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from fnmatch import fnmatch
 from functools import cached_property
 from getopt import GetoptError
-from itertools import zip_longest
+from itertools import chain, zip_longest
 import json
 from os.path import abspath
 import re
-from threading import Thread
+import sys
+from tempfile import NamedTemporaryFile
+import textwrap
+from threading import Semaphore, Thread
 import time
 from types import SimpleNamespace as NS
-from typing import Any, Callable, Generator, Iterable, Mapping, Optional
+from typing import Any, Callable, Collection, Generator, Iterable, Mapping, Optional, Self, Sequence
 from uuid import UUID
 
+from bs4 import BeautifulSoup
+from bs4.element import Tag as BS4Tag
+from icontract import require
+from mitmproxy.flow import Flow
+import requests
+from typeguard import typechecked
+from urllib.parse import urljoin
+
 from cs.binary import bs
-from cs.cmdutils import BaseCommand, popopts, qvprint, vprint
+from cs.bs4utils import printt_soup, Widget
+from cs.cmdutils import BaseCommand, popopts, vprint, vvprint
 from cs.deco import (
-    decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
+    attr, decorator, default_params, fmtdoc, OBSOLETE, promote, Promotable,
     uses_verbose, with_
 )
+from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedEntryMixin, FeedPerson
 from cs.fileutils import atomic_filename
+from cs.imageutils import SixelImageString
 from cs.lex import (
-    cutprefix, cutsuffix, FormatableMixin, FormatAsError, get_nonwhite, lc_,
-    printt, r, s, skipwhite
+    cutprefix, FormatableMixin, FormatAsError, get_nonwhite, lc_, printt, r, s,
+    skipwhite
 )
-from cs.logutils import warning
+from cs.logutils import warning, vvwarning
 from cs.mappings import mapped_property
-from cs.obj import public_subclasses
+from cs.obj import NoAttrs, public_subclasses, Refreshable
 from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py.func import funccite
 from cs.progress import progressbar
@@ -42,20 +56,19 @@ from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.rfc2616 import (
     content_encodings, content_length, content_type, datetime_from_http_date
 )
-from cs.seq import ClonedIterator
-from cs.tagset import BaseTagSets, HasTags, TagSet, TagSetTyping, UsesTagSets
-from cs.threads import HasThreadState, ThreadState
+from cs.seq import get0, not_none, ReIterable, unrepeated
+from cs.sqltags import SQLTags
+from cs.tagged import Entity, Entities, ScanData, uses_scandata
+from cs.tagset import BaseTagSets, TagSet, ZonedTypes
+from cs.threads import pmap, HasThreadState, NRLock, ThreadState
+from cs.trace import Trace
 from cs.units import BINARY_BYTES_SCALE
+from cs.upd import print, run_task
 from cs.urlutils import URL
 
-from bs4 import BeautifulSoup
-from bs4.element import Tag as BS4Tag
-from mitmproxy.flow import Flow
-import requests
-from typeguard import typechecked
 
 # The default HTML parser to use with BeautifulSoup.
-BS4_PARSER_DEFAULT = 'lxml'  # vs eg 'html5lib'
+BS4_PARSER_DEFAULT = 'html5lib'  ## 'lxml'  # vs eg 'html5lib'
 
 debug_fs_counts = False
 
@@ -73,11 +86,7 @@ def uses_pilfer(func):
   ''' Set the optional `P:Pilfer` parameter via a late import.
   '''
 
-  def func_with_Pilfer(
-      *a,
-      P: "Pilfer" = None,  # noqa: F821
-      **kw
-  ):
+  def func_with_Pilfer(*a, P: "Pilfer" = None, **kw):
     if P is None:
       P = default_Pilfer()
     with P:
@@ -87,8 +96,8 @@ def uses_pilfer(func):
 
 @decorator
 def pagemethod(method):
-  ''' A decorator for `SiteEntity` methods whose names end in
-      `_`*nom*`page` to provide a default URL for the flowstate
+  ''' A decorator for `SiteEntity` methods whose names have the form
+      *action*`_`*name*`page` to provide a default URL for the flowstate
       parameter from `self.`*nom*`page_url`.
 
       Note that the optional `flowstate` parameter must be the first
@@ -108,7 +117,7 @@ def pagemethod(method):
   if not pagename.endswith('page') or len(pagename) == 4:
     raise ValueError(
         f'cannot derive default page attribute name from {method.__name__=},'
-        ' which should end in _*nom*page, such as grok_sitepage'
+        ' which should end in _*nom*page, such as scan_sitepage'
     )
   promoting_method = promote(method)
 
@@ -137,13 +146,17 @@ def parse_img_srcset(srcset, offset=0) -> Mapping[str, list[str]]:
     mapping[url].append(condition)
   return mapping
 
+class URLPatternMatchError(ValueError):
+  ''' A subclass of `ValueError` for failure to match a `URLPattern`.
+  '''
+
 @dataclass
 class URLPattern(Promotable):
   ''' A class for matching a `URL` against a `(hostname_fnmatch,url_regexp)` pair.
   '''
 
   path_pattern: str
-  hostname_fnmatch: str | None = None
+  hostname_fnmatch: Sequence[str] | str | None = None
 
   class Converter:
 
@@ -161,18 +174,24 @@ class URLPattern(Promotable):
       self.to_str = to_str
 
     def __repr__(self):
-      return f'{self.__class__.__qualname__}({self.match_re},{self.from_str}->{self.to_str})'
+      return f'{self.__class__.__name__}({self.match_re},{self.from_str}->{self.to_str})'
 
   # converter specifications, a mapping of name -> (re,convert,deconvert)
   CONVERTERS = {
       # the default stops at / or &
       '':
       Converter(r'[^/?&]+', str, str),
+      '*':
+      Converter(r'[^/?&]*', str, str),
+      '**':
+      Converter(r'.*', str, str),
       # a nonnegative integer
       'int':
       Converter(r'0|[1-9]\d*', int, str),
       'lc_':
       Converter(r'[^/&A-Z]+', str, lc_),
+      'isodate':
+      Converter(r'\d{4}-\d\d-\d\d', date.fromisoformat, str),
       'uuid':
       Converter(
           r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}', UUID, str
@@ -188,7 +207,7 @@ class URLPattern(Promotable):
 
     # a <converter:name> placeholder
     PLACEHOLDER_re = re.compile(
-        r'<((?P<converter>[a-zA-Z][a-zA-Z0-9_]*):)?(?P<name>[a-z_][a-z0-9_]*)>'
+        r'<((?P<converter>([a-zA-Z][a-zA-Z0-9_]*|\*)):)?(?P<name>[a-z_][a-z0-9_]*)>'
     )
 
     @classmethod
@@ -236,6 +255,13 @@ class URLPattern(Promotable):
     '''
     self._parsed = self.ParsedPattern.from_str(self.path_pattern)
 
+  def __repr__(self):
+    return f'{self.__class__.__name__}:{self.short}'
+
+  @property
+  def short(self):
+    return f'{self.hostname_fnmatch}/{self.path_pattern}'
+
   @classmethod
   def from_str(cls, pattern: str):
     if pattern.isupper():
@@ -243,11 +269,14 @@ class URLPattern(Promotable):
           f'cannot promote {pattern!r} to URLPattern, looks like an HTTP METHOD name'
       )
     if '/' in pattern:
+      # just match the path with a regexp
       if not pattern.startswith('/'):
+        # llow anything before the text
         pattern = f'/<*:preamble>{pattern}'
       hostname_fnmatch = None
       path_pattern = pattern
     else:
+      # just match the hostname with a glob
       hostname_fnmatch = pattern
       path_pattern = None
     return cls(hostname_fnmatch, path_pattern)
@@ -270,12 +299,13 @@ class URLPattern(Promotable):
     '''
     subpaths = []
     for part in self._parsed.parts:
-      ##print("url_path_for: part =", part)
       if isinstance(part, str):
         subpaths.append(part)
       else:
         name, converter = part
-        value = fields[name]
+        value = fields.get(name)
+        if value is None:
+          value = getattr(fields, name, '')
         value_s = converter.to_str(value)
         try:
           vaule2 = converter.from_str(value_s)
@@ -287,37 +317,61 @@ class URLPattern(Promotable):
         subpaths.append(value_s)
     return ''.join(subpaths)
 
+  @Trace
   @promote
   def match(
       self,
       url: URL,
       extra: Mapping | None = None,
+      *,
+      T: Trace,
   ) -> dict | None:
     ''' Compare `url` against this pattern.
         Return `None` on no match.
         Return the regexp `groupdict()` on a match.
     '''
-    if self.hostname_fnmatch is not None and (
-        not isinstance(url.hostname, str)
-        or not fnmatch(url.hostname, self.hostname_fnmatch)):
-      # hostname mismatch
-      return None
+    T(f'URLPattern.natch url={url.short}')
+    PR = lambda *a: vvprint(f'match {url.short} vs {self}:', *a)
+    if url.hostname is not None and self.hostname_fnmatch is not None:
+      fnmatches = (
+          (self.hostname_fnmatch,)
+          if isinstance(self.hostname_fnmatch, str) else self.hostname_fnmatch
+      )
+      for fnm in fnmatches:
+        if fnmatch(url.hostname, fnm):
+          break
+      else:
+        # hostname mismatch
+        PR(f'REJECT on {self.hostname_fnmatch=} vs {url.hostname=}')
+        T(f'FAILED {url.hostname=} match against {fnmatches=}')
+        return None
     if self.path_pattern is None:
       # no pattern, accept and return empty match dict
+      PR('MATCH, no path_pattern')
       return {}
     qpath = url.path
     if url.query:
       qpath = f'{qpath}?{url.query}'
     # first try /path?query
+    PR(f'TRY {self.pattern_re=} vs {qpath=}')
+    T('TRY {qpath=} .match {self.pattern_re=}')
     m = self.pattern_re.match(qpath)
     if m is None and qpath != url.path:
       # otherwise try /path
+      PR(f'TRY {self.pattern_re=} vs {url.path=}')
+      T('TRY {url.path=} .match {self.pattern_re=}')
       m = self.pattern_re.match(url.path)
     if m is None:
+      PR("REJECT, neither matches")
+      T("FAILED pattern_re match")
       return None
     if m.end() < len(url.path):
+      PR(f'REJECT, {m.end()=} < {len(url.path)=}')
+      T(f'FAILED, {m.end()=} < {len(url.path)=}')
       return None
     # return the public named matches (excludes _* names)
+    PR('MATCH, return groupdict')
+    T(f'MATCHED {m.groupdict()=}')
     return {k: v for k, v in m.groupdict().items() if not k.startswith('_')}
 
   @classmethod
@@ -503,7 +557,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       else:
         rsp_close()
 
-  # NB: no __getattr__, it preemptys @cached_property
+  # NB: no __getattr__, it preempts @cached_property
 
   def as_URL(self) -> URL:
     ''' Return the `URL` from this `FlowState`, utilised by `@promote`.
@@ -540,7 +594,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
   def iterable_flowstates(
       cls,
       flowstates: Iterable,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
       runstate: RunState,
       **later_map_kw,
   ):
@@ -579,7 +633,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       return fs
 
     with P:
-      for flowstate in P.later.map(
+      for flowstate in pmap(
           get_iterable_fs,
           flowstates,
           concurrent=True,
@@ -589,7 +643,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
         runstate.raiseif()
 
   def clear(self, *attrs):
-    ''' Delete the named attrubtes `attrs`.
+    ''' Delete the named attributes `attrs`.
         We do this to clear derived attributes when we set an
         antecedant attribute.
     '''
@@ -614,6 +668,11 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     ''' The URL, obtained from `self.response.url` if missing.
     '''
     return URL(self.response.url)
+
+  def urlto(self, other: URL | str) -> URL:
+    ''' Retrn the `other` URL resolved against our own URL.
+    '''
+    return self.url.urlto(other)
 
   @cached_property
   def method(self) -> str:
@@ -699,7 +758,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       self,
       url: URL = None,
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
       **rq_kw,
   ) -> requests.Response:
     ''' Do a `Pilfer.GET` of `self.url` and return the `requests.Response`.
@@ -720,7 +779,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     self.url = url
     self._new_content()
     # this should be the decoded content, eg ungzipped
-    self.iterable_content = ClonedIterator(rsp.iter_content(chunk_size=None))
+    self.iterable_content = ReIterable(rsp.iter_content(chunk_size=None))
     return rsp
 
   @cached_property
@@ -751,7 +810,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
       # no mitmproxy.http.HTTPFlow, use requests
       # requests.Response.iter_content?
       iter_content = self.response.iter_content
-      return ClonedIterator(iter_content(chunk_size=65536))
+      return ReIterable(iter_content(chunk_size=65536))
     # TODO: can we accomodate a flow whose content is streaming in?
     return [flow.response.content]
 
@@ -800,7 +859,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
           total=dl_length,
           units_scale=BINARY_BYTES_SCALE,
           itemlenfunc=len,
-          report_print=qvprint,
+          report_print=vprint,
       ):
         runstate.raiseif()
         offset = 0
@@ -850,8 +909,16 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     if self.content_type == 'text/html':
       soup = BeautifulSoup(self.text, self.bs4parser)
       self.url.soup = soup
-      return soup
-    return None
+    elif self.content_type in ('text/xml', ATOM_CONTENT_TYPE,
+                               RSS_CONTENT_TYPE):
+      soup = BeautifulSoup(self.text, 'xml')
+      self.url.soup = soup
+    else:
+      vvwarning(
+          f'{self.__class__.__name__}.soup: unsupported content type {self.content_type=}'
+      )
+      soup = None
+    return soup
 
   @cached_property
   def meta(self):
@@ -868,9 +935,8 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     if soup is not None:
       if soup.head is None:
         warning("no HEAD tag")
-        print(soup)
       else:
-        for tag in soup.head.descendants:
+        for tag in soup.descendants:  # was .head
           if isinstance(tag, str):
             continue
           if tag.name != 'meta':
@@ -897,9 +963,10 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
               meta_properties[prop_name] = [current, tag_content]
           if http_equiv := tag.get('http-equiv'):
             meta_http_equiv[http_equiv] = tag['content']
-    return NS(
+    meta = NS(
         tags=meta_tags, properties=meta_properties, http_equiv=meta_http_equiv
     )
+    return meta
 
   @cached_property
   def links(self) -> Mapping[str, list[str]]:
@@ -915,7 +982,7 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
 
   @cached_property
   def opengraph(self) -> dict:
-    ''' The open graph properties as a dict, with their leading
+    ''' The open graph properties as a `dict`, with their leading
         `"og:"` prefix removed.
         See https://ogp.me/
     '''
@@ -957,12 +1024,40 @@ class FlowState(NS, MultiOpenMixin, HasThreadState, FormatableMixin,
     )
     if 'response' in self.__dict__:
       hdrs = self.response.headers
-      kwargs.update(content_length=content_length(hdrs),)
+      kwargs.update(content_length=content_length(hdrs))
     return kwargs
 
 uses_flowstate = default_params(flowstate=FlowState.default)
 
-class SiteEntity(HasTags):
+@decorator
+def with_base_url(method):
+  ''' Decorator for methods which may require a `base_url`
+        parameter, for example as context for some soup to parse where
+        relative URLs must be resolved.
+
+        Example:
+
+            @with_base_url
+            def soup_abs_hrefs(self, soup, *, base_url:str):
+                """ Yield absolute URLs from `soup`. """
+                for a in soup.find_all('a'):
+                    href = a.get("href", "")
+                    if not href or href=="#":
+                        continue
+                    href_url = URL(href)
+                    if not href_url.isabs():
+                        href_url = href_url.resolve(base_url)
+                    yield href_url
+    '''
+
+  def based_method(self, *method_a, base_url=None, **method_kw):
+    if base_url is None:
+      base_url = self.sitepage_url
+    return method(self, *method_a, base_url=base_url, **method_kw)
+
+  return based_method
+
+class SiteEntity(Entity, FeedEntryMixin, NoAttrs):
   ''' A base class for entities associated with a `SiteMap`.
 
       This provides the following additional facilities:
@@ -973,46 +1068,76 @@ class SiteEntity(HasTags):
       attribute to enable a `.sitepage_url` attribute which returns the
       primary web page for the entity.
 
-      Entity update: entities support individual update viathe
-      Refreshable.refresh() mixin method and bulk update via
+      Entity update: entities support individual update via the
+      `Refreshable.refresh()` mixin method and bulk update via
       `SiteMap.refreshed_entities(Iterabe[SiteEntity])`.
+
+      The following class attributes have special meaning:
+      * *NAME*`_URL_PATTERN`:
+        this is a `URLPattern` string to match URLs associated with
+        this kind of entity
+
+      The `SITEPAGE_URL_PATTERN` is a pattern for the canonical
+      page for this entity and should contain enough information
+      to `.refresh()` it.
+
+      Atom/RSS feeds:
+      The `SiteEntity` clas subclasses `FeedEntryMixin` so that any
+      entity may be an entry in web feed; for subclasses which may
+      also be feeds themselves, such as one for a television series,
+      they must subclass `FeedMixin` _ahead_ of the `SiteEntity`
+      superclass.
   '''
 
   # default staleness is 1 day
   REFRESH_LIFESPAN = 86400
 
-  # keys which can be obtained by grokking a web page
-  # a mapping of tag_name to page name eg "sitepage"
-  DERIVED_KEYS = {"_request": "sitepage"}
-  # properties which are obtained by defer()ing keys
-  # a mapping of property name to tag_name
-  DEREFFED_PROPERTIES = {}
-
   def __init_subclass__(cls, **kw):
     ''' `SiteEntity` subclass init - set `cls.url_re` from `cls.URL_RE` if present.
     '''
     super().__init_subclass__(**kw)
-    cls.WIDGET_CLASSES = []
     # default TYPE_SUBNAME derived from the class name
     try:
       TYPE_SUBNAME = cls.__dict__['TYPE_SUBNAME']
     except KeyError:
       cls.TYPE_SUBNAME = cls.__name__.lower()
-    # .url_re is the compiled form of .URL_RE if present and not an re.Pattern
-    try:
-      URL_RE = cls.URL_RE
-    except AttributeError:
-      pass
-    else:
-      cls.url_re = (
-          URL_RE if isinstance(URL_RE, re.Pattern) else re.compile(URL_RE)
-      )
+
+  @property
+  def name__(self):
+    ''' The `SiteEntity.name` with slashes replaced by double underscores.
+    '''
+    return self.name.replace("/", "__")
+
+  @cached_property
+  def refresh_lock(self):
+    return NRLock(self.name)
 
   @classmethod
-  def default_sitemap(cls) -> "SiteMap":
-    ''' Return the default `SiteMap` instance for `cls.TYPE_ZONE`.
+  def default_class_sitemap(cls, zone=None) -> "SiteMap":
+    ''' The default `SiteMap` instance for this class based on `zone`.
+        The default `zone` comes from `cls.TYPE_ZONE`.
+        This is a wrapper for `SiteMap.default()`.
     '''
-    return SiteMap.zone_sitemap(cls.TYPE_ZONE)
+    if zone is None:
+      zone = cls.TYPE_ZONE
+    return SiteMap.default(zone=zone)
+
+  @property
+  def sitemap(self):
+    ''' This property is the entity's `SiteMap`.
+        If one has not been set, obtain it from the `SiteMap.default()` class method
+        for `self.TYPE_ZONE` and record the result.
+    '''
+    # NB: not a cached property because we don't want to consume storage
+    try:
+      return self.__dict__['sitemap']
+    except KeyError:
+      sitemap = self.sitemap = SiteMap.default(self.TYPE_ZONE)
+      return sitemap
+
+  @sitemap.setter
+  def sitemap(self, new_sitemap: "SiteMap"):
+    self.__dict__['sitemap'] = new_sitemap
 
   @classmethod
   @pfx
@@ -1020,68 +1145,77 @@ class SiteEntity(HasTags):
   def from_URL(
       cls,
       url: URL,
-      sitemap: "SiteMap" = None,
+      sitemap: Optional["SiteMap"] = None,
       *,
-      pattern_name="sitepage_url",
-  ):
-    ''' Return the `SiteEntity` from `sitemap` matching `url`.
-        Raises `ValueError` if the `url.path` does not match via
+      pattern_name=None,
+  ) -> tuple[Self, dict]:
+    ''' Return the `SiteEntity` from `sitemap` matching `url` and the match `dict`.
+        Raises `URLPatternMatchError` (a subclass of `ValueError`)
+        if the `url.path` does not match via
         `cls.match_url(,url,pattern_name=pattern_name)`.
     '''
     if sitemap is None:
-      sitemap = cls.default_sitemap()
+      sitemap = Entities.default(cls.TYPE_ZONE)
     with Pfx("%s.from_URL(%s,%s)", cls.__name__, url, sitemap):
-      m = cls.match_url(url, pattern_name=pattern_name)
-      if m is None:
-        raise ValueError(
+      match, match_name = cls.match_url(url, pattern_name=pattern_name)
+      if match is None:
+        raise URLPatternMatchError(
             f'no match from {cls.__name__}.match_url({url},{pattern_name=})'
         )
-      pattern_name, match = m
       try:
         type_key = match["type_key"]
       except KeyError as e:
-        raise ValueError(
+        raise URLPatternMatchError(
             f'no type_key in match from {cls.__name__}.match_url({url},{pattern_name=}): {match=}'
         )
-      # fill in from the match if not already set
-      entity = sitemap[cls, type_key]
-      for match_key, value in match.items():
-        entity.setdefault(match_key, value)
-      return entity
+      ent = sitemap[cls, type_key]
+      # annotate the entity with zone.sitepage_url or similar
+      ent.setdefault(f'{ent.type_zone}.{match_name}_url', str(url))
+      return ent, match
 
-  def __getitem__(self, key):
-    super_getitem = super().__getitem__
+  @classmethod
+  def type_key_from_href(cls, href: str, **from_URL_kw) -> str | None:
+    ''' A convenience class method to return the `type_key` from
+        an `href` URL for this type of entity, or `None` if it does
+        not match.
+    '''
     try:
-      return super_getitem(key)
-    except KeyError as super_ee:
-      # the key is not (yet) present, see if we can fetch it by
-      # grokking some web page
+      self, _ = cls.from_URL(href, **from_URL_kw)
+    except URLPatternMatchError as e:
+      warning(f'{cls.__name__}.type_key_from_href({href=}): {e}')
+      return None
+    return self.type_key
+
+  @classmethod
+  @uses_runstate
+  def from_soup_hrefs(cls, soup, *, base_url: str,
+                      runstate: RunState) -> set["SiteEntity"]:
+    ''' Return a set of `SiteEntity` instances for anchor `href`s
+        which match `cls`' sitepages.
+
+        Example:
+
+            @with_base_url
+            def soup_articles(self, soup) -> set["Article"]:
+              """ Return a set of `Article`s from some soup. """
+              return Article.from_soup_hrefs(soup,base_url=base_url)
+    '''
+    ents = set()
+    for a in soup.find_all('a'):
+      runstate.raiseif()
+      href = a.get("href", "")
+      if not href or href == "#":
+        continue
+      ent_url = URL(href)
+      if not ent_url.isabs():
+        ent_url = ent_url.resolve(base_url)
       try:
-        page_name = self.DERIVED_KEYS[key]
-      except KeyError:
-        raise super_ee
-      if isinstance(page_name, str):
-        # a string naming an instance attribute such as .sitepage_url
-        # and a grokking method such as .grok_sitepage
-        page_url = getattr(self, f'{page_name}_url')
-        grok_method = getattr(self, f'grok_{page_name}')
-        vprint(f'{self.name}[{key!r}] -> grok_{page_name}({page_url!r})')
-        grok_method(page_url)
-        # infill keys not obtained so as to not pointlessly refetch
-        missing_expected_keys = sorted(
-            k for k, kpage in self.DERIVED_KEYS.items()
-            if kpage == page_name and k not in self.tags
-        )
-        if missing_expected_keys:
-          vprint(
-              f'{self.name}.tags missing {missing_expected_keys=}, (not set by {grok_method.__name__})'
-          )
-          for k in missing_expected_keys:
-            self.tags[k] = None
-        return super_getitem(key)
-      raise TypeError(
-          f'{self.__class__.__name__}.__getitem__({key=}): expected .{key} to be a string, got {r(page_name)}'
-      )
+        ent, _ = cls.from_URL(ent_url)
+      except ValueError as e:
+        # unrecognised, skip
+        continue
+      ents.add(ent)
+    return ents
 
   def get(self, key, default=None):
     ''' The `Mapping.get` method, to ensure that it goes through `__getitem__`.
@@ -1092,34 +1226,34 @@ class SiteEntity(HasTags):
       return default
 
   @classmethod
-  def pattern(
-      cls,
-      pattern_name="sitepage_url",
-      *,
-      sitemap: "SiteMap" = None,
-  ) -> URLPattern | None:
+  def pattern(cls, pattern_name="sitepage_url") -> URLPattern | None:
     ''' Return a `URLPattern` for the specified page name, default `"sitepage_url"`.
     '''
-    if sitemap is None:
-      sitemap = cls.default_sitemap()
     try:
       pattern_s = getattr(cls, f'{pattern_name.upper()}_PATTERN')
     except AttributeError as e:
       return None
+    sitemap = SiteMap.default(cls.TYPE_ZONE)
     return URLPattern(pattern_s, sitemap.URL_DOMAIN)
+
+  @classmethod
+  def url_pattern_names(cls, *, sitemap: Optional['SiteMap'] = None):
+    ''' The known URL pattern names, from a call to `cls.url_pattern_mapping()`.
+    '''
+    return cls.url_pattern_mapping(sitemap=sitemap).keys()
 
   @classmethod
   def url_pattern_mapping(
       cls,
       *,
-      sitemap: "SiteMap" = None,
+      sitemap: Optional["SiteMap"] = None,
   ) -> dict[str, URLPattern]:
     ''' Return a mapping of `pattern_name`->`URLPattern` derived
         from the `*_URL_PATTERN` attributes of this class and its
         superclasses.
     '''
     if sitemap is None:
-      sitemap = cls.default_sitemap()
+      sitemap = Entities.default(cls.TYPE_ZONE)
     pattern_map = {}
     for supercls in reversed(cls.__mro__):
       for clsattr, pattern_s in supercls.__dict__.items():
@@ -1130,42 +1264,15 @@ class SiteEntity(HasTags):
           else:
             pattern_map[clsattr] = pattern_s
     return {
-        pattern_name: URLPattern(pattern_s, sitemap.URL_DOMAIN)
+        pattern_name:
+        URLPattern(
+            pattern_s, getattr(sitemap, 'URL_DOMAINS', sitemap.URL_DOMAIN)
+        )
         for pattern_name, pattern_s in pattern_map.items()
     }
 
-  @classmethod
-  def match_url(cls,
-                url: URL,
-                *,
-                pattern_name="sitepage_url") -> tuple[str, dict] | None:
-    ''' Test whether this `SiteEntity` subclass matches `url`.
-        Return `None` if there is no pattern for `pattern_name`
-        (default `"sitepage_url"`), otherwise the result of the
-        pattern's `.match(url)` method (`None` on no match, a mapping
-        on a match).
-        If the optional argument `match` is not `None` it should
-        be a mapping, and will be updated by the mapping from a
-        successful match.
-    '''
-    try:
-      pattern_mapping = cls.url_pattern_mapping()
-    except Exception as e:
-      warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
-      return
-    for pattern_name, pattern in pattern_mapping.items():
-      try:
-        m = pattern.match(url)
-      except Exception as e:
-        warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
-        continue
-      if m is not None:
-        return pattern_name, m
-
-    return None
-
   @mapped_property
-  def patterns(self, pattern_name: str):
+  def patterns(self, pattern_name: str) -> URLPattern:
     ''' A mapping of `pattern_name` to the `URLPattern`
         derived from `getattr(self,f'{pattern_name.upper()}_PATTERN')`.
     '''
@@ -1173,6 +1280,79 @@ class SiteEntity(HasTags):
     if ptn is None:
       raise KeyError(pattern_name)
     return ptn
+
+  @mapped_property
+  def url_paths(self, pattern_name) -> str:
+    ''' A mapping of `pattern_name` to the URL path derived from
+        that pattern via its `.url_path_for` method.
+        derived from `getattr(self,f'{pattern_name.upper()}_PATTERN')`.
+    '''
+    ptn = self.patterns[pattern_name]
+    return ptn.url_path_for(self)
+
+  @mapped_property
+  def urls(self, pattern_name) -> str:
+    ''' A mapping of `pattern_name` to its pattern derived URL.
+    '''
+    url_s = self.url_paths[pattern_name]
+    url_s = self.urlto(url_s)
+    return url_s
+
+  @classmethod
+  @Trace
+  @promote
+  def match_url(
+      cls,
+      url: URL,
+      *,
+      pattern_name=None,
+      sitemap: Optional["SiteMap"] = None,
+      T: Trace,
+  ) -> tuple[dict | None, str | None]:
+    ''' Test whether `url` matches this `SiteEntity` subclass'
+        pattern named `pattern_name` (default `"sitepage_url"`).
+        Return `(None,None)` if there is no pattern for `pattern_name`.
+        Otherwise return `(match,pattern_name)` where `match` is
+        the result of `pattern.match(url)` and `pattern_name` is
+        the name of the matchined pattern.
+    '''
+    T("url", url.short)
+    try:
+      pattern_mapping = cls.url_pattern_mapping(sitemap=sitemap)
+    except Exception as e:
+      warning(f'{cls=}.url_pattern_mapping(): {e}', exc_info=sys.exc_info())
+      return None, None
+    T('pattern_mapping', pattern_mapping)
+    with Trace("pattern_mapping") as T2:
+      for name, pattern in pattern_mapping.items():
+        T2(f'{name=}:{pattern.short}')
+        if pattern_name is not None and name != pattern_name:
+          T2("skip, name != pattern_name")
+          continue
+        if pattern is None:
+          T2("skip, erased pattern")
+          continue  # an erased pattern
+        T2(f'try {type(pattern).__name__}.match')
+        try:
+          match = pattern.match(url)
+        except Exception as e:
+          T2("match fails", e)
+          warning(f'{pattern=}.match({url=}): {e}', exc_info=sys.exc_info())
+          continue
+        if match is not None:
+          match_name = name.lower().removesuffix('_pattern'
+                                                 ).removesuffix('_url')
+          T2("match {match_name=}", match)
+          return match, match_name
+        T2("no match")
+    T("no matches")
+    return None, None
+
+  @classmethod
+  def matches_url(cls, url, **match_url_kw) -> bool:
+    ''' Test whether `url` matches, a Boolean wrapper for `match_url()`.
+    '''
+    return cls.match_url(url, **match_url_kw)[0] is not None
 
   def __getattr__(self, attr):
     ''' A `SiteEntity` supports various automatic attributes.
@@ -1187,31 +1367,31 @@ class SiteEntity(HasTags):
         Example: `.sitepage_url` can be derived from `.SITEPAGE_URL_FORMAT`
         and the format string need only specify the path after the domain.
 
-        Related entities:
-        If the attribute name is present in `self.DEREFFED_PROPERTIES`
-        (a mapping of attribute name to `(tag_name,direct)` 2-tuples)
-        then the corresponding `tag_name` is obtained and returned
-        directly if `direct`.  Otherwise `self.deref(tag_name)` is
-        returned.
-        This may also be just the `tag_name`, and `direct` will be set to `False`.
-
         Opengraph fallback:
-        If `HasTags.__getattr__(attr)` raises `AttributeError` and
+        If `Entity.__getattr__(attr)` raises `AttributeError` and
         the tag `opengraph.{attr}` exists, return that.
     '''
-    cls = self.__class__
-    if attr.replace('_', '').islower():
-      # *_PATTERN derived attributes
-      ptnattr_name = f'{attr.upper()}_PATTERN'
-      try:
-        pattern_s = getattr(cls, ptnattr_name)
-      except AttributeError:
-        pass
-      else:
-        pattern = self.patterns[attr]
-        fields = dict(self)
-        fields.setdefault('type_key', self.type_key)
-        return pattern.url_path_for(fields)
+    # first the usual entity stuff
+    # which includes things like *_url because we define a .suffix_url method
+    try:
+      return super().__getattr__(attr)
+    except AttributeError as e:
+      cls = self.__class__
+      # lower_case_name -> UPPER_CASE_NAME_PATTERN ?
+      if attr.replace('_', '').islower():
+        # *_PATTERN derived attributes
+        ptnattr_name = f'{attr.upper()}_PATTERN'
+        try:
+          pattern_s = getattr(cls, ptnattr_name)
+        except AttributeError:
+          pass
+        else:
+          pattern = self.patterns[attr]
+          url_s = pattern.url_path_for(self)
+          # resolve *_url attributes
+          if attr.endswith('_url'):
+            url_s = self.urlto(url_s)
+          return url_s
       # *_FORMAT derived attributes
       # .fmtname returns self.format_as(cls.FMTNAME_FORMAT)
       fmtattr_name = f'{attr.upper()}_FORMAT'
@@ -1228,72 +1408,244 @@ class SiteEntity(HasTags):
               f'format {cls.__name__}.{fmtattr_name} {format_s!r}: {e.key}'
           ) from e
         else:
-          # for attributes ending in _url, such as .sitepage_url_url
+          # for attributes ending in _url, such as .sitepage_url
           # if the result commences with a / we consider it a subpath
           # of the site domain
-          # TODO: maybe test for :// ?
-          if attr.endswith('_url') and formatted.startswith('/'):
+          if attr.endswith('_url'):
             formatted = self.urlto(formatted)
           return formatted
-    # indirect derived attributes
-    DEREFFED_PROPERTIES = cls.DEREFFED_PROPERTIES
-    try:
-      deref_from = DEREFFED_PROPERTIES[attr]
-    except KeyError:
-      # not a DEREFFED_PROPERTIES, try the superclass
-      try:
-        return super().__getattr__(attr)
-      except AttributeError as e:
-        # try from the tags, may autofetch
+      # no superclass attribute, try the opengraph property
+      # TODO: opengraph allows multiple tags or multiple instancesand also structured tags eg og:image:url
+      if attr != 'opengraph':
         try:
-          return self[attr]
-        except KeyError:
-          # no superclass attribute, try the opengraph property
-          og_tag_name = f'opengraph.{attr}'
+          og = self.opengraph  ## opengraph
+        except AttributeError:
+          pass
+        else:
           try:
-            return self[og_tag_name]
+            return og[attr]
           except KeyError:
-            raise e
-    if isinstance(deref_from, str):
-      tag_name, direct = deref_from, False
-    else:
-      tag_name, direct = deref_from
-    # obtain the value; some tags will fetch info from the web if missing
-    # NB: always access the tag, triggers page fetch if missing
-    value = self[tag_name]
-    if direct:
-      return value
-    else:
-      value = self.deref(tag_name)
-    return value
+            pass
+      raise AttributeError(f'{self.__class__.__name__}.{attr}')
 
-  @property
-  def sitepage_url(self):
-    ''' Allow `self["sitepage"]` to override `self.SITEPAGE_URL_FORMAT`.
-        This may return `None` for entities with no primary site URL.
+  @mapped_property
+  def og(self):
+    ''' A mapping of the opengraph tags.
+    '''
+    return self.opengraph
+
+  @require(lambda attr: attr.endswith('_url'))
+  def suffix_url(self, attr) -> str:
+    ''' The handler for attribute names ending in `"_url"`.
+        We know there's no ['*_url'] tag at this point.
+        We first try `self.urls[attr]` to derive if from the entity `*_URL_PATTERN`s
+        then fall back to the opengraph tags.
+        `sitepage_url` comes from `og:url`.
+        Other URLs such as `image_url` come from `og:image` and so forth.
+        If the URL is not an absolute URL it is resolved using `self.urlto()`.
     '''
     try:
-      page_url = self.tags["sitepage"]
+      url_s = self.urls[attr]
     except KeyError:
-      page_url = self.__getattr__('sitepage_url')
-    if page_url is None:
-      warning("%s.site-age_url: no site page, returning None")
-    else:
-      if page_url.startswith('/'):
-        page_url = self.urlto(page_url)
-    return page_url
+      try:
+        og = self.opengraph
+      except AttributeError:
+        raise ValueError(f'no opengraph tags')
+      urlname = attr.removesuffix('_url')
+      if urlname == 'sitepage':
+        ogname = 'url'
+      else:
+        ogname = urlname
+      try:
+        url_s = og[ogname]
+      except KeyError as e:
+        raise ValueError(f'no opengraph[{ogname=}] tag') from e
+    url_s = self.urlto(url_s)
+    return url_s
+
+  @trace
+  @require(lambda attr: attr.endswith('_urls'))
+  def suffix_urls(self, attr) -> Collection[tuple[int, str]]:
+    ''' The handler for attribute names ending in `"_urls"`.
+        This returns a collection of `(pagenum,url)` 2-tuples for
+        a multipage base URL.
+
+        For example, `.sitepage_urls` is a tuple of `(pagenum,url)` 2-tuples.
+
+        If the entity has no `sitepage_pagenum_high` attribute,
+        this tuple only contains `(1,self.sitepage_url`).
+
+        However, if there is a `sitepage_pagenum_high` then a tuple
+        of `(pagenum,url)` 2-tuples is returned counting from
+        `.sitepage_pagenum_low` (which defaults to 1) through to
+        `sitepage_pagenum_high`, computed by
+        `self.page_url(self.sitepage_url,pagenum)`.
+
+        `SiteEntty` subclasses must provide a suitable `.page_url` method.
+    '''
+    base = attr.removesuffix('_urls')
+    base_url: str = getattr(self, f'{base}_url')
+    pagenum_high = getattr(self, f'{base}_pagenum_high', None)
+    if pagenum_high is None:
+      # return a 1-tuple of just the basic page url
+      return (1, base_url),
+    pagenum_low = getattr(self, f'{base}_pagenum_low', 1)
+    return tuple(
+        (pagenum, self.page_url(base_url, pagenum))
+        for pagenum in range(pagenum_low, pagenum_high + 1)
+    )
+
+  def refresh(self, *, map=pmap, **refresh_kw):
+    ''' We refresh related items in parallel by default.
+    '''
+    return super().refresh(map=map, **refresh_kw)
 
   @property
   def refresh_resource(self):
     ''' The default refresh resource is `self.sitepage_url`, supporting `Refreshable`.
     '''
-    return self.sitepage_url
+    try:
+      return self._url
+    except AttributeError:
+      return self.sitepage_url
+
+  def clean_url(self, url_s: str) -> str:
+    ''' Sometimes bogus URLs get into the data from bad web page metadata (or bugs).
+        This implements cleanup of such URLs if that's possible.
+        This default implementation returns the URL unchanged.
+    '''
+    return url_s
+
+  @pfx_method
+  @uses_runstate
+  @uses_verbose
+  def _refresh(self, *, data=None, runstate: RunState, verbose: bool):
+    ''' The default `_refresh` method runs
+        `self.scan_sitepage(self.sitepage_url)` and applies the resulting
+        `ScanData` instance to the relevant (detected/recognised) entities.
+
+        The relevant per-entity-type scan should be provided by
+        each subclass' `.scan_sitepage(FlowState)->ScanData` method.
+    '''
+    if data is not None:
+      self.type_zone_update(data)
+      return True
+    try:
+      url = self._url
+    except AttributeError:
+      url = getattr(self, 'sitepage_url', None)
+      if url is None:
+        warning(
+            f'{self.__class__.__name__}:{self.name}:_refresh: self.sitepage_url -> None'
+        )
+        return False
+    if isinstance(url, URL):
+      url = str(url)
+    url = self.clean_url(url)
+    url = self.urlto(url)
+    vprint(f'{self} refresh from {url}')
+    with run_task(
+        f'{self.__class__.__name__}[{self.name}].scan_sitepage({URL(url).short})',
+        report_print=verbose,
+        tick_deferred=True,
+    ) as proxy:
+      with self.sitemap.request_semaphore:
+        runstate.raiseif()
+        with proxy.ticker():
+            scandata = self.scan_sitepage(url)
+    scandata.apply(self)
+    return True
+
+  @pfx_method
+  @pagemethod
+  @uses_scandata
+  def scan_sitepage(
+      self, flowstate: FlowState, *, scandata: ScanData
+  ) -> ScanData:
+    ''' The default scan of a sitepage - this returns a nearly empty `ScanData`
+        because a site's pages need an entity specific parse.
+        Return `scandata` (because it may have been made by the call).
+
+        This base implementation updates the `ScanData` data for `self` with:
+        - `http.request`: a record of the request and response headers from the `flowstate`
+        - `html.meta`: the `flowstate.meta` tags
+        - `html.properties`: the `flowstate.meta.properties`
+        - `opengraph`: the `flowstate.opengraph_tags`
+
+        A subclass' `scan_sitepage` method should call this base
+        method to get the initial `ScanData` and then further update
+        it from the scan.
+    '''
+    data = scandata[self]
+    data[self.rq.tag_name] = self.rq(
+        "sitepage",
+        flowstate=flowstate,
+        no_save=True,
+    )
+    soup = flowstate.soup
+    if soup is None:
+      warning('no flowstate.soup')
+      return scanadata
+    # <head><title>
+    title = soup.head.title or soup.body.title
+    if title:
+      title = title.get_text().strip()
+      if title:
+        data['title'] = title
+    data["html.links"] = {
+        rel: [tag.attrs.get('href')
+              for tag in tags]
+        for rel, tags in flowstate.links.items()
+    }
+    try:
+      sitepage_urls = data['html.links']['canonical']
+    except KeyError:
+      pass
+    else:
+      if len(sitepage_urls) != 1:
+        warning(
+            f"expected 1 canonical link: {data['html.links']['canonical']=}, keeping the last"
+        )
+      sitepage_url = sitepage_urls[-1]
+      try:
+        junk, real_url_suffix = sitepage_url.rsplit('|https://', 1)
+      except ValueError:
+        if not sitepage_url.startswith('https://'):
+          warning(
+              f'{self.name}: no HTTPS on canonical URL {sitepage_url=} ignoring'
+          )
+          sitepage_url = None
+        pass
+      else:
+        warning(f'{self.name}: BOGUS canonical URL {sitepage_url=} adjusting')
+        sitepage_url = f'https://{real_url_suffix}'
+      if sitepage_url is not None:
+        data['sitepage_url'] = sitepage_urls[0]
+    data["html.meta"] = flowstate.meta.tags.as_dict()
+    data["html.properties"] = flowstate.meta.properties.as_dict()
+    data['opengraph'] = dict(flowstate.opengraph)
+    # no canonical link in the html? look in the opengraph for og:url
+    if 'sitepage_url' not in data and 'url' in data['opengraph']:
+      data['sitepage_url'] = data['opengraph']['url']
+    self.scan_soup(flowstate.soup, self.sitemap, scandata=scandata)
+    return scandata
+
+  @uses_scandata
+  def scan_soup(self, soup, sitemap, *, scandata: ScanData) -> ScanData:
+    return scandata
+
+  @promote
+  def grok_sitepage(self, flowstate: FlowState, match=None):
+    ''' Call `self.scan_sitepage()` and then apply it to `self`.
+    '''
+    scandata = self.scan_sitepage(flowstate)
+    scandata.apply(self)
 
   def format_kwargs(self):
     ''' The format keyword mapping for a `SiteEntity`.
 
         This includes:
-        - the `HasTags.format_kwargs()`
+        - the `Entity.format_kwargs()`
         - the values for any names in `type(self.tags)` with an
           upper case leading letter such as `URL_DOMAIN`
     '''
@@ -1322,61 +1674,59 @@ class SiteEntity(HasTags):
     '''
     return self.sitemap.urlto(path)
 
-  @classmethod
-  def grok_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteEntity"]:
-    ''' Scan the soup for the widgets associated with this `SiteEntity` type.
-    '''
-    for widget_class in cls.WIDGET_CLASSES:
-      vprint("scan soup for", widget_class)
-      for widget in widget_class.scan_soup(soup, sitemap):
-        widget.grok()
-        yield widget.entity
-
-  @pagemethod
-  def grok_sitepage(self, flowstate: FlowState, match=None):
-    ''' The basic sitepage grok:
-        - update the entity cache of the request
-        - record the metadata
-        - record the opengraph tags
-        - call `self.grok_soup`, which scans the page soup for the
-          known widgets
-    '''
-    self._request_update(flowstate, page="sitepage")
-    self.update_from_meta(flowstate)
-    self.update(flowstate.opengraph_tags)
-    # scan the soup for known widgets
-    1 in self.grok_soup(flowstate.soup, self.sitemap)
-
-  def _request(self, *, page="sitepage", method="GET"):
-    ''' Return the dict which caches the HTTP Response from the last request for `page`.
-        Note that just updating this dict does not reflect in the database.
-        Instead the `._request_update(flowstate)` method should be called.
-    '''
-    _request = self.tags.get('_request') or {}
-    _request.setdefault(page, {}).setdefault(method, {})
-    self.tags['_request'] = _request
-    return _request
-
-  def _request_update(
-      self, flowstate: FlowState, *, page="sitepage", method="GET"
+  @attr(tag_name='http.request')
+  def rq(
+      self,
+      page="sitepage",
+      *,
+      flowstate: FlowState | None = None,
+      method=None,
+      no_save=False,
+      tag_name=None,
   ):
-    ''' Update the cached HTTP response information for `page` from `flowstate`.
+    ''' Return and possibly update the entry in `self['http.request']`
+        for the last request for this entity.
+        If `flowstate` is provided, update the record from the `flowstate`
+        (unless `no_save` is true, default `False`).
     '''
-    _request = self._request(page="sitepage", method=flowstate.method)
-    _request[page][method].update(
-        url=flowstate.url.url_s,
-        request={
-            hdr.lower(): value
-            for hdr, value in sorted(flowstate.request.headers.items())
-            if hdr.lower() != 'authorization'
-        },
-        response={
-            hdr.lower(): value
-            for hdr, value in sorted(flowstate.response.headers.items())
-        },
-    )
-    # update the database
-    self.tags.set('_request', _request, force=True)
+    if method is None:
+      if flowstate is None:
+        method = 'GET'
+      else:
+        method = flowstate.method
+    if tag_name is None:
+      tag_name = self.rq.tag_name
+    tags = self.tags
+    needs_save = False
+    _rq = tags.get(tag_name)
+    if _rq is None:
+      needs_save = True
+      _rq = {}
+    for_page = _rq.get(page)
+    if for_page is None:
+      needs_save = True
+      for_page = _rq[page] = {}
+    for_method = for_page.get(method)
+    if for_method is None:
+      needs_save = True
+      for_method = for_page[method] = {}
+    if flowstate is not None:
+      needs_save = True
+      for_method.update(
+          url=flowstate.url.url_s,
+          request={
+              hdr.lower(): value
+              for hdr, value in sorted(flowstate.request.headers.items())
+              if hdr.lower() != 'authorization'
+          },
+          response={
+              hdr.lower(): value
+              for hdr, value in sorted(flowstate.response.headers.items())
+          },
+      )
+    if needs_save and not no_save:
+      tags[tag_name] = _rq
+    return _rq
 
   def rq_timestamp(self, *, page="sitepage", method="GET"):
     ''' Return the cached HTTP Response `Date` field for `page` as a UNIX timestamp.
@@ -1387,17 +1737,6 @@ class SiteEntity(HasTags):
     if http_date:
       return datetime_from_http_date(http_date).timestamp()
     return 0
-
-  def _refresh(self, resource=None):
-    ''' Try to refresh this entity from the sitepage, supporting `Refreshable`.
-    '''
-    ''' Refetch and reparse `self.sitepage_url` via `self.grok_sitepage()`
-        if the page is stale (or if `force` is true).
-    '''
-    if resource is None:
-      resource = self.sitepage_url
-    self.grok_sitepage(resource)
-    return True
 
   def update_from_meta(self, flowstate: FlowState, **update_kw):
     ''' Update this entity from the `flowstate.meta`.
@@ -1428,10 +1767,10 @@ class SiteEntity(HasTags):
     '''
     return SiteMap.by_db_key(db_key)
 
-  def update_content_timestamp(self, purpose, content_signature) -> float:
+  def update_timestamp(self, purpose, signature) -> float:
     ''' Update the UNIX time recorded for `purpose` based on
-        `content_signature`. Return the old time if there was one
-        and its signature equals `content_signature`.  Otherwise
+        `signature`. Return the old time if there was one
+        and its signature equals `signature`.  Otherwise
         update the timestamp and record it and the new signature.
     '''
     tag_name = f'timestamp.{purpose}'
@@ -1442,11 +1781,11 @@ class SiteEntity(HasTags):
       pass
     else:
       when, old_signature = last_sig
-      if old_signature == content_signature:
+      if old_signature == signature:
         # unchanged
         return when
     when = time.time()
-    self[tag_name] = [when, content_signature]
+    self[tag_name] = [when, signature]
     return when
 
   @staticmethod
@@ -1488,7 +1827,7 @@ class SiteEntity(HasTags):
         Example:
 
             @paginated
-            def grok_sitepage(self,flowstate:FlowState,method=None,*,pagenum:int):
+            def grok_sitepage(self, flowstate:FlowState, method=None, *, pagenum:int):
                 # process the flowstate, expecting to be called once for each page
     '''
 
@@ -1539,31 +1878,219 @@ class SiteEntity(HasTags):
     self.add('downloaded')
     return save_filename
 
+  @uses_pilfer
+  def image(self, *, P: "Pilfer"):
+    ''' Return Pillow `PIL.Image.Image`, or `None`.
+    '''
+    try:
+      from PIL import Image
+    except ImportError:
+      # no Pillow, so no Image
+      return None
+    try:
+      image_url = self.image_url
+    except AttributeError:
+      return None
+    if not image_url:
+      return None
+    url = URL(image_url)
+    ext = url.ext
+    with NamedTemporaryFile(prefix=f'.{self.name__}-image-', suffix=ext,
+                            mode='wb') as T:
+      flowstate = FlowState.from_URL(url)
+      for bs in flowstate.iterable_content:
+        T.write(bs)
+      T.flush()
+      return Image.open(T.name)
+
+  ########################################################################
+  # FeedCommonMixin methods
+  def feed_title(self, refresh=False):
+    ''' Return the feed title from `self.title` or `self.fullname` or `self.name`.
+    '''
+    if refresh:
+      self.refresh()
+    try:
+      title = self.title
+    except AttributeError:
+      try:
+        title = self.fullname
+      except AttributeError:
+        title = self.name
+    return title
+
+  ########################################################################
+  # FeedEntryMixin methods
+
+  def feed_authors(self, *, refresh=False) -> Sequence[FeedPerson]:
+    ''' Return a list of `FeedPerson`s.
+
+        This default implementation assumes that `self` looks like
+        ` cs.tagset.Entity` and that `self.author_ents` produces
+        an iterable of objects which look like `SiteEntity` instances,
+        which have a `.fullname` attribute and which may have
+        `.email` and `.sitepage_url` attributes.
+    '''
+    return [
+        FeedPerson.from_SiteEntity(ent, refresh=refresh)
+        for ent in self.author_ents
+    ]
+
+  def feed_author(self, *, refresh=False) -> FeedPerson | None:
+    return get0(self.feed_authors(refresh=refresh))
+
+  def feed_entry_signature(self, *, refresh=False, **refresh_kw):
+    ''' A signature for this entty's content.
+        This default implemnetation just returns the time of last refresh.
+    '''
+    if refresh:
+      self.refresh(**refresh_kw)
+    return dict(
+        name=self.name,
+        refresh_last_update=self.get('refresh_last_update', 0),
+    )
+
+  def feed_id(self):
+    return self.name
+
+  def feed_image_url(self):
+    return self.get('opengraph.image', {}).get('image')
+
+  def feed_last_build_timestamp(self, *, refresh=False, **refresh_kw) -> float:
+    ''' Return an updated timestamp for this feed based on the signatures of its entries.
+    '''
+    entries = self.feed_entries()
+    return self.update_timestamp(
+        'feed_content',
+        [
+            entry.feed_entry_signature(refresh=refresh, **refresh_kw)
+            for entry in entries
+        ],
+    )
+
+  def feed_link(self):
+    ''' The default link to the origin, from `self.sitepage_url`.
+    '''
+    return self.sitepage_url
+
+  ##################################################################
+  # BS4 methods.
+  @staticmethod
+  def bs4(tag_name, *contents, **attrs) -> BS4Tag:
+    ''' Create a BS4 `Tag` instance.
+    '''
+    tag = BS4Tag(name=tag_name, attrs=attrs)
+    tag.extend(contents)
+    return tag
+
+  def anchor(self, text=None) -> BS4Tag:
+    ''' Return an HTML anchor to this entity as a BS4 `Tag`.
+    '''
+    if text is None:
+      text = self.title
+    href = self.sitepage_url
+    href = self.urlto(href)
+    return self.bs4('a', text, href=href)
+
+  @property
+  def summary_title(self):
+    title = self.feed_title()
+    try:
+      sitepage_url = self.sitepage_url
+    except AttributeError as e:
+      warning(f'{self.name}: no .sitepage_url: {e}')
+    else:
+      title += "\n" + sitepage_url
+    return title
+
+  def tabulate_summary(self, *, recurse=False, file=None):
+    ''' Print a summary of this `SteEntity`.
+    '''
+    if file is None:
+      file = sys.stdout
+    img_max_width = 48
+    img_max_height = 16
+    wrap_width = 70
+    self.refresh()
+    rel_ents1 = list(unrepeated(not_none(self.refresh_related1())))
+    if recurse:
+      rel_ents = list(unrepeated(self.refresh_related()))
+    else:
+      rel_ents = ()
+    Refreshable.refresh_bulk(
+        tuple(rel_ents1) + tuple(rel_ents), concurrent=True
+    )
+    table = [[self.name, self.summary_title]]
+    rel_ents1 = list(unrepeated(not_none(self.refresh_related1())))
+    if rel_ents1:
+      table.append(
+          tuple([subent.name, subent.summary_title] for subent in rel_ents1)
+      )
+    image = self.image() or ''
+    description = self.feed_description() or ''
+    if image or description:
+      if image:
+        image = SixelImageString(image).resized_within(
+            img_max_width, img_max_height
+        )
+      description = textwrap.fill(description, wrap_width)
+      table.append([image, description])
+      if recurse:
+        rel_ents = list(unrepeated(self.refresh_related()))
+        if rel_ents:
+          subtables = []
+          for subent in rel_ents:
+            subtables.append(
+                tuple(subent.tabulate_summary(recurse=True, file=file))
+            )
+          table.extend(subtables)
+    return table
+
+  def printt_summary(self, *, recurse=False, file=None, **printt_kw):
+    table = self.tabulate_summary(recurse=recurse, file=file, **printt_kw)
+    printt(*table, file=file, **printt_kw)
+
 paginated = SiteEntity.paginated
 
 @dataclass
-class SiteWidget(ABC):
-  ''' A base class for classes representing known widgets on a site web page.
+class SiteWidget(Widget, ABC):
+  ''' A base class for classes representing known widgets on a site
+      web page and how to apply them to a `SiteMap`.
+
+      This subclasses `cs.bs4utils.Widget` and provides:
+      - `.sitemap`: the `SiteMap` associated with the widget
+      - `.entity`: a cached property being the primary `Entity` for this widget
+      - `.check_tag(tag)`: check if a tag is actually intended for
+        this widget class; the default method just returns `True`
+      - `.find_all(soup)`: find all the tags representing this
+        widget class; the default method uses `cls.TAG_NAME` and
+        `cls.FIND_ALL_CRITERIA`, then further winnows matched tags
+        using `.check_tag`
+
+      Subclasses must implement:
+      - `.entity_key()`: a methdod to compute the zone subkey of the
+        entity associated with the widget
+      - `.scan_soup()`: a method to obtain data from `self.tag` and return a `ScanData`
   '''
 
-  sitemap: "SiteMap"
-  tag: BS4Tag
-
-  def __init_subclass__(cls, *, sitemap_class, **kw):
-    ''' Record this widget class against its entity type.
-    '''
-    super().__init_subclass__(**kw)
-    cls.SITEMAP_CLASS = sitemap_class
-    sitemap_class.WIDGET_CLASSES.append(cls)
-    cls.ENTITY_CLASS.WIDGET_CLASSES.append(cls)
+  def __init__(
+      self,
+      tag: BS4Tag,
+      sitemap: "SiteMap",
+      entity: SiteEntity | None = None,
+  ):
+    self.tag = tag
+    self.sitemap = sitemap
+    if entity is not None:
+      self.entity = entity
+      self.entity_key = entity.type_key
 
   # most site widgets are DIVs
   TAG_NAME = 'div'
 
-  @property
-  @abstractmethod
+  @cached_property
   def entity_key(self):
-    ''' Return the `type_key` derived from `self.tag`.
+    ''' The `type_key` derived from `self.tag`.
     '''
     raise NotImplementedError
 
@@ -1573,28 +2100,76 @@ class SiteWidget(ABC):
     '''
     return self.sitemap[self.__class__.ENTITY_CLASS, self.entity_key]
 
-  @abstractmethod
-  def grok(self):
-    ''' Examine the content of `self.tag`, apply to `self.entity`.
-    '''
-    raise NotImplementedError
-
+  @classmethod
   def check_tag(cls, tag: BS4Tag) -> bool:
     ''' Test whether this tag is in fact an instance of the widget.
 
-        The default sweep by `scan_soup` uses `cls.TAG_NAME` and
+        The default sweep by `find_all` uses `cls.TAG_NAME` and
         `cls.FIND_ALL_CRITERIA`, then further winnows matched tags
         using this method.
     '''
     return True
 
   @classmethod
-  def scan_soup(cls, soup, sitemap: "SiteMap") -> Generator["SiteWidget"]:
-    ''' Scan some soup for this kind of widget, yield instances of `cls`.
+  def find_all(cls, soup) -> list[BS4Tag]:
+    ''' The default `SiteWidget.find_all`, which Finds all the BS4
+        tags in `soup` matching `cls.TAG_NAME` and
+        `cls.FIND_ALL_CRITERIA` where `cls.check_tag(tag)` is true.
     '''
-    for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA):
-      if cls.check_tag(tag):
-        yield cls(sitemap=sitemap, tag=tag)
+    return [
+        tag for tag in soup.find_all(cls.TAG_NAME, **cls.FIND_ALL_CRITERIA)
+        if cls.check_tag(tag)
+    ]
+
+  @classmethod
+  def scan(cls, soup, sitemap: "SiteMap") -> list[Self]:
+    ''' Return a list of all `SiteWidget`s of this type found in `soup`.
+    '''
+    return [cls(sitemap=sitemap, tag=tag) for tag in cls.find_all(soup)]
+
+  @classmethod
+  @uses_scandata
+  def scan_all(
+      cls,
+      soup,
+      *,
+      scandata: ScanData,
+      update: dict | None = None,
+  ) -> tuple[list[Self], ScanData]:
+    ''' Scan `soup` for all instances of this `SiteWidget` and run
+        each widget's `scan_soup()` method, applying the results to
+        `scandata`.
+        If `update` is provided, prefill each widget's scandata from `update`.
+        Return a `(widgets,scandata)` 2-tuple of the widgets found
+        and the `scandata`, which may have been created by the call.
+    '''
+    if getattr(cls, 'ENTITY_CLASS', None) is None:
+      # typical widget use here expected widgets to be associated
+      # with a primary `SiteEntity` though it's not inherently bad
+      # to not have that
+      warning(f'scan_all(soup,..,scandata) with no {cls=}.ENTITY_CLASS')
+    widgets = list(cls.scan(soup))
+    for widget in progressbar(widgets, f'scan for {cls.__name__}'):
+      if update:
+        data = scandata[widget.entity]
+        data.update(update)
+      widget.scan_soup(scandata=scandata)
+    return widgets, scandata
+
+  @abstractmethod
+  @uses_scandata
+  def scan_soup(self, *, scandata: ScanData) -> ScanData:
+    ''' Scan `self.tag` and update `scandata`, primarily about
+        `self.entity` but usually also about any other related entity
+        information.
+        Return `scandata` (because it may have been created with the call).
+    '''
+    raise NotImplementedError
+
+  def printt(self, label=None, **printt_kw):
+    if label is None:
+      label = f'{self.__class__.__name__}:{id(self)}'
+    printt_soup(self.tag, **printt_kw)
 
 class SiteMapPatternMatch(namedtuple(
     "SiteMapPatternMatch", "sitemap pattern_test pattern_arg match mapping")):
@@ -1613,19 +2188,127 @@ class SiteMapPatternMatch(namedtuple(
     '''
     return self.pattern_arg.format_map(ChainMap(self.mapping, extra or {}))
 
+class BaseSiteMapCommand(BaseCommand):
+
+  def pop_entity(self, argv: list[str]) -> SiteEntity:
+    sitemap = self.options.sitemap
+    try:
+      ent_spec = argv.pop(0)
+    except IndexError:
+      raise GetoptError('missing entity')
+    ent_key = ent_spec.removeprefix(f'{sitemap.TYPE_ZONE}.')
+    ent = sitemap[ent_key]
+    return ent
+
+  def cmd_ent(self, argv):
+    ''' Usage: {cmd} entity
+          Set entity and provide a REPL.
+    '''
+    options = self.options
+    printt(f'{self}.cmd_ent:', options.as_dict())
+    breakpoint()
+    if not argv:
+      raise GetoptError('missing entity')
+    ent = self.pop_entity(argv)
+    BaseCommand.repl(self, local=dict(ent=ent))
+
+  @popopts(
+      f=('force', 'Force refresh of entities even if not stale.'),
+      l=('long_mode', 'Long Mode.'),
+      r=('recurse', 'Recurse into related entities.'),
+  )
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} subname [type [key...]]
+          List entities for this SiteMap.
+    '''
+    options = self.options
+    force = options.force
+    long_mode = options.long_mode
+    recurse = options.recurse
+    runstate = options.runstate
+    if not argv:
+      # list subnames - entity types
+      for subname in sorted(set(subname for subname, type_key in self.keys())):
+        print(subname)
+        if long_mode:
+          printt(
+              *(
+                  [
+                      entity.type_key,
+                      entity.get('fullname') or entity.get('title', ''),
+                  ] for entity in map(
+                      lambda key: self[key],
+                      sorted(self.keys(subname=subname))
+                  )
+              ),
+              indent='  '
+          )
+      return 0
+    subname = argv.pop(0)
+    if argv:
+      ok = True
+      for type_key in argv:
+        if '.' in type_key:
+          warning("invalid dot in type_key %r", type_key)
+          ok = False
+      if not ok:
+        raise GetoptError('invalid type keys')
+      keys = [(subname, key) for key in argv]
+    else:
+      # list all entities of this type
+      keys = sorted(self.keys(subname=subname))
+      print("self.keys ->", *map(r, keys))
+    Q = ListQueue((self[key] for key in keys), unique=lambda ent: ent.name)
+    for ent in self.updated_entities(Q, force=force):
+      runstate.raiseif()
+      print(ent.name)
+      if long_mode:
+        printt(*sorted(ent.items()), indent='  ')
+      if recurse:
+        for (attr, subents) in ent.related():
+          print(attr, '->', [subent.name for subent in subents])
+
+  @popopts(
+      f=('force', 'Force refresh of entities even if not stale.'),
+      r=('recurse', 'Recursively refresh related entities.'),
+  )
+  def cmd_refresh(self, argv):
+    ''' Usage: {cmd} entity...
+          Refresh the specified entities by fetching and grokking their site pages.
+    '''
+    if not argv:
+      raise GetoptError("missing entities")
+    for ent_spec in argv:
+      with Pfx("entity %r", ent_spec):
+        ent_key = ent_spec.removeprefix(f'{self.TYPE_ZONE}.')
+        ent = self[ent_key]
+        ent.refresh(force=self.options.force, recurse=self.options.recurse)
+        ent.printt()
+
+  @popopts
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} URLs...
+          Scan the suppplied URLs, update entities accordingly.
+    '''
+    if not argv:
+      raise GetoptError('missing URLs')
+    for url in argv:
+      print("scan", url)
+      self.scan_matches(url, no_apply=self.options.dry_run)
+
 @dataclass
-class SiteMap(UsesTagSets, Promotable):
+class SiteMap(Entities, Promotable):
   ''' A base dataclass for site maps.
 
       A `SiteMap` data class embodies domain specific knowledge about a
       particular website or collection of websites.
 
-      It subclasses `cs.tagset.UsesTagSets` and gets its `.tagsets`
-      from `self.pilfer` if unspecified. Use as a `UsesTagSet`
+      It subclasses `cs.tagset.Entities` and gets its `.tagsets`
+      via `self.pilfer` if unspecified. Use as a `UsesTagSet`
       domain requires setting:
-      - `TYPE_ZONE` to the domain prefix
-      - `HasTagsClass` to the base `HasTags` entity class
-      See `cs.tagset.UsesTagSets` for details.
+      - `TYPE_ZONE` to the entity zone
+      - `EntityClass` to the base `Entity` entity class
+      See `cs.tagset.Entities` for details.
 
       A `Pilfer` instance obtains its site maps from the `[sitemaps]`
       clause in the configuration file, see the `Pilfer.sitemaps`
@@ -1646,7 +2329,7 @@ class SiteMap(UsesTagSets, Promotable):
       of this `SiteMap` base class.
 
       `SiteMap`s have a few class attributes:
-      * `TYPE_ZONE`: the `TagSetTyping.type_zone` value for entities
+      * `TYPE_ZONE`: the `ZonedTypes.type_zone` value for entities
         associated with this class
       * `URL_KEY_PATTERNS`: this is a list of `(match,keyformat)`
         2-tuples specifying cache keys for caching URL contents; the
@@ -1660,12 +2343,18 @@ class SiteMap(UsesTagSets, Promotable):
         See the `SiteMap.content_prefetch` method.
   '''
 
-  name: str = None
+  name: str | None = None
   pilfer: object = None
-  tagsets: BaseTagSets = None
+  tagsets: BaseTagSets | None = None
+  request_semaphore: Semaphore | None = None
 
-  # a registry of SiteMap subclasses by their TYPE_ZONE
-  sitemap_by_type_zone = {}
+  URL_SCHEME = 'https://'
+
+  DEFAULT_CONCURRENCY = 3
+
+  CommandClass = BaseSiteMapCommand
+  EntityClass = SiteEntity
+  TagsetsClass = SQLTags
 
   URL_KEY_PATTERNS = ()
 
@@ -1673,52 +2362,42 @@ class SiteMap(UsesTagSets, Promotable):
   def __post_init__(
       self,
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
   ):
     ''' Initialise `.pilfer` if omitted`, and then `.tagsets` from `self.pilfer`.
     '''
+    cls = self.__class__
     if self.name is None:
       self.name = self.TYPE_ZONE
     if self.pilfer is None:
       self.pilfer = P
+    if self.request_semaphore is None:
+      self.request_semaphore = Semaphore(self.DEFAULT_CONCURRENCY)
+    elif isinstance(self.request_semaphore, int):
+      self.request_semaphore = Semaphore(self.request_semaphore)
     # Register this `SiteMap` by its `TYPE_ZONE`.
-    sitemap_by_type_zone = self.__class__.sitemap_by_type_zone
+    by_type_zone = cls.by_type_zone
     try:
       self.TYPE_ZONE
     except AttributeError:
       vprint(f'no .TYPE_ZONE for SiteMap instance {self}')
-      pass
     else:
       try:
-        other_map = sitemap_by_type_zone[self.TYPE_ZONE]
+        other_map = by_type_zone[self.TYPE_ZONE]
       except KeyError:
         # not already taken
         pass
       else:
         warning(f'replacing {self.TYPE_ZONE=} -> {other_map} with {self}')
-      vprint(f'sitemap_by_type_zone[{self.TYPE_ZONE=}] = {self=}')
-      sitemap_by_type_zone[self.TYPE_ZONE] = self
+      by_type_zone[self.TYPE_ZONE] = self
     super().__init__(tagsets=self.pilfer.sqltags)
 
   @classmethod
   def zone_sitemap(cls, type_zone: str):
     ''' The `SiteMap` associated with `type_zone`.
+        This is also available as `SiteMap[type_zone]`.
     '''
-    return cls.sitemap_by_type_zone[type_zone]
-
-  @classmethod
-  def by_db_key(cls, db_key: str) -> SiteEntity:
-    ''' Return the `SiteEntity` for the database wide `key`.
-    '''
-    try:
-      zone, subname, key = TagSetTyping.type_parts_of(db_key)
-    except ValueError as e:
-      raise KeyError(f'{db_key=}: cannot parse into type parts: {e}') from e
-    try:
-      sitemap = cls.sitemap_by_type_zone[zone]
-    except KeyError as e:
-      raise KeyError(f'{db_key=}: no SiteMap registered for {zone=}') from e
-    return sitemap[subname, key]
+    return cls.by_type_zone[type_zone]
 
   @classmethod
   @uses_pilfer
@@ -1726,7 +2405,7 @@ class SiteMap(UsesTagSets, Promotable):
       cls,
       sitemap_name: str,
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
   ) -> "SiteMap":
     ''' Return the `SiteMap` instance known as `sitemap_name` in the ambient `Pilfer` instance.
     '''
@@ -1737,6 +2416,126 @@ class SiteMap(UsesTagSets, Promotable):
         f'{cls.__name__}.from_str({sitemap_name!r}): unknown sitemap name'
     )
 
+  @classmethod
+  def from_zone(cls, type_zone: str):
+    return cls.zone_sitemap(type_zone)
+
+  @classmethod
+  def from_tuple(cls, ent_key: tuple):
+    self = cls.default()
+    ent_type, key = ent_key
+    if isinstance(ent_type, str):
+      if '.' in ent_type:
+        raise ValueError(f'{ent_type=} should be a type subname, with no dots')
+      return self[f'{cls.TYPE_ZONE}.{ent_type}.{key}']
+    return self[ent_type, key]
+
+  @classmethod
+  def by_db_key(cls, db_key: str | tuple, *, site_zone=None) -> SiteEntity:
+    ''' Return the `SiteEntity` for the database wide `key`.
+        Raise `ValueError` for invalid `db_key`.
+        Raise `KeyError` for an unknown `db_key`.
+    '''
+    if isinstance(db_key, tuple):
+      zone, subname, key = db_key
+    else:
+      zone, subname, key = ZonedTypes.type_parts_of(db_key)
+    try:
+      sitemap = cls.by_type_zone[zone]
+    except KeyError as e:
+      raise KeyError(f'{db_key=}: no SiteMap registered for {zone=}') from e
+    return sitemap[subname, key]
+
+  @cached_property
+  def SiteMapCommand(self):
+
+    class SiteMapCommand(self.CommandClass):
+      sitemap = self
+
+      def run(self, **run_kw):
+        run_kw.setdefault('sitemap', self.sitemap)
+        return super().run(**run_kw)
+
+    if not SiteMapCommand.__doc__:
+      SiteMapCommand.__doc__ = f'Subcommand for working with the {self.name} SiteMap.'
+    return SiteMapCommand
+
+  def entities_for(self,
+                   spec,
+                   pattern_name: str | None = None) -> Iterable[SiteEntity]:
+    ''' Produce the `SiteEntity` instances for `spec`.
+
+        `spec` may be:
+        - a URL matched by `SiteMap.entities_for(url)` method
+        - a *zone*`.`*subtype*`:`*field*`=`*value* search string
+        - a *zone*`.`*subtype*`.`*key* string
+
+        Examples:
+
+            http://example.com/section/article.html
+            tvdb.actor:fullname=Joe Bloggs
+            tvdb.actor.1234
+
+        URLs are passed to `sitemap.entities_for()` for each `SiteMap`
+        registered for that URL in the `pilferrc`.
+
+        `zone.subtype:field=value` searches are pass to
+        `SiteMap[zone].entities_for()`.
+
+        Plain `zone.subtype.name` is passed to `SiteMap.by_db_key()`.
+    '''
+    # URLs
+    if isinstance(spec, URL) or '://' in spec:
+      base_entity_class = getattr(self, 'EntityClass', SiteEntity)
+      entities = []
+      for ent_class in public_subclasses(base_entity_class):
+        try:
+          ent, _ = ent_class.from_URL(spec, self, pattern_name=pattern_name)
+        except URLPatternMatchError as e:
+          continue
+        yield ent
+      return
+    # zone.subname.key
+    try:
+      zone, subname, key = ZonedTypes.type_parts_of(spec)
+    except ValueError as e:
+      pass
+    else:
+      ent = self.by_db_key((zone, subname, key))
+      yield ent
+      return
+    # tvdb.actor:fullname="Job Bloggs"
+    try:
+      zone, subtype, field, value = ZonedTypes.parse_zone_search(spec)
+    except ValueError:
+      pass
+    else:
+      try:
+        site_zone = self.TYPE_ZONE
+      except AttributeError:
+        pass
+      else:
+        if zone != site_zone:
+          warning(f'search {zone=} does not match {self.TYPE_ZONE=}')
+        else:
+          name_prefix = f'{zone}.{subtype}.'
+          for tag_name in field, f'{zone}.{field}':
+            for ent in trace(self.find)(**{tag_name: value}):
+              if not ent.name.startswith(name_prefix):
+                print(f'skip {ent.name=}')
+                continue
+              print("FOUND", ent)
+              yield ent
+      return
+    raise ValueError(f'unrecognised {spec=}')
+
+  def entity_for(
+      self, spec, *, pattern_name: str | None = None
+  ) -> SiteEntity | None:
+    ''' Return the first entity from `self.entities_for(spec)` or `None`.
+    '''
+    return get0(self.entities_for(spec, pattern_name=pattern_name))
+
   @property
   def name__(self):
     ''' The `SiteMap.name` with slashes replaced by double underscores.
@@ -1745,8 +2544,12 @@ class SiteMap(UsesTagSets, Promotable):
 
   def urlto(self, suburl, domain=None, *, scheme='https'):
     ''' Return the full URL for `suburl`.
+        This is based on `urllib.parse.urljoin`.
     '''
-    return f'{scheme}://{domain or self.URL_DOMAIN}/{suburl.lstrip("/")}'
+    return urljoin(
+        f'{scheme or self.URL_SCHEME}://{domain or self.URL_DOMAIN}',
+        suburl,
+    )
 
   @cached_property
   def url_root(self) -> str:
@@ -1756,6 +2559,7 @@ class SiteMap(UsesTagSets, Promotable):
     return self.urlto('')
 
   # TODO: some notion of staleness
+  # TODO: use pmap and Refreshable.refresh
   @classmethod
   @uses_pilfer
   @typechecked
@@ -1763,7 +2567,7 @@ class SiteMap(UsesTagSets, Promotable):
       cls,
       entities: Iterable["SiteEntity"],
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
       force=False,
   ) -> Generator[SiteEntity]:
     ''' A generator yielding updated `SiteEntity` instances
@@ -1808,7 +2612,7 @@ class SiteMap(UsesTagSets, Promotable):
     #             updated entities
     start_time = time.time()
     ent_spQ = IterableQueue()
-    ent_sps = ClonedIterator(ent_spQ)
+    ent_sps = ReIterable(ent_spQ)
     ent_fsQ = IterableQueue()
 
     def process_entities():
@@ -1824,7 +2628,7 @@ class SiteMap(UsesTagSets, Promotable):
             warning("not a SiteEntity: %s", r(entity))
             continue
           # TODO: a better staleness criterion
-          if not force and not entitiy.refresh_needed():
+          if not force and not entity.refresh_needed():
             # do not update
             ent_fsQ.put((entity, None))
             continue
@@ -1833,7 +2637,6 @@ class SiteMap(UsesTagSets, Promotable):
             # no sitepage, do not update
             ent_fsQ.put((entity, None))
             continue
-          # send the entity and sitepage to the prefetcher
           ent_spQ.put((entity, sitepage_url))
       finally:
         # close the (entity,sitepage) processor
@@ -1861,9 +2664,9 @@ class SiteMap(UsesTagSets, Promotable):
         ent_fsQ.put((None, None))
 
     # dispatch the workers
-    process_entitiesT = Thread(target=with_(process_entities, P), daemon=True)
+    process_entitiesT = Thread(target=with_(P, process_entities), daemon=True)
     process_entity_sitepagesT = Thread(
-        target=with_(process_entity_sitepages, P), daemon=True
+        target=with_(P, process_entity_sitepages), daemon=True
     )
     process_entitiesT.start()
     process_entity_sitepagesT.start()
@@ -1891,10 +2694,12 @@ class SiteMap(UsesTagSets, Promotable):
         pass
       else:
         try:
-          entity.refresh(update_from)
+          scandata = entity.scan_sitepage(update_from)
         except Exception as e:
           warning("exception for update_from=%s: %s", r(update_from), s(e))
           raise  # debug
+        else:
+          scandata.apply(entity)
       yield entity
 
   @staticmethod
@@ -1925,7 +2730,7 @@ class SiteMap(UsesTagSets, Promotable):
           it a regular expression. to apply against the URL path.
           If a regular expression containing a `'<'` is desired it
           should be inserted as a _regexp_ `\N{LESS-THAN SIGN}`
-          escape (_not_ a Python string escape.
+          escape (_not_ a Python string escape).
           A leading slash anchors a regexp against the start of the path
           otherwise it may match anywhere in the path.
         - a regular expression object to apply against the URL path
@@ -1937,7 +2742,8 @@ class SiteMap(UsesTagSets, Promotable):
           or `True` or a `Mapping[str,str]` for a match
 
         Note that to avoid confusing the decorator the first condition
-        cannot be a callable. However, it's usually a domain glob anyway.
+        cannot be a callable (unless it's a class, such as a `SiteEntity` subclass.
+        However, it's usually a domain glob anyway.
 
         The keyword parameters specify `Tag`s to set on the match `TagSet`
         if the conditions have matched. The parameter value may be:
@@ -1977,12 +2783,10 @@ class SiteMap(UsesTagSets, Promotable):
             test_name = f'{entity_class.__name__}.match_url(flowstate.url)'
 
             def test(flowstate, match):
-              vprint(f'@on: {test_name}')
-              m = entity_class.match_url(flowstate.url)
+              vprint(f'@on: {test_name}: {flowstate.url=}')
+              m, _ = entity_class.match_url(flowstate.url)
               if m is not None:
-                _, m = m
-                if m is not None:
-                  match.update(m)
+                match.update(m)
               return m
 
             test.__name__ = test_name
@@ -2010,7 +2814,7 @@ class SiteMap(UsesTagSets, Promotable):
               test_name = f'flowstate.method == {method_name=}'
 
               def test(flowstate, match):
-                vprint(f'@on: {method_name=} vs {method_name=}')
+                vprint(f'@on: {flowstate.method=} vs {method_name=}')
                 return flowstate.method == method_name
 
               test.__name__ = test_name
@@ -2114,12 +2918,11 @@ class SiteMap(UsesTagSets, Promotable):
     cond_attr.append((conditions, tags_kw))
     return method
 
-  @classmethod
   @pfx_method
   @uses_verbose
   @promote
   def on_matches(
-      cls,
+      self,
       flowstate: FlowState,
       methodglob: str | None = None,
       *,
@@ -2127,7 +2930,7 @@ class SiteMap(UsesTagSets, Promotable):
       **match_kw,
   ) -> Iterable[tuple[Callable, TagSet]]:
     ''' A generator yielding `(method,match)` 2-tuples for methods matched
-        by `flowstate` and `match_kw`, being the matching method
+        by `flowstate` and `match_kw`, being the matching bound method
         and a `TagSet` of values obtained during the match test.
 
         Parameters:
@@ -2141,16 +2944,17 @@ class SiteMap(UsesTagSets, Promotable):
         decorator to the method.
         A `(method,match)` 2-tuple is yielded for each matching conjunction.
 
-        Note that this means the same methods may be yielded multiple
+        *Note*: this means the same methods may be yielded multiple
         times if different conjunctions match (eg multiple matching
         `@on` decorators); this is because each condition may provide
         different `match` match results.
     '''
+    cls = self.__class__
     for method_name in dir(cls):
       if methodglob is not None and not fnmatch(method_name, methodglob):
         continue
       try:
-        method = getattr(cls, method_name)
+        method = getattr(self, method_name)
       except AttributeError:
         continue
       try:
@@ -2233,6 +3037,65 @@ class SiteMap(UsesTagSets, Promotable):
 
   @pfx_method
   @promote
+  def scan_matches(
+      self,
+      flowstate: FlowState,
+      flowattr: str | None = None,
+      methodglob: str = 'scan_*',
+      no_apply=False,
+      **match_kw,
+  ):
+    ''' Run all the scan methods in this `SiteMap` for `flowstate.url`.
+        This runs:
+        - `entity.scan_sitepage()` if the URL matches a `SiteEntty` sitepage pattern
+        - all the `SiteMap.scan+*` methods whose `.on_conditions` match
+          `flowstate` and ``match_kw`, as matched by `SiteMap.on_matches`
+          and apply the scan results (unless `no_apply` is true).
+        The result of each scan, a `ScanData`, is applied to its relevant entities.
+
+        Parameters:
+        * `flowstate`: the `FlowState` on which to match
+        * `flowattr`: an optional attribute name of the `flowstate`
+        * `methodglob`: an optional filename glob constraining the
+          chosen method names; the default is `"scan_*"`
+        * `match_kw`: the `on_match` keyword arguments which must match
+        * `no_apply`: do not apply the results of the matches and scans,
+          default `False`
+
+        Each method should return a `ScanData` instance containing
+        the information scanned from the page and its associated
+        entities.
+    '''
+    ent0 = self.entity_for(flowstate.url)
+    if ent0 is not None:
+      scandata = ent0.scan_sitepage(flowstate)
+      if not no_apply:
+        scandata.apply(ent0)
+    for method, match in self.on_matches(flowstate, methodglob, **match_kw):
+      with Pfx("call %s", method.__qualname__):
+        try:
+          scandata: ScanData = method(flowstate, match)
+          if not no_apply:
+            scandata.apply(
+                # provie the entities whose sitepage patterns match the URL
+                *(
+                    ent for ent in scandata.keys()
+                    if ent.matches_url(flowstate.url, sitemap=self)
+                )
+            )
+          printt(
+              ["scandata", flowstate.url],
+              {
+                  ent.name: data
+                  for ent, data in scandata
+              },
+          )
+        except Exception as e:
+          warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
+          raise
+
+  @pfx_method
+  @promote
   def run_matches(
       self,
       flowstate: FlowState,
@@ -2259,7 +3122,7 @@ class SiteMap(UsesTagSets, Promotable):
         method result is not `None` then the result is set as an
         updated value on `flowstate`.
     '''
-    ent = self.url_entity(flowstate.url)
+    ent = self.entity_for(flowstate.url)
     if ent is not None:
       ent.grok_sitepage(flowstate)
     else:
@@ -2268,10 +3131,10 @@ class SiteMap(UsesTagSets, Promotable):
       with Pfx("call %s", method.__qualname__):
         try:
           if flowattr is None:
-            result = method(self, flowstate, match)
+            result = method(flowstate, match)
           else:
             attrvalue = pfx_call(getattr, flowstate, flowattr)
-            result = method(self, flowstate, match, attrvalue)
+            result = method(flowstate, match, attrvalue)
         except Exception as e:
           warning("%s.%s: url=%s: %s", self, method.__name__, flowstate.url, e)
           raise
@@ -2302,83 +3165,10 @@ class SiteMap(UsesTagSets, Promotable):
       return
     yield from self.run_matches(flowstate, flowattr, 'grok_*', **run_match_kw)
 
-  @staticmethod
-  @decorator
-  def grok_entity_page(func, *, ent_class, page='sitepage', type_key=None):
-    ''' A decorator for web page `grok_*` methods which apply grokked
-        information to a `SiteEntity`.
-        This obtains the `entity` from `self[ent_class,match["type_key"]]`,
-        calls `entity.grok_sitepage(flowstate)`,
-        calls `func(self,flowstate,match,entity)`,
-        returns the `entity`.
-
-        Example:
-
-            @on(
-                URL_DOMAIN,
-                r'/something/(?P<type_key>[^/+])/....',
-            )
-            @grok_entity_page(ent_class=FrogEntity)
-            def grok_frog_sitepage(self, flowstate: FlowState, match, entity:FrogEntity):
-                pass # this example does no additional work
-    '''
-
-    def _grok_sitepage_wrapper(
-        self,
-        flowstate: FlowState,
-        match=None,
-    ) -> SiteEntity:
-      try:
-        ent_type_key = match["type_key"]
-      except KeyError as e:
-        if type_key is None:
-          raise KeyError(
-              f'no "type_key" in {match=} and no type_key= in @grok_entity_page decorator'
-          ) from e
-        ent_type_key = type_key
-      entity = self[ent_class, ent_type_key]
-      if flowstate is None:
-        url = getattr(entity, f'{page}_url')
-        flowstate = FlowState.from_URL(url)
-      grok_method = getattr(entity, f'grok_{page}')
-      grok_method(flowstate)
-      func(self, flowstate, match, entity)
-      return entity
-
-    return _grok_sitepage_wrapper
-
-  @promote
-  def url_entity(self, url: URL):
-    ''' Return the `SiteEntity` associated with this URL, or `None`
-        for an unrecognised URL.
-        Raise `ValueError` if multiple entities match the URL.
-    '''
-    try:
-      base_entity_class = self.HasTagsClass
-    except AttributeError as e:
-      vprint(
-          f'{self.__class__.__name__}.url_entity: no .HasTagsClass, skipping'
-      )
-      return None
-    entities = []
-    for ent_class in public_subclasses(base_entity_class):
-      try:
-        entity = ent_class.from_URL(url, self)
-      except ValueError as e:
-        vprint(
-            f'url_entity({url=}): SKIP {ent_class=}, does not match {ent_class=}: {e}'
-        )
-        continue
-      entities.append(entity)
-    if not entities:
-      return None
-    entity, = entities
-    return entity
-
   def matches(
       self,
       url: URL,
-      patterns: Iterable,  # [Tuple[Tuple[str, str], Any]],
+      patterns: Iterable,  # [Tuple[URLMatcher|Tuple[str, str], Any]],
       extra: Mapping | None = None,
   ) -> Iterable[SiteMapPatternMatch]:
     ''' A generator to match `url` against `patterns`, an iterable
@@ -2484,14 +3274,13 @@ class SiteMap(UsesTagSets, Promotable):
     return match.format_arg(extra=extra)
 
   @uses_pilfer
-  ##@typechecked # we don't import Pilfer (circular)
   def content_prefetch(
       self,
       match: SiteMapPatternMatch,
       flow,
       content_bs: bs,
       *,
-      P: "Pilfer",  # noqa: F821
+      P: "Pilfer",
   ):
     ''' The generic prefetch handler.
 
@@ -2609,7 +3398,17 @@ class SiteMap(UsesTagSets, Promotable):
     tags = []
     for link, link_tags in flowstate.links.items():
       for tag in link_tags:
-        if tag.attrs.get('type') == "application/rss+xml":
+        tag_content_type = tag.attrs.get('type')
+        if tag_content_type == ATOM_CONTENT_TYPE:
+          try:
+            href = tag.attrs['href']
+          except KeyError:
+            warning("no href in %s", tag)
+          else:
+            widget = BS4Tag(name='a', attrs=dict(href=href))
+            widget.string = "ATOM"
+            tags.append(widget)
+        if tag_content_type == RSS_CONTENT_TYPE:
           try:
             href = tag.attrs['href']
           except KeyError:
@@ -2645,131 +3444,6 @@ class SiteMap(UsesTagSets, Promotable):
     ]
     return super().find(*criteria, **crit_kw)
 
-  @popopts(
-      f=('force', 'Force refresh of entities even if not stale.'),
-      l=('long_mode', 'Long Mode.'),
-      r=('recurse', 'Recurse into related entities.'),
-  )
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} subname [type [key...]]
-          List entities for this SiteMap.
-    '''
-    options = self.options
-    force = options.force
-    long_mode = options.long_mode
-    recurse = options.recurse
-    runstate = options.runstate
-    if not argv:
-      # list subnames - entity types
-      for subname in sorted(set(subname for subname, type_key in self.keys())):
-        print(subname)
-        if long_mode:
-          printt(
-              *(
-                  [
-                      entity.type_key,
-                      entity.get('fullname') or entity.get('title', ''),
-                  ] for entity in map(
-                      lambda key: self[key],
-                      sorted(self.keys(subname=subname))
-                  )
-              ),
-              indent='  '
-          )
-      return 0
-    subname = argv.pop(0)
-    if argv:
-      ok = True
-      for type_key in argv:
-        if '.' in type_key:
-          warning("invalid dot in type_key %r", type_key)
-          ok = False
-      if not ok:
-        raise GetoptError('invalid type keys')
-      keys = [(subname, key) for key in argv]
-    else:
-      # list all entities of this type
-      keys = sorted(self.keys(subname=subname))
-      print("self.keys ->", *map(r, keys))
-    Q = ListQueue((self[key] for key in keys), unique=lambda ent: ent.name)
-    for ent in self.updated_entities(Q, force=force):
-      runstate.raiseif()
-      print(ent.name)
-      if long_mode:
-        printt(*sorted(ent.items()), indent='  ')
-      if recurse:
-        for (attr, subents) in ent.related():
-          print(attr, '->', [subent.name for subent in subents])
-
-  def cmd_refresh(self, argv):
-    ''' Usage: {cmd} entity...
-          Refresh the specified entities by fetching and grokking their site pages.
-    '''
-    if not argv:
-      raise GetoptError("missing entities")
-    for ent_spec in argv:
-      with Pfx("entity %r", ent_spec):
-        ent = self[ent_spec]
-        ent.printt()
-        ent.grok_sitepage()
-
 # expose the @on and @grok_entity_page decorators globally
 on = SiteMap.on
-grok_entity_page = SiteMap.grok_entity_page
 
-# Some presupplied site maps.
-
-@dataclass
-class DocSite(SiteMap):
-  ''' A general purpose doc site map with keys for `.html` and `.js` URLs
-      along with several other common extensions.
-  '''
-
-  # the URL path suffixes which will be cached
-  CACHE_SUFFIXES = tuple(
-      [
-          # web pages
-          '.html',
-          # style sheets
-          '.css',
-          #images
-          '.gif',
-          '.ico',
-          '.jpg',
-          '.png',
-          '.svg',
-          '.webp',
-          # scripts
-          '.js',
-          # fonts
-          '.woff2',
-      ]
-  )
-
-  @on('/', cache_key='{__}')
-  @on(
-      ''.join(
-          (
-              '/.*(',
-              '|'.join(ext.replace('.', r'\.') for ext in CACHE_SUFFIXES),
-              ')$',
-          )
-      ),
-      cache_key='{__}',
-  )
-  def cache_key_docsite(self, flowstate: FlowState, match: TagSet) -> str:
-    return match['cache_key']
-
-@dataclass
-class DockerIO(SiteMap):
-
-  TYPE_ZONE = 'dockerio'
-
-  # https://registry-1.docker.io/v2/linuxserver/ffmpeg/blobs/sha256:6e04116828ac8a3a5f3297238a6f2d0246440a95c9827d87cafe43067e9ccc5d
-  @on(
-      'registry-*.docker.io',
-      r'/v2/.*/blobs/[^/]+:[^/]+$',
-      cache_key='blobs/{__}',
-  )
-  def cache_key_image_blob(self, flowstate: FlowState, match: TagSet) -> str:
-    return match['cache_key']

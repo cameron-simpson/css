@@ -10,8 +10,9 @@
 set -ue
 
 trace=${DEBUG:+set-x}
+[ ! -t 2 ] || trace=set-x
 
-devdir=
+devdir=${DEVDIR:-''}
 dev_exec_precmd=
 
 cmd=$(basename "$0")

@@ -7,7 +7,7 @@ from inspect import iscoroutinefunction
 
 from cs.deco import decorator
 
-__version__ = '20250103-post'
+__version__ = '20261016-post'
 
 DISTINFO = {
     'keywords': ["python3"],

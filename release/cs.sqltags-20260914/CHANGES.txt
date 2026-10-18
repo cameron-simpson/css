@@ -1,0 +1,6 @@
+lib/python/cs/sqltags.py: cs.*: rename HasTags to Entity, UsesTagSets to Entities, TagSetTyping to ZonedTypes, etc, leaving compatibility names behind wrapped in @OBSOLETE
+lib/python/cs/sqltags.py: cs.sqltags: UsesSQLTags: replace EntitiesClass=SQLTags with TagsetsClass=SQLTags
+lib/python/cs/sqltags.py: cssqltags: improve exception message
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: add SQLTags.DB_URL_MEMORY='sqlite://', used as a default by Pilfer
+lib/python/cs/sqltags.py: cs.sqltags: moved Entities from cs.tagset to cs.tagged
+lib/python/cs/sqltags.py: cs.sqltags: update DISTINFO, happy the linter a bit

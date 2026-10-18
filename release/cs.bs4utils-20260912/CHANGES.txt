@@ -1,0 +1,18 @@
+lib/python/cs/bs4utils.py: cs.bs4utils: initial commit with child_tags() and table_grid()
+lib/python/cs/bs4utils.py: cs.bs4utils: pull tabulate_soup and dump_soup from c.app.pilfer.print as tabulate_soup and printt_soup
+lib/python/cs/bs4utils.py: cs.bs4utils: tabulate_soup: include the name= tag in the label, cropped because I've seen it abused
+lib/python/cs/bs4utils.py: cs.bs4utils: new as_xml() function to transcribe a BS4 Tag as na lxml element (I may be wanting this for the Atom feed stuff)
+lib/python/cs/bs4utils.py: cs.bs4utils: move table_grid down the bottom
+lib/python/cs/bs4utils.py: cs.bs4utils: new Widgwt base class and Table(Widget) for parsing complex HTML constructs
+lib/python/cs/bs4utils.py: cs.bs4utils: clean some lint
+lib/python/cs/bs4utils.py: cs.bs4utils: Table.printt(): rowspan support
+lib/python/cs/bs4utils.py: cs.bs4utils: a bit of a writeup of the Widget design/use
+lib/python/cs/bs4utils.py: cs.bs4utils: new fund_up(tag) method for locating related elder sibling or ancestor tags
+lib/python/cs/bs4utils.py: cs.bs4utils: Table.printt(): if there is no caption, fall back to the nearest nonempty heading
+lib/python/cs/bs4utils.py: cs.bs4utils: Table: new .as_lists() method to return the cells as a list-of-rows
+lib/python/cs/bs4utils.py: cs.bs4utils: new find_heading(tag) to fin the nearest heading tag using find_up()
+lib/python/cs/bs4utils.py: cs.bs4utils: Table: new .title property derived from the caption or failing that, the nearest heading
+lib/python/cs/bs4utils.py: cs.bs4utils: new as_indexed_values: elaborate version of as_lists returning a matrix of converted cells; some docstring updates
+lib/python/cs/bs4utils.py: cs.bs4utils: Table.section_rows: go back to using None for padding, infill None with empty TD cells before return
+lib/python/cs/bs4utils.py: cs.bs4utils: docstring updates
+lib/python/cs/bs4utils.py: cs.bs4utils: DISTINFO: add missing imports

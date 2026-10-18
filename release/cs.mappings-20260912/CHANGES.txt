@@ -1,0 +1,2 @@
+lib/python/cs/mappings.py: cs.mappings: IndexedSetMixin: use NoAttrs
+lib/python/cs/mappings.py: cs.mappings: update DISTINFO

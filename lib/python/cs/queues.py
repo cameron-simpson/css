@@ -17,6 +17,7 @@ from typing import Any, Callable, Iterable
 
 from typeguard import typechecked
 
+from cs.context import contextif
 from cs.lex import r
 import cs.logutils
 from cs.logutils import exception, warning, debug
@@ -27,11 +28,10 @@ from cs.resources import (
     RunState,
     RunStateMixin,
     uses_runstate,
-    ClosedError,
 )
-from cs.result import CancellationError
-from cs.semantics import not_closed
-from cs.seq import seq, unrepeated
+from cs.result import CancellationError, Result
+from cs.semantics import ClosedError, not_closed
+from cs.seq import Seq, seq, unrepeated
 
 __version__ = '20260531-post'
 
@@ -745,6 +745,105 @@ def get_batch(q, max_batch=128, *, poll_delay=0.01):
       if q.empty():
         break
   return batch
+
+class WorkerThreadQueue:
+  ''' A worker queue which serialises tasks in a single worker `Thread`.
+
+      Functions can be submitted for execution via the
+      `dispatch(func,*a,**kw)` method, which returns a `cs.result.Result`,
+      or by calling the `WorkerThreadQueue`, which returns the
+      function result (or raises its exception).
+
+      My planned use case is serialising batches of SQLite actions
+      where I open the database just once around a batch of requests.
+  '''
+
+  _EOQ = object()
+  _seq = Seq()
+
+  def __init__(
+      self,
+      maxsize=0,
+      *,
+      name=None,
+      get_batch_context: Callable | None = None
+  ):
+    ''' Initialise the worker queue.
+
+        Parameters:
+        * `maxsize`: the size of the internal `Queue`, default `0` (unbounded)
+        * `name`: optional name for the worker queue
+        * `get_batch_context`: optional function to obtain a context
+          manager to hol around batches of submitted functions
+    '''
+    if name is None:
+      name = f'{self.__class__.__name__}-{self._seq()}'
+    self.name = name
+    self.get_batch_context = get_batch_context
+    self._lock = Lock()
+    self._q = Queue(maxsize)
+    self._worker = Thread(name='WorkerQueue worker', target=self._work)
+    self._worker.start()
+
+  def close(self):
+    ''' Close the queue.
+        No more functions may be submitted after this.
+    '''
+    with self._lock:
+      if self._q is None:
+        raise ClosedError
+      self._q.put(self._EOQ)
+      self._q = None
+
+  @property
+  def closed(self):
+    ''' Whether the queue has been closed.
+    '''
+    return self._q is None
+
+  def __del__(self):
+    self.close()
+
+  def join(self):
+    ''' Wait for the worker to complete.
+    '''
+    self._worker.join()
+
+  def dispatch(self, func, *a, **kw) -> Result:
+    ''' Submit a function to be run, result a `cs.result.Reult`.
+    '''
+    R = Result(f'{self.name}--{getattr(func,"__name__",repr(func))}')
+    with self._lock:
+      if self.closed:
+        raise ClosedError
+      self._q.put((R, func, a, kw))
+    return R
+
+  def __call__(self, func, *a, **kw) -> Result:
+    ''' Calling the worker queue submits the supplied function and
+        returns its result (or raises its exception).
+    '''
+    R = self.dispatch(func, *a, **kw)
+    return R()
+
+  def _work(self):
+    running = True
+    while running:
+      batch = get_batch(self._q)
+      with contextif(self.get_batch_context):
+        for i, rq in enumerate(batch):
+          if rq is self._EOQ:
+            running = False
+            assert i == len(batch) - 1, (
+                f'early EOQ at index {i=} in batch sized {len(batch)}'
+            )
+            break
+          R, func, a, kw = rq
+          try:
+            R.run_func(func, *a, **kw)
+          except BaseException as e:
+            warning(f'exception from R.run_func({func=},...)A')
+            R.raise_(e)
 
 if __name__ == '__main__':
   import cs.queues_tests

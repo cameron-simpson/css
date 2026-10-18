@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
 
 import asyncio
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cached_property
 import logging
 import os
-from os.path import expanduser, join as joinpath
+from os.path import expanduser, isabs as isabspath, join as joinpath
 from getopt import GetoptError
 from pprint import pformat, pprint
 import re
 import sys
-from typing import Iterable
+from tempfile import NamedTemporaryFile
+from typing import Iterable, Literal
+from uuid import uuid4
 
-from bs4 import BeautifulSoup, NavigableString
-from lxml.etree import tostring as xml_tostring
+from bs4 import BeautifulSoup
 from typeguard import typechecked
 
-from cs.bs4utils import printt_soup
+from cs.bs4utils import printt_soup, Table
 from cs.cmdutils import BaseCommand, popopts
 from cs.context import stackattrs
-from cs.fileutils import atomic_filename
+from cs.deco import promote, vv
+from cs.feeds import ATOM_CONTENT_TYPE, RSS_CONTENT_TYPE, FeedMixin
 from cs.later import Later
 from cs.lex import (
     cutprefix,
@@ -28,16 +31,16 @@ from cs.lex import (
     get_identifier,
     is_identifier,
     printt,
-    s,
     skipwhite,
 )
 import cs.logutils
 from cs.logutils import debug, error, warning
 import cs.pfx
 from cs.pfx import Pfx, pfx_call
-from cs.queues import ListQueue
-from cs.sqltags import SQLTagSet
-from cs.tagset import TagSet
+from cs.psutils import run
+from cs.py.modules import import_extra
+from cs.trace import Trace
+from cs.tty import ttysizepx
 from cs.urlutils import URL
 
 from . import (
@@ -45,11 +48,11 @@ from . import (
     DEFAULT_FLAGS_CONJUNCTION,
     DEFAULT_MITM_LISTEN_HOST,
     DEFAULT_MITM_LISTEN_PORT,
+    DISTINFO,
 )
 from .parse import get_delim_regexp
 from .pilfer import Pilfer
 from .pipelines import PipeLineSpec
-from .rss import RSSChannelMixin
 from .sitemap import BS4_PARSER_DEFAULT, FlowState, SiteEntity, SiteMap
 
 def main(argv=None):
@@ -107,8 +110,10 @@ class PilferCommand(BaseCommand):
         expanduser('~/.pilferrc')
     )
     jobs: int = DEFAULT_JOBS
-    flagnames: str = tuple(DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split())
-    db_url: str = None
+    flagnames: tuple[str] = tuple(
+        DEFAULT_FLAGS_CONJUNCTION.replace(',', ' ').split()
+    )
+    db_url: str | None = None
     dl_output_format: str = '{basename}'
 
     @property
@@ -130,8 +135,8 @@ class PilferCommand(BaseCommand):
       return Pilfer(
           later=self.later,
           rcpaths=self.configpaths,
-          sqltags_db_url=self.db_url,
-          verify=not self.no_check_certificates,
+          sqltags=self.db_url,
+          verify=not getattr(self, 'no_check_certificates', False),
       )
 
     COMMON_OPT_SPECS = dict(
@@ -147,13 +152,17 @@ class PilferCommand(BaseCommand):
         F_=(
             'flagnames',
             'Flags which must be true for operation to continue.',
-            lambda s: s.replace(',', ' ').split(),
+            lambda flags: flags.replace(',', ' ').split(),
         ),
         load_cookies='Load the browser cookie state into the Pilfer session.',
         no_check_certificates='Do not verify SSL certificates.',
         u='unbuffered',
         x=('trace', 'Trace action execution.'),
     )
+
+  def run(self, **kw_options):
+    with self.options.pilfer:
+      return super().run(**kw_options)
 
   @contextmanager
   def run_context(self):
@@ -175,7 +184,6 @@ class PilferCommand(BaseCommand):
       with options.later:
         pilfer = options.pilfer
         with pilfer:
-          pilfer.sitemaps  # preloads SiteMaps from the pilferrc files as side effect
           with stackattrs(
               self.options,
               sqltags=pilfer.sqltags,
@@ -186,25 +194,34 @@ class PilferCommand(BaseCommand):
               pilfer.load_browser_cookies(pilfer.session.cookies)
             yield options
 
-  # TODO: accept a URL and look it up?
   def popentity(self, argv: list[str], sitemap=None) -> SiteEntity:
-    ''' Return a `SiteEntity` bound to the entity-name at `argv[0]`.
+    ''' Pop off the leading item of `argv` and return a `SiteEntity` bound to the entity it specifies.
+
+        Recognised spcifications in order of test:
+        - a string containing `://`: this is a URL which will be
+          matches against the `*_URL_PATTERN` patterns of the
+          `SiteEntity` classes
+        - *zone*`.`*subtype*`:`*field*`=`*value: return `SiteEntity`
+          insteances whose *field* is equal to *value*, or which
+          contain *value* if the *field* is a list
+        - entity name: the `SiteEntity` with this name
     '''
     if not argv:
       raise GetoptError('missing site-entity')
     entity_spec = argv.pop(0)
-    if '://' in entity_spec:
-      # match a URL to an entity
-      ent = self.options.pilfer.url_entity(entity_spec)
-      if ent is None:
-        raise GetoptError(
-            f'{entity_spec=} does not match a known SiteEntity subclass'
-        )
-    else:
+    with Trace(f'popentity {entity_spec=}') as T:
       try:
-        ent = SiteMap.by_db_key(entity_spec)
-      except KeyError as e:
-        raise GetoptError(f'unrecognised {entity_spec=}: {e}') from e
+        ent = self.options.pilfer.entity_for(entity_spec)
+      except ValueError as e:
+        T("Pilfer.entity_for fails", e)
+        T.printt()
+        raise GetoptError(f'invalid {entity_spec=}')
+      if ent is None:
+        T("no match")
+        T.printt()
+        raise GetoptError(f'no match for {entity_spec=}')
+    T("ent", str(ent))
+    vv(T.printt)()
     return ent
 
   @staticmethod
@@ -232,6 +249,130 @@ class PilferCommand(BaseCommand):
       spec = PipeLineSpec(pipe_name, argv[spec_offset:argv_offset])
       argv_offset += 1
       return spec, argv_offset
+
+  @popopts(
+      d_=('dirpath', 'Output directory for output_fspath, default ".".'),
+      f=('force', 'Force overwrite of the feed file if it already exists.'),
+      limit=('Limit the number of entries in the feed, default 20.', int),
+      o_=(
+          'output_fspath',
+          'Output the feed to the file output_fspath; "-" means the standard output.'
+      ),
+      refresh='Refresh the required web pages even if not stale.',
+      reparse='Reparse the generated feed file as a sanity check.',
+      sync='S3 sync to this endpoint.',
+      url_prefix_='URL prefix for the endpoint.',
+      uuid='Allocate a feed.uuid to the entity for Atom or RSS purposes,\n'
+      'and use it in the default output filename.',
+      xmlv='Provide a leading xml version tag.',
+  )
+  def _cmd_feed(self, argv, synd: Literal["atom", "rss"]):
+    options = self.options
+    pilfer = options.pilfer
+    if not argv:
+      raise GetoptError('missing entity or URL')
+    limit = options.limit or 20
+    # TODO: treat the output_fspath as a format?
+    if options.output_fspath and len(argv) > 1:
+      raise GetoptError(
+          'cannot specify the output path with more than 1 entity.'
+      )
+    xit = 0
+    subpaths_by_ent = {}
+    while argv:
+      with Pfx(argv[0]):
+        try:
+          entity = self.popentity(argv)
+        except GetoptError as e:
+          warning(f'cannot recognise as an entity: {e}')
+          xit = 1
+          continue
+        if not isinstance(entity, FeedMixin):
+          warning(f'entity {entity} is not an instance of FeedMixin')
+          xit = 1
+          continue
+        if options.uuid:
+          try:
+            feed_uuid = entity['feed.uuid']
+          except KeyError:
+            feed_uuid = entity['feed.uuid'] = uuid4()
+        else:
+          feed_uuid = None
+        output_fspath = options.output_fspath
+        if output_fspath != '-':
+          if not output_fspath:
+            output_fspath = (
+                f'{feed_uuid}.{synd}' if feed_uuid else
+                f'{entity.sitemap.URL_DOMAIN}--{entity.name}.{synd}'
+            )
+            subpaths_by_ent[entity] = output_fspath
+          if not isabspath(output_fspath):
+            output_fspath = joinpath(options.dirpath or ".", output_fspath)
+        getattr(entity, f'{synd}_save')(
+            output_fspath,
+            exists_ok=options.force,
+            refresh=options.refresh,
+            xmlv=options.xmlv,
+            limit=limit,
+        )
+        if output_fspath != '-':
+          print(entity.name, output_fspath)
+          if options.reparse:
+            print("Reparse", output_fspath)
+            rss_parser = import_extra('rss_parser', DISTINFO)
+            with open(output_fspath) as rssf:
+              parsed = rss_parser.parse(rssf.read())
+            print("Language", parsed.channel.language)
+            print("Atom", parsed.version)
+            # Iteratively print feed items
+            for item in parsed.channel.items:
+              print(item.title)
+              print(item.description[:50])
+    if options.sync:
+      aws_profile = os.environ['AWS_PROFILE']
+      aws_endpoint = os.environ['PILFER_FEED_AWS_ENDPOINT']
+      bucket = os.environ['PILFER_FEED_BUCKET']
+      bucket_subdir = os.environ['PILFER_FEED_BUCKET_SUBDIR']
+      bucket_url = os.environ['PILFER_FEED_BUCKET_URL']
+      srcdir = options.dirpath
+      dstdir = f's3://{bucket}/{bucket_subdir}'
+      table = []
+      for ent, subpath in sorted(subpaths_by_ent.items(),
+                                 key=lambda ent_subpath: ent_subpath[0].name):
+        table.extend(
+            (
+                [ent.name, output_fspath],
+                (
+                    [
+                        getattr(
+                            ent, 'title', getattr(ent, 'fullname', ent.name)
+                        ),
+                        f'{bucket_url}/{bucket_subdir}/{subpath}',
+                    ],
+                ),
+            )
+        )
+      printt(*table)
+      run(
+          [
+              'aws',
+              's3',
+              'sync',
+              srcdir,
+              dstdir,
+              ('--profile', aws_profile),
+              ('--endpoint', aws_endpoint),
+          ],
+          doit=options.doit,
+          quiet=options.quiet,
+      )
+    return xit
+
+  def cmd_atom(self, argv):
+    ''' Usage: {cmd} entity|URL...
+          Generate feeds for the specified entities (by name or URL).
+    '''
+    return self._cmd_feed(argv, "atom")
 
   @popopts(
       md=('show_md', 'Show metadata.'),
@@ -285,6 +426,80 @@ class PilferCommand(BaseCommand):
                 for cache_key in cache_keys
             )
         )
+
+  def cmd_config(self, argv):
+    ''' Usage: {cmd} [sitemap|domain {{sitecmd [args...] | [URL...]}}]
+          List or query the site maps from the config.
+          With no arguments, list the sitemaps.
+          With a sitemap name (eg "docs") and no further arguments, list the sitemap.
+          If a word follows the sitemap name, treat it as a subcommand of the sitemap.
+          Otherwise assume all remaining arguments are URLs and print the the key for
+          each URL.
+    '''
+    options = self.options
+    P = options.pilfer
+    if not argv:
+      # list site maps
+      if not P.sitemap_names:
+        warning("no sitemaps defined in %s", ", ".join(P.rcpaths))
+        return 0
+      maps = defaultdict(list)
+      for pattern, sitemap_name in P.sitemap_patterns:
+        maps[sitemap_name].append(pattern)
+      printt(
+          *(
+              [name, "\n".join(patterns)]
+              for name, patterns in sorted(maps.items())
+          )
+      )
+      return 0
+    # use a particular sitemap
+    map_name = argv.pop(0)
+    sitemap = P.sitemap[map_name]
+    if not argv:
+      # no URLs: recite the site map patterns
+      for pattern in sitemap.URL_KEY_PATTERNS:
+        (domain_glob, path_re_s), format_s = pattern
+        printt(
+            ['Domain:', '*' if domain_glob is None else domain_glob],
+            ['  Path RE:', path_re_s],
+            ['  Format:', format_s],
+        )
+      return 0
+    # a subcommand?
+    argv0_ = argv[0].replace('-', '_')
+    if is_identifier(argv0_):
+      sitecmd = argv0_
+      argv.pop(0)
+      with Pfx(sitecmd):
+        try:
+          cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
+        except AttributeError:
+          cmds = sorted(
+              name.removeprefix('cmd_')
+              for name in dir(sitemap)
+              if name.startswith('cmd_')
+          )
+          raise GetoptError(
+              f'unknown sitemap command, expected one of {", ".join(cmds)}'
+          )
+        with stackattrs(
+            sitemap,
+            cmd=f'{options.cmd} {sitecmd}',
+            options=self.options,
+            subcmd=sitecmd,
+        ):
+          return cmdmethod(argv)
+    # match URLs against the sitemap
+    table = []
+    for url in argv:
+      with Pfx(url):
+        U = URL(url)
+        table.extend((
+            ["URL:", url],
+            ["  key:", sitemap.url_key(url)],
+        ))
+    printt(*table)
 
   @popopts
   def cmd_dbshell(self, argv):
@@ -366,6 +581,8 @@ class PilferCommand(BaseCommand):
     '''
     options = self.options
     P = options.pilfer
+    if not argv and not sys.stdin.isatty():
+      argv = ['-']
     if argv and argv[0] == '-':
       # "-" means dump the content of stdin
       url = argv.pop(0)
@@ -402,7 +619,7 @@ class PilferCommand(BaseCommand):
     if url == '-':
       text = sys.stdin.read()
       soup = BeautifulSoup(text, BS4_PARSER_DEFAULT)
-      dump_soup(soup)
+      printt_soup(soup)
       return 0
     printt(
         [method, url],
@@ -438,7 +655,8 @@ class PilferCommand(BaseCommand):
     )
     soup = flowstate.soup
     if soup is None:
-      print("no soup for content_type", flowstate.content_type)
+      if not flowstate.content_type.startswith('image/'):
+        print("no soup for content_type", flowstate.content_type)
     else:
       table = []
       title = soup.head and soup.head.title
@@ -485,25 +703,18 @@ class PilferCommand(BaseCommand):
             )
         )
       printt(*table)
-    table = []
-    for i, (method, match_tags,
-            grokked) in enumerate(self.options.pilfer.grok(flowstate)):
-      if i == 0:
-        table.append(['Grokked:'])
-      table.append(
-          [
-              f'  {method.__qualname__}',
-              "\n".join(map(str, sorted(match_tags)))
-          ]
-      )
-      if grokked is not None:
-        for k, v in grokked.items():
-          table.append([[f'    {k}', dict(v)] if isinstance(v, TagSet) else v])
-    printt(*table)
     if self.options.dump_content:
       print("Content:", flowstate.content_type)
-      if flowstate.content_type in ('text/html',):
+      if flowstate.content_type in (
+          'text/html',
+          'text/xml',
+          ATOM_CONTENT_TYPE,
+          RSS_CONTENT_TYPE,
+      ):
         soup = flowstate.soup
+        ##meta = flowstate.meta
+        ##printt(meta)
+        ##breakpoint()
         printt_soup(soup)
       elif flowstate.content_type in ('application/json',):
         jdata = flowstate.json
@@ -529,6 +740,29 @@ class PilferCommand(BaseCommand):
             )
         else:
           pprint(jdata)
+      elif flowstate.content_type.startswith('image/'):
+        try:
+          from PIL import Image
+          from cs.imageutils import SixelImageString
+        except ImportError as e:
+          warning(f'missing PIL or cs.imageutils: {e}')
+        else:
+          with NamedTemporaryFile(
+              suffix=f'.{flowstate.content_type.split("/",1)[-1]}',
+              mode='wb') as T:
+            for bs in flowstate.iterable_content:
+              T.write(bs)
+            T.flush()
+            image = Image.open(T.name)
+          print(
+              f'{image.format} ({image.format_description}), {image.mode}, {image.size[0]}x{image.size[1]}'
+          )
+          exif = image.getexif()
+          if exif:
+            printt("EXIF:", exif)
+          tsize = ttysizepx(sys.stdout)
+          siximage = SixelImageString(image).resized_within(tsize.columns, 32)
+          print(siximage)
       else:
         warning("No content dump for %s.", flowstate.content_type)
 
@@ -580,40 +814,6 @@ class PilferCommand(BaseCommand):
         print("CLOSED DIVERSION", diversion_name)
 
     asyncio.run(run())
-
-  @popopts
-  def cmd_grok(self, argv):
-    ''' Usage: {cmd} URL
-          Call every matching @on grok_* method for sitemaps matching URL.
-    '''
-    if not argv:
-      raise GetoptError("missing URL")
-    url = argv.pop(0)
-    if argv:
-      raise GetoptError(f'extra arguments after URL: {argv!r}')
-    options = self.options
-    P = options.pilfer
-    print(url)
-    table = []
-    for method, match_tags, grokked in P.grok(url):
-      table.append(
-          [
-              f'  {method.__qualname__}',
-              "\n".join(map(str, sorted(match_tags)))
-          ]
-      )
-      if grokked is None:
-        table.append(['    grokked =>', 'None'])
-      else:
-        if isinstance(grokked, SQLTagSet):
-          table.append(
-              ['    grokked =>', f'{grokked.sqltags}[{grokked.name}]']
-          )
-        else:
-          table.append(['    grokked =>', s(grokked)])
-        for k, v in grokked.items():
-          table.append([f'      {k}', v])
-    printt(*table)
 
   @popopts
   def pop_mitm_action(self, argv):
@@ -713,6 +913,9 @@ class PilferCommand(BaseCommand):
     # make a MITMAddon and attach the CLI hooks
     mitm_addon = MITMAddon(logging_handlers=list(logging.getLogger().handlers))
     while argv:
+      # end the filter specifications
+      if argv[0] == '-' or argv[0].startswith(('http://', 'https://')):
+        break
       try:
         action, hook_names, criteria = self.pop_mitm_action(argv)
       except GetoptError as e:
@@ -721,14 +924,37 @@ class PilferCommand(BaseCommand):
       pfx_call(mitm_addon.add_action, action, hook_names, criteria or None)
     if bad_actions:
       raise GetoptError("invalid action specifications")
-    asyncio.run(
-        run_proxy(
-            listen_host,
-            listen_port,
-            addon=mitm_addon,
-            upstream_proxy_url=self.options.proxy,
-        )
-    )
+    if not argv:
+      asyncio.run(
+          run_proxy(
+              listen_host,
+              listen_port,
+              addon=mitm_addon,
+              upstream_proxy_url=self.options.proxy,
+          )
+      )
+      return 0
+
+    @promote
+    def run_url(mitm_addon, flow: FlowState):
+      flow.response  # for the side effect - does a GET
+      pfx_call(mitm_addon.call_hooks_for, 'response', flow)
+
+    for arg in argv:
+      with Pfx("%r", arg):
+        if arg == '-':
+          if sys.stdin.isatty():
+            while True:
+              url_s = input(f'{self.options.cmd} URL> ')
+              if url_s:
+                run_url(mitm_addon, url_s)
+          else:
+            for url_s in sys.stdin:
+              run_url(mitm_addon, url_s)
+        else:
+          url_s = arg
+          run_url(mitm_addon, url_s)
+    return 0
 
   def cmd_patch(self, argv):
     ''' Usage: {cmd} URL
@@ -746,7 +972,27 @@ class PilferCommand(BaseCommand):
       print(method, match_tags)
     print(flowstate.soup)
 
-  @popopts(f='Force: refresh the entity even if it is not stale.')
+  @popopts(
+      l=('long', 'Do a full printt() instread of the shorter report style.'),
+      r=('recurse', 'Recursively list the related subentities.'),
+  )
+  def cmd_print(self, argv):
+    ''' Usage: {cmd} ent-spec...
+          Print information about each ent-spec.
+    '''
+    if not argv:
+      raise GetoptError('missing ent-specs')
+    while argv:
+      ent = self.popentity(argv)
+      if self.options.long:
+        ent.printt()
+      else:
+        ent.printt_summary(recurse=self.options.recurse)
+
+  @popopts(
+      f=('force', 'Force: refresh the entity even if it is not stale.'),
+      r=('recurse', 'Recursively refresh the related subentities.'),
+  )
   def cmd_refresh(self, argv):
     ''' Usage: {cmd} entity...
           Refresh the specified entities by fetching and grokking their site pages.
@@ -755,56 +1001,14 @@ class PilferCommand(BaseCommand):
       raise GetoptError("missing entities")
     while argv:
       ent = self.popentity(argv)
-      ent.printt()
-      ent.refresh(force=self.options.force)
+      ent.refresh(force=self.options.force, recurse=self.options.recurse)
       ent.printt()
 
-  @popopts(
-      d_=('dirpath', 'Output directory for output_fspath, default ".".'),
-      f=('force', 'Force overwrite of the RSS file if it already exists.'),
-      o_=('output_fspath', 'Output the RSS to the file output_fspath.'),
-      refresh='Refresh the required web pages even if not stale.',
-      xmlv='Provide a leading xml version tag.',
-  )
   def cmd_rss(self, argv):
-    ''' Usage: {cmd} entity|URL
-          Generate an RSS feed for the specified entity or URL.
+    ''' Usage: {cmd} entity|URL...
+          Generate feeds for the specified entities (by name or URL).
     '''
-    pilfer = self.options.pilfer
-    if not argv:
-      raise GetoptError('missing entity or URL')
-    entity = self.popentity(argv)
-    if argv:
-      raise GetoptError(f'extra arguments after entity/URL: {argv!r}')
-    if not isinstance(entity, RSSChannelMixin):
-      raise GetoptError(
-          f'entity {entity} is not an instance of RSSChannelMixin'
-      )
-    output_fspath = joinpath(
-        self.options.dirpath or ".", self.options.output_fspath
-        or f'{entity.sitemap.URL_DOMAIN}--{entity.name}.rss'
-    )
-    rss = entity.rss(refresh=self.options.refresh)
-    with atomic_filename(output_fspath, mode='w',
-                         exists_ok=self.options.force) as T:
-      if self.options.xmlv:
-        print('<?xml version="1.0" encoding="UTF-8"?>', file=T)
-      print(
-          xml_tostring(rss, encoding='unicode', pretty_print=True),
-          end='',
-          file=T
-      )
-    print(output_fspath)
-    print("Reparse", output_fspath)
-    from rss_parser import RSSParser
-    with open(output_fspath) as rssf:
-      parsed = RSSParser.parse(rssf.read())
-    print("Language", parsed.channel.language)
-    print("RSS", parsed.version)
-    # Iteratively print feed items
-    for item in parsed.channel.items:
-      print(item.title)
-      print(item.description[:50])
+    return self._cmd_feed(argv, "rss")
 
   @popopts(p=('makedirs', 'Make required intermeditate directories.'))
   def cmd_save(self, argv):
@@ -824,73 +1028,88 @@ class PilferCommand(BaseCommand):
           *([f'  {hdr}', value] for hdr, value in rsp.headers.items()),
       )
 
-  def cmd_sitemap(self, argv):
-    ''' Usage: {cmd} [sitemap|domain {{sitecmd [args...] | [URL...]}}]
-          List or query the site maps from the config.
-          With no arguments, list the sitemaps.
-          With a sitemap name (eg "docs") and no further arguments, list the sitemap.
-          If a word follows the sitemap name, treat it as a subcommand of the sitemap.
-          Otherwise assume all remaining arguments are URLs and print the the key for
-          each URL.
+  @popopts(apply='Apply the scanned information.')
+  def cmd_scan(self, argv):
+    ''' Usage: {cmd} URL
+          Call every matching @on scan_* method for sitemaps matching URL.
     '''
+    if not argv:
+      raise GetoptError("missing URL")
+    url = URL(argv.pop(0))
+    print(url)
+    if argv:
+      raise GetoptError(f'extra arguments after URL: {argv!r}')
     options = self.options
     P = options.pilfer
-    xit = 0
-    if not argv:
-      # list site maps
-      printt(
-          *[
-              [pattern, str(sitemap)]
-              for pattern, sitemap in self.options.pilfer.sitemaps
-          ]
+    flowstate = FlowState.from_URL(url)
+    if not options.force and not (200 <= flowstate.response.status_code < 300):
+      warning(
+          f'{flowstate.url.short} {flowstate.response.status_code=} != 2xx, not scanning'
       )
-      return 0
-    # use a particular sitemap
-    map_name = argv.pop(0)
-    for domain_glob, sitemap in P.sitemaps:
-      if map_name == sitemap.name:
-        break
-    else:
-      warning("no sitemap named %r", map_name)
       return 1
-    if not argv:
-      # no URLs: recite the site map patterns
-      for pattern in sitemap.URL_KEY_PATTERNS:
-        (domain_glob, path_re_s), format_s = pattern
-        printt(
-            ['Domain:', '*' if domain_glob is None else domain_glob],
-            ['  Path RE:', path_re_s],
-            ['  Format:', format_s],
-        )
-      return 0
-    # a subcommand?
-    argv0_ = argv[0].replace('-', '_')
-    if is_identifier(argv0_):
-      sitecmd = argv0_
-      argv.pop(0)
-      with Pfx(sitecmd):
-        try:
-          cmdmethod = getattr(sitemap, f'cmd_{sitecmd}')
-        except AttributeError:
-          cmds = sorted(
-              name.removeprefix('cmd_')
-              for name in dir(sitemap)
-              if name.startswith('cmd_')
-          )
-          raise GetoptError(
-              f'unknown sitemap command, expected one of {", ".join(cmds)}'
-          )
-        with stackattrs(sitemap, options=self.options):
-          return cmdmethod(argv)
-    # match URLs against the sitemap
     table = []
-    for url in argv:
-      with Pfx(url):
-        U = URL(url)
-        table.extend((
-            ["URL:", url],
-            ["  key:", sitemap.url_key(url)],
-        ))
-    printt(*table)
+    with Trace("scan sitemaps") as T:
+      for sitemap in P.sitemaps_for_url_host(url):
+        with Trace(f'matched {sitemap}') as T2:
+          print(f'P.sitemaps_for_url_host({url=})\n  -> {sitemap}')
+          print("    look for matched scan_* methods via @on")
+          for method, match in sitemap.on_matches(flowstate, 'scan_*'):
+            T2(f'matched method {method}', match)
+            print(f'      {method=}')
+            scandata = method(flowstate, match)
+            scandata.printt(f'{method}({flowstate.url.short},{match=})')
+            breakpoint()
+          print("    look via entities_for ...")
+          for ent in sitemap.entities_for(url):
+            print(f'      matched {ent.name}')
+            scandata = trace(ent.scan_sitepage)(flowstate)
+            scandata.printt()
+    breakpoint()
+    return 0
+
+  @cached_property
+  def cmd_sitemap(self):
+    ''' A `BaseCommand` subclass with methods for each sitemap.
+    '''
+
+    class PilferSiteMapCommand(BaseCommand):
+      ''' Access the defined site maps' CLIs by name.
+      '''
+
+    P = self.options.pilfer
+    for sitemap_name in P.sitemap_names:
+      sitemap = P.sitemap[sitemap_name]
+      method_name = f'{BaseCommand.SUBCOMMAND_METHOD_PREFIX}{sitemap.name}'
+      setattr(PilferSiteMapCommand, method_name, sitemap.SiteMapCommand)
+    return PilferSiteMapCommand
+
+  def cmd_tables(self, argv):
+    ''' Usage: {cmd} URL
+          Scan URL for TABLE elements and print them out.
+    '''
+    P = self.options.pilfer
+    url, = argv
+    if url == '-':
+      text = sys.stdin.read()
+      soup = BeautifulSoup(text, BS4_PARSER_DEFAULT)
+      printt_soup(soup)
+      return 0
+    rsp = P.GET(
+        url,
+        ##headers=rqhdrs,
+        ##params=(None if not params or method == 'POST' else params),
+        ##data=(None if not params or method != 'POST' else params),
+        ##allow_redirects=not options.no_redirects,
+    )
+    if rsp.status_code != 200:
+      warning("%s %s -> status_code %r", url, rsp.status_code)
+    flowstate = FlowState(
+        url=url,
+        request=rsp.request,
+        response=rsp,
+    )
+    for table in Table.scan(flowstate.soup):
+      print()
+      table.printt()
 
 sys.exit(main(sys.argv))

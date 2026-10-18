@@ -6,6 +6,7 @@
 
 set -ue
 
+docker_exe=${DOCKER_EXE:-${DK_COMMAND:-docker}}
 name=
 image=
 use_tmux=
@@ -92,15 +93,22 @@ do
     first=
     # set initial args
     # --restart unless-stopped
-    set -- \
-      docker run \
+    set -- "$docker_exe" run \
         $rmopt \
-        --net=host \
         --pull "$run_pull_mode" \
+        --net=host \
         --restart "$restart" \
-        -e "PUID=$uid" \
-        -e "PGID=$gid" \
         -e "TZ=$tz"
+    case "$docker_exe" in
+      docker* | */docker* )
+        set -- "$@" -e "PUID=$uid" -e "PGID=$gid"
+        ;;
+      podman* | */podman* )
+        set -- "$@" --userns keep-id --group-add keep-groups
+        ;;
+      *)echo "$cmd: neither docker nor podman?" >&2
+        ;;
+    esac
     for port in $ports
     do  set -- "$@" -p "$port"
     done

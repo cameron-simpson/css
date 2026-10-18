@@ -1,0 +1,6 @@
+lib/python/cs/deco.py: cs.deco: fix docstring typo
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: also mark the obsolete function as deprecated
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: support Python pre-3.13 which has no @warnings.deprecated
+lib/python/cs/deco.py: cs.deco: ad a comment
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: accomodate classes as well as functions
+lib/python/cs/deco.py: cs.deco: @OBSOLETE: fix for classes with no .__firstlineno__

@@ -17,12 +17,10 @@ raising `ValueError` on failed tokenisation.
 import binascii
 from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass
-from datetime import date, datetime
 from functools import partial
 from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from pprint import PrettyPrinter
 import re
 from string import (
     ascii_letters,
@@ -34,22 +32,21 @@ from string import (
 )
 import sys
 from textwrap import dedent
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
 
 from dateutil.tz import tzlocal
 from icontract import require
 from typeguard import typechecked
 
-from cs.ascii_art import box_char, HORIZ, LARGE_CIRCLE
 from cs.dateutils import unixtime2datetime, UTC
-from cs.deco import attr, fmtdoc, decorator, OBSOLETE, Promotable
+from cs.deco import fmtdoc, decorator, OBSOLETE, Promotable
 from cs.gimmicks import warning
 from cs.obj import public_subclasses
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
-from cs.seq import common_prefix_length, common_suffix_length, with_neighbours
+from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20260526-post'
+__version__ = '20261016-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -59,7 +56,6 @@ DISTINFO = {
         "Topic :: Text Processing",
     ],
     'install_requires': [
-        'cs.ascii_art>=LARGE_CIRCLE',
         'cs.dateutils',
         'cs.deco',
         'cs.gimmicks',
@@ -215,7 +211,7 @@ def strlist(ary: Iterable, sep: str = ", ") -> str:
   return sep.join([str(a) for a in ary])
 
 # pylint: disable=redefined-outer-name
-def htmlify(s: str, nbsp: bool = False) -> str:
+def html_escape(s: str, nbsp: bool = False) -> str:
   ''' Convert a string for safe transcription in HTML.
 
       Parameters:
@@ -229,6 +225,8 @@ def htmlify(s: str, nbsp: bool = False) -> str:
   if nbsp:
     s = s.replace(" ", "&nbsp;")
   return s
+
+htmlify = OBSOLETE(html_escape)
 
 def htmlquote(s: str) -> str:
   ''' Quote a string for use in HTML.
@@ -428,9 +426,13 @@ def skipwhite(s: str, offset: int = 0) -> int:
 def indent(paragraph: str, line_indent: str = "  ") -> str:
   ''' Return the `paragraph` indented by `line_indent` (default `"  "`).
   '''
-  return "\n".join(
-      line and line_indent + line for line in paragraph.split("\n")
-  )
+  if not line_indent.strip():
+    # do not indent empty lines when the indent is whitespace
+    return "\n".join(
+        line and line_indent + line for line in paragraph.split("\n")
+    )
+  # otherwise we indent every line
+  return "\n".join(line_indent + line for line in paragraph.split("\n"))
 
 # TODO: add an optional detab=n parameter?
 def stripped_dedent(
@@ -615,7 +617,7 @@ def get_suffix_part(
           r')\s*$',
       )
   )
-  regexp = re.compile(regexp_s, re.I)
+  regexp = re.compile(regexp_s, re.IGNORECASE)
   m = regexp.search(s)
   if not m:
     return None, None
@@ -1494,275 +1496,6 @@ def split_remote_path(remotepath: str) -> Tuple[Union[str, None], str]:
   from cs.fs import RemotePath
   return RemotePath.from_str(remotepath)
 
-class TabulatePrettyPrinter(PrettyPrinter):
-  ''' A `PrettyPrinter` subclass which presents `date` and
-      `datetime` as ISO8601 strings.
-
-      This is used by `tabulate` and `printt`.
-  '''
-
-  def __init__(self, compact=True, sort_dicts=True, **ppkw):
-    ''' The default format settings use `compact=True` and `sort_dicts=True`.
-    '''
-    super().__init__(compact=compact, sort_dicts=sort_dicts, **ppkw)
-
-  def format(self, obj, *fmt_a) -> Tuple[str, bool, bool]:
-    ''' Use ISO8601 for `date` and `datetime` objects.
-    '''
-    if isinstance(obj, date):
-      return obj.isoformat(), True, False
-    if isinstance(obj, datetime):
-      return obj.isoformat(' '), True, False
-    return super().format(obj, *fmt_a)
-
-def row_cells(
-    row: str | Sequence[Any],
-    as_str: Callable[Any, str] | None = None,
-) -> List[List[str]]:
-  r'''Turn a row of items into a grid.
-
-      Process:
-      - convert each non-`str` item into a string using `as_str`
-      - break each string into lines
-      - make enough rows to cover the tallest column
-
-      The default `as_str` comes from `tabulate.as_str`.
-
-      Example:
-
-          >>> for cells in row_cells(['col1', 'multi\nline\ntext', 'goes\nhere', 'and\nhere']):
-          ...     print(cells)
-          ...
-          ['col1', 'multi', 'goes', 'and']
-          ['', 'line', 'here', 'here']
-          ['', 'text', '', '']
-  '''
-  if as_str is None:
-    as_str = tabulate.default_as_str
-  # promote a str to a single item list
-  if isinstance(row, str):
-    row = [row]
-  # turn non-str row items into strings
-  row = [(cell if isinstance(cell, str) else as_str(cell)) for cell in row]
-  if all("\n" not in cell for cell in row):
-    # no multiline row cells
-    return [row]
-  # split multiline cells into columns, pad columns to match
-  cols = [[subcell.rstrip() for subcell in cell.splitlines()] for cell in row]
-  max_height = max(map(len, cols))
-  return [
-      [(col[subrow] if subrow < len(col) else '')
-       for col in cols]
-      for subrow in range(max_height)
-  ]
-
-@typechecked
-def flatten_table_rows(
-    table_rows: list[str | list | tuple],
-    as_str: Callable[Any, str] | None = None,
-) -> tuple[list[list[str]], list[int]]:
-  ''' Flatten a list of table rows or tuples-of-table-rows into a
-      `(flat_rows,attach)` 2 -tuple where `flat_rows` is a list lof
-      list-of-str rows and attach is a list of indices into `flat_rows`
-      which are attachment points.
-      Nested subtables are connected with lines.
-
-      The default `as_str` comes from `tabulate.as_str`.
-  '''
-  if as_str is None:
-    as_str = tabulate.default_as_str
-
-  def is_attachable_cell_grid(cells):
-    ''' Test if a cell row has nonwhitepace in column 0
-      '''
-    return bool(cells and cells[0] and cells[0][0].lstrip())
-
-  # promote rows to lists or AttachedLines
-  rows: list[list[str]] = []
-  attach: list[int] = []
-  for prev_trow, trow, next_trow in with_neighbours(table_rows):
-    # FIXME: this calls row_cells twice on each row
-    #        maybe call cell_rows on all lists?
-    #        in a prepass?
-    if isinstance(trow, (list, str)):
-      attach_below = bool(
-          isinstance(next_trow, tuple) and next_trow
-          and is_attachable_cell_grid(row_cells(next_trow[0]))
-      )
-      cells = row_cells(trow)
-      attachable = is_attachable_cell_grid(cells)
-      if attachable:
-        attach.append(len(rows))
-      # append the cell rows, possibly indents and attached
-      for ci, cell_row in enumerate(cells):
-        if ci > 0 and attach_below:
-          indent = box_char(
-              arc=True,
-              up=True,
-              down=attach_below,
-              right=attachable and ci == 0,
-          )
-          cell_row[0] = indent + cell_row[0]
-        rows.append(cell_row)
-    elif isinstance(trow, tuple):
-      # an indented subscetion
-      subrows, subattach = flatten_table_rows(
-          list(trow), as_str=as_str
-      )  # was True
-      # indent all the subrows
-      n_subattach = len(subattach)
-      for subndx, subrow in enumerate(subrows):
-        # NB: must be before the subattach.pop(0) below
-        attach_above = bool(
-            subattach
-            and (type(prev_trow) is list or len(subattach) < n_subattach)
-        )
-        do_attach = bool(subattach and subattach[0] == subndx)
-        if do_attach:
-          subattach.pop(0)
-        sub_attach_below = bool(subattach)  # more things to come
-        up = attach_above  ## do_attach or sub_attach_below,
-        down = sub_attach_below
-        right = do_attach
-        indent = (
-            LARGE_CIRCLE if right and not up and not down else
-            box_char(arc=True, up=up, down=down, right=right)
-        ) + (
-            HORIZ if do_attach else " "
-        )
-        subrow[0] = indent + subrow[0]
-        rows.append(subrow)
-    else:
-      raise TypeError(f'row type {type(trow)} is neither list nor tuple')
-  return rows, attach
-
-@attr(default_as_str=TabulatePrettyPrinter().pformat)
-def tabulate(
-    *rows,
-    sep='  ',
-    as_str: Callable[Any, str] | None = None,
-) -> Iterable[str]:
-  r'''A generator yielding lines of values from `rows` aligned in columns.
-
-      Usually, each row in rows is a `list` of strings. Non-`str` objects are
-      promoted to `str` via the `as_str` function.
-      If the strings contain newlines they will be split into
-      subrows.
-
-      A row may also be a `tuple`, indicating a subtable, which
-      will be embedded with its column 0 indented and joined up
-      with lines to indicate structure.
-
-      The default `as_str` function is `TabulatePrettyPrinter().pformat`;
-      the `TabulatePrettyPrinter` class is a subclass of `pprint.PrettyPrinter`
-      which also understands `datetime.date` and `datetime.datetime` objects.
-      This is exposed as `tabulate.default_as_str`.
-
-      Example:
-
-          >>> for row in tabulate(
-          ...    ['one col'],
-          ...    ['three', 'column', 'row'],
-          ...    ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
-          ...    ['two', 'cols'],
-          ...    (
-          ...        ['subrow', 'description'],
-          ...        (["0nd", "subtable"],),
-          ...        (
-          ...            ['inner', 'table'],
-          ...            ['', 'unattached'],
-          ...            ['inner\nbottom', 'last inner row'],
-          ...        ),
-          ...        (["2nd\nbbb", "subtable"],),
-          ...        ['subrow2'],
-          ...     ),
-          ...     ['one col'],
-          ...     ['three', 'column', 'row'],
-          ...     ['row3', 'multi\nline\ntext', 'goes\nhere', 'and\nhere'],
-          ...     ['two', 'cols'],
-          ...     (
-          ...        ['subrow','description'],
-          ...        (
-          ...           ['inner','table'],
-          ...           ['','unattached'],
-          ...           ['inner\nbottom','last inner row'],
-          ...        ),
-          ...     ),
-          ...     ['subrow2'],
-          ... ):
-          ...     print(row)
-          ...
-          one col
-          three       column          row
-          row3        multi           goes  and
-                      line            here  here
-                      text
-          two         cols
-          ├─subrow    description
-          │ ╰─0nd     subtable
-          │ ╭─inner   table
-          │ │         unattached
-          │ ╰─inner   last inner row
-          │   bottom
-          │ ◯─2nd     subtable
-          │   bbb
-          ╰─subrow2
-          one col
-          three       column          row
-          row3        multi           goes  and
-                      line            here  here
-                      text
-          two         cols
-          ╰─subrow    description
-            ├─inner   table
-            │         unattached
-            ╰─inner   last inner row
-              bottom
-          subrow2
-          >>>
-  '''
-  if as_str is None:
-    as_str = tabulate.default_as_str
-  if not rows:
-    # avoids max of empty list
-    return
-  rows, _ = flatten_table_rows(list(rows), as_str=as_str)
-  # pad short rows with empty columns
-  max_cols = max(map(len, rows))
-  for row in rows:
-    if len(row) < max_cols:
-      row += [''] * (max_cols - len(row))
-  col_widths = [
-      max(map(len, (row[c]
-                    for row in rows)))
-      for c in range(max(map(len, rows)))
-  ]
-  for row in rows:
-    yield sep.join(
-        f'{col_val:<{col_widths[c]}}' for c, col_val in enumerate(row)
-    ).rstrip()
-
-def printt(
-    *table, file=None, flush=False, indent='', print_func=None, **tabulate_kw
-):
-  ''' A wrapper for `tabulate()` to print the results.
-      Each positional argument is a table row.
-
-      Parameters:
-      * `file`: optional output file, passed to `print_func`
-      * `flush`: optional flush flag, passed to `print_func`
-      * `indent`: optional leading indent for the output lines;
-        if this is an `int` instead of a `str`, use that many spaces
-      * `print_func`: optional `print()` function, default `builtins.print`
-      Other keyword arguments are passed to `tabulate()`.
-  '''
-  if isinstance(indent, int):
-    indent = ' ' * indent
-  if print_func is None:
-    from builtins import print as print_func
-  for line in tabulate(*table, **tabulate_kw):
-    print_func(indent + line, file=file, flush=flush)
-
 def single_space(s: str, *, sep=' ') -> str:
   ''' Return the string `s` stripped and with internal whitespace replaced by `sep` (default `" "`).
   '''
@@ -1913,7 +1646,7 @@ class FormatableFormatter(Formatter):
       rf'({FORMAT_RE_ATTRIBUTE_NAME_s}|\[{FORMAT_RE_ELEMENT_INDEX_s}\]'
       rf')*'
   )
-  FORMAT_RE_FIELD_EXPR = re.compile(FORMAT_RE_FIELD_EXPR_s, re.I)
+  FORMAT_RE_FIELD_EXPR = re.compile(FORMAT_RE_FIELD_EXPR_s, re.IGNORECASE)
   FORMAT_RE_FIELD = re.compile(
       (
           r'{'
@@ -1921,7 +1654,7 @@ class FormatableFormatter(Formatter):
           r'(!(?P<conversion>[^:}]*))?'
           r'(:(?P<format_spec>[^}]*))?'
           r'}'
-      ), re.I
+      ), re.IGNORECASE
   )
 
   if False:  # pylint: disable=using-constant-test
@@ -2665,6 +2398,20 @@ class QuotedString(_LiteralValue, BaseToken):
         value=value,
         quote=q,
     )
+
+@OBSOLETE('cs.printt.tabulate')
+def tabulate(*a, **kw):
+  ''' Compatibility shim for `cs.printt.tabulate()`, which was formerly here.
+  '''
+  from cs.printt import tabulate
+  return tabulate(*a, **kw)
+
+@OBSOLETE('cs.printt.printt')
+def printt(*a, **kw):
+  ''' Compatibility shim for `cs.printt.printt()`, which was formerly here.
+  '''
+  from cs.printt import printt
+  return printt(*a, **kw)
 
 if __name__ == '__main__':
   import cs.lex_tests

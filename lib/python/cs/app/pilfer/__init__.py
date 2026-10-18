@@ -5,9 +5,10 @@
 
 ''' Pilfer, a web scraping tool.
 
-    Presently this has two modes, a scraper and a proxy.
+    Presently this has two main modes, a scraper and a proxy.
     The scraper is invoked as `pilfer from` *URL* *action-pipeline...*
     The proxy is invoked as `pilfer mitm` [`@`*IP*`:`*port*] *actions*...
+    However, the `pilfer` command has several subcommands in addition to these.
 
     The scraper feeds URLs through a pipeline which processes the
     URLs, or data derived from them. Where it needs the URL's content
@@ -29,7 +30,7 @@ DISTINFO = {
         "Topic :: Internet :: Proxy Servers",
         "Topic :: Utilities",
     ],
-    'python_requires':
+    'requires_python':
     '>=3.13',  # for configparser.UNNAMED_SECTION
     'entry_points': {
         'console_scripts': {
@@ -71,6 +72,9 @@ DISTINFO = {
         'requests',
         'typeguard',
     ],
+    'extras_requires': {
+        'reparse': ['rss_parser'],
+    },
 }
 
 # parallelism of jobs

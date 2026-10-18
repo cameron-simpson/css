@@ -37,7 +37,7 @@ from cs.py.func import funcname, prop
 from cs.py.stack import caller
 from cs.seq import Ordered, Seq
 
-__version__ = '20260531-post'
+__version__ = '20260912-post'
 
 DISTINFO = {
     'description':
@@ -968,17 +968,27 @@ def pmap(
   def dispatcher():
     ''' Dispatch `Thread`s to run `func` against each item.
     '''
-    nonlocal ndispatched
-    for i, item in enumerate(it):
-      name = f'pmap[{i}]:{func=},{item=}'
-      T = builtin_Thread(name=name, target=run_func, args=(sem, func, i, item))
-      if sem is not None: sem.acquire()
-      try:
-        T.start()
-        ndispatched += 1
-      except Exception as e:
-        if sem is not None: sem.release()
-        warning(f'pmap: Thread({name}).start(): {e}', exc_info=sys.exc_info())
+    try:
+      nonlocal ndispatched
+      for i, item in enumerate(it):
+        name = f'pmap[{i}]:{func=},{item=}'
+        T = builtin_Thread(
+            name=name, target=run_func, args=(sem, func, i, item)
+        )
+        if sem is not None: sem.acquire()
+        try:
+          T.start()
+          ndispatched += 1
+        except Exception as e:
+          if sem is not None: sem.release()
+          warning(
+              f'pmap: Thread({name}).start(): {e}', exc_info=sys.exc_info()
+          )
+      # indicate all functions dispatched
+      resultQ.put(None)
+    except Exception as e:
+      warning("pmap: dispatcher: %r %s", type(e), e)
+      raise
 
   name = f'pmap dispatcher:{func=}'
   DT = builtin_Thread(name=name, target=dispatcher)
@@ -988,8 +998,13 @@ def pmap(
     ordered = None
   else:
     ordered = Ordered()
-  while DT.is_alive() or consumed < ndispatched:
-    i, (result, exc) = resultQ.get()
+  all_dispatched = False
+  while not all_dispatched or consumed < ndispatched:
+    qitem = resultQ.get()
+    if qitem is None:
+      all_dispatched = True
+      continue
+    i, (result, exc) = qitem
     consumed += 1
     if unordered:
       yield yield_value(i, result, exc)

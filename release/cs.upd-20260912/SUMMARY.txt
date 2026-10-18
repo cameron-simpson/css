@@ -1,0 +1,1 @@
+Move the ticker facility into UpdProxy (new UpdProxy.ticker() context manager), add new ticker_deferred=False parameter to run_task to allow users to allowate a slot an run the ticker just during the operation.

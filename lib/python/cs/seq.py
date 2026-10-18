@@ -17,15 +17,15 @@ from heapq import heappop, heappush
 import itertools
 from threading import Lock, Condition, Thread
 from typing import (
-    Any, Callable, GenericAlias, Generator, Hashable, Iterable, Optional,
-    Tuple, TypeVar
+    Any, Callable, GenericAlias, Generator, Hashable, Iterable, Iterator,
+    Optional, Tuple, TypeVar
 )
 
-from cs.deco import decorator
+from cs.deco import decorator, OBSOLETE
 from cs.gimmicks import warning
 from cs.typingutils import Sortable
 
-__version__ = '20260526-post'
+__version__ = '20260912-post'
 
 DISTINFO = {
     'description':
@@ -124,6 +124,34 @@ def get0(iterable, default=None):
   except IndexError:
     return default
   return i
+
+def consume(it: Iterator, last_item=lambda _: False, *, no_items=None):
+  ''' Consume the iterator `it`.
+      If `last_item(item)` is true for some `item` from the iterator,
+      cease at that item; the default `last_item` returns `False`,
+      consuming everything from the iterator.
+      Return the last item consumed, or `no_items` (default `None`) if there were no items.
+  '''
+  item = no_items
+  for item in it:
+    if last_item(item):
+      return item
+  return no_items
+
+def consumed(it: Iterator, last_item=lambda _: False) -> Generator:
+  ''' Consume the iterator `it`, a variation on `consume()`.
+      If `last_item(item)` is true for some `item` from the iterator,
+      cease at that item; the default `last_item` returns `False`,
+      consuming everything from the iterator.
+      Return an iterator yielding the last item consumed (if any)
+      and then the remaining items from `it`.
+  '''
+  no_items = object()
+  last_item = consume(it, last_item=last_item, no_items=no_items)
+  if last_item is no_items:
+    return
+  yield last_item
+  yield from it
 
 def tee(iterable, *Qs):
   ''' A generator yielding the items from an iterable
@@ -404,7 +432,7 @@ class StatefulIterator:
     self.state = new_state
     return item
 
-class ClonedIterator(Iterable):
+class ReIterable(Iterable):
   ''' A thread safe clone of some orginal iterator.
 
       `next()` of this yields the next item from the supplied iterator.
@@ -450,6 +478,9 @@ class ClonedIterator(Iterable):
           self._cloned.append(item)
       yield item
       i += 1
+
+# better name suggested by λambda @ python.discord
+ClonedIterator = OBSOLETE(ReIterable)
 
 def splitoff(sq, *sizes):
   ''' Split a sequence into (usually short) prefixes and a tail,
@@ -891,6 +922,9 @@ class range:
 
   @classmethod
   def __class_getitem__(cls, index):
+    ''' You can also index this `range` type` with a slice, obtaining
+        a range matching the slice.
+    '''
     if isinstance(index, slice):
       return range(...)[index]
     if isinstance(index, type):

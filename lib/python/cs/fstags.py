@@ -122,9 +122,9 @@ from typing import (
 from icontract import ensure, require
 from typeguard import typechecked
 
-from cs.cmdutils import BaseCommand, popopts, vprint
+from cs.cmdutils import BaseCommand, popopts, vprint, vvprint
 from cs.context import stackattrs
-from cs.deco import default_params, fmtdoc, promote, Promotable, uses_verbose
+from cs.deco import decorator, default_params, fmtdoc, promote, Promotable, uses_verbose
 from cs.fileutils import atomic_copy2, crop_name, findup, shortpath
 from cs.fs import HasFSPath, FSPathBasedSingleton, scandirpaths, scandirtree
 from cs.lex import (
@@ -138,6 +138,7 @@ from cs.logutils import error, warning
 from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState, uses_runstate
 from cs.seq import unrepeated
+from cs.tagged import Entities
 from cs.tagset import (
     BaseTagSets,
     RegexpTagRule,
@@ -148,13 +149,12 @@ from cs.tagset import (
     TagsCommandMixin,
     TagsOntology,
     TagsOntologyCommand,
-    UsesTagSets,
     tag_or_tag_value,
 )
 from cs.threads import locked, locked_property
 from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 
-__version__ = '20260531-post'
+__version__ = '20260912-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -179,6 +179,7 @@ DISTINFO = {
         'cs.resources',
         'cs.seq',
         'cs.tagset>=20211212',
+        'cs.tagged',
         'cs.threads',
         'cs.upd',
         'icontract',
@@ -349,7 +350,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   )
   def cmd_as_envvars(self, argv):
     ''' Usage: {cmd} --prefix path [tag_name...]
-          Export the tags of path as shell command to set 
+          Export the tags of path as shell command to set
           Dots in names are translated into "__".
     '''
     options = self.options
@@ -1070,11 +1071,22 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = argv
     self.options.fstags.import_xattrs(paths)
 
-# A decorator for functions expecting an fstags parameter.
-uses_fstags = default_params(fstags=lambda: DEFAULT_FSTAGS)
+@decorator
+def uses_fstags(func):
+  ''' Provide the ambient `FSTags` instance as the `fstags` parameter is omitted.
+      Also run the original function inside `with fstags`, ensuring
+      a sync on the final close.
+  '''
+
+  @default_params(fstags=lambda: DEFAULT_FSTAGS)
+  def using_fstags(*a, fstags: FSTags, **kw):
+    with fstags:
+      return func(*a, fstags=fstags, **kw)
+
+  return using_fstags
 
 # pylint: disable=too-many-public-methods
-class FSTags(MultiOpenMixin, UsesTagSets):
+class FSTags(MultiOpenMixin, Entities):
   ''' A class to examine filesystem tags.
   '''
 
@@ -1099,7 +1111,7 @@ class FSTags(MultiOpenMixin, UsesTagSets):
         * `physical`: optional flag for the associated `FSTagsConfig`
           specifying whether `TagFile`s are indexed by their physical or logical
           filesystem paths
-        * `tagsets`: an optional `BaseTagSets` to be used via the `UsesTagSets` methods
+        * `tagsets`: an optional `BaseTagSets` to be used via the `Entities` methods
         * `update_mapping`: optional secondary mapping to which to mirror
           tags, such as an `SQLTags`;
           the default comes from an `SQLTags` specified by the
@@ -1119,7 +1131,7 @@ class FSTags(MultiOpenMixin, UsesTagSets):
     if tagsets is None:
       self.tagsets = None
     else:
-      UsesTagSets.__init__(self, tagsets=tagsets)
+      Entities.__init__(self, tagsets=tagsets)
     if update_mapping is None:
       update_mapping = os.environ.get(FSTAGS_UPDATE_MAPPING_ENVVAR) or None
       if update_mapping:
@@ -1164,7 +1176,7 @@ class FSTags(MultiOpenMixin, UsesTagSets):
     ''' Flush modified tag files.
     '''
     for tagfile in self._tagfiles.values():
-      vprint("save", tagfile)
+      vvprint("save", tagfile)
       try:
         tagfile.save()
       except FileNotFoundError as e:

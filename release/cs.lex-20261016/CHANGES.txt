@@ -1,0 +1,7 @@
+lib/python/cs/lex.py: cs.lex: replace use of TabulatePrettyPrinter.pformat() with tabulate_as_str() which also understands Pillow Images; update some docstrings, plumb as_str where it was missing
+lib/python/cs/lex.py: cs.lex: remove commented out debug
+lib/python/cs/lex.py: cs.lex: flatten_table_rows: use a cell's .indent(0 method if it has one (eg SixelImageString)
+lib/python/cs/lex.py: cs.lex,cs.printt: move printt, tabluate and friends to new cs.printt module
+lib/python/cs/lex.py: cs.lex: indent: if the indent is not entirely whitespace, indent every line instead of only the nonempty lines
+lib/python/cs/lex.py: cs.lex: add @OBSLETE(tabulate) stub for former tabulate() function, also moved to cs.printt
+lib/python/cs/lex.py: cs.lex: update DISTINFO

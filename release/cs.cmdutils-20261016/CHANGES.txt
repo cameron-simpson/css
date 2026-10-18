@@ -1,0 +1,4 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: refactor the entire usage stuff to work from a live instance so that we can report on dynamicly added subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: SubCommand.subcommand_names: methods have no subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: printt() and tabulate() moved to cs.printt
+lib/python/cs/cmdutils.py: cs.cmdutils: update DISTINFO

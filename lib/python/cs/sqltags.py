@@ -77,6 +77,7 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
 )
+from cs.tagged import Entities
 from cs.tagset import (
     BaseTagSets,
     Tag,
@@ -86,14 +87,13 @@ from cs.tagset import (
     TagSetCriterion,
     TagsCommandMixin,
     TagsOntology,
-    UsesTagSets,
     as_unixtime,
     tag_or_tag_value,
 )
 from cs.threads import locked, ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20260531-post'
+__version__ = '20260914-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -117,6 +117,7 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.sqlalchemy_utils>=20210420',
+        'cs.tagged',
         'cs.tagset>=20211212',
         'cs.threads>=20201025',
         'cs.upd',
@@ -129,7 +130,7 @@ DISTINFO = {
 # regexp for "word[,word...]:", the leading prefix for categories
 # if not specified by the -c command line option
 CATEGORIES_PREFIX_re = re.compile(
-    r'(?P<categories>[a-z]\w*(,[a-z]\w*)*):\s*', re.I
+    r'(?P<categories>[a-z]\w*(,[a-z]\w*)*):\s*', re.IGNORECASE
 )
 
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
@@ -1616,6 +1617,9 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
   DBURL_ENVVAR = DBURL_ENVVAR
   DBURL_DEFAULT = DBURL_DEFAULT
 
+  # a URL for an in-memory SQLite db
+  DB_URL_MEMORY = 'sqlite://'
+
   @classmethod
   def _singleton_key(cls, db_url=None, ontology=None):
     ''' The filesystem path for the `db_url` or `None`.
@@ -1669,7 +1673,7 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
     if db_url.startswith('~') or isabspath(db_url):
       # expect filesystem path to an SQLite file
       if not db_url.endswith('.sqlite'):
-        raise ValueError("expected path to .sqlite file")
+        raise ValueError(f'expected path to .sqlite file, got {db_url=}')
       db_url = expanduser(db_url)
     return cls(db_url=db_url)
 
@@ -2068,11 +2072,11 @@ class SQLTags(SingletonMixin, BaseTagSets, Promotable):
         with Pfx(tag):
           dbe.add_tag(tag)
 
-class UsesSQLTags(UsesTagSets):
-  ''' A mixin subclassing `UsesTagSets` to support classes which
+class UsesSQLTags(Entities):
+  ''' A mixin subclassing `Entities` to support classes which
       use an `SQLTags` to store their data.
 
-      As with `cs.tagset.UsesTagSets`, subclasses must supply a
+      As with `cs.tagset.Entities`, subclasses must supply a
       `hastags_class` and _may_ supply a `tagsets_class` if it
       should not be `SQLTags`. The subclass must also define a
       `.TYPE_ZONE` class attribute.
@@ -2081,12 +2085,12 @@ class UsesSQLTags(UsesTagSets):
           class MBDB(UsesSQLTags, MultiOpenMixin, RunStateMixin:
 
               TYPE_ZONE = 'mbdb'
-              HasTagsClass = _MBEntity
-              TagSetsClass = MBSQLTags
+              EntityClass = _MBEntity
+              TagsetsClass = MBSQLTags
 
   '''
 
-  TagSetsClass = SQLTags
+  TagsetsClass = SQLTags
 
 class SQLTagsCommandsMixin(TagsCommandMixin):
 

@@ -1,0 +1,2 @@
+lib/python/cs/gvutils.py: cs.gvutils: DOTNodeMixin: use NoAttrs
+lib/python/cs/gvutils.py: cs.gvutils: update DISTINFO

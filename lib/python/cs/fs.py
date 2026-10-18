@@ -41,7 +41,7 @@ from cs.lex import r
 from cs.obj import SingletonMixin
 from cs.pfx import pfx, pfx_call, Pfx
 
-__version__ = '20260526-post'
+__version__ = '20261016-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -296,7 +296,7 @@ def update_linkdir(linkdirpath: str, paths: Iterable[str], trim=False):
   return name_map
 
 # pylint: disable=too-few-public-methods
-class HasFSPath:
+class HasFSPath(PathLike):
   ''' A mixin for an object with a `.fspath` attribute representing
       a filesystem location.
 
@@ -314,6 +314,11 @@ class HasFSPath:
 
   def __lt__(self, other):
     return self.fspath < other.fspath
+
+  def __fspath__(self):
+    ''' Return the filesystem path string, for `os.PathLike`.
+    '''
+    return self.fspath
 
   @property
   def shortpath(self):
@@ -675,7 +680,9 @@ def is_valid_rpath(rpath, log=None) -> bool:
     return False
   return True
 
-def findup(dirpath: str, criterion: Union[str, Callable[[str], Any]]) -> str:
+def findup(
+    dirpath: str, criterion: Union[str, Callable[[str], Any]]
+) -> str | None:
   ''' Walk up the filesystem tree looking for a directory where
       `criterion(fspath)` is not `None`, where `fspath` starts at `dirpath`.
       Return the result of `criterion(fspath)`.

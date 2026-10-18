@@ -1,0 +1,1 @@
+pmap: dispatcher: issue a warning about exceptions and reraise so that they are visible.

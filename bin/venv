@@ -34,7 +34,7 @@ usage="Usage $cmd [subcmd ...]
     exec command ...
             Execute command with the venv/bin at the from of \$PATH."
 
-            modern=1
+modern=1
 trace=
 [ -t 2 ] && trace=set-x
 

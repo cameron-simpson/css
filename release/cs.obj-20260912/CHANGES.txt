@@ -1,0 +1,15 @@
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: rework the update logic for clarity and reliability
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: correct default for ratelimit, fix bad return, drop unused assignment
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: logic fix for last_poll=None
+lib/python/cs/obj.py: cs.obj: new NoAttrs mixin to allow classes to freely use super().__getattr__ and to issue a more informative AttributeError
+lib/python/cs/obj.py: cs.obj: HasTags renamed to Entity
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: make an assertion failure informative
+lib/python/cs/obj.py: cs.obj: Refreshable: new refresh_related1() method for related objects to be refreshed but not recursively
+lib/python/cs/obj.py: cs.obj: NoAttrs: no need to check for super().__getattr__, NoAttrs will always be last
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: use self.refresh_lock as a mutex if present
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: move the seen check inside the mutex
+lib/python/cs/obj.py: cs.obj: DISTINFO: fix requirement typo
+lib/python/cs/obj.py: cs.obj: Refreshable: pass the related() and related1() items through not_none to accomodate these meethods returning some Nones, which is often expedient
+lib/python/cs/obj.py: cs.obj: Refreshable.refresh: use a mutex around the seen set, use the supplied (but optional) lock only if data is None, forbid recurse and data not None
+lib/python/cs/obj.py: cs.obj: Refreshable: .refresh,._refresh: drop the optional resource parameter
+lib/python/cs/obj.py: cs.obj: clean some lint

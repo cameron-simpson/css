@@ -1,0 +1,2 @@
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: fix up the "seekable" logic, fix a typo, replace some old prints with warning
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: docstring updates
