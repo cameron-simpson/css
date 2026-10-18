@@ -1562,19 +1562,22 @@ class BaseCommand:
     '''
     return cutprefix(method_name, cls.SUBCOMMAND_METHOD_PREFIX)
 
-  # NB: this is _not_ a cached_property because potentially commands
-  # can be added at any time
-  @property
-  def subcommand_names(self) -> list[str]:
-    ''' A list of the subcommand names.
-    '''
-    cls = type(self)
+  @classmethod
+  def _class_subcommand_names(cls) -> list[str]:
     prefix = cls.SUBCOMMAND_METHOD_PREFIX
     return [
         method_name.removeprefix(prefix)
         for method_name in dir(cls)
         if method_name.startswith(prefix)
     ]
+
+  # NB: this is _not_ a cached_property because potentially commands
+  # can be added at any time
+  @property
+  def subcommand_names(self) -> list[str]:
+    ''' A list of the subcommand names.
+    '''
+    return type(self)._class_subcommand_names()
 
   @mapped_property
   def subcommand(self, subcmd: str) -> SubCommand:
@@ -1604,7 +1607,9 @@ class BaseCommand:
   def has_subcommands(self):
     ''' Test whether the class defines additional subcommands.
     '''
-    return len(self.subcommand_names) > 0
+    names = set(self.subcommand_names
+                ) - set(BaseCommand._class_subcommand_names())
+    return len(names) > 0
 
   def usage_text(
       self,
