@@ -65,7 +65,7 @@ from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from .cache import ContentCache
 from .cookies import morsel, read_firefox_cookies
 from .format import FormatMapping
-from .parse import import_name
+from .parse import ModuleObjSpec
 from .sitemap import FlowState, SiteEntity, SiteMap
 from .urls import hrefs, srcs
 
@@ -740,21 +740,29 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
     return named.keys()
 
   @mapped_property
+  def sitemap_specs(self, name: str) -> ModuleObjSpec:
+    ''' A lazy mapping of sitemap `name` to its `ModuleObjSpec` instance.
+    '''
+    named, _ = self._sitemap_pattern_specs
+    map_spec = named[name]
+    module_name, subname = map_spec.split(':', 1)
+    return ModuleObjSpec(module_name=module_name, subname=subname)
+
+  # we don't cache this mapping because we want to evaluate
+  # ModuleObjSpec.sitemap every time
+  @mapped_property(cached=False)
   def sitemap(self, name: str) -> SiteMap | None:
     ''' A lazy mapping of sitemap `name` to its `SiteMap` instance,
         or `None` if associated import fails.
     '''
-    named, _ = self._sitemap_pattern_specs
-    map_spec = named[name]
+    sitemap_spec = self.sitemap_specs[name]
     try:
-      map_class = import_name(map_spec)
-    except (ImportError, NameError, SyntaxError) as e:
-      warning(f'sitemap[{name=}] -> {map_spec!r}: {e._}')
+      sitemap_cls = sitemap_spec.object
+    except Exception as e:
+      warning(f'sitemap[{name=}]: {sitemap_spec}: {e}')
       breakpoint()
-      raise
       return None
-    sitemap = map_class(name=name)
-    return sitemap
+    return sitemap_cls(name=name)
 
   @property
   def sitemap_patterns(self) -> list[tuple[str, str]]:
