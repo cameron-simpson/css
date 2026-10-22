@@ -11,8 +11,9 @@ from icontract import require
 from lxml.builder import ElementMaker
 from typeguard import typechecked
 
-from cs.lex import cropped_repr, printt
+from cs.lex import cropped_repr
 from cs.pfx import pfx
+from cs.printt import printt
 from cs.gimmicks import warning
 
 __version__ = '20261022.2-post'
@@ -27,6 +28,7 @@ DISTINFO = {
     'install_requires': [
         'cs.lex',
         'cs.pfx',
+        'cs.printt',
         'cs.gimmicks',
         'beautifulsoup4',
         'icontract',
