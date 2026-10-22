@@ -15,7 +15,7 @@ from cs.lex import cropped_repr, printt
 from cs.pfx import pfx
 from cs.gimmicks import warning
 
-__version__ = '20261022.2'
+__version__ = '20261022.2-post'
 
 DISTINFO = {
     'keywords': ["python3"],
