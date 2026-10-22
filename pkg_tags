@@ -1,4 +1,5 @@
 Pillow
+beautifulsoup4
 blake3
 cs.ansi_colour pypi.release="20260531" ok_revision="06bc05583731fdb5252cf451321e908791580d91" features={"20220227":["COLOUR_CODES","TerminalColors","colour_escape"]}
 cs.app.beyonwiz pypi.release=20160828
@@ -21,7 +22,7 @@ cs.app.svcd pypi.release="20221228" ok_revision="7c5680713e8e717fefca746ec7cac6f
 cs.app.ydl pypi.release="20220318" ok_revision="6c4e9e800dde94ed935a1b31a532f68cbe63adb8"
 cs.ascii_art ok_revision=e96f85c04d2b0b141e1fe188d4113f3881eeec47 pypi.release="20260912" features={"20260403":["LARGE_CIRCLE"]}
 cs.binary pypi.release="20260531" ok_revision="446ac4a0da0759d822c3f84c6f58737f6c4406e2" features={"20230212":["BinaryMixin_load","BinaryMixin_save"],"20240630":["AbstractBinary__write","BinarySingleValue__value_from_bytes"],"20250501":["BinaryStruct","ListOfBinary","bs","is_single_value","struct_field_types"]}
-cs.bs4utils ok_revision=b1a4fae176c7b3488c39611b72eb65992e5cdf44 pypi.release="20260912"
+cs.bs4utils ok_revision=b1a4fae176c7b3488c39611b72eb65992e5cdf44 pypi.release="20261022"
 cs.buffer pypi.release="20260915.1" ok_revision=d66cd68b5dcebf8b162b6af3c5a13e2db36071f3 features={"20230212":["CornuCopyBuffer_promote"],"20240201":["CornuCopyBuffer_read1"],"20240630":["CornuCopyBuffer__final_offset"],"20250428":["CornuCopyBuffer__from_cli_filespec"],"20260914":["CornuCopyBuffer__BufferedIOBase"]}
 cs.cache pypi.release="20260531" ok_revision="182f1003d29836ad1a43ddb923a4202d379e4860" features={"20240412":["CachingMapping"],"20240422":["ConvCache","convof"],"20250103":["cachedmethod","file_based","file_property"]}
 cs.clockutils pypi.release=20190101
@@ -111,6 +112,7 @@ cs.upd ok_revision="3ad1a5ebe519cd18bb236d0575435fba49ac146b" pypi.release="2026
 cs.urlutils ok_revision=b4ea3cf304216020d5a7f1f21b5aa18f9d3a3060 pypi.release="20260531"
 cs.x ok_revision="5a1922f2dc283faa4f6fd4e2801a5f5a668c31e7" pypi.release="20261016.1" features={"20231129":["via_logger"]}
 icontract
+lxml
 "python-dateutil"
 requests
 sqlalchemy
