@@ -52,7 +52,7 @@ def find_up(
     test: str | Callable[[BS4Tag], bool],
     *,
     first=False
-) -> Generator[tuple[BS4Tag, BS4Tag], tuple[None, None]]:
+) -> Generator[tuple[BS4Tag, BS4Tag], tuple[None, None], None, None]:
   ''' A generator yielding `(found,ref)` 2-tuples obtained by
       search the tag tree left and up from `tag` using `.previous_sibling`
       and `.parent`, matching tags where `test(found)` is true.
