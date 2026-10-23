@@ -45,14 +45,94 @@ DISTINFO = {
     ],
 }
 
+class NSObject:
+  ''' The root of the pre-known NS* classes.
+  '''
+
+class NSArray(list, NSObject):
+
+  @classmethod
+  def from_elem(cls, elem):
+    ''' Ingest a plist <array>, returning a Python list.
+    '''
+    if elem.tag != 'array':
+      raise ValueError(f'not an <array>: {elem=}')
+    return cls(map(ingest_plist_elem, elem))
+
+class NSDictionary(dict, NSObject):
+  ''' A mapping for a plist, subclassing `dict`, which also allows
+      access to the elements by attribute if that does not conflict
+      with a `dict` method.
   '''
 
 def import_as_etree(plist):
   ''' Load an Apple plist and return an etree.Element.
+  @classmethod
+  def from_etree(cls, xml) -> Self:
+    ''' Recursively a plist's `ElementTree` into a native Python structure.
+        This returns a `NSDictionary`, a mapping of the plists's top dict
+        with attribute access to key values.
+    '''
+    root = xml.getroot()
+    if root.tag != 'plist':
+      raise ValueError(f'root Element is not a plist: {root=}')
+    return cls.from_elem(root[0])
+
+  @classmethod
+  def from_elem(cls, dict_elem) -> Self:
+    ''' Ingest a plist <dict> Element, returning a `NSDictionary`.
+    '''
+    if dict_elem.tag != 'dict':
+      raise ValueError("not a <dict>: %r" % (dict_elem,))
+    self = cls()
+    key = None
+    for i, elem in enumerate(dict_elem):
+      if i % 2 == 0:
+        if elem.tag == 'key':
+          key = elem.text
+        else:
+          raise ValueError(f'not a <key>: {elem=}')
+      else:
+        value = ingest_plist_elem(elem)
+        self[key] = value
+        key = None
+    if key is not None:
+      raise ValueError(f'no value for {key=}')
+    try:
+      objects = self['$objects']
+    except KeyError:
+      pass
+    else:
+      printt(f'{cls.__name__} PRE RESOLVE', self)
+      for i, object in enumerate(objects):
+        resolve_object(objects, i)
+      printt(f'{cls.__name__} POST RESOLVE', self)
+    return self
 
       Paramaters:
       * `plist`: the source plist: data if `bytes`, filename if `str`,
         otherwise a file object open for binary read.
+  # make existing keys available as attribute
+  def __getattr__(self, attr):
+    if attr[0].isalpha():
+      try:
+        return self[attr]
+      except KeyError as e:
+        # pylint: disable=raise-missing-from
+        raise AttributeError(attr) from e
+    raise AttributeError(attr)
+
+  def __setattr__(self, attr, value):
+    if attr in self:
+      self[attr] = value
+    else:
+      super().__setattr__(attr, value)
+
+# a mapping of the predefined names to their classes
+NS_BASE_CLASSES = {
+    cls.__name__: cls
+    for cls in (NSArray, NSDictionary, NSObject)
+}
   '''
   if isinstance(plist, bytes):
     # read bytes as a data stream
