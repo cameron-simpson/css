@@ -62,7 +62,7 @@ class NSArray(list, NSObject):
     '''
     if elem.tag != 'array':
       raise ValueError(f'not an <array>: {elem=}')
-    return cls(map(ingest_plist_elem, elem))
+    return cls(map(elem_as_python, elem))
 
 class NSDictionary(dict, NSObject):
   ''' A mapping for a plist, subclassing `dict`, which also allows
@@ -96,7 +96,7 @@ class NSDictionary(dict, NSObject):
         else:
           raise ValueError(f'not a <key>: {elem=}')
       else:
-        value = ingest_plist_elem(elem)
+        value = elem_as_python(elem)
         self[key] = value
         key = None
     if key is not None:
