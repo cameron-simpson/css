@@ -35,14 +35,18 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.logutils',
+        'cs.buffer',
+        'cs.gimmicks',
         'cs.pfx',
         'cs.sh',
     ],
+    'requires_python':
+    # 3.6 for for os.PathLike
+    # 3.11 for typing.Self
+    '>=3.11',
 }
 
 class NSObject:
@@ -188,7 +192,7 @@ def import_as_etree(plist):
   return read_plist(plist, 'etree')
 
 def ingest_plist(plist, recurse=False, resolve=False):
-  ''' Ingest an Apple plist and return as a `PListDict`.
+  ''' Ingest an Apple plist and return as a `NSDictionary`.
       Trivial wrapper for `import_as_etree` and `ingest_plist_etree`.
 
       Parameters:
@@ -233,15 +237,17 @@ def export_xml_to_plist(E, fp=None, fmt='binary1'):
     )
   return None
 
-def ingest_plist_etree(plist_etree):
+@OBSOLETE('NSDictionary.from_etree')
+def ingest_plist_etree(plist_etree) -> NSDictionary:
   ''' Recursively a plist's `ElementTree` into a native Python structure.
-      This returns a `PListDict`, a mapping of the plists's top dict
+      This returns a `NSDictionary`, a mapping of the plists's top dict
       with attribute access to key values.
   '''
-  root = plist_etree.getroot()
-  if root.tag != 'plist':
-    raise ValueError("%r root Element is not a plist" % (root,))
-  return ingest_plist_dict(root[0])
+  return NSDictionary.from_etree(plist_etree)
+
+@OBSOLETE('NSDictionary.from_elem')
+def ingest_plist_dict(e):
+  return NSDictionary.from_elem(e)
 
 # pylint: disable=too-many-return-statements
 def ingest_plist_elem(e):
@@ -270,59 +276,6 @@ def ingest_plist_elem(e):
     return dt
   return e
 
-def ingest_plist_array(pa):
-  ''' Ingest a plist <array>, returning a Python list.
-  '''
-  if pa.tag != 'array':
-    raise ValueError("not an <array>: %r" % (pa,))
-  a = []
-  for i, e in enumerate(pa):
-    e = pa[i]
-    a.append(ingest_plist_elem(e))
-  return a
-
-def ingest_plist_dict(pd):
-  ''' Ingest a plist <dict> Element, returning a PListDict.
-  '''
-  if pd.tag != 'dict':
-    raise ValueError("not a <dict>: %r" % (pd,))
-  d = PListDict()
-  key = None
-  for i, e in enumerate(pd):
-    if i % 2 == 0:
-      if e.tag == 'key':
-        key = e.text
-      else:
-        raise ValueError("unexpected key element %r" % (e,))
-    else:
-      value = ingest_plist_elem(e)
-      d[key] = value
-      key = None
-  if key is not None:
-    raise ValueError("no value for key %r" % (key,))
-  return d
-
-class PListDict(dict):
-  ''' A mapping for a plist, subclassing `dict`, which also allows
-      access to the elements by attribute if that does not conflict
-      with a `dict` method.
-  '''
-
-  def __getattr__(self, attr):
-    if attr[0].isalpha():
-      try:
-        return self[attr]
-      except KeyError:
-        # pylint: disable=raise-missing-from
-        raise AttributeError(attr)
-    raise AttributeError(attr)
-
-  def __setattr__(self, attr, value):
-    if attr in self:
-      self[attr] = value
-    else:
-      super().__setattr__(attr, value)
-
 # pylint: disable=too-many-statements.too-many-branches,too-many-nested-blocks,too-many-locals
 def resolve_object(objs, i):
   ''' Resolve an object definition from structures like an iPhoto album
@@ -332,7 +285,7 @@ def resolve_object(objs, i):
   if isinstance(
       o, (str, int, bool, float, ObjectClassDefinition, ObjectClassInstance)):
     return o
-  if isinstance(o, PListDict):
+  if isinstance(o, NSDictionary):
     if '$class' in o:
       # instance definition
       class_id = o.pop('$class')['CF$UID']
@@ -396,7 +349,7 @@ def resolve_object(objs, i):
   return o
 
 # pylint: disable=too-few-public-methods
-class ObjectClassDefinition(object):
+class ObjectClassDefinition:
   ''' A representation of a "class" object, used in `resolve_object()`
       for otherwise unrecognised objects which contain a `$classname` member.
   '''
@@ -406,11 +359,12 @@ class ObjectClassDefinition(object):
     self.mro = mro
 
   def __str__(self):
-    return "%s%r" % (self.name, self.mro)
+    return f'{self.__class__.__name__}:{self.name}({",".join(self.mro)})'
+    ##return "%s%r" % (self.name, self.mro)
 
   __repr__ = __str__
 
-class ObjectClassInstance(object):
+class ObjectClassInstance:
   ''' A representation of a "class instance", used in `resolve_object()`
       for objects with a `$class` member.
   '''
@@ -426,7 +380,8 @@ class ObjectClassInstance(object):
     return self.class_def.name
 
   def __str__(self):
-    return "%s%r" % (self.name, self.value)
+    return f'{self.__class__.__name__}:{self.name}:{self.value!r}'
+    ##return "%s%r" % (self.name, self.value)
 
   __repr__ = __str__
 
@@ -508,3 +463,6 @@ def writePlist(rootObj, path, binary=False):
   if is_iphone():
     shutil.copyfile(tpath, path)
   return None
+
+if __name__ == '__main__':
+  pass
