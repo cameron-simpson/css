@@ -267,27 +267,31 @@ def elem_as_python(elem, objects: list | None = None):
   ''' Ingest a plist `Element`, converting various types to native Python objects.
       Unhandled types remain as the original `Element`.
   '''
-  if e.tag == 'dict':
-    return ingest_plist_dict(e)
-  if e.tag == 'array':
-    return ingest_plist_array(e)
-  if e.tag in ('string', 'key'):
-    return e.text
-  if e.tag == 'integer':
-    return int(e.text)
-  if e.tag == 'real':
-    return float(e.text)
-  if e.tag == 'false':
+  if objects is None:
+    objects = []
+  if elem.tag in ('string', 'key'):
+    return elem.text
+  if elem.tag == 'integer':
+    return int(elem.text)
+  if elem.tag == 'real':
+    return float(elem.text)
+  if elem.tag == 'false':
     return False
-  if e.tag == 'true':
+  if elem.tag == 'true':
     return True
-  if e.tag == 'data':
-    return base64.b64decode(e.text)
-  if e.tag == 'date':
-    dt = datetime.strptime(e.text, '%Y-%m-%dT%H:%M:%SZ')
+  if elem.tag == 'data':
+    return base64.b64decode(elem.text)
+  if elem.tag == 'date':
+    dt = datetime.strptime(elem.text, '%Y-%m-%dT%H:%M:%SZ')
     dt = datetime.combine(dt.date(), dt.time(), timezone.utc)
     return dt
-  return e
+  if elem.tag == 'dict':
+    pl_d = NSDictionary.from_elem(elem)
+    return pl_d
+  if elem.tag == 'array':
+    return NSArray.from_elem(elem)
+  warning(f'unhandled plist element {elem=}')
+  return elem
 
 @OBSOLETE('elem_as_python')
 def ingest_plist_elem(elem, objects: list | None = None):
