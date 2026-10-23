@@ -263,7 +263,7 @@ def ingest_plist_dict(e):
   return NSDictionary.from_elem(e)
 
 # pylint: disable=too-many-return-statements
-def ingest_plist_elem(e):
+def elem_as_python(elem, objects: list | None = None):
   ''' Ingest a plist `Element`, converting various types to native Python objects.
       Unhandled types remain as the original `Element`.
   '''
@@ -288,6 +288,10 @@ def ingest_plist_elem(e):
     dt = datetime.combine(dt.date(), dt.time(), timezone.utc)
     return dt
   return e
+
+@OBSOLETE('elem_as_python')
+def ingest_plist_elem(elem, objects: list | None = None):
+  return elem_as_python(elem, objects)
 
 # pylint: disable=too-many-statements.too-many-branches,too-many-nested-blocks,too-many-locals
 def resolve_object(objs, i):
