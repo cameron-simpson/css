@@ -65,8 +65,6 @@ class NSDictionary(dict, NSObject):
       with a `dict` method.
   '''
 
-def import_as_etree(plist):
-  ''' Load an Apple plist and return an etree.Element.
   @classmethod
   def from_etree(cls, xml) -> Self:
     ''' Recursively a plist's `ElementTree` into a native Python structure.
@@ -109,9 +107,6 @@ def import_as_etree(plist):
       printt(f'{cls.__name__} POST RESOLVE', self)
     return self
 
-      Paramaters:
-      * `plist`: the source plist: data if `bytes`, filename if `str`,
-        otherwise a file object open for binary read.
   # make existing keys available as attribute
   def __getattr__(self, attr):
     if attr[0].isalpha():
@@ -133,30 +128,64 @@ NS_BASE_CLASSES = {
     cls.__name__: cls
     for cls in (NSArray, NSDictionary, NSObject)
 }
+
+def read_plist(plist, format: str) -> str | etree.ElementTree:
+  ''' Load an Apple plist and return it as a `str` in the specified
+      `format`.
+
+      Parameters:
+      * `plist`: the source plist: data if `bytes`, filename if
+        `str` or `os.PathLike`, otherwise a file decriptor or a
+        file object open for binary read
+      * `format`: the desired output format, `'etree'`, `'json'` or `'xml'`
+
+      Each `format` has its own expected return value:
+      * `dict`: a `NSDictionary` decoded from the plist
+      * `etree`: an `ElementTree` XML object
+      * `json`: a `str` in JSON format
+      * `xml1`: a `str` in the plist `xml1` XML format
   '''
+  if format == 'dict':
+    xml = read_plist(plist, 'etree')
+    return NSDictionary.from_etree(xml)
+  if format == 'etree':
+    xml_s: str = read_plist(plist, 'xml')
+    if xml_s.startswith('<?xml '):
+      close_pos = xml_s.find('?>')
+      assert close_pos >= 6
+      xml_s = xml_s[close_pos + 2:]
+    return etree.parse(StringIO(xml_s))
+  if format == 'json':
+    pl_convert = 'json'
+  elif format in ('xml', 'xml1'):
+    pl_convert = 'xml1'
+  else:
+    raise ValueError(f'unsupported {format=}')
   if isinstance(plist, bytes):
-    # read bytes as a data stream
-    # write to temp file, decode using plutil
-    with tempfile.NamedTemporaryFile() as tfp:
-      tfp.write(plist)
-      tfp.flush()
-      tfp.seek(0, 0)
-      return import_as_etree(tfp.file)
-  if isinstance(plist, str):
+    pfd = CornuCopyBuffer([plist]).as_fd()
+    return read_plist(pfd, format=format)
+  if isinstance(plist, (str, PathLike)):
     # presume plist is a filename
     with open(plist, "rb") as pfp:
-      return import_as_etree(pfp)
-  # presume plist is a file
-  with subprocess.Popen(['plutil', '-convert', 'xml1', '-o', '-', '-'],
-                        stdin=plist, stdout=subprocess.PIPE) as P:
-    E = etree.parse(P.stdout)
-    retcode = P.wait()
+      return read_plist(pfp, format=format)
+  # presume plist is a file or file descriptor
+  pl_argv = ['plutil', '-convert', pl_convert, '-o', '-', '-']
+  with subprocess.Popen(pl_argv, stdin=plist, stdout=subprocess.PIPE) as P:
+    plist_bs = P.stdout.read()
+  retcode = P.wait()
   if retcode != 0:
-    raise ValueError(
-        "export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" %
-        (E, retcode)
-    )
-  return E
+    raise ValueError(f'nonzero exit code {retcode} from {pl_argv=}')
+  return plist_bs.decode('utf-8')
+
+@OBSOLETE('read_plist(..,"etree")')
+def import_as_etree(plist):
+  ''' Load an Apple plist and return an `etree.Element`.
+      Parameters:
+      * `plist`: the source plist: data if `bytes`, filename if
+        `str` or `os.PathLike`, otherwise a file descriptor or a
+        file object open for binary read.
+  '''
+  return read_plist(plist, 'etree')
 
 def ingest_plist(plist, recurse=False, resolve=False):
   ''' Ingest an Apple plist and return as a `PListDict`.
