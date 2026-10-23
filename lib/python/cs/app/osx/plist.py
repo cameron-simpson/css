@@ -45,10 +45,7 @@ DISTINFO = {
     ],
 }
 
-def is_iphone():
-  ''' Test if we're on an iPhone.
   '''
-  return os.uname()[4].startswith('iPhone')
 
 def import_as_etree(plist):
   ''' Load an Apple plist and return an etree.Element.
@@ -362,6 +359,11 @@ class ObjectClassInstance(object):
 ####################################################################################
 # Old routines written for use inside my jailbroken iPhone.
 #
+
+def is_iphone():
+  ''' Test if we're on an iPhone.
+  '''
+  return os.uname()[4].startswith('iPhone')
 
 def readPlist(path, binary=False):
   ''' An old routine I made to use inside my jailbroken iPhone.
