@@ -1,19 +1,26 @@
 #!/usr/bin/python
 #
 
-''' Some simple MacOS plist facilities.
-    Supports binary plist files, which the stdlib `plistlib` module does not.
+''' Some simple MacOS plist (property list) facilities.
+    Supports binary plist files, which the stdlib `plistlib` module
+    does not, via the `plutil` MacOS command.
 '''
 
 import base64
 from datetime import datetime, timezone
+from io import StringIO
+import json
 import os
+from os import PathLike
 import plistlib
 import shutil
 import subprocess
 import tempfile
+from typing import Self
 
-from cs.logutils import warning
+from cs.buffer import CornuCopyBuffer
+from cs.deco import OBSOLETE
+from cs.gimmicks import warning
 from cs.pfx import Pfx
 import cs.sh
 
