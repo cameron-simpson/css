@@ -302,28 +302,29 @@ def resolve_object(objs, i):
   ''' Resolve an object definition from structures like an iPhoto album
       queryData object list.
   '''
-  o = objs[i]
+  obj = objs[i]
   if isinstance(
-      o, (str, int, bool, float, ObjectClassDefinition, ObjectClassInstance)):
-    return o
-  if isinstance(o, NSDictionary):
-    if '$class' in o:
+      obj,
+      (str, int, bool, float, ObjectClassDefinition, ObjectClassInstance)):
+    return obj
+  if isinstance(obj, NSDictionary):
+    if '$class' in obj:
       # instance definition
-      class_id = o.pop('$class')['CF$UID']
+      class_id = obj.pop('$class')['CF$UID']
       class_def = resolve_object(objs, class_id)
-      if 'NS.string' in o:
+      if 'NS.string' in obj:
         # NS.string => flat string
-        value = o.pop('NS.string')
-      elif 'NS.objects' in o:
+        value = obj.pop('NS.string')
+      elif 'NS.objects' in obj:
         objects = []
-        for od in o.pop('NS.objects'):
+        for od in obj.pop('NS.objects'):
           obj_id = od.pop('CF$UID')
           if od:
             raise ValueError("other fields in obj ref: %r" % (od,))
           objects.append(resolve_object(objs, obj_id))
-        if 'NS.keys' in o:
+        if 'NS.keys' in obj:
           keys = []
-          for kd in o.pop('NS.keys'):
+          for kd in obj.pop('NS.keys'):
             key_id = kd.pop('CF$UID')
             if kd:
               raise ValueError("other fields in key ref: %r" % (kd,))
@@ -332,42 +333,43 @@ def resolve_object(objs, i):
           value = dict(zip(keys, objects))
         else:
           value = list(objects)
-      elif 'NS.data' in o:
-        value = o['NS.data']
-      elif 'NSLocation' in o:
-        count = o['NSRangeCount']
-        length = o['NSLength']
-        location = o['NSLocation']
-        value = o
-      elif 'NSRangeData' in o:
-        count = o['NSRangeCount']
-        data = o['NSRangeData']
+      elif 'NS.data' in obj:
+        value = obj['NS.data']
+      elif 'NSLocation' in obj:
+        count = obj['NSRangeCount']
+        length = obj['NSLength']
+        location = obj['NSLocation']
+        value = obj
+      elif 'NSRangeData' in obj:
+        count = obj['NSRangeCount']
+        data = obj['NSRangeData']
         key_id = data.pop('CF$UID')
         if data:
           raise ValueError("other fields in NSRangeData: %r" % (data,))
         data = resolve_object(objs, key_id)
         value = {'NSRangeCount': count, 'NSRangeData': data}
-      elif 'data' in o:
-        data = o['data']
+      elif 'data' in obj:
+        data = obj['data']
         key_id = data.pop('CF$UID')
         if data:
           raise ValueError("other fields in data: %r" % (data,))
         data = resolve_object(objs, key_id)
-        o['data'] = data
+        obj['data'] = data
         value = data
       else:
-        warning("unhandled $class instance: %r", o)
-      o = ObjectClassInstance(class_def, value)
-    elif '$classname' in o:
-      class_name = o.pop('$classname')
-      class_mro = o.pop('$classes')
-      o = ObjectClassDefinition(class_name, class_mro)
+        warning("unhandled $class instance: %r", obj)
+        value = None
+      obj = ObjectClassInstance(class_def, value)
+    elif '$classname' in obj:
+      class_name = obj.pop('$classname')
+      class_mro = obj.pop('$classes')
+      obj = ObjectClassDefinition(class_name, class_mro)
     else:
-      warning("unknown dict content: %r" % (o,))
+      warning("unknown dict content: %r" % (obj,))
   else:
-    warning("unsupported value %r" % (o,))
-  objs[i] = o
-  return o
+    warning("unsupported value %r" % (obj,))
+  objs[i] = obj
+  return obj
 
 # pylint: disable=too-few-public-methods
 class ObjectClassDefinition:
