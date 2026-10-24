@@ -57,12 +57,12 @@ class NSObject:
 class NSArray(list, NSObject):
 
   @classmethod
-  def from_elem(cls, elem):
+  def from_elem(cls, elem, objects=None):
     ''' Ingest a plist <array>, returning a Python list.
     '''
     if elem.tag != 'array':
       raise ValueError(f'not an <array>: {elem=}')
-    return cls(map(elem_as_python, elem))
+    return cls(map(lambda elem: elem_as_python(elem, objects=objects), elem))
 
 class NSDictionary(dict, NSObject):
   ''' A mapping for a plist, subclassing `dict`, which also allows
@@ -71,7 +71,7 @@ class NSDictionary(dict, NSObject):
   '''
 
   @classmethod
-  def from_etree(cls, xml) -> Self:
+  def from_etree(cls, xml, objects=None) -> Self:
     ''' Recursively a plist's `ElementTree` into a native Python structure.
         This returns a `NSDictionary`, a mapping of the plists's top dict
         with attribute access to key values.
@@ -79,10 +79,10 @@ class NSDictionary(dict, NSObject):
     root = xml.getroot()
     if root.tag != 'plist':
       raise ValueError(f'root Element is not a plist: {root=}')
-    return cls.from_elem(root[0])
+    return cls.from_elem(root[0], objects=objects)
 
   @classmethod
-  def from_elem(cls, dict_elem) -> Self:
+  def from_elem(cls, dict_elem, objects=None) -> Self:
     ''' Ingest a plist <dict> Element, returning a `NSDictionary`.
     '''
     if dict_elem.tag != 'dict':
@@ -96,7 +96,7 @@ class NSDictionary(dict, NSObject):
         else:
           raise ValueError(f'not a <key>: {elem=}')
       else:
-        value = elem_as_python(elem)
+        value = elem_as_python(elem, objects=objects)
         self[key] = value
         key = None
     if key is not None:
@@ -286,10 +286,10 @@ def elem_as_python(elem, objects: list | None = None):
     dt = datetime.combine(dt.date(), dt.time(), timezone.utc)
     return dt
   if elem.tag == 'dict':
-    pl_d = NSDictionary.from_elem(elem)
+    pl_d = NSDictionary.from_elem(elem, objects=objects)
     return pl_d
   if elem.tag == 'array':
-    return NSArray.from_elem(elem)
+    return NSArray.from_elem(elem, objects=objects)
   warning(f'unhandled plist element {elem=}')
   return elem
 
