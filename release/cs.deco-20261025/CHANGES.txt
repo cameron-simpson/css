@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: new @pprint_as_dict decorator to make pprint() and friends render instances like a dict, useful for Mappings
+lib/python/cs/deco.py: cs.deco: new @pprint_as(as_type) decorator, the egenral form of @pprint_as_dict
