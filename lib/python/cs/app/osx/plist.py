@@ -129,11 +129,9 @@ class NSDictionary(dict, NSObject):
     except KeyError:
       pass
     else:
-      printt(f'{cls.__name__} PRE RESOLVE', self)
       scope = NSScope(objects=objects)
       for key, item in list(self.items()):
         self[key] = scope.resolve(item)
-      printt(f'{cls.__name__} POST RESOLVE', self)
     return self
 
   # make existing keys available as attribute
@@ -331,9 +329,8 @@ def read_plist(plist, format: str = 'dict'):
   pl_argv = ['plutil', '-convert', pl_convert, '-o', '-', '-']
   with subprocess.Popen(pl_argv, stdin=plist, stdout=subprocess.PIPE) as P:
     plist_bs = P.stdout.read()
-  retcode = P.wait()
-  if retcode != 0:
-    raise ValueError(f'nonzero exit code {retcode} from {pl_argv=}')
+  if P.returncode != 0:
+    raise ValueError(f'nonzero exit code {P.returncode} from {pl_argv=}')
   return plist_bs.decode('utf-8')
 
 def export_xml_to_plist(E, fp=None, fmt='binary1'):
