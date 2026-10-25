@@ -20,8 +20,11 @@ import sqlite3
 from threading import RLock
 from types import SimpleNamespace as NS
 from uuid import uuid4
+
 from PIL import Image
+
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -36,7 +39,7 @@ from cs.tagset import Tag
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 from cs.x import X
-from .plist import ingest_plist
+from .plist import read_plist
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
@@ -238,7 +241,7 @@ def cmd_ls(I, argv):
         if argv:
           for column_name in sorted(row.column_names):
             if column_name.endswith('Data'):
-              obj = ingest_plist(row[column_name], recurse=True, resolve=True)
+              obj = read_plist(row[column_name])
               print(' ', column_name + ':')
               pprint.pprint(obj.value, width=32)
             else:
@@ -686,7 +689,7 @@ class iPhoto(NS):
     return self.pathto('AlbumData.xml')
 
   def load_albumdata(self):
-    return ingest_plist(self.albumdata_path, recurse=True, resolve=True)
+    return read_plist(self.albumdata_path, 'dict')
 
   @locked_property
   def albumdata_xml_plist(self):
@@ -1082,7 +1085,7 @@ class AlbumPList(object):
 
   def __init__(self, plistpath):
     self.path = plistpath
-    self.plist = ingest_plist(plistpath, recurse=True, resolve=True)
+    self.plist = read_plist(plistpath)
 
   def __str__(self):
     return "<AlbumPList:%r>" % (self.plist,)
