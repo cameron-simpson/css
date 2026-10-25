@@ -158,6 +158,123 @@ NS_BASE_CLASSES = {
     for cls in (NSArray, NSDictionary, NSObject)
 }
 
+class NSScope(Sequence):
+  ''' A scope for resolving object references in plists.
+     It subclasses a list of reference objects and has a `.classes:dict`
+     mapping of class names to class definitions.
+  '''
+
+  def __init__(self, base_classes=None, objects=None):
+    super().__init__()
+    self.classes = dict(base_classes or NS_BASE_CLASSES)
+    self._objects = tuple(objects or ())
+
+  def __len__(self):
+    return len(self._objects)
+
+  @cache
+  def __getitem__(self, index):
+    return self.resolve(self._objects[index])
+
+  @ensure(lambda result: not isinstance(result, NSScope))
+  def resolve(self, obj):
+    ''' Resolve `obj` against this `Scope`.
+    '''
+    if isinstance(
+        obj,
+        (str, int, bool, float, ObjectClassDefinition, ObjectClassInstance)):
+      return obj
+    if isinstance(obj, list):
+      return [self.resolve(item) for item in obj]
+    if isinstance(obj, Mapping):
+      objd = dict(obj)
+      if (objid := objd.pop('CF$UID', None)) is not None:
+        resolved = self[objid]
+      elif (ns_string := objd.pop('NS.string', None)) is not None:
+        resolved = ns_string
+      elif (ns_data := objd.pop('NS.data', None)) is not None:
+        resolved = ns_data
+      elif (ns_locations := objd.pop('NSLocation', None)) is not None:
+        ns_count = objd.pop('NSRangeCount')
+        ns_length = objd.pop('NSLength')
+        resolved = obj
+      elif (ns_range_data := objd.pop('NSRangeData', None)) is not None:
+        ns_range_count = obj['NSRangeCount']
+        assert 'CF$UID' in ns_range_data
+        key_id = self.resolve(ns_range_data)
+        data = self[key_id]
+        resolved = {'NSRangeCount': ns_range_count, 'NSRangeData': data}
+      elif (data := objd.pop('data', None)) is not None:
+        data = dict(data)
+        assert 'CF$UID' in data
+        key_id = self.resolve(data)
+        resolved = self[key_id]
+      elif (classname := objd.pop('$classname', None)) is not None:
+        # classname
+        class_mro = objd.pop('$classes')
+        if objd:
+          warning(f'unhandled items in obj: {objd!r}')
+
+        mro = []
+        for mro_name in class_mro:
+          try:
+            mro_cls = self.classes[mro_name]
+          except KeyError as e:
+            warning(
+                f'no class named {mro_name!r} in self.classes:{sorted(self.classes.keys())}'
+            )
+          else:
+            mro.append(mro_cls)
+        if not mro:
+          mro = dict,
+
+        @pprint_as_dict
+        class cls(*mro):
+
+          def __repr__(self):
+            return f'{self.__class__.__name__}:{self}'
+
+        cls.__name__ = classname
+        if classname in self.classes:
+          warning(f'replacing Scope.classes[{classname=}]')
+        self.classes[classname] = cls
+        resolved = cls
+      elif (cls_ := objd.pop('$class', None)) is not None:
+        # #class instance
+        cls = self.resolve(cls_)
+        if (attributes := objd.pop('attributes', None)) is not None:
+          # attributes
+          attrs = self.resolve(attributes)
+          resolved = cls()
+          for key, item in attrs.items():
+            setattr(resolved, key, item)
+        else:
+          # we expect NS.objects and maybe NS.keys
+          objs = objd.pop('NS.objects')
+          objs = self.resolve(objs)
+          if (keys := objd.pop('NS.keys', None)) is not None:
+            # objects and keys - a dict
+            if len(objs) != len(keys):
+              warning(
+                  f'len(NS.objects)={len(objs)} != len(NS.keys)={len(keys)} for {obj=}'
+              )
+            keys = self.resolve(keys)
+            resolved = cls(zip(keys, objs))
+          else:
+            # just objects = a list
+            resolved = cls(objs)
+      else:
+        # just resolve every value in the Mapping
+        resolved = {}
+        for key in sorted(objd.keys()):
+          item = objd.pop(key)
+          resolved[key] = self.resolve(item)
+      if objd:
+        warning(f'uncomsumed keys {",".join(sorted(objd.keys()))} from {obj=}')
+      return resolved
+    warning(f'resolved value {obj.__class__.__name__}:{obj=}')
+    return obj
+
 @overload
 def read_plist(plist, format: Literal['dict']) -> NSDictionary:
   ...
