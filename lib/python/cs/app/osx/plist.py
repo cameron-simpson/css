@@ -7,7 +7,9 @@
 '''
 
 import base64
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
+from functools import cache
 from io import StringIO
 import json
 import os
@@ -19,7 +21,7 @@ import tempfile
 from typing import overload, Literal, Self
 
 from cs.buffer import CornuCopyBuffer
-from cs.deco import OBSOLETE
+from cs.deco import OBSOLETE, pprint_as_dict
 from cs.gimmicks import warning
 from cs.pfx import Pfx
 import cs.sh
@@ -50,9 +52,30 @@ DISTINFO = {
     '>=3.11',
 }
 
-class NSObject:
+@pprint_as_dict
+class NSObject(Mapping):
   ''' The root of the pre-known NS* classes.
   '''
+
+  def __str__(self):
+    return 'NSObject(' + ','.join(
+        f'.{attr}={value}' for attr, value in sorted(self.__dict__.items())
+    ) + ')'
+
+  def __repr__(self):
+    return str(self)
+
+  def __len__(self):
+    return len(self.__dict__)
+
+  def keys(self):
+    return self.__dict__.keys()
+
+  def __iter__(self):
+    return iter(self.__dict__)
+
+  def __getitem__(self, attr):
+    return self.__dict__[attr]
 
 class NSArray(list, NSObject):
 
