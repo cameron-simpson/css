@@ -1,3 +1,4 @@
+cbz GUI reader with zooms etc which I like
 calibre and dedrm, display calibre plugins paths in usage
 obok prints to be monkeypatchs with qvprint as with dedrm
 cs.ebooks.dedrm: option to use the plugin.zip directly instead of an unpacked source tree?

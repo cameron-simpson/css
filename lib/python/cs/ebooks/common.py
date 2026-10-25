@@ -125,8 +125,8 @@ class AbstractEbooksTree(FSPathBasedSingleton, MultiOpenMixin, MappingABC):
     raise NotImplementedError
 
   def __iter__(self) -> Iterable:
-    ''' Yield primary keys from the library.
-        This might yield ASINs for a Kindle library, VolumeIDs for a Kobo library, etc.
+    ''' Yield external primary keys from the library.
+        This yields ASINs for a Kindle library, VolumeIDs for a Kobo library, etc.
     '''
     return iter(self.get_library_books_mapping())
 

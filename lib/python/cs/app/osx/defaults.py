@@ -5,7 +5,7 @@
 
 from subprocess import PIPE
 
-from cs.app.osx.plist import ingest_plist
+from cs.app.osx.plist import read_plist
 from cs.cache import cachedmethod
 from cs.lex import r
 from cs.psutils import run
@@ -90,8 +90,9 @@ class DomainDefaults:
   def as_dict(self):
     ''' Return the current defaults as a `dict`.
     '''
-    plist = self.defaults.run(['export', self.domain, '-'])
-    return ingest_plist(plist.encode('utf-8'))
+    plist_f = self.defaults.run(['export', self.domain, '-'])
+    plist_bs = plist_f.encode('utf-8')
+    return read_plist(plist_bs, 'dict')
 
   @typechecked
   def __getitem__(self, key: str):

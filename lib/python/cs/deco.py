@@ -1314,3 +1314,38 @@ class Promotable:
           f', last attempt of {cls.__name__}({obj.__class__.__name__}:{obj!r})'
           f' raised {e.__class__.__name__}: {e}'
       )
+
+@decorator
+def pprint_as(cls, *, as_type):
+  ''' Arrange for `pprint` to render nstances of this class using
+      the handler it already uses for `as_type`.
+
+      Because `pprint` keys the printer from a class' `__repr__`
+      you may want this on any dick-like class with its own `__repr__`
+      (even viaa superclass).
+
+      Example usage:
+
+          @pprint_as(as_type=list)
+          class MyClass(Sequence):
+              ...
+  '''
+  from pprint import PrettyPrinter
+  PrettyPrinter._dispatch[cls.__repr__
+                          ] = PrettyPrinter._dispatch[as_type.__repr__]
+  return cls
+
+def pprint_as_dict(cls):
+  ''' Arrange for `pprint` to render nstances of this class like a `dict`.
+
+      Because `pprint` keys the printer from a class' `__repr__`
+      you may want this on any `Mapping` class with its own `__repr__`
+      (even viaa superclass).
+
+      Example usage:
+
+          @pprint_as_dict
+          class MyClass(Mapping):
+              ...
+  '''
+  return pprint_as(cls, as_type=dict)

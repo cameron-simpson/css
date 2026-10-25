@@ -4,17 +4,19 @@
 '''
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from contextlib import contextmanager
+from functools import cached_property
 from inspect import isgeneratorfunction
 import logging
 import os
 from os.path import abspath
 import sys
 from threading import current_thread
-from typing import Any, Optional, Union, List, Tuple
+from typing import Any, Generator, Optional, Union, List, Tuple
 
 from icontract import require
-from sqlalchemy import Column, Integer, create_engine
+from sqlalchemy import Column, Integer, Select, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
@@ -23,9 +25,11 @@ from typeguard import typechecked
 from cs.context import contextif
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import lockfile
+from cs.fs import HasFSPath
 from cs.lex import cutprefix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
+from cs.printt import printt
 from cs.psutils import run
 from cs.resources import MultiOpenMixin
 from cs.threads import NRLock, ThreadState
@@ -922,3 +926,177 @@ def proxy_on_demand_field(field_func, field_name=None):
     return field_value
 
   return field_func_wrapper
+
+class AutoDB(HasFSPath, Mapping):
+  ''' An SQLite3 database whose schema is autoloaded.
+
+      This presents a `Mapping` view of the database where the keys
+      are `Table` names and the values are `TableProxy` instances.
+
+      The `TableProxy` class presents a mapping of `Column` names
+      to `Column`s.
+  '''
+
+  @property
+  def dbpath(self):
+    return self.fspath
+
+  @property
+  def dburl(self):
+    return f'sqlite:///{self.fspath}'
+
+  @cached_property
+  def engine(self):
+    return create_engine(self.dburl)
+
+  @cached_property
+  def base(self):
+    return declarative_base()
+
+  @cached_property
+  def metadata(self):
+    ''' The `Metadata`, prepopulated from the database schema.
+    '''
+    metadata = self.base.metadata
+    metadata.reflect(self.engine)
+    return metadata
+
+  @property
+  def sorted_tables(self):
+    ''' The `Metadata.sorted_tables' list of table names.
+    '''
+    return self.metadata.sorted_tables
+
+  @property
+  def tables(self):
+    ''' The `Metadata.tables'.
+    '''
+    return self.metadata.tables
+
+  def execute(self, stmt) -> Generator:
+    ''' Execute `stmt` with a fresh connection, yielding result rows.
+    '''
+    with self.engine.connect() as conn:
+      yield from conn.execute(stmt)
+
+  def __len__(self):
+    return len(self.tables)
+
+  def keys(self):
+    return self.tables.keys()
+
+  def __iter__(self):
+    return iter(self.tables)
+
+  def items(self):
+    TableProxy = self.__class__.TableProxy
+    yield from (
+        (name, TableProxy(self, table, name))
+        for name, table in self.tables.items()
+    )
+
+  def values(self):
+    yield from (table_proxy for name, table_proxy in self.items())
+
+  def __getitem__(self, table_name: str):
+    return self.__class__.TableProxy(self, self.tables[table_name], table_name)
+
+  def printt(self, **printt_kw):
+    ttable = []
+    for name, table_proxy in sorted(self.items()):
+      ttable.append(name)
+      ttable.append(
+          tuple(
+              [colname, column]
+              for colname, column in sorted(table_proxy.items())
+          )
+      )
+    printt(*ttable, **printt_kw)
+
+  class TableProxy(Mapping):
+    ''' A `Table` presented as a mapping of column definitions.
+    '''
+
+    def __init__(self, db, table, name):
+      self.db = db
+      self.table = table
+      self.name = name
+
+    def select(self) -> Select:
+      ''' Return a `Select` instance for this table.
+      '''
+      return self.table.select()
+
+    def count(self):
+      ''' A count of the rows in the table.
+      '''
+      count, = self.db.execute(self.select().count())
+      return count
+
+    def rows(self, select: Select | None = None):
+      ''' A generator yielding `RowProxies` for each `Row` from the
+          tabl obtained from `select`.
+      '''
+      if select is None:
+        select = self.select()
+      RowProxy = self.__class__.RowProxy
+      yield from (RowProxy(self, row) for row in self.db.execute(select))
+
+    def __len__(self):
+      return self.table.columns
+
+    def keys(self):
+      return self.table.columns.keys()
+
+    def __iter__(self):
+      return iter(self.columns)
+
+    def items(self):
+      return self.table.columns.items()
+
+    def values(self):
+      return self.table.columns.values()
+
+    def __getitem__(self, index):
+      return self.table.columns[index]
+
+  class RowProxy(Mapping):
+    ''' A `Mapping` view of a `Row` from a database query.
+    '''
+
+    def __init__(self, table, row):
+      self.table = table
+      self.row = row
+
+    def __len__(self):
+      return len(self.row)
+
+    def __iter__(self):
+      return iter(self.keys())
+
+    def keys(self):
+      return self.row._mapping.keys()
+
+    def items(self):
+      return self.row._mapping.items()
+
+    def values(self):
+      return self.row._mapping.values()
+
+    def __getitem__(self, column):
+      if isinstance(column, int):
+        return self.row[column]
+      if isinstance(column, str):
+        return self.row._mapping[column]
+      raise TypeError(f'expected int or str, got {type(column)}:{column=}')
+
+    def __setitem(self, column, value):
+      raise NotImplementedError
+
+if __name__ == '__main__':
+  import sys
+  cmd, dbpath = sys.argv
+  db = AutoDB(dbpath)
+  for t in db.sorted_tables:
+    print(t.name)
+  breakpoint()

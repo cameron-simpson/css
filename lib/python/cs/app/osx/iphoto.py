@@ -1,10 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Access iPhoto data.
-#       - Cameron Simpson <cs@cskk.id.au> 04apr2013
+# - Cameron Simpson <cs@cskk.id.au> 04apr2013
 #
 
-from __future__ import print_function
 import sys
 import os
 import os.path
@@ -20,8 +19,11 @@ import sqlite3
 from threading import RLock
 from types import SimpleNamespace as NS
 from uuid import uuid4
+
 from PIL import Image
+
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -36,7 +38,7 @@ from cs.tagset import Tag
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 from cs.x import X
-from .plist import ingest_plist
+from .plist import read_plist
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
@@ -238,7 +240,7 @@ def cmd_ls(I, argv):
         if argv:
           for column_name in sorted(row.column_names):
             if column_name.endswith('Data'):
-              obj = ingest_plist(row[column_name], recurse=True, resolve=True)
+              obj = read_plist(row[column_name])
               print(' ', column_name + ':')
               pprint.pprint(obj.value, width=32)
             else:
@@ -445,7 +447,7 @@ def cmd_autotag(I, argv):
   xit = 0
   if argv and argv[0].startswith('/'):
     ptn = argv.pop(0)[1:]
-    ptn_re = re.compile(ptn, re.I)
+    ptn_re = re.compile(ptn, re.IGNORECASE)
   else:
     ptn = None
   if argv:
@@ -686,7 +688,7 @@ class iPhoto(NS):
     return self.pathto('AlbumData.xml')
 
   def load_albumdata(self):
-    return ingest_plist(self.albumdata_path, recurse=True, resolve=True)
+    return read_plist(self.albumdata_path, 'dict')
 
   @locked_property
   def albumdata_xml_plist(self):
@@ -949,7 +951,7 @@ class iPhoto(NS):
         )
       return selector
 
-class iPhotoDBs(object):
+class iPhotoDBs:
 
   def __init__(self, iphoto):
     self.iphoto = iphoto
@@ -1078,11 +1080,11 @@ class Album_Mixin(iPhotoRow):
       error("apalbum: %r: %s", self.apalbum_path, e)
       return None
 
-class AlbumPList(object):
+class AlbumPList:
 
   def __init__(self, plistpath):
     self.path = plistpath
-    self.plist = ingest_plist(plistpath, recurse=True, resolve=True)
+    self.plist = read_plist(plistpath)
 
   def __str__(self):
     return "<AlbumPList:%r>" % (self.plist,)
@@ -1399,7 +1401,7 @@ class VFace_Mixin(iPhotoRow):
     MI.close()
     return face_Image
 
-class _SelectMasters(object):
+class _SelectMasters:
   ''' Select masters base class.
   '''
 
