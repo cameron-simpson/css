@@ -1317,11 +1317,11 @@ class Promotable:
 
 @decorator
 def pprint_as(cls, *, as_type):
-  ''' Arrange for `pprint` to render nstances of this class using
+  ''' Arrange for `pprint` to render instances of this class using
       the handler it already uses for `as_type`.
 
       Because `pprint` keys the printer from a class' `__repr__`
-      you may want this on any dick-like class with its own `__repr__`
+      you may want this on any collection class with its own `__repr__`
       (even viaa superclass).
 
       Example usage:
@@ -1336,7 +1336,7 @@ def pprint_as(cls, *, as_type):
   return cls
 
 def pprint_as_dict(cls):
-  ''' Arrange for `pprint` to render nstances of this class like a `dict`.
+  ''' Arrange for `pprint` to render instances of this class like a `dict`.
 
       Because `pprint` keys the printer from a class' `__repr__`
       you may want this on any `Mapping` class with its own `__repr__`
