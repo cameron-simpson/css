@@ -1314,3 +1314,22 @@ class Promotable:
           f', last attempt of {cls.__name__}({obj.__class__.__name__}:{obj!r})'
           f' raised {e.__class__.__name__}: {e}'
       )
+
+def pprint_as_dict(cls):
+  ''' Arrange for `pprint` to render this class like a `dict`.
+
+      Because `pprint` keys the printer from a class' `__repr__`
+      you may want this on any `Mapping` class with its own `__repr__`
+      (even viaa superclass).
+
+      Example usage:
+
+          @pprint_as_dict
+          class MyClass(Mapping):
+              ...
+  '''
+
+  from pprint import PrettyPrinter
+  PrettyPrinter._dispatch[cls.__repr__] = PrettyPrinter._pprint_dict
+
+  return cls
