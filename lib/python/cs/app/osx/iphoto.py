@@ -1,10 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Access iPhoto data.
-#       - Cameron Simpson <cs@cskk.id.au> 04apr2013
+# - Cameron Simpson <cs@cskk.id.au> 04apr2013
 #
 
-from __future__ import print_function
 import sys
 import os
 import os.path
@@ -448,7 +447,7 @@ def cmd_autotag(I, argv):
   xit = 0
   if argv and argv[0].startswith('/'):
     ptn = argv.pop(0)[1:]
-    ptn_re = re.compile(ptn, re.I)
+    ptn_re = re.compile(ptn, re.IGNORECASE)
   else:
     ptn = None
   if argv:
@@ -952,7 +951,7 @@ class iPhoto(NS):
         )
       return selector
 
-class iPhotoDBs(object):
+class iPhotoDBs:
 
   def __init__(self, iphoto):
     self.iphoto = iphoto
@@ -1081,7 +1080,7 @@ class Album_Mixin(iPhotoRow):
       error("apalbum: %r: %s", self.apalbum_path, e)
       return None
 
-class AlbumPList(object):
+class AlbumPList:
 
   def __init__(self, plistpath):
     self.path = plistpath
@@ -1402,7 +1401,7 @@ class VFace_Mixin(iPhotoRow):
     MI.close()
     return face_Image
 
-class _SelectMasters(object):
+class _SelectMasters:
   ''' Select masters base class.
   '''
 
