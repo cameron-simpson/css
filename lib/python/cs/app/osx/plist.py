@@ -7,7 +7,7 @@
 '''
 
 import base64
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, MutableSequence, Sequence
 from datetime import datetime, timezone
 from functools import cache
 from io import StringIO
@@ -388,6 +388,15 @@ def elem_as_python(elem, objects: list | None = None):
   warning(f'unhandled plist element {elem=}')
   return elem
 
+def resolve_objects(objects: MutableSequence, scope: NSScope | None = None):
+  ''' Resolve a sequence of `objects` against `scope`.
+      If scope is not supplied a new `NSScope` is created using the
+      `objects` as the reference.
+      The sequence is modified in place.
+  '''
+  if scope is None:
+    scope = NSScope(objects)
+  return scope.resolve_objects(objects)
 
 ####################################################################################
 # Old routines written for use inside my jailbroken iPhone.
