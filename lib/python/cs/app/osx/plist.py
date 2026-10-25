@@ -335,38 +335,6 @@ def read_plist(plist, format: str = 'dict'):
     raise ValueError(f'nonzero exit code {retcode} from {pl_argv=}')
   return plist_bs.decode('utf-8')
 
-@OBSOLETE('read_plist(..,"etree")')
-def import_as_etree(plist):
-  ''' Load an Apple plist and return an `etree.Element`.
-      Parameters:
-      * `plist`: the source plist: data if `bytes`, filename if
-        `str` or `os.PathLike`, otherwise a file descriptor or a
-        file object open for binary read.
-  '''
-  return read_plist(plist, 'etree')
-
-def ingest_plist(plist, recurse=False, resolve=False):
-  ''' Ingest an Apple plist and return as a `NSDictionary`.
-      Trivial wrapper for `import_as_etree` and `ingest_plist_etree`.
-
-      Parameters:
-      * `recurse`: unpack any `bytes` objects as plists
-      * `resolve`: resolve unpacked `bytes` plists' `'$objects'` entries
-  '''
-  if resolve and not recurse:
-    raise ValueError("resolve true but recurse false")
-  with Pfx("ingest_plist(%r)", plist):
-    pd = ingest_plist_etree(import_as_etree(plist))
-    if recurse:
-      for key, value in list(pd.items()):
-        with Pfx("[%r]", key):
-          if isinstance(value, bytes):
-            subpd = ingest_plist(value)
-            if resolve:
-              subpd = resolve_object(subpd['$objects'], 1)
-            pd[key] = subpd
-    return pd
-
 def export_xml_to_plist(E, fp=None, fmt='binary1'):
   ''' Export the content of an `etree.Element` to a plist file.
 
@@ -390,18 +358,6 @@ def export_xml_to_plist(E, fp=None, fmt='binary1'):
         (E, retcode)
     )
   return None
-
-@OBSOLETE('NSDictionary.from_etree')
-def ingest_plist_etree(plist_etree) -> NSDictionary:
-  ''' Recursively a plist's `ElementTree` into a native Python structure.
-      This returns a `NSDictionary`, a mapping of the plists's top dict
-      with attribute access to key values.
-  '''
-  return NSDictionary.from_etree(plist_etree)
-
-@OBSOLETE('NSDictionary.from_elem')
-def ingest_plist_dict(e):
-  return NSDictionary.from_elem(e)
 
 # pylint: disable=too-many-return-statements
 def elem_as_python(elem, objects: list | None = None):
@@ -433,10 +389,6 @@ def elem_as_python(elem, objects: list | None = None):
     return NSArray.from_elem(elem, objects=objects)
   warning(f'unhandled plist element {elem=}')
   return elem
-
-@OBSOLETE('elem_as_python')
-def ingest_plist_elem(elem, objects: list | None = None):
-  return elem_as_python(elem, objects)
 
 
 # pylint: disable=too-few-public-methods
