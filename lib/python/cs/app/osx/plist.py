@@ -125,13 +125,17 @@ class NSDictionary(dict, NSObject):
     if key is not None:
       raise ValueError(f'no value for {key=}')
     try:
-      objects = self['$objects']
+      objects = self.pop('$objects')
     except KeyError:
       pass
     else:
       scope = NSScope(objects=objects)
+      # resolve every object
+      for i in range(len(objects)):
+        scope[i]
       for key, item in list(self.items()):
         self[key] = scope.resolve(item)
+      self['$objects'] = list(scope)
     return self
 
   # make existing keys available as attribute
@@ -213,6 +217,8 @@ class NSScope(Sequence):
 
         mro = []
         for mro_name in class_mro:
+          if mro_name == classname:
+            continue
           try:
             mro_cls = self.classes[mro_name]
           except KeyError as e:
@@ -222,7 +228,7 @@ class NSScope(Sequence):
           else:
             mro.append(mro_cls)
         if not mro:
-          mro = dict,
+          mro.append(dict)
 
         @pprint_as_dict
         class cls(*mro):
