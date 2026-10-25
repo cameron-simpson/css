@@ -130,8 +130,9 @@ class NSDictionary(dict, NSObject):
       pass
     else:
       printt(f'{cls.__name__} PRE RESOLVE', self)
-      for i, object in enumerate(objects):
-        resolve_object(objects, i)
+      scope = NSScope(objects=objects)
+      for key, item in list(self.items()):
+        self[key] = scope.resolve(item)
       printt(f'{cls.__name__} POST RESOLVE', self)
     return self
 
