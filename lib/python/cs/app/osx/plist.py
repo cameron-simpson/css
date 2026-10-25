@@ -361,9 +361,10 @@ def export_xml_to_plist(E, fp=None, fmt='binary1'):
 def elem_as_python(elem, objects: list | None = None):
   ''' Ingest a plist `Element`, converting various types to native Python objects.
       Unhandled types remain as the original `Element`.
+
+      The optional `objects` is a sequence of reference objects to
+      support resolving references.
   '''
-  if objects is None:
-    objects = []
   if elem.tag in ('string', 'key'):
     return elem.text
   if elem.tag == 'integer':
