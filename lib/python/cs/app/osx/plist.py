@@ -319,7 +319,10 @@ def read_plist(plist, format: str = 'dict'):
     raise ValueError(f'unsupported {format=}')
   if isinstance(plist, bytes):
     pfd = CornuCopyBuffer([plist]).as_fd()
-    return read_plist(pfd, format=format)
+    try:
+      return read_plist(pfd, format=format)
+    finally:
+      os.close(pfd)
   if isinstance(plist, (str, PathLike)):
     # presume plist is a filename
     with open(plist, "rb") as pfp:
