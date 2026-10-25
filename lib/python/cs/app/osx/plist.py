@@ -217,6 +217,8 @@ class NSScope(Sequence):
 
         mro = []
         for mro_name in class_mro:
+          if mro_name == classname:
+            continue
           try:
             mro_cls = self.classes[mro_name]
           except KeyError as e:
@@ -226,7 +228,7 @@ class NSScope(Sequence):
           else:
             mro.append(mro_cls)
         if not mro:
-          mro = dict,
+          mro.append(dict)
 
         @pprint_as_dict
         class cls(*mro):
