@@ -180,9 +180,7 @@ class NSScope(Sequence):
   def resolve(self, obj):
     ''' Resolve `obj` against this `Scope`.
     '''
-    if isinstance(
-        obj,
-        (str, int, bool, float, ObjectClassDefinition, ObjectClassInstance)):
+    if isinstance(obj, (str, int, bool, float)):
       return obj
     if isinstance(obj, list):
       return [self.resolve(item) for item in obj]
@@ -390,78 +388,6 @@ def elem_as_python(elem, objects: list | None = None):
   warning(f'unhandled plist element {elem=}')
   return elem
 
-
-# pylint: disable=too-few-public-methods
-class ObjectClassDefinition:
-  ''' A representation of a "class" object, used in `resolve_object()`
-      for otherwise unrecognised objects which contain a `$classname` member.
-  '''
-
-  def __init__(self, name, mro):
-    self.name = name
-    self.mro = mro
-
-  def __str__(self):
-    return f'{self.__class__.__name__}:{self.name}({",".join(self.mro)})'
-    ##return "%s%r" % (self.name, self.mro)
-
-  __repr__ = __str__
-
-class ObjectClassInstance:
-  ''' A representation of a "class instance", used in `resolve_object()`
-      for objects with a `$class` member.
-  '''
-
-  def __init__(self, class_def, value):
-    self.class_def = class_def
-    self.value = value
-
-  @property
-  def name(self):
-    ''' The name from teh class definiton.
-    '''
-    return self.class_def.name
-
-  def __str__(self):
-    return f'{self.__class__.__name__}:{self.name}:{self.value!r}'
-    ##return "%s%r" % (self.name, self.value)
-
-  __repr__ = __str__
-
-  def __len__(self):
-    return len(self.value)
-
-  def __getitem__(self, key):
-    return self.value[key]
-
-  def __setitem__(self, key, value):
-    self.value[key] = value
-
-  def __contains__(self, key):
-    return key in self.value
-
-  def __getattr__(self, attr):
-    try:
-      return self.value[attr]
-    except KeyError:
-      # pylint: disable=raise-missing-from
-      raise AttributeError("not in self.value: %r" % (attr,))
-    except TypeError:
-      # pylint: disable=raise-missing-from
-      raise AttributeError("cannot index self.value: %r" % (attr,))
-    raise AttributeError(attr)
-
-  # pylint: disable=missing-function-docstring
-  def keys(self):
-    return self.value.keys()
-
-  # pylint: disable=missing-function-docstring
-  def items(self):
-    return self.value.items()
-
-  # pylint: disable=missing-function-docstring
-  def values(self):
-    return self.value.values()
 
 ####################################################################################
 # Old routines written for use inside my jailbroken iPhone.
