@@ -287,15 +287,15 @@ def read_plist(plist, format: Literal['etree']) -> etree.ElementTree:
 def read_plist(plist, format: Literal['json', 'xml1']) -> str:
   ...
 
-def read_plist(plist, format: str):
-  ''' Load an Apple plist and return it as a `str` in the specified
-      `format`.
+def read_plist(plist, format: str = 'dict'):
+  ''' Load an Apple plist and return it in the specified `format`.
 
       Parameters:
       * `plist`: the source plist: data if `bytes`, filename if
         `str` or `os.PathLike`, otherwise a file decriptor or a
         file object open for binary read
-      * `format`: the desired output format, `"dict"`, `"etree"`, `"json"` or `"xml"`
+      * `format`: the desired output format, `"dict"`, `"etree"`,
+        `"json"` or `"xml"`; the default is `"dict"`
 
       Each `format` has its own expected return value:
       * `"dict"`: a `NSDictionary` decoded from the plist
