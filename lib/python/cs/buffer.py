@@ -268,6 +268,8 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
         up to `maxlength` bytes from `bfr` into it.
         Return the file descriptor of the read end of the pipe.
 
+        *NOTE*: The caller is responsible for closing the returned file descriptor.
+
         The default `maxlength` is `Ellipsis`, meaning to copy all data.
 
         Note that the thread preemptively consumes from the buffer.
