@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from typeguard import typechecked
 
-from cs.app.osx.plist import ingest_plist
+from cs.app.osx.plist import read_plist
 from cs.context import stackattrs
 from cs.deco import strable
 from cs.logutils import warning
@@ -185,9 +185,9 @@ class AppleBooksDB(ORM):
       plist = Column('Z_PLIST', LargeBinary)
 
       def plist_as_dict(self):
-        ''' Return the plist column as a `PListDict`.
+        ''' Return the plist column as an `NSDictionary`.
         '''
-        return ingest_plist(self.plist)
+        return read_plist(self.plist, 'dict')
 
     class Collection(Base, BasicTableMixin, HasPKMixin):
       ''' Collection definitions.
