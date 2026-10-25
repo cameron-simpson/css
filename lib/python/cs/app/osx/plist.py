@@ -125,13 +125,17 @@ class NSDictionary(dict, NSObject):
     if key is not None:
       raise ValueError(f'no value for {key=}')
     try:
-      objects = self['$objects']
+      objects = self.pop('$objects')
     except KeyError:
       pass
     else:
       scope = NSScope(objects=objects)
+      # resolve every object
+      for i in range(len(objects)):
+        scope[i]
       for key, item in list(self.items()):
         self[key] = scope.resolve(item)
+      self['$objects'] = list(scope)
     return self
 
   # make existing keys available as attribute
