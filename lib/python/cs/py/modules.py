@@ -351,7 +351,7 @@ class ModuleReloader(Refreshable):
     except (ImportError, NameError, SyntaxError) as e:
       warning(f'reload {self.fspath=}: {e}')
       return False
-    print(f'  reload ok, update self.last_mtime <= {mtime=}')
+    print(f'  reload ok, update self.last_mtime <- {mtime=}')
     self.last_mtime = mtime
     print('  -> True')
     return True
