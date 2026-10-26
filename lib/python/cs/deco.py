@@ -239,6 +239,34 @@ def attr(func, **attrs):
     setattr(func, attr, value)
   return func
 
+def methodif(attr_test, attribute_error_message=None):
+  ''' A decorator for methods which raises `AttributeError` if
+      `attr_test(self)` fails, as though the method does not exist.
+
+      Example:
+
+          @methodif(lambda self: self.product_type == 'music', "not a music product")
+          def get_tracks(self):
+              """ Return the music tracks for this product.
+              """
+              ...
+  '''
+
+  @decorator
+  def methodif_deco(method):
+
+    def wrapped_method(self, *method_a, **method_kw):
+      if not attr_test(self):
+        raise AttributeError(
+            method.__name__ if attribute_error_message is
+            None else f'{method.__name__}: {attribute_error_message}'
+        )
+      return method(self, *method_a, **method_kw)
+
+    return wrapped_method
+
+  return methodif_deco
+
 @decorator
 def contextdecorator(cmgrfunc):
   ''' A decorator for a context manager function `cmgrfunc`
@@ -1329,6 +1357,9 @@ def pprint_as(cls, *, as_type):
           @pprint_as(as_type=list)
           class MyClass(Sequence):
               ...
+
+      If PEP813 (The Pretty Print Protocol) gets accepted this will
+      need its implementation updated.
   '''
   from pprint import PrettyPrinter
   PrettyPrinter._dispatch[cls.__repr__
@@ -1337,10 +1368,7 @@ def pprint_as(cls, *, as_type):
 
 def pprint_as_dict(cls):
   ''' Arrange for `pprint` to render instances of this class like a `dict`.
-
-      Because `pprint` keys the printer from a class' `__repr__`
-      you may want this on any `Mapping` class with its own `__repr__`
-      (even viaa superclass).
+      This is a convenience shim for `@pprint_as`.
 
       Example usage:
 
@@ -1349,3 +1377,27 @@ def pprint_as_dict(cls):
               ...
   '''
   return pprint_as(cls, as_type=dict)
+
+def pprint_as_list(cls):
+  ''' Arrange for `pprint` to render instances of this class like a `list`.
+      This is a convenience shim for `@pprint_as`.
+
+      Example usage:
+
+          @pprint_as_list
+          class MyClass(Sequence):
+              ...
+  '''
+  return pprint_as(cls, as_type=list)
+
+def pprint_as_set(cls):
+  ''' Arrange for `pprint` to render instances of this class like a `set`.
+      This is a convenience shim for `@pprint_as`.
+
+      Example usage:
+
+          @pprint_as_set
+          class MyClass(set):
+              ...
+  '''
+  return pprint_as(cls, as_type=list)
