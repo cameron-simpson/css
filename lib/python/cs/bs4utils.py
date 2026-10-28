@@ -128,10 +128,20 @@ def find_heading(
 
 @typechecked
 def tabulate_soup(
-    tag: BS4Tag | NavigableString
+    tag: BS4Tag | NavigableString,
+    *,
+    with_ancestors=False,
+    without_children=False,
 ) -> list[list[str, str] | tuple]:
   ''' Return a table describing `soup` for use with `cs.lex.printt`.
       Connect tags with their child tags using Unicode box characters.
+
+      Parameters:
+      * `tag`: the `Tag` or `NovigableString` to tabulate
+      * `with_ancestors`: if true (default `False`), prepend the
+        ancestor tags of `tag`
+      * `without_children`: if true (default `False`), omit the
+        children of a `Tag`
   '''
   table = []
   if isinstance(tag, NavigableString):
@@ -158,44 +168,52 @@ def tabulate_soup(
       # I saw an amazon page embed an obscene amount of JSON in a
       # name attribute :-(
       label += f' name={cropped_repr(name_attr)}'
-    children = list(
-        child for child in tag.children if isinstance(child, NavigableString)
-        or child.name not in ('script', 'style')
-    )
-    # count the subtags which aren't strings
-    nsubtags = sum(
-        not isinstance(child, NavigableString) for child in children
-    )
-    if not attrs and len(children) == 1 and isinstance(children[0],
-                                                       NavigableString):
-      # The super compact form:
-      # a tag with no attrs and some text puts the text beside the tag name.
-      assert nsubtags == 0
-      text = f'{str(children[0]).strip()}'
-      table.append([label, text])
-    else:
-      attr_text = "\n".join(
-          f'{attr}={value!r}' for attr, value in sorted(attrs.items())
+    if not without_children:
+      children = list(
+          child for child in tag.children
+          if isinstance(child, NavigableString) or child.name not in
+          ('script', 'style')
       )
-      table.append([label, attr_text])
-      if children:
-        subtable = []
-        for child in children:
-          subtable.extend(tabulate_soup(child))
-        table.append(tuple(subtable))
+      # count the subtags which aren't strings
+      nsubtags = sum(
+          not isinstance(child, NavigableString) for child in children
+      )
+      if not attrs and len(children) == 1 and isinstance(children[0],
+                                                         NavigableString):
+        # The super compact form:
+        # a tag with no attrs and some text puts the text beside the tag name.
+        assert nsubtags == 0
+        text = f'{str(children[0]).strip()}'
+        table.append([label, text])
+      else:
+        attr_text = "\n".join(
+            f'{attr}={value!r}' for attr, value in sorted(attrs.items())
+        )
+        table.append([label, attr_text])
+        if children:
+          subtable = []
+          for child in children:
+            subtable.extend(tabulate_soup(child))
+          table.append(tuple(subtable))
+  if with_ancestors:
+    tag = soup
+    while (parent := tag.parent) is not None:
+      table = [
+          *tabulate_soup(parent, with_ancestors=True, without_children=True),
+          tuple(table),
+      ]
+      tag = parent
   return table
 
-def printt_soup(tag: BS4Tag, **printt_kw):
+def printt_soup(
+    tag: BS4Tag, *, with_ancestors=False, without_children=False, **printt_kw
+):
   ''' Print the contents of the soup via `cs.lex.printt`
       using `tabulate_soup` to make the table.
   '''
-  if isinstance(tag, BS4Tag) and tag.name == 'html':
-    table = []
-    if tag.head:
-      table.extend(tabulate_soup(tag.head))
-    table.extend(tabulate_soup(tag.body))
-  else:
-    table = tabulate_soup(tag)
+  table = tabulate_soup(
+      tag, with_ancestors=with_ancestors, without_children=without_children
+  )
   printt(*table, **printt_kw)
 
 def as_xml(tag: BS4Tag, *, E=None):
@@ -632,6 +650,9 @@ if __name__ == '__main__':
     print("--------------------------------------")
     soup = BeautifulSoup(html, features="lxml")
     printt_soup(soup)
+    h1 = soup.find('h1')
+    if h1 is not None:
+      printt_soup(h1, with_ancestors=True)
     for table in Table.scan(soup):
       print()
       table.printt()
