@@ -16,7 +16,7 @@ from cs.pfx import pfx
 from cs.printt import printt
 from cs.gimmicks import warning
 
-__version__ = '20261022.3-post'
+__version__ = '20261029'
 
 DISTINFO = {
     'keywords': ["python3"],
