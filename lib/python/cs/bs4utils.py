@@ -196,7 +196,6 @@ def tabulate_soup(
             subtable.extend(tabulate_soup(child))
           table.append(tuple(subtable))
   if with_ancestors:
-    tag = soup
     while (parent := tag.parent) is not None:
       table = [
           *tabulate_soup(parent, with_ancestors=True, without_children=True),
