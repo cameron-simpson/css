@@ -168,37 +168,35 @@ def tabulate_soup(
       # I saw an amazon page embed an obscene amount of JSON in a
       # name attribute :-(
       label += f' name={cropped_repr(name_attr)}'
-    if not without_children:
-      children = list(
-          child for child in tag.children
-          if isinstance(child, NavigableString) or child.name not in
-          ('script', 'style')
+    children = list(
+        child for child in tag.children if isinstance(child, NavigableString)
+        or child.name not in ('script', 'style')
+    )
+    # count the subtags which aren't strings
+    nsubtags = sum(
+        not isinstance(child, NavigableString) for child in children
+    )
+    if not attrs and len(children) == 1 and isinstance(children[0],
+                                                       NavigableString):
+      # The super compact form:
+      # a tag with no attrs and some text puts the text beside the tag name.
+      assert nsubtags == 0
+      text = f'{str(children[0]).strip()}'
+      table.append([label, text])
+    else:
+      attr_text = "\n".join(
+          f'{attr}={value!r}' for attr, value in sorted(attrs.items())
       )
-      # count the subtags which aren't strings
-      nsubtags = sum(
-          not isinstance(child, NavigableString) for child in children
-      )
-      if not attrs and len(children) == 1 and isinstance(children[0],
-                                                         NavigableString):
-        # The super compact form:
-        # a tag with no attrs and some text puts the text beside the tag name.
-        assert nsubtags == 0
-        text = f'{str(children[0]).strip()}'
-        table.append([label, text])
-      else:
-        attr_text = "\n".join(
-            f'{attr}={value!r}' for attr, value in sorted(attrs.items())
-        )
-        table.append([label, attr_text])
-        if children:
-          subtable = []
-          for child in children:
-            subtable.extend(tabulate_soup(child))
-          table.append(tuple(subtable))
+      table.append([label, attr_text])
+      if children and not without_children:
+        subtable = []
+        for child in children:
+          subtable.extend(tabulate_soup(child))
+        table.append(tuple(subtable))
   if with_ancestors:
     while (parent := tag.parent) is not None:
       table = [
-          *tabulate_soup(parent, with_ancestors=True, without_children=True),
+          *tabulate_soup(parent, with_ancestors=False, without_children=True),
           tuple(table),
       ]
       tag = parent
@@ -209,6 +207,13 @@ def printt_soup(
 ):
   ''' Print the contents of the soup via `cs.lex.printt`
       using `tabulate_soup` to make the table.
+
+      Parameters:
+      * `tag`: the `Tag` or `NovigableString` to print
+      * `with_ancestors`: if true (default `False`), prepend the
+        ancestor tags of `tag`
+      * `without_children`: if true (default `False`), omit the
+        children of a `Tag`
   '''
   table = tabulate_soup(
       tag, with_ancestors=with_ancestors, without_children=without_children
