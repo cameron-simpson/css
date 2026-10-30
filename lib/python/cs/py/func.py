@@ -10,7 +10,7 @@ Convenience facilities related to Python functions.
 
 from functools import partial
 
-__version__ = '20261030'
+__version__ = '20261030-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
