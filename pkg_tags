@@ -78,7 +78,7 @@ cs.printt ok_revision="6aea1190840327d3bb7d7a892f42a13eb660d924" pypi.release="2
 cs.progress pypi.release="20260531" ok_revision="85c336f7b2cadc71f8d0dca871c8e01c26a924c3" features={"20210803":["progress_runstate"],"20230212":["update_period"],"20240412":["BaseProgress__update_period"],"20250306":["Progress__qbar"],"20250412":["fix_progressbar_no_tty"]}
 cs.psutils pypi.release="20260531" ok_revision="3e962a3811960940f03453ed4783b86926cccc8f" features={"20220429":["signal_handler"],"20220531":["print_argv"],"20240211":["prep_argv","run__input"],"20241206":["run__remote"],"20250108":["run__fold"],"20250513":["print_argv__as_str"]}
 cs.py.doc pypi.release="20261016" ok_revision=ac3a913e9718b0e92ecc934df2d1fd0bff9e8085
-cs.py.func pypi.release="20261030" ok_revision="0cc440ccf1383ce8ca079543058555999ec3b1c9" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"],"20261030":["akw"]}
+cs.py.func pypi.release="20261031" ok_revision="0cc440ccf1383ce8ca079543058555999ec3b1c9" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"],"20221207":["func_a_kw"],"20261030":["akw"]}
 cs.py.modules pypi.release="20260531" ok_revision="55766da91fe3f0f5bf1468181d71b5c21da1c189" features={"20220606":["import_extra"]}
 cs.py.stack pypi.release="20250724" ok_revision=eaabd52273e7d3de35c7ab1db6fda136cab56b62 features={"20240412":["stack_dump__select"]}
 cs.py3 pypi.release="20220523" ok_revision="325b1a7d99ea4853e44b94ea96115537f76dfe47"
