@@ -4,14 +4,33 @@
 '''
 
 from functools import cached_property
+from os import PathLike
 from pathlib import Path
 
 from batgrl.app import App
 from batgrl.gadgets.gadget import SizeHint
-from batgrl.gadgets.image import Image as ImageGadget
-from PIL.Image import Image, open as open_image
+import batgrl.gadgets.image
+from PIL.Image import Image as PILImage, open as open_image
 
 from cs.fs import HasFSPath
+from cs.pfx import pfx_method
+
+# TODO: also accept a PIL.Image.Image
+class ImageGadget(batgrl.gadgets.image.Image):
+  ''' A shim subclass for `batgrl.gadgets.image.Image` which also accepts
+      `path` as a string, optionally as the first positional parameter.
+  '''
+
+  @pfx_method
+  def __init__(self, path: PathLike | str | None = None, **image_kw):
+    if path is not None and not isinstance(path, Path):
+      if isinstance(path, str):
+        path = Path(path)
+      elif isinstance(path, PathLike):
+        path = Path(path.__fspath__())
+      else:
+        warning(f'unexpected type for path: {type(path)}:{path=}')
+    super().__init__(path=path, **image_kw)
 
 class Previewable(HasFSPath):
 
@@ -29,7 +48,7 @@ class Previewable(HasFSPath):
         pass
 
   @cached_property
-  def image(self) -> Image:
+  def image(self) -> PILImage:
     return open_image(self.fspath)
 
 class Preview(App):
@@ -40,9 +59,8 @@ class Preview(App):
     self.obj = obj
 
   async def on_start(self):
-    print("Preview on_start")
     self.img_view = ImageGadget(
-        path=Path(self.obj.fspath),
+        path=self.obj.fspath,
         size_hint=SizeHint(width_hint=0.3, height_hint=0.8),
     )
     self.add_gadget(self.img_view)
@@ -51,5 +69,4 @@ if __name__ == '__main__':
   import sys
   cmd, imagepath = sys.argv
   app = Preview(Previewable(imagepath))
-  print("app.run()...")
   app.run()
