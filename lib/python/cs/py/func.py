@@ -33,13 +33,13 @@ class akw:
 
       Example:
 
-          >>> args = akw(1, 2, x=3, z=4)
+          >>> args = akw(1, 2, x=3, z=4, a=1)
           >>> args
-          akw(*(1, 2),**{'x': 3, 'z': 4})
+          akw(1,2,x=3,z=4,a=1)
           >>> args.args
           (1, 2)
           >>> args.kwargs
-          {'x': 3, 'z': 4}
+          {'x': 3, 'z': 4, 'a': 1}
           >>> import sys
           >>> prakw=akw(1, 2, file=sys.stdout)
           >>> prakw(print, 3)
@@ -51,7 +51,16 @@ class akw:
     self.kwargs = kwargs
 
   def __repr__(self):
-    return '%s(*%r,**%r)' % (self.__class__.__name__, self.args, self.kwargs)
+    return "".join(
+        (
+            self.__class__.__name__,
+            "(",
+            ",".join(map(repr, self.args)),
+            ("," if self.args and self.kwargs else ""),
+            ",".join((f'{k}={v!r}' for k, v in self.kwargs.items())),
+            ")",
+        )
+    )
 
   def __call__(self, func, *cargs, **ckwargs):
     ''' Call `func` with `self.args` and `cargs` as positional
