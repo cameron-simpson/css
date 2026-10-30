@@ -241,7 +241,7 @@ class VCS_Hg(HasFSPath, VCS):
     '''
     with self._pipefrom(
         'log',
-        rev=",".join(revs),
+        rev=[rev.encode('ascii') for rev in revs],
         template='{node}\n{tags}\n{desc}\a',
     ) as piped:
       for entry_s in piped.read().decode('utf-8').split('\a'):
