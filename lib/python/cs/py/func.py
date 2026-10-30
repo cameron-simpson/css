@@ -23,6 +23,43 @@ DISTINFO = {
     '>=3',
 }
 
+class akw:
+  ''' A trite class to store positional and keyword arguments.
+
+      It's a constant annoyance to me that there no neat way to
+      store a pairing of positional and keyword arguments for use
+      with a function.
+      You can eaily store a sequence, a mapping, and you can store
+      a function with arguments using `functools.partial`.
+
+      Example:
+
+          >>> args = akw(1, 2, x=3, z=4)
+          >>> args
+          akw(*(1, 2),**{'x': 3, 'z': 4})
+          >>> args.args
+          (1, 2)
+          >>> args.kwargs
+          {'x': 3, 'z': 4}
+          >>> import sys
+          >>> prakw=akw(1, 2, file=sys.stdout)
+          >>> prakw(print, 3)
+          1 2 3
+  '''
+
+  def __init__(self, *args, **kwargs):
+    self.args = args
+    self.kwargs = kwargs
+
+  def __repr__(self):
+    return '%s(*%r,**%r)' % (self.__class__.__name__, self.args, self.kwargs)
+
+  def __call__(self, func, *cargs, **ckwargs):
+    ''' Call `func` with `self.args` and `cargs` as positional
+        arguments and `self.kwargs` and `ckwargs` as keyword arguments.
+    '''
+    return func(*self.args, *cargs, **self.kwargs, **ckwargs)
+
 def funcname(func):
   ''' Return a name for the supplied function `func`.
       Several objects do not have a __name__ attribute, such as partials.
