@@ -28,7 +28,7 @@ class akw:
       It's a constant annoyance to me that there no neat way to
       store a pairing of positional and keyword arguments for use
       with a function.
-      You can eaily store a sequence, a mapping, and you can store
+      You can store easily a sequence or a mapping, and you can store
       a function with arguments using `functools.partial`.
 
       Example:
