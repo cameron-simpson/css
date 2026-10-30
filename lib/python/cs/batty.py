@@ -13,6 +13,7 @@ import batgrl.gadgets.image
 from PIL.Image import Image as PILImage, open as open_image
 
 from cs.fs import HasFSPath
+from cs.gimmicks import warning
 from cs.pfx import pfx_method
 
 # TODO: also accept a PIL.Image.Image
@@ -67,6 +68,8 @@ class Preview(App):
 
 if __name__ == '__main__':
   import sys
+  from cs.logutils import setup_logging
   cmd, imagepath = sys.argv
+  setup_logging(cmd)
   app = Preview(Previewable(imagepath))
   app.run()
