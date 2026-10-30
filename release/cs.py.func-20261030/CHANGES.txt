@@ -1,0 +1,2 @@
+lib/python/cs/py/func.py: cs.py.func: new akw(*args,**kwargs) callable class to store function arguments for later use
+lib/python/cs/py/func.py: cs.py.func: not python 2 compatible
