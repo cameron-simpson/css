@@ -1,0 +1,2 @@
+lib/python/cs/py/func.py: cs.py.func: fix docstring typo
+lib/python/cs/py/func.py: cs.py.func: akw: better repr() and str()
