@@ -126,6 +126,20 @@ class ASIN(_AmazonEntity):
         raise RuntimeError
       self['asin'] = asin
 
+  @property
+  def ent_longname(self):
+    if self.asin_type == 'author':
+      return self.fullname
+    return self.title
+
+  @property
+  def image_url(self):
+    try:
+      return self.cover_url
+    except AttributeError:
+      og = getattr(self, 'opengraph', {})
+      return og.get('image')
+
   def field_ref_type(self, field_name: str) -> str:
     ''' All the entity subtypes at amazon are `asin`.
     '''
