@@ -7,6 +7,7 @@ from functools import cached_property, partial
 from getopt import GetoptError
 import json
 import re
+import textwrap
 
 from typeguard import typechecked
 
@@ -14,9 +15,9 @@ from cs.app.pilfer.sitemap import (
     FlowState, SiteEntity, SiteMap, SiteWidget, URLPattern, on, uses_scandata
 )
 from cs.bs4utils import child_tags, printt_soup, Table, BS4Tag, Widget
-from cs.cmdutils import popopts
+from cs.cmdutils import BaseCommand, popopts
 from cs.deco import methodif, promote
-from cs.lex import printt
+from cs.lex import printt, single_space
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.tagged import ScanData
@@ -88,57 +89,6 @@ class _AmazonEntity(SiteEntity):
 
   TYPE_ZONE = 'amazon'
 
-  @trace
-  def generic_grok_amazon_page(self, flowstate: FlowState):
-    breakpoint()
-    raise RuntimeError
-    meta = flowstate.meta
-    soup = flowstate.soup
-    printt(*flowstate.meta.tags.items())
-    self["title"] = meta.tags["title"]
-    prod_byline_div = soup.find('div', id='bylineInfo')
-    self["by_line"] = " ".join(prod_byline_div.text.strip().split())
-    ##for author_span in prod_byline_div.find_all('span',class_='author'):
-    landing_img = soup.find('img', id='landingImage')
-    if landing_img:
-      self["landing_image_url"] = landing_img["src"]
-    prod_desc_div = soup.find('div', id='productDescription')
-    if prod_desc_div is not None:
-      self["description"] = prod_desc_div.text.strip()
-      desc_artist_ids = []
-      for a in prod_desc_div.find_all('a'):
-        href = a["href"]
-        if m := re.match(r'/exec/obidos/ts/artist-glance/(?P<artist_id>\d+)',
-                         href):
-          desc_artist_ids.append(int(m.group("artist_id")))
-      self["description_arists"] = desc_artist_ids
-    breadcrumbs_div = soup.find('div', id='breadcrumbs_feature_div')
-    if breadcrumbs_div:
-      breadcrumbs = []
-      for li in child_tags(breadcrumbs_div.ul, 'li'):
-        breadcrumbs.append(
-            dict(
-                label=li.text.strip(),
-                href=li.span.a["href"],
-            )
-        )
-      self["breadcrumbs"] = breadcrumbs
-    details_div = soup.find('div', id='detailBullets_feature_div')
-    if details_div:
-      details = {}
-      for li in child_tags(details_div.ul, 'li'):
-        print("Details LI", li)
-        try:
-          key_span, value = child_tags(li.span)
-        except ValueError:
-          print("skip details", li.text)
-        else:
-          key = key_span.text.strip().split("\n")[0].lower()
-          details[key] = value.text.strip()
-          print("DETAILS", repr(key), '->', repr(details[key]))
-      self["details"] = details
-    print("GROK GENERIC")
-    printt(*map(list, sorted(self.items())), indent="  ")
 
 class ASIN(_AmazonEntity):
   ''' A class for Amazon entities with an ASIN.
@@ -251,21 +201,22 @@ class ASIN(_AmazonEntity):
     else:
       data['author_id'] = author_ids = []
       for author_span in byline_div.find_all('span', class_='author'):
-        fullname = author_span.get_text().strip()
         anchor = author_span.a
         href = anchor.attrs.get('href')
         if not href:
-          warning(f'{fullname=}: no href')
+          warning(f'{author_span=}: no href')
         else:
           try:
             author_asin = asin_from_href(href, '/')
           except ValueError:
-            warning(f'{fullname=}: {href=}: no ASIN')
+            warning(f'{author_span=}: {href=}: no ASIN')
             continue
           author_ids.append(author_asin)
           author_data = scandata[ASIN, author_asin]
+          author_data.update(
+              self.parse_author_citation(author_span.get_text())
+          )
           author_data['asin_type'] = 'author'
-          author_data['fullname'] = fullname
           author_data['sitepage_url'] = href.split('?', 1)[0]
     desc_div = soup.find('div', id='bookDescription_feature_div')
     if desc_div is None:
@@ -435,7 +386,7 @@ class ASIN(_AmazonEntity):
         data['title'] = prune_book_title(parts[0])
       else:
         warning(f'unhandled title: {parts=}')
-        breakpoint()
+        ##breakpoint()
       # normalise the asin_type
       if not data:
         warning(f'no asin_type inferred from {title=}')
@@ -443,6 +394,18 @@ class ASIN(_AmazonEntity):
         asin_type = data['asin_type'].lower()
         asin_type = {'books': 'book'}.get(asin_type, asin_type)
         data['asin_type'] = asin_type
+    return data
+
+  def parse_author_citation(cls, author: str) -> dict:
+    ''' Parse information from an Amazon author name, which may
+        have the contributor role at the end in brackets.
+    '''
+    data = {'role': 'author'}
+    fullname = single_space(author)
+    if m := re.search(r' \((\S+)\)$', fullname):
+      data['role'] = m.group(1).lower()
+      fullname = fullname[:m.start()]
+    data['fullname'] = fullname
     return data
 
   def refresh_related(self):
@@ -469,14 +432,32 @@ class ASIN(_AmazonEntity):
     else:
       warning(f'{self.name}.refresh_related: unhandled {asin_type=}')
 
+class AmazonCommand(BaseCommand):
 
+  @popopts
+  def cmd_asin(self, argv):
+    ''' Report on the specified ASINs.
+    '''
+    if not argv:
+      raise GetoptError('missing ASINs')
+    xit = 0
+    sitemap = self.options.sitemap
+    for asin in argv:
+      with Pfx(asin):
+        if not is_valid_asin(asin):
+          warning('invalid ASIN')
+          xit = 1
+          continue
+        ent = sitemap[ASIN, asin]
+        ent.refresh()
+        ent.report()
 
 @dataclass
 class AmazonMap(SiteMap):
 
+  CommandClass = AmazonCommand
   EntityClass = _AmazonEntity
   TYPE_ZONE = 'amazon'
-  WIDGET_CLASSES = []
   URL_DOMAIN = 'www.amazon.com.au'
 
   URL_KEY_PATTERNS = [
@@ -498,20 +479,8 @@ class AmazonMap(SiteMap):
       ),
   ]
 
-  @on(
-      ##URL_DOMAIN,
-      AmazonGeneralProduct,
-  )
-  # a comic volume URL
-  # https://www.amazon.com/MS-MARVEL-VOL-NORMAL-Graphic/dp/078519021X/ref=.......
-  @on(
-      ##URL_DOMAIN,
-      AmazonDigitalProduct,
-  )
-  ##@trace
-  @grok_entity_page(ent_class=AmazonGeneralProduct)
-  def grok_product_page(self, flowstate: FlowState, match, entity):
-    pass
+  ASIN_URL_PATTERN = '<*:pretext>/dp/<type_key><*:tracking>'
+  ASIN_pattern = URLPattern(ASIN_URL_PATTERN)
 
   # an author page
   # https://www.amazon.com/stores/G.-Willow-Wilson/author/B003JLY7S8?.......
@@ -528,8 +497,7 @@ class AmazonMap(SiteMap):
 # Widgets have to come after the sitemap.
 #
 
-@dataclass
-class ItemWidget(SiteWidget, entity_class=_AmazonEntity):
+class ItemWidget(SiteWidget):
   FIND_ALL_CRITERIA = dict(class_='product-card')
 
   @property
@@ -545,12 +513,11 @@ class ItemWidget(SiteWidget, entity_class=_AmazonEntity):
       if (title := a.get('aria-label')) and title != self.entity.get('title'):
         self.entity['title'] = title
 
-@dataclass
-class SeriesInfoRow(SiteWidget, entity_class=AmazonSeries):
-  ''' The Series Information DIV.
+class BookSeriesInfoRow(SiteWidget):
+  ''' The Series Information DIV from the carousel in a book page.
   '''
 
-  ENTITY_CLASS = AmazonSeries
+  ENTITY_CLASS = ASIN
   FIND_ALL_CRITERIA = dict(id='seriesInfoRow')
 
   @cached_property
@@ -560,7 +527,6 @@ class SeriesInfoRow(SiteWidget, entity_class=AmazonSeries):
     image_div = self.tag.find('div', id='seriesImageContainer')
     return asin_from_href(image_div.a.attrs['href'])
 
-  @trace
   @uses_scandata
   @typechecked
   def scan_soup(self, *, scandata: ScanData) -> ScanData:
@@ -590,49 +556,64 @@ class SeriesInfoRow(SiteWidget, entity_class=AmazonSeries):
       anchor = title_span.parent
       book_asin = asin_from_href(anchor.attrs['href'])
       book_asins.append(book_asin)
-      book = ent.sitemap[AmazonBook, book_asin]
+      book = ent.sitemap[ASIN, book_asin]
       book_data = scandata[book]
       book_data['title'] = prune_book_title(
           title_span.string.strip(), series=data['title']
       )
       author_anchor = li.find('a', **{'data-test-id': 'itemByLine'})
-      author_asin = asin_from_href(author_anchor.attrs['href'], '/e/')
-      book_data['author_id'] = author_asin
+      author_href = author_anchor.attrs['href']
+      try:
+        author_asin = asin_from_href(author_href, '/e/')
+      except ValueError as e:
+        warning(f'no ASIN in {author_href=}: {e}')
+      else:
+        book_data['author_id'] = [author_asin]
+        author_asins.add(author_asin)
+        author = ent.sitemap[ASIN, author_asin]
+        author_data = scandata[author]
+        author_data['fullname'] = author_anchor.string.strip()
       book_data['series_id'] = series_asin
-      book_data['series_position'] = pos
-      author_asins.add(author_asin)
-      author = ent.sitemap[AmazonAuthor, author_asin]
-      author_data = scandata[author]
-      author_data['fullname'] = author_anchor.string.strip()
+      book_data['series_number'] = pos
     data['book_id'] = book_asins
     data['author_id'] = sorted(author_asins)
     return scandata
 
-@dataclass
-class ProductDetails(SiteWidget, entity_class=AmazonBook):
+class ProductDetails(SiteWidget):
   ''' The Product Details DIV.
   '''
 
-  ENTITY_CLASS = AmazonBook
+  ENTITY_CLASS = ASIN
   FIND_ALL_CRITERIA = dict(id='detailBullets_feature_div')
 
   @cached_property
   def entity_key(self):
     ''' Obtain the product ASIN from the ASIN detail entry.
     '''
-    parsed = self.parsed
+    data = self.entity_data
     try:
-      return parsed['asin']
+      return data['asin']
     except KeyError as e:
-      warning(
-          f'{self.__class__.__name__}.entity_key: no ASIN in {self.parsed=}: {e}'
-      )
-      printt(parsed)
-      breakpoint()
-      raise
+      try:
+        return data['isbn_10']
+      except KeyError as e:
+        warning(
+            f'{self.__class__.__name__}.entity_key: no ASIN or ISBN_10 in {self.entity_data=}: {e}'
+        )
+        raise
 
   @cached_property
-  def parsed(self):
+  def entity_data(self) -> dict:
+    ''' Scan the product detials info DIV.
+
+        This exists distinct from `scan_soup` because we need the
+        data to find `self.entity`.
+
+        This extracts:
+        - the series ASIN and title
+        - the series author ASINs and fullnames
+        - the member books ASINs and titles
+    '''
     parsed = {}
     try:
       ul = self.tag.ul
@@ -692,45 +673,48 @@ class ProductDetails(SiteWidget, entity_class=AmazonBook):
         except ValueError as e:
           warning(f'unhandled {key_span.string} {value=}: {e}')
       parsed[key] = value
+    if 'asin' not in parsed:
+      warning(
+          f'{self.__class__.__name__}.entity_data: no ASIN entry in {parsed=}'
+      )
     return parsed
 
   @uses_scandata
-  @typechecked
-  def scan(self, *, scandata: ScanData) -> ScanData:
-    ''' Scan the series info DIV.
-        This extracts:
-        - the series ASIN and title
-        - the series author ASINs and fullnames
-        - the member books ASINs and titles
-    '''
-    ent = self.entity
-    data = scandata[ent]
-    data.update(self.parsed)
+  def scan_soup(self, *, scandata: ScanData) -> ScanData:
+    # TODO: fill in the series data etc
+    data = scandata[self.entity]
+    data.update(self.entity_data)
     return scandata
 
-@dataclass
-class MusicTracks:  ## ABC ## (SiteWidget, entity_class=_AmazonEntity):
-  ''' The Product Details DIV.
+class MusicTracks(Widget):
+  ''' The Music tracks from a music page.
   '''
 
-  ENTITY_CLASS = AmazonMusic
-  FIND_ALL_CRITERIA = dict(id='detailBullets_feature_div')
+  @classmethod
+  def find_all(self, soup: BS4Tag) -> list[BS4Tag]:
+    return [soup.find('dov', id='musc-tracks')]
 
-  def grok_sitepage(self, flowstate: FlowState):
-    self.generic_grok_amazon_page(flowstate)
-    soup = flowstate.soup
-    music_tracks_div = soup.find('div', id='music-tracks')
-    if music_tracks_div:
-      table, = Table.scan(music_tracks_div)
-      print("MUSIC TRACKS:")
-      table.printt()
-      self["music_tracks"] = [track[1] for track in grid]
+  @cached_property
+  def music_tracks(self):
+    table, = Table.scan(self.tag)
+    self["music_tracks"] = [track[1] for track in table.as_lists()]
+
+class ASINWidget(SiteWidget):
+  Entity = ASIN
 
 class _AmazonPrimeEntity(SiteEntity):
   TYPE_ZONE = 'prime'
 
 class AmazonPrime(SiteMap):
+  URL_DOMAIN = 'www.primevideo.com'
   EntityClass = _AmazonPrimeEntity
+
+  @on(URL_DOMAIN)
+  def scan_page(self, flowstate: FlowState, _=None) -> TagSet:
+    for carousel in APCarousel.scan(flowstate.soup):
+      print(carousel.title)
+      for card in carousel:
+        print(" ", card.title, card.type)
 
 class APCard(Widget):
   ''' A card from a carousel.
