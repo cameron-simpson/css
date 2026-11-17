@@ -353,9 +353,8 @@ def ffprobe_json(
     print_argv(*argv, indent="+ ", end=" |\n")
     return {}
   cp = run(argv, doit=doit, capture_output=True, check=check, quiet=quiet)
-  if not doit:
-    return None
-  print(cp.stderr.decode('utf-8', errors='replace'), file=sys.stderr)
+  errs = cp.stderr.decode('utf-8', errors='replace')
+  print(errs, end=('' if errs.endswith('\n') else '\n'), file=sys.stderr)
   probed = json.loads(cp.stdout.decode('utf-8'))
   return probed
 
