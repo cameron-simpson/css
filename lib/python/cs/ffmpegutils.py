@@ -30,8 +30,8 @@ from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.mappings import attrable
-from cs.pfx import Pfx, pfx, pfx_call
-from cs.psutils import pipefrom, print_argv
+from cs.pfx import Pfx, pfx
+from cs.psutils import pipefrom, print_argv, run
 from cs.tagset import TagSet
 
 __version__ = '20260531-post'
@@ -338,7 +338,9 @@ def convert(
     print_argv(*ff_argv, fold=True)
   return ff_argv
 
-def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
+def ffprobe_json(
+    input_file, *, check=True, doit=True, ffprobe_exe='ffprobe', quiet=False
+):
   ''' Run `ffprobe -print_format json` on `input_file`,
       return format, stream, program and chapter information
       as an `AttrableMapping` (a `dict` subclass).
@@ -350,9 +352,15 @@ def ffprobe(input_file, *, doit=True, ffprobe_exe='ffprobe', quiet=False):
   if not doit:
     print_argv(*argv, indent="+ ", end=" |\n")
     return {}
-  P = pipefrom(argv, quiet=quiet, text=True)
-  probed = pfx_call(json.loads, pfx_call(P.stdout.read))
-  return attrable(probed)
+  cp = run(argv, doit=doit, capture_output=True, check=check, quiet=quiet)
+  if not doit:
+    return None
+  print(cp.stderr.decode('utf-8', errors='replace'), file=sys.stderr)
+  probed = json.loads(cp.stdout.decode('utf-8'))
+  return probed
+
+def ffprobe(input_file, **ffprobe_json_kw):
+  return attrable(ffprobe_json(input_file, **ffprobe_json_kw))
 
 @pfx
 @typechecked
