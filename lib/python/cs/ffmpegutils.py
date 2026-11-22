@@ -70,6 +70,12 @@ FFMPEG_DOCKER_EXE_DEFAULT = '/usr/local/bin/ffmpeg'
 FFMPEG_DOCKER_IMAGE_DEFAULT = 'docker.io/linuxserver/ffmpeg'
 FFMPEG_DOCKER_IMAGE_ENVVAR = 'FFMPEG_DOCKER_IMAGE'
 
+@fmtdoc
+def ffmpeg_exe():
+  ''' Return the default ffmpeg executable from `${FFMPEG_EXE_ENVVAR}` or `{FFMPEG_EXE_DEFAULT=}`.
+  '''
+  return os.environ.get(FFMPEG_EXE_ENVVAR, FFMPEG_EXE_DEFAULT)
+
 def main_ffmpeg_docker(argv=None):
   ''' The `ffm[peg-docker` command line implementation.
   '''
