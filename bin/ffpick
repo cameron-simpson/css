@@ -1,0 +1,251 @@
+#!/usr/bin/env python3
+
+''' Pick sections of a video file.
+'''
+
+from abc import ABC, abstractmethod
+import os
+from os.path import basename, exists as existspath, join as joinpath, splitext
+from pprint import pprint
+import re
+from subprocess import CalledProcessError
+import sys
+from tempfile import mkstemp,TemporaryDirectory
+from types import SimpleNamespace as NS
+from typing import Any, Callable, Iterable, Self, Tuple
+
+import ffmpeg
+
+from cs.cmdutils import BaseCommand, GetoptError, popopts
+from cs.ffmpegutils import convert as ffconvert, ffmpeg_exe, ffprobe
+from cs.logutils import info, warning
+from cs.pfx import Pfx, pfx_call
+from cs.printt import printt
+from cs.psutils import pipefrom, prep_argv, print_argv, run
+
+from cs.debug import trace
+
+def main(argv=None):
+  return FFPickCommand(argv).run()
+
+class Picker(ABC):
+
+  def __init__(
+      self,
+      match_func: Callable[[dict], Any],
+      *,
+      exclude: bool = False,
+  ):
+    self.match_func = match_func
+    self.exclude = bool(exclude)
+
+  @classmethod
+  def from_str(cls, pick_spec: str, /, *, exclude=False) -> Self:
+    pick_by, pattern = pick_spec.split(':', 1)
+    if pick_by == 'chapter':
+      return ChapterPick.from_str(pattern, exclude=exclude)
+    raise ValueError(f'unhandled {pick_by=}')
+
+  @abstractmethod
+  def matches(self, probed: dict, *, exclude=False) -> Iterable:
+    ''' Match this `Pikcer` against `probed`, the `dict` returned by `ffprobe()`.
+        Return an interable of matches.
+    '''
+    raise NotImplementedError
+
+  def matches_timespans(self,
+                        probed,
+                        *,
+                        invert=False) -> Iterable[Tuple[float, float]]:
+    ''' Match against `probed`, the return from `ffprobe`.
+        Return chapter ``(start_time,end_time)` 2-tuples.
+
+        This default implementation expects `matches` to prodice
+        objects with `.start_time` and `.end_time` atteibutes being
+        time offsets in seconds.
+    '''
+    for chapter in self.matches(probed, invert=invert):
+      yield float(chapter.start_time), float(chapter.end_time)
+
+class ChapterPick(Picker):
+
+  @classmethod
+  def from_str(cls, pattern: str, /, *, exclude=False) -> Self:
+    if pattern.startswith('/'):
+      chap_re = re.compile(pattern[1:], re.I)
+      match_func = lambda ch: chap_re.search(ch['tags']['title'])
+    else:
+      raise ValueError(f'unrecognised {pattern=}')
+    return cls(match_func, exclude=exclude)
+
+  def matches(self, probed, *, invert=False) -> Iterable:
+    ''' Match against `probed`, the return from `ffprobe`.
+        Return chapter ``(start_time,end_time)` 2-tuples.
+    '''
+    exclude = bool(invert) ^ bool(self.exclude)
+    for chapter in probed['chapters']:
+      if bool(self.match_func(chapter)) ^ exclude:
+        yield chapter
+
+def pick(
+    mediafile: str,
+    *pickers,
+    outputpath:str=None,
+    exists_ok=False,
+    keep_failed_output=False
+) -> str:
+  ''' Pick subsections from `mediafile` using `pickers` and write a
+      new media file to `outputpath`.
+      Return the output filesystem path.
+  '''
+  with Pfx(f'pick({mediafile=},...)'):
+    if not existspath(mediafile):
+      raise ValueError(f'missing {mediafile=}')
+    media_prefix, media_suffix = splitext(mediafile)
+    media_base = basename(media_prefix)
+    if not outputpath:
+      outputpath=f'{media_prefix}--picked{media_suffix}'
+    if not exists_ok and existspath(outputpath):
+      raise ValueError(f'{outputpath=} already exists')
+    probed = ffprobe(mediafile)
+    pprint(probed, indent=2)
+    if chapters := probed.get('chapters'):
+      printt(
+          "chapter:",
+          {ch['id']: ch
+           for ch in sorted(chapters, key=lambda ch: ch['id'])}
+      )
+    print(f'{pickers=}')
+    # prepare the basis of each ffmpeg invocation
+    exe = ffmpeg_exe()
+    ffargv0 = [exe, ('-loglevel', 'repeat+error'), '-nostdin']
+    if exists_ok:
+      ffargv0.append('-y')
+    ffargv0 = tuple(ffargv0)
+    # TODO: can I use a Range here, to overlap the timespans?
+    timespans = []
+    for picker in pickers:
+      timespans.extend(picker.matches_timespans(probed))
+    if not timespans:
+      raise ValueError("no timespans pickered")
+    clips = []
+    try:
+      for i, (start_time, end_time) in enumerate(timespans):
+        ##clippath = joinpath(dirpath, f'{media_base}--{i:02d}.ts')
+        ##clippath = f'{media_base}--{i:02d}.ts'
+        clipfd, clippath = mkstemp(prefix=f'{media_base}--{i:02d}--',suffix='.ts')
+        clips.append(clippath)
+        os.close(clipfd)
+        clip_argv = [
+            *ffargv0,
+            '-y',
+            ('-ss', str(start_time)),
+            ('-to', str(end_time)),
+            '-noaccurate_seek',
+            ('-i', mediafile),
+            ('-c', 'copy'),
+            clippath,
+        ]
+        run(clip_argv, fold=True)
+      ##clips_spec='|'.join(f"'{clippath}'" for clippath in clips)
+      clips_spec = '|'.join(clips)
+      ffargv = [
+          *ffargv0,
+          exists_ok and '-y',
+          ('-i', f'concat:{clips_spec}'),
+          ('-i', mediafile),
+          ('-map', '0'),
+          ('-map_metadata', '1'),
+          ('-map_chapters', '-1'),  # strip chapters
+          ('-c', 'copy'),
+          outputpath,
+      ]
+      try:
+        run(ffargv, fold=True)
+      except CalledProcessError as e:
+        print(f'FAILED: {e}')
+        breakpoint()
+        if keep_failed_output:
+          if existspath(outputpath):
+            info(f'failed output present at {outputpath=}')
+        else:
+          try:
+            pfx_call(os.remove, outputpath)
+          except FileNotFoundError:
+            pass
+        raise
+    finally:
+      for clippath in clips:
+        try:
+          pfx_call(os.remove, clippath)
+        except FileNotFoundError as e:
+          warning(f'tmep clip file {clippath=}: {e}')
+    return outputpath
+
+class FFPickCommand(BaseCommand):
+  ''' Pick subsections of a media file.
+  '''
+
+  def poppick(self, argv) -> Picker:
+    ''' Pop the first item from `argv` and return it as a `Picker` instanc.
+    '''
+    if not argv:
+      raise GetoptError("missing pick")
+    pick = argv.pop(0)
+    with Pfx('pick %s', pick):
+      exclude = False
+      if pick.startswith('-'):
+        exclude = True
+        pick = pick[1:]
+      try:
+        return Picker.from_str(pick, exclude=exclude)
+      except ValueError as e:
+        raise GetoptError(f'invalid pick: {e}') from e
+
+  @popopts(
+      o_=('outputpath', 'Output filename.'),
+      y=('overwrite', 'Overwrite the output file.'),
+  )
+  def main(self, argv):
+    ''' Usage: {cmd} [-y] mediafile [picks...]
+          Scan mediafile and report pickable things.
+    '''
+    options = self.options
+    overwrite = options.overwrite
+    outputpath = options.outputpath
+    if not argv:
+      raise GetoptError("missing mediafile")
+    mediafile = argv.pop(0)
+    if not argv:
+      probed = ffprobe(mediafile)
+      pprint(probed, indent=2)
+      if chapters := probed.get('chapters'):
+        printt(
+            "chapter:",
+            {ch['id']: ch
+             for ch in sorted(chapters, key=lambda ch: ch['id'])}
+        )
+      return 0
+    pickers = []
+    while argv:
+      picker = self.poppick(argv)
+      print(picker)
+      pickers.append(picker)
+    print(f'{pickers=}')
+    try:
+      outputpath=trace(pick)(
+          mediafile,
+          *pickers,
+          outputpath=outputpath,
+          exists_ok=overwrite,
+          keep_failed_output=True
+      )
+    except ValueError as e:
+      warning(f'picker failed: {e}')
+      raise
+      return 1
+    print(outputpath)
+    return 0
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
