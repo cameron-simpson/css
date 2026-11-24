@@ -1,0 +1,73 @@
+#!/bin/sh
+#
+# Wrapper for ffpick to produce a recording with the advertisements removed.
+# This relies on the source recording having chapters
+# - Cameron Simpson <cs@cskk.id.au> 23nov2026
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+chapter_substring=advertisement
+outdir=
+#          show-name                  sNNeNN               episode-name
+prefix_re='[^-]([^-]|-[^-])*[^-](--[a-z]+\d+[a-z]+\d+--[^-]([^-]|-[^-])*[^-])?--'
+annotation=noads--
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-d outdir] [-s substring] [-P prefix_re] media...
+    -A annotation   The annotation to add to the filename after the prefix.
+                    Default: $annotation
+    -d outdir       Output directory for the clipped file.
+                    Default: the media file directory.
+    -P prefix_re    An extended reguar expression matching the
+                    prefix of the media filename to go before the annotation.
+                    Default: $prefix_re
+                    meaning: show-name -- sNNeNN -- episode-name --
+    -s substring    The substring in the chapter title used to exclude them.
+                    Default: $chapter_substring"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -A)     annotation=$2; shift ;;
+    -d)     outdir=$2; shift ;;
+    -P)     prefix_re=$2; shift ;;
+    -s)     chapter_substring=$2; shift ;;
+    --)     shift; break ;;
+    -?*)    echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)      break ;;
+  esac
+  shift
+done
+
+[ -z "$outdir" ] || [ -d "$outdir" ] || {
+  echo "$cmd: outdir is not a directory: $outdir" >&2
+  badopts=1
+}
+
+case "$prefix_re" in
+  */*)  echo "$cmd: forbidden / in prefix_re: $prefix_re" >&2
+        badopts=1
+        ;;
+esac
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing media" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+for mediafile
+do
+  $trace ffpick \
+          -A "$annotation" -P "$prefix_re" -o "$outdir" \
+          -- "$mediafile" \
+          "-chapter:/$chapter_substring"
+done
