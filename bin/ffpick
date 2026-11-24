@@ -27,8 +27,6 @@ from cs.pfx import Pfx, pfx_call
 from cs.printt import printt
 from cs.psutils import run
 
-from cs.debug import trace
-
 def main(argv=None):
   return FFPickCommand(argv).run()
 
@@ -294,7 +292,7 @@ class FFPickCommand(BaseCommand):
       pickers.append(picker)
     print(f'{pickers=}')
     try:
-      outputpath = trace(pick)(
+      outputpath = pick(
           mediafile,
           *pickers,
           annotation=options.annotation,
