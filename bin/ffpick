@@ -3,25 +3,29 @@
 ''' Pick sections of a video file.
 '''
 
+# TODO: copy the metadata
+# TODO: rewrite subtitle metadata to accomodate lost time?
+# TODO: copy the fstags
+
 from abc import ABC, abstractmethod
 import os
-from os.path import basename, exists as existspath, join as joinpath, splitext
+from os.path import (
+    basename, dirname, exists as existspath, join as joinpath, samefile,
+    splitext
+)
 from pprint import pprint
 import re
 from subprocess import CalledProcessError
 import sys
-from tempfile import mkstemp,TemporaryDirectory
-from types import SimpleNamespace as NS
+from tempfile import mkstemp
 from typing import Any, Callable, Iterable, Self, Tuple
 
-import ffmpeg
-
 from cs.cmdutils import BaseCommand, GetoptError, popopts
-from cs.ffmpegutils import convert as ffconvert, ffmpeg_exe, ffprobe
+from cs.ffmpegutils import ffmpeg_exe, ffprobe
 from cs.logutils import info, warning
 from cs.pfx import Pfx, pfx_call
 from cs.printt import printt
-from cs.psutils import pipefrom, prep_argv, print_argv, run
+from cs.psutils import run
 
 from cs.debug import trace
 
@@ -72,7 +76,7 @@ class ChapterPick(Picker):
   @classmethod
   def from_str(cls, pattern: str, /, *, exclude=False) -> Self:
     if pattern.startswith('/'):
-      chap_re = re.compile(pattern[1:], re.I)
+      chap_re = re.compile(pattern[1:], re.IGNORECASE)
       match_func = lambda ch: chap_re.search(ch['tags']['title'])
     else:
       raise ValueError(f'unrecognised {pattern=}')
@@ -90,13 +94,41 @@ class ChapterPick(Picker):
 def pick(
     mediafile: str,
     *pickers,
-    outputpath:str=None,
-    exists_ok=False,
-    keep_failed_output=False
+    annotation: str = '--picked',
+    outdirpath: str | None = None,
+    outputpath: str | None = None,
+    prefix_re: str | re.Pattern | None = None,
+    exists_ok: bool = False,
+    keep_failed_output=False,
 ) -> str:
   ''' Pick subsections from `mediafile` using `pickers` and write a
       new media file to `outputpath`.
       Return the output filesystem path.
+
+      Parameters:
+      * `mediafile`: the source media file
+      * `annotation`: an optional annotation string to insert into
+        a generated `outputpath`, default `"--picked"`
+      * `outdirpath`: optional directory component of a generated
+        `outputpath`, default `dirname(mediafile)`
+      * `outputpath`: optional output media file path, generated
+        if not specified
+      * `prefix_re`: optional regular expression to match a prefix
+        of the mediafile basename used when generating an outputpath
+      * `exists_ok`: if false, raise an error if the outputpath
+        already exists
+      * `keep_failed_output`: if true, do not remove the outputpath
+        if `ffmpeg` fails
+
+      A generated outputpath is made as:
+          {outdirpath}/{prefix}{annotation}{suffix}{extension}
+      where:
+      - the `mediafile` basename is split into {mediabase} and the
+        file extension
+      - the `prefix` is obtained by matching `prefix_re` against
+        {mediabase}, unless `prefix_re` is not speciied in which case
+        the entire {mediabase} is used
+      - the `suffix` is the portion of {mediabase} after the {prefix}
   '''
   with Pfx(f'pick({mediafile=},...)'):
     if not existspath(mediafile):
@@ -104,7 +136,30 @@ def pick(
     media_prefix, media_suffix = splitext(mediafile)
     media_base = basename(media_prefix)
     if not outputpath:
-      outputpath=f'{media_prefix}--picked{media_suffix}'
+      # compute a default outputpath
+      if outdirpath is None or outdirpath == '':
+        outdirpath = dirname(media_prefix)
+      if prefix_re is None:
+        outprefix = media_prefix
+        outsuffix = media_suffix
+      else:
+        if not isinstance(prefix_re, re.Pattern):
+          prefix_re = pfx_call(re.compile, prefix_re)
+        if (m := prefix_re.match(media_base)) is None:
+          raise ValueError(f'{prefix_re=} does not match {media_base=}')
+        outprefix = m.group()
+        outsuffix = media_base[m.end():]
+      outbase = f'{outprefix}{annotation}{outsuffix}{media_suffix}'
+      assert os.sep not in outbase
+      outputpath = joinpath(outdirpath, outbase)
+    try:
+      if samefile(mediafile, outputpath):
+        raise ValueError(
+            'input and output are the same file'
+            f': {mediafile=} {outputpath=}'
+        )
+    except FileNotFoundError:
+      pass
     if not exists_ok and existspath(outputpath):
       raise ValueError(f'{outputpath=} already exists')
     probed = ffprobe(mediafile)
@@ -133,7 +188,9 @@ def pick(
       for i, (start_time, end_time) in enumerate(timespans):
         ##clippath = joinpath(dirpath, f'{media_base}--{i:02d}.ts')
         ##clippath = f'{media_base}--{i:02d}.ts'
-        clipfd, clippath = mkstemp(prefix=f'{media_base}--{i:02d}--',suffix='.ts')
+        clipfd, clippath = mkstemp(
+            prefix=f'{media_base}--{i:02d}--', suffix='.ts'
+        )
         clips.append(clippath)
         os.close(clipfd)
         clip_argv = [
@@ -203,16 +260,20 @@ class FFPickCommand(BaseCommand):
         raise GetoptError(f'invalid pick: {e}') from e
 
   @popopts(
+      A_=(
+          'annotation',
+          'Annotation string to append after the prefix, default "--picked".'
+      ),
+      d_=('outdirpath', 'Output file directory.'),
       o_=('outputpath', 'Output filename.'),
+      P_=('prefix_re_s', 'Mediafile prefix regexp, default ".*"'),
       y=('overwrite', 'Overwrite the output file.'),
   )
   def main(self, argv):
-    ''' Usage: {cmd} [-y] mediafile [picks...]
+    ''' Usage: {cmd} mediafile [picks...]
           Scan mediafile and report pickable things.
     '''
     options = self.options
-    overwrite = options.overwrite
-    outputpath = options.outputpath
     if not argv:
       raise GetoptError("missing mediafile")
     mediafile = argv.pop(0)
@@ -233,12 +294,15 @@ class FFPickCommand(BaseCommand):
       pickers.append(picker)
     print(f'{pickers=}')
     try:
-      outputpath=trace(pick)(
+      outputpath = trace(pick)(
           mediafile,
           *pickers,
-          outputpath=outputpath,
-          exists_ok=overwrite,
-          keep_failed_output=True
+          annotation=options.annotation,
+          outdirpath=options.outdirpath,
+          outputpath=options.outputpath,
+          prefix_re=options.prefix_re_s,
+          exists_ok=bool(options.overwrite),
+          keep_failed_output=True,
       )
     except ValueError as e:
       warning(f'picker failed: {e}')
