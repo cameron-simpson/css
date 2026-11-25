@@ -63,7 +63,6 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -x
 for mediafile
 do
   $trace ffpick \
