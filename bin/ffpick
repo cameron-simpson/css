@@ -169,8 +169,8 @@ class TimePick(Picker):
 def pick(
     mediafile: str,
     *pickers,
-    annotation: str = '--picked',
     fstags:FSTags,
+    annotation: str | None,
     outdirpath: str | None = None,
     outputpath: str | None = None,
     prefix_re: str | re.Pattern | None = None,
@@ -209,6 +209,8 @@ def pick(
   with Pfx(f'pick({mediafile=},...)'):
     if not existspath(mediafile):
       raise ValueError(f'missing {mediafile=}')
+    if annotation is None:
+      annotation = '--picked'
     media_prefix, media_suffix = splitext(mediafile)
     media_base = basename(media_prefix)
     if not outputpath:
@@ -217,7 +219,7 @@ def pick(
         outdirpath = dirname(media_prefix)
       if prefix_re is None:
         outprefix = media_prefix
-        outsuffix = media_suffix
+        outsuffix = ''
       else:
         if not isinstance(prefix_re, re.Pattern):
           prefix_re = pfx_call(re.compile, prefix_re)
@@ -254,6 +256,7 @@ def pick(
       ffargv0.append('-y')
     ffargv0 = tuple(ffargv0)
     # TODO: can I use a Range here, to overlap the timespans?
+    #       no, Ranges think they're ints at present
     timespans = []
     for picker in pickers:
       timespans.extend(picker.matches_timespans(probed))
@@ -371,11 +374,14 @@ class FFPickCommand(BaseCommand):
       print(picker)
       pickers.append(picker)
     print(f'{pickers=}')
+    annotation = options.annotation
+    if annotation is None:
+      annotation = "--" + ",".join(map(str, pickers))
     try:
       outputpath = pick(
           mediafile,
           *pickers,
-          annotation=options.annotation,
+          annotation=annotation,
           outdirpath=options.outdirpath,
           outputpath=options.outputpath,
           prefix_re=options.prefix_re_s,
