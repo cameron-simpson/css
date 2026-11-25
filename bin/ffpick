@@ -23,6 +23,7 @@ from typing import Any, Callable, Iterable, Self, Tuple
 
 from cs.cmdutils import BaseCommand, GetoptError, popopts
 from cs.ffmpegutils import ffmpeg_exe, ffprobe
+from cs.fstags import FSTags,uses_fstags
 from cs.logutils import info, warning
 from cs.pfx import Pfx, pfx_call
 from cs.printt import printt
@@ -164,10 +165,12 @@ class TimePick(Picker):
       if exclude:
         yield TimeSpan(pos, npos)
 
+@uses_fstags
 def pick(
     mediafile: str,
     *pickers,
     annotation: str = '--picked',
+    fstags:FSTags,
     outdirpath: str | None = None,
     outputpath: str | None = None,
     prefix_re: str | re.Pattern | None = None,
@@ -292,12 +295,14 @@ def pick(
       ]
       try:
         run(ffargv, fold=True)
+        fstags[outputpath].update(fstags[mediafile])
       except CalledProcessError as e:
         print(f'FAILED: {e}')
         breakpoint()
         if keep_failed_output:
           if existspath(outputpath):
             info(f'failed output present at {outputpath=}')
+            fstags[outputpath].update(fstags[mediafile])
         else:
           try:
             pfx_call(os.remove, outputpath)
