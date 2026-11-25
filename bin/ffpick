@@ -8,6 +8,7 @@
 # TODO: copy the fstags
 
 from abc import ABC, abstractmethod
+from collections import namedtuple
 import os
 from os.path import (
     basename, dirname, exists as existspath, join as joinpath, samefile,
@@ -30,6 +31,11 @@ from cs.psutils import run
 def main(argv=None):
   return FFPickCommand(argv).run()
 
+class TimeSpan(namedtuple('TimeSpan', 'start_time end_time')):
+  ''' An object with `.start_time` and `.end_time` attributes
+      used as `Picker` match results.
+  '''
+
 class Picker(ABC):
 
   def __init__(
@@ -43,6 +49,10 @@ class Picker(ABC):
 
   @classmethod
   def from_str(cls, pick_spec: str, /, *, exclude=False) -> Self:
+    try:
+      return TimePick.from_str(pick_spec)
+    except ValueError:
+      pass
     pick_by, pattern = pick_spec.split(':', 1)
     if pick_by == 'chapter':
       return ChapterPick.from_str(pattern, exclude=exclude)
@@ -60,16 +70,19 @@ class Picker(ABC):
                         *,
                         invert=False) -> Iterable[Tuple[float, float]]:
     ''' Match against `probed`, the return from `ffprobe`.
-        Return chapter ``(start_time,end_time)` 2-tuples.
+        Return `(start_time,end_time)` 2-tuples.
 
-        This default implementation expects `matches` to prodice
-        objects with `.start_time` and `.end_time` atteibutes being
+        This default implementation expects `matches` to produce
+        objects with `.start_time` and `.end_time` attributes being
         time offsets in seconds.
     '''
     for chapter in self.matches(probed, invert=invert):
       yield float(chapter.start_time), float(chapter.end_time)
 
 class ChapterPick(Picker):
+
+  def __str__(self):
+    return f'{"!" if self.exclude else ""}chapter:{self.match_func}'
 
   @classmethod
   def from_str(cls, pattern: str, /, *, exclude=False) -> Self:
@@ -82,12 +95,74 @@ class ChapterPick(Picker):
 
   def matches(self, probed, *, invert=False) -> Iterable:
     ''' Match against `probed`, the return from `ffprobe`.
-        Return chapter ``(start_time,end_time)` 2-tuples.
+        Return chapter objects, which have `.start_time` and
+        `.end_time` attributes.
     '''
     exclude = bool(invert) ^ bool(self.exclude)
     for chapter in probed['chapters']:
       if bool(self.match_func(chapter)) ^ exclude:
         yield chapter
+
+class TimePick(Picker):
+  ''' A `Picker` subclass for start..end timespans.
+  '''
+
+  #                    [start:float]          ..  [end:float]
+  span_re = re.compile(r'(?P<start>\d+(\.\d*)?)?\.\.(?P<end>\d+(\.\d*)?)?')
+
+  def __init__(self, start, end, exclude=False):
+    if end is not ... and end < start:
+      raise ValueError(f'{start=} > {end=}')
+    self.start = start
+    self.end = end
+    self.exclude = exclude
+
+  def __str__(self):
+    return (
+        ("!" if self.exclude else "") + (
+            f'{self.start}..'
+            if self.end is ... else f'{self.start}..{self.end}'
+        )
+    )
+
+  @classmethod
+  def from_str(cls, pattern: str, /, *, exclude=False) -> Self:
+    if not (m := cls.span_re.match(pattern)) or m.end() != len(pattern):
+      raise ValueError(
+          f'{cls.__name__}: {pattern=} does not match {cls.span_re.pattern!r}'
+      )
+    start = m.group('start')
+    start = float(start) if start else 0.0
+    end = m.group('end')
+    end = float(end) if end else ...
+    return cls(start=start, end=end, exclude=exclude)
+
+  def matches(self, probed, *, invert=False) -> Iterable:
+    ''' Match against `probed`, the return from `ffprobe`.
+        Return chapter objects, which have `.start_time` and
+        `.end_time` attributes.
+    '''
+    exclude = bool(invert) ^ bool(self.exclude)
+    duration = float(probed["format"]["duration"])
+    if duration < 0.0:
+      raise ValueError(f'probed {duration=} < 0.0')
+    start = self.start
+    end = duration if self.end is ... else self.end
+    pos = 0.0
+    if pos < start:
+      npos = min(start, duration)
+      if exclude:
+        yield TimeSpan(pos, npos)
+      pos = npos
+    if pos < end:
+      npos = min(end, duration)
+      if not exclude:
+        yield TimeSpan(pos, npos)
+      pos = npos
+    if pos < duration:
+      npos = duration
+      if exclude:
+        yield TimeSpan(pos, npos)
 
 def pick(
     mediafile: str,
