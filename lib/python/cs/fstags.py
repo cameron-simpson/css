@@ -350,7 +350,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   )
   def cmd_as_envvars(self, argv):
     ''' Usage: {cmd} --prefix path [tag_name...]
-          Export the tags of path as shell command to set
+          Export the tags of path as shell command to set environment variables.
           Dots in names are translated into "__".
     '''
     options = self.options
@@ -1049,18 +1049,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_xattr_export(self, argv):
     ''' Usage: {cmd} {{-|paths...}}
-          Import tag information from extended attributes.
-    '''
-    if not argv:
-      raise GetoptError("missing paths")
-    if len(argv) == 1 and argv[0] == '-':
-      paths = [line.rstrip('\n') for line in sys.stdin]
-    else:
-      paths = argv
-    self.options.fstags.export_xattrs(paths)
-
-  def cmd_xattr_import(self, argv):
-    ''' Usage: {cmd} {{-|paths...}}
           Update extended attributes from tags.
     '''
     if not argv:
@@ -1070,6 +1058,18 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = argv
     self.options.fstags.import_xattrs(paths)
+
+  def cmd_xattr_import(self, argv):
+    ''' Usage: {cmd} {{-|paths...}}
+          Import tag information from extended attributes.
+    '''
+    if not argv:
+      raise GetoptError("missing paths")
+    if len(argv) == 1 and argv[0] == '-':
+      paths = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      paths = argv
+    self.options.fstags.export_xattrs(paths)
 
 @decorator
 def uses_fstags(func):
