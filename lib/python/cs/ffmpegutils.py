@@ -25,6 +25,7 @@ from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union
 import ffmpeg
 from typeguard import typechecked
 
+from cs.deco import fmtdoc
 from cs.dockerutils import DockerRun
 from cs.fstags import FSTags, uses_fstags
 from cs.lex import cutprefix
