@@ -1,0 +1,1 @@
+CornuCopyBuffer.from_file: bugfix default offset.
