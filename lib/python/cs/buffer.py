@@ -345,7 +345,7 @@ class CornuCopyBuffer(Promotable, io.BufferedIOBase):
     '''
     seekable = f.seekable()
     if offset is None:
-      offset = foffset
+      offset = f.tell()
     if final_offset is None:
       final_offset = cls._stat_final_offset(f)
     it = (
