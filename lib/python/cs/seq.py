@@ -40,7 +40,7 @@ DISTINFO = {
         'cs.gimmicks',
         'cs.typingutils',
     ],
-    'python_requires':
+    'requires_python':
     '>=3',
 }
 
@@ -926,7 +926,7 @@ class range:
         a range matching the slice.
     '''
     if isinstance(index, slice):
-      return range(...)[index]
+      return cls(...)[index]
     if isinstance(index, type):
       return GenericAlias(cls, (index,))
     raise TypeError(f'{type(index)}:{index!r} is not a slice')
