@@ -351,22 +351,22 @@ class Pilfer(HasThreadState, HasFSPath, MultiOpenMixin, RunStateMixin):
   def __enter_exit__(self):
     ''' Run both the inherited context managers.
     '''
-    with self.session:
-      for _ in zip_longest(
-          MultiOpenMixin.__enter_exit__(self),
-          HasThreadState.__enter_exit__(self) if self.default else (),
-      ):
-        yield
+    for _ in zip_longest(
+        MultiOpenMixin.__enter_exit__(self),
+        HasThreadState.__enter_exit__(self) if self.default else (),
+    ):
+      yield
 
   @contextmanager
   def startup_shutdown(self):
     ''' Open the `Later` work queue, the `SQLTags` if specified,
-        the content cache.
+        the content cache, the `PilferSession`.
     '''
     with self.later:
       with contextif(self.sqltags):
         with self.content_cache:
-          yield
+          with self.session:
+            yield
 
   @property
   def defaults(self):
