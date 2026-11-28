@@ -445,20 +445,6 @@ def pfxprint(*a, print=None, **print_kw):
     print = builtins.print
   print(prefix() + ':', *a, **print_kw)
 
-@contextmanager
-def PrePfx(tag, *args):
-  ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
-  '''
-  if args:
-    tag = tag % args
-  state = Pfx._state
-  old_ur_prefix = state._ur_prefix
-  state._ur_prefix = tag
-  try:
-    yield None
-  finally:
-    state._ur_prefix = old_ur_prefix
-
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function and caller into messages.
   '''
@@ -619,13 +605,3 @@ def XP(msg, *args, **kwargs):
   if args:
     return X("%s%s" + msg, prefix(), DEFAULT_SEPARATOR, *args, **kwargs)
   return X(prefix() + DEFAULT_SEPARATOR + msg, **kwargs)
-
-def XX(prepfx, msg, *args, **kwargs):
-  ''' Trite wrapper for `XP()` to transiently insert a leading prefix string.
-
-      Example:
-
-          XX("NOTE!", "some message")
-  '''
-  with PrePfx(prepfx):
-    return XP(msg, *args, **kwargs)
