@@ -343,17 +343,15 @@ class Pfx(Contextual):
 
   @property
   def loggers(self):
-    ''' Return the loggers to use for this Pfx instance.
+    ''' Return the loggers to use for this `Pfx` instance.
     '''
-    _loggers = self._loggers
-    if _loggers is None:
-      for P in reversed(self._state.stack):
-        if P._loggers is not None:
-          _loggers = P._loggers
-          break
-      if _loggers is None:
-        _loggers = (logging.getLogger(),)
-    return _loggers
+    P = self
+    while P is not None:
+      loggers = P._loggers
+      if loggers is not None:
+        return loggers
+      P = P.parent
+    return (logging.getLogger(),)
 
   @classmethod
   def scope(cls, msg=None, *a):
@@ -399,15 +397,8 @@ class Pfx(Contextual):
     ''' Log a message at an arbitrary log level to this Pfx's loggers.
     '''
     ## to debug format errors ## D("msg=%r, args=%r, kwargs=%r", msg, args, kwargs)
-    for L in self.loggers:
-      try:
-        L.log(level, msg, *args, **kwargs)
-      except Exception as e:  # pylint: disable=broad-except
-        print(
-            "%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s" %
-            (self._state.prefix, L, msg, args, kwargs, e),
-            file=sys.stderr
-        )
+    for logger in self.loggers:
+      logger.log(level, msg, *args, **kwargs)
 
   @logging_wrapper
   def debug(self, msg, *args, **kwargs):
