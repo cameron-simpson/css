@@ -120,7 +120,7 @@ class Pfx(Contextual):
 
   def __init__(
       self,
-      mark: str,
+      mark: str = None,
       *args,
       absolute=False,
       loggers=None,
@@ -159,6 +159,9 @@ class Pfx(Contextual):
 
             with Pfx('message %s ...', arg1, arg2, ...):
     '''
+    global cmd
+    if mark is None:
+      mark = cmd or sys.argv[0]
     if print:
       # True/False
       if isinstance(print, bool):
