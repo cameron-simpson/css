@@ -820,7 +820,7 @@ class Contextual(ContextManagerMixin):
     except LookupError:
       return None
 
-  #classmetho
+  @classmethod
   def default(cls, *, factory: Callable[[], Self] | None = None) -> Self:
     ''' Obtain the default instance of this class from the context.
         If one has not been made, `factory()` is called to obtain it.
