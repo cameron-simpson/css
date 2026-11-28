@@ -23,7 +23,7 @@ from cs.context import closeall, contextif, stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, exception
-from cs.pfx import Pfx, PrePfx, pfx_method
+from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState
@@ -952,7 +952,7 @@ class PacketConnection(MultiOpenMixin):
         - the remote has announced end-of-requests and we have no
           outstanding requests
     '''
-    with PrePfx("_SEND [%s]", self):
+    with Pfx("_SEND [%s]", self):
       Q = self._sendQ
       grace = self.packet_grace
       # run until the _sendQ closes or we get an EOF_Packet
@@ -1081,7 +1081,7 @@ class BaseRequest:
 
         This is called with the correct `BaseRequest` subclass
         derived from the received `Packet.rq_type`.
-        It decodes the 
+        It decodes the
 
         This default implementation assumes that `flags==0`
         and calls `cls.from_bytes(payload)`.
