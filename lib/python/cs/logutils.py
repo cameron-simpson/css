@@ -368,7 +368,7 @@ class PfxFormatter(Formatter):
         then call `Formatter.format`.
     '''
     record.cmd = self.cmd if self.cmd else cs.pfx.cmd
-    record.pfx = Pfx._state.prefix
+    record.pfx = Pfx.default()
     try:
       s = Formatter.format(self, record)
     except TypeError as e:
@@ -398,7 +398,7 @@ class PfxFormatter(Formatter):
         '''
         ##msg0 = record.msg
         ##args0 = record.args
-        cur_pfx = Pfx._state.prefix
+        cur_pfx = Pfx.default().prefix()
         if not cur_pfx:
           return old_format(record)
         if not isinstance(record.args, tuple):
@@ -585,13 +585,13 @@ def logException(exc_type, exc_value, exc_tb):
 def exception(msg, *args, **kwargs):
   ''' Emit an exception log with the current `Pfx` prefix.
   '''
-  Pfx._state.cur.exception(msg, *args, **kwargs)
+  Pfx.default().exception(msg, *args, **kwargs)
 
 @logging_wrapper
 def log(level, msg, *args, **kwargs):
   ''' Emit a log at the specified level with the current `Pfx` prefix.
   '''
-  Pfx._state.cur.log(level, msg, *args, **kwargs)
+  Pfx.default().log(level, msg, *args, **kwargs)
 
 @logging_wrapper(stacklevel_increment=1)
 def debug(msg, *args, **kwargs):
