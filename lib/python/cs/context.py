@@ -14,12 +14,19 @@ except ImportError:
     '''
     yield None
 
+from contextvars import ContextVar, copy_context
 from functools import partial
 import signal
+from threading import current_thread, Thread
 from typing import Callable, Iterable
+try:
+  from typing import Self
+except ImportError:
+  Self = "Self"
 
 from cs.deco import decorator
 from cs.gimmicks import error
+from cs.naysync import afunc
 
 __version__ = '20250528-post'
 
@@ -31,6 +38,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.deco', 'cs.gimmicks'],
+    'requires_python':
+    '>=3.7',  # 3.7 for contextvars
 }
 
 @contextmanager
@@ -774,3 +783,91 @@ def reconfigure_file(f, **kw):
     yield
   finally:
     f.reconfigure(**old)
+
+class Contextual(ContextManagerMixin):
+  ''' A mixin for classes which have the notion of an "ambient"
+      instance, the "current" or "default" instance, which saves
+      having to pass it around as a function parameter.
+
+      This uses a `contextvars.ContextVar` as the reference to the current instance
+  '''
+
+  def __init_subclass__(cls, **kw):
+    # prepare a ContextVar for this subclass
+    cls._Contextual_instance = ContextVar(
+        f'{cls.__module__}.{cls.__name__} current instance'
+    )
+    super().__init_subclass__(*kw)
+
+  def __enter_exit__(self):
+    ''' Use as a context manager makes this instance the default instance for the duration.
+    '''
+    token = self.__class__._Contextual_instance.set(self)
+    # using the token as a context manager only arrived in 3.14
+    # so doing it the hard way for now
+    try:
+      yield self
+    finally:
+      self.__class__._Contextual_instance.reset(token)
+
+  @classmethod
+  def current(cls) -> Self | None:
+    ''' Return the current instance, or `None` if one is not set
+        on the current context.
+    '''
+    try:
+      return cls._Contextual_instance.get()
+    except LookupError:
+      return None
+
+  #classmetho
+  def default(cls, *, factory: Callable[[], Self] | None = None) -> Self:
+    ''' Obtain the default instance of this class from the context.
+        If one has not been made, `factory()` is called to obtain it.
+        If `factory` is not specified, `cls()` is used.
+        If a new instance was made, it is set as the default instance;
+        a second call to this method with the same context will
+        return the same instance.
+    '''
+    try:
+      self = cls._Contextual_instance.get()
+    except LookupError:
+      if factory is None:
+        factory = cls
+      self = factory()
+      cls._Contextual_instance.set(self)
+    return self
+
+  async def as_coro(self, func, *func_a, _no_start=False, **func_kw):
+    ''' Call `func(*func_a,**func_kw)` with `self` as the default instance.
+        Return an awaitable for its result.
+        If the special parameter `_no_start` is specified as true,
+        do not call the function, just return the corroutine.
+    '''
+    async_func = afunc(func)
+
+    async def bg_func():
+      with self:
+        return await async_func(*func_a, **func_kw)
+
+    coro = bg_func()
+    if _no_start:
+      return coro
+    return await coro
+
+  def as_thread(self, func, *func_a, _no_start=False, **func_kw):
+    ''' Dispatch `func(*func_a,**func)` in a Thread whose context
+        has `self` as the default instance.
+    '''
+    T0 = current_thread()
+    thread_name = f'{getattr(func,"__name__",str(func))}(....) from Thread:{T0.ident}:{T0.name!r})'
+    new_context = copy_context()
+
+    def bg_func():
+      with self:
+        return func(*func_a, **func_kw)
+
+    T = Thread(name=thread_name, target=lambda: new_context.run(bg_func))
+    if not _no_start:
+      T.start()
+    return T
